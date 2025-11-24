@@ -15,11 +15,6 @@
 
 use std::{fmt, hash::Hasher, sync::Arc, time::Duration};
 
-use config::{
-    FxIndexMap,
-    meta::promql::NAME_LABEL,
-    utils::{json, sort::sort_float},
-};
 use hashbrown::HashSet;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -27,6 +22,12 @@ use serde::{
     Deserialize, Serialize,
     de::{Deserializer, SeqAccess, Visitor},
     ser::{SerializeSeq, SerializeStruct, Serializer},
+};
+
+use crate::{
+    FxIndexMap,
+    meta::promql::NAME_LABEL,
+    utils::{json, sort::sort_float},
 };
 
 // https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels
@@ -140,7 +141,7 @@ impl LabelsExt for Labels {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, PartialOrd, Serialize)]
 pub struct Label {
     pub name: String,
     pub value: String,
@@ -223,12 +224,12 @@ impl<'de> Deserialize<'de> for Sample {
 }
 
 impl Sample {
-    pub(crate) fn new(timestamp: i64, value: f64) -> Self {
+    pub fn new(timestamp: i64, value: f64) -> Self {
         Self { timestamp, value }
     }
 
     #[allow(dead_code)]
-    pub(crate) fn is_nan(&self) -> bool {
+    pub fn is_nan(&self) -> bool {
         self.value.is_nan()
     }
 }
@@ -548,7 +549,7 @@ impl<'de> Deserialize<'de> for RangeValue {
 }
 
 impl RangeValue {
-    pub(crate) fn new<S>(labels: Labels, samples: S) -> Self
+    pub fn new<S>(labels: Labels, samples: S) -> Self
     where
         S: IntoIterator<Item = Sample>,
     {
@@ -560,7 +561,7 @@ impl RangeValue {
         }
     }
 
-    pub(crate) fn new_with_exemplars<S>(labels: Labels, exemplars: S) -> Self
+    pub fn new_with_exemplars<S>(labels: Labels, exemplars: S) -> Self
     where
         S: IntoIterator<Item = Arc<Exemplar>>,
     {
@@ -574,7 +575,7 @@ impl RangeValue {
 }
 
 #[derive(Debug)]
-pub(crate) enum ExtrapolationKind {
+pub enum ExtrapolationKind {
     /// Calculate the per-second average rate of increase of the time series.
     /// Adjust for breaks in monotonicity (counter resets).
     /// Should only be used with counters.
@@ -609,7 +610,7 @@ pub(crate) enum ExtrapolationKind {
 ///
 /// Panics if the samples are not in the range.
 // cf. https://github.com/prometheus/prometheus/blob/80b7f73d267a812b3689321554aec637b75f468d/promql/functions.go#L67
-pub(crate) fn extrapolated_rate(
+pub fn extrapolated_rate(
     samples: &[Sample],
     eval_ts: i64,
     range: Duration,
@@ -734,14 +735,14 @@ pub enum Value {
 }
 
 impl Value {
-    pub(crate) fn get_ref_matrix_values(&self) -> Option<&Vec<RangeValue>> {
+    pub fn get_ref_matrix_values(&self) -> Option<&Vec<RangeValue>> {
         match self {
             Value::Matrix(values) => Some(values),
             _ => None,
         }
     }
 
-    pub(crate) fn get_range_values(self) -> Option<Vec<RangeValue>> {
+    pub fn get_range_values(self) -> Option<Vec<RangeValue>> {
         match self {
             Value::Matrix(values) => Some(values),
             _ => None,
@@ -749,21 +750,21 @@ impl Value {
     }
 
     #[allow(dead_code)]
-    pub(crate) fn get_vector(&self) -> Option<&Vec<InstantValue>> {
+    pub fn get_vector(&self) -> Option<&Vec<InstantValue>> {
         match self {
             Value::Vector(values) => Some(values),
             _ => None,
         }
     }
 
-    pub(crate) fn get_string(&self) -> Option<String> {
+    pub fn get_string(&self) -> Option<String> {
         match self {
             Value::String(v) => Some(v.into()),
             _ => None,
         }
     }
 
-    pub(crate) fn get_float(&self) -> Option<f64> {
+    pub fn get_float(&self) -> Option<f64> {
         match self {
             Value::Float(f) => Some(*f),
             _ => None,
@@ -789,9 +790,13 @@ impl Value {
             }
             Value::Matrix(v) => {
                 v.sort_by(|a, b| {
-                    let a = a.samples.iter().map(|x| x.value).sum::<f64>();
-                    let b = b.samples.iter().map(|x| x.value).sum::<f64>();
-                    sort_float(&b, &a)
+                    if a.labels > b.labels {
+                        std::cmp::Ordering::Greater
+                    } else if a.labels < b.labels {
+                        std::cmp::Ordering::Less
+                    } else {
+                        std::cmp::Ordering::Equal
+                    }
                 });
             }
             _ => {}
@@ -847,7 +852,7 @@ pub fn signature(labels: &Labels) -> u64 {
 /// matching `names`.
 // REFACTORME: make this a method of `Metric`
 pub fn signature_without_labels(labels: &Labels, exclude_names: &[&str]) -> u64 {
-    let mut hasher = config::utils::hash::gxhash::new_hasher();
+    let mut hasher = crate::utils::hash::gxhash::new_hasher();
     labels
         .iter()
         .filter(|item| !exclude_names.contains(&item.name.as_str()))
@@ -1354,20 +1359,30 @@ mod tests {
         }
 
         let mut matrix = Value::Matrix(vec![
-            RangeValue::new(vec![], vec![Sample::new(1000, 1.0), Sample::new(2000, 1.0)]), /* sum = 2.0 */
-            RangeValue::new(vec![], vec![Sample::new(1000, 2.0), Sample::new(2000, 3.0)]), /* sum = 5.0 */
-            RangeValue::new(vec![], vec![Sample::new(1000, 1.5), Sample::new(2000, 1.5)]), /* sum = 3.0 */
+            RangeValue::new(
+                vec![Arc::new(Label::new("k1", "v1"))],
+                vec![Sample::new(1000, 1.0), Sample::new(2000, 1.0)],
+            ), // sum = 2.0
+            RangeValue::new(
+                vec![Arc::new(Label::new("k1", "v3"))],
+                vec![Sample::new(1000, 2.0), Sample::new(2000, 3.0)],
+            ), // sum = 5.0
+            RangeValue::new(
+                vec![Arc::new(Label::new("k1", "v2"))],
+                vec![Sample::new(1000, 1.5), Sample::new(2000, 1.5)],
+            ), // sum = 3.0
         ]);
 
+        // we sort by alphabetical order of labels
         matrix.sort();
 
         if let Value::Matrix(ref m) = matrix {
             let sum0: f64 = m[0].samples.iter().map(|s| s.value).sum();
             let sum1: f64 = m[1].samples.iter().map(|s| s.value).sum();
             let sum2: f64 = m[2].samples.iter().map(|s| s.value).sum();
-            assert_eq!(sum0, 5.0); // Highest sum first
+            assert_eq!(sum0, 2.0);
             assert_eq!(sum1, 3.0);
-            assert_eq!(sum2, 2.0); // Lowest sum last
+            assert_eq!(sum2, 5.0);
         }
     }
 

@@ -15,12 +15,10 @@
 
 use std::time::Duration;
 
+use config::meta::promql::value::{EvalContext, Sample, Value};
 use datafusion::error::Result;
 
-use crate::service::promql::{
-    functions::RangeFunc,
-    value::{EvalContext, Sample, Value},
-};
+use crate::service::promql::functions::RangeFunc;
 
 pub(crate) fn idelta(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     super::eval_range(data, IdeltaFunc::new(), eval_ctx)
@@ -53,8 +51,9 @@ impl RangeFunc for IdeltaFunc {
 mod tests {
     use std::time::Duration;
 
+    use config::meta::promql::value::{Labels, RangeValue, TimeWindow};
+
     use super::*;
-    use crate::service::promql::value::{Labels, RangeValue, TimeWindow};
     // Test helper
     fn idelta_test_helper(data: Value) -> Result<Value> {
         let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
@@ -65,9 +64,9 @@ mod tests {
     fn test_idelta_function() {
         // Create a range value with sample data
         let samples = vec![
-            crate::service::promql::value::Sample::new(1000, 10.0),
-            crate::service::promql::value::Sample::new(2000, 15.0),
-            crate::service::promql::value::Sample::new(3000, 25.0),
+            Sample::new(1000, 10.0),
+            Sample::new(2000, 15.0),
+            Sample::new(3000, 25.0),
         ];
 
         let range_value = RangeValue {

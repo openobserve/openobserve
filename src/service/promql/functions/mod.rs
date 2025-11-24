@@ -15,15 +15,13 @@
 
 use std::{collections::HashSet, time::Duration};
 
+use config::meta::promql::value::{EvalContext, LabelsExt, RangeValue, Sample, Value};
 use datafusion::error::{DataFusionError, Result};
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use strum::EnumString;
 
-use crate::service::promql::{
-    micros,
-    value::{EvalContext, LabelsExt, RangeValue, Sample, Value},
-};
+use crate::service::promql::micros;
 
 mod absent;
 mod absent_over_time;
@@ -48,6 +46,7 @@ mod predict_linear;
 mod quantile_over_time;
 mod rate;
 mod resets;
+mod scalar;
 mod stddev_over_time;
 mod stdvar_over_time;
 mod sum_over_time;
@@ -77,6 +76,7 @@ pub(crate) use predict_linear::predict_linear;
 pub(crate) use quantile_over_time::quantile_over_time;
 pub(crate) use rate::rate;
 pub(crate) use resets::resets;
+pub(crate) use scalar::scalar;
 pub(crate) use stddev_over_time::stddev_over_time;
 pub(crate) use stdvar_over_time::stdvar_over_time;
 pub(crate) use sum_over_time::sum_over_time;

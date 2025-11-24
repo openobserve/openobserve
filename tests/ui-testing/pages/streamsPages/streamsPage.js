@@ -362,6 +362,49 @@ export class StreamsPage {
         await this.waitForUI(1000);
     }
 
+    // Extended Retention Methods
+    async navigateToExtendedRetention() {
+        // First open the stream detail view
+        await this.page.getByRole('button', { name: 'Stream Detail' }).first().click();
+        await this.waitForUI(2000);
+        
+        // Navigate to Extended Retention tab directly
+        await this.page.getByText('Extended Retention').click();
+        await this.waitForUI(1000);
+    }
+
+    async selectDateRange(startDay, endDay) {
+        await this.page.locator('[data-test="date-time-btn"]').click();
+        
+        // Use specific calendar locators to avoid strict mode violation
+        await this.page.locator('.q-date__calendar .q-btn').filter({ hasText: startDay.toString() }).first().click();
+        await this.page.locator('.q-date__calendar .q-btn').filter({ hasText: endDay.toString() }).first().click();
+        
+        await this.page.locator('[data-test="date-time-apply-btn"]').click();
+    }
+
+    async selectDateRangeForCurrentMonth() {
+        const currentDate = new Date();
+        const currentDay = currentDate.getDate();
+        const endDay = Math.min(currentDay + 5, 28); // Select a date 5 days later or 28th, whichever is smaller
+        
+        await this.selectDateRange(currentDay, endDay);
+        
+        // Return the date range text for later use
+        return `${currentDay.toString().padStart(2, '0')}-${(currentDate.getMonth() + 1).toString().padStart(2, '0')}-${currentDate.getFullYear()} ${endDay.toString().padStart(2, '0')}-${(currentDate.getMonth() + 1).toString().padStart(2, '0')}-${currentDate.getFullYear()}`;
+    }
+
+    async deleteRetentionPeriod(dateRangeText) {
+        // Select the checkbox for deletion
+        await this.page.getByRole('row', { name: dateRangeText }).locator('[data-test="schema-stream-delete-undefined-field-fts-key-checkbox"]').click();
+        await this.page.locator('[data-test="schema-delete-button"]').click();
+        await this.page.locator('[data-test="confirm-button"]').click();
+    }
+
+    async expectStreamSettingsUpdatedMessage() {
+        await expect(this.page.getByText('Stream settings updated')).toBeVisible();
+    }
+
     async waitForUI(milliseconds) {
         await this.page.waitForTimeout(milliseconds);
     }

@@ -66,7 +66,7 @@ describe("AddGroup Component", () => {
     it("displays the correct title", () => {
       const titleElement = wrapper.find('[data-test="add-group-section-title"]');
       expect(titleElement.exists()).toBe(true);
-      expect(titleElement.text()).toContain("Add User Group");
+      expect(titleElement.text()).toContain("New user group");
     });
   });
 

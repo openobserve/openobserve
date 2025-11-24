@@ -186,9 +186,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             Custom logo text is used to change the default branding text displayed in the application.
           </span>
         </div>
+        <!-- Light Mode Logo -->
         <div class="settings-grid-item q-ml-xs">
-          <div class="q-pt-sm individual-setting-title  full-width tw-mb-5">
-            {{ t("settings.customLogoTitle") }}
+          <div class="q-pt-sm individual-setting-title full-width tw-mb-5">
+            {{ t("settings.customLogoTitle") }} (Light Mode)
           </div>
           <div
             v-if="
@@ -209,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               icon="delete"
               data-test="setting_ent_custom_logo_img_delete_btn"
-              @click="confirmDeleteLogo()"
+              @click="confirmDeleteLogo('light')"
               class="q-mx-md"
               size="sm"
             ></q-btn>
@@ -217,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else class="tw-flex tw-items-center tw-gap-3">
             <q-file
             data-test="setting_ent_custom_logo_img_file_upload"
-            v-model="files"
+            v-model="filesLight"
             :label="'Drag & drop or click to upload'"
             counter
             :counter-label="counterLabelFn"
@@ -241,10 +242,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon="close"
                 dense
                 size="sm"
-                @click="files = null"
+                @click="filesLight = null"
               ></q-btn>
               <q-btn
-                data-test="settings_ent_logo_custom_text_save_btn"
+                data-test="settings_ent_logo_custom_light_save_btn"
                 :loading="onSubmit.isLoading.value"
                 icon="check"
                 class="q-mr-sm "
@@ -253,13 +254,92 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 color="primary"
                 type="submit"
                 no-caps
-                @click="uploadImage(files)"
+                @click="uploadImage(filesLight, 'light')"
               />
             </div>
           </div>
           <div class="tw-flex tw-flex-col tw-mb-5">
             <span class="individual-setting-description">
-              Custom logo is used to change the default branding logo displayed in the application.
+              Custom logo for light mode theme. This will be displayed when users are in light mode.
+            </span>
+          </div>
+        </div>
+
+        <!-- Dark Mode Logo -->
+        <div class="settings-grid-item q-ml-xs">
+          <div class="q-pt-sm individual-setting-title full-width tw-mb-5">
+            {{ t("settings.customLogoTitle") }} (Dark Mode)
+          </div>
+          <div
+            v-if="
+              store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
+              store.state.zoConfig.custom_logo_dark_img != null
+            "
+            class="full-width"
+          >
+            <q-img
+              data-test="setting_ent_custom_logo_dark_img"
+              :src="
+                `data:image; base64, ` + store.state.zoConfig.custom_logo_dark_img
+              "
+              :alt="t('settings.logoLabel')"
+              style="max-width: 150px; max-height: 31px"
+              class="q-mx-md"
+            />
+            <q-btn
+              icon="delete"
+              data-test="setting_ent_custom_logo_dark_img_delete_btn"
+              @click="confirmDeleteLogo('dark')"
+              class="q-mx-md"
+              size="sm"
+            ></q-btn>
+          </div>
+          <div v-else class="tw-flex tw-items-center tw-gap-3">
+            <q-file
+            data-test="setting_ent_custom_logo_dark_img_file_upload"
+            v-model="filesDark"
+            :label="'Drag & drop or click to upload'"
+            counter
+            :counter-label="counterLabelFn"
+            max-file-size="20481"
+            accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
+            @rejected="onRejected"
+            dense
+            borderless
+            class="q-mx-none o2-file-input tw-w-[250px] "
+          >
+            <template v-slot:prepend>
+              <q-icon name="attach_file" />
+            </template>
+          </q-file>
+          <div class="btn-group tw-flex tw-h-[28px] tw-mb-5">
+              <q-btn
+                type="button"
+                class="q-mr-sm"
+                no-caps
+                color="red"
+                icon="close"
+                dense
+                size="sm"
+                @click="filesDark = null"
+              ></q-btn>
+              <q-btn
+                data-test="settings_ent_logo_custom_dark_save_btn"
+                :loading="onSubmit.isLoading.value"
+                icon="check"
+                class="q-mr-sm "
+                dense
+                size="sm"
+                color="primary"
+                type="submit"
+                no-caps
+                @click="uploadImage(filesDark, 'dark')"
+              />
+            </div>
+          </div>
+          <div class="tw-flex tw-flex-col tw-mb-5">
+            <span class="individual-setting-description">
+              Custom logo for dark mode theme. This will be displayed when users are in dark mode.
             </span>
           </div>
         </div>
@@ -343,9 +423,10 @@ export default defineComponent({
     },
     confirmDialogOK() {
       this.confirmDeleteImage = false;
-      this.deleteLogo();
+      this.deleteLogo(this.logoThemeToDelete);
     },
-    confirmDeleteLogo() {
+    confirmDeleteLogo(theme: string) {
+      this.logoThemeToDelete = theme;
       this.confirmDeleteImage = true;
     },
   },
@@ -366,6 +447,9 @@ export default defineComponent({
     const customText = ref("");
     const editingText = ref(false);
     const files = ref(null);
+    const filesLight = ref(null);
+    const filesDark = ref(null);
+    const logoThemeToDelete = ref<string>('light');
 
     customText.value = store.state.zoConfig.custom_logo_text;
 
@@ -506,7 +590,7 @@ export default defineComponent({
       }
     });
 
-    const uploadImage = (fileList: any = null) => {
+    const uploadImage = (fileList: any = null, theme: string = 'light') => {
       const selectedFiles = fileList || files.value;
       // Handle single file or file array
       //but mostly we will support single file because we only show one image at a time right
@@ -518,7 +602,7 @@ export default defineComponent({
           fileToUpload = selectedFiles;
         }
       }
-      
+
       if (config.isEnterprise == "true" && fileToUpload) {
         loadingState.value = true;
         const formData = new FormData();
@@ -533,12 +617,13 @@ export default defineComponent({
           .createLogo(
             store.state.selectedOrganization?.identifier || orgIdentifier,
             formData,
+            theme,
           )
           .then(async (res) => {
             if (res.status == 200) {
               q.notify({
                 type: "positive",
-                message: "Logo updated successfully.",
+                message: `${theme === 'dark' ? 'Dark mode' : 'Light mode'} logo updated successfully.`,
                 timeout: 2000,
               });
 
@@ -546,6 +631,12 @@ export default defineComponent({
                 store.dispatch("setConfig", res.data);
               });
 
+              // Clear the appropriate file ref
+              if (theme === 'dark') {
+                filesDark.value = null;
+              } else {
+                filesLight.value = null;
+              }
               files.value = null;
             } else {
               q.notify({
@@ -580,7 +671,7 @@ export default defineComponent({
       }
     };
 
-    const deleteLogo = () => {
+    const deleteLogo = (theme: string = 'light') => {
       loadingState.value = true;
       let orgIdentifier = "default";
       for (let item of store.state.organizations) {
@@ -591,12 +682,13 @@ export default defineComponent({
       settingsService
         .deleteLogo(
           store.state.selectedOrganization?.identifier || orgIdentifier,
+          theme,
         )
         .then(async (res: any) => {
           if (res.status == 200) {
             q.notify({
               type: "positive",
-              message: "Logo deleted successfully.",
+              message: `${theme === 'dark' ? 'Dark mode' : 'Light mode'} logo deleted successfully.`,
               timeout: 2000,
             });
 
@@ -818,6 +910,9 @@ export default defineComponent({
       scrapeIntereval,
       onSubmit,
       files,
+      filesLight,
+      filesDark,
+      logoThemeToDelete,
       counterLabelFn(CounterLabelParams: { filesNumber: any; totalSize: any }) {
         return `(Only .png, .jpg, .jpeg, .gif, .bmp formats & size <=20kb & Max Size: 150x30px) ${CounterLabelParams.filesNumber} file | ${CounterLabelParams.totalSize}`;
       },

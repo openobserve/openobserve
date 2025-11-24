@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::utils::sort::sort_float;
-
-use super::value::Sample;
+use config::{meta::promql::value::Sample, utils::sort::sort_float};
 
 /// Calculate mean over a slice of f64s
 pub fn mean(data: &[f64]) -> Option<f64> {

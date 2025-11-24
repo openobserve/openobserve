@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-tabs>
       </q-card-section>
 
-      <q-card-section class="q-pt-none scroll-content">
+      <q-card-section class="q-pt-none scroll-content-predefined-themes">
         <q-tab-panels v-model="activeTab" animated>
           <!-- Light Mode Themes -->
           <q-tab-panel name="light" class="q-pa-none">
@@ -642,7 +642,7 @@ const resetToDefaultTheme = () => {
 </script>
 
 <style scoped>
-.scroll-content {
+.scroll-content-predefined-themes {
   max-height: calc(100vh - 100px);
   overflow-y: auto;
 }

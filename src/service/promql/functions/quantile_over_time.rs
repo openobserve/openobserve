@@ -15,13 +15,10 @@
 
 use std::time::Duration;
 
+use config::meta::promql::value::{EvalContext, Sample, Value};
 use datafusion::error::Result;
 
-use crate::service::promql::{
-    common::quantile,
-    functions::RangeFunc,
-    value::{EvalContext, Sample, Value},
-};
+use crate::service::promql::{common::quantile, functions::RangeFunc};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#quantile_over_time
 pub(crate) fn quantile_over_time(

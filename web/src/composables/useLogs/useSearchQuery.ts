@@ -40,9 +40,10 @@ export const useSearchQuery = () => {
     addTransformToQuery,
     updateUrlQueryParams,
     fnUnparsedSQL,
+    checkTimestampAlias,
   } = logsUtils();
 
-  const { searchObj, notificationMsg, initialQueryPayload } = searchState();
+  const { searchObj, notificationMsg, initialQueryPayload, searchAggData } = searchState();
 
   const getQueryReq = (isPagination: boolean): SearchRequestPayload | null => {
     if (!isPagination) {
@@ -53,6 +54,10 @@ export const useSearchQuery = () => {
     searchObj.meta.searchApplied = true;
     searchObj.data.functionError = "";
 
+
+    searchAggData.total = 0;
+    searchAggData.hasAggregation = false;
+       
     if (
       !searchObj.data.stream.streamLists?.length ||
       searchObj.data.stream.selectedStream.length == 0
@@ -61,16 +66,8 @@ export const useSearchQuery = () => {
       return null;
     }
 
-    if (
-      Number.isNaN(searchObj.data.datetime.endTime) ||
-      Number.isNaN(searchObj.data.datetime.startTime)
-    ) {
-      const period =
-        (router.currentRoute.value?.query?.period as string) || "15m";
-      const extractedDate: any = extractTimestamps(period);
-      searchObj.data.datetime.startTime = extractedDate.from;
-      searchObj.data.datetime.endTime = extractedDate.to;
-    }
+    if (Number.isNaN(searchObj.data.datetime.endTime))   searchObj.data.datetime.endTime = "Invalid Date"
+    if (Number.isNaN(searchObj.data.datetime.startTime)) searchObj.data.datetime.startTime = "Invalid Date"
 
     const queryReq: SearchRequestPayload = buildSearch();
 
@@ -278,6 +275,8 @@ export const useSearchQuery = () => {
         setChartInterval(req);
       } else {
         notificationMsg.value = "Invalid date format";
+        if(timestamps.startTime == "Invalid Date") notificationMsg.value = "Invalid start datetime"
+        else if(timestamps.endTime == "Invalid Date") notificationMsg.value = "Invalid end datetime"
         return null;
       }
 
@@ -329,6 +328,12 @@ export const useSearchQuery = () => {
     const parsedSQL: any = fnParsedSQL();
 
     if (parsedSQL != undefined) {
+
+     if (!checkTimestampAlias(searchObj.data.query)) {
+            const errorMsg = `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`;
+            notificationMsg.value = errorMsg;
+            return null;
+          }
 
       if (Array.isArray(parsedSQL) && parsedSQL.length == 0) {
         notificationMsg.value =

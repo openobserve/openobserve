@@ -13,13 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::promql::value::{EvalContext, RangeValue, Sample, Value};
 use datafusion::error::Result;
 use hashbrown::HashMap;
 
 use crate::service::promql::{
     aggregations::{Accumulate, AggFunc},
     common::quantile as calculate_quantile,
-    value::{EvalContext, RangeValue, Sample, Value},
 };
 
 /// Note: quantile aggregates all series into a single result (no label grouping)

@@ -186,7 +186,12 @@ async fn get(path: web::Path<String>) -> Result<HttpResponse, StdErr> {
 
 #[cfg(feature = "enterprise")]
 #[post("/{org_id}/settings/logo")]
-async fn upload_logo(mut payload: Multipart) -> Result<HttpResponse, StdErr> {
+async fn upload_logo(
+    mut payload: Multipart,
+    query: web::Query<std::collections::HashMap<String, String>>,
+) -> Result<HttpResponse, StdErr> {
+    let theme = query.get("theme").map(|s| s.to_string());
+
     match payload.try_next().await {
         Ok(field) => {
             let mut data: Vec<u8> = Vec::<u8>::new();
@@ -199,7 +204,7 @@ async fn upload_logo(mut payload: Multipart) -> Result<HttpResponse, StdErr> {
                     return Ok(MetaHttpResponse::bad_request("Image data not present"));
                 }
 
-                match settings::upload_logo(data).await {
+                match settings::upload_logo(data, theme).await {
                     Ok(_) => Ok(HttpResponse::Ok().json(serde_json::json!({"successful": "true"}))),
                     Err(e) => Ok(MetaHttpResponse::bad_request(e)),
                 }
@@ -219,8 +224,12 @@ async fn upload_logo() -> Result<HttpResponse, StdErr> {
 
 #[cfg(feature = "enterprise")]
 #[delete("/{org_id}/settings/logo")]
-async fn delete_logo() -> Result<HttpResponse, StdErr> {
-    match settings::delete_logo().await {
+async fn delete_logo(
+    query: web::Query<std::collections::HashMap<String, String>>,
+) -> Result<HttpResponse, StdErr> {
+    let theme = query.get("theme").map(|s| s.to_string());
+
+    match settings::delete_logo(theme).await {
         Ok(_) => Ok(HttpResponse::Ok().json(serde_json::json!({"successful": "true"}))),
         Err(e) => Ok(MetaHttpResponse::internal_error(e)),
     }

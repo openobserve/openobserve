@@ -13,10 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::promql::value::{LabelsExt, RangeValue, Sample, Value};
 use datafusion::error::{DataFusionError, Result};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-
-use crate::service::promql::value::{LabelsExt, RangeValue, Sample, Value};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#clamp
 pub(crate) fn clamp(data: Value, min: f64, max: f64) -> Result<Value> {
@@ -57,8 +56,9 @@ pub(crate) fn clamp(data: Value, min: f64, max: f64) -> Result<Value> {
 mod tests {
     use std::time::Duration;
 
+    use config::meta::promql::value::{Labels, RangeValue, Sample, TimeWindow, Value};
+
     use super::*;
-    use crate::service::promql::value::{Labels, RangeValue, Sample, TimeWindow, Value};
 
     // Helper function to create a matrix from sample values
     fn create_matrix(eval_ts: i64, values: Vec<f64>) -> Value {

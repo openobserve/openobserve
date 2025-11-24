@@ -19,7 +19,7 @@ const store = createStore({
   state: {
     API_ENDPOINT: "http://localhost:5080",
     isAiChatEnabled: false,
-    
+
     theme: "dark",
     timezone: "UTC",
     selectedOrganization: {
@@ -46,7 +46,7 @@ const store = createStore({
       iat: 1678689753,
       family_name: "example",
       email: "example@gmail.com",
-    },  
+    },
     savedViewDialog: false,
     regionInfo: [],
     zoConfig: {
@@ -62,6 +62,7 @@ const store = createStore({
       user_defined_schemas_enabled: true,
       super_cluster_enabled: false,
       query_on_stream_selection: false,
+      query_values_default_num: 10,
       meta_org: "default",
       default_functions: [
         {
@@ -106,11 +107,11 @@ const store = createStore({
       },
       isDataIngested: false,
       allDashboardData: {},
-      foldersByType:[],
+      foldersByType: [],
     },
-    streams:{
-      logs:{
-        
+    streams: {
+      logs: {
+
       }
     }
 

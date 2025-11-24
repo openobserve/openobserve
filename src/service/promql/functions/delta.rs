@@ -15,12 +15,12 @@
 
 use std::time::Duration;
 
+use config::meta::promql::value::{
+    EvalContext, ExtrapolationKind, Sample, Value, extrapolated_rate,
+};
 use datafusion::error::Result;
 
-use crate::service::promql::{
-    functions::RangeFunc,
-    value::{EvalContext, ExtrapolationKind, Sample, Value, extrapolated_rate},
-};
+use crate::service::promql::functions::RangeFunc;
 
 pub(crate) fn delta(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     super::eval_range(data, DeltaFunc::new(), eval_ctx)

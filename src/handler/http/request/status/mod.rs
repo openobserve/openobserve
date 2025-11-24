@@ -58,7 +58,7 @@ use {
     o2_enterprise::enterprise::common::{
         auditor::{AuditMessage, Protocol, ResponseMeta},
         config::{get_config as get_o2_config, refresh_config as refresh_o2_config},
-        settings::{get_logo, get_logo_text},
+        settings::{get_logo, get_logo_dark, get_logo_text},
     },
     o2_openfga::config::{
         get_config as get_openfga_config, refresh_config as refresh_openfga_config,
@@ -122,6 +122,7 @@ struct ConfigResponse<'a> {
     custom_docs_url: String,
     rum: Rum,
     custom_logo_img: Option<String>,
+    custom_logo_dark_img: Option<String>,
     custom_hide_menus: String,
     custom_hide_self_logo: bool,
     meta_org: String,
@@ -152,6 +153,7 @@ struct ConfigResponse<'a> {
     #[cfg(feature = "enterprise")]
     ingestion_quota_used: f64,
     log_page_default_field_list: String,
+    query_values_default_num: i64,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -284,6 +286,12 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let logo = None;
 
     #[cfg(feature = "enterprise")]
+    let logo_dark = get_logo_dark().await;
+
+    #[cfg(not(feature = "enterprise"))]
+    let logo_dark = None;
+
+    #[cfg(feature = "enterprise")]
     let custom_hide_menus = &o2cfg.common.custom_hide_menus;
     #[cfg(not(feature = "enterprise"))]
     let custom_hide_menus = "";
@@ -356,6 +364,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         custom_slack_url: custom_slack_url.to_string(),
         custom_docs_url: custom_docs_url.to_string(),
         custom_logo_img: logo,
+        custom_logo_dark_img: logo_dark,
         custom_hide_menus: custom_hide_menus.to_string(),
         custom_hide_self_logo,
         rum: Rum {
@@ -398,6 +407,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         license_server_url,
         #[cfg(feature = "enterprise")]
         ingestion_quota_used,
+        query_values_default_num: cfg.limit.query_values_default_num,
     }))
 }
 
@@ -511,6 +521,63 @@ pub async fn config_reload() -> Result<HttpResponse, Error> {
     })
     .await;
     Ok(HttpResponse::Ok().json(serde_json::json!({"status": status})))
+}
+
+fn hide_sensitive_fields(mut value: serde_json::Value) -> serde_json::Value {
+    if let Some(obj) = value.as_object_mut() {
+        for (key, val) in obj.iter_mut() {
+            let key_lower = key.to_lowercase();
+
+            // Simple rule: contains any of these sensitive keywords
+            let is_sensitive = key_lower.contains("password")
+                || key_lower.contains("secret")
+                || key_lower.contains("key")
+                || key_lower.contains("auth")
+                || key_lower.contains("token")
+                || key_lower.contains("credential");
+
+            if is_sensitive {
+                if let Some(s) = val.as_str() {
+                    *val = if s.is_empty() {
+                        serde_json::Value::String("[not set]".to_string())
+                    } else {
+                        serde_json::Value::String("[hidden]".to_string())
+                    };
+                }
+            } else if val.is_object() {
+                *val = hide_sensitive_fields(val.clone());
+            }
+        }
+    }
+    value
+}
+
+#[get("/runtime")]
+pub async fn config_runtime() -> Result<HttpResponse, Error> {
+    let cfg = get_config();
+    let mut config_value = serde_json::to_value(cfg.as_ref())
+        .map_err(|e| Error::other(format!("Failed to serialize config: {e}")))?;
+
+    config_value = hide_sensitive_fields(config_value);
+
+    let mut final_response = serde_json::Map::new();
+    final_response.insert(
+        "_metadata".to_string(),
+        json::json!({
+            "version": config::VERSION,
+            "commit_hash": config::COMMIT_HASH,
+            "build_date": config::BUILD_DATE,
+            "instance_id": get_instance_id(),
+        }),
+    );
+
+    if let Some(config_obj) = config_value.as_object() {
+        for (key, value) in config_obj {
+            final_response.insert(key.clone(), value.clone());
+        }
+    }
+
+    Ok(HttpResponse::Ok().json(final_response))
 }
 
 async fn get_stream_schema_status() -> (usize, usize, usize) {
@@ -945,14 +1012,13 @@ async fn enable_node(
 
             // If this is an ingester node, set draining mode and flush
             if LOCAL_NODE.is_ingester() {
-                // Set draining flag to trigger immediate S3 upload
-                o2_enterprise::enterprise::drain::set_draining(true);
-
                 // Flush memory to WAL
                 if let Err(e) = ingester::flush_all().await {
                     log::error!("[NODE] Error flushing ingester during disable: {e}");
                     return Ok(MetaHttpResponse::internal_error(e));
                 }
+                // Set draining flag to trigger immediate S3 upload after flush memory to disk
+                o2_enterprise::enterprise::drain::set_draining(true);
                 log::info!("[NODE] Ingester flushed successfully, S3 upload will be prioritized");
             }
         }

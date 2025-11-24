@@ -22,6 +22,7 @@ use config::{
     get_config,
     meta::{
         cluster::RoleGroup,
+        promql::value::*,
         search::ScanStats,
         self_reporting::usage::{RequestStats, UsageType},
         stream::StreamType,
@@ -45,7 +46,7 @@ use crate::{
     service::{
         promql::{
             DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, MetricsQueryRequest, adjust_start_end,
-            micros, value::*,
+            micros,
         },
         search::server_internal_error,
         self_reporting::report_request_usage_stats,
@@ -101,7 +102,7 @@ async fn search_in_cluster(
     let cache_disabled =
         !cfg.common.metrics_cache_enabled || !req.use_cache || start == end || step == 0;
     // adjust start and end time
-    let (start, end) = adjust_start_end(start, end, step, cache_disabled);
+    let (start, end) = adjust_start_end(start, end, step);
 
     log::info!(
         "[trace_id {trace_id}] promql->search->start: org_id: {}, use_cache: {}, time_range: [{},{}), step: {}, query: {}",
@@ -131,11 +132,8 @@ async fn search_in_cluster(
 
     // The number of resolution steps; see the diagram at
     // https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#range-queries
-    let partition_step = max(micros(DEFAULT_LOOKBACK), step);
-    let nr_steps = match (end - start) / partition_step {
-        0 => 1,
-        n => n,
-    };
+    let partition_step = max(micros(DEFAULT_LOOKBACK) * 2, step);
+    let nr_steps = (end - start + partition_step - 1) / partition_step;
 
     // get cache data
     let original_start = start;
@@ -387,7 +385,7 @@ fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
         });
         merged_metrics.insert(signature(&labels), labels);
     }
-    let mut merged_data = merged_data
+    let merged_data = merged_data
         .into_iter()
         .map(|(sig, samples)| {
             let mut samples = samples
@@ -398,16 +396,9 @@ fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
                 })
                 .collect::<Vec<_>>();
             samples.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-            (
-                sig,
-                RangeValue::new(merged_metrics.get(&sig).unwrap().to_owned(), samples),
-            )
+            RangeValue::new(merged_metrics.get(&sig).unwrap().to_owned(), samples)
         })
         .collect::<Vec<_>>();
-    // sort by signature
-    merged_data.sort_by(|a, b| a.0.cmp(&b.0));
-    let merged_data = merged_data.into_iter().map(|(_, v)| v).collect::<Vec<_>>();
-
     let mut value = Value::Matrix(merged_data);
     value.sort();
     value

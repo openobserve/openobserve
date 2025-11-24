@@ -19,7 +19,7 @@ use arrow::array::Array;
 use async_recursion::async_recursion;
 use config::{
     TIMESTAMP_COL_NAME,
-    meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
+    meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL, value::*},
     utils::{
         hash::{Sum64, gxhash},
         json,
@@ -53,8 +53,9 @@ use super::{
     utils::{apply_label_selector, apply_matchers},
 };
 use crate::service::promql::{
-    aggregations, binaries, functions, micros, rewrite::remove_filter_all, value::*,
+    aggregations, binaries, functions, micros, rewrite::remove_filter_all,
 };
+
 type TokioResult = tokio::task::JoinHandle<Result<(HashMap<u64, Vec<Sample>>, HashSet<i64>)>>;
 type TokioExemplarsResult =
     tokio::task::JoinHandle<Result<(HashMap<u64, Vec<Arc<Exemplar>>>, HashSet<i64>)>>;
@@ -1083,14 +1084,7 @@ impl Engine {
             Func::Rate => functions::rate(input, &self.eval_ctx)?,
             Func::Resets => functions::resets(input, &self.eval_ctx)?,
             Func::Round => functions::round(input)?,
-            Func::Scalar => match input {
-                Value::Float(_) => input,
-                _ => {
-                    return Err(DataFusionError::NotImplemented(format!(
-                        "Invalid scalar value: {input:?}"
-                    )));
-                }
-            },
+            Func::Scalar => functions::scalar(input, &self.eval_ctx)?,
             Func::Sgn => functions::sgn(input)?,
             Func::Sort => {
                 return Err(DataFusionError::NotImplemented(format!(

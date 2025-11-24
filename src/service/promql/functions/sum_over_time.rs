@@ -15,12 +15,10 @@
 
 use std::time::Duration;
 
+use config::meta::promql::value::{EvalContext, Sample, Value};
 use datafusion::error::Result;
 
-use crate::service::promql::{
-    functions::RangeFunc,
-    value::{EvalContext, Sample, Value},
-};
+use crate::service::promql::functions::RangeFunc;
 
 pub(crate) fn sum_over_time(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     super::eval_range(data, SumOverTimeFunc::new(), eval_ctx)

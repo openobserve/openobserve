@@ -13,14 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::promql::value::{EvalContext, Sample, Value};
 use datafusion::error::Result;
 use hashbrown::HashMap;
 use promql_parser::parser::LabelModifier;
 
-use crate::service::promql::{
-    aggregations::{Accumulate, AggFunc},
-    value::{EvalContext, Sample, Value},
-};
+use crate::service::promql::aggregations::{Accumulate, AggFunc};
 
 /// Aggregates Matrix input for range queries
 pub fn sum(param: &Option<LabelModifier>, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
@@ -81,10 +79,10 @@ impl Accumulate for SumAccumulate {
 mod tests {
     use std::sync::Arc;
 
+    use config::meta::promql::value::{Label, RangeValue, Sample, Value};
     use promql_parser::parser::LabelModifier;
 
     use super::*;
-    use crate::service::promql::value::{Label, RangeValue, Sample, Value};
 
     #[test]
     fn test_sum_range_function() {

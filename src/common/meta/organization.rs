@@ -340,6 +340,18 @@ pub struct OrganizationSetting {
 
 impl Default for OrganizationSetting {
     fn default() -> Self {
+        let cfg = config::get_config();
+        let light_mode_theme_color = if cfg.common.default_theme_light_mode_color.is_empty() {
+            None
+        } else {
+            Some(cfg.common.default_theme_light_mode_color.clone())
+        };
+        let dark_mode_theme_color = if cfg.common.default_theme_dark_mode_color.is_empty() {
+            None
+        } else {
+            Some(cfg.common.default_theme_dark_mode_color.clone())
+        };
+
         Self {
             scrape_interval: default_scrape_interval(),
             trace_id_field_name: default_trace_id_field_name(),
@@ -349,8 +361,8 @@ impl Default for OrganizationSetting {
             enable_streaming_search: default_enable_streaming_search(),
             min_auto_refresh_interval: default_auto_refresh_interval(),
             free_trial_expiry: None,
-            light_mode_theme_color: None,
-            dark_mode_theme_color: None,
+            light_mode_theme_color,
+            dark_mode_theme_color,
             #[cfg(feature = "enterprise")]
             claim_parser_function: default_claim_parser_function(),
         }

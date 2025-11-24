@@ -29,6 +29,8 @@ export interface PayloadFormData {
   };
   stream_name: string;
   stream_type: string;
+  row_template?: string;
+  row_template_type?: string;
   uuid?: string;
   updatedAt?: string;
   createdAt?: string;

@@ -135,7 +135,7 @@ describe("EditScript", () => {
     it("should display correct title for add mode", () => {
       const title = wrapper.find('[data-test="add-action-script-title"]');
       expect(title.exists()).toBe(true);
-      expect(title.text()).toContain("Add");
+      expect(title.text()).toContain("New");
     });
 
     it("should display correct title for edit mode", async () => {

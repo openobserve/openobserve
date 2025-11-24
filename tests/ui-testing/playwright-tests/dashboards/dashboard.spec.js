@@ -9,6 +9,7 @@ import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/dashboard-time";
+import { waitForStreamComplete } from "../utils/streaming-helpers.js";
 import PageManager from "../../pages/page-manager";
 
 const randomDashboardName =
@@ -939,7 +940,14 @@ ORDER BY _time ASC`
 
     await waitForDateTimeButtonToBeEnabled(page);
     await pm.dashboardTimeRefresh.setRelative("5", "w");
+
+    // Wait for streaming to complete before checking chart
+    const streamPromise = waitForStreamComplete(page);
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await streamPromise;
+
+    // Wait for chart to render
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Verify line chart data is rendered correctly
     await page.waitForSelector('[data-test="chart-renderer"]', {
@@ -957,11 +965,14 @@ ORDER BY _time ASC`
       { timeout: 15000 }
     );
 
-    // Wait for canvas elements to be rendered
-    await page.waitForSelector('[data-test="chart-renderer"] canvas', {
-      state: "attached",
-      timeout: 15000,
-    });
+    // Wait for canvas elements to be rendered with data
+    await page.waitForFunction(
+      () => {
+        const canvases = document.querySelectorAll('[data-test="chart-renderer"] canvas');
+        return canvases.length >= 2;
+      },
+      { timeout: 15000, polling: 500 }
+    );
 
     // Validate chart is properly rendered
     const chartContainer = page.locator('[data-test="chart-renderer"]');

@@ -579,7 +579,7 @@ describe("General", () => {
       }
     });
 
-    it("should upload image successfully", async () => {
+    it("should upload image successfully with default theme", async () => {
       const mockFile = new File(["test"], "test.png", { type: "image/png" });
       const wrapper = createWrapper();
 
@@ -588,10 +588,29 @@ describe("General", () => {
       expect(mockSettingsService.createLogo).toHaveBeenCalledWith(
         "test-org",
         expect.any(FormData),
+        "light", // default theme
       );
       expect(mockNotify).toHaveBeenCalledWith({
         type: "positive",
-        message: "Logo updated successfully.",
+        message: "Light mode logo updated successfully.",
+        timeout: 2000,
+      });
+    });
+
+    it("should upload dark mode image successfully", async () => {
+      const mockFile = new File(["test"], "test-dark.png", { type: "image/png" });
+      const wrapper = createWrapper();
+
+      await wrapper.vm.uploadImage(mockFile, "dark");
+
+      expect(mockSettingsService.createLogo).toHaveBeenCalledWith(
+        "test-org",
+        expect.any(FormData),
+        "dark",
+      );
+      expect(mockNotify).toHaveBeenCalledWith({
+        type: "positive",
+        message: "Dark mode logo updated successfully.",
         timeout: 2000,
       });
     });
@@ -631,15 +650,28 @@ describe("General", () => {
       }
     });
 
-    it("should delete logo successfully", async () => {
+    it("should delete logo successfully with default theme", async () => {
       const wrapper = createWrapper();
 
       await wrapper.vm.deleteLogo();
 
-      expect(mockSettingsService.deleteLogo).toHaveBeenCalledWith("test-org");
+      expect(mockSettingsService.deleteLogo).toHaveBeenCalledWith("test-org", "light");
       expect(mockNotify).toHaveBeenCalledWith({
         type: "positive",
-        message: "Logo deleted successfully.",
+        message: "Light mode logo deleted successfully.",
+        timeout: 2000,
+      });
+    });
+
+    it("should delete dark mode logo successfully", async () => {
+      const wrapper = createWrapper();
+
+      await wrapper.vm.deleteLogo("dark");
+
+      expect(mockSettingsService.deleteLogo).toHaveBeenCalledWith("test-org", "dark");
+      expect(mockNotify).toHaveBeenCalledWith({
+        type: "positive",
+        message: "Dark mode logo deleted successfully.",
         timeout: 2000,
       });
     });
@@ -730,6 +762,7 @@ describe("General", () => {
       expect(mockSettingsService.createLogo).toHaveBeenCalledWith(
         "default",
         expect.any(FormData),
+        "light",
       );
     });
   });

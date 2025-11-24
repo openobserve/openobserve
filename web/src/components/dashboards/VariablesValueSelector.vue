@@ -46,7 +46,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           readonly
           data-test="dashboard-variable-constant-selector"
           @update:model-value="onVariablesValueUpdated(index)"
-         borderless hide-bottom-space></q-input>
+          borderless
+          hide-bottom-space
+        ></q-input>
       </div>
       <div v-else-if="item.type == 'textbox'">
         <q-input
@@ -59,7 +61,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
           data-test="dashboard-variable-textbox-selector"
           @update:model-value="onVariablesValueUpdated(index)"
-         borderless hide-bottom-space></q-input>
+          borderless
+          hide-bottom-space
+        ></q-input>
       </div>
       <div v-else-if="item.type == 'custom'">
         <VariableCustomValueSelector
@@ -1189,6 +1193,48 @@ export default defineComponent({
 
           const parentVariables =
             variablesDependencyGraph[name].parentVariables;
+
+          // Check if any parent has no data (empty options)
+          const hasParentWithNoData = parentVariables.some(
+            (parentName: string) => {
+              const parentVariable = variablesData.values.find(
+                (v: any) => v.name === parentName,
+              );
+
+              return (
+                parentVariable &&
+                (parentVariable.value === null ||
+                  parentVariable.value === undefined ||
+                  (Array.isArray(parentVariable.value) &&
+                    parentVariable.value.length === 0))
+              );
+            },
+          );
+
+          // If any parent has no data, skip API and set child value to null
+          if (hasParentWithNoData) {
+            variableLog(
+              variableObject.name,
+              `Parent variable has no data, skipping API call and resetting child value`,
+            );
+
+            // Reset the child variable value
+            resetVariableState(variableObject);
+            const nullValue = variableObject.multiSelect ? [] : null;
+            variableObject.value = nullValue;
+            variableObject.options = [];
+            variableObject.isLoading = false;
+            variableObject.isVariablePartialLoaded = true;
+            variableObject.isVariableLoadingPending = false;
+
+            // Update old variables data to reflect the reset
+            oldVariablesData[variableObject.name] = variableObject.value;
+
+            emitVariablesData();
+            resolve(true);
+            return;
+          }
+
           const areParentsReady = parentVariables.every(
             (parentName: string) => {
               const parentVariable = variablesData.values.find(
@@ -1632,7 +1678,7 @@ export default defineComponent({
             `Old Varilables Data: ${JSON.stringify(oldVariablesData)}`,
           );
           for (const childVariable of childVariableObjects) {
-              await loadSingleVariableDataByName(childVariable, false);
+            await loadSingleVariableDataByName(childVariable, false);
           }
         }
       } catch (error) {
