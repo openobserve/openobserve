@@ -430,14 +430,14 @@ export const useSearchBar = () => {
         return;
       }
 
-      if (
-        isNaN(searchObj.data.datetime.endTime) ||
-        isNaN(searchObj.data.datetime.startTime)
-      ) {
-        setDateTime(
-          (router.currentRoute.value?.query?.period as string) || "15m",
-        );
-      }
+      // if (
+      //   isNaN(searchObj.data.datetime.endTime) ||
+      //   isNaN(searchObj.data.datetime.startTime)
+      // ) {
+      //   setDateTime(
+      //     (router.currentRoute.value?.query?.period as string) || "15m",
+      //   );
+      // }
 
       // Use the appropriate method to fetch data
       getDataThroughStream(isPagination);
