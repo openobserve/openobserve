@@ -18,8 +18,7 @@ use std::str::FromStr;
 use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 use config::meta::{
     alerts::{
-        ConditionList, QueryCondition as MetaQueryCondition,
-        TriggerCondition as MetaTriggerCondition,
+        QueryCondition as MetaQueryCondition, TriggerCondition as MetaTriggerCondition,
         alert::{Alert as MetaAlert, ListAlertsParams},
         deduplication::DeduplicationConfig as MetaDeduplicationConfig,
     },
