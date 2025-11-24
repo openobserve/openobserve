@@ -77,7 +77,7 @@ impl TryFrom<alerts::Model> for MetaAlert {
             .context_attributes
             .map(serde_json::from_value)
             .transpose()?;
-        let query_conditions: Option<ConditionList> = value
+        let query_conditions: Option<config::meta::alerts::AlertConditionParams> = value
             .query_conditions
             .map(serde_json::from_value)
             .transpose()?;

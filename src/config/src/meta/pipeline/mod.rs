@@ -128,10 +128,17 @@ impl Pipeline {
 
         for node in self.nodes.iter_mut() {
             // ck 4
-            if matches!(&node.data, NodeData::Condition(condition_params) if !condition_params.conditions.has_conditions())
-            {
-                return Err(anyhow!("ConditionNode must have non-empty conditions"));
-            } else if let NodeData::Stream(stream_params) = &mut node.data {
+            if let NodeData::Condition(condition_params) = &node.data {
+                let has_empty_conditions = match condition_params {
+                    components::ConditionParams::V1 { conditions } => !conditions.has_conditions(),
+                    components::ConditionParams::V2 { conditions } => conditions.conditions.is_empty(),
+                };
+                if has_empty_conditions {
+                    return Err(anyhow!("ConditionNode must have non-empty conditions"));
+                }
+            }
+
+            if let NodeData::Stream(stream_params) = &mut node.data {
                 // ck 8
                 if stream_params.stream_type == StreamType::EnrichmentTables
                     && matches!(&self.source, PipelineSource::Realtime(_))
