@@ -2562,25 +2562,8 @@ export class LogsPage {
         return await this.page.locator(this.histogramToggle).click();
     }
 
-    async navigateToLogs() {
-        await this.page.locator(this.logsMenuItem).click();
-        return await this.page.waitForTimeout(1000);
-    }
-
     async fillStreamFilter(streamName) {
         return await this.page.locator(this.indexDropDown).fill(streamName);
-    }
-
-    async clickAllFields() {
-        return await this.page.locator('[data-test="logs-all-fields-btn"]').click();
-    }
-
-    async toggleQueryMode() {
-        return await this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] div').first().click();
-    }
-
-    async applyQuery() {
-        return await this.page.locator(this.queryButton).click();
     }
 
     async navigateToHome() {
@@ -2591,12 +2574,24 @@ export class LogsPage {
         return await this.page.locator(`[data-test="log-search-index-list-stream-toggle-${streamName}"] div`).nth(2).click();
     }
 
+    async toggleQueryMode() {
+        return await this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] div').first().click();
+    }
+
     async clickMonacoEditor() {
         return await this.page.locator('#fnEditor').locator('.monaco-editor').click();
     }
 
     async fillMonacoEditor(text) {
         return await this.page.locator('#fnEditor').locator('.inputarea').fill(text);
+    }
+
+    async getCellByName(name) {
+        return await this.page.getByRole('cell', { name });
+    }
+
+    async clickCellByName(name) {
+        return await this.page.getByRole('cell', { name }).click();
     }
 
     async clickTableExpandMenu() {
@@ -2652,12 +2647,9 @@ export class LogsPage {
         return await this.page.locator('[data-test="log-table-column-0-source"]').click({ force: true });
     }
 
-    async getCellByName(name) {
-        return await this.page.getByRole('cell', { name });
-    }
-
-    async clickCellByName(name) {
-        return await this.page.getByRole('cell', { name }).click();
+    async setDateTimeToToday() {
+        // Assuming this is a specific date picker method - might need adjustment based on actual implementation
+        return await this.page.locator('[data-test="date-time-today-btn"]').click();
     }
 
     async getQuickModeToggleAttributes() {

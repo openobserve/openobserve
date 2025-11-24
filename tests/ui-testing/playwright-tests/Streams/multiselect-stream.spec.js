@@ -60,7 +60,7 @@ async function multistreamselect(page) {
     await page.waitForTimeout(4000);
 
     // Click all fields and enable function editor
-    await pageManager.logsPage.clickAllFields();
+    await pageManager.logsPage.clickAllFieldsButton();
     await pageManager.logsPage.toggleQueryMode();
     await pageManager.logsPage.clickMonacoEditor();
     
@@ -205,7 +205,7 @@ async function multistreamselect(page) {
     await page.waitForTimeout(4000);
     
     // Click All Fields and enable function editor
-    await pageManager.logsPage.clickAllFields();
+    await pageManager.logsPage.clickAllFieldsButton();
     await pageManager.logsPage.toggleQueryMode();
     await pageManager.logsPage.clickMonacoEditor();
     
