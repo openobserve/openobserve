@@ -50,6 +50,27 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
+    // check if current hour is allowed for retention
+    if !cfg.compact.retention_allowed_hours.is_empty() {
+        let current_hour = Utc::now().hour();
+        let allowed_hours: Vec<u32> = cfg
+            .compact
+            .retention_allowed_hours
+            .split(',')
+            .filter_map(|s| s.trim().parse::<u32>().ok())
+            .filter(|&h| h < 24)
+            .collect();
+
+        if !allowed_hours.is_empty() && !allowed_hours.contains(&current_hour) {
+            log::debug!(
+                "[COMPACTOR] retention skipped: current hour {} is not in allowed hours {:?}",
+                current_hour,
+                allowed_hours
+            );
+            return Ok(());
+        }
+    }
+
     let now = config::utils::time::now();
     let data_lifecycle_end = now - Duration::try_days(cfg.compact.data_retention_days).unwrap();
 
