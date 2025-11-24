@@ -634,6 +634,83 @@ impl std::fmt::Display for Operator {
     }
 }
 
+// Filter system for pipeline conditions with linear evaluation
+// This provides an alternative to the tree-based ConditionList for expressing
+// mixed boolean operations with natural left-to-right ordering
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum LogicalOperator {
+    And,
+    Or,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize, ToSchema)]
+#[serde(tag = "filterType", rename_all = "lowercase")]
+pub enum FilterItem {
+    Condition {
+        #[serde(rename = "type")]
+        type_field: String, // Always "condition"
+        column: String,
+        operator: Operator,
+        #[schema(value_type = Object)]
+        value: Value,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        ignore_case: Option<bool>,
+        #[serde(rename = "logicalOperator")]
+        logical_operator: LogicalOperator,
+    },
+    Group {
+        #[serde(rename = "logicalOperator")]
+        logical_operator: LogicalOperator,
+        conditions: Vec<FilterItem>,
+    },
+}
+
+impl FilterItem {
+    /// Get the logical operator for this filter item
+    pub fn logical_operator(&self) -> &LogicalOperator {
+        match self {
+            FilterItem::Condition {
+                logical_operator, ..
+            } => logical_operator,
+            FilterItem::Group {
+                logical_operator, ..
+            } => logical_operator,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FilterGroup {
+    pub filter_type: String, // Always "group"
+    #[serde(rename = "logicalOperator")]
+    pub logical_operator: LogicalOperator,
+    pub conditions: Vec<FilterItem>,
+}
+
+impl FilterGroup {
+    /// Checks if the filter group has conditions
+    pub fn has_conditions(&self) -> bool {
+        self.conditions.len() > 1
+    }
+
+    /// Validates the filter group structure
+    pub fn validate(&self) -> Result<(), String> {
+        if self.filter_type != "group" {
+            return Err(format!(
+                "Invalid filterType: expected 'group', got '{}'",
+                self.filter_type
+            ));
+        }
+        if !self.has_conditions() {
+            return Err("FilterGroup must have at least two conditions".to_string());
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod test {
     use chrono::{DateTime, FixedOffset, TimeZone};
@@ -1388,6 +1465,156 @@ mod test {
                 tz_name
             );
         }
+    }
+
+    #[test]
+    fn test_filter_group_serialization() {
+        // Test simple FilterGroup serialization
+        let filter_json = r#"{
+            "filterType": "group",
+            "logicalOperator": "AND",
+            "conditions": [
+                {
+                    "filterType": "condition",
+                    "type": "condition",
+                    "column": "status",
+                    "operator": "=",
+                    "value": "error",
+                    "logicalOperator": "AND"
+                },
+                {
+                    "filterType": "condition",
+                    "type": "condition",
+                    "column": "level",
+                    "operator": "=",
+                    "value": "critical",
+                    "logicalOperator": "OR"
+                }
+            ]
+        }"#;
+
+        let filter: FilterGroup = serde_json::from_str(filter_json).unwrap();
+        assert_eq!(filter.filter_type, "group");
+        assert_eq!(filter.logical_operator, LogicalOperator::And);
+        assert_eq!(filter.conditions.len(), 2);
+
+        // Test serialization back to JSON
+        let serialized = serde_json::to_value(&filter).unwrap();
+        assert_eq!(serialized["filterType"], "group");
+        assert_eq!(serialized["logicalOperator"], "AND");
+    }
+
+    #[test]
+    fn test_filter_group_with_nested_groups() {
+        let filter_json = r#"{
+            "filterType": "group",
+            "logicalOperator": "AND",
+            "conditions": [
+                {
+                    "filterType": "condition",
+                    "type": "condition",
+                    "column": "status",
+                    "operator": "=",
+                    "value": "error",
+                    "logicalOperator": "AND"
+                },
+                {
+                    "filterType": "group",
+                    "logicalOperator": "OR",
+                    "conditions": [
+                        {
+                            "filterType": "condition",
+                            "type": "condition",
+                            "column": "service",
+                            "operator": "=",
+                            "value": "api",
+                            "logicalOperator": "OR"
+                        },
+                        {
+                            "filterType": "condition",
+                            "type": "condition",
+                            "column": "service",
+                            "operator": "=",
+                            "value": "web",
+                            "logicalOperator": "AND"
+                        }
+                    ],
+                    "logicalOperator": "AND"
+                }
+            ]
+        }"#;
+
+        let filter: FilterGroup = serde_json::from_str(filter_json).unwrap();
+        assert_eq!(filter.conditions.len(), 2);
+
+        // Check nested group
+        if let FilterItem::Group { conditions, .. } = &filter.conditions[1] {
+            assert_eq!(conditions.len(), 2);
+        } else {
+            panic!("Expected nested group");
+        }
+    }
+
+    #[test]
+    fn test_filter_item_logical_operator() {
+        let condition_item = FilterItem::Condition {
+            type_field: "condition".to_string(),
+            column: "status".to_string(),
+            operator: Operator::EqualTo,
+            value: Value::String("error".to_string()),
+            ignore_case: None,
+            logical_operator: LogicalOperator::And,
+        };
+
+        assert_eq!(*condition_item.logical_operator(), LogicalOperator::And);
+
+        let group_item = FilterItem::Group {
+            logical_operator: LogicalOperator::Or,
+            conditions: vec![],
+        };
+
+        assert_eq!(*group_item.logical_operator(), LogicalOperator::Or);
+    }
+
+    #[test]
+    fn test_filter_group_validation() {
+        // Valid filter group
+        let filter = FilterGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![FilterItem::Condition {
+                type_field: "condition".to_string(),
+                column: "status".to_string(),
+                operator: Operator::EqualTo,
+                value: Value::String("error".to_string()),
+                ignore_case: None,
+                logical_operator: LogicalOperator::And,
+            }],
+        };
+        assert!(filter.validate().is_ok());
+
+        // Invalid filter type
+        let invalid_filter = FilterGroup {
+            filter_type: "invalid".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![FilterItem::Condition {
+                type_field: "condition".to_string(),
+                column: "status".to_string(),
+                operator: Operator::EqualTo,
+                value: Value::String("error".to_string()),
+                ignore_case: None,
+                logical_operator: LogicalOperator::And,
+            }],
+        };
+        assert!(invalid_filter.validate().is_err());
+
+        // Empty conditions
+        let empty_filter = FilterGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![],
+        };
+        assert!(empty_filter.validate().is_err());
     }
 
     #[test]
