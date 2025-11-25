@@ -31,5 +31,6 @@ FROM gcr.io/distroless/cc-debian13:latest-arm64 AS runtime
 COPY --from=builder /openobserve/target/release/openobserve /
 COPY --from=builder /lib/aarch64-linux-gnu/liblzma.so.5 /lib/aarch64-linux-gnu/liblzma.so.5
 COPY --from=builder /lib/aarch64-linux-gnu/libz.so.1 /lib/aarch64-linux-gnu/libz.so.1
+COPY --from=builder /lib/aarch64-linux-gnu/libbz2.so.1.0 /lib/aarch64-linux-gnu/libbz2.so.1.0
 RUN ["/openobserve", "init-dir", "-p", "/data/"]
 CMD ["/openobserve"]
