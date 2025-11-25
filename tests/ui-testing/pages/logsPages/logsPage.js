@@ -45,6 +45,7 @@ export class LogsPage {
         this.relative15MinButton = '[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block';
         this.relative6WeeksButton = '[data-test="date-time-relative-6-w-btn"] > .q-btn__content';
         this.relative30SecondsButton = '[data-test="date-time-relative-30-s-btn"] > .q-btn__content > .block';
+        this.relative1HourButton = '[data-test="date-time-relative-1-h-btn"]';
         this.absoluteTab = '[data-test="date-time-absolute-tab"]';
         this.scheduleText = '[data-test="date-time-btn"]';
         this.timeZoneDropdown = '[data-test="timezone-select"]';
@@ -604,6 +605,10 @@ export class LogsPage {
     async waitForSearchResultAndCheckText(expectedText) {
         await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]');
         await expect(this.page.locator('[data-test="logs-search-result-logs-table"]')).toContainText(expectedText);
+    }
+
+    async expectLogsTableRowCount(count) {
+        return await expect(this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr')).toHaveCount(count);
     }
 
     // Time and date methods
@@ -2612,6 +2617,30 @@ export class LogsPage {
 
     async selectRelative6Hours() {
         return await this.page.locator('[data-test="date-time-relative-6-h-btn"]').click();
+    }
+
+    async selectRelative1Hour() {
+        return await this.page.locator(this.relative1HourButton).click();
+    }
+
+    async clickAbsoluteTimeTab() {
+        return await this.page.locator('[data-test="date-time-absolute-tab"]').click();
+    }
+
+    async fillStartDate(date) {
+        return await this.page.locator('[data-test="date-time-absolute-start-date"]').fill(date);
+    }
+
+    async fillEndDate(date) {
+        return await this.page.locator('[data-test="date-time-absolute-end-date"]').fill(date);
+    }
+
+    async clickApplyDateRange() {
+        return await this.page.locator('[data-test="date-time-btn-apply"]').click();
+    }
+
+    async searchFieldByName(fieldName) {
+        return await this.page.locator('[data-cy="index-field-search-input"]').fill(fieldName);
     }
 
     async navigateToStreams() {
