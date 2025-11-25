@@ -57,6 +57,9 @@ const destination = {
       )}`
     );
   },
+  bulkDelete: (org_identifier: string, data: any) => {
+    return http().delete(`/api/${org_identifier}/alerts/destinations/bulk`, { data });
+  },
 };
 
 export default destination;

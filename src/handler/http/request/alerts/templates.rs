@@ -17,13 +17,16 @@ use std::io::Error;
 
 use actix_web::{HttpRequest, HttpResponse, delete, get, http::StatusCode, post, put, web};
 
+#[cfg(feature = "enterprise")]
+use crate::handler::http::request::search::utils::check_resource_permissions;
 use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
-    handler::http::models::destinations::Template,
+    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
+    handler::http::{
+        extractors::Headers,
+        models::destinations::{Template, TemplateBulkDeleteRequest, TemplateBulkDeleteResponse},
+    },
     service::{alerts::templates, db::alerts::templates::TemplateError},
 };
-#[cfg(feature = "enterprise")]
-use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
 
 impl From<TemplateError> for HttpResponse {
     fn from(value: TemplateError) -> Self {
@@ -250,4 +253,70 @@ async fn delete_template(path: web::Path<(String, String)>) -> Result<HttpRespon
         Ok(_) => Ok(MetaHttpResponse::ok("Template deleted")),
         Err(e) => Ok(e.into()),
     }
+}
+
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Templates",
+    operation_id = "DeleteAlertTemplateBulk",
+    summary = "Delete multiple alert template",
+    description = "Removes multiple alert notification template from the organization. The templates must not be in use by any \
+                   active destinations before deletion. Once deleted, any destinations previously using these templates \
+                   will need to be updated with alternative templates to continue formatting notifications properly.",
+    security(
+        ("Authorization"= [])
+    ),
+    request_body(content = TemplateBulkDeleteRequest, description = "Template names", content_type = "application/json"),    
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = TemplateBulkDeleteResponse),
+        (status = 500, description = "Failure",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "delete"}))
+    )
+)]
+#[delete("/{org_id}/alerts/templates/bulk")]
+async fn delete_template_bulk(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    req: web::Json<TemplateBulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+    let req = req.into_inner();
+    let _user_id = user_email.user_id;
+
+    #[cfg(feature = "enterprise")]
+    for name in &req.ids {
+        if let Some(res) =
+            check_resource_permissions(&org_id, &_user_id, "templates", name, "DELETE", "").await
+        {
+            return Ok(res);
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
+    for name in req.ids {
+        match templates::delete(&org_id, &name).await {
+            Ok(_) => {
+                successful.push(name);
+            }
+            Err(e) => {
+                log::error!("error while deleting template {org_id}/{name} : {e}");
+                unsuccessful.push(name);
+                err = Some(e.to_string());
+            }
+        }
+    }
+
+    Ok(MetaHttpResponse::json(TemplateBulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    }))
 }

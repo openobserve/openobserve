@@ -707,6 +707,22 @@ impl FromRequest for AuthExtractor {
 
             // if let Some(auth_header) = req.headers().get("Authorization") {
             if !auth_str.is_empty() {
+                let path_is_bulk_operation = method.eq("DELETE")
+                    && (path.contains("/cipher_keys/bulk")
+                        || path.contains("/re_patterns/bulk")
+                        || path.contains("/alerts/templates/bulk")
+                        || path.contains("/alerts/destinations/bulk")
+                        || (path.starts_with("v2/") && path.contains("/alerts/bulk"))
+                        || path.contains("/dashboards/bulk")
+                        || path.contains("/pipelines/bulk")
+                        || path.contains("/actions/bulk")
+                        || path.contains("/groups/bulk")
+                        || path.contains("/roles/bulk")
+                        || path.contains("/service_accounts/bulk")
+                        || path.contains("/functions/bulk")
+                        || path.contains("/users/bulk")
+                        || path.contains("/reports/bulk"));
+
                 if (method.eq("POST") && url_len > 1 && path_columns[1].starts_with("_search"))
                 || (method.eq("POST")
                     && url_len > 1
@@ -723,7 +739,7 @@ impl FromRequest for AuthExtractor {
                 || path.contains("/ws")
                 || path.contains("/_values_stream")
                 // bulk enable of pipelines and alerts
-                || path.contains("/bulk/enable")
+                || path_is_bulk_operation
                 // for license the function itself with do a perm check
                 || (url_len == 1 && path.contains("license"))
                 {

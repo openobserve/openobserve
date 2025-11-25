@@ -38,6 +38,18 @@ struct PatternCreateRequest {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+struct PatternBulkDeleteRequest {
+    ids: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+struct PatternBulkDeleteResponse {
+    successful: Vec<String>,
+    unsuccessful: Vec<String>,
+    err: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 struct PatternGetResponse {
     id: String,
     name: String,
@@ -343,6 +355,110 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         drop(path);
         Ok(MetaHttpResponse::forbidden("not supported"))
     }
+}
+
+/// delete pattern with given id
+#[cfg(feature = "enterprise")]
+#[utoipa::path(
+    delete,
+    context_path = "/api",
+    summary = "Delete regex pattern in bulk",
+    description = "Removes multiple regex patterns from the system using its identifiers",
+    params(
+        ("org_id" = String, Path, description = "org id of for the patterns to delete", example = "default")
+    ),
+    request_body(
+        content = PatternBulkDeleteRequest,
+        description = "re_patterns to delete",
+        content_type = "application/json",
+    ),
+    responses(
+        (
+            status = 200,
+            description = "Empty response",
+            body = (),
+            content_type = "application/json",
+        ),
+    ),
+    tag = "RePattern"
+)]
+#[delete("/{org_id}/re_patterns/bulk")]
+pub async fn delete_bulk(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(req): Json<PatternBulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
+
+    use crate::handler::http::request::search::utils::check_resource_permissions;
+
+    let org_id = path.into_inner();
+    let user_id = user_email.user_id;
+    let mgr = match get_pattern_manager().await {
+        Ok(m) => m,
+        Err(e) => {
+            return Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Cannot get pattern manager : {e:?}"),
+                )),
+            );
+        }
+    };
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
+    for id in &req.ids {
+        if let Some(res) =
+            check_resource_permissions(&org_id, &user_id, "re_patterns", id, "DELETE", "").await
+        {
+            return Ok(res);
+        }
+        let pattern_usage = mgr.get_pattern_usage(&id);
+        let (pattern_streams, extra) = if pattern_usage.len() > 5 {
+            (
+                &pattern_usage[0..5],
+                format!(" and {} more", pattern_usage.len() - 5),
+            )
+        } else {
+            (&pattern_usage[0..], "".to_string())
+        };
+        if !pattern_usage.is_empty() {
+            unsuccessful.push(id.to_string());
+            err = Some(format!(
+                "Cannot delete pattern, associated with {pattern_streams:?}{extra}"
+            ));
+        }
+    }
+    if !unsuccessful.is_empty() {
+        return Ok(MetaHttpResponse::json(PatternBulkDeleteResponse {
+            successful,
+            unsuccessful,
+            err,
+        }));
+    }
+
+    for id in req.ids {
+        match crate::service::db::re_pattern::remove(&id).await {
+            Ok(_) => {
+                remove_ownership(&org_id, "re_patterns", Authz::new(&id)).await;
+                successful.push(id);
+            }
+            Err(e) => {
+                log::error!("error while deleting pattern {org_id}/{id} : {e}");
+                unsuccessful.push(id);
+                err = Some(e.to_string());
+            }
+        }
+    }
+
+    Ok(MetaHttpResponse::json(PatternBulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    }))
 }
 
 /// update the pattern for given id
