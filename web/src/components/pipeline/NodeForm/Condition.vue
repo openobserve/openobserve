@@ -584,7 +584,7 @@ const saveCondition = async () => {
     // The conditionGroup is already in V2 format which matches backend
     let conditionData = {
       node_type: "condition",
-      version: "2",
+      version: 2, // Numeric version for consistency with alerts
       conditions: conditionGroup.value,
     };
 
