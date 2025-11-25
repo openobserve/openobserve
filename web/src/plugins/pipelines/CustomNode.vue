@@ -305,45 +305,106 @@ const getTruncatedConditions = (conditionData) => {
   // Handle null/undefined
   if (!conditionData) return '';
 
-  // Helper to recursively extract all conditions from ConditionList
-  const extractConditions = (node) => {
-    if (!node) return [];
+  // Build preview string recursively (similar to alert preview)
+  const buildPreviewString = (node) => {
+    if (!node) return '';
 
-    // Handle OR node
+    // V2 Format: Group
+    if (node.filterType === 'group' && node.conditions && Array.isArray(node.conditions)) {
+      if (node.conditions.length === 0) return '';
+
+      const parts = [];
+      node.conditions.forEach((item, index) => {
+        let conditionStr = '';
+
+        if (item.filterType === 'group') {
+          // Nested group
+          const nestedPreview = buildPreviewString(item);
+          if (nestedPreview) {
+            conditionStr = `(${nestedPreview})`;
+          }
+        } else if (item.filterType === 'condition') {
+          // Condition
+          const column = item.column || 'field';
+          const operator = item.operator || '=';
+          const value = item.value !== undefined && item.value !== null && item.value !== ''
+            ? `'${item.value}'`
+            : "''";
+          conditionStr = `${column} ${operator} ${value}`;
+        }
+
+        // Add logical operator before condition (except for first)
+        if (index > 0 && item.logicalOperator) {
+          parts.push(`${item.logicalOperator.toLowerCase()} ${conditionStr}`);
+        } else {
+          parts.push(conditionStr);
+        }
+      });
+
+      return parts.join(' ');
+    }
+
+    // V1 Backend Format: OR node
     if (node.or && Array.isArray(node.or)) {
-      return node.or.flatMap(item => extractConditions(item));
+      const parts = node.or.map(item => {
+        const nested = buildPreviewString(item);
+        return nested ? `(${nested})` : '';
+      }).filter(Boolean);
+      return parts.join(' or ');
     }
 
-    // Handle AND node
+    // V1 Backend Format: AND node
     if (node.and && Array.isArray(node.and)) {
-      return node.and.flatMap(item => extractConditions(item));
+      const parts = node.and.map(item => {
+        const nested = buildPreviewString(item);
+        return nested ? `(${nested})` : '';
+      }).filter(Boolean);
+      return parts.join(' and ');
     }
 
-    // Handle NOT node
+    // V1 Backend Format: NOT node
     if (node.not) {
-      return extractConditions(node.not);
+      const nested = buildPreviewString(node.not);
+      return nested ? `not (${nested})` : '';
     }
 
-    // Handle single condition (EndCondition) - has column/operator/value
+    // V1 Frontend Format: items array
+    if (node.items && Array.isArray(node.items)) {
+      const operator = node.label?.toLowerCase() || 'and';
+      const parts = node.items.map(item => buildPreviewString(item)).filter(Boolean);
+      return parts.join(` ${operator} `);
+    }
+
+    // Single condition
     if (node.column && node.operator) {
-      return [node];
+      const column = node.column || 'field';
+      const operator = node.operator || '=';
+      const value = node.value !== undefined && node.value !== null && node.value !== ''
+        ? `'${node.value}'`
+        : "''";
+      return `${column} ${operator} ${value}`;
     }
 
-    // If it's an array (legacy format), return as-is
+    // V0 Format: Array
     if (Array.isArray(node)) {
-      return node.filter(c => c.column && c.operator);
+      const parts = node.filter(c => c.column && c.operator).map(c => {
+        const column = c.column || 'field';
+        const operator = c.operator || '=';
+        const value = c.value !== undefined && c.value !== null && c.value !== ''
+          ? `'${c.value}'`
+          : "''";
+        return `${column} ${operator} ${value}`;
+      });
+      return parts.join(' and ');
     }
 
-    return [];
+    return '';
   };
 
-  const allConditions = extractConditions(conditionData);
+  const previewText = buildPreviewString(conditionData);
 
-  const allConditionsText = allConditions.map(condition =>
-    `${condition.column} ${condition.operator} ${condition.value || ''}`
-  ).join(', ');
-
-  return allConditionsText.length > 30 ? allConditionsText.substring(0, 30) + '...' : allConditionsText;
+  // Truncate to 20 characters
+  return previewText.length > 20 ? previewText.substring(0, 20) + '...' : previewText;
 }
 
 const confirmDialogMeta = ref({
