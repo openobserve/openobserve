@@ -344,11 +344,31 @@ export default class DashboardPanelConfigs {
         const el = document.querySelector(selector);
         if (el) el.scrollTop = el.scrollHeight;
       }, ".sidebar-content");
+
+      // Wait a bit for scroll to complete
+      await this.page.waitForTimeout(500);
     }
 
     // Ensure the button is actually visible before proceeding
-    await this.overrideConfig.scrollIntoViewIfNeeded();
-    await this.overrideConfig.waitFor({ state: "visible" });
+    // First wait for it to be attached
+    await this.overrideConfig.waitFor({ state: "attached", timeout: 20000 });
+
+    // Try to scroll it into view with timeout handling
+    try {
+      await this.overrideConfig.scrollIntoViewIfNeeded({ timeout: 10000 });
+    } catch (e) {
+      // If scrollIntoView fails, try programmatic scroll one more time
+      await this.page.evaluate(() => {
+        const button = document.querySelector('[data-test="dashboard-addpanel-config-override-config-add-btn"]');
+        if (button) {
+          button.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
+      await this.page.waitForTimeout(1000);
+    }
+
+    // Finally wait for it to be visible
+    await this.overrideConfig.waitFor({ state: "visible", timeout: 10000 });
   }
   //Metric Text
   //BG color
