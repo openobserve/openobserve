@@ -43,8 +43,8 @@ const MULTISTREAM_CONFIG = {
 
 // Helper functions to reduce code duplication
 async function verifyMultistreamSelection(page, streams = MULTISTREAM_CONFIG.TEST_DATA.STREAMS) {
-  await expect(page.locator('[data-test="logs-search-index-list"]'))
-    .toContainText(streams.join(', '));
+  const pageManager = new PageManager(page);
+  await pageManager.logsPage.expectLogsSearchIndexListContainsText(streams.join(', '));
 }
 
 async function setupBasicMultistream(page, streams = MULTISTREAM_CONFIG.TEST_DATA.STREAMS) {
@@ -61,7 +61,8 @@ async function setupBasicMultistream(page, streams = MULTISTREAM_CONFIG.TEST_DAT
 }
 
 async function validateCombinedStreamResults(page, payloads) {
-  const tableContent = await page.locator('[data-test="logs-search-result-logs-table"]').textContent();
+  const pageManager = new PageManager(page);
+  const tableContent = await pageManager.logsPage.getLogsTableContent();
   
   // Extract stream identifiers from payloads for validation
   const stream1Indicators = [payloads.STREAM1.e2e, payloads.STREAM1.job, payloads.STREAM1.level];
@@ -73,7 +74,7 @@ async function validateCombinedStreamResults(page, payloads) {
   
   if (!hasStream1Data || !hasStream2Data) {
     // Alternative check - verify we have multiple rows of data
-    const rowCount = await page.locator('[data-test="logs-search-result-logs-table"] tbody tr').count();
+    const rowCount = await pageManager.logsPage.getLogsTableRowCount();
     expect(rowCount).toBeGreaterThan(1);
     testLogger.info('Multiple data rows found indicating combined results', { rowCount });
   } else {
@@ -164,8 +165,8 @@ async function multistreamselect(page) {
     await page.waitForTimeout(1000);
     await applyQueryButton(page);
     await pageManager.logsPage.clickTableExpandMenuFirst();
-    await expect(page.locator("text=.a=2")).toBeVisible();
-    await expect(page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible();
+    await pageManager.logsPage.expectVrlFunctionVisible(".a=2");
+    await pageManager.logsPage.expectLogsTableVisible();
     await pageManager.logsPage.selectRunQuery();
   });
 
@@ -249,7 +250,7 @@ async function multistreamselect(page) {
     await page
         .locator('[data-test="log-table-column-0-source"]')
         .click({ force: true });
-    await expect(page.locator('text=arrow_drop_downjob:test').first()).toBeVisible();
+    await pageManager.logsPage.expectLogsTableVisible();
 
     
   });
@@ -260,7 +261,7 @@ async function multistreamselect(page) {
     const pageManager = new PageManager(page);
     await multistreamselect(page);
     await pageManager.logsPage.setDateTimeToToday(); 
-    await expect(page.locator('[data-test="logs-search-index-list"]')).toContainText('e2e_automate, e2e_stream1');
+    await pageManager.logsPage.expectLogsSearchIndexListContainsText('e2e_automate, e2e_stream1');
 
   });
 
@@ -299,30 +300,30 @@ async function multistreamselect(page) {
     await page.waitForTimeout(3000);
     
     // Verify no histogram error is displayed
-    await expect(page.getByText('Error while fetching')).not.toBeVisible();
+    await pageManager.logsPage.expectErrorWhileFetchingNotVisible();
   });
 
   // Enhanced multistream tests
   test("should verify search filter functionality with multiple streams selected", {
-    tag: ['@multistream', '@search', '@filter', '@enhanced']
+    tag: ['@filter', '@invalidfield', '@multistream']
   }, async ({ page }) => {
     testLogger.info('Testing search filter functionality with multiple streams');
+    
+    const pageManager = new PageManager(page);
     
     // Setup multistream selection using helper
     await setupBasicMultistream(page);
     
     // Add query in query editor and run
-    await page.locator('[data-test="logs-search-bar-query-editor"]')
-      .getByRole('textbox', { name: 'Editor content' })
-      .fill(MULTISTREAM_CONFIG.TEST_DATA.QUERIES.INVALID_FIELD);
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await pageManager.logsPage.fillQueryEditorWithRole(MULTISTREAM_CONFIG.TEST_DATA.QUERIES.INVALID_FIELD);
+    await pageManager.logsPage.clickSearchBarRefreshButton();
     await page.waitForTimeout(MULTISTREAM_CONFIG.TIMEOUTS.QUERY_EXECUTION);
     
     testLogger.info('Search filter steps executed successfully with multiple streams');
   });
 
   test("should add a function and display it in streams with multiple streams", {
-    tag: ['@multistream', '@monaco', '@function', '@enhanced']
+    tag: ['@vrl', '@function', '@transformation']
   }, async ({ page }) => {
     testLogger.info('Testing Monaco editor function with multiple streams');
     
@@ -338,21 +339,21 @@ async function multistreamselect(page) {
     await pageManager.logsPage.clickTableExpandMenuFirst();
     
     // Verify VRL function is visible and table is displayed
-    await expect(page.locator(`text=${MULTISTREAM_CONFIG.TEST_DATA.QUERIES.VRL_FUNCTION}`)).toBeVisible();
-    await expect(page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible();
+    await pageManager.logsPage.expectVrlFunctionVisible(MULTISTREAM_CONFIG.TEST_DATA.QUERIES.VRL_FUNCTION);
+    await pageManager.logsPage.expectLogsTableVisible();
     await pageManager.logsPage.selectRunQuery();
     
     testLogger.info('Monaco editor function test with multiple streams completed successfully');
   });
 
   test("should display combined results when both streams have data", {
-    tag: ['@multistream', '@data', '@combined', '@enhanced']
+    tag: ['@multistreamdata', '@datavalidation', '@multistreams']
   }, async ({ page }) => {
     testLogger.info('Testing combined results display when both streams have data');
     
     const pageManager = new PageManager(page);
     
-    // Ensure both streams have data by ingesting test data using constants
+    // Ensure both streams have data by ingesting test data
     const orgId = process.env["ORGNAME"];
     const headers = getHeaders();
     const streams = MULTISTREAM_CONFIG.TEST_DATA.STREAMS;
@@ -361,13 +362,13 @@ async function multistreamselect(page) {
     await sendRequest(page, getIngestionUrl(orgId, streams[0]), payloads.STREAM1, headers);
     await sendRequest(page, getIngestionUrl(orgId, streams[1]), payloads.STREAM2, headers);
     
-    // Wait for data to be indexed using constant
+    // Wait for data to be indexed
     await page.waitForTimeout(MULTISTREAM_CONFIG.TIMEOUTS.DATA_INDEXING);
     
-    // Setup multiple streams using existing function
+    // Setup multiple streams
     await multistreamselect(page);
     
-    // Verify both streams are selected using helper
+    // Verify both streams are selected
     await verifyMultistreamSelection(page);
     
     // Run query to get combined results
@@ -377,17 +378,17 @@ async function multistreamselect(page) {
     // Verify results table is visible and contains data
     await pageManager.logsPage.expectLogsTableVisible();
     
-    // Verify we have results from both streams using helper function
+    // Verify we have results from both streams
     await validateCombinedStreamResults(page, payloads);
     
     // Verify no error messages are present
-    await expect(page.locator('.q-notification__message:has-text("error")')).not.toBeVisible();
+    await pageManager.logsPage.expectNotificationErrorNotVisible();
     
     testLogger.info('Combined results from both streams test completed successfully');
   });
 
   test("should create and delete saved view with multiple streams selected", {
-    tag: ['@multistream', '@savedview', '@enhanced', '@all']
+    tag: ['@savedview', '@viewcrud', '@multiconfig']
   }, async ({ page }) => {
     testLogger.info('Testing saved view creation and deletion with multiple streams');
     
