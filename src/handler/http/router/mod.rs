@@ -641,7 +641,13 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
     let service = service
         .service(alerts::deduplication::get_config)
         .service(alerts::deduplication::set_config)
-        .service(alerts::deduplication::delete_config);
+        .service(alerts::deduplication::delete_config)
+        .service(alerts::incidents::list_incidents)
+        .service(alerts::incidents::get_incident)
+        .service(alerts::incidents::update_incident_status)
+        .service(alerts::incidents::get_config)
+        .service(alerts::incidents::set_config)
+        .service(alerts::incidents::delete_config);
 
     #[cfg(feature = "cloud")]
     let service = service

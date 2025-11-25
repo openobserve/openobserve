@@ -4,6 +4,8 @@ pub mod prelude;
 
 pub mod action_scripts;
 pub mod alert_dedup_state;
+pub mod alert_incident_alerts;
+pub mod alert_incidents;
 pub mod alerts;
 pub mod cipher_keys;
 pub mod compactor_manual_jobs;

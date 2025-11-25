@@ -643,106 +643,6 @@ async fn handle_alert_triggers(
 
     // send notification
     if let Some(data) = trigger_results.data {
-        // Check if grouping is enabled BEFORE deduplication (enterprise-only feature)
-        #[cfg(feature = "enterprise")]
-        let grouping_enabled = alert
-            .deduplication
-            .as_ref()
-            .and_then(|d| d.grouping.as_ref())
-            .map(|g| g.enabled)
-            .unwrap_or(false);
-
-        #[cfg(not(feature = "enterprise"))]
-        let grouping_enabled = false;
-
-        if grouping_enabled {
-            #[cfg(feature = "enterprise")]
-            {
-                let grouping_config = alert
-                    .deduplication
-                    .as_ref()
-                    .and_then(|d| d.grouping.as_ref())
-                    .unwrap();
-
-                // Calculate fingerprint for grouping
-                let fingerprint = if let Some(dedup_config) = alert.deduplication.as_ref() {
-                    let org_config =
-                        match crate::service::alerts::org_config::get_deduplication_config(
-                            &new_trigger.org,
-                        )
-                        .await
-                        {
-                            Ok(Some(config)) => Some(config),
-                            _ => None,
-                        };
-
-                    if let Some(first_row) = data.first() {
-                        crate::service::alerts::deduplication::calculate_fingerprint(
-                            &alert,
-                            first_row,
-                            dedup_config,
-                            org_config.as_ref(),
-                        )
-                    } else {
-                        alert.get_unique_key()
-                    }
-                } else {
-                    alert.get_unique_key()
-                };
-
-                log::debug!(
-                    "[SCHEDULER trace_id {scheduler_trace_id}] Adding alert to batch, org: {}, alert: {}, fingerprint: {}, rows: {}",
-                    &new_trigger.org,
-                    &alert.name,
-                    fingerprint,
-                    data.len()
-                );
-
-                // Add to batch
-                let batch_ready = crate::service::alerts::grouping::add_to_batch(
-                    fingerprint.clone(),
-                    new_trigger.org.clone(),
-                    alert.clone(),
-                    data.clone(),
-                    grouping_config.group_wait_seconds,
-                    grouping_config.max_group_size,
-                );
-
-                if batch_ready {
-                    log::info!(
-                        "[SCHEDULER trace_id {scheduler_trace_id}] Batch {} reached max size, sending immediately",
-                        fingerprint
-                    );
-                    if let Some(batch) =
-                        crate::service::alerts::grouping::get_ready_batch(&fingerprint)
-                        && let Err(e) =
-                            crate::job::alert_grouping::send_grouped_notification_sync(batch).await
-                    {
-                        log::error!(
-                            "[SCHEDULER trace_id {scheduler_trace_id}] Failed to send grouped notification: {}",
-                            e
-                        );
-                    }
-                } else {
-                    log::debug!(
-                        "[SCHEDULER trace_id {scheduler_trace_id}] Alert added to batch, waiting for more alerts or timeout, fingerprint: {}",
-                        fingerprint
-                    );
-                }
-
-                // Alert added to batch, don't send individual notification
-                trigger_data.period_end_time = if should_store_last_end_time {
-                    Some(trigger_results.end_time)
-                } else {
-                    None
-                };
-                new_trigger.data = json::to_string(&trigger_data).unwrap();
-                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-                publish_triggers_usage(trigger_data_stream);
-                return Ok(());
-            }
-        }
-
         // Apply deduplication if enabled (enterprise-only feature)
         #[cfg(feature = "enterprise")]
         let data = if let Some(db) = ORM_CLIENT.get() {
@@ -760,6 +660,50 @@ async fn handle_alert_triggers(
                             &new_trigger.org,
                             &new_trigger.module_key
                         );
+
+                        // Even though deduplicated, still correlate into incidents
+                        #[cfg(feature = "enterprise")]
+                        if let Some(db) = ORM_CLIENT.get()
+                            && let Ok(Some(correlation_config)) =
+                                crate::service::alerts::org_config::get_correlation_config(
+                                    &new_trigger.org,
+                                )
+                                .await
+                            && correlation_config.enabled
+                        {
+                            let semantic_groups =
+                                match crate::service::alerts::org_config::get_deduplication_config(
+                                    &new_trigger.org,
+                                )
+                                .await
+                                {
+                                    Ok(Some(dedup_config)) => {
+                                        dedup_config.semantic_field_groups.clone()
+                                    }
+                                    _ => vec![],
+                                };
+
+                            // Correlate using original data (before deduplication)
+                            for row in &data {
+                                if let Err(e) =
+                                    crate::service::alerts::correlation::correlate_alert(
+                                        db,
+                                        &new_trigger.org,
+                                        &alert,
+                                        row,
+                                        &correlation_config,
+                                        &semantic_groups,
+                                    )
+                                    .await
+                                {
+                                    log::error!(
+                                        "[SCHEDULER trace_id {scheduler_trace_id}] Error correlating deduplicated alert: {}",
+                                        e
+                                    );
+                                }
+                            }
+                        }
+
                         // All results were deduplicated, skip notification
                         // Still update the trigger timing
                         trigger_data.period_end_time = if should_store_last_end_time {
@@ -792,31 +736,87 @@ async fn handle_alert_triggers(
             data
         };
 
-        // [ENTERPRISE] Collect alert events for batched incident creation
-        // #[cfg(feature = "enterprise")]
-        // if rca_enabled && !data.is_empty() {
-        //     // Collect each deduplicated result row as an alert event
-        //     // Use parent trace_id for cross-alert correlation (not scheduler_trace_id)
-        //     for row in &data {
-        //         if let Err(e) =
-        // o2_enterprise::enterprise::ai::rca::integration::collect_alert_event(
-        // trace_id, // Use parent trace_id for cross-alert batch             &alert,
-        //             row,
-        //             triggered_at,
-        //         ) {
-        //             log::error!(
-        //                 "[SCHEDULER trace_id {scheduler_trace_id}] Error collecting alert event
-        // for RCA: {}",                 e
-        //             );
-        //             // Don't fail alert evaluation if RCA collection fails
-        //         }
-        //     }
-        //     log::debug!(
-        //         "[SCHEDULER trace_id {scheduler_trace_id}] Collected {} alert events for RCA
-        // batch {}",         data.len(),
-        //         trace_id
-        //     );
-        // }
+        // Apply correlation if enabled (enterprise-only feature)
+        #[cfg(feature = "enterprise")]
+        if let Some(db) = ORM_CLIENT.get() {
+            // Get correlation config for this org
+            match crate::service::alerts::org_config::get_correlation_config(&new_trigger.org).await
+            {
+                Ok(Some(correlation_config)) if correlation_config.enabled => {
+                    // Get semantic groups from org-level deduplication config
+                    let semantic_groups =
+                        match crate::service::alerts::org_config::get_deduplication_config(
+                            &new_trigger.org,
+                        )
+                        .await
+                        {
+                            Ok(Some(dedup_config)) => dedup_config.semantic_field_groups.clone(),
+                            _ => vec![],
+                        };
+
+                    // Correlate each result row into incidents
+                    for row in &data {
+                        match crate::service::alerts::correlation::correlate_alert(
+                            db,
+                            &new_trigger.org,
+                            &alert,
+                            row,
+                            &correlation_config,
+                            &semantic_groups,
+                        )
+                        .await
+                        {
+                            Ok(Some(incident_id)) => {
+                                log::debug!(
+                                    "[SCHEDULER trace_id {scheduler_trace_id}] Alert correlated to incident {} for org: {}, alert: {}",
+                                    incident_id,
+                                    &new_trigger.org,
+                                    &alert.name
+                                );
+                            }
+                            Ok(None) => {
+                                log::debug!(
+                                    "[SCHEDULER trace_id {scheduler_trace_id}] Alert not correlated (below min threshold) for org: {}, alert: {}",
+                                    &new_trigger.org,
+                                    &alert.name
+                                );
+                            }
+                            Err(e) => {
+                                log::error!(
+                                    "[SCHEDULER trace_id {scheduler_trace_id}] Error correlating alert for org: {}, alert: {}: {}",
+                                    &new_trigger.org,
+                                    &alert.name,
+                                    e
+                                );
+                                // Don't fail alert evaluation if correlation fails
+                            }
+                        }
+                    }
+                }
+                Ok(Some(_)) => {
+                    // Correlation config exists but is disabled
+                    log::debug!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Correlation disabled for org: {}",
+                        &new_trigger.org
+                    );
+                }
+                Ok(None) => {
+                    // No correlation config for this org
+                    log::debug!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] No correlation config found for org: {}",
+                        &new_trigger.org
+                    );
+                }
+                Err(e) => {
+                    log::error!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Error getting correlation config for org: {}: {}",
+                        &new_trigger.org,
+                        e
+                    );
+                    // Don't fail alert evaluation if config retrieval fails
+                }
+            }
+        }
 
         let vars = get_row_column_map(&data);
         // Multi-time range alerts can have multiple time ranges, hence only
@@ -838,7 +838,117 @@ async fn handle_alert_triggers(
         trigger_data_stream.start_time = alert_start_time;
         trigger_data_stream.end_time = alert_end_time;
 
-        // No grouping - send individual notification
+        // Check if grouping is enabled (enterprise-only feature)
+        #[cfg(feature = "enterprise")]
+        let grouping_enabled = alert
+            .deduplication
+            .as_ref()
+            .and_then(|d| d.grouping.as_ref())
+            .map(|g| g.enabled)
+            .unwrap_or(false);
+
+        #[cfg(not(feature = "enterprise"))]
+        let grouping_enabled = false;
+
+        if grouping_enabled {
+            #[cfg(feature = "enterprise")]
+            {
+                let grouping_config = alert
+                    .deduplication
+                    .as_ref()
+                    .and_then(|d| d.grouping.as_ref())
+                    .unwrap();
+
+                // Calculate fingerprint for grouping (using same logic as deduplication)
+                let fingerprint = if let Some(dedup_config) = alert.deduplication.as_ref() {
+                    // Get org-level dedup config for semantic groups
+                    let org_config =
+                        match crate::service::alerts::org_config::get_deduplication_config(
+                            &new_trigger.org,
+                        )
+                        .await
+                        {
+                            Ok(Some(config)) => Some(config),
+                            _ => None,
+                        };
+
+                    // Calculate fingerprint using first row (all rows passed dedup so share same
+                    // fingerprint)
+                    if let Some(first_row) = data.first() {
+                        crate::service::alerts::deduplication::calculate_fingerprint(
+                            &alert,
+                            first_row,
+                            dedup_config,
+                            org_config.as_ref(),
+                        )
+                    } else {
+                        // Fallback: use alert ID as fingerprint
+                        alert.get_unique_key()
+                    }
+                } else {
+                    // No dedup config, use alert ID as fingerprint
+                    alert.get_unique_key()
+                };
+
+                log::debug!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Adding alert to batch, org: {}, alert: {}, fingerprint: {}, rows: {}",
+                    &new_trigger.org,
+                    &alert.name,
+                    fingerprint,
+                    data.len()
+                );
+
+                // Add to batch
+                let batch_ready = crate::service::alerts::grouping::add_to_batch(
+                    fingerprint.clone(),
+                    new_trigger.org.clone(),
+                    alert.clone(),
+                    data.clone(),
+                    grouping_config.group_wait_seconds,
+                    grouping_config.max_group_size,
+                );
+
+                if batch_ready {
+                    log::info!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Batch {} reached max size, sending immediately",
+                        fingerprint
+                    );
+                    // Batch is full, send immediately
+                    if let Some(batch) =
+                        crate::service::alerts::grouping::get_ready_batch(&fingerprint)
+                    {
+                        // Send grouped notification via background worker logic
+                        if let Err(e) =
+                            crate::job::alert_grouping::send_grouped_notification_sync(batch).await
+                        {
+                            log::error!(
+                                "[SCHEDULER trace_id {scheduler_trace_id}] Failed to send grouped notification: {}",
+                                e
+                            );
+                        }
+                    }
+                } else {
+                    log::debug!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Alert added to batch, waiting for more alerts or timeout, fingerprint: {}",
+                        fingerprint
+                    );
+                }
+
+                // Alert added to batch, don't send individual notification
+                // Update trigger state and return
+                trigger_data.period_end_time = if should_store_last_end_time {
+                    Some(trigger_results.end_time)
+                } else {
+                    None
+                };
+                new_trigger.data = json::to_string(&trigger_data).unwrap();
+                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                publish_triggers_usage(trigger_data_stream);
+                return Ok(());
+            }
+        }
+
+        // Normal flow: Send individual notification (grouping disabled or not enterprise)
         match alert
             .send_notification(
                 &data,

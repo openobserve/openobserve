@@ -207,6 +207,38 @@ const alerts = {
   get_dedup_summary: (org_identifier: string) => {
     return http().get(`/api/${org_identifier}/alerts/dedup/summary`);
   },
+  // Incident APIs
+  listIncidents: (org_identifier: string, status?: string) => {
+    const params = new URLSearchParams();
+    if (status) params.append("status", status);
+    return http().get(`/api/${org_identifier}/alerts/incidents?${params}`);
+  },
+  getIncident: (org_identifier: string, incident_id: string) => {
+    return http().get(`/api/${org_identifier}/alerts/incidents/${incident_id}`);
+  },
+  updateIncidentStatus: (
+    org_identifier: string,
+    incident_id: string,
+    status: string,
+  ) => {
+    return http().put(
+      `/api/${org_identifier}/alerts/incidents/${incident_id}/status`,
+      { status },
+    );
+  },
+  // Correlation Config APIs
+  getCorrelationConfig: (org_identifier: string) => {
+    return http().get(`/api/${org_identifier}/alerts/correlation/config`);
+  },
+  setCorrelationConfig: (org_identifier: string, data: any) => {
+    return http().post(
+      `/api/${org_identifier}/alerts/correlation/config`,
+      data,
+    );
+  },
+  deleteCorrelationConfig: (org_identifier: string) => {
+    return http().delete(`/api/${org_identifier}/alerts/correlation/config`);
+  },
 };
 
 export default alerts;

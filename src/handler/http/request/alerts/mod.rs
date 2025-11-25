@@ -52,6 +52,7 @@ pub mod deduplication;
 pub mod deprecated;
 pub mod destinations;
 pub mod history;
+pub mod incidents;
 pub mod templates;
 
 impl From<AlertError> for HttpResponse {

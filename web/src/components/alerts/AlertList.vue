@@ -147,8 +147,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #after>
           <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
             <div class="tw-h-full card-container">
+              <!-- Incidents View -->
+              <IncidentList v-if="activeTab === 'incidents'" />
               <!-- Alert List Table -->
               <q-table
+                v-else
                 v-model:selected="selectedAlerts"
                 :selected-rows-label="getSelectedString"
                 selection="multiple"
@@ -875,6 +878,7 @@ import config from "@/aws-exports";
 import ImportAlert from "@/components/alerts/ImportAlert.vue";
 import OrganizationDeduplicationSettings from "@/components/alerts/OrganizationDeduplicationSettings.vue";
 import DedupSummaryCards from "@/components/alerts/DedupSummaryCards.vue";
+import IncidentList from "@/components/alerts/IncidentList.vue";
 import {
   getImageURL,
   getUUID,
@@ -1095,6 +1099,10 @@ export default defineComponent({
       {
         label: t("alerts.realTime"),
         value: "realTime",
+      },
+      {
+        label: "Incidents",
+        value: "incidents",
       },
     ]);
 

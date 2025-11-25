@@ -18,11 +18,62 @@
 //! This module provides functions to store and retrieve org-level alert configs
 //! using the existing key-value DB interface.
 
-use config::meta::alerts::deduplication::GlobalDeduplicationConfig;
+use config::meta::alerts::{
+    correlation::CorrelationConfig, deduplication::GlobalDeduplicationConfig,
+};
 use infra::db;
 
 const MODULE: &str = "alert_config";
+const CORRELATION_KEY: &str = "correlation";
 const DEDUPLICATION_KEY: &str = "deduplication";
+
+/// Get correlation config for an organization
+pub async fn get_correlation_config(
+    org_id: &str,
+) -> Result<Option<CorrelationConfig>, anyhow::Error> {
+    let key = db::build_key(MODULE, org_id, CORRELATION_KEY, 0);
+    let db = db::get_db().await;
+
+    match db.get(&key).await {
+        Ok(bytes) => {
+            let config: CorrelationConfig = serde_json::from_slice(&bytes)?;
+            Ok(Some(config))
+        }
+        Err(infra::errors::Error::DbError(infra::errors::DbError::KeyNotExists(_))) => Ok(None),
+        Err(e) => Err(anyhow::anyhow!("Failed to get correlation config: {}", e)),
+    }
+}
+
+/// Set correlation config for an organization
+pub async fn set_correlation_config(
+    org_id: &str,
+    config: &CorrelationConfig,
+) -> Result<(), anyhow::Error> {
+    // Validate the config before storing
+    config.validate().map_err(|e| anyhow::anyhow!("{}", e))?;
+
+    let key = db::build_key(MODULE, org_id, CORRELATION_KEY, 0);
+    let value = serde_json::to_vec(config)?;
+    let db = db::get_db().await;
+
+    db.put(&key, value.into(), db::NO_NEED_WATCH, None)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to set correlation config: {}", e))?;
+
+    Ok(())
+}
+
+/// Delete correlation config for an organization
+pub async fn delete_correlation_config(org_id: &str) -> Result<(), anyhow::Error> {
+    let key = db::build_key(MODULE, org_id, CORRELATION_KEY, 0);
+    let db = db::get_db().await;
+
+    db.delete_if_exists(&key, false, db::NO_NEED_WATCH)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to delete correlation config: {}", e))?;
+
+    Ok(())
+}
 
 /// Get deduplication config for an organization
 pub async fn get_deduplication_config(
@@ -75,7 +126,7 @@ mod tests {
 
     #[test]
     fn test_build_key() {
-        let key = db::build_key(MODULE, "org123", DEDUPLICATION_KEY, 0);
-        assert_eq!(key, "/alert_config/org123/deduplication");
+        let key = db::build_key(MODULE, "org123", CORRELATION_KEY, 0);
+        assert_eq!(key, "/alert_config/org123/correlation");
     }
 }

@@ -350,8 +350,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
             .await
             .expect("cloud ofga migrations failed");
 
-        use crate::service::self_reporting::{ingest_data_retention_usages, search::get_usage};
-        o2_enterprise::enterprise::metering::init(get_usage, ingest_data_retention_usages)
+        use crate::service::self_reporting::search::get_usage;
+        o2_enterprise::enterprise::metering::init(get_usage)
             .await
             .expect("cloud usage metering job init failed");
 
