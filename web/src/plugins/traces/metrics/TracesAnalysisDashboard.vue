@@ -31,7 +31,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-icon name="dashboard" size="md" color="primary" />
           <div>
             <div class="tw-text-lg tw-font-semibold">
-              {{ props.analysisType === 'latency' ? t('latencyInsights.title') : t('volumeInsights.title') }}
+              <template v-if="props.analysisType === 'latency'">{{ t('latencyInsights.title') }}</template>
+              <template v-else-if="props.analysisType === 'volume'">{{ t('volumeInsights.title') }}</template>
+              <template v-else-if="props.analysisType === 'error'">Error Insights</template>
             </div>
             <div class="tw-text-xs tw-text-gray-500">
               <span v-if="props.analysisType === 'latency' && durationFilter">
@@ -43,6 +45,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template v-else>
                   {{ t('volumeInsights.rateLabel') }} {{ rateFilter.start }} - {{ rateFilter.end }} traces/interval
+                </template>
+              </span>
+              <span v-else-if="props.analysisType === 'error' && errorFilter">
+                <template v-if="errorFilter.timeStart && errorFilter.timeEnd">
+                  Error Spike Period: {{ formatTimestamp(errorFilter.timeStart) }} - {{ formatTimestamp(errorFilter.timeEnd) }}
+                </template>
+                <template v-else>
+                  Errors >= {{ errorFilter.start }}
                 </template>
               </span>
             </div>
@@ -163,6 +173,13 @@ interface RateFilter {
   timeEnd?: number;
 }
 
+interface ErrorFilter {
+  start: number;
+  end: number;
+  timeStart?: number;
+  timeEnd?: number;
+}
+
 interface TimeRange {
   startTime: number;
   endTime: number;
@@ -171,11 +188,12 @@ interface TimeRange {
 interface Props {
   durationFilter?: DurationFilter;
   rateFilter?: RateFilter;
+  errorFilter?: ErrorFilter;
   timeRange: TimeRange;
   streamName: string;
   streamType?: string; // logs or traces
   baseFilter?: string;
-  analysisType?: "latency" | "volume"; // New prop to distinguish analysis type
+  analysisType?: "latency" | "volume" | "error"; // New prop to distinguish analysis type
   streamFields?: any[]; // Stream schema fields for smart dimension selection
   logSamples?: any[]; // Actual log data for sample-based analysis (logs only)
 }
@@ -322,19 +340,29 @@ const loadAnalysis = async () => {
     console.log('[Analysis] Available stream fields:', props.streamFields?.length || 0);
 
     // Determine which filter to use based on analysis type
-    const filterConfig = props.analysisType === 'latency'
-      ? { durationFilter: props.durationFilter, rateFilter: undefined }
-      : { durationFilter: undefined, rateFilter: props.rateFilter };
+    let filterConfig;
+    if (props.analysisType === 'latency') {
+      filterConfig = { durationFilter: props.durationFilter, rateFilter: undefined, errorFilter: undefined };
+    } else if (props.analysisType === 'volume') {
+      filterConfig = { durationFilter: undefined, rateFilter: props.rateFilter, errorFilter: undefined };
+    } else if (props.analysisType === 'error') {
+      filterConfig = { durationFilter: undefined, rateFilter: undefined, errorFilter: props.errorFilter };
+    }
 
-    // For volume analysis with rate filter, use the actual selected time range from the brush
+    // For volume/error analysis with filter, use the actual selected time range from the brush
     // Otherwise, use the global time range
-    const selectedTimeRange =
-      props.analysisType === 'volume' && props.rateFilter?.timeStart && props.rateFilter?.timeEnd
-        ? {
-            startTime: props.rateFilter.timeStart,
-            endTime: props.rateFilter.timeEnd
-          }
-        : props.timeRange;
+    let selectedTimeRange = props.timeRange;
+    if (props.analysisType === 'volume' && props.rateFilter?.timeStart && props.rateFilter?.timeEnd) {
+      selectedTimeRange = {
+        startTime: props.rateFilter.timeStart,
+        endTime: props.rateFilter.timeEnd
+      };
+    } else if (props.analysisType === 'error' && props.errorFilter?.timeStart && props.errorFilter?.timeEnd) {
+      selectedTimeRange = {
+        startTime: props.errorFilter.timeStart,
+        endTime: props.errorFilter.timeEnd
+      };
+    }
 
     const config: LatencyInsightsConfig = {
       streamName: props.streamName,
@@ -365,6 +393,7 @@ const loadAnalysis = async () => {
       },
       rateFilter: config.rateFilter,
       durationFilter: config.durationFilter,
+      errorFilter: config.errorFilter,
       baseFilter: config.baseFilter,
     });
 

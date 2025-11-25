@@ -106,6 +106,50 @@ export function useLatencyInsightsDashboard() {
       });
 
       return unionQuery;
+    } else if (config.analysisType === "error") {
+      // Error Analysis: Compare error percentages by dimension
+      // Error % = (error_traces / total_traces) * 100
+      const baselineQuery = `
+        SELECT
+          COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
+          'Baseline' AS series,
+          (approx_distinct(trace_id) FILTER (WHERE span_status = 'ERROR') * 100.0) /
+          NULLIF(approx_distinct(trace_id), 0) AS error_percentage
+        FROM "${config.streamName}"
+        ${baselineWhere}
+        GROUP BY ${dimensionName}
+      `.trim();
+
+      const selectedQuery = `
+        SELECT
+          COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
+          'Selected' AS series,
+          (approx_distinct(trace_id) FILTER (WHERE span_status = 'ERROR') * 100.0) /
+          NULLIF(approx_distinct(trace_id), 0) AS error_percentage
+        FROM "${config.streamName}"
+        ${selectedWhere}
+        GROUP BY ${dimensionName}
+      `.trim();
+
+      const unionQuery = `${baselineQuery} UNION ${selectedQuery} ORDER BY error_percentage DESC LIMIT 40`;
+
+      console.log(`[Query Generation] Error analysis query for dimension "${dimensionName}":`, {
+        baselineTimeRange: {
+          start: new Date(config.baselineTimeRange.startTime / 1000).toISOString(),
+          end: new Date(config.baselineTimeRange.endTime / 1000).toISOString(),
+        },
+        selectedTimeRange: {
+          start: new Date(config.selectedTimeRange.startTime / 1000).toISOString(),
+          end: new Date(config.selectedTimeRange.endTime / 1000).toISOString(),
+        },
+        baselineWhere,
+        selectedWhere,
+        baselineQuery,
+        selectedQuery,
+        unionQuery
+      });
+
+      return unionQuery;
     } else {
       // Latency Analysis: Compare percentile latencies by dimension
       const baselineQuery = `
@@ -140,25 +184,47 @@ export function useLatencyInsightsDashboard() {
     config: LatencyInsightsConfig
   ) => {
     const isVolumeAnalysis = config.analysisType === "volume";
+    const isErrorAnalysis = config.analysisType === "error";
     const panels = analyses.map((analysis, index) => {
       // Build panel description based on analysis type
-      const description = isVolumeAnalysis
-        ? `Trace count comparison for dimension: ${analysis.dimensionName}. Higher Selected bars indicate this dimension value appears more frequently in high-volume periods.`
-        : `Percentile latency comparison for dimension: ${analysis.dimensionName}. Higher Selected bars indicate this dimension value correlates with slower traces.`;
+      let description = "";
+      if (isVolumeAnalysis) {
+        description = `Trace count comparison for dimension: ${analysis.dimensionName}. Higher Selected bars indicate this dimension value appears more frequently in high-volume periods.`;
+      } else if (isErrorAnalysis) {
+        description = `Error percentage comparison for dimension: ${analysis.dimensionName}. Higher Selected bars indicate this dimension value has more errors in the error spike period.`;
+      } else {
+        description = `Percentile latency comparison for dimension: ${analysis.dimensionName}. Higher Selected bars indicate this dimension value correlates with slower traces.`;
+      }
 
       // Generate SQL query for this dimension
       const sqlQuery = buildComparisonQuery(analysis.dimensionName, config);
 
+      // Determine panel ID prefix
+      let panelPrefix = "LatencyInsights";
+      if (isVolumeAnalysis) panelPrefix = "VolumeInsights";
+      if (isErrorAnalysis) panelPrefix = "ErrorInsights";
+
+      // Determine unit and decimals
+      let unit = "microseconds";
+      let decimals = 2;
+      if (isVolumeAnalysis) {
+        unit = "traces";
+        decimals = 0;
+      } else if (isErrorAnalysis) {
+        unit = "percent";
+        decimals = 2;
+      }
+
       return {
-        id: `Panel_${isVolumeAnalysis ? 'VolumeInsights' : 'LatencyInsights'}_${index}`,
+        id: `Panel_${panelPrefix}_${index}`,
         type: "bar",
         title: analysis.dimensionName,
         description,
         config: {
           show_legends: true,
           legends_position: "bottom",
-          unit: isVolumeAnalysis ? "traces" : "microseconds",
-          decimals: isVolumeAnalysis ? 0 : 2,
+          unit,
+          decimals,
           axis_border_show: true,
           label_option: {
             rotate: 45,
@@ -237,8 +303,8 @@ export function useLatencyInsightsDashboard() {
               y: [
                 {
                   label: "",
-                  alias: isVolumeAnalysis ? "trace_count" : "percentile_latency",
-                  column: isVolumeAnalysis ? "trace_count" : "percentile_latency",
+                  alias: isVolumeAnalysis ? "trace_count" : (isErrorAnalysis ? "error_percentage" : "percentile_latency"),
+                  column: isVolumeAnalysis ? "trace_count" : (isErrorAnalysis ? "error_percentage" : "percentile_latency"),
                   color: null,
                   isDerived: false,
                   havingConditions: [],
@@ -287,13 +353,21 @@ export function useLatencyInsightsDashboard() {
       };
     });
 
-    const title = isVolumeAnalysis ? "Volume Insights" : "Latency Insights";
-    const description = isVolumeAnalysis
-      ? `Comparing trace count distribution ${config.rateFilter ? `of selected periods (rate ${config.rateFilter.start}-${config.rateFilter.end} traces)` : ''} vs baseline across dimensions`
-      : `Comparing percentile latency of selected traces (duration ${config.durationFilter?.start}-${config.durationFilter?.end}µs) vs baseline across dimensions`;
+    let title = "Latency Insights";
+    if (isVolumeAnalysis) title = "Volume Insights";
+    if (isErrorAnalysis) title = "Error Insights";
+
+    let description = "";
+    if (isVolumeAnalysis) {
+      description = `Comparing trace count distribution ${config.rateFilter ? `of selected periods (rate ${config.rateFilter.start}-${config.rateFilter.end} traces)` : ''} vs baseline across dimensions`;
+    } else if (isErrorAnalysis) {
+      description = `Comparing error percentage of traces during error spike period vs baseline across dimensions`;
+    } else {
+      description = `Comparing percentile latency of selected traces (duration ${config.durationFilter?.start}-${config.durationFilter?.end}µs) vs baseline across dimensions`;
+    }
 
     // Only include percentile variable for latency analysis
-    const variables = isVolumeAnalysis
+    const variables = (isVolumeAnalysis || isErrorAnalysis)
       ? { list: [], showDynamicFilters: false }
       : {
           list: [

@@ -110,6 +110,22 @@ class="tw-mx-1 tw-text-red-500" />
       >
         <q-tooltip>{{ t('volumeInsights.analyzeTooltip') }}</q-tooltip>
       </q-btn>
+
+      <!-- Error Analysis Button (shown when Error filter exists) -->
+      <q-btn
+        v-if="hasErrorFilter"
+        outline
+        dense
+        no-caps
+        color="negative"
+        icon="error_outline"
+        label="Analyze Errors"
+        class="analyze-button tw-h-[2rem]"
+        @click="openErrorAnalysisDashboard"
+        data-test="error-analyze-button"
+      >
+        <q-tooltip>Analyze error distribution across dimensions</q-tooltip>
+      </q-btn>
     </div>
 
     <!-- Charts Section -->
@@ -165,6 +181,19 @@ class="tw-mx-1 tw-text-red-500" />
       :streamFields="streamFields"
       analysisType="volume"
       @close="showVolumeAnalysisDashboard = false"
+    />
+
+    <!-- Error Analysis Dashboard -->
+    <TracesAnalysisDashboard
+      v-if="showErrorAnalysisDashboard"
+      :streamName="streamName"
+      streamType="traces"
+      :timeRange="originalTimeRangeBeforeSelection || timeRange"
+      :errorFilter="analysisErrorFilter"
+      :baseFilter="filter"
+      :streamFields="streamFields"
+      analysisType="error"
+      @close="showErrorAnalysisDashboard = false"
     />
   </div>
 </template>
@@ -246,6 +275,10 @@ const analysisRateFilter = ref({ start: 0, end: 0 });
 // Store the original time range before selection for baseline comparison
 const originalTimeRangeBeforeSelection = ref<TimeRange | null>(null);
 
+// Error Analysis state
+const showErrorAnalysisDashboard = ref(false);
+const analysisErrorFilter = ref({ start: 0, end: 0 });
+
 // Reactivity trigger for Map changes (Vue 3 doesn't track Map.set() automatically)
 const rangeFiltersVersion = ref(0);
 
@@ -299,6 +332,23 @@ const hasRateFilter = computed(() => {
   rangeFilters.value.forEach((filter) => {
     if (filter.panelTitle === "Rate") {
       // Show volume analyze button if we have any rate filter (start or end)
+      if (filter.start !== null || filter.end !== null) {
+        hasFilter = true;
+      }
+    }
+  });
+  return hasFilter;
+});
+
+// Check if error filter exists
+const hasErrorFilter = computed(() => {
+  // Force reactivity by accessing rangeFiltersVersion
+  rangeFiltersVersion.value;
+
+  let hasFilter = false;
+  rangeFilters.value.forEach((filter) => {
+    if (filter.panelTitle === "Errors") {
+      // Show error analyze button if we have any error filter (start or end)
       if (filter.start !== null || filter.end !== null) {
         hasFilter = true;
       }
@@ -434,8 +484,8 @@ const createRangeFilter = (data, start = null, end = null, timeStart = null, tim
   const panelId = data?.id;
   const panelTitle = data?.title || "Chart";
 
-  // Support both Duration and Rate panels
-  if (panelId && (panelTitle === "Duration" || panelTitle === "Rate")) {
+  // Support Duration, Rate, and Errors panels
+  if (panelId && (panelTitle === "Duration" || panelTitle === "Rate" || panelTitle === "Errors")) {
     searchObj.meta.metricsRangeFilters.set(panelId, {
       panelTitle,
       start: start ? Math.floor(start) : null,
@@ -490,14 +540,14 @@ const onDataZoom = ({
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
     });
 
-    // For Rate panel: use placeholder values to indicate time-based selection
-    // Volume analysis will use the time range, not Y-axis values
-    if (panelTitle === "Rate") {
+    // For Rate and Errors panels: use placeholder values to indicate time-based selection
+    // Volume/Error analysis will use the time range, not Y-axis values
+    if (panelTitle === "Rate" || panelTitle === "Errors") {
       // Convert milliseconds to microseconds for OpenObserve timestamp format
       const timeStartMicros = start * 1000;
       const timeEndMicros = end * 1000;
 
-      console.log('[Rate Selection] User selected time range on Rate chart:', {
+      console.log(`[${panelTitle} Selection] User selected time range on ${panelTitle} chart:`, {
         startMs: start,
         endMs: end,
         startMicros: timeStartMicros,
@@ -508,7 +558,7 @@ const onDataZoom = ({
       });
 
       // Use -1 as placeholder to indicate time-based zoom (not Y-axis value zoom)
-      // Pass actual time range as timeStart/timeEnd for volume analysis
+      // Pass actual time range as timeStart/timeEnd for volume/error analysis
       createRangeFilter(data, -1, -1, timeStartMicros, timeEndMicros);
     } else {
       // For Duration/other panels: use actual Y-axis values (start1, end1)
@@ -631,6 +681,42 @@ const openVolumeAnalysisDashboard = () => {
   };
 
   showVolumeAnalysisDashboard.value = true;
+};
+
+const openErrorAnalysisDashboard = () => {
+  // Get the current error range from existing filters
+  let errorStart = null;
+  let errorEnd = null;
+  let timeStart = null;
+  let timeEnd = null;
+
+  rangeFilters.value.forEach((filter) => {
+    if (filter.panelTitle === "Errors") {
+      errorStart = filter.start;
+      errorEnd = filter.end;
+      timeStart = filter.timeStart;
+      timeEnd = filter.timeEnd;
+    }
+  });
+
+  console.log('[Error Analysis] Opening dashboard with error filter:', {
+    errorStart,
+    errorEnd,
+    timeStart,
+    timeEnd,
+    timeStartISO: timeStart ? new Date(timeStart / 1000).toISOString() : 'null',
+    timeEndISO: timeEnd ? new Date(timeEnd / 1000).toISOString() : 'null',
+  });
+
+  // Set the error filter for analysis
+  analysisErrorFilter.value = {
+    start: errorStart || 0,
+    end: errorEnd || Number.MAX_SAFE_INTEGER,
+    timeStart: timeStart || undefined,
+    timeEnd: timeEnd || undefined,
+  };
+
+  showErrorAnalysisDashboard.value = true;
 };
 
 const handleContextMenuSelect = (selection: {

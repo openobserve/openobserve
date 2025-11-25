@@ -53,9 +53,13 @@ export interface LatencyInsightsConfig {
     start: number;
     end: number;
   };
+  errorFilter?: {
+    start: number;
+    end: number;
+  };
   baseFilter?: string;
   dimensions: string[]; // List of dimension names to analyze
-  analysisType?: "latency" | "volume"; // Type of analysis to perform
+  analysisType?: "latency" | "volume" | "error"; // Type of analysis to perform
 }
 
 export function useLatencyInsightsAnalysis() {
