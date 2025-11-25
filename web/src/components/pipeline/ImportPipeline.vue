@@ -1175,7 +1175,7 @@ export default defineComponent({
       // Convert V0 and V1 conditions to V2 format in condition nodes before creating pipeline
       if (input.nodes && Array.isArray(input.nodes)) {
         input.nodes.forEach((node: any) => {
-          if (node.node_type === "condition" && node.data?.conditions) {
+          if (node.data?.node_type === "condition" && node.data?.conditions) {
             // Check if version field is already present (V2)
             if (node.data.version !== "2" && node.data.version !== 2) {
               const version = detectConditionsVersion(node.data.conditions);
