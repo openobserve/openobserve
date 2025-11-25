@@ -86,7 +86,8 @@
     "contactUs": "Neem contact met ons op",
     "addFolder": "Map toevoegen",
     "status": "Status",
-    "cancel": "Annuleer"
+    "cancel": "Annuleer",
+    "test": "Test"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",

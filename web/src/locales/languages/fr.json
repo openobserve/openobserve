@@ -86,7 +86,8 @@
     "contactUs": "Nous contacter",
     "addFolder": "Ajouter un dossier",
     "status": "État",
-    "cancel": "Annuler"
+    "cancel": "Annuler",
+    "test": "Testez"
   },
   "search": {
     "selectIndex": "Sélectionnez Stream First",

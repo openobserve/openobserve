@@ -86,7 +86,8 @@
     "contactUs": "Póngase en contacto con nosotros",
     "addFolder": "Agregar carpeta",
     "status": "Estado",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "test": "Prueba"
   },
   "search": {
     "selectIndex": "Selecciona el índice primero",

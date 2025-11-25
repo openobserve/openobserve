@@ -86,7 +86,8 @@
     "contactUs": "お問い合わせ",
     "addFolder": "[フォルダを追加]",
     "status": "ステータス",
-    "cancel": "[キャンセル]"
+    "cancel": "[キャンセル]",
+    "test": "テスト"
   },
   "search": {
     "metrics": "メトリクス",

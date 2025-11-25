@@ -86,7 +86,8 @@
     "contactUs": "문의하기",
     "addFolder": "폴더 추가",
     "status": "상태",
-    "cancel": "취소"
+    "cancel": "취소",
+    "test": "테스트"
   },
   "search": {
     "selectIndex": "스트림 우선 선택",
