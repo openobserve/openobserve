@@ -3,7 +3,7 @@ name: Update Translations
 on:
   push:
     branches:
-      - '**'
+      - 'chore/automate_launguage_conversion'
     paths:
       - 'web/src/locales/languages/en.json'
   workflow_dispatch:
