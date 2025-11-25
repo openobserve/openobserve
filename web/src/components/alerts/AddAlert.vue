@@ -1530,11 +1530,12 @@ export default defineComponent({
     // - V1: Tree-based structure with {and: [...]} or {or: [...]} or {label, items, groupId}
     // - V2: Linear structure with filterType, logicalOperator per condition
 
-    // Check for version field at query_condition level (V2 format from backend)
-    if (this.formData.query_condition.version === "2" || this.formData.query_condition.version === 2) {
-      // V2: Backend sends { version: "2", conditions: {...} }
-      // Extract conditions - it's already in V2 format
-      // The conditions are already at this.formData.query_condition.conditions
+    // Check for V2 format from backend
+    // Backend sends: query_condition: { conditions: { version: 2, conditions: {...} } }
+    if (this.formData.query_condition.conditions?.version === "2" || this.formData.query_condition.conditions?.version === 2) {
+      // V2: Extract the nested conditions object
+      // Backend sends { version: 2, conditions: {...} }, we need just the inner conditions
+      this.formData.query_condition.conditions = ensureIds(this.formData.query_condition.conditions.conditions);
     } else if(this.formData.query_condition.conditions && ( !Array.isArray(this.formData.query_condition.conditions) && Object.keys(this.formData.query_condition.conditions).length != 0)){
       // No version field - could be V1 or old V2
       // Detect version by structure
@@ -1711,19 +1712,13 @@ export default defineComponent({
         }
 
         // VERSION HANDLING
-        const version = detectConditionsVersion(this.formData.query_condition.conditions);
-        if (version === 2) {
-          // V2: Wrap with version field at query_condition level
-          // Backend expects: { version: "2", conditions: {...} }
-          payload.query_condition = {
-            ...payload.query_condition,
-            version: "2",
-            conditions: this.formData.query_condition.conditions,
-          };
-        } else {
-          // V1: Transform and send without version (legacy format)
-          payload.query_condition.conditions = this.transformFEToBE(this.formData.query_condition.conditions);
-        }
+        // All conditions are converted to V2 format during data loading,
+        // so we always wrap with version field for backend
+        // Backend expects: query_condition: { conditions: { version: 2, conditions: {...} } }
+        payload.query_condition.conditions = {
+          version: 2,
+          conditions: this.formData.query_condition.conditions,
+        };
 
         if (this.beingUpdated) {
           payload.folder_id = this.router.currentRoute.value.query.folder || "default";

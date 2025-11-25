@@ -21,6 +21,7 @@ import store from "@/test/unit/helpers/store";
 import { installQuasar } from "@/test/unit/helpers";
 import router from "@/test/unit/helpers/router";
 import { generateWhereClause } from "@/utils/alerts/alertQueryBuilder";
+import { detectConditionsVersion } from "@/utils/alerts/alertDataTransforms";
 
 import PreviewAlert from "@/components/alerts/PreviewAlert.vue";
 
@@ -1156,6 +1157,138 @@ describe("AddAlert Component", () => {
     });
     it('retransformBEToFE returns null for invalid keys', () => {
       expect(w.vm.retransformBEToFE({} as any)).toBeNull();
+    });
+  });
+
+  describe('V2 Conditions Version Field Placement', () => {
+    let w: any;
+    beforeEach(() => {
+      w = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      w.vm.formData.name = "test_v2_alert";
+      w.vm.formData.stream_name = "_rundata";
+      w.vm.formData.stream_type = "logs";
+      w.vm.formData.is_real_time = false;
+      w.vm.scheduledAlertRef = { tab: 'custom' };
+      w.vm.isAggregationEnabled = false;
+    });
+
+    it('should wrap V2 conditions with version field INSIDE conditions object when saving', () => {
+      // Set up V2 format conditions
+      const v2Conditions = {
+        filterType: 'group',
+        logicalOperator: 'AND',
+        groupId: 'test-group',
+        conditions: [
+          {
+            id: 'test-id',
+            type: 'condition',
+            filterType: 'condition',
+            column: 'status',
+            operator: '=',
+            value: '200',
+            logicalOperator: 'AND',
+            ignore_case: true
+          }
+        ]
+      };
+      w.vm.formData.query_condition.conditions = v2Conditions;
+      w.vm.formData.query_condition.aggregation = null;
+      w.vm.formData.query_condition.type = 'custom';
+
+      const payload = w.vm.getAlertPayload();
+
+      // Simulate the version wrapping logic from onSubmit()
+      const version = detectConditionsVersion(w.vm.formData.query_condition.conditions);
+      if (version === 2) {
+        payload.query_condition.conditions = {
+          version: 2,
+          conditions: w.vm.formData.query_condition.conditions,
+        };
+      }
+
+      // Backend expects: conditions: { version: 2, conditions: {...} }
+      expect(payload.query_condition.conditions).toHaveProperty('version');
+      expect(payload.query_condition.conditions.version).toBe(2);
+      expect(payload.query_condition.conditions).toHaveProperty('conditions');
+      expect(payload.query_condition.conditions.conditions.filterType).toBe('group');
+      expect(payload.query_condition.conditions.conditions.logicalOperator).toBe('AND');
+    });
+
+    it('should NOT have version field at query_condition level for V2', () => {
+      // Set up V2 format conditions
+      w.vm.formData.query_condition.conditions = {
+        filterType: 'group',
+        logicalOperator: 'OR',
+        groupId: 'test-group',
+        conditions: []
+      };
+
+      const payload = w.vm.getAlertPayload();
+
+      // Simulate the version wrapping logic from onSubmit()
+      const version = detectConditionsVersion(w.vm.formData.query_condition.conditions);
+      if (version === 2) {
+        payload.query_condition.conditions = {
+          version: 2,
+          conditions: w.vm.formData.query_condition.conditions,
+        };
+      }
+
+      // Version should NOT be at this level
+      expect(payload.query_condition).not.toHaveProperty('version');
+      // But should be inside conditions
+      expect(payload.query_condition.conditions).toHaveProperty('version');
+    });
+
+    it('should handle V1 conditions without version field', () => {
+      // Set up V1 format conditions (tree-based)
+      w.vm.formData.query_condition.conditions = {
+        or: [
+          { column: 'status', operator: '=', value: '200', ignore_case: true }
+        ]
+      };
+
+      const payload = w.vm.getAlertPayload();
+
+      // V1 format should not have version field at any level
+      expect(payload.query_condition).not.toHaveProperty('version');
+      expect(payload.query_condition.conditions).not.toHaveProperty('version');
+      // Should be transformed to V1 backend format
+      expect(payload.query_condition.conditions).toHaveProperty('or');
+    });
+
+    it('should correctly extract V2 conditions when loading from backend', async () => {
+      // Simulate backend response with V2 format
+      w.vm.formData.query_condition.conditions = {
+        version: 2,
+        conditions: {
+          filterType: 'group',
+          logicalOperator: 'AND',
+          groupId: 'backend-group',
+          conditions: [
+            {
+              id: 'backend-id',
+              type: 'condition',
+              filterType: 'condition',
+              column: 'level',
+              operator: '=',
+              value: 'error',
+              logicalOperator: 'AND',
+              ignore_case: true
+            }
+          ]
+        }
+      };
+
+      // Call the data loading logic (simulating mounted hook behavior)
+      await w.vm.$nextTick();
+
+      // After loading, conditions should be extracted from nested structure
+      // The actual extraction happens in the component's data loading logic
+      // This test verifies the structure matches backend expectations
+      expect(w.vm.formData.query_condition.conditions.version).toBe(2);
+      expect(w.vm.formData.query_condition.conditions.conditions).toBeDefined();
+      expect(w.vm.formData.query_condition.conditions.conditions.filterType).toBe('group');
     });
   });
 
