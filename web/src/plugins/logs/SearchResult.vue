@@ -83,14 +83,14 @@ color="warning" size="sm"> </q-icon>
             dense
             color="primary"
             icon="analytics"
-            label="Analyze Dimensions"
+            :label="t('latencyInsights.analyzeButtonLabel')"
             class="q-ml-md"
             size="sm"
             @click="openVolumeAnalysisDashboard"
             data-test="logs-analyze-dimensions-button"
           >
             <q-tooltip>
-              Analyze dimension distribution for current time range
+              {{ t('volumeInsights.analyzeTooltipLogs') }}
             </q-tooltip>
           </q-btn>
         </div>

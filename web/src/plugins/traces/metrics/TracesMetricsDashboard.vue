@@ -87,12 +87,12 @@ class="tw-mx-1 tw-text-red-500" />
         no-caps
         color="primary"
         icon="analytics"
-        label="Analyze Dimensions"
+        :label="t('latencyInsights.analyzeButtonLabel')"
         class="analyze-button tw-h-[2rem]"
         @click="openUnifiedAnalysisDashboard"
         data-test="analyze-dimensions-button"
       >
-        <q-tooltip>Analyze trace patterns across dimensions (Volume, Latency, Errors)</q-tooltip>
+        <q-tooltip>{{ t('latencyInsights.analyzeTooltip') }}</q-tooltip>
       </q-btn>
     </div>
 

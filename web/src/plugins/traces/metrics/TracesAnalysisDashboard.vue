@@ -29,13 +29,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card-section class="analysis-header tw-flex tw-items-center tw-justify-between tw-py-3 tw-px-4 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)]">
         <div class="tw-flex tw-items-center tw-gap-3">
           <q-icon name="dashboard" size="md" color="primary" />
-          <div>
-            <div class="tw-text-lg tw-font-semibold">
+          <div class="tw-flex tw-flex-col tw-gap-0">
+            <span class="tw-text-lg tw-font-semibold">
               <template v-if="props.analysisType === 'latency'">{{ t('latencyInsights.title') }}</template>
               <template v-else-if="props.analysisType === 'volume'">{{ t('volumeInsights.title') }}</template>
               <template v-else-if="props.analysisType === 'error'">{{ t('errorInsights.title') }}</template>
-            </div>
-            <div class="tw-text-xs tw-text-gray-500">
+            </span>
+            <span class="tw-text-xs tw-opacity-70">
               <span v-if="props.analysisType === 'latency' && durationFilter">
                 {{ t('latencyInsights.durationLabel') }} {{ formatTimeWithSuffix(durationFilter.start) }} - {{ formatTimeWithSuffix(durationFilter.end) }}
               </span>
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t('errorInsights.errorsGreaterThan') }} {{ errorFilter.start }}
                 </template>
               </span>
-            </div>
+            </span>
           </div>
         </div>
 
