@@ -60,28 +60,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="tw-flex tw-items-center tw-gap-3">
-          <!-- Baseline selector (only for latency analysis) -->
-          <template v-if="props.analysisType === 'latency'">
-            <div class="tw-flex tw-items-center tw-gap-2">
-              <q-icon name="compare_arrows" size="xs" color="primary" />
-              <span class="tw-text-sm tw-font-semibold tw-text-gray-700">{{ t('latencyInsights.compareToLabel') }}</span>
-            </div>
-            <q-select
-              v-model="baselineMode"
-              :options="baselineModeOptions"
-              dense
-              outlined
-              emit-value
-              map-options
-              class="tw-w-48"
-              data-test="baseline-mode-selector"
-            >
-              <template v-slot:prepend>
-                <q-icon name="schedule" size="xs" />
-              </template>
-            </q-select>
-          </template>
-
           <q-btn
             flat
             round
@@ -316,58 +294,13 @@ const currentTimeObj = computed(() => ({
 }));
 
 const baselineTimeRange = computed(() => {
-  // For volume and error analysis: baseline is ALWAYS the global datetime control value
-  // This represents the overall time range before the user made a brush selection
-  if (props.analysisType === 'volume' || props.analysisType === 'error') {
-    const result = props.timeRange;
+  // Baseline is always the original/global time range (before brush selection)
+  const result = props.timeRange;
 
-    console.log("[Analysis] Baseline time range (volume/error analysis):", {
-      analysisType: props.analysisType,
-      note: "Using global datetime control value for baseline",
-      globalTimeRange: {
-        start: new Date(result.startTime / 1000).toISOString(),
-        end: new Date(result.endTime / 1000).toISOString(),
-        startMicros: result.startTime,
-        endMicros: result.endTime,
-      },
-    });
-
-    return result;
-  }
-
-  // For latency analysis: calculate baseline based on mode
-  const selectedTimeRange = props.timeRange;
-  const selectedDuration = selectedTimeRange.endTime - selectedTimeRange.startTime;
-
-  let result;
-  switch (baselineMode.value) {
-    case "before":
-      result = {
-        startTime: selectedTimeRange.startTime - selectedDuration,
-        endTime: selectedTimeRange.startTime,
-      };
-      break;
-    case "after":
-      result = {
-        startTime: selectedTimeRange.endTime,
-        endTime: selectedTimeRange.endTime + selectedDuration,
-      };
-      break;
-    case "full_range":
-    default:
-      result = {
-        startTime: selectedTimeRange.startTime,
-        endTime: selectedTimeRange.endTime,
-      };
-      break;
-  }
-
-  console.log("[Analysis] Baseline time range (latency analysis):", {
-    mode: baselineMode.value,
+  console.log("[Analysis] Baseline time range:", {
     analysisType: props.analysisType,
-    selectedDuration: selectedDuration,
-    selectedDurationSeconds: `${(selectedDuration / 1000000).toFixed(2)}s`,
-    calculatedBaselineRange: {
+    note: "Using global datetime control value for baseline",
+    baselineRange: {
       start: new Date(result.startTime / 1000).toISOString(),
       end: new Date(result.endTime / 1000).toISOString(),
       startMicros: result.startTime,
@@ -595,6 +528,18 @@ watch(
       console.log('[Analysis] ⏳ Skipping reload - already loading');
     } else if (!isOpen.value) {
       console.log('[Analysis] ⏸️ Skipping reload - modal not open');
+    }
+  }
+);
+
+// Watch for changes in baseline mode
+watch(
+  () => baselineMode.value,
+  (newMode, oldMode) => {
+    console.log(`[Analysis] 🔄 Baseline mode changed: ${oldMode} → ${newMode}`);
+    if (isOpen.value && !loading.value) {
+      console.log(`[Analysis] ✅ Reloading analysis with new baseline mode: ${newMode}`);
+      loadAnalysis();
     }
   }
 );
