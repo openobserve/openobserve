@@ -140,8 +140,8 @@ impl HTTPOutputFormat {
     pub fn get_content_type(&self) -> &'static str {
         match self {
             Self::JSON => "application/json",
-            Self::NDJSON => "application/x+ndjson",
-            Self::NestedEvent => "application/x+ndjson",
+            Self::NDJSON => "application/x-ndjson",
+            Self::NestedEvent => "application/x-ndjson",
             Self::ESBulk { .. } => "application/x-ndjson",
         }
     }
