@@ -46,6 +46,7 @@ use crate::{
     },
 };
 
+pub mod dedup_stats;
 pub mod deduplication;
 #[allow(deprecated)]
 pub mod deprecated;

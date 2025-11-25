@@ -691,6 +691,114 @@ pub static META_NUM_ALERTS: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+
+// Alert deduplication metrics
+pub static ALERT_DEDUP_SUPPRESSED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "alert_dedup_suppressed_total",
+            "Total number of alerts suppressed by deduplication",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "alert_name", "dedup_type"],
+    )
+    .expect("Metric created")
+});
+
+pub static ALERT_DEDUP_PASSED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "alert_dedup_passed_total",
+            "Total number of alerts that passed deduplication",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "alert_name"],
+    )
+    .expect("Metric created")
+});
+
+pub static ALERT_DEDUP_ERRORS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "alert_dedup_errors_total",
+            "Total deduplication processing errors",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "error_type"],
+    )
+    .expect("Metric created")
+});
+
+// Alert grouping/batching metrics
+pub static ALERT_GROUPING_BATCHES_PENDING: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "alert_grouping_batches_pending",
+            "Current number of pending alert batches",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+pub static ALERT_GROUPING_NOTIFICATIONS_SENT_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "alert_grouping_notifications_sent_total",
+            "Total number of grouped notifications sent",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "send_strategy", "reason"],
+    )
+    .expect("Metric created")
+});
+
+pub static ALERT_GROUPING_BATCH_SIZE: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "alert_grouping_batch_size",
+            "Number of alerts per grouped notification",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![1.0, 2.0, 3.0, 5.0, 10.0, 25.0, 50.0, 100.0]),
+        &["organization", "send_strategy"],
+    )
+    .expect("Metric created")
+});
+
+pub static ALERT_GROUPING_WAIT_TIME: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "alert_grouping_wait_time_seconds",
+            "Time batches waited before sending (seconds)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![5.0, 10.0, 15.0, 20.0, 30.0, 45.0, 60.0, 90.0, 120.0]),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+pub static ALERT_GROUPING_SEND_ERRORS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "alert_grouping_send_errors_total",
+            "Total grouped notification send failures",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "error_type"],
+    )
+    .expect("Metric created")
+});
 pub static META_NUM_DASHBOARDS: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new("meta_num_dashboards", "Metadata dashboard nums")
@@ -1374,6 +1482,34 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(META_NUM_DASHBOARDS.clone()))
+        .expect("Metric registered");
+
+    // alert deduplication metrics
+    registry
+        .register(Box::new(ALERT_DEDUP_SUPPRESSED_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(ALERT_DEDUP_PASSED_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(ALERT_DEDUP_ERRORS_TOTAL.clone()))
+        .expect("Metric registered");
+
+    // alert grouping metrics
+    registry
+        .register(Box::new(ALERT_GROUPING_BATCHES_PENDING.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(ALERT_GROUPING_NOTIFICATIONS_SENT_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(ALERT_GROUPING_BATCH_SIZE.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(ALERT_GROUPING_WAIT_TIME.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(ALERT_GROUPING_SEND_ERRORS_TOTAL.clone()))
         .expect("Metric registered");
 
     // db stats

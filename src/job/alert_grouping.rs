@@ -80,6 +80,11 @@ async fn send_grouped_notification(
         elapsed_seconds
     );
 
+    // Record wait time metric
+    config::metrics::ALERT_GROUPING_WAIT_TIME
+        .with_label_values(&[batch.org_id.as_str()])
+        .observe(elapsed_seconds as f64);
+
     // Get the first alert (primary) and grouping config
     let primary_alert = &batch.alerts[0].alert;
     let grouping_config = primary_alert
@@ -205,8 +210,29 @@ async fn send_grouped_notification(
                     batch.fingerprint,
                     err_msg
                 );
+                // Record error metric
+                config::metrics::ALERT_GROUPING_SEND_ERRORS_TOTAL
+                    .with_label_values(&[batch.org_id.as_str(), "partial_failure"])
+                    .inc();
                 return Err(anyhow::anyhow!("Partial failure: {}", err_msg));
             }
+
+            // Record successful send metrics
+            let strategy_str = format!("{:?}", send_strategy).to_lowercase();
+            let reason = if elapsed_seconds >= grouping_config.group_wait_seconds {
+                "expired"
+            } else {
+                "max_size"
+            };
+
+            config::metrics::ALERT_GROUPING_NOTIFICATIONS_SENT_TOTAL
+                .with_label_values(&[batch.org_id.as_str(), strategy_str.as_str(), reason])
+                .inc();
+
+            config::metrics::ALERT_GROUPING_BATCH_SIZE
+                .with_label_values(&[batch.org_id.as_str(), strategy_str.as_str()])
+                .observe(alert_count as f64);
+
             log::info!(
                 "[alert_grouping_worker] Successfully sent grouped notification (fingerprint: {}): {}",
                 batch.fingerprint,
@@ -220,6 +246,10 @@ async fn send_grouped_notification(
                 batch.fingerprint,
                 e
             );
+            // Record error metric
+            config::metrics::ALERT_GROUPING_SEND_ERRORS_TOTAL
+                .with_label_values(&[batch.org_id.as_str(), "send_failed"])
+                .inc();
             Err(anyhow::anyhow!("Send failed: {}", e))
         }
     }

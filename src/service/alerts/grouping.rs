@@ -166,10 +166,16 @@ pub fn add_to_batch(
         });
 
     if is_new_batch {
-        log::debug!(
-            "[grouping] Current pending batches count: {}",
-            PENDING_BATCHES.len()
-        );
+        let batch_count = PENDING_BATCHES.len();
+        log::debug!("[grouping] Current pending batches count: {}", batch_count);
+
+        // Update gauge metric for pending batches
+        // Use org_id from the batch we just inserted
+        if let Some(batch) = PENDING_BATCHES.get(&fingerprint) {
+            config::metrics::ALERT_GROUPING_BATCHES_PENDING
+                .with_label_values(&[batch.org_id.as_str()])
+                .set(batch_count as i64);
+        }
     }
 
     batch_ready
@@ -223,6 +229,14 @@ pub fn get_expired_batches() -> Vec<PendingBatch> {
     }
 
     expired
+}
+
+/// Get count of pending batches for an organization
+pub fn get_pending_batch_count(org_id: &str) -> i64 {
+    PENDING_BATCHES
+        .iter()
+        .filter(|entry| entry.org_id == org_id)
+        .count() as i64
 }
 
 /// Clear all pending batches (for testing)

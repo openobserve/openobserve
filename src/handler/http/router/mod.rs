@@ -522,6 +522,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(alerts::trigger_alert)
         .service(alerts::move_alerts)
         .service(alerts::history::get_alert_history)
+        .service(alerts::dedup_stats::get_dedup_summary)
         .service(alerts::deprecated::save_alert)
         .service(alerts::deprecated::update_alert)
         .service(alerts::deprecated::get_alert)
