@@ -328,18 +328,15 @@ const getInitialDimensions = () => {
 
   // For LOGS: Use sample-based analysis if we have log data
   if (streamType === "logs" && props.logSamples && props.logSamples.length >= 10) {
-    console.log(`[Analysis] Using sample-based dimension selection for logs (${props.logSamples.length} samples)`);
     return selectDimensionsFromData(props.logSamples, schemaFields, 6);
   }
 
   // For TRACES: Use OTel conventions
   if (streamType === "traces") {
-    console.log("[Analysis] Using OTel-based dimension selection for traces");
     return selectTraceDimensions(schemaFields, 6);
   }
 
   // Fallback for logs without samples
-  console.log("[Analysis] Using schema-based dimension selection (fallback)");
   return selectDimensionsFromData([], schemaFields, 6);
 };
 
@@ -395,54 +392,24 @@ const toggleDimension = (dimensionValue: string) => {
 
 const baselineTimeRange = computed(() => {
   // Baseline is always the original/global time range (before brush selection)
-  const result = props.timeRange;
-
-  console.log("[Analysis] Baseline time range:", {
-    analysisType: props.analysisType,
-    note: "Using global datetime control value for baseline",
-    baselineRange: {
-      start: new Date(result.startTime / 1000).toISOString(),
-      end: new Date(result.endTime / 1000).toISOString(),
-      startMicros: result.startTime,
-      endMicros: result.endTime,
-    },
-  });
-
-  return result;
+  return props.timeRange;
 });
 
 const loadAnalysis = async () => {
   try {
-    console.log('='.repeat(80));
-    console.log(`[Analysis] ========== LOADING ${activeAnalysisType.value.toUpperCase()} ANALYSIS ==========`);
-    console.log('[Analysis] Active analysis type:', activeAnalysisType.value);
-    console.log('[Analysis] Selected dimensions for analysis:', selectedDimensions.value);
-    console.log('[Analysis] Available stream fields:', props.streamFields?.length || 0);
-    console.log('[Analysis] Stream type:', props.streamType);
-    console.log('[Analysis] Stream name:', props.streamName);
-
     // Determine which filter to use based on active analysis type
     let filterConfig;
     if (activeAnalysisType.value === 'latency') {
-      console.log('[Analysis] Using LATENCY filter:', props.durationFilter);
       filterConfig = { durationFilter: props.durationFilter, rateFilter: undefined, errorFilter: undefined };
     } else if (activeAnalysisType.value === 'volume') {
-      console.log('[Analysis] Using VOLUME/RATE filter:', props.rateFilter);
       filterConfig = { durationFilter: undefined, rateFilter: props.rateFilter, errorFilter: undefined };
     } else if (activeAnalysisType.value === 'error') {
-      console.log('[Analysis] Using ERROR filter:', props.errorFilter);
       filterConfig = { durationFilter: undefined, rateFilter: undefined, errorFilter: props.errorFilter };
     }
 
     // For volume/error analysis with filter, use the actual selected time range from the brush
     // Otherwise, use the global time range
     let selectedTimeRange = props.timeRange;
-
-    console.log('[Analysis] Rate filter received:', props.rateFilter);
-    console.log('[Analysis] Props timeRange:', {
-      start: new Date(props.timeRange.startTime / 1000).toISOString(),
-      end: new Date(props.timeRange.endTime / 1000).toISOString(),
-    });
 
     // Check for ANY time-based filter (from any RED metrics panel)
     // Use whichever filter has a time range selection - applies to ALL tabs
@@ -451,34 +418,16 @@ const loadAnalysis = async () => {
         startTime: props.rateFilter.timeStart,
         endTime: props.rateFilter.timeEnd
       };
-      console.log('[Analysis] ✅ Using RATE filter time range for selected (applies to all tabs):', {
-        start: new Date(props.rateFilter.timeStart / 1000).toISOString(),
-        end: new Date(props.rateFilter.timeEnd / 1000).toISOString(),
-      });
     } else if (props.durationFilter?.timeStart && props.durationFilter?.timeEnd) {
       selectedTimeRange = {
         startTime: props.durationFilter.timeStart,
         endTime: props.durationFilter.timeEnd
       };
-      console.log('[Analysis] ✅ Using DURATION filter time range for selected (applies to all tabs):', {
-        start: new Date(props.durationFilter.timeStart / 1000).toISOString(),
-        end: new Date(props.durationFilter.timeEnd / 1000).toISOString(),
-      });
     } else if (props.errorFilter?.timeStart && props.errorFilter?.timeEnd) {
       selectedTimeRange = {
         startTime: props.errorFilter.timeStart,
         endTime: props.errorFilter.timeEnd
       };
-      console.log('[Analysis] ✅ Using ERROR filter time range for selected (applies to all tabs):', {
-        start: new Date(props.errorFilter.timeStart / 1000).toISOString(),
-        end: new Date(props.errorFilter.timeEnd / 1000).toISOString(),
-      });
-    } else {
-      console.log('[Analysis] ⚠️ No time-based filter found on any panel, using global time range for selected (baseline and selected will be the same)');
-      console.log('[Analysis] Selected time range equals props.timeRange:', {
-        start: new Date(selectedTimeRange.startTime / 1000).toISOString(),
-        end: new Date(selectedTimeRange.endTime / 1000).toISOString(),
-      });
     }
 
     const config: LatencyInsightsConfig = {
@@ -493,27 +442,6 @@ const loadAnalysis = async () => {
       analysisType: activeAnalysisType.value,
     };
 
-    console.log('[Analysis] Dashboard config for query generation:', {
-      analysisType: config.analysisType,
-      streamName: config.streamName,
-      selectedTimeRange: {
-        start: new Date(config.selectedTimeRange.startTime / 1000).toISOString(),
-        end: new Date(config.selectedTimeRange.endTime / 1000).toISOString(),
-        startMicros: config.selectedTimeRange.startTime,
-        endMicros: config.selectedTimeRange.endTime,
-      },
-      baselineTimeRange: {
-        start: new Date(config.baselineTimeRange.startTime / 1000).toISOString(),
-        end: new Date(config.baselineTimeRange.endTime / 1000).toISOString(),
-        startMicros: config.baselineTimeRange.startTime,
-        endMicros: config.baselineTimeRange.endTime,
-      },
-      rateFilter: config.rateFilter,
-      durationFilter: config.durationFilter,
-      errorFilter: config.errorFilter,
-      baseFilter: config.baseFilter,
-    });
-
     // OPTIMIZATION: Skip analyzeAllDimensions() to avoid 20 extra queries
     // Instead, create mock analyses with dimension names only
     // The dashboard UNION queries will fetch the actual data
@@ -526,35 +454,12 @@ const loadAnalysis = async () => {
     }));
 
     // Generate dashboard JSON with UNION queries
-    console.log('[Analysis] Generating dashboard with', mockAnalyses.length, 'dimensions');
-    console.log('[Analysis] Mock analyses:', mockAnalyses.map(a => a.dimensionName));
-
     const dashboard = generateDashboard(mockAnalyses, config);
-
-    console.log('[Analysis] Dashboard generated successfully!');
-    console.log('[Analysis] Dashboard title:', dashboard.title);
-    console.log('[Analysis] Panel count:', dashboard.tabs[0]?.panels?.length || 0);
-    console.log('[Analysis] Panels:', dashboard.tabs[0]?.panels?.map(p => ({
-      id: p.id,
-      title: p.title,
-      hasQuery: !!p.queries?.[0]?.query,
-      queryLength: p.queries?.[0]?.query?.length || 0
-    })) || []);
-
-    // Log first query as sample
-    if (dashboard.tabs[0]?.panels?.[0]?.queries?.[0]?.query) {
-      console.log('[Analysis] Sample query (first panel):', dashboard.tabs[0].panels[0].queries[0].query.substring(0, 300) + '...');
-    }
 
     dashboardData.value = dashboard;
     dashboardRenderKey.value++; // Increment to force re-render on full reload
-    console.log('[Analysis] Dashboard data set to reactive ref, panels should now render');
-    console.log('[Analysis] Current dashboardData panels count:', dashboardData.value?.tabs?.[0]?.panels?.length || 0);
-    console.log('[Analysis] Dashboard render key:', dashboardRenderKey.value);
-    console.log('='.repeat(80));
   } catch (err: any) {
-    console.error("[Analysis] ❌ ERROR loading analysis:", err);
-    console.error("[Analysis] Error stack:", err.stack);
+    console.error("Error loading analysis:", err);
     showErrorNotification(err.message || t('latencyInsights.failedToLoad'));
   }
 };
@@ -584,7 +489,6 @@ watch(
   () => dashboardData.value,
   (newVal) => {
     if (newVal) {
-      console.log('[Analysis] Dashboard data changed, panels:', newVal.tabs[0]?.panels?.map(p => ({
         id: p.id,
         title: p.title,
         hasQuery: !!p.queries?.[0]?.query
@@ -608,7 +512,6 @@ watch(
 // Add new dimension panels without re-rendering existing ones
 const addDimensionPanels = async (addedDimensions: string[]) => {
   if (!dashboardData.value || !dashboardData.value.tabs?.[0]?.panels) {
-    console.log('[Analysis] ⚠️ No dashboard data to append to, doing full reload');
     loadAnalysis();
     return;
   }
@@ -618,8 +521,6 @@ const addDimensionPanels = async (addedDimensions: string[]) => {
     const currentPanels = dashboardData.value.tabs[0].panels;
     const existingCount = currentPanels.length;
 
-    console.log(`[Analysis] Current panel count: ${existingCount}`);
-    console.log(`[Analysis] Adding ${addedDimensions.length} new dimension(s)`);
 
     // Build config (reuse logic from loadAnalysis)
     let filterConfig: any = {};
@@ -681,10 +582,6 @@ const addDimensionPanels = async (addedDimensions: string[]) => {
       panel.id = `${panel.id}_${timestamp}`;
     });
 
-    console.log(`[Analysis] ✅ Appending ${newPanels.length} new panels`);
-    console.log('[Analysis] Existing panel count:', existingCount);
-    console.log('[Analysis] New panel layouts:', newPanels.map(p => ({ title: p.title, layout: p.layout })));
-    console.log('[Analysis] Existing panel layouts:', currentPanels.slice(0, 3).map(p => ({ title: p.title, layout: p.layout })));
 
     // Create a new dashboard object to ensure Vue detects the change
     // We need to increment the render key to force grid re-layout, but this will cause re-queries
@@ -704,19 +601,15 @@ const addDimensionPanels = async (addedDimensions: string[]) => {
 
     // DON'T increment dashboardRenderKey - let Vue's reactivity handle it
     // Since each panel has a unique ID (item.id + timestamp), Vue will only render the new panel
-    console.log('[Analysis] ✅ Not incrementing render key - Vue should only render new panels');
 
     // Wait for DOM to update, then refresh GridStack to position new panels
     await nextTick();
     if (dashboardChartsRef.value?.refreshGridStack) {
-      console.log('[Analysis] 🔄 Calling refreshGridStack to position new panels');
       await dashboardChartsRef.value.refreshGridStack();
     }
 
-    console.log(`[Analysis] ✅ Total panels now: ${dashboardData.value.tabs[0].panels.length}`);
   } catch (err: any) {
-    console.error('[Analysis] ❌ Error adding panels:', err);
-    console.log('[Analysis] Falling back to full reload');
+    console.error('Error adding dimension panels:', err);
     loadAnalysis();
   }
 };
@@ -725,14 +618,9 @@ const addDimensionPanels = async (addedDimensions: string[]) => {
 watch(
   selectedDimensions,
   (newDimensions, oldDimensions) => {
-    console.log('[Analysis] 🔍 Dimension watcher triggered');
-    console.log('[Analysis] Old dimensions:', oldDimensions);
-    console.log('[Analysis] New dimensions:', newDimensions);
-    console.log('[Analysis] isOpen:', isOpen.value, 'loading:', loading.value);
 
     // Skip if this is the initial load (already handled by isOpen watcher)
     if (!oldDimensions || oldDimensions.length === 0) {
-      console.log('[Analysis] ⏭️ Skipping: Initial load');
       return;
     }
 
@@ -741,33 +629,25 @@ watch(
       newDimensions.some((d, i) => d !== oldDimensions[i]);
 
     if (!changed) {
-      console.log('[Analysis] ⏭️ Skipping: Dimensions unchanged');
       return;
     }
 
     const addedDimensions = newDimensions.filter(d => !oldDimensions.includes(d));
     const removedDimensions = oldDimensions.filter(d => !newDimensions.includes(d));
 
-    console.log(`[Analysis] 🔄 Dimensions changed: ${oldDimensions.length} → ${newDimensions.length}`);
-    console.log(`[Analysis] Removed:`, removedDimensions);
-    console.log(`[Analysis] Added:`, addedDimensions);
 
     if (isOpen.value && newDimensions.length > 0) {
       if (removedDimensions.length > 0) {
         // If dimensions were removed, we need to regenerate to remove panels
-        console.log(`[Analysis] ✅ Regenerating dashboard (dimensions removed)`);
         dashboardData.value = null;
         nextTick(() => {
           loadAnalysis();
         });
       } else if (addedDimensions.length > 0) {
         // If only added, append new panels without regenerating existing ones
-        console.log(`[Analysis] ✅ Adding new panels for:`, addedDimensions);
         addDimensionPanels(addedDimensions);
       }
-    } else {
-      console.log('[Analysis] ⚠️ Not reloading: isOpen=', isOpen.value, 'dimensionsCount=', newDimensions.length);
-    }
+    } 
   },
   { deep: true }
 );
@@ -776,18 +656,10 @@ watch(
 watch(
   () => activeAnalysisType.value,
   (newTab, oldTab) => {
-    console.log(`[Analysis] 🔄 TAB CHANGED: ${oldTab} → ${newTab}`);
-    console.log('[Analysis] Modal open:', isOpen.value);
-    console.log('[Analysis] Currently loading:', loading.value);
 
     if (isOpen.value && !loading.value) {
-      console.log(`[Analysis] ✅ Reloading analysis for ${newTab} tab`);
       loadAnalysis();
-    } else if (loading.value) {
-      console.log('[Analysis] ⏳ Skipping reload - already loading');
-    } else if (!isOpen.value) {
-      console.log('[Analysis] ⏸️ Skipping reload - modal not open');
-    }
+    } 
   }
 );
 
