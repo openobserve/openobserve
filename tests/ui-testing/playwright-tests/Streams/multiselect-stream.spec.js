@@ -250,6 +250,26 @@ async function multistreamselect(page) {
     testLogger.info('Search filter steps executed successfully with multiple streams');
   });
 
+  test("should add a function and display it in streams with multiple streams", {
+    tag: ['@multistream', '@monaco', '@function', '@enhanced']
+  }, async ({ page }) => {
+    testLogger.info('Testing Monaco editor function with multiple streams');
+    
+    const pageManager = new PageManager(page);
+    
+    // Setup multiple streams
+    await multistreamselect(page);
+    await pageManager.logsPage.fillMonacoEditor('.a=2');
+    await page.waitForTimeout(1000);
+    await applyQueryButton(page);
+    await pageManager.logsPage.clickTableExpandMenuFirst();
+    await expect(page.locator("text=.a=2")).toBeVisible();
+    await expect(page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible();
+    await pageManager.logsPage.selectRunQuery();
+    
+    testLogger.info('Monaco editor function test with multiple streams completed successfully');
+  });
+
   test("should display combined results when both streams have data", {
     tag: ['@multistream', '@data', '@combined', '@enhanced']
   }, async ({ page }) => {
