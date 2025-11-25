@@ -152,11 +152,11 @@ def test_create_dashboard(create_session, base_url):
     url = f"{base_url}api/{ORG_ID}/dashboards"
 
     dashboard_data = {
+        "version": 8,
         "title": "Test Dashboard",
         "description": "Dashboard created by automated test",
         "folder_id": "default",
-        "panels": [],
-        "layouts": []
+        "tabs": []
     }
 
     resp = session.post(url, json=dashboard_data)
@@ -267,10 +267,11 @@ def test_create_dashboard_with_empty_panels(create_session, base_url):
     url = f"{base_url}api/{ORG_ID}/dashboards"
 
     dashboard_data = {
+        "version": 8,
         "title": "Dashboard with Empty Panels",
         "description": "Test dashboard with empty panels",
         "folder_id": "default",
-        "panels": []  # Empty panels array is valid
+        "tabs": []  # Empty tabs array is valid
     }
 
     resp = session.post(url, json=dashboard_data)
@@ -342,10 +343,10 @@ def test_update_nonexistent_dashboard(create_session, base_url):
     url = f"{base_url}api/{ORG_ID}/dashboards/nonexistent_dashboard_id_12345"
 
     update_data = {
+        "version": 8,
         "title": "Updated Title",
         "folder_id": "default",
-        "panels": [],
-        "layouts": []
+        "tabs": []
     }
 
     resp = session.put(url, json=update_data)
@@ -860,6 +861,7 @@ def test_dashboard_with_panel_filters(create_session, base_url):
     session = create_session
 
     dashboard_data = {
+        "version": 8,
         "title": "Dashboard with Panel Filters",
         "description": "Test panel filters",
         "folder_id": "default",
