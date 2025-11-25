@@ -235,11 +235,44 @@ web/src/locales/languages/
 
 ## Troubleshooting
 
+### Workflow Not Detecting en.json Changes
+
+**Symptom:** You changed `en.json` but workflow says "en.json not modified"
+
+**Solution 1 - Check workflow logs:**
+1. Go to **Actions** → **Update Translations** → Click the run
+2. Look at "Check if en.json was modified" step
+3. It shows debug info: event type, before/after SHAs, and changed files
+
+**Solution 2 - Use force flag:**
+1. Go to **Actions** → **Update Translations**
+2. Click **Run workflow**
+3. Check **"Force translation even if en.json not detected as changed"**
+4. Click **Run workflow**
+
+**Solution 3 - Debug detection:**
+```bash
+# Locally check what git sees
+git show --name-only --pretty="" HEAD
+# Should show web/src/locales/languages/en.json
+
+# Check last push
+git diff HEAD~1 --name-only
+```
+
+**Root cause:** The detection uses `git diff` to compare commits. If:
+- Multiple commits in one push → Uses `github.event.before` and `github.sha`
+- First commit on branch → Uses `git show HEAD`
+- Manual trigger → Uses `git show HEAD`
+
 ### AWS Credentials Error
 ```
 ERROR: No credentials for the translation service.
 ```
-**Solution**: Configure AWS credentials (see setup section)
+**Solution**: IAM role should be automatically assumed via OIDC. Check:
+1. Workflow has `permissions: id-token: write`
+2. Role ARN is correct: `arn:aws:iam::058694856476:role/GitHubActionsRole`
+3. Role has `translate:TranslateText` permission
 
 ### Import Error
 ```
@@ -252,6 +285,15 @@ ModuleNotFoundError: No module named 'boto3'
 - Review translations before merging PRs
 - Consider manual review for critical UI text
 - Native speakers should review translations
+
+### Build Started Before Translation Completed
+
+**Symptom:** Build has old translations
+
+**Solution:** This shouldn't happen with current setup. Verify:
+1. Build workflow has `workflow_run` trigger with `workflows: ["Update Translations"]`
+2. Translation workflow completed successfully
+3. Check Actions logs for timing
 
 ## Workflow Example
 

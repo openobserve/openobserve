@@ -11,6 +11,11 @@ on:
         description: 'Languages to translate (space-separated, e.g., "fr es de"). Leave empty for all.'
         required: false
         default: ''
+      force:
+        description: 'Force translation even if en.json not detected as changed'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   update-translations:
@@ -29,13 +34,50 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check if en.json was modified
         id: check_en_json
         run: |
-          if git diff HEAD~1 --name-only | grep -q "web/src/locales/languages/en.json"; then
+          echo "Checking for en.json changes..."
+          echo "Event: ${{ github.event_name }}"
+          echo "Force flag: ${{ github.event.inputs.force }}"
+          echo "Before: ${{ github.event.before }}"
+          echo "After: ${{ github.sha }}"
+
+          # Check if force flag is set (manual workflow dispatch)
+          if [ "${{ github.event.inputs.force }}" = "true" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "🔧 Force flag set - running translation regardless"
+            exit 0
+          fi
+
+          EN_JSON_CHANGED=false
+
+          # Method 1: Check using git diff with before/after SHAs
+          if [ "${{ github.event.before }}" != "" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            echo "Comparing ${{ github.event.before }} with ${{ github.sha }}"
+            CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
+            echo "Changed files in this push:"
+            echo "$CHANGED_FILES"
+
+            if echo "$CHANGED_FILES" | grep -q "web/src/locales/languages/en.json"; then
+              EN_JSON_CHANGED=true
+            fi
+          else
+            # Method 2: For first push or workflow_dispatch, check last commit
+            echo "Checking last commit changes..."
+            CHANGED_FILES=$(git show --name-only --pretty="" HEAD)
+            echo "Changed files in last commit:"
+            echo "$CHANGED_FILES"
+
+            if echo "$CHANGED_FILES" | grep -q "web/src/locales/languages/en.json"; then
+              EN_JSON_CHANGED=true
+            fi
+          fi
+
+          if [ "$EN_JSON_CHANGED" = true ]; then
             echo "changed=true" >> $GITHUB_OUTPUT
             echo "✅ en.json was modified, will update translations"
           else
