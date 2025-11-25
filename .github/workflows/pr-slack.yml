@@ -1,7 +1,7 @@
 name: Notify Slack on stale PRs
 on:
   schedule:
-    - cron: "0 16 * * *" # everyday at 4PM
+    - cron: "0 14 * * *" # everyday at 4PM
   workflow_dispatch:
 
 jobs:
