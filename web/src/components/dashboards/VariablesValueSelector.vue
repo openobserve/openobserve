@@ -1953,7 +1953,8 @@ export default defineComponent({
         variable.options = [];
       });
 
-      emitVariablesData();
+      // Removed emitVariablesData() here to prevent emitting null values.
+      // The emit will happen in loadSingleVariableDataByName (with masking).
 
       // Load variables in dependency order, even if parent value is empty
       for (const varName of affectedVariables) {
