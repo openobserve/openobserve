@@ -3,7 +3,7 @@ permissions:
   contents: read
 on:
   schedule:
-    - cron: "20 17 * * *" # everyday at 4PM
+    - cron: "0 11 * * *" # everyday at 11AM
   workflow_dispatch:
 
 jobs:
