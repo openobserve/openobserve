@@ -1148,9 +1148,6 @@ export default defineComponent({
       navigatePatternDetail,
       addPatternToSearch,
       extractConstantsFromPattern,
-      showVolumeAnalysisDashboard,
-      hasHistogramSelection,
-      histogramSelectionRange,
       openVolumeAnalysisDashboard,
       closeVolumeAnalysisDashboard,
     };

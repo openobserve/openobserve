@@ -38,32 +38,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t('latencyInsights.durationLabel') }} {{ formatTimeWithSuffix(durationFilter.start) }} - {{ formatTimeWithSuffix(durationFilter.end) }}
               </span>
               <span v-else-if="props.analysisType === 'volume' && rateFilter">
-                {{ t('volumeInsights.rateLabel') }} {{ rateFilter.start }} - {{ rateFilter.end }} traces/interval
+                <template v-if="rateFilter.timeStart && rateFilter.timeEnd">
+                  {{ t('volumeInsights.timeRangeLabel') }} {{ formatTimestamp(rateFilter.timeStart) }} - {{ formatTimestamp(rateFilter.timeEnd) }}
+                </template>
+                <template v-else>
+                  {{ t('volumeInsights.rateLabel') }} {{ rateFilter.start }} - {{ rateFilter.end }} traces/interval
+                </template>
               </span>
             </div>
           </div>
         </div>
 
         <div class="tw-flex tw-items-center tw-gap-3">
-          <!-- Baseline selector -->
-          <div class="tw-flex tw-items-center tw-gap-2">
-            <q-icon name="compare_arrows" size="xs" color="primary" />
-            <span class="tw-text-sm tw-font-semibold tw-text-gray-700">{{ t('latencyInsights.compareToLabel') }}</span>
-          </div>
-          <q-select
-            v-model="baselineMode"
-            :options="baselineModeOptions"
-            dense
-            outlined
-            emit-value
-            map-options
-            class="tw-w-48"
-            data-test="baseline-mode-selector"
-          >
-            <template v-slot:prepend>
-              <q-icon name="schedule" size="xs" />
-            </template>
-          </q-select>
+          <!-- Baseline selector (only for latency analysis) -->
+          <template v-if="props.analysisType === 'latency'">
+            <div class="tw-flex tw-items-center tw-gap-2">
+              <q-icon name="compare_arrows" size="xs" color="primary" />
+              <span class="tw-text-sm tw-font-semibold tw-text-gray-700">{{ t('latencyInsights.compareToLabel') }}</span>
+            </div>
+            <q-select
+              v-model="baselineMode"
+              :options="baselineModeOptions"
+              dense
+              outlined
+              emit-value
+              map-options
+              class="tw-w-48"
+              data-test="baseline-mode-selector"
+            >
+              <template v-slot:prepend>
+                <q-icon name="schedule" size="xs" />
+              </template>
+            </q-select>
+          </template>
 
           <q-btn
             flat
@@ -152,6 +159,8 @@ interface DurationFilter {
 interface RateFilter {
   start: number;
   end: number;
+  timeStart?: number;
+  timeEnd?: number;
 }
 
 interface TimeRange {
@@ -190,6 +199,8 @@ const dashboardData = ref<any>(null);
 const dashboardChartsRef = ref<any>(null);
 
 // Baseline mode selection
+// For volume analysis: baseline mode is ignored, always uses global datetime control
+// For latency analysis: default to "full_range" to compare slow vs fast traces in same period
 const baselineMode = ref("full_range");
 const baselineModeOptions = computed(() => [
   { label: t("latencyInsights.fullTimeRange"), value: "full_range" },
@@ -243,41 +254,62 @@ const currentTimeObj = computed(() => ({
 }));
 
 const baselineTimeRange = computed(() => {
-  const selectedDuration = props.timeRange.endTime - props.timeRange.startTime;
+  // For volume analysis: baseline is ALWAYS the global datetime control value
+  // This represents the overall time range before the user made a brush selection
+  if (props.analysisType === 'volume') {
+    const result = props.timeRange;
+
+    console.log("[Analysis] Baseline time range (volume analysis):", {
+      analysisType: props.analysisType,
+      note: "Using global datetime control value for baseline",
+      globalTimeRange: {
+        start: new Date(result.startTime / 1000).toISOString(),
+        end: new Date(result.endTime / 1000).toISOString(),
+        startMicros: result.startTime,
+        endMicros: result.endTime,
+      },
+    });
+
+    return result;
+  }
+
+  // For latency analysis: calculate baseline based on mode
+  const selectedTimeRange = props.timeRange;
+  const selectedDuration = selectedTimeRange.endTime - selectedTimeRange.startTime;
 
   let result;
   switch (baselineMode.value) {
     case "before":
       result = {
-        startTime: props.timeRange.startTime - selectedDuration,
-        endTime: props.timeRange.startTime,
+        startTime: selectedTimeRange.startTime - selectedDuration,
+        endTime: selectedTimeRange.startTime,
       };
       break;
     case "after":
       result = {
-        startTime: props.timeRange.endTime,
-        endTime: props.timeRange.endTime + selectedDuration,
+        startTime: selectedTimeRange.endTime,
+        endTime: selectedTimeRange.endTime + selectedDuration,
       };
       break;
     case "full_range":
     default:
       result = {
-        startTime: props.timeRange.startTime,
-        endTime: props.timeRange.endTime,
+        startTime: selectedTimeRange.startTime,
+        endTime: selectedTimeRange.endTime,
       };
       break;
   }
 
-  console.log("[Latency Insights] Baseline mode changed:", {
+  console.log("[Analysis] Baseline time range (latency analysis):", {
     mode: baselineMode.value,
+    analysisType: props.analysisType,
     selectedDuration: selectedDuration,
-    originalRange: {
-      start: new Date(props.timeRange.startTime).toISOString(),
-      end: new Date(props.timeRange.endTime).toISOString(),
-    },
-    baselineRange: {
-      start: new Date(result.startTime).toISOString(),
-      end: new Date(result.endTime).toISOString(),
+    selectedDurationSeconds: `${(selectedDuration / 1000000).toFixed(2)}s`,
+    calculatedBaselineRange: {
+      start: new Date(result.startTime / 1000).toISOString(),
+      end: new Date(result.endTime / 1000).toISOString(),
+      startMicros: result.startTime,
+      endMicros: result.endTime,
     },
   });
 
@@ -294,17 +326,47 @@ const loadAnalysis = async () => {
       ? { durationFilter: props.durationFilter, rateFilter: undefined }
       : { durationFilter: undefined, rateFilter: props.rateFilter };
 
+    // For volume analysis with rate filter, use the actual selected time range from the brush
+    // Otherwise, use the global time range
+    const selectedTimeRange =
+      props.analysisType === 'volume' && props.rateFilter?.timeStart && props.rateFilter?.timeEnd
+        ? {
+            startTime: props.rateFilter.timeStart,
+            endTime: props.rateFilter.timeEnd
+          }
+        : props.timeRange;
+
     const config: LatencyInsightsConfig = {
       streamName: props.streamName,
       streamType: props.streamType || "traces",
       orgIdentifier: currentOrgIdentifier.value,
-      selectedTimeRange: props.timeRange,
+      selectedTimeRange,
       baselineTimeRange: baselineTimeRange.value,
       ...filterConfig,
       baseFilter: props.baseFilter,
       dimensions: selectedDimensions.value,
       analysisType: props.analysisType,
     };
+
+    console.log('[Analysis] Dashboard config for query generation:', {
+      analysisType: config.analysisType,
+      streamName: config.streamName,
+      selectedTimeRange: {
+        start: new Date(config.selectedTimeRange.startTime / 1000).toISOString(),
+        end: new Date(config.selectedTimeRange.endTime / 1000).toISOString(),
+        startMicros: config.selectedTimeRange.startTime,
+        endMicros: config.selectedTimeRange.endTime,
+      },
+      baselineTimeRange: {
+        start: new Date(config.baselineTimeRange.startTime / 1000).toISOString(),
+        end: new Date(config.baselineTimeRange.endTime / 1000).toISOString(),
+        startMicros: config.baselineTimeRange.startTime,
+        endMicros: config.baselineTimeRange.endTime,
+      },
+      rateFilter: config.rateFilter,
+      durationFilter: config.durationFilter,
+      baseFilter: config.baseFilter,
+    });
 
     // OPTIMIZATION: Skip analyzeAllDimensions() to avoid 20 extra queries
     // Instead, create mock analyses with dimension names only
@@ -328,6 +390,22 @@ const loadAnalysis = async () => {
 
 const onClose = () => {
   emit("close");
+};
+
+// Helper functions for formatting
+const formatTimestamp = (microseconds: number) => {
+  const date = new Date(microseconds / 1000);
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  return `${hours}:${minutes}:${seconds}`;
+};
+
+const formatTimeWithSuffix = (milliseconds: number) => {
+  if (milliseconds >= 1000) {
+    return `${(milliseconds / 1000).toFixed(2)}s`;
+  }
+  return `${milliseconds.toFixed(2)}ms`;
 };
 
 // Load analysis when modal opens

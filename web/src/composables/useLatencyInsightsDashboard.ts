@@ -33,8 +33,13 @@ export function useLatencyInsightsDashboard() {
       : "";
     const isVolumeAnalysis = config.analysisType === "volume";
 
-    // Build baseline WHERE clause (time filtering handled by dashboard global time range)
-    const baselineWhere = baseFilters ? `WHERE ${baseFilters}` : "";
+    // Build time filters for baseline and selected periods
+    const baselineTimeFilter = `_timestamp >= ${config.baselineTimeRange.startTime} AND _timestamp <= ${config.baselineTimeRange.endTime}`;
+    const selectedTimeFilter = `_timestamp >= ${config.selectedTimeRange.startTime} AND _timestamp <= ${config.selectedTimeRange.endTime}`;
+
+    // Build baseline WHERE clause with time filtering
+    const baselineFiltersArray = [baselineTimeFilter, baseFilters].filter(f => f);
+    const baselineWhere = baselineFiltersArray.length ? `WHERE ${baselineFiltersArray.join(' AND ')}` : "";
 
     // Build selected WHERE clause with appropriate filter
     let filterClause = "";
@@ -47,34 +52,60 @@ export function useLatencyInsightsDashboard() {
       filterClause = `duration >= ${config.durationFilter.start} AND duration <= ${config.durationFilter.end}`;
     }
 
-    const selectedFilters = baseFilters && filterClause
-      ? `${filterClause} AND ${baseFilters}`
-      : (filterClause || baseFilters);
-    const selectedWhere = selectedFilters ? `WHERE ${selectedFilters}` : "";
+    const selectedFiltersArray = [selectedTimeFilter, filterClause, baseFilters].filter(f => f);
+    const selectedWhere = selectedFiltersArray.length ? `WHERE ${selectedFiltersArray.join(' AND ')}` : "";
 
     if (isVolumeAnalysis) {
-      // Volume Analysis: Compare trace counts by dimension
+      // Volume Analysis: Normalize both baseline and selected to the selected time window
+      // This shows: "If baseline was compressed to spike duration, how many traces would it have?"
+      // Makes comparison intuitive: spike shows MORE traces in same time window
+
+      // Calculate durations in seconds
+      const baselineDurationSeconds = (config.baselineTimeRange.endTime - config.baselineTimeRange.startTime) / 1000000;
+      const selectedDurationSeconds = (config.selectedTimeRange.endTime - config.selectedTimeRange.startTime) / 1000000;
+
+      // Normalize baseline to selected time window: (traces/baseline_duration) * selected_duration
       const baselineQuery = `
         SELECT
           COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
           'Baseline' AS series,
-          COUNT(*) AS trace_count
+          (approx_distinct(trace_id) * ${selectedDurationSeconds}) / ${baselineDurationSeconds} AS trace_count
         FROM "${config.streamName}"
         ${baselineWhere}
         GROUP BY ${dimensionName}
       `.trim();
 
+      // Selected uses actual count (already in the selected time window)
       const selectedQuery = `
         SELECT
           COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
           'Selected' AS series,
-          COUNT(*) AS trace_count
+          approx_distinct(trace_id) AS trace_count
         FROM "${config.streamName}"
         ${selectedWhere}
         GROUP BY ${dimensionName}
       `.trim();
 
-      return `${baselineQuery} UNION ${selectedQuery} ORDER BY trace_count DESC LIMIT 40`;
+      const unionQuery = `${baselineQuery} UNION ${selectedQuery} ORDER BY trace_count DESC LIMIT 40`;
+
+      console.log(`[Query Generation] Volume analysis query for dimension "${dimensionName}":`, {
+        baselineTimeRange: {
+          start: new Date(config.baselineTimeRange.startTime / 1000).toISOString(),
+          end: new Date(config.baselineTimeRange.endTime / 1000).toISOString(),
+          durationSeconds: baselineDurationSeconds,
+        },
+        selectedTimeRange: {
+          start: new Date(config.selectedTimeRange.startTime / 1000).toISOString(),
+          end: new Date(config.selectedTimeRange.endTime / 1000).toISOString(),
+          durationSeconds: selectedDurationSeconds,
+        },
+        normalization: `Baseline normalized: count * ${selectedDurationSeconds} / ${baselineDurationSeconds}`,
+        baselineQuery,
+        selectedQuery,
+        unionQuery
+      });
+
+      return unionQuery;
     } else {
       // Latency Analysis: Compare percentile latencies by dimension
       const baselineQuery = `

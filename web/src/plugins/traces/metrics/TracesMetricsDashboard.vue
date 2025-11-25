@@ -159,7 +159,7 @@ class="tw-mx-1 tw-text-red-500" />
       v-if="showVolumeAnalysisDashboard"
       :streamName="streamName"
       streamType="traces"
-      :timeRange="timeRange"
+      :timeRange="originalTimeRangeBeforeSelection || timeRange"
       :rateFilter="analysisRateFilter"
       :baseFilter="filter"
       :streamFields="streamFields"
@@ -243,6 +243,8 @@ const analysisDurationFilter = ref({ start: 0, end: 0 });
 // Volume Insights state
 const showVolumeAnalysisDashboard = ref(false);
 const analysisRateFilter = ref({ start: 0, end: 0 });
+// Store the original time range before selection for baseline comparison
+const originalTimeRangeBeforeSelection = ref<TimeRange | null>(null);
 
 // Reactivity trigger for Map changes (Vue 3 doesn't track Map.set() automatically)
 const rangeFiltersVersion = ref(0);
@@ -428,7 +430,7 @@ const refreshDashboard = () => {
 //   console.log("event -----", event);
 // };
 
-const createRangeFilter = (data, start = null, end = null) => {
+const createRangeFilter = (data, start = null, end = null, timeStart = null, timeEnd = null) => {
   const panelId = data?.id;
   const panelTitle = data?.title || "Chart";
 
@@ -438,6 +440,8 @@ const createRangeFilter = (data, start = null, end = null) => {
       panelTitle,
       start: start ? Math.floor(start) : null,
       end: end ? Math.floor(end) : null,
+      timeStart: timeStart ? Math.floor(timeStart) : null,
+      timeEnd: timeEnd ? Math.floor(timeEnd) : null,
     });
     // Increment version to trigger reactivity
     rangeFiltersVersion.value++;
@@ -470,17 +474,68 @@ const onDataZoom = ({
   if (start && end) {
     const panelTitle = data?.title;
 
+    // Store the original time range BEFORE selection for volume analysis baseline
+    // This must be done before emit() which triggers the parent to update the datetime control
+    originalTimeRangeBeforeSelection.value = {
+      startTime: props.timeRange.startTime,
+      endTime: props.timeRange.endTime,
+    };
+
+    // Log datetime BEFORE selection
+    console.log('[BEFORE Selection] Current datetime control value:', {
+      startMs: props.timeRange.startTime / 1000,
+      endMs: props.timeRange.endTime / 1000,
+      startTime: new Date(props.timeRange.startTime / 1000).toLocaleString(),
+      endTime: new Date(props.timeRange.endTime / 1000).toLocaleString(),
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+    });
+
     // For Rate panel: use placeholder values to indicate time-based selection
     // Volume analysis will use the time range, not Y-axis values
     if (panelTitle === "Rate") {
+      // Convert milliseconds to microseconds for OpenObserve timestamp format
+      const timeStartMicros = start * 1000;
+      const timeEndMicros = end * 1000;
+
+      console.log('[Rate Selection] User selected time range on Rate chart:', {
+        startMs: start,
+        endMs: end,
+        startMicros: timeStartMicros,
+        endMicros: timeEndMicros,
+        startTime: new Date(start).toISOString(),
+        endTime: new Date(end).toISOString(),
+        duration: `${((end - start) / 1000).toFixed(2)}s`
+      });
+
       // Use -1 as placeholder to indicate time-based zoom (not Y-axis value zoom)
-      createRangeFilter(data, -1, -1);
+      // Pass actual time range as timeStart/timeEnd for volume analysis
+      createRangeFilter(data, -1, -1, timeStartMicros, timeEndMicros);
     } else {
       // For Duration/other panels: use actual Y-axis values (start1, end1)
+      console.log('[Duration Selection] User selected duration range on Duration chart:', {
+        startMs: start,
+        endMs: end,
+        durationStartMs: start1,
+        durationEndMs: end1,
+        startTime: new Date(start).toISOString(),
+        endTime: new Date(end).toISOString(),
+        durationRange: `${(start1 / 1000).toFixed(2)}s - ${(end1 / 1000).toFixed(2)}s`
+      });
+
       createRangeFilter(data, start1, end1);
     }
 
+    // All panels emit time-range-selected to update global datetime control
     emit("time-range-selected", { start, end });
+
+    // Log datetime AFTER selection (the new value that will be set)
+    console.log('[AFTER Selection] New datetime control value (emitted):', {
+      startMs: start,
+      endMs: end,
+      startTime: new Date(start).toLocaleString(),
+      endTime: new Date(end).toLocaleString(),
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+    });
   } else {
     console.log('onDataZoom: start or end missing, not creating filter');
   }
@@ -546,18 +601,33 @@ const openVolumeAnalysisDashboard = () => {
   // Get the current rate range from existing filters
   let rateStart = null;
   let rateEnd = null;
+  let timeStart = null;
+  let timeEnd = null;
 
   rangeFilters.value.forEach((filter) => {
     if (filter.panelTitle === "Rate") {
       rateStart = filter.start;
       rateEnd = filter.end;
+      timeStart = filter.timeStart;
+      timeEnd = filter.timeEnd;
     }
+  });
+
+  console.log('[Volume Analysis] Opening dashboard with rate filter:', {
+    rateStart,
+    rateEnd,
+    timeStart,
+    timeEnd,
+    timeStartISO: timeStart ? new Date(timeStart / 1000).toISOString() : 'null',
+    timeEndISO: timeEnd ? new Date(timeEnd / 1000).toISOString() : 'null',
   });
 
   // Set the rate filter for analysis
   analysisRateFilter.value = {
     start: rateStart || 0,
     end: rateEnd || Number.MAX_SAFE_INTEGER,
+    timeStart: timeStart || undefined,
+    timeEnd: timeEnd || undefined,
   };
 
   showVolumeAnalysisDashboard.value = true;
