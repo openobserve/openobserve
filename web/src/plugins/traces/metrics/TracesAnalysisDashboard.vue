@@ -493,16 +493,6 @@ watch(
   { immediate: true }
 );
 
-// Reload when baseline mode changes
-watch(
-  () => baselineMode.value,
-  () => {
-    if (isOpen.value && !loading.value) {
-      loadAnalysis();
-    }
-  }
-);
-
 // Reload when active analysis type (tab) changes
 watch(
   () => activeAnalysisType.value,
@@ -518,18 +508,6 @@ watch(
       console.log('[Analysis] ⏳ Skipping reload - already loading');
     } else if (!isOpen.value) {
       console.log('[Analysis] ⏸️ Skipping reload - modal not open');
-    }
-  }
-);
-
-// Watch for changes in baseline mode
-watch(
-  () => baselineMode.value,
-  (newMode, oldMode) => {
-    console.log(`[Analysis] 🔄 Baseline mode changed: ${oldMode} → ${newMode}`);
-    if (isOpen.value && !loading.value) {
-      console.log(`[Analysis] ✅ Reloading analysis with new baseline mode: ${newMode}`);
-      loadAnalysis();
     }
   }
 );
