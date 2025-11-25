@@ -652,6 +652,7 @@ export default defineComponent({
       isLimitQuery,
       updateUrlQueryParams,
       addTraceId,
+      checkTimestampAlias,
     } = logsUtils();
     const {
       getHistogramData,
@@ -2132,6 +2133,15 @@ export default defineComponent({
         ) {
           showErrorNotification(
             "Multiple SQL queries are not allowed to visualize",
+          );
+          variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
+          return null;
+        }
+        
+        // validate that timestamp column is not used as an alias
+        if (!checkTimestampAlias(logsPageQuery)) {
+          showErrorNotification(
+            `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`,
           );
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;

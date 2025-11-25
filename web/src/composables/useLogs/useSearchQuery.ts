@@ -40,6 +40,7 @@ export const useSearchQuery = () => {
     addTransformToQuery,
     updateUrlQueryParams,
     fnUnparsedSQL,
+    checkTimestampAlias,
   } = logsUtils();
 
   const { searchObj, notificationMsg, initialQueryPayload, searchAggData } = searchState();
@@ -65,16 +66,8 @@ export const useSearchQuery = () => {
       return null;
     }
 
-    if (
-      Number.isNaN(searchObj.data.datetime.endTime) ||
-      Number.isNaN(searchObj.data.datetime.startTime)
-    ) {
-      const period =
-        (router.currentRoute.value?.query?.period as string) || "15m";
-      const extractedDate: any = extractTimestamps(period);
-      searchObj.data.datetime.startTime = extractedDate.from;
-      searchObj.data.datetime.endTime = extractedDate.to;
-    }
+    if (Number.isNaN(searchObj.data.datetime.endTime))   searchObj.data.datetime.endTime = "Invalid Date"
+    if (Number.isNaN(searchObj.data.datetime.startTime)) searchObj.data.datetime.startTime = "Invalid Date"
 
     const queryReq: SearchRequestPayload = buildSearch();
 
@@ -281,7 +274,15 @@ export const useSearchQuery = () => {
 
         setChartInterval(req);
       } else {
-        notificationMsg.value = "Invalid date format";
+        if(timestamps.startTime == "Invalid Date") {
+          notificationMsg.value = "The selected start time is  invalid. Please choose a valid time."
+        }
+        else if(timestamps.endTime == "Invalid Date") {
+          notificationMsg.value = "The selected end time is  invalid. Please choose a valid time."
+        }
+        else {
+          notificationMsg.value = "Invalid date format."
+        }
         return null;
       }
 
@@ -333,6 +334,12 @@ export const useSearchQuery = () => {
     const parsedSQL: any = fnParsedSQL();
 
     if (parsedSQL != undefined) {
+
+     if (!checkTimestampAlias(searchObj.data.query)) {
+            const errorMsg = `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`;
+            notificationMsg.value = errorMsg;
+            return null;
+          }
 
       if (Array.isArray(parsedSQL) && parsedSQL.length == 0) {
         notificationMsg.value =

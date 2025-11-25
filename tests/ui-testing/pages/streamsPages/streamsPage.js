@@ -362,6 +362,94 @@ export class StreamsPage {
         await this.waitForUI(1000);
     }
 
+    // Extended Retention Methods
+    async navigateToExtendedRetention() {
+        // First open the stream detail view
+        await this.page.getByRole('button', { name: 'Stream Detail' }).first().click();
+        await this.waitForUI(2000);
+        
+        // Navigate to Extended Retention tab directly
+        await this.page.getByText('Extended Retention').click();
+        await this.waitForUI(1000);
+    }
+
+    async selectDateRange(startDay, endDay) {
+        await this.page.locator('[data-test="date-time-btn"]').click();
+        
+        // Wait for date picker to be visible
+        await this.page.locator('.q-date').waitFor({ state: 'visible' });
+        
+        // Ensure we're in the correct view (day view, not year/month view)
+        // If year view is visible, click on current year to go to month view
+        if (await this.page.locator('.q-date__view--years').isVisible()) {
+            const currentYear = new Date().getFullYear();
+            await this.page.locator('.q-date__years .q-btn').filter({ hasText: currentYear.toString() }).click();
+        }
+        
+        // If month view is visible, click on current month to go to day view  
+        if (await this.page.locator('.q-date__view--months').isVisible()) {
+            const currentMonth = new Date().toLocaleDateString('en', { month: 'short' });
+            await this.page.locator('.q-date__months .q-btn').filter({ hasText: currentMonth }).click();
+        }
+        
+        // Now we should be in day view, wait for calendar to be ready
+        await this.page.locator('.q-date__calendar').waitFor({ state: 'visible' });
+        await this.page.waitForTimeout(500); // Small wait for transitions
+        
+        // Use specific calendar locators to avoid strict mode violation
+        // Click start day with retry logic
+        try {
+            await this.page.locator('.q-date__calendar .q-btn').filter({ hasText: startDay.toString() }).first().click({ timeout: 5000 });
+        } catch (error) {
+            // Fallback: try to click any available day close to startDay
+            const availableDays = await this.page.locator('.q-date__calendar .q-btn').filter({ hasText: /^\d+$/ }).all();
+            if (availableDays.length > 0) {
+                await availableDays[0].click();
+            }
+        }
+        
+        // Wait a bit between clicks
+        await this.page.waitForTimeout(300);
+        
+        // Click end day with retry logic
+        try {
+            await this.page.locator('.q-date__calendar .q-btn').filter({ hasText: endDay.toString() }).first().click({ timeout: 5000 });
+        } catch (error) {
+            // Fallback: try to click any available day close to endDay
+            const availableDays = await this.page.locator('.q-date__calendar .q-btn').filter({ hasText: /^\d+$/ }).all();
+            if (availableDays.length > 1) {
+                await availableDays[1].click();
+            }
+        }
+        
+        await this.page.locator('[data-test="date-time-apply-btn"]').click();
+    }
+
+    async selectDateRangeForCurrentMonth() {
+        const currentDate = new Date();
+        const currentDay = currentDate.getDate();
+        
+        // Calculate a safe end day - ensure it's within the current month and not too far
+        const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+        const endDay = Math.min(currentDay + 3, daysInMonth - 1, 25); // Conservative approach - max 25th
+        
+        await this.selectDateRange(currentDay, endDay);
+        
+        // Return the date range text for later use
+        return `${currentDay.toString().padStart(2, '0')}-${(currentDate.getMonth() + 1).toString().padStart(2, '0')}-${currentDate.getFullYear()} ${endDay.toString().padStart(2, '0')}-${(currentDate.getMonth() + 1).toString().padStart(2, '0')}-${currentDate.getFullYear()}`;
+    }
+
+    async deleteRetentionPeriod(dateRangeText) {
+        // Select the checkbox for deletion
+        await this.page.getByRole('row', { name: dateRangeText }).locator('[data-test="schema-stream-delete-undefined-field-fts-key-checkbox"]').click();
+        await this.page.locator('[data-test="schema-delete-button"]').click();
+        await this.page.locator('[data-test="confirm-button"]').click();
+    }
+
+    async expectStreamSettingsUpdatedMessage() {
+        await expect(this.page.getByText('Stream settings updated')).toBeVisible();
+    }
+
     async waitForUI(milliseconds) {
         await this.page.waitForTimeout(milliseconds);
     }

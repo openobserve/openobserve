@@ -173,4 +173,7 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
     document.body.style.removeProperty('--o2-menu-gradient-end');
     document.body.style.removeProperty('--o2-menu-color');
   }
+
+  // Dispatch event to notify components (like SearchResult) to re-render
+  window.dispatchEvent(new CustomEvent('themeColorChanged'));
 };

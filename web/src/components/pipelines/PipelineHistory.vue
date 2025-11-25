@@ -32,10 +32,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-history-back-btn"
             />
             <div
-              class="q-table__title tw-font-[600] q-ml-sm"
+              class="q-table__title tw-font-[600] q-ml-sm tw-flex tw-items-center tw-gap-2"
               data-test="pipeline-history-title"
             >
               {{ t(`pipeline.history`) }}
+              <q-icon name="info" size="18px" color="grey-6">
+                <q-tooltip>
+                  History is only available for scheduled and manually triggered pipelines.
+                  Real-time pipelines do not generate history records.
+                </q-tooltip>
+              </q-icon>
             </div>
           </div>
           <div class="flex q-ml-auto items-center">
@@ -771,6 +777,9 @@ const onPipelineSelected = (val: any) => {
   if (val && val.value) {
     // Store the pipeline ID for the API call
     searchQuery.value = val.value;
+    // Automatically trigger search when an item is selected
+    pagination.value.page = 1;
+    fetchPipelineHistory();
   }
 };
 
@@ -780,6 +789,13 @@ const clearSearch = () => {
 };
 
 const manualSearch = () => {
+  // Update searchQuery from selectedPipeline when manually searching
+  if (selectedPipeline.value && selectedPipeline.value.value) {
+    searchQuery.value = selectedPipeline.value.value;
+  } else if (selectedPipeline.value && typeof selectedPipeline.value === 'string') {
+    // Handle case where user typed a value without selecting from dropdown
+    searchQuery.value = selectedPipeline.value;
+  }
   pagination.value.page = 1;
   fetchPipelineHistory();
 };
@@ -814,7 +830,6 @@ const fetchPipelineHistory = async () => {
       params.sort_order = pagination.value.descending ? "desc" : "asc";
     }
 
-    console.log("Fetching pipeline history with params:", params);
 
     const url = `/api/${org}/pipelines/history`;
     const response = await http().get(url, { params });
@@ -829,7 +844,6 @@ const fetchPipelineHistory = async () => {
         id: `${hit.timestamp}_${index}`,
         "#": (index + 1) + (pagination.value.page - 1) * pagination.value.rowsPerPage,
       }));
-      // console.log(pagination.value);
 
       // Update pagination total
       pagination.value.rowsNumber = historyData.total || 0;
@@ -951,7 +965,11 @@ const closeErrorDialog = () => {
 };
 
 const goBack = () => {
-  router.push({ name: "pipelines" });
+  router.push({ 
+    name: "pipelines",
+    query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          }});
 };
 
 // Lifecycle

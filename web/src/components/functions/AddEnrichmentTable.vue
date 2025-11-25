@@ -47,11 +47,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <q-file
-              color="lime-11"
               filled
               v-model="formData.file"
               :label="t('function.uploadCSVFile')"
-              bg-color="input-bg"
               class="col-12 q-py-md showLabelOnTop lookup-table-file-uploader"
               stack-label
               outlined
