@@ -96,6 +96,7 @@ async fn search_in_cluster(
         end,
         step,
         query_exemplars,
+        query_data: _,
     } = req.query.as_ref().unwrap();
 
     // cache disabled if result cache is disabled or use_cache is false or start == end or step == 0

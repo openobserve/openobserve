@@ -334,6 +334,7 @@ pub async fn search_inner(
             need_wal: req.need_wal,
         },
         query.query_exemplars,
+        query.query_data,
         timeout,
     );
 

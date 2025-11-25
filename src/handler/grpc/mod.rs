@@ -50,6 +50,7 @@ impl From<crate::service::promql::MetricsQueryRequest> for cluster_rpc::MetricsQ
             end: req.end,
             step: req.step,
             query_exemplars: req.query_exemplars,
+            query_data: false,
         };
 
         let job = cluster_rpc::Job {

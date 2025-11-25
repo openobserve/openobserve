@@ -30,6 +30,7 @@ message MetricsQueryStmt {
     int64               end = 3;
     int64              step = 4;
     bool    query_exemplars = 5;
+    bool         query_data = 6;
 }
 
 message MetricsQueryResponse {

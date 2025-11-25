@@ -43,12 +43,19 @@ pub struct PromqlContext {
     /// Default look back from sample search.
     pub lookback_delta: i64,
     pub query_exemplars: bool,
+    pub query_data: bool,
     pub scan_stats: Arc<RwLock<ScanStats>>,
     pub timeout: u64, // seconds, query timeout
 }
 
 impl PromqlContext {
-    pub fn new<P>(org_id: &str, provider: P, query_exemplars: bool, timeout: u64) -> Self
+    pub fn new<P>(
+        org_id: &str,
+        provider: P,
+        query_exemplars: bool,
+        query_data: bool,
+        timeout: u64,
+    ) -> Self
     where
         P: TableProvider,
     {
@@ -61,6 +68,7 @@ impl PromqlContext {
             end: now,
             interval: five_min,
             query_exemplars,
+            query_data,
             lookback_delta: five_min,
             scan_stats: Arc::new(RwLock::new(ScanStats::default())),
             timeout,

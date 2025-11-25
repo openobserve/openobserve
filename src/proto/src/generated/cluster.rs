@@ -513,6 +513,8 @@ pub struct MetricsQueryStmt {
     pub step: i64,
     #[prost(bool, tag = "5")]
     pub query_exemplars: bool,
+    #[prost(bool, tag = "6")]
+    pub query_data: bool,
 }
 #[derive(serde::Serialize)]
 #[derive(Clone, PartialEq, ::prost::Message)]

@@ -632,6 +632,7 @@ impl Engine {
             let selector = selector.clone();
             let col_filters = &self.col_filters;
             let query_exemplars = self.ctx.query_exemplars;
+            let query_data = self.ctx.query_data;
             let trace_id = self.trace_id.to_string();
             let task = tokio::time::timeout(Duration::from_secs(self.ctx.timeout), async move {
                 selector_load_data_from_datafusion(
@@ -643,6 +644,7 @@ impl Engine {
                     end,
                     col_filters,
                     query_exemplars,
+                    query_data,
                 )
                 .await
             });
@@ -1119,6 +1121,7 @@ async fn selector_load_data_from_datafusion(
     end: i64,
     label_selector: &Option<HashSet<String>>,
     query_exemplars: bool,
+    query_data: bool,
 ) -> Result<HashMap<u64, RangeValue>> {
     let start_time = std::time::Instant::now();
     let table_name = selector.name.as_ref().unwrap();
@@ -1231,6 +1234,12 @@ async fn selector_load_data_from_datafusion(
                     continue;
                 }
                 labels.clear(); // reset and reuse the same vector
+                if query_data {
+                    labels.push(Arc::new(Label {
+                        name: HASH_LABEL.to_string(),
+                        value: hash.to_string(),
+                    }));
+                }
                 for (name, value) in cols.iter() {
                     if value.is_null(i) {
                         continue;
@@ -1258,6 +1267,12 @@ async fn selector_load_data_from_datafusion(
                     continue;
                 }
                 labels.clear(); // reset and reuse the same vector
+                if query_data {
+                    labels.push(Arc::new(Label {
+                        name: HASH_LABEL.to_string(),
+                        value: hash.to_string(),
+                    }));
+                }
                 for (name, value) in cols.iter() {
                     if value.is_null(i) {
                         continue;
@@ -1558,6 +1573,7 @@ mod tests {
                 "test_org",
                 SimpleMockProvider,
                 false,
+                false,
                 30,
             )),
             create_test_eval_ctx(),
@@ -1576,6 +1592,7 @@ mod tests {
                 "test_org",
                 SimpleMockProvider,
                 false,
+                false,
                 30,
             )),
             create_test_eval_ctx(),
@@ -1593,6 +1610,7 @@ mod tests {
             Arc::new(PromqlContext::new(
                 "test_org",
                 SimpleMockProvider,
+                false,
                 false,
                 30,
             )),
@@ -1613,6 +1631,7 @@ mod tests {
             Arc::new(PromqlContext::new(
                 "test_org",
                 SimpleMockProvider,
+                false,
                 false,
                 30,
             )),
@@ -1635,6 +1654,7 @@ mod tests {
                 "test_org",
                 SimpleMockProvider,
                 false,
+                false,
                 30,
             )),
             create_test_eval_ctx(),
@@ -1655,6 +1675,7 @@ mod tests {
             Arc::new(PromqlContext::new(
                 "test_org",
                 SimpleMockProvider,
+                false,
                 false,
                 30,
             )),
@@ -1681,6 +1702,7 @@ mod tests {
             Arc::new(PromqlContext::new(
                 "test_org",
                 SimpleMockProvider,
+                false,
                 false,
                 30,
             )),
@@ -1714,6 +1736,7 @@ mod tests {
             Arc::new(PromqlContext::new(
                 "test_org",
                 SimpleMockProvider,
+                false,
                 false,
                 30,
             )),
@@ -1752,6 +1775,7 @@ mod tests {
                 "test_org",
                 SimpleMockProvider,
                 false,
+                false,
                 30,
             )),
             create_test_eval_ctx(),
@@ -1776,6 +1800,7 @@ mod tests {
             Arc::new(PromqlContext::new(
                 "test_org",
                 SimpleMockProvider,
+                false,
                 false,
                 30,
             )),
@@ -1803,6 +1828,7 @@ mod tests {
                 "test_org",
                 SimpleMockProvider,
                 false,
+                false,
                 30,
             )),
             create_test_eval_ctx(),
@@ -1829,6 +1855,7 @@ mod tests {
                 "test_org",
                 SimpleMockProvider,
                 false,
+                false,
                 30,
             )),
             create_test_eval_ctx(),
@@ -1854,6 +1881,7 @@ mod tests {
             Arc::new(PromqlContext::new(
                 "test_org",
                 SimpleMockProvider,
+                false,
                 false,
                 30,
             )),
@@ -1884,6 +1912,7 @@ mod tests {
                 "test_org",
                 SimpleMockProvider,
                 false,
+                false,
                 30,
             )),
             create_test_eval_ctx(),
@@ -1912,6 +1941,7 @@ mod tests {
                 "test_org",
                 SimpleMockProvider,
                 false,
+                false,
                 30,
             )),
             create_test_eval_ctx(),
@@ -1929,6 +1959,7 @@ mod tests {
             Arc::new(PromqlContext::new(
                 "test_org",
                 SimpleMockProvider,
+                false,
                 false,
                 30,
             )),
@@ -1952,6 +1983,7 @@ mod tests {
                 "test_org",
                 SimpleMockProvider,
                 false,
+                false,
                 30,
             )),
             create_test_eval_ctx(),
@@ -1973,6 +2005,7 @@ mod tests {
             Arc::new(PromqlContext::new(
                 "test_org",
                 SimpleMockProvider,
+                false,
                 false,
                 30,
             )),
@@ -1999,6 +2032,7 @@ mod tests {
                 "test_org",
                 SimpleMockProvider,
                 false,
+                false,
                 30,
             )),
             create_test_eval_ctx(),
@@ -2020,6 +2054,7 @@ mod tests {
             Arc::new(PromqlContext::new(
                 "test_org",
                 SimpleMockProvider,
+                false,
                 false,
                 30,
             )),
@@ -2044,6 +2079,7 @@ mod tests {
             Arc::new(PromqlContext::new(
                 "test_org",
                 SimpleMockProvider,
+                false,
                 false,
                 30,
             )),
@@ -2070,6 +2106,7 @@ mod tests {
             Arc::new(PromqlContext::new(
                 "test_org",
                 SimpleMockProvider,
+                false,
                 false,
                 30,
             )),
@@ -2099,6 +2136,7 @@ mod tests {
                 "test_org",
                 SimpleMockProvider,
                 false,
+                false,
                 30,
             )),
             create_test_eval_ctx(),
@@ -2126,6 +2164,7 @@ mod tests {
             Arc::new(PromqlContext::new(
                 "test_org",
                 SimpleMockProvider,
+                false,
                 false,
                 30,
             )),
@@ -2159,6 +2198,7 @@ mod tests {
                 "test_org",
                 SimpleMockProvider,
                 false,
+                false,
                 30,
             )),
             create_test_eval_ctx(),
@@ -2191,6 +2231,7 @@ mod tests {
                 "test_org",
                 SimpleMockProvider,
                 false,
+                false,
                 30,
             )),
             create_test_eval_ctx(),
@@ -2221,6 +2262,7 @@ mod tests {
             Arc::new(PromqlContext::new(
                 "test_org",
                 SimpleMockProvider,
+                false,
                 false,
                 30,
             )),
@@ -2255,6 +2297,7 @@ mod tests {
                 "test_org",
                 SimpleMockProvider,
                 false,
+                false,
                 30,
             )),
             create_test_eval_ctx(),
@@ -2288,6 +2331,7 @@ mod tests {
             Arc::new(PromqlContext::new(
                 "test_org",
                 SimpleMockProvider,
+                false,
                 false,
                 30,
             )),
@@ -2324,6 +2368,7 @@ mod tests {
                 "test_org",
                 SimpleMockProvider,
                 false,
+                false,
                 30,
             )),
             create_test_eval_ctx(),
@@ -2354,6 +2399,7 @@ mod tests {
                 "test_org",
                 SimpleMockProvider,
                 false,
+                false,
                 30,
             )),
             create_test_eval_ctx(),
@@ -2380,6 +2426,7 @@ mod tests {
             Arc::new(PromqlContext::new(
                 "test_org",
                 SimpleMockProvider,
+                false,
                 false,
                 30,
             )),
@@ -2409,6 +2456,7 @@ mod tests {
                 "test_org",
                 SimpleMockProvider,
                 false,
+                false,
                 30,
             )),
             create_test_eval_ctx(),
@@ -2435,6 +2483,7 @@ mod tests {
             Arc::new(PromqlContext::new(
                 "test_org",
                 SimpleMockProvider,
+                false,
                 false,
                 30,
             )),
@@ -2472,6 +2521,7 @@ mod tests {
             Arc::new(PromqlContext::new(
                 "test_org",
                 SimpleMockProvider,
+                false,
                 false,
                 30,
             )),
@@ -2515,6 +2565,7 @@ mod tests {
                 "test_org",
                 SimpleMockProvider,
                 false,
+                false,
                 30,
             )),
             create_test_eval_ctx(),
@@ -2536,6 +2587,7 @@ mod tests {
             Arc::new(PromqlContext::new(
                 "test_org",
                 SimpleMockProvider,
+                false,
                 false,
                 30,
             )),
@@ -2567,6 +2619,7 @@ mod tests {
             Arc::new(PromqlContext::new(
                 "test_org",
                 SimpleMockProvider,
+                false,
                 false,
                 30,
             )),
@@ -2600,6 +2653,7 @@ mod tests {
                 "test_org",
                 SimpleMockProvider,
                 false,
+                false,
                 30,
             )),
             create_test_eval_ctx(),
@@ -2632,6 +2686,7 @@ mod tests {
             Arc::new(PromqlContext::new(
                 "test_org",
                 SimpleMockProvider,
+                false,
                 false,
                 30,
             )),
@@ -2667,6 +2722,7 @@ mod tests {
                 "test_org",
                 SimpleMockProvider,
                 false,
+                false,
                 30,
             )),
             create_test_eval_ctx(),
@@ -2689,6 +2745,7 @@ mod tests {
             Arc::new(PromqlContext::new(
                 "test_org",
                 SimpleMockProvider,
+                false,
                 false,
                 30,
             )),
@@ -2718,6 +2775,7 @@ mod tests {
                 "test_org",
                 SimpleMockProvider,
                 false,
+                false,
                 30,
             )),
             create_test_eval_ctx(),
@@ -2746,6 +2804,7 @@ mod tests {
             Arc::new(PromqlContext::new(
                 "test_org",
                 SimpleMockProvider,
+                false,
                 false,
                 30,
             )),
@@ -2777,6 +2836,7 @@ mod tests {
                 "test_org",
                 SimpleMockProvider,
                 false,
+                false,
                 30,
             )),
             create_test_eval_ctx(),
@@ -2807,6 +2867,7 @@ mod tests {
             Arc::new(PromqlContext::new(
                 "test_org",
                 SimpleMockProvider,
+                false,
                 false,
                 30,
             )),
@@ -2879,6 +2940,7 @@ mod tests {
                 "test_org",
                 SimpleMockProvider,
                 false,
+                false,
                 30,
             )),
             create_test_eval_ctx(),
@@ -2913,6 +2975,7 @@ mod tests {
             Arc::new(PromqlContext::new(
                 "test_org",
                 SimpleMockProvider,
+                false,
                 false,
                 30,
             )),
@@ -2949,6 +3012,7 @@ mod tests {
                 "test_org",
                 SimpleMockProvider,
                 false,
+                false,
                 30,
             )),
             create_test_eval_ctx(),
@@ -2983,6 +3047,7 @@ mod tests {
             Arc::new(PromqlContext::new(
                 "test_org",
                 SimpleMockProvider,
+                false,
                 false,
                 30,
             )),
@@ -3020,6 +3085,7 @@ mod tests {
             Arc::new(PromqlContext::new(
                 "test_org",
                 SimpleMockProvider,
+                false,
                 false,
                 30,
             )),

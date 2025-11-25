@@ -86,7 +86,8 @@ impl Metrics for MetricsQuerier {
     ) -> Result<Response<Self::DataStream>, Status> {
         let cap = std::cmp::max(2, config::get_config().limit.cpu_num);
         let (tx, rx) = mpsc::channel::<Result<MetricsQueryResponse, Status>>(cap);
-        let req: MetricsQueryRequest = req.into_inner();
+        let mut req: MetricsQueryRequest = req.into_inner();
+        req.query.as_mut().unwrap().query_data = true;
 
         // spawn a task to push streaming responses
         tokio::task::spawn(async move {
