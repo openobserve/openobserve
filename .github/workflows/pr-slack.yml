@@ -1,4 +1,6 @@
 name: Notify Slack on stale PRs
+permissions:
+  contents: read
 on:
   schedule:
     - cron: "0 14 * * *" # everyday at 4PM
