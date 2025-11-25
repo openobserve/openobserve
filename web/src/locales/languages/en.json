@@ -1,6 +1,7 @@
 {
   "common": {
-    "close": "Close",
+    "test": "Test",
+    "close": "Close1",
     "cancel": "Cancel",
     "ok": "OK",
     "apply": "Apply",
