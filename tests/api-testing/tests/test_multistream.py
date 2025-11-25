@@ -1,22 +1,3 @@
-"""
-Multistream API Tests for OpenObserve
-
-This module contains API tests for multistream functionality that correspond to
-the UI tests in multiselect-stream.spec.js. These API tests are significantly
-faster than UI tests and validate the same core functionality.
-
-Test Coverage:
-1. Multistream data ingestion and retrieval  
-2. Multistream search with filters
-3. Multistream search with non-existent fields (error handling)
-4. Multistream query with VRL functions
-5. Multistream combined results validation
-6. Performance comparison vs UI tests
-
-Corresponding UI tests: 
-- playwright-tests/Streams/multiselect-stream.spec.js (4 enhanced tests)
-"""
-
 import json
 import requests
 import pytest
