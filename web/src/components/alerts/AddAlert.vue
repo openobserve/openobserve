@@ -553,7 +553,6 @@ const defaultValue: any = () => {
                 value: "",
                 values: [],
                 logicalOperator: "AND",
-                ignore_case: false,
                 id: ""
             }
         ]
@@ -1225,7 +1224,6 @@ export default defineComponent({
                       value: filter.values[0],
                       values: [],
                       logicalOperator: 'AND',
-                      ignore_case: false,
                       id: getUUID()
                     });
                   }

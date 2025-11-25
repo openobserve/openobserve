@@ -338,14 +338,12 @@ const getDefaultConditionGroup = (): ConditionGroup => {
     logicalOperator: 'AND',
     groupId: getUUID(),
     conditions: [{
-      type: 'condition',
       filterType: 'condition',
       column: '',
       operator: '=',
       value: '',
       values: [],
       logicalOperator: 'AND',
-      ignore_case: true,
       id: getUUID(),
     }]
   } as any;

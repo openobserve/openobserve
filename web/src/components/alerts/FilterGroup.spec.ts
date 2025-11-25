@@ -46,7 +46,6 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
           operator: '=',
           value: 'test',
           logicalOperator: 'AND',
-          ignore_case: true,
         }
       ],
     },
@@ -256,12 +255,12 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       wrapper.vm.addCondition('test-group');
 
       expect(wrapper.vm.groups.conditions).toHaveLength(initialLength + 1);
-      
+
       const newCondition = wrapper.vm.groups.conditions[wrapper.vm.groups.conditions.length - 1];
       expect(newCondition.column).toBe('');
       expect(newCondition.operator).toBe('=');
       expect(newCondition.value).toBe('');
-      expect(newCondition.ignore_case).toBe(true);
+      expect(newCondition.ignore_case).toBeUndefined(); // No longer added to conditions
       expect(newCondition.id).toBe('mock-uuid-123');
     });
 
@@ -340,7 +339,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       expect(defaultCondition.operator).toBe('=');
       expect(defaultCondition.value).toBe('');
       expect(defaultCondition.logicalOperator).toBe('OR');
-      expect(defaultCondition.ignore_case).toBe(true);
+      expect(defaultCondition.ignore_case).toBeUndefined(); // No longer added to conditions
     });
 
     it('should emit add-group event', () => {
@@ -1535,7 +1534,6 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
             operator: '!=',
             value: 'newtest',
             logicalOperator: 'OR',
-            ignore_case: true
           }
         ]
       };
