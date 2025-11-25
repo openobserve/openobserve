@@ -164,7 +164,7 @@ def test_create_dashboard(create_session, base_url):
 
     body = resp.json()
     # Dashboard ID is nested in v8.dashboardId
-    assert "v7" in body and "dashboardId" in body["v8"], "Response should contain dashboard ID in v8.dashboardId"
+    assert "v8" in body and "dashboardId" in body["v8"], "Response should contain dashboard ID in v8.dashboardId"
 
     # Clean up: delete the created dashboard
     dashboard_id = body["v8"]["dashboardId"]
