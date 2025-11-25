@@ -414,6 +414,12 @@ import alertsService from "../../services/alerts";
 import useStreams from "@/composables/useStreams";
 import BaseImport from "../common/BaseImport.vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
+import {
+  detectConditionsVersion,
+  convertV0ToV2,
+  convertV1ToV2,
+  convertV1BEToV2,
+} from "@/utils/alerts/alertDataTransforms";
 
 export default defineComponent({
   name: "ImportAlert",
@@ -991,6 +997,34 @@ export default defineComponent({
       input.folder_id = folderId;
       input.owner = store.state.userInfo.email;
       input.last_edited_by = store.state.userInfo.email;
+
+      // VERSION DETECTION AND CONVERSION
+      // Convert V0 and V1 conditions to V2 format before creating alert
+      if (input.query_condition && input.query_condition.conditions) {
+        // Check if version field is already present (V2)
+        if (input.query_condition.version !== "2" && input.query_condition.version !== 2) {
+          const version = detectConditionsVersion(input.query_condition.conditions);
+
+          if (version === 0) {
+            // V0: Flat array format - convert to V2
+            input.query_condition.conditions = convertV0ToV2(input.query_condition.conditions);
+            input.query_condition.version = "2";
+          } else if (version === 1) {
+            // V1: Tree-based format - convert to V2
+            if (input.query_condition.conditions.and || input.query_condition.conditions.or) {
+              // V1 Backend format
+              input.query_condition.conditions = convertV1BEToV2(input.query_condition.conditions);
+            } else if (input.query_condition.conditions.label && input.query_condition.conditions.items) {
+              // V1 Frontend format
+              input.query_condition.conditions = convertV1ToV2(input.query_condition.conditions);
+            }
+            input.query_condition.version = "2";
+          } else if (version === 2) {
+            // V2: Already in correct format, just add version field
+            input.query_condition.version = "2";
+          }
+        }
+      }
 
       try {
         await alertsService.create_by_alert_id(

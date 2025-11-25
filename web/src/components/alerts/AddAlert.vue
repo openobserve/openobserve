@@ -525,6 +525,10 @@ import {
   removeConditionGroup as removeConditionGroupUtil,
   transformFEToBE as transformFEToBEUtil,
   retransformBEToFE as retransformBEToFEUtil,
+  detectConditionsVersion,
+  convertV0ToV2,
+  convertV1ToV2,
+  convertV1BEToV2,
   type TransformContext,
 } from "@/utils/alerts/alertDataTransforms";
 
@@ -537,12 +541,20 @@ const defaultValue: any = () => {
     query_condition: {
       conditions:
       {
-        "or": [
+        filterType: "group",
+        logicalOperator: "AND",
+        groupId: "",
+        conditions: [
             {
-                "column": "",
-                "operator": ">",
-                "value": "",
-                "ignore_case": false
+                type: "condition",
+                filterType: "condition",
+                column: "",
+                operator: ">",
+                value: "",
+                values: [],
+                logicalOperator: "AND",
+                ignore_case: false,
+                id: ""
             }
         ]
         },
@@ -1205,20 +1217,28 @@ export default defineComponent({
                 const conditions: any[] = [];
                 query.fields.filter.forEach((filter: any) => {
                   if (filter.type === 'list' && filter.values && filter.values.length > 0) {
+                    // V2: Create condition with filterType and logicalOperator
                     conditions.push({
+                      type: 'condition',
+                      filterType: 'condition',
                       column: filter.column,
                       operator: "=",
                       value: filter.values[0],
-                      ignore_case: false
+                      values: [],
+                      logicalOperator: 'AND',
+                      ignore_case: false,
+                      id: getUUID()
                     });
                   }
                 });
 
                 if (conditions.length > 0) {
+                  // V2: Create group with filterType and conditions array
                   formData.value.query_condition.conditions = {
+                    filterType: 'group',
+                    logicalOperator: 'AND',
                     groupId: getUUID(),
-                    label: 'and',
-                    items: conditions
+                    conditions: conditions
                   };
                 }
               }
@@ -1503,18 +1523,50 @@ export default defineComponent({
         id: getUUID(),
       };
     });
-    //this is done because 
-    //if we are getting the conditions as null or undefined then we need to create a new group 
-    //if we are getting the conditions as an object then we need to transform it to the frontend format
-    if(this.formData.query_condition.conditions && ( !Array.isArray(this.formData.query_condition.conditions) && Object.keys(this.formData.query_condition.conditions).length != 0)){
-      this.formData.query_condition.conditions = this.retransformBEToFE(this.formData.query_condition.conditions);
+    // VERSION DETECTION AND CONVERSION
+    // Supports three versions:
+    // - V0: Flat array of conditions with implicit AND between all (no groups)
+    // - V1: Tree-based structure with {and: [...]} or {or: [...]} or {label, items, groupId}
+    // - V2: Linear structure with filterType, logicalOperator per condition
+
+    // Check for version field at query_condition level (V2 format from backend)
+    if (this.formData.query_condition.version === "2" || this.formData.query_condition.version === 2) {
+      // V2: Backend sends { version: "2", conditions: {...} }
+      // Extract conditions - it's already in V2 format
+      // The conditions are already at this.formData.query_condition.conditions
+    } else if(this.formData.query_condition.conditions && ( !Array.isArray(this.formData.query_condition.conditions) && Object.keys(this.formData.query_condition.conditions).length != 0)){
+      // No version field - could be V1 or old V2
+      // Detect version by structure
+      const version = detectConditionsVersion(this.formData.query_condition.conditions);
+
+      if (version === 0) {
+        // V0: Flat array format - convert to V2
+        // V0 had implicit AND between all conditions (no groups)
+        this.formData.query_condition.conditions = convertV0ToV2(this.formData.query_condition.conditions);
+      } else if (version === 1) {
+        // V1 format - need to convert to V2
+        // First check if it's BE format ({and: [...]}) or FE format ({label, items, groupId})
+        if (this.formData.query_condition.conditions.and || this.formData.query_condition.conditions.or) {
+          // V1 Backend format - convert to V2
+          this.formData.query_condition.conditions = convertV1BEToV2(this.formData.query_condition.conditions);
+        } else if (this.formData.query_condition.conditions.label && this.formData.query_condition.conditions.items) {
+          // V1 Frontend format - convert to V2
+          this.formData.query_condition.conditions = convertV1ToV2(this.formData.query_condition.conditions);
+        }
+      }
+      // V2 format without version field - use as-is, no transformation needed
+    } else if (Array.isArray(this.formData.query_condition.conditions) && this.formData.query_condition.conditions.length > 0) {
+      // V0: Flat array of conditions - convert to V2
+      // This handles the case where conditions is directly an array at the top level
+      this.formData.query_condition.conditions = convertV0ToV2(this.formData.query_condition.conditions);
     }
     else if (this.formData.query_condition.conditions == null || this.formData.query_condition.conditions == undefined || this.formData.query_condition.conditions.length == 0 || Object.keys(this.formData.query_condition.conditions).length == 0){
-
+      // No conditions - create empty V2 group
       this.formData.query_condition.conditions = {
+        filterType: 'group',
+        logicalOperator: 'AND',
+        conditions: [],
         groupId: getUUID(),
-        label: 'and',
-        items: []
       }
     }
   },
@@ -1654,8 +1706,20 @@ export default defineComponent({
           }
         }
 
-        // Transform the form data to the backend format
-        payload.query_condition.conditions = this.transformFEToBE(this.formData.query_condition.conditions);
+        // VERSION HANDLING
+        const version = detectConditionsVersion(this.formData.query_condition.conditions);
+        if (version === 2) {
+          // V2: Wrap with version field at query_condition level
+          // Backend expects: { version: "2", conditions: {...} }
+          payload.query_condition = {
+            ...payload.query_condition,
+            version: "2",
+            conditions: this.formData.query_condition.conditions,
+          };
+        } else {
+          // V1: Transform and send without version (legacy format)
+          payload.query_condition.conditions = this.transformFEToBE(this.formData.query_condition.conditions);
+        }
 
         if (this.beingUpdated) {
           payload.folder_id = this.router.currentRoute.value.query.folder || "default";
