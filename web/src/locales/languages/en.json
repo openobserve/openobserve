@@ -629,7 +629,8 @@
     "selectDimensions": "Select Fields",
     "analyzeButtonLabel": "Analyze",
     "refreshTooltip": "Refresh analysis with updated percentile",
-    "customSQLFieldsDisabled": "Field selection is not available for custom SQL queries. Dimensions are extracted from your query results."
+    "customSQLFieldsDisabled": "Field selection is not available for custom SQL queries. Dimensions are extracted from your query results.",
+    "timeRangeSelected": "Time Range Selected"
   },
   "volumeInsights": {
     "title": "Insights",
