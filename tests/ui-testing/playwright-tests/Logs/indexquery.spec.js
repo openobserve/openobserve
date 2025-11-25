@@ -38,14 +38,14 @@ async function runQuery(page, query) {
         
         if (!response.ok) {
           const errorText = await response.text();
-          console.error('Query failed with status:', response.status, 'Error:', errorText);
+          testLogger.error('Query failed', { status: response.status, error: errorText });
           return { error: errorText, status: response.status };
         }
         
         const result = await response.json();
         return result;
       } catch (err) {
-        console.error('Query execution error', err);
+        testLogger.error('Query execution error', { error: err.message });
         return { error: err.message };
       }
     }, { 
