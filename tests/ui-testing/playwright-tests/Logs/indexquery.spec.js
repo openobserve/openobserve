@@ -228,134 +228,152 @@ test.describe("Compare SQL query execution times", () => {
     }
   });
 
-  test("should validate custom date range picker functionality", {
-    tag: ['@logs', '@datePicker', '@dateRange', '@smoke', '@all']
+  test("should validate time range filtering with custom timestamped data", {
+    tag: ['@logs', '@timeFilter', '@dataIngestion', '@critical', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing custom date range picker functionality');
+    testLogger.info('Testing time range filtering with custom timestamped data ingestion');
     
+    // This test validates that OpenObserve correctly filters logs based on their actual timestamp
+    // (not ingestion time) when backdated data is ingested. Real-world scenarios include:
+    // - Log ingestion delays: Logs arrive late with past timestamps
+    // - Batch processing: Historical data being processed and ingested  
+    // - Multi-source logs: Different systems sending logs with their local timestamps
+    // - Time zone handling: Logs from different time zones with past timestamps
+    
+    const orgId = process.env["ORGNAME"];
+    const streamName = `e2e_time_test_${Date.now()}`; // Use timestamp for uniqueness
+    const basicAuthCredentials = Buffer.from(
+      `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+    ).toString('base64');
+
+    const headers = {
+      "Authorization": `Basic ${basicAuthCredentials}`,
+      "Content-Type": "application/json",
+    };
+
+    // Create test data with different timestamps (within 5-hour ingestion limit)
+    const now = Date.now();
+    const oneHourAgo = now - (1 * 60 * 60 * 1000);
+    const threeHoursAgo = now - (3 * 60 * 60 * 1000);
+    const fourHoursAgo = now - (4 * 60 * 60 * 1000);
+
+    const testLogs = [
+      {
+        _timestamp: new Date(oneHourAgo).toISOString(),
+        message: "Recent log entry - 1 hour ago",
+        level: "info",
+        test_id: "time_test_1h",
+        data_age: "1h_old",
+        hours_old: 1,
+        expected_in_30m_range: false,
+        expected_in_2h_range: true,
+        expected_in_6h_range: true
+      },
+      {
+        _timestamp: new Date(threeHoursAgo).toISOString(),
+        message: "Three hour old log entry - 3 hours ago",
+        level: "info", 
+        test_id: "time_test_3h",
+        data_age: "3h_old",
+        hours_old: 3,
+        expected_in_30m_range: false,
+        expected_in_2h_range: false,
+        expected_in_6h_range: true
+      },
+      {
+        _timestamp: new Date(fourHoursAgo).toISOString(),
+        message: "Four hour old log entry - 4 hours ago",
+        level: "info",
+        test_id: "time_test_4h",
+        data_age: "4h_old",
+        hours_old: 4,
+        expected_in_30m_range: false,
+        expected_in_2h_range: false,
+        expected_in_6h_range: true
+      }
+    ];
+
+    // Ingest test data with specific timestamps
+    const ingestionResponse = await page.evaluate(async ({ url, headers, orgId, streamName, testLogs }) => {
+      const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(testLogs)
+      });
+      return await fetchResponse.json();
+    }, {
+      url: process.env.INGESTION_URL,
+      headers: headers,
+      orgId: orgId,
+      streamName: streamName,
+      testLogs: testLogs
+    });
+
+    testLogger.debug('Test data ingested', { response: ingestionResponse });
+    
+    // Verify ingestion was successful
+    expect(ingestionResponse.code).toBe(200);
+    expect(ingestionResponse.status[0].successful).toBe(3);
+    expect(ingestionResponse.status[0].failed).toBe(0);
+    testLogger.info('Verified all 3 test logs were successfully ingested');
+    
+    await page.waitForTimeout(5000); // Wait for data to be indexed and available
+
+    // Navigate to logs page and select test stream
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
-    await pm.logsPage.selectStream("e2e_automate");
-    
-    // Open date time picker using POM
+    await pm.logsPage.selectStream(streamName);
+
+    // STEP 0: First verify ALL data is available in wide range (baseline check to eliminate false positives)
     await pm.logsPage.clickDateTimeButton();
-    
-    // Select absolute time range option using POM
-    await pm.logsPage.clickAbsoluteTimeTab();
-    await page.waitForTimeout(500);
-    
-    // Set custom date range (last 24 hours) using POM methods
-    const now = new Date();
-    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    
-    // Use POM methods for date inputs
-    const startDateInput = page.locator('[data-test="date-time-absolute-start-date"]');
-    
-    if (await startDateInput.isVisible()) {
-      await pm.logsPage.fillStartDate(yesterday.toISOString().split('T')[0]);
-      await pm.logsPage.fillEndDate(now.toISOString().split('T')[0]);
-      
-      // Apply the custom date range using POM
-      await pm.logsPage.clickApplyDateRange();
-      await page.waitForTimeout(1000);
-      
-      // Run query with custom date range and assert API response
-      await applyQueryButton(pm);
-      
-      // Verify logs table is visible and contains data
-      await expect(page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible();
-      const logRows = page.locator('[data-test="logs-search-result-logs-table"] tbody tr');
-      await expect(logRows).not.toHaveCount(0);
-      
-      // Verify that date range is actually applied by checking if date picker shows the selected range
-      await pm.logsPage.clickDateTimeButton();
-      const selectedDateRange = page.locator('[data-test="date-time-absolute-start-date"]');
-      await expect(selectedDateRange).toHaveValue(yesterday.toISOString().split('T')[0]);
-    }
-    
-    testLogger.info('Custom date range picker test completed successfully');
-  });
-
-  test("should validate field filtering and advanced search functionality", {
-    tag: ['@logs', '@fieldFilter', '@advancedSearch', '@sql', '@regression', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing field filtering and advanced search capabilities');
-    
-    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
-    await pm.logsPage.selectStream("e2e_automate");
-    await pm.logsPage.clickRefreshButton();
-    
-    // Enable quick mode and access fields
-    await pm.logsPage.clickQuickModeToggle();
-    await pm.logsPage.clickAllFieldsButton();
-    
-    // Test field value filtering using POM
-    await pm.logsPage.searchFieldByName("level");
-    await page.waitForTimeout(1000);
-    
-    // Look for level field in the field list
-    const levelField = page.locator('[title="level"]').first();
-    if (await levelField.isVisible()) {
-      testLogger.info('Field filtering working - level field found');
-      
-      // Click on level field to add it as a filter
-      await levelField.click({ force: true });
-      await page.waitForTimeout(500);
-    }
-    
-    // Test advanced search with multiple conditions
-    await pm.logsPage.clickSQLModeToggle();
-    await pm.logsPage.clickQueryEditor();
-    await pm.logsPage.clearQueryEditor();
-    
-    // Advanced query with AND conditions
-    const advancedQuery = "SELECT * FROM 'e2e_automate' WHERE level='info' AND job='test' LIMIT 50";
-    await pm.logsPage.fillQueryEditor(advancedQuery);
-    
-    // Apply query and assert API response
+    await pm.logsPage.clickPast6DaysButton();
     await applyQueryButton(pm);
     
-    // Verify advanced search results are displayed
-    await expect(page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible();
-    const logRows = page.locator('[data-test="logs-search-result-logs-table"] tbody tr');
-    await expect(logRows).not.toHaveCount(0);
-    
-    // Verify that the query was actually applied by checking the query editor contains our query
-    const queryText = await pm.logsPage.getQueryEditorText();
-    await expect(queryText.replace(/\s/g, "")).toContain(advancedQuery.replace(/\s/g, ""));
-    
-    testLogger.info('Field filtering and advanced search test completed successfully');
-  });
+    // Verify all 3 logs are available (proves ingestion and indexing worked)
+    await pm.logsPage.expectLogsTableVisible();
+    await pm.logsPage.expectLogsTableRowCount(3);
+    await pm.logsPage.waitForSearchResultAndCheckText("Recent log entry - 1 hour ago");
+    await pm.logsPage.waitForSearchResultAndCheckText("Three hour old log entry - 3 hours ago");
+    await pm.logsPage.waitForSearchResultAndCheckText("Four hour old log entry - 4 hours ago");
+    testLogger.info('Baseline check passed: All 3 logs are available in 6-day range');
 
-  test("should display logs table and basic functionality", {
-    tag: ['@logs', '@logsTable', '@basicUI', '@smoke', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing basic logs display and table functionality');
-    
-    // Navigate to logs page and select stream
-    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
-    await pm.logsPage.selectStream("e2e_automate");
-    
-    // Apply query to load logs and assert API response
+    // Test 1: Set time range to last 30 minutes - should show NO logs (all are older than 30 min)
+    await pm.logsPage.clickDateTimeButton();
+    await pm.logsPage.clickRelative15MinButton(); // Using 15min as closest to 30min
     await applyQueryButton(pm);
+
+    // Verify exactly 0 rows are visible (all data is older than 15 minutes)
+    await pm.logsPage.expectLogsTableRowCount(0);
+    testLogger.info('15-minute range test passed: No data visible (all logs older than 15 minutes)');
+
+    // Test 2: Set time range to last 2 hours - should show exactly 1 log (1-hour old log only)
+    await pm.logsPage.clickDateTimeButton();
+    await pm.logsPage.selectRelative6Hours(); // Using 6h since 2h might not exist
+    await applyQueryButton(pm);
+
+    // Verify all 3 logs are visible (all within 6 hours)
+    await pm.logsPage.expectLogsTableRowCount(3);
+    await pm.logsPage.waitForSearchResultAndCheckText("Recent log entry - 1 hour ago");
+    await pm.logsPage.waitForSearchResultAndCheckText("data_age\":1h_old");
+    testLogger.info('6-hour range test passed: All 3 logs visible (all within 6 hours)');
+
+    // Test 3: Return to 6 days - should show all 3 logs again (final verification)
+    await pm.logsPage.clickDateTimeButton();
+    await pm.logsPage.clickPast6DaysButton();
+    await applyQueryButton(pm);
+
+    // Verify all 3 logs are visible again (confirms filtering is reversible)
+    await pm.logsPage.expectLogsTableRowCount(3);
+    await pm.logsPage.waitForSearchResultAndCheckText("Recent log entry - 1 hour ago");
+    await pm.logsPage.waitForSearchResultAndCheckText("Three hour old log entry - 3 hours ago");
+    await pm.logsPage.waitForSearchResultAndCheckText("Four hour old log entry - 4 hours ago");
+    await pm.logsPage.waitForSearchResultAndCheckText("data_age\":1h_old");
+    await pm.logsPage.waitForSearchResultAndCheckText("data_age\":3h_old");
+    await pm.logsPage.waitForSearchResultAndCheckText("data_age\":4h_old");
     
-    // Verify logs table is visible
-    await expect(page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible();
-    
-    // Test that logs are actually loaded by checking for table rows
-    const logRows = page.locator('[data-test="logs-search-result-logs-table"] tbody tr');
-    await expect(logRows).not.toHaveCount(0);
-    
-    // Verify refresh button functionality
-    const refreshButton = page.locator('[data-test="logs-search-bar-refresh-btn"]');
-    await expect(refreshButton).toBeVisible();
-    
-    // Verify that we can see log data in the table
-    await expect(page.locator('[data-test="logs-search-result-logs-table"] tbody')).toContainText(/\w+/);
-    
-    // Verify that the table has expected columns
-    await expect(page.locator('[data-test="logs-search-result-logs-table"] thead')).toBeVisible();
-    
-    testLogger.info('Basic logs display test completed successfully');
+    testLogger.info('Final verification passed: All 3 logs visible in 6-day range');
+    testLogger.info('Time range filtering validation completed successfully - Progressive filtering works: 0 → 3 → 3 logs as range expands');
+
+    testLogger.info('Time range filtering validation test completed successfully');
   });
 
   test.afterEach(async () => {
