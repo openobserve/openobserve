@@ -623,7 +623,10 @@
     "p50Median": "P50 (Median)",
     "p75": "P75",
     "p95": "P95",
-    "p99": "P99"
+    "p99": "P99",
+    "dimensionsButton": "Fields ({count})",
+    "dimensionsTooltip": "Add or remove dimensions to analyze",
+    "selectDimensions": "Select Fields"
   },
   "volumeInsights": {
     "title": "Insights",

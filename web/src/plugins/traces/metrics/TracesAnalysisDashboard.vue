@@ -67,11 +67,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             no-caps
             color="primary"
             icon="tune"
-            :label="`Dimensions (${selectedDimensions.length})`"
+            :label="t('latencyInsights.dimensionsButton', { count: selectedDimensions.length })"
             @click="showDimensionSelector = true"
             data-test="dimension-selector-button"
           >
-            <q-tooltip>Add or remove dimensions to analyze</q-tooltip>
+            <q-tooltip>{{ t('latencyInsights.dimensionsTooltip') }}</q-tooltip>
           </q-btn>
 
           <q-btn
@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-card style="min-width: 400px; max-width: 500px">
       <q-card-section class="tw-p-4 tw-border-b">
         <div class="tw-flex tw-items-center tw-justify-between">
-          <div class="tw-text-base tw-font-semibold">Select Dimensions</div>
+          <div class="tw-text-base tw-font-semibold">{{ t('latencyInsights.selectDimensions') }}</div>
           <q-btn flat round dense icon="close" v-close-popup />
         </div>
       </q-card-section>
