@@ -1224,16 +1224,13 @@ export default defineComponent({
             variableObject.value = nullValue;
             variableObject.options = [];
             variableObject.isLoading = false;
-            // IMPORTANT: Mark as NOT partially loaded to prevent panels from rendering
-            // with default data while the dependency chain resolves.
-            // This keeps the variable in a "waiting for parent" state.
-            variableObject.isVariablePartialLoaded = false;
-            variableObject.isVariableLoadingPending = true;
+            variableObject.isVariablePartialLoaded = true;
+            variableObject.isVariableLoadingPending = false;
 
             // Update old variables data to reflect the reset
             oldVariablesData[variableObject.name] = variableObject.value;
 
-            emitVariablesData();
+            // emitVariablesData();
             resolve(true);
             return;
           }
@@ -1951,10 +1948,9 @@ export default defineComponent({
         variable.value = variable.multiSelect ? [] : null;
         // Reset options array
         variable.options = [];
+        // Emit the updated values immediately
+        emitVariablesData();
       });
-
-      // Removed emitVariablesData() here to prevent emitting null values.
-      // The emit will happen in loadSingleVariableDataByName (with masking).
 
       // Load variables in dependency order, even if parent value is empty
       for (const varName of affectedVariables) {
