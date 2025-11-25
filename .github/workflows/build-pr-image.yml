@@ -1,12 +1,6 @@
 name: Build PR Docker Image
 
 on:
-  workflow_run:
-    workflows: ["Update Translations"]
-    types:
-      - completed
-    branches:
-      - "*"
   pull_request:
     branches:
       - "*"
@@ -19,18 +13,6 @@ env:
   AWS_REGION: us-east-1
 
 jobs:
-  check_translation_status:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_run'
-    steps:
-      - name: Check translation workflow status
-        run: |
-          if [ "${{ github.event.workflow_run.conclusion }}" != "success" ]; then
-            echo "❌ Translation workflow did not succeed. Stopping build."
-            exit 1
-          fi
-          echo "✅ Translation workflow completed successfully"
-
   check_changes:
     runs-on: ubuntu-latest
     permissions:
