@@ -715,15 +715,13 @@ async fn handle_alert_triggers(
                     );
                     if let Some(batch) =
                         crate::service::alerts::grouping::get_ready_batch(&fingerprint)
-                    {
-                        if let Err(e) =
+                        && let Err(e) =
                             crate::job::alert_grouping::send_grouped_notification_sync(batch).await
-                        {
-                            log::error!(
-                                "[SCHEDULER trace_id {scheduler_trace_id}] Failed to send grouped notification: {}",
-                                e
-                            );
-                        }
+                    {
+                        log::error!(
+                            "[SCHEDULER trace_id {scheduler_trace_id}] Failed to send grouped notification: {}",
+                            e
+                        );
                     }
                 } else {
                     log::debug!(
@@ -740,7 +738,7 @@ async fn handle_alert_triggers(
                 };
                 new_trigger.data = json::to_string(&trigger_data).unwrap();
                 db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-                publish_triggers_usage(trigger_data_stream).await;
+                publish_triggers_usage(trigger_data_stream);
                 return Ok(());
             }
         }

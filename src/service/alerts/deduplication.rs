@@ -232,6 +232,26 @@ async fn apply_deduplication_impl(
                             e
                         );
                     }
+
+                    // Record suppression metric
+                    let dedup_type = if existing_state.alert_id == alert_id {
+                        "same_alert"
+                    } else {
+                        "cross_alert"
+                    };
+                    config::metrics::ALERT_DEDUP_SUPPRESSED_TOTAL
+                        .with_label_values(&[org_id.as_str(), &alert.name, dedup_type])
+                        .inc();
+
+                    log::debug!(
+                        "[dedup] Suppressed alert '{}' for org: {}, fingerprint: {}, occurrence: {}, type: {}",
+                        alert.name,
+                        org_id,
+                        fingerprint,
+                        existing_state.occurrence_count + 1,
+                        dedup_type
+                    );
+
                     false
                 } else {
                     // Outside window - treat as new alert
@@ -265,6 +285,18 @@ async fn apply_deduplication_impl(
                     e
                 );
             }
+
+            // Record passed metric
+            config::metrics::ALERT_DEDUP_PASSED_TOTAL
+                .with_label_values(&[org_id.as_str(), &alert.name])
+                .inc();
+
+            log::debug!(
+                "[dedup] Alert '{}' passed dedup check for org: {}, fingerprint: {}",
+                alert.name,
+                org_id,
+                fingerprint
+            );
 
             deduplicated_rows.push(row);
         }

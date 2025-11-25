@@ -204,6 +204,9 @@ const alerts = {
   deleteOrganizationDeduplicationConfig: (org_identifier: string) => {
     return http().delete(`/api/${org_identifier}/alerts/deduplication/config`);
   },
+  get_dedup_summary: (org_identifier: string) => {
+    return http().get(`/api/${org_identifier}/alerts/dedup/summary`);
+  },
 };
 
 export default alerts;
