@@ -88,7 +88,7 @@ dashmap.workspace = true
 datafusion.workspace = true
 datafusion-proto.workspace = true
 datafusion-functions-aggregate-common.workspace = true
-# datafusion-functions-json.workspace = true
+datafusion-functions-json.workspace = true
 arrow.workspace = true
 arrow-flight.workspace = true
 arrow-json.workspace = true
@@ -261,7 +261,7 @@ dashmap = { version = "6.1", features = ["serde"] }
 datafusion = "51.0.0"
 datafusion-proto = "51.0.0"
 datafusion-functions-aggregate-common = "51.0.0"
-# datafusion-functions-json = "0.50.0"
+datafusion-functions-json = "0.51.0"
 expect-test = "1.4"
 arrow = { version = "57.0.0", features = ["ipc_compression", "prettyprint"] }
 arrow-flight = "57.0.0"
