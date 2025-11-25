@@ -33,17 +33,16 @@ jobs:
         run: |
           PRS=$(echo '${{ steps.stale-prs.outputs.prs }}' | jq -r '.[] | "- <https://github.com/${{ github.repository }}/pull/\(.number)|#\(.number) \(.title)> — @\(.user)"')
           MESSAGE="🔔 *Stale Pull Requests in ${{ github.repository }}*\n\n$PRS"
-          echo "message<<EOF" >> $GITHUB_OUTPUT
-          echo "$MESSAGE" >> $GITHUB_OUTPUT
+          # Escape for JSON and create the payload
+          PAYLOAD=$(jq -n --arg msg "$MESSAGE" '{text: $msg}')
+          echo "payload<<EOF" >> $GITHUB_OUTPUT
+          echo "$PAYLOAD" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Send Slack notification
         if: ${{ steps.stale-prs.outputs.prs != '' }}
         uses: slackapi/slack-github-action@v1.25.0
         with:
-          payload: |
-            {
-              "text": "${{ steps.slack-msg.outputs.message }}"
-            }
+          payload: ${{ steps.slack-msg.outputs.payload }}
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.STALE_PR_SLACK_NOTIFICATION }}
