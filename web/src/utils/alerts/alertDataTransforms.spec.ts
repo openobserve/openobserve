@@ -1026,7 +1026,6 @@ describe('alertDataTransforms - V2 Structure Tests', () => {
         operator: '=',
         value: 'active',
         logicalOperator: 'AND',
-        ignore_case: true
       });
     });
 
@@ -1059,25 +1058,6 @@ describe('alertDataTransforms - V2 Structure Tests', () => {
       expect(result.conditions[0].id).toBe('mock-uuid-123');
     });
 
-    it('should default ignore_case to true when not specified', () => {
-      const v0Data = [
-        { column: 'field1', operator: '=', value: 'val1' }
-      ];
-
-      const result = convertV0ToV2(v0Data);
-
-      expect(result.conditions[0].ignore_case).toBe(true);
-    });
-
-    it('should preserve ignore_case when specified', () => {
-      const v0Data = [
-        { column: 'field1', operator: '=', value: 'val1', ignore_case: false }
-      ];
-
-      const result = convertV0ToV2(v0Data);
-
-      expect(result.conditions[0].ignore_case).toBe(false);
-    });
 
     it('should handle V0 with all operators', () => {
       const v0Data = [
@@ -1133,7 +1113,6 @@ describe('alertDataTransforms - V2 Structure Tests', () => {
         operator: '=',
         value: 'active',
         logicalOperator: 'AND',
-        ignore_case: true,
         id: '1'
       });
     });
@@ -1244,19 +1223,6 @@ describe('alertDataTransforms - V2 Structure Tests', () => {
       expect(result.filterType).toBe('group');
       expect(result.logicalOperator).toBe('AND');
       expect(result.conditions).toHaveLength(0);
-    });
-
-    it('should default ignore_case to true when not specified', () => {
-      const v1Data = {
-        label: 'and',
-        items: [
-          { id: '1', column: 'field', operator: '=', value: 'val' }
-        ]
-      };
-
-      const result = convertV1ToV2(v1Data);
-
-      expect(result.conditions[0].ignore_case).toBe(true);
     });
 
     it('should preserve existing ids from V1 conditions', () => {
@@ -1421,18 +1387,6 @@ describe('alertDataTransforms - V2 Structure Tests', () => {
       const result = convertV1BEToV2(v1BEData);
 
       expect(result.conditions[0].id).toBe('existing-id');
-    });
-
-    it('should default ignore_case to true when not specified', () => {
-      const v1BEData = {
-        and: [
-          { column: 'field', operator: '=', value: 'val' }
-        ]
-      };
-
-      const result = convertV1BEToV2(v1BEData);
-
-      expect(result.conditions[0].ignore_case).toBe(true);
     });
 
     it('should generate groupId for the root group', () => {

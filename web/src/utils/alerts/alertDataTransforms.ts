@@ -310,7 +310,6 @@ export const convertV0ToV2 = (v0Data: any[]): V2Group => {
       value: item.value || "",
       values: item.values || [],
       logicalOperator: "AND", // V0 had implicit AND between all
-      ignore_case: item.ignore_case !== undefined ? item.ignore_case : true,
       id: item.id || getUUID(),
     };
 
@@ -364,7 +363,6 @@ export const convertV1ToV2 = (v1Data: any, isFirstGroup: boolean = true): V2Grou
       value: item.value || "",
       values: item.values || [],
       logicalOperator: logicalOperator,
-      ignore_case: item.ignore_case !== undefined ? item.ignore_case : true,
     };
 
     // Keep the id if it exists
@@ -444,7 +442,6 @@ export const convertV1BEToV2 = (v1BEData: any): V2Group => {
       value: item.value || "",
       values: item.values || [],
       logicalOperator: logicalOperator,
-      ignore_case: item.ignore_case !== undefined ? item.ignore_case : true,
       id: item.id || getUUID(),
     };
 

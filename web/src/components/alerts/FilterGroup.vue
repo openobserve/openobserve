@@ -259,7 +259,6 @@
       value: '',
       values: [],
       logicalOperator: groups.value.logicalOperator || 'AND',
-      ignore_case: true,
       id: getUUID(),
     };
     groups.value.conditions.push(newCondition);
@@ -280,7 +279,6 @@
           value: '',
           values: [],
           logicalOperator: 'OR',
-          ignore_case: true,
           id: getUUID(),
         }
       ]
