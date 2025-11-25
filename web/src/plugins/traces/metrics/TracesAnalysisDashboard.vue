@@ -272,12 +272,12 @@ const currentTimeObj = computed(() => ({
 }));
 
 const baselineTimeRange = computed(() => {
-  // For volume analysis: baseline is ALWAYS the global datetime control value
+  // For volume and error analysis: baseline is ALWAYS the global datetime control value
   // This represents the overall time range before the user made a brush selection
-  if (props.analysisType === 'volume') {
+  if (props.analysisType === 'volume' || props.analysisType === 'error') {
     const result = props.timeRange;
 
-    console.log("[Analysis] Baseline time range (volume analysis):", {
+    console.log("[Analysis] Baseline time range (volume/error analysis):", {
       analysisType: props.analysisType,
       note: "Using global datetime control value for baseline",
       globalTimeRange: {
@@ -426,8 +426,15 @@ const loadAnalysis = async () => {
     }));
 
     // Generate dashboard JSON with UNION queries
+    console.log('[Analysis] Generating dashboard with', mockAnalyses.length, 'dimensions');
     const dashboard = generateDashboard(mockAnalyses, config);
+    console.log('[Analysis] Dashboard generated:', {
+      title: dashboard.title,
+      panelCount: dashboard.tabs[0]?.panels?.length || 0,
+      panels: dashboard.tabs[0]?.panels?.map(p => ({ id: p.id, title: p.title })) || []
+    });
     dashboardData.value = dashboard;
+    console.log('[Analysis] Dashboard data set, should trigger panel rendering');
   } catch (err: any) {
     console.error("[Analysis] Error loading analysis:", err);
     showErrorNotification(err.message || "Failed to load analysis");
@@ -453,6 +460,21 @@ const formatTimeWithSuffix = (milliseconds: number) => {
   }
   return `${milliseconds.toFixed(2)}ms`;
 };
+
+// Watch dashboard data changes
+watch(
+  () => dashboardData.value,
+  (newVal) => {
+    if (newVal) {
+      console.log('[Analysis] Dashboard data changed, panels:', newVal.tabs[0]?.panels?.map(p => ({
+        id: p.id,
+        title: p.title,
+        hasQuery: !!p.queries?.[0]?.query
+      })));
+    }
+  },
+  { deep: true }
+);
 
 // Load analysis when modal opens
 watch(

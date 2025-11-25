@@ -69,28 +69,34 @@ export function useLatencyInsightsDashboard() {
         ? "approx_distinct(trace_id)"
         : "count(_timestamp)";
 
-      console.log(`[CACHE TEST] NEW CODE IS LOADED for dimension "${dimensionName}"`);
-
-      // Check if baseline and selected time ranges are the same
+      // For logs only: check if we should use single query or comparison query
+      // Traces ALWAYS use comparison (UNION) query regardless of time range
       const isSameTimeRange =
+        config.streamType === "logs" &&
         config.baselineTimeRange.startTime === config.selectedTimeRange.startTime &&
         config.baselineTimeRange.endTime === config.selectedTimeRange.endTime;
 
-      console.log(`[Query Generation] Time range comparison for dimension "${dimensionName}":`, {
+      console.log(`[Query Generation] Volume analysis mode for dimension "${dimensionName}":`, {
+        streamType: config.streamType,
         baseline: {
-          start: config.baselineTimeRange.startTime,
-          end: config.baselineTimeRange.endTime,
+          start: new Date(config.baselineTimeRange.startTime / 1000).toISOString(),
+          end: new Date(config.baselineTimeRange.endTime / 1000).toISOString(),
         },
         selected: {
-          start: config.selectedTimeRange.startTime,
-          end: config.selectedTimeRange.endTime,
+          start: new Date(config.selectedTimeRange.startTime / 1000).toISOString(),
+          end: new Date(config.selectedTimeRange.endTime / 1000).toISOString(),
         },
-        isSameTimeRange,
-        startMatch: config.baselineTimeRange.startTime === config.selectedTimeRange.startTime,
-        endMatch: config.baselineTimeRange.endTime === config.selectedTimeRange.endTime,
+        timeRangesMatch: config.baselineTimeRange.startTime === config.selectedTimeRange.startTime &&
+                         config.baselineTimeRange.endTime === config.selectedTimeRange.endTime,
+        willUseSingleQuery: isSameTimeRange,
+        reason: config.streamType === "traces"
+          ? "Traces always use UNION query (comparison)"
+          : isSameTimeRange
+            ? "Logs: same time range, using single query"
+            : "Logs: different time ranges, using UNION query"
       });
 
-      // If time ranges are the same (no brush selection), show single query instead of comparison
+      // If time ranges are the same AND it's logs (no brush selection), show single query instead of comparison
       if (isSameTimeRange) {
         const singleQuery = `
           SELECT
@@ -250,10 +256,26 @@ export function useLatencyInsightsDashboard() {
     const isErrorAnalysis = config.analysisType === "error";
 
     // Check if we're using comparison mode (baseline vs selected) or single query mode
+    // Traces ALWAYS use comparison mode
+    // Logs use comparison mode only when time ranges differ (brush selection made)
     const isSameTimeRange =
+      config.streamType === "logs" &&
       config.baselineTimeRange.startTime === config.selectedTimeRange.startTime &&
       config.baselineTimeRange.endTime === config.selectedTimeRange.endTime;
     const isComparisonMode = !isSameTimeRange;
+
+    console.log('[Dashboard Generation] Comparison mode:', {
+      streamType: config.streamType,
+      analysisType: config.analysisType,
+      timeRangesMatch: config.baselineTimeRange.startTime === config.selectedTimeRange.startTime &&
+                       config.baselineTimeRange.endTime === config.selectedTimeRange.endTime,
+      isComparisonMode,
+      reason: config.streamType === "traces"
+        ? "Traces always show comparison"
+        : isSameTimeRange
+          ? "Logs: same time range, no comparison"
+          : "Logs: different time ranges, show comparison"
+    });
 
     const panels = analyses.map((analysis, index) => {
       // Build panel description based on analysis type
@@ -272,6 +294,14 @@ export function useLatencyInsightsDashboard() {
 
       // Generate SQL query for this dimension
       const sqlQuery = buildComparisonQuery(analysis.dimensionName, config);
+
+      console.log(`[Panel Generation] Creating panel for dimension "${analysis.dimensionName}":`, {
+        index,
+        dimensionName: analysis.dimensionName,
+        queryLength: sqlQuery?.length || 0,
+        queryPreview: sqlQuery?.substring(0, 100) + '...',
+        hasQuery: !!sqlQuery
+      });
 
       // Determine panel ID prefix
       let panelPrefix = "LatencyInsights";
