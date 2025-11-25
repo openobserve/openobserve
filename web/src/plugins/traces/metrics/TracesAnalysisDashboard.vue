@@ -238,16 +238,6 @@ const availableTabs = computed(() => {
 // Show tabs only if multiple analysis types available
 const showTabs = computed(() => props.availableAnalysisTypes.length > 1);
 
-// Baseline mode selection
-// For volume analysis: baseline mode is ignored, always uses global datetime control
-// For latency analysis: default to "full_range" to compare slow vs fast traces in same period
-const baselineMode = ref("full_range");
-const baselineModeOptions = computed(() => [
-  { label: t("latencyInsights.fullTimeRange"), value: "full_range" },
-  { label: t("latencyInsights.beforePeriod"), value: "before" },
-  { label: t("latencyInsights.afterPeriod"), value: "after" },
-]);
-
 /**
  * Smart dimension selection
  * - For logs: Uses sample-based analysis with schema metadata
