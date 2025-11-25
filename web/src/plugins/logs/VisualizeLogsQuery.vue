@@ -636,6 +636,20 @@ export default defineComponent({
         return;
       }
 
+      // Check if VRL functions are present and trying to switch to non-table chart
+      if (
+        dashboardPanelData.meta.stream.vrlFunctionFieldList.length > 0 &&
+        newType !== "table"
+      ) {
+        showErrorNotification(
+          "VRL functions are present. Only table chart is supported when using VRL functions.",
+        );
+        // Force table chart type
+        dashboardPanelData.data.type = "table";
+        resetAggregationFunction();
+        return;
+      }
+
       // If validation passes, proceed with the change
       dashboardPanelData.data.type = newType;
       resetAggregationFunction();
