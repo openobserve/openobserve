@@ -649,7 +649,7 @@ export default defineComponent({
       } else {
         console.log('[Logs Volume Analysis] Histogram selection cleared (zoom reset)');
         this.hasHistogramSelection = false;
-        this.histogramSelectionRange = { start: 0, end: 0 };
+        this.histogramSelectionRange = { start: 0, end: 0, timeStart: undefined, timeEnd: undefined };
         // Reset original time range when selection is cleared
         this.originalTimeRangeBeforeSelection = null;
       }
@@ -698,7 +698,7 @@ export default defineComponent({
     // Volume Analysis state
     const showVolumeAnalysisDashboard = ref(false);
     const hasHistogramSelection = ref(false);
-    const histogramSelectionRange = ref({ start: 0, end: 0 });
+    const histogramSelectionRange = ref({ start: 0, end: 0, timeStart: undefined, timeEnd: undefined });
     const originalTimeRangeBeforeSelection = ref<{ startTime: number; endTime: number } | null>(null);
 
     const searchTableRef: any = ref(null);
@@ -1096,7 +1096,7 @@ export default defineComponent({
         // Clear histogram selection when chart is reset
         console.log('[Logs Volume Analysis] Chart reset, clearing histogram selection');
         hasHistogramSelection.value = false;
-        histogramSelectionRange.value = { start: 0, end: 0 };
+        histogramSelectionRange.value = { start: 0, end: 0, timeStart: undefined, timeEnd: undefined };
         originalTimeRangeBeforeSelection.value = null;
       }
     });
@@ -1140,7 +1140,7 @@ export default defineComponent({
         if (!isFromBrushSelection && oldTime && (newTime.start !== oldTime.start || newTime.end !== oldTime.end)) {
           console.log('[Logs Volume Analysis] Datetime changed from outside, clearing histogram selection');
           hasHistogramSelection.value = false;
-          histogramSelectionRange.value = { start: 0, end: 0 };
+          histogramSelectionRange.value = { start: 0, end: 0, timeStart: undefined, timeEnd: undefined };
           originalTimeRangeBeforeSelection.value = null;
         }
       },

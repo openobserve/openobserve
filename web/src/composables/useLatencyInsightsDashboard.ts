@@ -148,20 +148,7 @@ export function useLatencyInsightsDashboard() {
         GROUP BY ${dimensionName}
       `.trim();
 
-      const unionQuery = `
-        SELECT * FROM (
-          ${baselineQuery}
-          UNION
-          ${selectedQuery}
-        )
-        ORDER BY
-          CASE series
-            WHEN 'Selected' THEN 1
-            WHEN 'Baseline' THEN 2
-          END,
-          trace_count DESC
-        LIMIT 10
-      `.trim();
+      const unionQuery = `${baselineQuery} UNION ${selectedQuery} ORDER BY trace_count DESC LIMIT 5`;
 
       console.log(`[Query Generation] Volume analysis query for dimension "${dimensionName}":`, {
         baselineTimeRange: {
@@ -213,20 +200,7 @@ export function useLatencyInsightsDashboard() {
         GROUP BY ${dimensionName}
       `.trim();
 
-      const unionQuery = `
-        SELECT * FROM (
-          ${baselineQuery}
-          UNION
-          ${selectedQuery}
-        )
-        ORDER BY
-          CASE series
-            WHEN 'Selected' THEN 1
-            WHEN 'Baseline' THEN 2
-          END,
-          error_percentage DESC
-        LIMIT 10
-      `.trim();
+      const unionQuery = `${baselineQuery} UNION ${selectedQuery} ORDER BY error_percentage DESC LIMIT 5`;
 
       console.log(`[Query Generation] Error analysis query for dimension "${dimensionName}":`, {
         baselineTimeRange: {
@@ -267,20 +241,7 @@ export function useLatencyInsightsDashboard() {
         GROUP BY ${dimensionName}
       `.trim();
 
-      return `
-        SELECT * FROM (
-          ${baselineQuery}
-          UNION
-          ${selectedQuery}
-        )
-        ORDER BY
-          CASE series
-            WHEN 'Selected' THEN 1
-            WHEN 'Baseline' THEN 2
-          END,
-          percentile_latency DESC
-        LIMIT 10
-      `.trim();
+      return `${baselineQuery} UNION ${selectedQuery} ORDER BY percentile_latency DESC LIMIT 5`;
     }
   };
 
