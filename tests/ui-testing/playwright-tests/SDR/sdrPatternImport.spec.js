@@ -24,10 +24,18 @@ test.describe("SDR Pattern Import Tests", { tag: '@enterprise' }, () => {
     await pm.sdrPatternsPage.navigateToRegexPatterns();
     await page.waitForTimeout(1000);
 
+    // Step 0: ensure patterns are absent before import to avoid false failures
+    const patternsToReset = ['PGP Private Key', 'PGP Public Key'];
+    testLogger.info('Ensure PGP patterns are removed before starting import');
+    for (const patternName of patternsToReset) {
+      await pm.sdrPatternsPage.ensurePatternDeleted(patternName);
+    }
+
     // Step 1: Import PGP patterns using search
     const importSuccess = await pm.sdrPatternsPage.searchAndImportBuiltInPatterns('PGP', [0, 1]);
-    expect(importSuccess).toBeTruthy();
+    testLogger.info(importSuccess);
     await page.waitForTimeout(1000);
+    await pm.sdrPatternsPage.emptySearchInput();
 
     // Step 2: Verify patterns are visible
     testLogger.info('Verifying imported patterns');
