@@ -16,31 +16,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="database-deprecation-wrapper q-px-md q-pt-md"
+    class="feature-card q-mb-md"
+    :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'"
     v-if="showDeprecationWarning"
+    role="region"
+    aria-label="MySQL deprecation warning"
   >
-    <div class="database-deprecation-container q-pa-md gradient-banner">
-      <div class="row items-center">
-        <div class="col">
-          <span class="deprecation-message">
-            ⚠️ MySQL support is DEPRECATED and will be removed in future.
-          </span>
-          <br />
-          <span class="deprecation-subtitle">
-            Please migrate to PostgreSQL to ensure continued support.
-          </span>
-        </div>
-        <div class="col-auto q-ml-sm">
-          <q-btn
-            @click="dismissWarning"
-            flat
-            round
-            dense
-            icon="close"
-            size="sm"
-            class="text-grey-7"
-          />
-        </div>
+    <div class="row items-center">
+      <div class="col">
+        <span class="deprecation-message">
+          ⚠️ MySQL support is DEPRECATED and will be removed in future.
+        </span>
+        <br />
+        <span class="deprecation-subtitle">
+          Please migrate to PostgreSQL to ensure continued support.
+        </span>
+      </div>
+      <div class="col-auto q-ml-sm">
+        <q-btn
+          @click="dismissWarning"
+          flat
+          round
+          dense
+          icon="close"
+          size="sm"
+          class="text-grey-7"
+        />
       </div>
     </div>
   </div>
@@ -103,6 +104,7 @@ export default defineComponent({
     });
 
     return {
+      store,
       showDeprecationWarning,
       dismissWarning,
     };
@@ -111,54 +113,17 @@ export default defineComponent({
 </script>
 
 <style scoped>
-.gradient-banner {
-  background: linear-gradient(
-    to right,
-    transparent 60%,
-    #fff7e6 70%,
-    #ffe8cc 100%
-  );
-}
-
-.database-deprecation-container {
-  border: 1px solid #ffa940;
-  border-radius: 6px;
-}
-
 .deprecation-message {
   font-size: 16px;
   font-weight: 600;
-  line-height: 28px;
-  color: #d46b08;
+  line-height: 24px;
+  color: var(--o2-text-primary);
 }
 
 .deprecation-subtitle {
   font-size: 14px;
   font-weight: 400;
   line-height: 20px;
-  color: #ad6800;
-}
-
-.body--dark {
-  .gradient-banner {
-    background: linear-gradient(
-      to right,
-      transparent 60%,
-      #2d2416 70%,
-      #3d2e1a 100%
-    );
-  }
-
-  .database-deprecation-container {
-    border: 1px solid #d46b08;
-  }
-
-  .deprecation-message {
-    color: #ffa940;
-  }
-
-  .deprecation-subtitle {
-    color: #ffc069;
-  }
+  color: var(--o2-text-secondary);
 }
 </style>
