@@ -97,15 +97,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-ml-sm o2-secondary-button tw-h-[36px]"
             no-caps
             flat
-            :label="t('settings.header')"
-            @click="showCorrelationDrawer = true"
-            data-test="correlation-settings-btn"
-            icon="settings"
-          />
-          <q-btn
-            class="q-ml-sm o2-secondary-button tw-h-[36px]"
-            no-caps
-            flat
             :label="t(`dashboard.import`)"
             @click="importAlert"
             data-test="alert-import"
@@ -124,6 +115,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
+
+    <!-- Dedup Summary Cards (Enterprise Only) -->
+    <DedupSummaryCards
+      v-if="!showAddAlertDialog && !showImportAlertDialog && store.state.zoConfig.is_enterprise"
+      class="tw-px-[0.625rem]"
+    />
+
     <div
       v-if="!showAddAlertDialog && !showImportAlertDialog"
       class="full-width alert-list-table"
@@ -216,7 +214,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <q-td v-for="col in columns" :key="col.name" :props="props">
                       <template v-if="col.name === 'name'">
-                        {{ computedName(props.row[col.field]) }}
+                        <div class="flex items-center tw-gap-2">
+                          <span>{{ computedName(props.row[col.field]) }}</span>
+                          <q-badge
+                            v-if="props.row.deduplication?.enabled"
+                            color="primary"
+                            outline
+                            dense
+                            class="tw-text-[10px]"
+                          >
+                            <q-icon name="filter_alt" size="10px" class="q-mr-xs" />
+                            Dedup
+                            <q-icon
+                              v-if="props.row.deduplication?.grouping?.enabled"
+                              name="group_work"
+                              size="10px"
+                              class="q-ml-xs"
+                              color="amber"
+                            />
+                            <q-tooltip class="bg-grey-8">
+                              <div>Deduplication: Enabled</div>
+                              <div v-if="props.row.deduplication?.fingerprint_fields?.length">
+                                Fields: {{ props.row.deduplication.fingerprint_fields.join(', ') }}
+                              </div>
+                              <div v-if="props.row.deduplication?.time_window_minutes">
+                                Window: {{ props.row.deduplication.time_window_minutes }} minutes
+                              </div>
+                              <div v-if="props.row.deduplication?.grouping?.enabled">
+                                Grouping: {{ props.row.deduplication.grouping.group_wait_seconds }}s wait
+                              </div>
+                            </q-tooltip>
+                          </q-badge>
+                        </div>
                         <q-tooltip
                           v-if="props.row[col.field]?.length > 30"
                           class="alert-name-tooltip"
