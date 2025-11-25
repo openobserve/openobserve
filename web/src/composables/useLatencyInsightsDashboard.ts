@@ -57,19 +57,24 @@ export function useLatencyInsightsDashboard() {
 
     if (isVolumeAnalysis) {
       // Volume Analysis: Normalize both baseline and selected to the selected time window
-      // This shows: "If baseline was compressed to spike duration, how many traces would it have?"
-      // Makes comparison intuitive: spike shows MORE traces in same time window
+      // This shows: "If baseline was compressed to spike duration, how many records would it have?"
+      // Makes comparison intuitive: spike shows MORE records in same time window
 
       // Calculate durations in seconds
       const baselineDurationSeconds = (config.baselineTimeRange.endTime - config.baselineTimeRange.startTime) / 1000000;
       const selectedDurationSeconds = (config.selectedTimeRange.endTime - config.selectedTimeRange.startTime) / 1000000;
 
-      // Normalize baseline to selected time window: (traces/baseline_duration) * selected_duration
+      // Use count(_timestamp) for logs, approx_distinct(trace_id) for traces
+      const countExpression = config.streamType === "traces"
+        ? "approx_distinct(trace_id)"
+        : "count(_timestamp)";
+
+      // Normalize baseline to selected time window: (records/baseline_duration) * selected_duration
       const baselineQuery = `
         SELECT
           COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
           'Baseline' AS series,
-          (approx_distinct(trace_id) * ${selectedDurationSeconds}) / ${baselineDurationSeconds} AS trace_count
+          (${countExpression} * ${selectedDurationSeconds}) / ${baselineDurationSeconds} AS trace_count
         FROM "${config.streamName}"
         ${baselineWhere}
         GROUP BY ${dimensionName}
@@ -80,26 +85,33 @@ export function useLatencyInsightsDashboard() {
         SELECT
           COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
           'Selected' AS series,
-          approx_distinct(trace_id) AS trace_count
+          ${countExpression} AS trace_count
         FROM "${config.streamName}"
         ${selectedWhere}
         GROUP BY ${dimensionName}
       `.trim();
 
-      const unionQuery = `${baselineQuery} UNION ${selectedQuery} ORDER BY trace_count DESC LIMIT 40`;
+      const unionQuery = `${baselineQuery} UNION ${selectedQuery} ORDER BY trace_count DESC LIMIT 5`;
 
       console.log(`[Query Generation] Volume analysis query for dimension "${dimensionName}":`, {
         baselineTimeRange: {
           start: new Date(config.baselineTimeRange.startTime / 1000).toISOString(),
           end: new Date(config.baselineTimeRange.endTime / 1000).toISOString(),
+          startMicros: config.baselineTimeRange.startTime,
+          endMicros: config.baselineTimeRange.endTime,
           durationSeconds: baselineDurationSeconds,
         },
         selectedTimeRange: {
           start: new Date(config.selectedTimeRange.startTime / 1000).toISOString(),
           end: new Date(config.selectedTimeRange.endTime / 1000).toISOString(),
+          startMicros: config.selectedTimeRange.startTime,
+          endMicros: config.selectedTimeRange.endTime,
           durationSeconds: selectedDurationSeconds,
         },
         normalization: `Baseline normalized: count * ${selectedDurationSeconds} / ${baselineDurationSeconds}`,
+        rateFilter: config.rateFilter,
+        baselineWhere,
+        selectedWhere,
         baselineQuery,
         selectedQuery,
         unionQuery
@@ -131,7 +143,7 @@ export function useLatencyInsightsDashboard() {
         GROUP BY ${dimensionName}
       `.trim();
 
-      const unionQuery = `${baselineQuery} UNION ${selectedQuery} ORDER BY error_percentage DESC LIMIT 40`;
+      const unionQuery = `${baselineQuery} UNION ${selectedQuery} ORDER BY error_percentage DESC LIMIT 5`;
 
       console.log(`[Query Generation] Error analysis query for dimension "${dimensionName}":`, {
         baselineTimeRange: {
@@ -172,7 +184,7 @@ export function useLatencyInsightsDashboard() {
         GROUP BY ${dimensionName}
       `.trim();
 
-      return `${baselineQuery} UNION ${selectedQuery} ORDER BY percentile_latency DESC LIMIT 40`;
+      return `${baselineQuery} UNION ${selectedQuery} ORDER BY percentile_latency DESC LIMIT 5`;
     }
   };
 

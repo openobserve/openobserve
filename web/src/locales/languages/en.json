@@ -629,7 +629,8 @@
     "analyzeButton": "Rate Analysis",
     "analyzeTooltip": "Analyze trace rate patterns across dimensions",
     "analyzeTooltipLogs": "Analyze dimension distribution for current time range",
-    "rateLabel": "Rate:"
+    "rateLabel": "Rate:",
+    "timeRangeLabel": "Time Range:"
   },
   "confirmDialog": {
     "cancel": "Cancel",

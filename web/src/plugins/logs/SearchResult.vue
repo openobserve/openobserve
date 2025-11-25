@@ -394,7 +394,8 @@ color="warning" size="xs"></q-icon> Error while
         v-if="showVolumeAnalysisDashboard"
         :streamName="searchObj.data.stream.selectedStream[0]"
         streamType="logs"
-        :timeRange="volumeAnalysisTimeRange"
+        :timeRange="originalTimeRangeBeforeSelection || volumeAnalysisTimeRange"
+        :rateFilter="hasHistogramSelection ? histogramSelectionRange : undefined"
         :baseFilter="searchObj.data.editorValue"
         :streamFields="
           searchObj.data.stream.userDefinedSchema?.length > 0
@@ -613,6 +614,19 @@ export default defineComponent({
     },
     onChartUpdate({ start, end }: { start: any; end: any }) {
       this.searchObj.meta.showDetailTab = false;
+
+      // Store the original time range BEFORE updating datetime (for volume analysis baseline)
+      if (start && end && !this.originalTimeRangeBeforeSelection) {
+        this.originalTimeRangeBeforeSelection = {
+          startTime: this.searchObj.data.datetime.startTime,
+          endTime: this.searchObj.data.datetime.endTime,
+        };
+        console.log('[Logs Volume Analysis] Stored original time range before selection:', {
+          start: new Date(this.originalTimeRangeBeforeSelection.startTime / 1000).toISOString(),
+          end: new Date(this.originalTimeRangeBeforeSelection.endTime / 1000).toISOString(),
+        });
+      }
+
       this.$emit("update:datetime", { start, end });
 
       // Track histogram selection for volume analysis
@@ -620,12 +634,22 @@ export default defineComponent({
       if (start && end) {
         this.hasHistogramSelection = true;
         this.histogramSelectionRange = {
-          start: start * 1000,  // Convert ms to microseconds
-          end: end * 1000       // Convert ms to microseconds
+          start: -1,  // Placeholder to indicate time-based selection (not Y-axis)
+          end: -1,    // Placeholder to indicate time-based selection (not Y-axis)
+          timeStart: start * 1000,  // Convert ms to microseconds
+          timeEnd: end * 1000       // Convert ms to microseconds
         };
+        console.log('[Logs Volume Analysis] Histogram selection range:', {
+          timeStart: new Date(start).toISOString(),
+          timeEnd: new Date(end).toISOString(),
+          timeStartMicros: start * 1000,
+          timeEndMicros: end * 1000,
+        });
       } else {
         this.hasHistogramSelection = false;
         this.histogramSelectionRange = { start: 0, end: 0 };
+        // Reset original time range when selection is cleared
+        this.originalTimeRangeBeforeSelection = null;
       }
     },
     onTimeBoxed(obj: any) {
@@ -673,6 +697,7 @@ export default defineComponent({
     const showVolumeAnalysisDashboard = ref(false);
     const hasHistogramSelection = ref(false);
     const histogramSelectionRange = ref({ start: 0, end: 0 });
+    const originalTimeRangeBeforeSelection = ref<{ startTime: number; endTime: number } | null>(null);
 
     const searchTableRef: any = ref(null);
 
@@ -1143,6 +1168,7 @@ export default defineComponent({
       showPatternDetails,
       hasHistogramSelection,
       histogramSelectionRange,
+      originalTimeRangeBeforeSelection,
       showVolumeAnalysisDashboard,
       openPatternDetails,
       navigatePatternDetail,

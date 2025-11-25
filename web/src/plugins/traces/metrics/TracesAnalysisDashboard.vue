@@ -244,18 +244,18 @@ const selectedDimensions = computed(() => {
   // For LOGS: Use sample-based analysis if we have log data
   if (streamType === "logs" && props.logSamples && props.logSamples.length >= 10) {
     console.log(`[Analysis] Using sample-based dimension selection for logs (${props.logSamples.length} samples)`);
-    return selectDimensionsFromData(props.logSamples, schemaFields, 8);
+    return selectDimensionsFromData(props.logSamples, schemaFields, 6);
   }
 
   // For TRACES: Use OTel conventions
   if (streamType === "traces") {
     console.log("[Analysis] Using OTel-based dimension selection for traces");
-    return selectTraceDimensions(schemaFields, 8);
+    return selectTraceDimensions(schemaFields, 6);
   }
 
   // Fallback for logs without samples
   console.log("[Analysis] Using schema-based dimension selection (fallback)");
-  return selectDimensionsFromData([], schemaFields, 8);
+  return selectDimensionsFromData([], schemaFields, 6);
 });
 
 const currentOrgIdentifier = computed(() => {
@@ -352,16 +352,25 @@ const loadAnalysis = async () => {
     // For volume/error analysis with filter, use the actual selected time range from the brush
     // Otherwise, use the global time range
     let selectedTimeRange = props.timeRange;
+
+    console.log('[Analysis] Rate filter received:', props.rateFilter);
+
     if (props.analysisType === 'volume' && props.rateFilter?.timeStart && props.rateFilter?.timeEnd) {
       selectedTimeRange = {
         startTime: props.rateFilter.timeStart,
         endTime: props.rateFilter.timeEnd
       };
+      console.log('[Analysis] Using rate filter time range for selected:', {
+        start: new Date(props.rateFilter.timeStart / 1000).toISOString(),
+        end: new Date(props.rateFilter.timeEnd / 1000).toISOString(),
+      });
     } else if (props.analysisType === 'error' && props.errorFilter?.timeStart && props.errorFilter?.timeEnd) {
       selectedTimeRange = {
         startTime: props.errorFilter.timeStart,
         endTime: props.errorFilter.timeEnd
       };
+    } else {
+      console.log('[Analysis] Using global time range for selected (no filter or missing timeStart/timeEnd)');
     }
 
     const config: LatencyInsightsConfig = {
