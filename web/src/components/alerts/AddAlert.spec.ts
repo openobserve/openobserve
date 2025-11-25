@@ -1186,7 +1186,6 @@ describe("AddAlert Component", () => {
             operator: '=',
             value: '200',
             logicalOperator: 'AND',
-            ignore_case: true
           }
         ]
       };
@@ -1272,7 +1271,6 @@ describe("AddAlert Component", () => {
               operator: '=',
               value: 'error',
               logicalOperator: 'AND',
-              ignore_case: true
             }
           ]
         }
