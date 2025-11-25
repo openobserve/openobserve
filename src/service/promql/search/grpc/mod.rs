@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::HashSet,
     sync::Arc,
     time::{Duration, UNIX_EPOCH},
 };
@@ -29,6 +28,7 @@ use config::{
     utils::time::{now_micros, second_micros},
 };
 use datafusion::{arrow::datatypes::Schema, error::DataFusionError, prelude::SessionContext};
+use hashbrown::HashSet;
 use infra::errors::Result;
 use promql_parser::{label::Matchers, parser};
 use proto::cluster_rpc;
@@ -59,7 +59,7 @@ impl TableProvider for StorageProvider {
         label_selector: Option<HashSet<String>>,
         filters: &mut [(String, Vec<String>)],
     ) -> datafusion::error::Result<Vec<(SessionContext, Arc<Schema>, ScanStats)>> {
-        let mut resp = Vec::new();
+        let mut ctxs = Vec::new();
         // register storage table
         let trace_id = self.trace_id.to_owned() + "-storage-" + stream_name;
         let ctx = storage::create_context(
@@ -72,7 +72,7 @@ impl TableProvider for StorageProvider {
         )
         .await?;
         if let Some(ctx) = ctx {
-            resp.push(ctx);
+            ctxs.push(ctx);
         }
 
         // register Wal table
@@ -88,10 +88,10 @@ impl TableProvider for StorageProvider {
             )
             .await?;
             for ctx in wal_ctx_list {
-                resp.push(ctx);
+                ctxs.push(ctx);
             }
         }
-        Ok(resp)
+        Ok(ctxs)
     }
 }
 

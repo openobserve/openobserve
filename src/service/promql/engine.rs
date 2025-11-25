@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
+use std::{str::FromStr, sync::Arc, time::Duration};
 
 use arrow::array::Array;
 use async_recursion::async_recursion;
@@ -37,7 +37,7 @@ use datafusion::{
     prelude::{DataFrame, SessionContext, col, lit},
 };
 use futures::{TryStreamExt, future::try_join_all};
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use promql_parser::{
     label::MatchOp,
     parser::{
@@ -2919,7 +2919,7 @@ mod tests {
             _stream_name: &str,
             _time_range: (i64, i64),
             _machers: promql_parser::label::Matchers,
-            _label_selector: Option<std::collections::HashSet<String>>,
+            _label_selector: Option<HashSet<String>>,
             _filters: &mut [(String, Vec<String>)],
         ) -> datafusion::error::Result<
             Vec<(

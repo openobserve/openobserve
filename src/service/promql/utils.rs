@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashSet;
-
 use config::{
     TIMESTAMP_COL_NAME,
     meta::promql::{BUCKET_LABEL, HASH_LABEL, VALUE_LABEL},
@@ -24,6 +22,7 @@ use datafusion::{
     error::Result,
     prelude::{DataFrame, col, lit},
 };
+use hashbrown::HashSet;
 use promql_parser::label::{MatchOp, Matchers};
 
 use crate::service::search::datafusion::udf::regexp_udf::{REGEX_MATCH_UDF, REGEX_NOT_MATCH_UDF};

@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::HashSet,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -22,6 +21,7 @@ use std::{
 use async_trait::async_trait;
 use config::meta::search::ScanStats;
 use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContext};
+use hashbrown::HashSet;
 use promql_parser::label::Matchers;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;

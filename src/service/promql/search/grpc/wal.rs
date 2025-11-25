@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::sync::Arc;
 
 use arrow::record_batch::RecordBatch;
 use config::{
@@ -30,6 +27,7 @@ use datafusion::{
     physical_plan::visit_execution_plan,
     prelude::{SessionContext, col, lit},
 };
+use hashbrown::HashSet;
 use promql_parser::label::Matchers;
 use proto::cluster_rpc::{self, IndexInfo, QueryIdentifier};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -216,7 +214,7 @@ async fn get_wal_batches(
             .schema()
             .as_ref()
             .clone()
-            .with_metadata(HashMap::new()),
+            .with_metadata(std::collections::HashMap::new()),
     );
     let mut new_batches = Vec::with_capacity(batches.len());
     for batch in batches {

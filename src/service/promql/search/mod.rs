@@ -38,6 +38,8 @@ use infra::{
     client::grpc::make_grpc_metrics_client,
     errors::{Error, ErrorCodes, Result},
 };
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use proto::cluster_rpc;
 use tracing::{Instrument, info_span};
 
@@ -223,6 +225,12 @@ async fn search_in_cluster(
         }
         let req_need_wal = req.need_wal;
         worker_start += worker_dt;
+
+        // check super cluster
+        #[cfg(feature = "enterprise")]
+        if get_o2_config().super_cluster.enabled {
+            req.is_super_cluster = true;
+        }
 
         log::info!(
             "[trace_id {trace_id}] promql->search->partition: node: {}, need_wal: {}, time_range: [{},{})",
