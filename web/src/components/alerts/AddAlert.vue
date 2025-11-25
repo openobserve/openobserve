@@ -547,7 +547,6 @@ const defaultValue: any = () => {
         groupId: "",
         conditions: [
             {
-                type: "condition",
                 filterType: "condition",
                 column: "",
                 operator: ">",
@@ -1220,7 +1219,6 @@ export default defineComponent({
                   if (filter.type === 'list' && filter.values && filter.values.length > 0) {
                     // V2: Create condition with filterType and logicalOperator
                     conditions.push({
-                      type: 'condition',
                       filterType: 'condition',
                       column: filter.column,
                       operator: "=",

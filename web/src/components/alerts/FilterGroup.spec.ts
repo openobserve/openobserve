@@ -41,7 +41,6 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       conditions: [
         {
           id: 'item-1',
-          type: 'condition',
           filterType: 'condition',
           column: 'field1',
           operator: '=',
@@ -1531,7 +1530,6 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         conditions: [
           {
             id: 'new-item',
-            type: 'condition',
             filterType: 'condition',
             column: 'newfield',
             operator: '!=',

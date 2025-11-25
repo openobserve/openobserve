@@ -947,7 +947,6 @@ describe('alertDataTransforms - V2 Structure Tests', () => {
         logicalOperator: 'AND',
         conditions: [
           {
-            type: 'condition',
             filterType: 'condition',
             column: 'status',
             operator: '=',
@@ -1022,7 +1021,6 @@ describe('alertDataTransforms - V2 Structure Tests', () => {
       expect(result.groupId).toBe('mock-uuid-123');
 
       expect(result.conditions[0]).toMatchObject({
-        type: 'condition',
         filterType: 'condition',
         column: 'status',
         operator: '=',
@@ -1130,7 +1128,6 @@ describe('alertDataTransforms - V2 Structure Tests', () => {
       expect(result.groupId).toBe('test-group');
       expect(result.conditions).toHaveLength(1);
       expect(result.conditions[0]).toMatchObject({
-        type: 'condition',
         filterType: 'condition',
         column: 'status',
         operator: '=',

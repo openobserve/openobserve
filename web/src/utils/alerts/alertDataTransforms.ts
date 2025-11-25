@@ -18,7 +18,6 @@ export interface TransformContext {
 // ============================================================================
 
 export interface V2Condition {
-  type: "condition";
   filterType: "condition";
   column: string;
   operator: string;
@@ -305,7 +304,6 @@ export const convertV0ToV2 = (v0Data: any[]): V2Group => {
   // Convert each flat condition to V2 format
   const conditions: V2Condition[] = v0Data.map((item: any, index: number) => {
     const condition: V2Condition = {
-      type: "condition",
       filterType: "condition",
       column: item.column || "",
       operator: item.operator || "=",
@@ -360,7 +358,6 @@ export const convertV1ToV2 = (v1Data: any, isFirstGroup: boolean = true): V2Grou
 
     // It's a condition
     const condition: V2Condition = {
-      type: "condition",
       filterType: "condition",
       column: item.column || "",
       operator: item.operator || "=",
@@ -441,7 +438,6 @@ export const convertV1BEToV2 = (v1BEData: any): V2Group => {
     // In V2, each condition's logicalOperator determines how it connects to the NEXT item
     // So all conditions in this group should have the same operator (from the group level in V1)
     const condition: V2Condition = {
-      type: "condition",
       filterType: "condition",
       column: item.column || "",
       operator: item.operator || "=",
