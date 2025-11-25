@@ -165,20 +165,34 @@ The role is already configured in the workflow file and will automatically authe
 ### Workflow Behavior
 
 ```mermaid
-graph LR
-    A[Push en.json] --> B[Workflow Triggers]
-    B --> C[Run Translation Script]
-    C --> D[Update Language Files]
-    D --> E[Auto-commit to Branch]
-    E --> F[Build Workflows Use Updated Files]
+graph TD
+    A[Push Code to Branch] --> B[Update Translations Workflow]
+    B --> C{en.json Changed?}
+    C -->|Yes| D[Run Translation Script]
+    C -->|No| E[Skip Translation]
+    D --> F[Commit Updated Languages]
+    E --> G[Mark Complete]
+    F --> G
+    G --> H[Build Workflows Start]
+    H --> I[Build with Latest Translations]
 ```
 
+**Workflow Execution Order:**
+
+1. **Any push** → `update-translations.yml` runs FIRST
+2. Checks if `en.json` changed
+   - If YES: Translates and commits
+   - If NO: Skips (fast)
+3. Marks workflow as complete
+4. **Build workflows trigger** → Use updated translations
+
 **Key Features:**
-- ✅ Only runs on main repository (not forks)
-- ✅ Only processes when `en.json` actually changes
-- ✅ Commits changes automatically - no PR needed
-- ✅ Preserves existing translations (only adds new keys)
-- ✅ Works on feature branches too
+- ✅ **Always runs first** - All builds wait for translation workflow
+- ✅ **Smart detection** - Only translates if en.json actually changed
+- ✅ **Non-blocking** - Quick skip if no translation needed
+- ✅ **Auto-commit** - Updates committed back to same branch
+- ✅ **Build dependency** - Builds wait for translation completion
+- ✅ **Works everywhere** - All branches (main, develop, feature branches)
 
 ### Manual Workflow Trigger
 

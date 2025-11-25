@@ -3,9 +3,8 @@ name: Update Translations
 on:
   push:
     branches:
-      - 'chore/automate_launguage_conversion'
-    paths:
-      - 'web/src/locales/languages/en.json'
+      - '**'
+    # No path filter - always run to check for changes
   workflow_dispatch:
     inputs:
       languages:
@@ -30,10 +29,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 2
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Check if en.json was modified
+        id: check_en_json
+        run: |
+          if git diff HEAD~1 --name-only | grep -q "web/src/locales/languages/en.json"; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "✅ en.json was modified, will update translations"
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "ℹ️  en.json not modified, skipping translation update"
+          fi
+
       - name: Configure AWS Credentials with IAM Role
+        if: steps.check_en_json.outputs.changed == 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::058694856476:role/GitHubActionsRole
@@ -41,15 +52,18 @@ jobs:
           aws-region: us-east-1
 
       - name: Set up Python
+        if: steps.check_en_json.outputs.changed == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
       - name: Install Python dependencies
+        if: steps.check_en_json.outputs.changed == 'true'
         run: |
           pip install -q boto3 botocore
 
       - name: Run translation script
+        if: steps.check_en_json.outputs.changed == 'true'
         run: |
           cd scripts/translations
           if [ -n "${{ github.event.inputs.languages }}" ]; then
@@ -98,3 +112,16 @@ jobs:
         if: steps.check_changes.outputs.changes != 'true'
         run: |
           echo "ℹ️  No translation updates needed. All translations are up to date."
+
+      - name: Workflow complete
+        if: always()
+        run: |
+          echo "✅ Translation workflow completed successfully"
+          if [ "${{ steps.check_en_json.outputs.changed }}" != "true" ]; then
+            echo "ℹ️  No en.json changes detected - skipped translation"
+          elif [ "${{ steps.check_changes.outputs.changes }}" == "true" ]; then
+            echo "✅ Translations updated and committed"
+          else
+            echo "ℹ️  No new translation keys to update"
+          fi
+          echo "📦 Dependent workflows can now proceed"
