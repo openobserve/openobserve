@@ -1,30 +1,39 @@
 <template>
-    <div class=" tw-flex tw-items-start tw-gap-2 tw-flex-no-wrap ">
-      <!-- V2: Only show "if" for first condition in root group (index 0, depth 0) -->
-      <!-- For other conditions in root group or any nested group, show operator toggle -->
-      <div v-if="index === 0 && depth === 0" class="tw-text-sm tw-w-[20px] tw-mr-2 tw-mt-2 tw-flex tw-items-center">
-        <span>if</span>
-      </div>
-      <!-- Operator label for non-first conditions -->
-      <div v-else-if="!isFirstInGroup" class="tw-flex tw-items-center tw-gap-0.5 tw-mr-1 tw-mt-2">
-        <span class="tw-text-sm tw-font-medium tw-min-w-[30px]">
-          {{ computedLabel }}
-        </span>
-        <!-- Toggle AND/OR button after label -->
-        <q-btn
-          data-test="alert-conditions-toggle-operator-btn"
-          flat
-          dense
-          round
-          size="sm"
-          icon="restart_alt"
-          class="tw-w-[26px] tw-h-[26px] tw-flex-shrink-0 operator-toggle-btn"
-          @click="toggleOperator"
-        >
-          <q-tooltip>
-            Toggle between AND/OR
-          </q-tooltip>
-        </q-btn>
+    <div class=" tw-flex tw-items-start tw-gap-1 tw-flex-no-wrap ">
+      <!-- V2: Fixed-width left column for alignment -->
+      <!-- All conditions have the same width for the operator/label section -->
+      <div class="tw-flex tw-items-center tw-justify-center tw-mt-2 tw-min-w-[60px]">
+        <!-- First condition in root group: show "if" centered -->
+        <template v-if="index === 0 && depth === 0">
+          <span class="tw-text-sm">if</span>
+        </template>
+
+        <!-- First condition in nested groups: empty space for alignment -->
+        <template v-else-if="isFirstInGroup">
+          <!-- Empty space to maintain alignment -->
+        </template>
+
+        <!-- Other conditions: show operator + toggle button -->
+        <template v-else>
+          <span class="tw-text-sm tw-font-medium tw-min-w-[30px] tw-lowercase">
+            {{ computedLabel }}
+          </span>
+          <!-- Toggle AND/OR button after label -->
+          <q-btn
+            data-test="alert-conditions-toggle-operator-btn"
+            flat
+            dense
+            round
+            size="sm"
+            icon="restart_alt"
+            class="tw-h-[26px] tw-flex-shrink-0 operator-toggle-btn"
+            @click="toggleOperator"
+          >
+            <q-tooltip>
+              Toggle between and/or
+            </q-tooltip>
+          </q-btn>
+        </template>
       </div>
         <div
           data-test="alert-conditions-select-column"

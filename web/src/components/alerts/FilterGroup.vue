@@ -77,7 +77,7 @@
                 :input-width="props.conditionInputWidth"
                 :is-first-in-group="index === 0"
             />
-            <div class="tw-mb-1" v-if="!(props.disableFirstCondition && index === 0 && depth === 0)">
+            <div class="tw-mb-3" v-if="!(props.disableFirstCondition && index === 0 && depth === 0)">
                 <q-btn data-test="alert-conditions-delete-condition-btn" icon="close" size="10px" flat border-less @click="removeCondition(item.id)" />
             </div>
                 </div>
@@ -253,7 +253,6 @@
   const addCondition = (groupId: string) => {
     // V2: Create condition with filterType and logicalOperator
     const newCondition = {
-      type: 'condition',
       filterType: 'condition',
       column: '',
       operator: '=',
@@ -275,7 +274,6 @@
       groupId: getUUID(),
       conditions: [
         {
-          type: 'condition',
           filterType: 'condition',
           column: '',
           operator: '=',
@@ -453,7 +451,7 @@ const buildPreviewString = (group: any): string => {
 
     // Add logical operator before condition (except for first condition)
     if (index > 0 && item.logicalOperator) {
-      parts.push(`${item.logicalOperator} ${conditionStr}`);
+      parts.push(`${item.logicalOperator.toLowerCase()} ${conditionStr}`);
     } else {
       parts.push(conditionStr);
     }

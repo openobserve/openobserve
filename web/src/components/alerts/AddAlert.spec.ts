@@ -1181,7 +1181,6 @@ describe("AddAlert Component", () => {
         conditions: [
           {
             id: 'test-id',
-            type: 'condition',
             filterType: 'condition',
             column: 'status',
             operator: '=',
@@ -1268,7 +1267,6 @@ describe("AddAlert Component", () => {
           conditions: [
             {
               id: 'backend-id',
-              type: 'condition',
               filterType: 'condition',
               column: 'level',
               operator: '=',
