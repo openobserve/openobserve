@@ -60,6 +60,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="tw-flex tw-items-center tw-gap-3">
+          <!-- Refresh button (shown when percentile changes on latency tab) -->
+          <q-btn
+            v-if="showRefreshButton"
+            dense
+            no-caps
+            color="primary"
+            icon="refresh"
+            :label="t('panel.refresh')"
+            @click="refreshAfterPercentileChange"
+            data-test="percentile-refresh-button"
+          >
+            <q-tooltip>{{ t('latencyInsights.refreshTooltip') }}</q-tooltip>
+          </q-btn>
+
           <!-- Dimension selector button -->
           <q-btn
             outline
@@ -147,6 +161,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :viewOnly="true"
           :allowAlertCreation="false"
           searchType="dashboards"
+          @variablesData="handleVariablesDataChange"
+          @refreshedVariablesDataUpdated="handleVariablesDataChange"
         />
       </q-card-section>
     </q-card>
@@ -290,6 +306,16 @@ const dashboardChartsRef = ref<any>(null);
 const showDimensionSelector = ref(false);
 const dashboardRenderKey = ref(0); // Only increment on full reload to avoid re-rendering on panel append
 const dimensionSearchText = ref('');
+
+// Percentile change tracking
+const initialPercentile = ref<string | null>(null);
+const currentPercentile = ref<string | null>(null);
+const showRefreshButton = computed(() => {
+  return activeAnalysisType.value === 'latency' &&
+         initialPercentile.value !== null &&
+         currentPercentile.value !== null &&
+         initialPercentile.value !== currentPercentile.value;
+});
 
 // Active tab management
 const activeAnalysisType = ref<"latency" | "volume" | "error">(props.analysisType);
@@ -440,6 +466,7 @@ const loadAnalysis = async () => {
       baseFilter: props.baseFilter,
       dimensions: selectedDimensions.value,
       analysisType: activeAnalysisType.value,
+      percentile: currentPercentile.value || undefined,
     };
 
     // OPTIMIZATION: Skip analyzeAllDimensions() to avoid 20 extra queries
@@ -458,10 +485,40 @@ const loadAnalysis = async () => {
 
     dashboardData.value = dashboard;
     dashboardRenderKey.value++; // Increment to force re-render on full reload
+
+    // Reset percentile tracking after loading new analysis
+    initialPercentile.value = null;
+    currentPercentile.value = null;
   } catch (err: any) {
     console.error("Error loading analysis:", err);
     showErrorNotification(err.message || t('latencyInsights.failedToLoad'));
   }
+};
+
+const handleVariablesDataChange = (variablesData: any) => {
+  if (activeAnalysisType.value !== 'latency') {
+    return;
+  }
+
+  // Extract percentile from the values array
+  const percentileVar = variablesData?.values?.find((v: any) => v.name === 'percentile');
+  const percentileValue = percentileVar?.value;
+
+
+  if (percentileValue !== undefined) {
+    // Set initial percentile on first load
+    if (initialPercentile.value === null) {
+      initialPercentile.value = percentileValue;
+    }
+    currentPercentile.value = percentileValue;
+  }
+};
+
+const refreshAfterPercentileChange = () => {
+  // Update initial percentile to current to hide refresh button
+  initialPercentile.value = currentPercentile.value;
+  // Reload the analysis with new percentile
+  loadAnalysis();
 };
 
 const onClose = () => {

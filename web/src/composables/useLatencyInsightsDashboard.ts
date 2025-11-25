@@ -76,25 +76,6 @@ export function useLatencyInsightsDashboard() {
         config.baselineTimeRange.startTime === config.selectedTimeRange.startTime &&
         config.baselineTimeRange.endTime === config.selectedTimeRange.endTime;
 
-      console.log(`[Query Generation] Volume analysis mode for dimension "${dimensionName}":`, {
-        streamType: config.streamType,
-        baseline: {
-          start: new Date(config.baselineTimeRange.startTime / 1000).toISOString(),
-          end: new Date(config.baselineTimeRange.endTime / 1000).toISOString(),
-        },
-        selected: {
-          start: new Date(config.selectedTimeRange.startTime / 1000).toISOString(),
-          end: new Date(config.selectedTimeRange.endTime / 1000).toISOString(),
-        },
-        timeRangesMatch: config.baselineTimeRange.startTime === config.selectedTimeRange.startTime &&
-                         config.baselineTimeRange.endTime === config.selectedTimeRange.endTime,
-        willUseSingleQuery: isSameTimeRange,
-        reason: config.streamType === "traces"
-          ? "Traces always use UNION query (comparison)"
-          : isSameTimeRange
-            ? "Logs: same time range, using single query"
-            : "Logs: different time ranges, using UNION query"
-      });
 
       // If time ranges are the same AND it's logs (no brush selection), show single query instead of comparison
       if (isSameTimeRange) {
@@ -109,18 +90,7 @@ export function useLatencyInsightsDashboard() {
           LIMIT 5
         `.trim();
 
-        console.log(`[Query Generation] Volume analysis (single query) for dimension "${dimensionName}":`, {
-          timeRange: {
-            start: new Date(config.selectedTimeRange.startTime / 1000).toISOString(),
-            end: new Date(config.selectedTimeRange.endTime / 1000).toISOString(),
-            startMicros: config.selectedTimeRange.startTime,
-            endMicros: config.selectedTimeRange.endTime,
-            durationSeconds: selectedDurationSeconds,
-          },
-          note: 'Using single query (no comparison) because baseline and selected time ranges are identical',
-          selectedWhere,
-          singleQuery
-        });
+  
 
         return singleQuery;
       }
@@ -150,30 +120,7 @@ export function useLatencyInsightsDashboard() {
 
       const unionQuery = `${baselineQuery} UNION ${selectedQuery} ORDER BY trace_count DESC LIMIT 5`;
 
-      console.log(`[Query Generation] Volume analysis query for dimension "${dimensionName}":`, {
-        baselineTimeRange: {
-          start: new Date(config.baselineTimeRange.startTime / 1000).toISOString(),
-          end: new Date(config.baselineTimeRange.endTime / 1000).toISOString(),
-          startMicros: config.baselineTimeRange.startTime,
-          endMicros: config.baselineTimeRange.endTime,
-          durationSeconds: baselineDurationSeconds,
-        },
-        selectedTimeRange: {
-          start: new Date(config.selectedTimeRange.startTime / 1000).toISOString(),
-          end: new Date(config.selectedTimeRange.endTime / 1000).toISOString(),
-          startMicros: config.selectedTimeRange.startTime,
-          endMicros: config.selectedTimeRange.endTime,
-          durationSeconds: selectedDurationSeconds,
-        },
-        normalization: `Baseline normalized: count * ${selectedDurationSeconds} / ${baselineDurationSeconds}`,
-        rateFilter: config.rateFilter,
-        baselineWhere,
-        selectedWhere,
-        baselineQuery,
-        selectedQuery,
-        unionQuery
-      });
-
+      
       return unionQuery;
     } else if (config.analysisType === "error") {
       // Error Analysis: Compare error percentages by dimension
@@ -202,21 +149,6 @@ export function useLatencyInsightsDashboard() {
 
       const unionQuery = `${baselineQuery} UNION ${selectedQuery} ORDER BY error_percentage DESC LIMIT 5`;
 
-      console.log(`[Query Generation] Error analysis query for dimension "${dimensionName}":`, {
-        baselineTimeRange: {
-          start: new Date(config.baselineTimeRange.startTime / 1000).toISOString(),
-          end: new Date(config.baselineTimeRange.endTime / 1000).toISOString(),
-        },
-        selectedTimeRange: {
-          start: new Date(config.selectedTimeRange.startTime / 1000).toISOString(),
-          end: new Date(config.selectedTimeRange.endTime / 1000).toISOString(),
-        },
-        baselineWhere,
-        selectedWhere,
-        baselineQuery,
-        selectedQuery,
-        unionQuery
-      });
 
       return unionQuery;
     } else {
@@ -264,19 +196,7 @@ export function useLatencyInsightsDashboard() {
       config.baselineTimeRange.endTime === config.selectedTimeRange.endTime;
     const isComparisonMode = !isSameTimeRange;
 
-    console.log('[Dashboard Generation] Comparison mode:', {
-      streamType: config.streamType,
-      analysisType: config.analysisType,
-      timeRangesMatch: config.baselineTimeRange.startTime === config.selectedTimeRange.startTime &&
-                       config.baselineTimeRange.endTime === config.selectedTimeRange.endTime,
-      isComparisonMode,
-      reason: config.streamType === "traces"
-        ? "Traces always show comparison"
-        : isSameTimeRange
-          ? "Logs: same time range, no comparison"
-          : "Logs: different time ranges, show comparison"
-    });
-
+ 
     const panels = analyses.map((analysis, index) => {
       // Build panel description based on analysis type
       let description = "";
@@ -295,14 +215,7 @@ export function useLatencyInsightsDashboard() {
       // Generate SQL query for this dimension
       const sqlQuery = buildComparisonQuery(analysis.dimensionName, config);
 
-      console.log(`[Panel Generation] Creating panel for dimension "${analysis.dimensionName}":`, {
-        index,
-        dimensionName: analysis.dimensionName,
-        queryLength: sqlQuery?.length || 0,
-        queryPreview: sqlQuery?.substring(0, 100) + '...',
-        hasQuery: !!sqlQuery
-      });
-
+  
       // Determine panel ID prefix
       let panelPrefix = "LatencyInsights";
       if (isVolumeAnalysis) panelPrefix = "VolumeInsights";
@@ -479,6 +392,7 @@ export function useLatencyInsightsDashboard() {
     }
 
     // Only include percentile variable for latency analysis
+    const percentileValue = config.percentile || "0.95";
     const variables = (isVolumeAnalysis || isErrorAnalysis)
       ? { list: [], showDynamicFilters: false }
       : {
@@ -487,13 +401,13 @@ export function useLatencyInsightsDashboard() {
               type: "custom",
               name: "percentile",
               label: "Latency Percentile",
-              value: "0.95",
+              value: percentileValue,
               multiSelect: false,
               options: [
-                { label: "P50 (Median)", value: "0.50", selected: false },
-                { label: "P75", value: "0.75", selected: false },
-                { label: "P95", value: "0.95", selected: true },
-                { label: "P99", value: "0.99", selected: false },
+                { label: "P50 (Median)", value: "0.50", selected: percentileValue === "0.50" },
+                { label: "P75", value: "0.75", selected: percentileValue === "0.75" },
+                { label: "P95", value: "0.95", selected: percentileValue === "0.95" },
+                { label: "P99", value: "0.99", selected: percentileValue === "0.99" },
               ],
             },
           ],

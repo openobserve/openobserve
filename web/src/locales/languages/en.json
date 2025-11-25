@@ -627,7 +627,8 @@
     "dimensionsButton": "Fields ({count})",
     "dimensionsTooltip": "Add or remove dimensions to analyze",
     "selectDimensions": "Select Fields",
-    "analyzeButtonLabel": "Analyze"
+    "analyzeButtonLabel": "Analyze",
+    "refreshTooltip": "Refresh analysis with updated percentile"
   },
   "volumeInsights": {
     "title": "Insights",

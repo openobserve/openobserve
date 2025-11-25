@@ -60,6 +60,7 @@ export interface LatencyInsightsConfig {
   baseFilter?: string;
   dimensions: string[]; // List of dimension names to analyze
   analysisType?: "latency" | "volume" | "error"; // Type of analysis to perform
+  percentile?: string; // Latency percentile value (e.g., "0.95" for P95)
 }
 
 export function useLatencyInsightsAnalysis() {
