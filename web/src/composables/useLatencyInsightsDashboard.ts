@@ -69,6 +69,57 @@ export function useLatencyInsightsDashboard() {
         ? "approx_distinct(trace_id)"
         : "count(_timestamp)";
 
+      console.log(`[CACHE TEST] NEW CODE IS LOADED for dimension "${dimensionName}"`);
+
+      // Check if baseline and selected time ranges are the same
+      const isSameTimeRange =
+        config.baselineTimeRange.startTime === config.selectedTimeRange.startTime &&
+        config.baselineTimeRange.endTime === config.selectedTimeRange.endTime;
+
+      console.log(`[Query Generation] Time range comparison for dimension "${dimensionName}":`, {
+        baseline: {
+          start: config.baselineTimeRange.startTime,
+          end: config.baselineTimeRange.endTime,
+        },
+        selected: {
+          start: config.selectedTimeRange.startTime,
+          end: config.selectedTimeRange.endTime,
+        },
+        isSameTimeRange,
+        startMatch: config.baselineTimeRange.startTime === config.selectedTimeRange.startTime,
+        endMatch: config.baselineTimeRange.endTime === config.selectedTimeRange.endTime,
+      });
+
+      // If time ranges are the same (no brush selection), show single query instead of comparison
+      if (isSameTimeRange) {
+        const singleQuery = `
+          SELECT
+            COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
+            ${countExpression} AS trace_count
+          FROM "${config.streamName}"
+          ${selectedWhere}
+          GROUP BY ${dimensionName}
+          ORDER BY trace_count DESC
+          LIMIT 5
+        `.trim();
+
+        console.log(`[Query Generation] Volume analysis (single query) for dimension "${dimensionName}":`, {
+          timeRange: {
+            start: new Date(config.selectedTimeRange.startTime / 1000).toISOString(),
+            end: new Date(config.selectedTimeRange.endTime / 1000).toISOString(),
+            startMicros: config.selectedTimeRange.startTime,
+            endMicros: config.selectedTimeRange.endTime,
+            durationSeconds: selectedDurationSeconds,
+          },
+          note: 'Using single query (no comparison) because baseline and selected time ranges are identical',
+          selectedWhere,
+          singleQuery
+        });
+
+        return singleQuery;
+      }
+
+      // Different time ranges: use comparison query with baseline vs selected
       // Normalize baseline to selected time window: (records/baseline_duration) * selected_duration
       const baselineQuery = `
         SELECT
@@ -197,11 +248,22 @@ export function useLatencyInsightsDashboard() {
   ) => {
     const isVolumeAnalysis = config.analysisType === "volume";
     const isErrorAnalysis = config.analysisType === "error";
+
+    // Check if we're using comparison mode (baseline vs selected) or single query mode
+    const isSameTimeRange =
+      config.baselineTimeRange.startTime === config.selectedTimeRange.startTime &&
+      config.baselineTimeRange.endTime === config.selectedTimeRange.endTime;
+    const isComparisonMode = !isSameTimeRange;
+
     const panels = analyses.map((analysis, index) => {
       // Build panel description based on analysis type
       let description = "";
       if (isVolumeAnalysis) {
-        description = `Trace count comparison for dimension: ${analysis.dimensionName}. Higher Selected bars indicate this dimension value appears more frequently in high-volume periods.`;
+        if (isComparisonMode) {
+          description = `Trace count comparison for dimension: ${analysis.dimensionName}. Higher Selected bars indicate this dimension value appears more frequently in high-volume periods.`;
+        } else {
+          description = `Top values by count for dimension: ${analysis.dimensionName}.`;
+        }
       } else if (isErrorAnalysis) {
         description = `Error percentage comparison for dimension: ${analysis.dimensionName}. Higher Selected bars indicate this dimension value has more errors in the error spike period.`;
       } else {
@@ -233,15 +295,15 @@ export function useLatencyInsightsDashboard() {
         title: analysis.dimensionName,
         description,
         config: {
-          show_legends: true,
-          legends_position: "bottom",
+          show_legends: isComparisonMode,
+          legends_position: isComparisonMode ? "bottom" : null,
           unit,
           decimals,
           axis_border_show: true,
           label_option: {
             rotate: 45,
           },
-          color: {
+          color: isComparisonMode ? {
             mode: "custom",
             fixedColor: ["#1976d2", "#ffc107"],
             seriesBy: "last",
@@ -249,6 +311,11 @@ export function useLatencyInsightsDashboard() {
               { name: "Baseline", color: "#1976d2" },
               { name: "Selected", color: "#ffc107" },
             ],
+          } : {
+            mode: "palette-classic-by-series",
+            fixedColor: ["#5960b2"],
+            seriesBy: "last",
+            colorBySeries: [],
           },
           top_results_others: false,
           line_thickness: 1.5,
@@ -324,7 +391,7 @@ export function useLatencyInsightsDashboard() {
                 },
               ],
               z: [],
-              breakdown: [
+              breakdown: isComparisonMode ? [
                 {
                   label: "",
                   alias: "series",
@@ -334,7 +401,7 @@ export function useLatencyInsightsDashboard() {
                   havingConditions: [],
                   treatAsNonTimestamp: true,
                 },
-              ],
+              ] : [],
               filter: {
                 filterType: "group",
                 logicalOperator: "AND",

@@ -646,6 +646,7 @@ export default defineComponent({
           timeEndMicros: end * 1000,
         });
       } else {
+        console.log('[Logs Volume Analysis] Histogram selection cleared (zoom reset)');
         this.hasHistogramSelection = false;
         this.histogramSelectionRange = { start: 0, end: 0 };
         // Reset original time range when selection is cleared
@@ -1090,6 +1091,12 @@ export default defineComponent({
       if (newVal) {
         plotChart.value = {};
         searchObj.meta.resetPlotChart = false;
+
+        // Clear histogram selection when chart is reset
+        console.log('[Logs Volume Analysis] Chart reset, clearing histogram selection');
+        hasHistogramSelection.value = false;
+        histogramSelectionRange.value = { start: 0, end: 0 };
+        originalTimeRangeBeforeSelection.value = null;
       }
     });
 
@@ -1104,6 +1111,39 @@ export default defineComponent({
         // });
       },
       { deep: true },
+    );
+
+    // Watch for datetime changes from outside (datetime picker, search button, etc.)
+    // Clear histogram selection when datetime changes not from brush selection
+    watch(
+      () => ({
+        start: searchObj.data.datetime.startTime,
+        end: searchObj.data.datetime.endTime,
+      }),
+      (newTime, oldTime) => {
+        // Only clear if this is NOT from a brush selection (onChartUpdate sets both together)
+        // We can detect this by checking if the time change is significant (> 1 second difference from histogram range)
+        const histogramStartTime = histogramSelectionRange.value.timeStart
+          ? histogramSelectionRange.value.timeStart / 1000 // Convert to ms
+          : null;
+        const histogramEndTime = histogramSelectionRange.value.timeEnd
+          ? histogramSelectionRange.value.timeEnd / 1000 // Convert to ms
+          : null;
+
+        const isFromBrushSelection =
+          histogramStartTime &&
+          histogramEndTime &&
+          Math.abs((newTime.start / 1000) - histogramStartTime) < 1000 && // Within 1 second
+          Math.abs((newTime.end / 1000) - histogramEndTime) < 1000;
+
+        if (!isFromBrushSelection && oldTime && (newTime.start !== oldTime.start || newTime.end !== oldTime.end)) {
+          console.log('[Logs Volume Analysis] Datetime changed from outside, clearing histogram selection');
+          hasHistogramSelection.value = false;
+          histogramSelectionRange.value = { start: 0, end: 0 };
+          originalTimeRangeBeforeSelection.value = null;
+        }
+      },
+      { deep: true }
     );
 
     const selectedStreamFullTextSearchKeys = computed(() => {

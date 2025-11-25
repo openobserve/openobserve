@@ -354,6 +354,10 @@ const loadAnalysis = async () => {
     let selectedTimeRange = props.timeRange;
 
     console.log('[Analysis] Rate filter received:', props.rateFilter);
+    console.log('[Analysis] Props timeRange:', {
+      start: new Date(props.timeRange.startTime / 1000).toISOString(),
+      end: new Date(props.timeRange.endTime / 1000).toISOString(),
+    });
 
     if (props.analysisType === 'volume' && props.rateFilter?.timeStart && props.rateFilter?.timeEnd) {
       selectedTimeRange = {
@@ -371,6 +375,10 @@ const loadAnalysis = async () => {
       };
     } else {
       console.log('[Analysis] Using global time range for selected (no filter or missing timeStart/timeEnd)');
+      console.log('[Analysis] Selected time range equals props.timeRange:', {
+        start: new Date(selectedTimeRange.startTime / 1000).toISOString(),
+        end: new Date(selectedTimeRange.endTime / 1000).toISOString(),
+      });
     }
 
     const config: LatencyInsightsConfig = {
