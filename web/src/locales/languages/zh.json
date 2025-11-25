@@ -86,8 +86,7 @@
     "contactUs": "联系我们",
     "addFolder": "添加文件夹",
     "status": "状态",
-    "cancel": "取消",
-    "test": "测试"
+    "cancel": "取消"
   },
   "search": {
     "selectIndex": "选择数据流",
