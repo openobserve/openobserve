@@ -320,7 +320,6 @@ const hasAnyBrushSelection = computed(() => {
     }
   });
 
-  console.log('[Analyze Dimensions Button] Has brush selection:', hasSelection);
   return hasSelection;
 });
 
@@ -415,16 +414,6 @@ const loadDashboard = async () => {
 
     dashboardData.value = convertedDashboard;
 
-    // Debug: Check if Duration panel has dataZoom config
-    console.log('Dashboard loaded. Checking Duration panel config:', {
-      panels: convertedDashboard.tabs[0].panels.map(p => ({
-        id: p.id,
-        title: p.title,
-        hasDataZoom: !!p.config?.dataZoom,
-        dataZoomConfig: p.config?.dataZoom
-      }))
-    });
-
     updateLayout();
   } catch (err: any) {
     console.error("Error loading dashboard:", err);
@@ -443,9 +432,6 @@ const refreshDashboard = () => {
   }
 };
 
-// const onDataZoom = (event: any) => {
-//   console.log("event -----", event);
-// };
 
 const createRangeFilter = (data, start = null, end = null, timeStart = null, timeEnd = null) => {
   const panelId = data?.id;
@@ -478,15 +464,6 @@ const onDataZoom = ({
   end1: number;
   data: any; // contains panel schema with data.id as panel id
 }) => {
-  console.log('onDataZoom event received:', {
-    start,
-    end,
-    start1,
-    end1,
-    data,
-    panelId: data?.id,
-    panelTitle: data?.title
-  });
 
   if (start && end) {
     const panelTitle = data?.title;
@@ -498,15 +475,6 @@ const onDataZoom = ({
       endTime: props.timeRange.endTime,
     };
 
-    // Log datetime BEFORE selection
-    console.log('[BEFORE Selection] Current datetime control value:', {
-      startMs: props.timeRange.startTime / 1000,
-      endMs: props.timeRange.endTime / 1000,
-      startTime: new Date(props.timeRange.startTime / 1000).toLocaleString(),
-      endTime: new Date(props.timeRange.endTime / 1000).toLocaleString(),
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-    });
-
     // For Rate and Errors panels: use placeholder values to indicate time-based selection
     // Volume/Error analysis will use the time range, not Y-axis values
     if (panelTitle === "Rate" || panelTitle === "Errors") {
@@ -514,16 +482,7 @@ const onDataZoom = ({
       const timeStartMicros = start * 1000;
       const timeEndMicros = end * 1000;
 
-      console.log(`[${panelTitle} Selection] User selected time range on ${panelTitle} chart:`, {
-        startMs: start,
-        endMs: end,
-        startMicros: timeStartMicros,
-        endMicros: timeEndMicros,
-        startTime: new Date(start).toISOString(),
-        endTime: new Date(end).toISOString(),
-        duration: `${((end - start) / 1000).toFixed(2)}s`
-      });
-
+  
       // Use -1 as placeholder to indicate time-based zoom (not Y-axis value zoom)
       // Pass actual time range as timeStart/timeEnd for volume/error analysis
       createRangeFilter(data, -1, -1, timeStartMicros, timeEndMicros);
@@ -533,35 +492,13 @@ const onDataZoom = ({
       const timeStartMicros = start * 1000;
       const timeEndMicros = end * 1000;
 
-      console.log('[Duration Selection] User selected duration range on Duration chart:', {
-        startMs: start,
-        endMs: end,
-        durationStartMs: start1,
-        durationEndMs: end1,
-        startTime: new Date(start).toISOString(),
-        endTime: new Date(end).toISOString(),
-        durationRange: `${(start1 / 1000).toFixed(2)}s - ${(end1 / 1000).toFixed(2)}s`,
-        timeStartMicros,
-        timeEndMicros
-      });
 
       createRangeFilter(data, start1, end1, timeStartMicros, timeEndMicros);
     }
 
     // All panels emit time-range-selected to update global datetime control
     emit("time-range-selected", { start, end });
-
-    // Log datetime AFTER selection (the new value that will be set)
-    console.log('[AFTER Selection] New datetime control value (emitted):', {
-      startMs: start,
-      endMs: end,
-      startTime: new Date(start).toLocaleString(),
-      endTime: new Date(end).toLocaleString(),
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-    });
-  } else {
-    console.log('onDataZoom: start or end missing, not creating filter');
-  }
+  } 
 };
 
 const removeRangeFilter = (panelId: string) => {
@@ -636,15 +573,6 @@ const openVolumeAnalysisDashboard = () => {
     }
   });
 
-  console.log('[Volume Analysis] Opening dashboard with rate filter:', {
-    rateStart,
-    rateEnd,
-    timeStart,
-    timeEnd,
-    timeStartISO: timeStart ? new Date(timeStart / 1000).toISOString() : 'null',
-    timeEndISO: timeEnd ? new Date(timeEnd / 1000).toISOString() : 'null',
-  });
-
   // Set the rate filter for analysis
   analysisRateFilter.value = {
     start: rateStart || 0,
@@ -672,15 +600,6 @@ const openErrorAnalysisDashboard = () => {
     }
   });
 
-  console.log('[Error Analysis] Opening dashboard with error filter:', {
-    errorStart,
-    errorEnd,
-    timeStart,
-    timeEnd,
-    timeStartISO: timeStart ? new Date(timeStart / 1000).toISOString() : 'null',
-    timeEndISO: timeEnd ? new Date(timeEnd / 1000).toISOString() : 'null',
-  });
-
   // Set the error filter for analysis
   analysisErrorFilter.value = {
     start: errorStart || 0,
@@ -701,14 +620,6 @@ const openUnifiedAnalysisDashboard = () => {
   let latestFilterType = null;
 
   rangeFilters.value.forEach((filter) => {
-    console.log('[Unified Analysis] Processing filter:', {
-      panelTitle: filter.panelTitle,
-      start: filter.start,
-      end: filter.end,
-      timeStart: filter.timeStart,
-      timeEnd: filter.timeEnd,
-      hasTimeRange: !!(filter.timeStart && filter.timeEnd)
-    });
 
     if (filter.panelTitle === "Duration") {
       durationStart = filter.start;
@@ -755,13 +666,6 @@ const openUnifiedAnalysisDashboard = () => {
 
   // Set default tab based on most recent selection, or volume if no selection
   defaultAnalysisTab.value = latestFilterType || "volume";
-
-  console.log('[Unified Analysis] Opening dashboard:', {
-    defaultTab: defaultAnalysisTab.value,
-    durationFilter: analysisDurationFilter.value,
-    rateFilter: analysisRateFilter.value,
-    errorFilter: analysisErrorFilter.value,
-  });
 
   showAnalysisDashboard.value = true;
 };
