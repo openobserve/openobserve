@@ -82,10 +82,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             color="primary"
             icon="tune"
             :label="t('latencyInsights.dimensionsButton', { count: selectedDimensions.length })"
+            :disable="isCustomSQLMode"
             @click="showDimensionSelector = true"
             data-test="dimension-selector-button"
           >
-            <q-tooltip>{{ t('latencyInsights.dimensionsTooltip') }}</q-tooltip>
+            <q-tooltip v-if="isCustomSQLMode">{{ t('latencyInsights.customSQLFieldsDisabled') }}</q-tooltip>
+            <q-tooltip v-else>{{ t('latencyInsights.dimensionsTooltip') }}</q-tooltip>
           </q-btn>
 
           <q-btn
@@ -315,6 +317,11 @@ const showRefreshButton = computed(() => {
          initialPercentile.value !== null &&
          currentPercentile.value !== null &&
          initialPercentile.value !== currentPercentile.value;
+});
+
+// Detect custom SQL mode
+const isCustomSQLMode = computed(() => {
+  return props.baseFilter?.trim().toUpperCase().startsWith('SELECT') || false;
 });
 
 // Active tab management

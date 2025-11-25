@@ -114,7 +114,6 @@ export function useLatencyInsightsAnalysis() {
       LIMIT 100
     `.trim();
 
-    console.log(`[LatencyInsights] Built ${applyDurationFilter ? 'SELECTED' : 'BASELINE'} distribution query for ${dimensionName}:`, query);
     return query;
   };
 
@@ -206,8 +205,6 @@ export function useLatencyInsightsAnalysis() {
   ): Map<string | number, { count: number; percent: number }> => {
     const distribution = new Map();
 
-    console.log('[LatencyInsights] calculateDistribution - data:', data, 'totalCount:', totalCount);
-
     data.forEach((row: any) => {
       const value = row.value || "(no value)";
       const count = parseInt(row.count) || 0;
@@ -216,7 +213,6 @@ export function useLatencyInsightsAnalysis() {
       distribution.set(value, { count, percent });
     });
 
-    console.log('[LatencyInsights] calculateDistribution - result map size:', distribution.size);
     return distribution;
   };
 
@@ -275,8 +271,6 @@ export function useLatencyInsightsAnalysis() {
     config: LatencyInsightsConfig
   ): Promise<DimensionAnalysis> => {
     try {
-      console.log(`[LatencyInsights] Analyzing dimension: ${dimensionName}`);
-
       // Get baseline distribution (WITHOUT duration filter - all traces)
       const baselineDistQuery = buildDistributionQuery(
         dimensionName,
@@ -295,8 +289,6 @@ export function useLatencyInsightsAnalysis() {
         config.baselineTimeRange
       );
 
-      console.log(`[LatencyInsights] Baseline dist result for ${dimensionName}:`, baselineDistResult);
-
       // Get selected distribution (WITH duration filter - only slow traces)
       const selectedDistQuery = buildDistributionQuery(
         dimensionName,
@@ -314,8 +306,6 @@ export function useLatencyInsightsAnalysis() {
         config.orgIdentifier,
         config.selectedTimeRange
       );
-
-      console.log(`[LatencyInsights] Selected dist result for ${dimensionName}:`, selectedDistResult);
 
       // Get baseline population stats (WITHOUT duration filter)
       const baselinePopQuery = buildPopulationQuery(
@@ -356,8 +346,6 @@ export function useLatencyInsightsAnalysis() {
       // Calculate distributions
       const baselineTotalCount = baselinePopResult.hits?.[0]?.total_count || 0;
       const selectedTotalCount = selectedPopResult.hits?.[0]?.total_count || 0;
-
-      console.log(`[LatencyInsights] ${dimensionName} - Baseline total: ${baselineTotalCount}, Selected total: ${selectedTotalCount}`);
 
       const baselineDistribution = calculateDistribution(
         baselineDistResult.hits || [],

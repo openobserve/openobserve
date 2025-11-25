@@ -31,8 +31,119 @@ export function useLatencyInsightsDashboard() {
     const baseFilters = config.baseFilter?.trim().length
       ? config.baseFilter.trim()
       : "";
+
+    // Check if baseFilter is a custom SQL query (starts with SELECT)
+    const isCustomSQL = baseFilters.trim().toUpperCase().startsWith('SELECT');
     const isVolumeAnalysis = config.analysisType === "volume";
 
+    // For custom SQL queries, wrap them in a subquery and GROUP BY the dimension
+    if (isCustomSQL && isVolumeAnalysis) {
+      // Check if we need comparison mode (different time ranges = brush selection)
+      const isSameTimeRange =
+        config.baselineTimeRange.startTime === config.selectedTimeRange.startTime &&
+        config.baselineTimeRange.endTime === config.selectedTimeRange.endTime;
+
+      // If same time range, show single query (no comparison)
+      if (isSameTimeRange) {
+        return `
+          SELECT
+            COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
+            COUNT(*) AS trace_count
+          FROM (
+            ${baseFilters}
+          ) AS user_query
+          GROUP BY ${dimensionName}
+          ORDER BY trace_count DESC
+          LIMIT 5
+        `.trim();
+      }
+
+      // Different time ranges: Baseline vs Selected comparison
+      // We need to replace or inject the time range in the user's SQL query for baseline and selected
+
+      // Function to add or replace timestamp filters in SQL query
+      const addOrReplaceTimestampFilter = (sql: string, startTime: number, endTime: number) => {
+        // Pattern to match _timestamp conditions in WHERE clause
+        const timestampPattern = /_timestamp\s*>=\s*\d+\s*AND\s*_timestamp\s*<=\s*\d+/gi;
+
+        // Check if SQL already has timestamp filter
+        if (timestampPattern.test(sql)) {
+          // Replace existing timestamp filter
+          return sql.replace(timestampPattern, `_timestamp >= ${startTime} AND _timestamp <= ${endTime}`);
+        }
+
+        // No timestamp filter found, need to inject it
+        // Check if SQL has a WHERE clause
+        const wherePattern = /\bWHERE\b/i;
+        if (wherePattern.test(sql)) {
+          // Has WHERE clause, add timestamp filter with AND
+          return sql.replace(wherePattern, `WHERE _timestamp >= ${startTime} AND _timestamp <= ${endTime} AND`);
+        } else {
+          // No WHERE clause, need to add one before GROUP BY, ORDER BY, or LIMIT
+          // Find the position to insert WHERE clause
+          const insertBeforePattern = /\b(GROUP\s+BY|ORDER\s+BY|LIMIT)\b/i;
+          const match = sql.match(insertBeforePattern);
+
+          if (match) {
+            // Insert WHERE before GROUP BY/ORDER BY/LIMIT
+            const insertPos = match.index!;
+            return sql.slice(0, insertPos) + `WHERE _timestamp >= ${startTime} AND _timestamp <= ${endTime} ` + sql.slice(insertPos);
+          } else {
+            // No GROUP BY/ORDER BY/LIMIT, add WHERE at the end
+            return sql.trim() + ` WHERE _timestamp >= ${startTime} AND _timestamp <= ${endTime}`;
+          }
+        }
+      };
+
+      // Calculate durations for normalization
+      const baselineDurationSeconds = (config.baselineTimeRange.endTime - config.baselineTimeRange.startTime) / 1000000;
+      const selectedDurationSeconds = (config.selectedTimeRange.endTime - config.selectedTimeRange.startTime) / 1000000;
+
+      // Create baseline query with baseline time range
+      const baselineSQL = addOrReplaceTimestampFilter(
+        baseFilters,
+        config.baselineTimeRange.startTime,
+        config.baselineTimeRange.endTime
+      );
+
+      // For custom SQL, the user's query might already have aggregations
+      // We need to sum those up when grouping by the dimension
+      // Try to detect if there's a count column (common patterns: count, cnt, a, total, etc.)
+      // For simplicity, we'll just count rows which works for most cases
+      const baselineQuery = `
+        SELECT
+          COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
+          'Baseline' AS series,
+          (SUM(CASE WHEN a IS NOT NULL THEN a ELSE 1 END) * ${selectedDurationSeconds}) / ${baselineDurationSeconds} AS trace_count
+        FROM (
+          ${baselineSQL}
+        ) AS baseline_query
+        GROUP BY ${dimensionName}
+      `.trim();
+
+      // Create selected query with selected time range
+      const selectedSQL = addOrReplaceTimestampFilter(
+        baseFilters,
+        config.selectedTimeRange.startTime,
+        config.selectedTimeRange.endTime
+      );
+
+      const selectedQuery = `
+        SELECT
+          COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
+          'Selected' AS series,
+          SUM(CASE WHEN a IS NOT NULL THEN a ELSE 1 END) AS trace_count
+        FROM (
+          ${selectedSQL}
+        ) AS selected_query
+        GROUP BY ${dimensionName}
+      `.trim();
+
+      // Combine with UNION
+      return `${baselineQuery} UNION ${selectedQuery} ORDER BY trace_count DESC LIMIT 5`;
+    }
+
+    // Normal mode: Build queries with WHERE clauses
     // Build time filters for baseline and selected periods
     const baselineTimeFilter = `_timestamp >= ${config.baselineTimeRange.startTime} AND _timestamp <= ${config.baselineTimeRange.endTime}`;
     const selectedTimeFilter = `_timestamp >= ${config.selectedTimeRange.startTime} AND _timestamp <= ${config.selectedTimeRange.endTime}`;

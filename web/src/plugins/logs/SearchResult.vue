@@ -77,7 +77,7 @@ color="warning" size="sm"> </q-icon>
           </div>
           <!-- Volume Analysis Button -->
           <q-btn
-            v-if="searchObj.data?.queryResults?.hits?.length > 0"
+            v-if="searchObj.data?.queryResults?.hits?.length > 0 && !searchObj.meta.sqlMode"
             outline
             no-caps
             dense
