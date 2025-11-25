@@ -17,20 +17,32 @@ export class LoginPage {
   }
 
   async loginAsInternalUser() {
+    // Wait for page to stabilize before checking for internal login button
+    await this.page.waitForLoadState('domcontentloaded');
 
-    if (await this.page.getByText('Login as internal user').isVisible()) {
+    const loginAsInternalLink = this.page.getByText('Login as internal user');
 
-       await this.page.getByText('Login as internal user').click();
-       await this.page.waitForURL(process.env["ZO_BASE_URL"] + "/web/login", {
+    // Wait for the link with a reasonable timeout
+    try {
+      await loginAsInternalLink.waitFor({ state: 'visible', timeout: 10000 });
+      await loginAsInternalLink.click();
+      await this.page.waitForURL(process.env["ZO_BASE_URL"] + "/web/login", {
         waitUntil: "networkidle",
-        });
-   
+      });
+
+      // Additional wait to ensure login form is fully rendered
+      await this.page.waitForLoadState('domcontentloaded');
+    } catch (error) {
+      // If "Login as internal user" link is not found, form might already be visible
+      console.log('Login as internal user link not found, form may already be visible');
     }
-  
-    
   }
 
   async login() {
+    // Wait for login form elements to be available
+    await this.userIdInput.waitFor({ state: 'visible', timeout: 15000 });
+    await this.passwordInput.waitFor({ state: 'visible', timeout: 15000 });
+
     await this.userIdInput.fill(process.env["ZO_ROOT_USER_EMAIL"]);
     await this.passwordInput.fill(process.env["ZO_ROOT_USER_PASSWORD"]);
 
@@ -40,7 +52,30 @@ export class LoginPage {
       { timeout: 60000 }
     );
 
-    await this.loginButton.click();
+    // Wait for page to be fully loaded before clicking
+    await this.page.waitForLoadState('domcontentloaded');
+    await this.page.waitForTimeout(1000);
+
+    // Check if login button is visible, if not click "Login as internal user" first
+    const isLoginButtonVisible = await this.loginButton.isVisible().catch(() => false);
+    if (!isLoginButtonVisible) {
+      if (await this.page.getByText('Login as internal user').isVisible()) {
+        await this.page.getByText('Login as internal user').click();
+        await this.page.waitForTimeout(1000);
+      }
+    }
+
+    // Click with retry logic to handle DOM detachment
+    for (let i = 0; i < 3; i++) {
+      try {
+        await this.loginButton.click({ timeout: 5000 });
+        break;
+      } catch (error) {
+        if (i === 2) throw error;
+        await this.page.waitForTimeout(1000);
+      }
+    }
+
     await waitForLogin;
     await this.page.waitForTimeout(2000);
     await this.page.waitForURL(process.env["ZO_BASE_URL"] + "/web/", {
