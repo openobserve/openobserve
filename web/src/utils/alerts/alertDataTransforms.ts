@@ -51,6 +51,37 @@ export interface V1Group {
 }
 
 /**
+ * Ensures all groups have groupId and all conditions have id
+ * This is needed because data from backend might not have these fields
+ */
+export const ensureIds = (group: any): any => {
+  if (!group) return group;
+
+  // Ensure this group has a groupId
+  if (group.filterType === "group" && !group.groupId) {
+    group.groupId = getUUID();
+  }
+
+  // Process conditions array
+  if (group.conditions && Array.isArray(group.conditions)) {
+    group.conditions = group.conditions.map((item: any) => {
+      if (item.filterType === "group") {
+        // Recursively ensure IDs for nested groups
+        return ensureIds(item);
+      } else {
+        // Ensure condition has an id
+        if (!item.id) {
+          item.id = getUUID();
+        }
+        return item;
+      }
+    });
+  }
+
+  return group;
+};
+
+/**
  * Updates a condition group (root or nested) with new data
  * This is called when FilterGroup emits add-condition or add-group events
  *

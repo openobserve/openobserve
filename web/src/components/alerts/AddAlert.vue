@@ -529,6 +529,7 @@ import {
   convertV0ToV2,
   convertV1ToV2,
   convertV1BEToV2,
+  ensureIds,
   type TransformContext,
 } from "@/utils/alerts/alertDataTransforms";
 
@@ -1542,23 +1543,25 @@ export default defineComponent({
       if (version === 0) {
         // V0: Flat array format - convert to V2
         // V0 had implicit AND between all conditions (no groups)
-        this.formData.query_condition.conditions = convertV0ToV2(this.formData.query_condition.conditions);
+        this.formData.query_condition.conditions = ensureIds(convertV0ToV2(this.formData.query_condition.conditions));
       } else if (version === 1) {
         // V1 format - need to convert to V2
         // First check if it's BE format ({and: [...]}) or FE format ({label, items, groupId})
         if (this.formData.query_condition.conditions.and || this.formData.query_condition.conditions.or) {
           // V1 Backend format - convert to V2
-          this.formData.query_condition.conditions = convertV1BEToV2(this.formData.query_condition.conditions);
+          this.formData.query_condition.conditions = ensureIds(convertV1BEToV2(this.formData.query_condition.conditions));
         } else if (this.formData.query_condition.conditions.label && this.formData.query_condition.conditions.items) {
           // V1 Frontend format - convert to V2
-          this.formData.query_condition.conditions = convertV1ToV2(this.formData.query_condition.conditions);
+          this.formData.query_condition.conditions = ensureIds(convertV1ToV2(this.formData.query_condition.conditions));
         }
+      } else {
+        // V2 format - ensure all IDs exist
+        this.formData.query_condition.conditions = ensureIds(this.formData.query_condition.conditions);
       }
-      // V2 format without version field - use as-is, no transformation needed
     } else if (Array.isArray(this.formData.query_condition.conditions) && this.formData.query_condition.conditions.length > 0) {
       // V0: Flat array of conditions - convert to V2
       // This handles the case where conditions is directly an array at the top level
-      this.formData.query_condition.conditions = convertV0ToV2(this.formData.query_condition.conditions);
+      this.formData.query_condition.conditions = ensureIds(convertV0ToV2(this.formData.query_condition.conditions));
     }
     else if (this.formData.query_condition.conditions == null || this.formData.query_condition.conditions == undefined || this.formData.query_condition.conditions.length == 0 || Object.keys(this.formData.query_condition.conditions).length == 0){
       // No conditions - create empty V2 group

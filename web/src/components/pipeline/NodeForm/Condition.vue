@@ -169,6 +169,7 @@ import {
   convertV1BEToV2,
   updateGroup as updateGroupUtil,
   removeConditionGroup as removeConditionGroupUtil,
+  ensureIds,
   type V2Group,
 } from "@/utils/alerts/alertDataTransforms";
 
@@ -310,22 +311,22 @@ const getDefaultConditionGroup = (): ConditionGroup => {
       if (version === 0) {
         // V0: Flat array format - convert to V2
         // V0 had implicit AND between all conditions (no groups)
-        return convertV0ToV2(conditions) as any;
+        const converted = convertV0ToV2(conditions);
+        return ensureIds(converted) as any;
       } else if (version === 1) {
         // V1: Convert to V2
+        let converted;
         if (conditions.and || conditions.or) {
           // V1 Backend format
-          return convertV1BEToV2(conditions) as any;
+          converted = convertV1BEToV2(conditions);
         } else if (conditions.label && conditions.items) {
           // V1 Frontend format
-          return convertV1ToV2(conditions) as any;
+          converted = convertV1ToV2(conditions);
         }
+        return ensureIds(converted) as any;
       } else {
-        // V2: Use as-is, but ensure groupId exists
-        if (!conditions.groupId) {
-          conditions.groupId = getUUID();
-        }
-        return conditions;
+        // V2: Use as-is, but ensure all groupIds and ids exist recursively
+        return ensureIds(conditions) as any;
       }
     } catch (error) {
       console.error("Error converting condition to group format:", error);
