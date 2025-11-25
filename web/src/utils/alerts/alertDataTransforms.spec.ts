@@ -4,6 +4,11 @@ import {
   retransformBEToFE,
   updateGroup,
   removeConditionGroup,
+  detectConditionsVersion,
+  convertV0ToV2,
+  convertV1ToV2,
+  convertV1BEToV2,
+  ensureIds,
   TransformContext,
 } from './alertDataTransforms';
 
@@ -922,6 +927,1264 @@ describe('alertDataTransforms - OR Operator Pipeline Tests', () => {
 
       expect(result.or[0].value).toBe('100');
       expect(result.or[1].value).toBe('active');
+    });
+  });
+});
+
+// ============================================================================
+// VERSION 2 (V2) COMPREHENSIVE TESTS
+// ============================================================================
+
+describe('alertDataTransforms - V2 Structure Tests', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe('detectConditionsVersion', () => {
+    it('should detect V2 structure with filterType and conditions array', () => {
+      const v2Data = {
+        filterType: 'group',
+        logicalOperator: 'AND',
+        conditions: [
+          {
+            type: 'condition',
+            filterType: 'condition',
+            column: 'status',
+            operator: '=',
+            value: 'active',
+            logicalOperator: 'AND',
+            id: '1'
+          }
+        ],
+        groupId: 'root'
+      };
+
+      expect(detectConditionsVersion(v2Data)).toBe(2);
+    });
+
+    it('should detect V1 structure with and/or keys', () => {
+      const v1BEData = {
+        and: [
+          { column: 'status', operator: '=', value: 'active', ignore_case: true }
+        ]
+      };
+
+      expect(detectConditionsVersion(v1BEData)).toBe(1);
+    });
+
+    it('should detect V1 structure with label and items', () => {
+      const v1FEData = {
+        label: 'and',
+        items: [
+          { id: '1', column: 'status', operator: '=', value: 'active' }
+        ],
+        groupId: 'test'
+      };
+
+      expect(detectConditionsVersion(v1FEData)).toBe(1);
+    });
+
+    it('should detect V0 structure (flat array)', () => {
+      const v0Data = [
+        { column: 'status', operator: '=', value: 'active', ignore_case: true },
+        { column: 'type', operator: '!=', value: 'test', ignore_case: false }
+      ];
+
+      expect(detectConditionsVersion(v0Data)).toBe(0);
+    });
+
+    it('should return 0 for null or undefined', () => {
+      expect(detectConditionsVersion(null)).toBe(0);
+      expect(detectConditionsVersion(undefined)).toBe(0);
+    });
+
+    it('should return 0 for empty array', () => {
+      expect(detectConditionsVersion([])).toBe(0);
+    });
+
+    it('should return 0 for empty object', () => {
+      expect(detectConditionsVersion({})).toBe(0);
+    });
+  });
+
+  describe('convertV0ToV2', () => {
+    it('should convert flat array to V2 group structure', () => {
+      const v0Data = [
+        { column: 'status', operator: '=', value: 'active', ignore_case: true },
+        { column: 'type', operator: '!=', value: 'test', ignore_case: false }
+      ];
+
+      const result = convertV0ToV2(v0Data);
+
+      expect(result.filterType).toBe('group');
+      expect(result.logicalOperator).toBe('AND');
+      expect(result.conditions).toHaveLength(2);
+      expect(result.groupId).toBe('mock-uuid-123');
+
+      expect(result.conditions[0]).toMatchObject({
+        type: 'condition',
+        filterType: 'condition',
+        column: 'status',
+        operator: '=',
+        value: 'active',
+        logicalOperator: 'AND',
+        ignore_case: true
+      });
+    });
+
+    it('should convert empty array to empty V2 group', () => {
+      const result = convertV0ToV2([]);
+
+      expect(result.filterType).toBe('group');
+      expect(result.logicalOperator).toBe('AND');
+      expect(result.conditions).toHaveLength(0);
+      expect(result.groupId).toBe('mock-uuid-123');
+    });
+
+    it('should handle V0 with existing ids', () => {
+      const v0Data = [
+        { id: 'existing-1', column: 'field1', operator: '=', value: 'val1' }
+      ];
+
+      const result = convertV0ToV2(v0Data);
+
+      expect(result.conditions[0].id).toBe('existing-1');
+    });
+
+    it('should generate ids for V0 items without ids', () => {
+      const v0Data = [
+        { column: 'field1', operator: '=', value: 'val1' }
+      ];
+
+      const result = convertV0ToV2(v0Data);
+
+      expect(result.conditions[0].id).toBe('mock-uuid-123');
+    });
+
+    it('should default ignore_case to true when not specified', () => {
+      const v0Data = [
+        { column: 'field1', operator: '=', value: 'val1' }
+      ];
+
+      const result = convertV0ToV2(v0Data);
+
+      expect(result.conditions[0].ignore_case).toBe(true);
+    });
+
+    it('should preserve ignore_case when specified', () => {
+      const v0Data = [
+        { column: 'field1', operator: '=', value: 'val1', ignore_case: false }
+      ];
+
+      const result = convertV0ToV2(v0Data);
+
+      expect(result.conditions[0].ignore_case).toBe(false);
+    });
+
+    it('should handle V0 with all operators', () => {
+      const v0Data = [
+        { column: 'a', operator: '=', value: '1' },
+        { column: 'b', operator: '!=', value: '2' },
+        { column: 'c', operator: '>', value: '3' },
+        { column: 'd', operator: '<', value: '4' },
+        { column: 'e', operator: '>=', value: '5' },
+        { column: 'f', operator: '<=', value: '6' },
+        { column: 'g', operator: 'Contains', value: '7' },
+        { column: 'h', operator: 'NotContains', value: '8' }
+      ];
+
+      const result = convertV0ToV2(v0Data);
+
+      expect(result.conditions).toHaveLength(8);
+      expect(result.conditions[0].operator).toBe('=');
+      expect(result.conditions[6].operator).toBe('Contains');
+    });
+
+    it('should set all conditions to AND operator (V0 implicit AND)', () => {
+      const v0Data = [
+        { column: 'a', operator: '=', value: '1' },
+        { column: 'b', operator: '=', value: '2' }
+      ];
+
+      const result = convertV0ToV2(v0Data);
+
+      expect(result.conditions[0].logicalOperator).toBe('AND');
+      expect(result.conditions[1].logicalOperator).toBe('AND');
+    });
+  });
+
+  describe('convertV1ToV2 - Frontend Format', () => {
+    it('should convert V1 FE format to V2 with single condition', () => {
+      const v1Data = {
+        groupId: 'test-group',
+        label: 'and',
+        items: [
+          { id: '1', column: 'status', operator: '=', value: 'active', ignore_case: true }
+        ]
+      };
+
+      const result = convertV1ToV2(v1Data);
+
+      expect(result.filterType).toBe('group');
+      expect(result.logicalOperator).toBe('AND');
+      expect(result.groupId).toBe('test-group');
+      expect(result.conditions).toHaveLength(1);
+      expect(result.conditions[0]).toMatchObject({
+        type: 'condition',
+        filterType: 'condition',
+        column: 'status',
+        operator: '=',
+        value: 'active',
+        logicalOperator: 'AND',
+        ignore_case: true,
+        id: '1'
+      });
+    });
+
+    it('should convert V1 OR group to V2', () => {
+      const v1Data = {
+        groupId: 'or-group',
+        label: 'or',
+        items: [
+          { id: '1', column: 'type', operator: '=', value: 'error', ignore_case: false },
+          { id: '2', column: 'type', operator: '=', value: 'warning', ignore_case: false }
+        ]
+      };
+
+      const result = convertV1ToV2(v1Data);
+
+      expect(result.logicalOperator).toBe('OR');
+      expect(result.conditions).toHaveLength(2);
+      expect(result.conditions[0].logicalOperator).toBe('OR');
+      expect(result.conditions[1].logicalOperator).toBe('OR');
+    });
+
+    it('should convert nested V1 groups to V2', () => {
+      const v1Data = {
+        groupId: 'root',
+        label: 'and',
+        items: [
+          { id: '1', column: 'env', operator: '=', value: 'prod', ignore_case: false },
+          {
+            groupId: 'nested-or',
+            label: 'or',
+            items: [
+              { id: '2', column: 'level', operator: '=', value: 'error', ignore_case: true },
+              { id: '3', column: 'level', operator: '=', value: 'critical', ignore_case: true }
+            ]
+          }
+        ]
+      };
+
+      const result = convertV1ToV2(v1Data);
+
+      expect(result.filterType).toBe('group');
+      expect(result.logicalOperator).toBe('AND');
+      expect(result.conditions).toHaveLength(2);
+
+      // First item is a condition
+      expect(result.conditions[0].filterType).toBe('condition');
+
+      // Second item is a nested group
+      expect(result.conditions[1].filterType).toBe('group');
+      expect(result.conditions[1].logicalOperator).toBe('OR');
+      expect(result.conditions[1].conditions).toHaveLength(2);
+    });
+
+    it('should handle deeply nested V1 structure (3 levels)', () => {
+      const v1Data = {
+        groupId: 'root',
+        label: 'and',
+        items: [
+          {
+            groupId: 'level-1',
+            label: 'or',
+            items: [
+              { id: '1', column: 'a', operator: '=', value: '1' },
+              {
+                groupId: 'level-2',
+                label: 'and',
+                items: [
+                  { id: '2', column: 'b', operator: '=', value: '2' },
+                  {
+                    groupId: 'level-3',
+                    label: 'or',
+                    items: [
+                      { id: '3', column: 'c', operator: '=', value: '3' }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      };
+
+      const result = convertV1ToV2(v1Data);
+
+      expect(result.filterType).toBe('group');
+      expect(result.conditions[0].filterType).toBe('group');
+      expect(result.conditions[0].conditions[1].filterType).toBe('group');
+      expect(result.conditions[0].conditions[1].conditions[1].filterType).toBe('group');
+    });
+
+    it('should return as-is if already V2 format', () => {
+      const v2Data = {
+        filterType: 'group',
+        logicalOperator: 'AND',
+        conditions: [],
+        groupId: 'test'
+      };
+
+      const result = convertV1ToV2(v2Data);
+
+      expect(result).toBe(v2Data);
+    });
+
+    it('should handle null input', () => {
+      const result = convertV1ToV2(null);
+
+      expect(result.filterType).toBe('group');
+      expect(result.logicalOperator).toBe('AND');
+      expect(result.conditions).toHaveLength(0);
+    });
+
+    it('should default ignore_case to true when not specified', () => {
+      const v1Data = {
+        label: 'and',
+        items: [
+          { id: '1', column: 'field', operator: '=', value: 'val' }
+        ]
+      };
+
+      const result = convertV1ToV2(v1Data);
+
+      expect(result.conditions[0].ignore_case).toBe(true);
+    });
+
+    it('should preserve existing ids from V1 conditions', () => {
+      const v1Data = {
+        label: 'and',
+        items: [
+          { id: 'custom-id-123', column: 'field', operator: '=', value: 'val' }
+        ]
+      };
+
+      const result = convertV1ToV2(v1Data);
+
+      expect(result.conditions[0].id).toBe('custom-id-123');
+    });
+  });
+
+  describe('convertV1BEToV2 - Backend Format', () => {
+    it('should convert V1 BE format with AND to V2', () => {
+      const v1BEData = {
+        and: [
+          { column: 'status', operator: '=', value: 'active', ignore_case: true },
+          { column: 'type', operator: '!=', value: 'test', ignore_case: false }
+        ]
+      };
+
+      const result = convertV1BEToV2(v1BEData);
+
+      expect(result.filterType).toBe('group');
+      expect(result.logicalOperator).toBe('AND');
+      expect(result.conditions).toHaveLength(2);
+      expect(result.conditions[0].logicalOperator).toBe('AND');
+      expect(result.conditions[1].logicalOperator).toBe('AND');
+    });
+
+    it('should convert V1 BE format with OR to V2', () => {
+      const v1BEData = {
+        or: [
+          { column: 'level', operator: '=', value: 'error', ignore_case: true },
+          { column: 'level', operator: '=', value: 'critical', ignore_case: true }
+        ]
+      };
+
+      const result = convertV1BEToV2(v1BEData);
+
+      expect(result.filterType).toBe('group');
+      expect(result.logicalOperator).toBe('OR');
+      expect(result.conditions).toHaveLength(2);
+      expect(result.conditions[0].logicalOperator).toBe('OR');
+    });
+
+    it('should convert nested V1 BE format', () => {
+      const v1BEData = {
+        and: [
+          { column: 'env', operator: '=', value: 'prod', ignore_case: false },
+          {
+            or: [
+              { column: 'severity', operator: '>=', value: '3', ignore_case: false },
+              { column: 'priority', operator: '=', value: 'high', ignore_case: true }
+            ]
+          }
+        ]
+      };
+
+      const result = convertV1BEToV2(v1BEData);
+
+      expect(result.logicalOperator).toBe('AND');
+      expect(result.conditions).toHaveLength(2);
+
+      // First is condition
+      expect(result.conditions[0].filterType).toBe('condition');
+
+      // Second is nested OR group
+      expect(result.conditions[1].filterType).toBe('group');
+      expect(result.conditions[1].logicalOperator).toBe('OR');
+    });
+
+    it('should convert deeply nested V1 BE structure', () => {
+      const v1BEData = {
+        or: [
+          { column: 'alert', operator: '=', value: 'true', ignore_case: false },
+          {
+            and: [
+              { column: 'metric', operator: '>', value: '100', ignore_case: false },
+              {
+                or: [
+                  { column: 'tag', operator: 'Contains', value: 'prod', ignore_case: true },
+                  { column: 'tag', operator: 'Contains', value: 'staging', ignore_case: true }
+                ]
+              }
+            ]
+          }
+        ]
+      };
+
+      const result = convertV1BEToV2(v1BEData);
+
+      // Root group has 'or' key, so logicalOperator should be 'OR'
+      expect(result.logicalOperator).toBe('OR');
+      expect(result.conditions).toHaveLength(2);
+
+      // conditions[0] is a condition
+      expect(result.conditions[0].filterType).toBe('condition');
+
+      // conditions[1] is a nested group with 'and' key, so logicalOperator should be 'AND'
+      expect(result.conditions[1].filterType).toBe('group');
+      expect(result.conditions[1].logicalOperator).toBe('AND');
+      expect(result.conditions[1].conditions).toHaveLength(2);
+
+      // conditions[1].conditions[1] is a deeply nested group with 'or' key
+      expect(result.conditions[1].conditions[1].filterType).toBe('group');
+      expect(result.conditions[1].conditions[1].logicalOperator).toBe('OR');
+      expect(result.conditions[1].conditions[1].conditions).toHaveLength(2);
+    });
+
+    it('should return as-is if already V2 format', () => {
+      const v2Data = {
+        filterType: 'group',
+        logicalOperator: 'AND',
+        conditions: []
+      };
+
+      const result = convertV1BEToV2(v2Data);
+
+      expect(result).toBe(v2Data);
+    });
+
+    it('should handle null input', () => {
+      const result = convertV1BEToV2(null);
+
+      expect(result.filterType).toBe('group');
+      expect(result.logicalOperator).toBe('AND');
+      expect(result.conditions).toHaveLength(0);
+    });
+
+    it('should handle empty object', () => {
+      const result = convertV1BEToV2({});
+
+      expect(result.filterType).toBe('group');
+      expect(result.logicalOperator).toBe('AND');
+      expect(result.conditions).toHaveLength(0);
+    });
+
+    it('should generate ids for conditions without ids', () => {
+      const v1BEData = {
+        and: [
+          { column: 'field', operator: '=', value: 'val', ignore_case: true }
+        ]
+      };
+
+      const result = convertV1BEToV2(v1BEData);
+
+      expect(result.conditions[0].id).toBe('mock-uuid-123');
+    });
+
+    it('should preserve existing ids from V1 BE conditions', () => {
+      const v1BEData = {
+        and: [
+          { id: 'existing-id', column: 'field', operator: '=', value: 'val', ignore_case: true }
+        ]
+      };
+
+      const result = convertV1BEToV2(v1BEData);
+
+      expect(result.conditions[0].id).toBe('existing-id');
+    });
+
+    it('should default ignore_case to true when not specified', () => {
+      const v1BEData = {
+        and: [
+          { column: 'field', operator: '=', value: 'val' }
+        ]
+      };
+
+      const result = convertV1BEToV2(v1BEData);
+
+      expect(result.conditions[0].ignore_case).toBe(true);
+    });
+
+    it('should generate groupId for the root group', () => {
+      const v1BEData = {
+        and: [
+          { column: 'field', operator: '=', value: 'val' }
+        ]
+      };
+
+      const result = convertV1BEToV2(v1BEData);
+
+      expect(result.groupId).toBe('mock-uuid-123');
+    });
+  });
+
+  describe('ensureIds', () => {
+    it('should add groupId to group without one', () => {
+      const data = {
+        filterType: 'group',
+        logicalOperator: 'AND',
+        conditions: []
+      };
+
+      const result = ensureIds(data);
+
+      expect(result.groupId).toBe('mock-uuid-123');
+    });
+
+    it('should preserve existing groupId', () => {
+      const data = {
+        filterType: 'group',
+        logicalOperator: 'AND',
+        conditions: [],
+        groupId: 'existing-group-id'
+      };
+
+      const result = ensureIds(data);
+
+      expect(result.groupId).toBe('existing-group-id');
+    });
+
+    it('should add id to condition without one', () => {
+      const data = {
+        filterType: 'group',
+        logicalOperator: 'AND',
+        conditions: [
+          {
+            filterType: 'condition',
+            column: 'status',
+            operator: '=',
+            value: 'active'
+          }
+        ]
+      };
+
+      const result = ensureIds(data);
+
+      expect(result.conditions[0].id).toBe('mock-uuid-123');
+    });
+
+    it('should preserve existing condition ids', () => {
+      const data = {
+        filterType: 'group',
+        logicalOperator: 'AND',
+        conditions: [
+          {
+            id: 'existing-id',
+            filterType: 'condition',
+            column: 'status',
+            operator: '=',
+            value: 'active'
+          }
+        ]
+      };
+
+      const result = ensureIds(data);
+
+      expect(result.conditions[0].id).toBe('existing-id');
+    });
+
+    it('should recursively add ids to nested groups', () => {
+      const data = {
+        filterType: 'group',
+        logicalOperator: 'AND',
+        conditions: [
+          {
+            filterType: 'condition',
+            column: 'env',
+            operator: '=',
+            value: 'prod'
+          },
+          {
+            filterType: 'group',
+            logicalOperator: 'OR',
+            conditions: [
+              {
+                filterType: 'condition',
+                column: 'level',
+                operator: '=',
+                value: 'error'
+              }
+            ]
+          }
+        ]
+      };
+
+      const result = ensureIds(data);
+
+      expect(result.groupId).toBe('mock-uuid-123');
+      expect(result.conditions[0].id).toBe('mock-uuid-123');
+      expect(result.conditions[1].groupId).toBe('mock-uuid-123');
+      expect(result.conditions[1].conditions[0].id).toBe('mock-uuid-123');
+    });
+
+    it('should handle deeply nested structure (3 levels)', () => {
+      const data = {
+        filterType: 'group',
+        logicalOperator: 'AND',
+        conditions: [
+          {
+            filterType: 'group',
+            logicalOperator: 'OR',
+            conditions: [
+              {
+                filterType: 'group',
+                logicalOperator: 'AND',
+                conditions: [
+                  {
+                    filterType: 'condition',
+                    column: 'deep',
+                    operator: '=',
+                    value: 'value'
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      };
+
+      const result = ensureIds(data);
+
+      // Root group
+      expect(result.groupId).toBeDefined();
+      // Level 1 group
+      expect(result.conditions[0].groupId).toBeDefined();
+      // Level 2 group
+      expect(result.conditions[0].conditions[0].groupId).toBeDefined();
+      // Level 3 condition
+      expect(result.conditions[0].conditions[0].conditions[0].id).toBeDefined();
+    });
+
+    it('should handle null input', () => {
+      const result = ensureIds(null);
+
+      expect(result).toBeNull();
+    });
+
+    it('should handle undefined input', () => {
+      const result = ensureIds(undefined);
+
+      expect(result).toBeUndefined();
+    });
+
+    it('should handle group with null conditions', () => {
+      const data = {
+        filterType: 'group',
+        logicalOperator: 'AND',
+        conditions: null
+      };
+
+      const result = ensureIds(data);
+
+      expect(result.groupId).toBe('mock-uuid-123');
+      expect(result.conditions).toBeNull();
+    });
+
+    it('should handle group with undefined conditions', () => {
+      const data = {
+        filterType: 'group',
+        logicalOperator: 'AND'
+      };
+
+      const result = ensureIds(data);
+
+      expect(result.groupId).toBe('mock-uuid-123');
+    });
+
+    it('should handle mixed conditions with and without ids', () => {
+      const data = {
+        filterType: 'group',
+        logicalOperator: 'AND',
+        conditions: [
+          {
+            id: 'has-id',
+            filterType: 'condition',
+            column: 'a',
+            operator: '=',
+            value: '1'
+          },
+          {
+            filterType: 'condition',
+            column: 'b',
+            operator: '=',
+            value: '2'
+          },
+          {
+            id: 'has-id-2',
+            filterType: 'condition',
+            column: 'c',
+            operator: '=',
+            value: '3'
+          }
+        ]
+      };
+
+      const result = ensureIds(data);
+
+      expect(result.conditions[0].id).toBe('has-id');
+      expect(result.conditions[1].id).toBe('mock-uuid-123');
+      expect(result.conditions[2].id).toBe('has-id-2');
+    });
+  });
+
+  describe('updateGroup - V2 Structure', () => {
+    it('should update root V2 group', () => {
+      const context: TransformContext = {
+        formData: {
+          query_condition: {
+            conditions: {
+              filterType: 'group',
+              logicalOperator: 'AND',
+              groupId: 'root',
+              conditions: [
+                {
+                  filterType: 'condition',
+                  column: 'old',
+                  operator: '=',
+                  value: 'value',
+                  logicalOperator: 'AND',
+                  id: '1'
+                }
+              ]
+            }
+          }
+        }
+      };
+
+      const updatedGroup = {
+        filterType: 'group',
+        logicalOperator: 'OR',
+        groupId: 'root',
+        conditions: [
+          {
+            filterType: 'condition',
+            column: 'new',
+            operator: '!=',
+            value: 'updated',
+            logicalOperator: 'OR',
+            id: '2'
+          }
+        ]
+      };
+
+      updateGroup(updatedGroup, context);
+
+      expect(context.formData.query_condition.conditions.logicalOperator).toBe('OR');
+      expect(context.formData.query_condition.conditions.conditions[0].column).toBe('new');
+    });
+
+    it('should update nested V2 group', () => {
+      const context: TransformContext = {
+        formData: {
+          query_condition: {
+            conditions: {
+              filterType: 'group',
+              logicalOperator: 'AND',
+              groupId: 'root',
+              conditions: [
+                {
+                  filterType: 'condition',
+                  column: 'base',
+                  operator: '=',
+                  value: 'test',
+                  logicalOperator: 'AND',
+                  id: '1'
+                },
+                {
+                  filterType: 'group',
+                  logicalOperator: 'OR',
+                  groupId: 'nested',
+                  conditions: [
+                    {
+                      filterType: 'condition',
+                      column: 'old',
+                      operator: '=',
+                      value: 'value',
+                      logicalOperator: 'OR',
+                      id: '2'
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      };
+
+      const updatedGroup = {
+        filterType: 'group',
+        logicalOperator: 'OR',
+        groupId: 'nested',
+        conditions: [
+          {
+            filterType: 'condition',
+            column: 'new',
+            operator: '!=',
+            value: 'updated',
+            logicalOperator: 'OR',
+            id: '3'
+          }
+        ]
+      };
+
+      updateGroup(updatedGroup, context);
+
+      const nestedGroup = context.formData.query_condition.conditions.conditions[1];
+      expect(nestedGroup.conditions[0].column).toBe('new');
+      expect(nestedGroup.conditions[0].value).toBe('updated');
+    });
+
+    it('should handle deeply nested V2 update (3 levels)', () => {
+      const context: TransformContext = {
+        formData: {
+          query_condition: {
+            conditions: {
+              filterType: 'group',
+              logicalOperator: 'AND',
+              groupId: 'root',
+              conditions: [
+                {
+                  filterType: 'group',
+                  logicalOperator: 'OR',
+                  groupId: 'level-1',
+                  conditions: [
+                    {
+                      filterType: 'group',
+                      logicalOperator: 'AND',
+                      groupId: 'level-2-target',
+                      conditions: [
+                        {
+                          filterType: 'condition',
+                          column: 'old',
+                          operator: '=',
+                          value: 'old',
+                          logicalOperator: 'AND',
+                          id: '1'
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      };
+
+      const updatedGroup = {
+        filterType: 'group',
+        logicalOperator: 'AND',
+        groupId: 'level-2-target',
+        conditions: [
+          {
+            filterType: 'condition',
+            column: 'new',
+            operator: '=',
+            value: 'new',
+            logicalOperator: 'AND',
+            id: '2'
+          }
+        ]
+      };
+
+      updateGroup(updatedGroup, context);
+
+      const deepGroup = context.formData.query_condition.conditions.conditions[0].conditions[0];
+      expect(deepGroup.conditions[0].column).toBe('new');
+      expect(deepGroup.conditions[0].value).toBe('new');
+    });
+
+    it('should handle V2 group with multiple conditions', () => {
+      const context: TransformContext = {
+        formData: {
+          query_condition: {
+            conditions: {
+              filterType: 'group',
+              logicalOperator: 'AND',
+              groupId: 'root',
+              conditions: [
+                {
+                  filterType: 'group',
+                  logicalOperator: 'OR',
+                  groupId: 'target',
+                  conditions: []
+                }
+              ]
+            }
+          }
+        }
+      };
+
+      const updatedGroup = {
+        filterType: 'group',
+        logicalOperator: 'OR',
+        groupId: 'target',
+        conditions: [
+          {
+            filterType: 'condition',
+            column: 'a',
+            operator: '=',
+            value: '1',
+            logicalOperator: 'OR',
+            id: '1'
+          },
+          {
+            filterType: 'condition',
+            column: 'b',
+            operator: '=',
+            value: '2',
+            logicalOperator: 'OR',
+            id: '2'
+          },
+          {
+            filterType: 'condition',
+            column: 'c',
+            operator: '=',
+            value: '3',
+            logicalOperator: 'OR',
+            id: '3'
+          }
+        ]
+      };
+
+      updateGroup(updatedGroup, context);
+
+      const targetGroup = context.formData.query_condition.conditions.conditions[0];
+      expect(targetGroup.conditions).toHaveLength(3);
+    });
+  });
+
+  describe('removeConditionGroup - V2 Structure', () => {
+    it('should remove V2 condition from root group', () => {
+      const context: TransformContext = {
+        formData: {
+          query_condition: {
+            conditions: {
+              filterType: 'group',
+              logicalOperator: 'AND',
+              groupId: 'root',
+              conditions: [
+                {
+                  filterType: 'condition',
+                  column: 'keep',
+                  operator: '=',
+                  value: 'this',
+                  logicalOperator: 'AND',
+                  id: 'keep-id'
+                },
+                {
+                  filterType: 'group',
+                  logicalOperator: 'OR',
+                  groupId: 'remove-this',
+                  conditions: []
+                }
+              ]
+            }
+          }
+        }
+      };
+
+      removeConditionGroup('remove-this', null, context);
+
+      expect(context.formData.query_condition.conditions.conditions).toHaveLength(1);
+      expect(context.formData.query_condition.conditions.conditions[0].id).toBe('keep-id');
+    });
+
+    it('should remove nested V2 group', () => {
+      const context: TransformContext = {
+        formData: {
+          query_condition: {
+            conditions: {
+              filterType: 'group',
+              logicalOperator: 'AND',
+              groupId: 'root',
+              conditions: [
+                {
+                  filterType: 'group',
+                  logicalOperator: 'OR',
+                  groupId: 'parent',
+                  conditions: [
+                    {
+                      filterType: 'condition',
+                      column: 'keep',
+                      operator: '=',
+                      value: 'keep',
+                      logicalOperator: 'OR',
+                      id: 'keep-id'
+                    },
+                    {
+                      filterType: 'group',
+                      logicalOperator: 'AND',
+                      groupId: 'remove-nested',
+                      conditions: []
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      };
+
+      removeConditionGroup('remove-nested', null, context);
+
+      const parentGroup = context.formData.query_condition.conditions.conditions[0];
+      expect(parentGroup.conditions).toHaveLength(1);
+      expect(parentGroup.conditions[0].id).toBe('keep-id');
+    });
+
+    it('should remove empty parent groups after nested removal', () => {
+      const context: TransformContext = {
+        formData: {
+          query_condition: {
+            conditions: {
+              filterType: 'group',
+              logicalOperator: 'AND',
+              groupId: 'root',
+              conditions: [
+                {
+                  filterType: 'group',
+                  logicalOperator: 'OR',
+                  groupId: 'parent',
+                  conditions: [
+                    {
+                      filterType: 'group',
+                      logicalOperator: 'AND',
+                      groupId: 'only-child-remove',
+                      conditions: []
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      };
+
+      removeConditionGroup('only-child-remove', null, context);
+
+      // Parent group should be removed since it's now empty
+      expect(context.formData.query_condition.conditions.conditions).toHaveLength(0);
+    });
+
+    it('should handle removing from deeply nested V2 structure', () => {
+      const context: TransformContext = {
+        formData: {
+          query_condition: {
+            conditions: {
+              filterType: 'group',
+              logicalOperator: 'AND',
+              groupId: 'root',
+              conditions: [
+                {
+                  filterType: 'group',
+                  logicalOperator: 'OR',
+                  groupId: 'level-1',
+                  conditions: [
+                    {
+                      filterType: 'condition',
+                      column: 'keep',
+                      operator: '=',
+                      value: 'keep',
+                      logicalOperator: 'OR',
+                      id: 'keep-id'
+                    },
+                    {
+                      filterType: 'group',
+                      logicalOperator: 'AND',
+                      groupId: 'level-2',
+                      conditions: [
+                        {
+                          filterType: 'group',
+                          logicalOperator: 'OR',
+                          groupId: 'level-3-remove',
+                          conditions: []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      };
+
+      removeConditionGroup('level-3-remove', null, context);
+
+      const level1 = context.formData.query_condition.conditions.conditions[0];
+      // level-2 should be removed since it's now empty
+      expect(level1.conditions).toHaveLength(1);
+      expect(level1.conditions[0].id).toBe('keep-id');
+    });
+  });
+
+  describe('V2 Integration Tests', () => {
+    it('should convert V0 to V2 and ensure all ids', () => {
+      const v0Data = [
+        { column: 'status', operator: '=', value: 'active' },
+        { column: 'type', operator: '!=', value: 'test' }
+      ];
+
+      const v2Data = convertV0ToV2(v0Data);
+      const withIds = ensureIds(v2Data);
+
+      expect(withIds.groupId).toBeDefined();
+      expect(withIds.conditions[0].id).toBeDefined();
+      expect(withIds.conditions[1].id).toBeDefined();
+    });
+
+    it('should convert V1 FE to V2 and ensure all ids for nested structure', () => {
+      const v1Data = {
+        label: 'and',
+        items: [
+          { column: 'env', operator: '=', value: 'prod' },
+          {
+            label: 'or',
+            items: [
+              { column: 'level', operator: '=', value: 'error' },
+              { column: 'level', operator: '=', value: 'critical' }
+            ]
+          }
+        ]
+      };
+
+      const v2Data = convertV1ToV2(v1Data);
+      const withIds = ensureIds(v2Data);
+
+      expect(withIds.groupId).toBeDefined();
+      expect(withIds.conditions[0].id).toBeDefined();
+      expect(withIds.conditions[1].groupId).toBeDefined();
+      expect(withIds.conditions[1].conditions[0].id).toBeDefined();
+      expect(withIds.conditions[1].conditions[1].id).toBeDefined();
+    });
+
+    it('should convert V1 BE to V2 and ensure all ids', () => {
+      const v1BEData = {
+        and: [
+          { column: 'env', operator: '=', value: 'prod', ignore_case: false },
+          {
+            or: [
+              { column: 'severity', operator: '>=', value: '3', ignore_case: false },
+              { column: 'priority', operator: '=', value: 'high', ignore_case: true }
+            ]
+          }
+        ]
+      };
+
+      const v2Data = convertV1BEToV2(v1BEData);
+      const withIds = ensureIds(v2Data);
+
+      expect(withIds.groupId).toBeDefined();
+      expect(withIds.conditions[0].id).toBeDefined();
+      expect(withIds.conditions[1].groupId).toBeDefined();
+      expect(withIds.conditions[1].conditions[0].id).toBeDefined();
+      expect(withIds.conditions[1].conditions[1].id).toBeDefined();
+    });
+
+    it('should detect version, convert, and ensure ids in complete flow', () => {
+      const v1Data = {
+        and: [
+          { column: 'status', operator: '=', value: 'active', ignore_case: true }
+        ]
+      };
+
+      const version = detectConditionsVersion(v1Data);
+      expect(version).toBe(1);
+
+      const v2Data = convertV1BEToV2(v1Data);
+      expect(v2Data.filterType).toBe('group');
+
+      const withIds = ensureIds(v2Data);
+      expect(withIds.groupId).toBeDefined();
+      expect(withIds.conditions[0].id).toBeDefined();
+    });
+
+    it('should handle complete CRUD flow with V2 structure', () => {
+      // Create initial V2 structure
+      const context: TransformContext = {
+        formData: {
+          query_condition: {
+            conditions: ensureIds({
+              filterType: 'group',
+              logicalOperator: 'AND',
+              conditions: [
+                {
+                  filterType: 'condition',
+                  column: 'status',
+                  operator: '=',
+                  value: 'active',
+                  logicalOperator: 'AND'
+                }
+              ]
+            })
+          }
+        }
+      };
+
+      // Update: Add nested group
+      const updatedRoot = {
+        ...context.formData.query_condition.conditions,
+        conditions: [
+          ...context.formData.query_condition.conditions.conditions,
+          ensureIds({
+            filterType: 'group',
+            logicalOperator: 'OR',
+            groupId: 'new-group',
+            conditions: [
+              {
+                filterType: 'condition',
+                column: 'type',
+                operator: '=',
+                value: 'error',
+                logicalOperator: 'OR'
+              }
+            ]
+          })
+        ]
+      };
+
+      updateGroup(updatedRoot, context);
+
+      expect(context.formData.query_condition.conditions.conditions).toHaveLength(2);
+
+      // Delete: Remove the nested group
+      removeConditionGroup('new-group', null, context);
+
+      expect(context.formData.query_condition.conditions.conditions).toHaveLength(1);
     });
   });
 });
