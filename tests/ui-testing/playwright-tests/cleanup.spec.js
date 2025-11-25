@@ -33,6 +33,9 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up all pipelines for e2e_automate streams
     await pm.apiCleanup.cleanupPipelines();
 
+    // Clean up all pipeline destinations matching pattern "destination" + 2-3 digits
+    await pm.apiCleanup.cleanupPipelineDestinations();
+
     // Clean up all functions matching pattern "Pipeline" + 3 digits
     await pm.apiCleanup.cleanupFunctions();
 
