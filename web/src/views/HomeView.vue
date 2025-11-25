@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <TrialPeriod></TrialPeriod>
          </div>
           <LicensePeriod @update-license="goToLicensePage"></LicensePeriod>
+        <DatabaseDeprecationBanner></DatabaseDeprecationBanner>
         <div class="feature-card"
         :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'"
         role="region"
@@ -429,6 +430,7 @@ import pipelines from "@/services/pipelines";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
+import DatabaseDeprecationBanner from "@/components/DatabaseDeprecationBanner.vue";
 import { useRouter } from "vue-router";
 import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
 import store from "@/test/unit/helpers/store";
@@ -913,6 +915,7 @@ export default defineComponent({
     CustomChartRenderer,
     TrialPeriod,
     LicensePeriod,
+    DatabaseDeprecationBanner,
     HomeViewSkeleton,
   },
 });
