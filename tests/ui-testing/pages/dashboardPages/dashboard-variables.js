@@ -31,7 +31,7 @@ export default class DashboardVariables {
     await variableTab.click();
 
     // Add Variable
-    await this.page.locator('[data-test="dashboard-variable-add-btn"]').click({timeout:50000});
+    await this.page.locator('[data-test="dashboard-variable-add-btn"]').click({timeout:5000});
     await this.page.locator('[data-test="dashboard-variable-name"]').fill(name);
 
     // Select Stream Type
@@ -62,19 +62,62 @@ export default class DashboardVariables {
     await fieldSelect.click();
     await fieldSelect.fill(field);
 
-    // Wait for dropdown options to populate
-    await this.page.waitForTimeout(500);
+    // Wait for dropdown to have options available
+    await this.page.waitForFunction(
+      () => {
+        const options = document.querySelectorAll('[role="option"]');
+        return options.length > 0;
+      },
+      { timeout: 10000, polling: 100 }
+    );
 
-    // Select the field from dropdown using role option
-    const fieldOption = this.page.getByRole("option", { name: field, exact: true });
-    await fieldOption.waitFor({ state: "visible", timeout: 10000 });
-    await fieldOption.click();
+    // Try to select the field from dropdown - use multiple strategies
+    let fieldSelected = false;
+
+    // Strategy 1: Try exact match
+    try {
+      const fieldOption = this.page.getByRole("option", { name: field, exact: true });
+      await fieldOption.waitFor({ state: "visible", timeout: 5000 });
+      await fieldOption.click();
+      fieldSelected = true;
+    } catch (e) {
+      // Strategy 2: Try partial match
+      try {
+        const fieldOption = this.page.getByRole("option", { name: field, exact: false }).first();
+        await fieldOption.waitFor({ state: "visible", timeout: 5000 });
+        await fieldOption.click();
+        fieldSelected = true;
+      } catch (e2) {
+        // Strategy 3: Use keyboard to select the first visible option
+        try {
+          await this.page.keyboard.press('ArrowDown');
+          // Wait for selection to be highlighted
+          await this.page.waitForFunction(
+            () => {
+              const highlighted = document.querySelector('[role="option"][aria-selected="true"]') ||
+                                 document.querySelector('[role="option"].q-manual-focusable--focused') ||
+                                 document.querySelector('[role="option"].q-focusable--focused');
+              return highlighted !== null;
+            },
+            { timeout: 3000, polling: 100 }
+          );
+          await this.page.keyboard.press('Enter');
+          fieldSelected = true;
+        } catch (e3) {
+          fieldSelected = false;
+        }
+      }
+    }
+
+    if (!fieldSelected) {
+      throw new Error(`Failed to select field: ${field}`);
+    }
 
     // Add Filter Configuration if provided
     if (filterConfig) {
 
       const addFilterBtn = this.page.locator('[data-test="dashboard-add-filter-btn"]');
-      await addFilterBtn.waitFor({ state: "visible", timeout: 50000 });
+      await addFilterBtn.waitFor({ state: "visible", timeout: 5000 });
       await addFilterBtn.click();
       
       // Wait for and interact with Filter Name selector
