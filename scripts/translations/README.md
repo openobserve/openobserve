@@ -179,19 +179,19 @@ graph TD
 
 **Workflow Execution Order:**
 
-1. **Any push** → `update-translations.yml` runs FIRST
+1. **Push code** → `update-translations.yml` runs
 2. Checks if `en.json` changed
-   - If YES: Translates and commits
-   - If NO: Skips (fast)
-3. Marks workflow as complete
-4. **Build workflows trigger** → Use updated translations
+   - If YES: Translates and commits back to branch
+   - If NO: Skips (fast, ~10 seconds)
+3. **If translations were committed** → New push event
+4. **Build workflows trigger** on the new commit → Use updated translations
 
 **Key Features:**
-- ✅ **Always runs first** - All builds wait for translation workflow
+- ✅ **Always runs** - Checks every push for en.json changes
 - ✅ **Smart detection** - Only translates if en.json actually changed
 - ✅ **Non-blocking** - Quick skip if no translation needed
 - ✅ **Auto-commit** - Updates committed back to same branch
-- ✅ **Build dependency** - Builds wait for translation completion
+- ✅ **Natural flow** - Translation commit triggers builds automatically
 - ✅ **Works everywhere** - All branches (main, develop, feature branches)
 
 ### Manual Workflow Trigger
@@ -286,14 +286,15 @@ ModuleNotFoundError: No module named 'boto3'
 - Consider manual review for critical UI text
 - Native speakers should review translations
 
-### Build Started Before Translation Completed
+### Build Has Old Translations
 
-**Symptom:** Build has old translations
+**Symptom:** Build doesn't have the latest translations
 
-**Solution:** This shouldn't happen with current setup. Verify:
-1. Build workflow has `workflow_run` trigger with `workflows: ["Update Translations"]`
-2. Translation workflow completed successfully
-3. Check Actions logs for timing
+**Solution:** Check if translation workflow ran and committed:
+1. Go to **Actions** → Find the **Update Translations** run
+2. Check if it detected en.json changes and committed translations
+3. If translations were committed, the commit should trigger a new build
+4. The new build will have updated translations
 
 ## Workflow Example
 
