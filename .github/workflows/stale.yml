@@ -2,7 +2,7 @@ name: Close stale PRs
 
 on:
   schedule:
-    - cron: "0 0 * * *" # runs daily
+    - cron: "0 14 * * *" # runs daily
   workflow_dispatch:
 
 jobs:
