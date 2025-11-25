@@ -201,10 +201,8 @@ const error = ref<string | null>(null);
 const dashboardChartsRef = ref<any>(null);
 const currentTimeObj = ref({
   __global: {
-    // Convert microseconds to milliseconds before creating Date objects
-    // usePanelDataLoader will convert back to microseconds for the API
-    start_time: new Date(props.timeRange.startTime / 1000),
-    end_time: new Date(props.timeRange.endTime / 1000),
+    start_time: new Date(props.timeRange.startTime),
+    end_time: new Date(props.timeRange.endTime),
   },
 });
 
@@ -365,12 +363,11 @@ const loadDashboard = async () => {
 
     currentTimeObj.value = {
       __global: {
-        // Convert microseconds to milliseconds before creating Date objects
-        // usePanelDataLoader will convert back to microseconds for the API
-        start_time: new Date(props.timeRange.startTime / 1000),
-        end_time: new Date(props.timeRange.endTime / 1000),
+        start_time: new Date(props.timeRange.startTime),
+        end_time: new Date(props.timeRange.endTime),
       },
     };
+
     // Convert the dashboard schema and update stream names
     const convertedDashboard = convertDashboardSchemaVersion(deepCopy(metrics));
 
@@ -400,11 +397,13 @@ const loadDashboard = async () => {
           : "";
       }
 
+      const streamName = searchObj.data.stream.selectedStream.value;
+
       convertedDashboard.tabs[0].panels[index]["queries"][0].query = panel[
         "queries"
       ][0].query.replace(
         "[STREAM_NAME]",
-        `"${searchObj.data.stream.selectedStream.value}"`,
+        `"${streamName}"`,
       );
 
       convertedDashboard.tabs[0].panels[index]["queries"][0].query = panel[

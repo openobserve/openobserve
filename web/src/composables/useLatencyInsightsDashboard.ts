@@ -514,6 +514,8 @@ export function useLatencyInsightsDashboard() {
               label: "Latency Percentile",
               value: percentileValue,
               multiSelect: false,
+              isLoading: false,
+              isVariableLoading: false,
               options: [
                 { label: "P50 (Median)", value: "0.50", selected: percentileValue === "0.50" },
                 { label: "P75", value: "0.75", selected: percentileValue === "0.75" },

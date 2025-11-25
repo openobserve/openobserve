@@ -309,9 +309,9 @@ const showDimensionSelector = ref(false);
 const dashboardRenderKey = ref(0); // Only increment on full reload to avoid re-rendering on panel append
 const dimensionSearchText = ref('');
 
-// Percentile change tracking
-const initialPercentile = ref<string | null>(null);
-const currentPercentile = ref<string | null>(null);
+// Percentile change tracking - default to P95
+const initialPercentile = ref<string | null>("0.95");
+const currentPercentile = ref<string | null>("0.95");
 const showRefreshButton = computed(() => {
   return activeAnalysisType.value === 'latency' &&
          initialPercentile.value !== null &&
@@ -402,14 +402,14 @@ const currentOrgIdentifier = computed(() => {
   return store.state.selectedOrganization.identifier;
 });
 
-const currentTimeObj = computed(() => ({
-  __global: {
-    // Create Date objects from microsecond timestamps
-    // The dashboard loader will convert these to microseconds for the API
-    start_time: new Date(baselineTimeRange.value.startTime / 1000),
-    end_time: new Date(baselineTimeRange.value.endTime / 1000),
-  },
-}));
+const currentTimeObj = computed(() => {
+  return {
+    __global: {
+      start_time: new Date(baselineTimeRange.value.startTime),
+      end_time: new Date(baselineTimeRange.value.endTime),
+    },
+  };
+});
 
 // Toggle dimension selection
 const toggleDimension = (dimensionValue: string) => {
@@ -493,9 +493,8 @@ const loadAnalysis = async () => {
     dashboardData.value = dashboard;
     dashboardRenderKey.value++; // Increment to force re-render on full reload
 
-    // Reset percentile tracking after loading new analysis
-    initialPercentile.value = null;
-    currentPercentile.value = null;
+    // Don't reset percentile values - keep them synchronized with the dashboard
+    // The handleVariablesDataChange event will update them if needed
   } catch (err: any) {
     console.error("Error loading analysis:", err);
     showErrorNotification(err.message || t('latencyInsights.failedToLoad'));
