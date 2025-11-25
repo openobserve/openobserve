@@ -182,31 +182,35 @@ impl<'de> Deserialize<'de> for ConditionParams {
         use serde::de::Error;
         use serde_json::Value;
 
-        let mut value = Value::deserialize(deserializer)?;
+        let value = Value::deserialize(deserializer)?;
 
-        // If version field is missing, default to "1" for backward compatibility
-        if value.get("version").is_none()
-            && let Value::Object(ref mut map) = value {
-                map.insert("version".to_string(), Value::from(1));
+        // If version field is missing, default to 1 for backward compatibility
+        let version = value.get("version").and_then(|v| v.as_u64()).unwrap_or(1);
+
+        let Some(conditions) = value.get("conditions") else {
+            return Err(D::Error::missing_field("conditions"));
+        };
+
+        match version {
+            1 => {
+                let conditions: ConditionList = serde_json::from_value(conditions.clone())
+                    .map_err(|e| {
+                        D::Error::custom(format!("Failed to parse v1 conditions: {}", e))
+                    })?;
+                Ok(ConditionParams::V1 { conditions })
             }
-
-        // Now use the standard internally-tagged deserialization
-        #[derive(Deserialize)]
-        #[serde(tag = "version")]
-        enum ConditionParamsHelper {
-            #[serde(rename = "1")]
-            V1 { conditions: ConditionList },
-            #[serde(rename = "2")]
-            V2 { conditions: ConditionGroup },
+            2 => {
+                let conditions: ConditionGroup = serde_json::from_value(conditions.clone())
+                    .map_err(|e| {
+                        D::Error::custom(format!("Failed to parse v2 conditions: {}", e))
+                    })?;
+                Ok(ConditionParams::V2 { conditions })
+            }
+            _ => Err(D::Error::custom(format!(
+                "Unsupported version: {}",
+                version
+            ))),
         }
-
-        let helper: ConditionParamsHelper = serde_json::from_value(value)
-            .map_err(|e| D::Error::custom(format!("Failed to parse ConditionParams: {}", e)))?;
-
-        Ok(match helper {
-            ConditionParamsHelper::V1 { conditions } => ConditionParams::V1 { conditions },
-            ConditionParamsHelper::V2 { conditions } => ConditionParams::V2 { conditions },
-        })
     }
 }
 
