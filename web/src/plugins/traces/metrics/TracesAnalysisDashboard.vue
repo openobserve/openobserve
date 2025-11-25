@@ -484,20 +484,6 @@ const formatTimeWithSuffix = (milliseconds: number) => {
   return `${milliseconds.toFixed(2)}ms`;
 };
 
-// Watch dashboard data changes
-watch(
-  () => dashboardData.value,
-  (newVal) => {
-    if (newVal) {
-        id: p.id,
-        title: p.title,
-        hasQuery: !!p.queries?.[0]?.query
-      })));
-    }
-  },
-  { deep: true }
-);
-
 // Load analysis when modal opens
 watch(
   () => isOpen.value,
