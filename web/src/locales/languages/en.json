@@ -1,7 +1,7 @@
 {
   "common": {
     "close": "Close",
-    "cancel": "stopped",
+    "cancel": "Cancel",
     "ok": "OK",
     "apply": "Apply",
     "startTime": "Start time",
