@@ -1552,6 +1552,7 @@ export default defineComponent({
           this.formData.query_condition.conditions = ensureIds(convertV1BEToV2(this.formData.query_condition.conditions));
         } else if (this.formData.query_condition.conditions.label && this.formData.query_condition.conditions.items) {
           // V1 Frontend format - convert to V2
+          // this wont be executed atleast once but we are keeping it incase any FE logics got saved already 
           this.formData.query_condition.conditions = ensureIds(convertV1ToV2(this.formData.query_condition.conditions));
         }
       } else {
