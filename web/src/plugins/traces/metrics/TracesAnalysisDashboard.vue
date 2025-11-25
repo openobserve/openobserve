@@ -154,36 +154,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <!-- Dimension Selector Dialog -->
   <q-dialog v-model="showDimensionSelector">
-    <q-card style="min-width: 400px; max-width: 500px">
+    <q-card class="dimension-selector-dialog">
       <q-card-section class="tw-p-4 tw-border-b">
-        <div class="tw-flex tw-items-center tw-justify-between">
+        <div class="tw-flex tw-items-center tw-justify-between tw-mb-3">
           <div class="tw-text-base tw-font-semibold">{{ t('latencyInsights.selectDimensions') }}</div>
           <q-btn flat round dense icon="close" v-close-popup />
         </div>
+
+        <!-- Search Input -->
+        <q-input
+          v-model="dimensionSearchText"
+          dense
+          outlined
+          :placeholder="t('search.searchField')"
+          clearable
+          class="tw-w-full"
+        >
+          <template #prepend>
+            <q-icon name="search" />
+          </template>
+        </q-input>
       </q-card-section>
 
-      <q-card-section class="tw-p-0" style="max-height: 400px; overflow-y: auto">
-        <q-list>
+      <q-card-section class="tw-p-0 dimension-list-container">
+        <q-list v-if="filteredDimensions.length > 0">
           <q-item
-            v-for="dimension in availableDimensions"
+            v-for="dimension in filteredDimensions"
             :key="dimension.value"
-            clickable
-            @click="toggleDimension(dimension.value)"
-            class="tw-py-2"
+            dense
+            class="dimension-list-item"
           >
             <q-item-section side>
               <q-checkbox
                 :model-value="selectedDimensions.includes(dimension.value)"
                 @update:model-value="toggleDimension(dimension.value)"
                 color="primary"
+                size="xs"
                 dense
               />
             </q-item-section>
             <q-item-section>
-              <q-item-label>{{ dimension.label }}</q-item-label>
+              <q-item-label class="dimension-label">{{ dimension.label }}</q-item-label>
             </q-item-section>
           </q-item>
         </q-list>
+
+        <!-- No results message -->
+        <div v-else class="tw-p-4 tw-text-center tw-text-gray-500">
+          {{ t('search.noResult') }}
+        </div>
       </q-card-section>
     </q-card>
   </q-dialog>
@@ -270,6 +289,7 @@ const dashboardData = ref<any>(null);
 const dashboardChartsRef = ref<any>(null);
 const showDimensionSelector = ref(false);
 const dashboardRenderKey = ref(0); // Only increment on full reload to avoid re-rendering on panel append
+const dimensionSearchText = ref('');
 
 // Active tab management
 const activeAnalysisType = ref<"latency" | "volume" | "error">(props.analysisType);
@@ -334,6 +354,18 @@ const availableDimensions = computed(() => {
       value: f.name || f,
     }))
     .sort((a, b) => a.label.localeCompare(b.label));
+});
+
+// Filter dimensions based on search text
+const filteredDimensions = computed(() => {
+  if (!dimensionSearchText.value?.trim()) {
+    return availableDimensions.value;
+  }
+
+  const searchLower = dimensionSearchText.value.toLowerCase();
+  return availableDimensions.value.filter(dim =>
+    dim.label.toLowerCase().includes(searchLower)
+  );
 });
 
 const currentOrgIdentifier = computed(() => {
@@ -791,6 +823,42 @@ watch(
     overflow: auto;
     min-height: 0;
     background: #f5f5f5 !important;
+  }
+}
+
+// Dimension selector dialog
+.dimension-selector-dialog {
+  min-width: 25rem;
+  max-width: 31.25rem;
+}
+
+.dimension-list-container {
+  max-height: 25rem;
+  overflow-y: auto;
+
+  .dimension-list-item {
+    padding: 0.5rem 1rem;
+    border-bottom: 0.0625rem solid var(--q-border-color, #e0e0e0);
+
+    &:hover {
+      background-color: var(--q-hover-color, rgba(0, 0, 0, 0.04));
+    }
+
+    .dimension-label {
+      font-size: 0.875rem;
+      line-height: 1.25rem;
+    }
+  }
+}
+
+// Dark mode support for dimension selector
+body.body--dark {
+  .dimension-list-item {
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.05);
+    }
   }
 }
 
