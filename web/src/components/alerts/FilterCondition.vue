@@ -1,9 +1,30 @@
 <template>
     <div class=" tw-flex tw-items-start tw-gap-2 tw-flex-no-wrap ">
-      <div class="tw-text-sm tw-w-[20px] tw-mr-2 tw-mt-2">
-        {{
-        index == 0 ? 'if' : computedLabel
-           }}
+      <!-- V2: Only show "if" for first condition in root group (index 0, depth 0) -->
+      <!-- For other conditions in root group or any nested group, show operator toggle -->
+      <div v-if="index === 0 && depth === 0" class="tw-text-sm tw-w-[20px] tw-mr-2 tw-mt-2 tw-flex tw-items-center">
+        <span>if</span>
+      </div>
+      <!-- Operator label for non-first conditions -->
+      <div v-else-if="!isFirstInGroup" class="tw-flex tw-items-center tw-gap-0.5 tw-mr-1 tw-mt-2">
+        <span class="tw-text-sm tw-font-medium tw-min-w-[30px]">
+          {{ computedLabel }}
+        </span>
+        <!-- Toggle AND/OR button after label -->
+        <q-btn
+          data-test="alert-conditions-toggle-operator-btn"
+          flat
+          dense
+          round
+          size="sm"
+          icon="restart_alt"
+          class="tw-w-[26px] tw-h-[26px] tw-flex-shrink-0 operator-toggle-btn"
+          @click="toggleOperator"
+        >
+          <q-tooltip>
+            Toggle between AND/OR
+          </q-tooltip>
+        </q-btn>
       </div>
         <div
           data-test="alert-conditions-select-column"
@@ -112,6 +133,11 @@
         default: '',
         required: false,
     },
+    isFirstInGroup: {
+        type: Boolean,
+        default: false,
+        required: false,
+    },
     });
 
 import { ref, computed } from "vue";
@@ -151,8 +177,25 @@ const addGroupApiHeader = (groupId: string) => {
 };
 
 const computedLabel = computed(() => {
+  // V2: First condition in any group should not show AND/OR operator
+  // Only subsequent conditions show the operator
+  if (props.isFirstInGroup) {
+    return '';  // No operator for first condition in group
+  }
+  // V2: Use condition's logicalOperator if available
+  if (props.condition.logicalOperator) {
+    return props.condition.logicalOperator;
+  }
   return props.label;
 });
+
+// Toggle operator between AND/OR for this condition
+const toggleOperator = () => {
+  if (props.condition.logicalOperator) {
+    props.condition.logicalOperator = props.condition.logicalOperator === 'AND' ? 'OR' : 'AND';
+    emits('input:update', 'conditions', props.condition);
+  }
+};
 
 const computedInputWidth = computed(() => {
   // If custom width is provided, use it; otherwise use default responsive width
@@ -180,6 +223,13 @@ const filterColumns = (val: string, update: Function) => {
 };
   </script>
 
-  <style >
+  <style scoped>
+.operator-toggle-btn {
+  color: var(--o2-primary-btn-bg) !important;
+}
+
+.operator-toggle-btn:hover {
+  background-color: rgba(var(--o2-primary-btn-bg-rgb), 0.1) !important;
+}
 </style>
   

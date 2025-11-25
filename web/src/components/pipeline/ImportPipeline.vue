@@ -442,6 +442,12 @@ import destinationService from "@/services/alert_destination";
 import jstransform from "@/services/jstransform";
 import usePipelines from "@/composables/usePipelines";
 import BaseImport from "../common/BaseImport.vue";
+import {
+  detectConditionsVersion,
+  convertV0ToV2,
+  convertV1ToV2,
+  convertV1BEToV2,
+} from "@/utils/alerts/alertDataTransforms";
 
 export default defineComponent({
   name: "ImportPipeline",
@@ -1165,6 +1171,38 @@ export default defineComponent({
     };
 
     const createPipeline = async (input: any, index: any) => {
+      // VERSION DETECTION AND CONVERSION
+      // Convert V0 and V1 conditions to V2 format in condition nodes before creating pipeline
+      if (input.nodes && Array.isArray(input.nodes)) {
+        input.nodes.forEach((node: any) => {
+          if (node.node_type === "condition" && node.data?.conditions) {
+            // Check if version field is already present (V2)
+            if (node.data.version !== "2" && node.data.version !== 2) {
+              const version = detectConditionsVersion(node.data.conditions);
+
+              if (version === 0) {
+                // V0: Flat array format - convert to V2
+                node.data.conditions = convertV0ToV2(node.data.conditions);
+                node.data.version = "2";
+              } else if (version === 1) {
+                // V1: Tree-based format - convert to V2
+                if (node.data.conditions.and || node.data.conditions.or) {
+                  // V1 Backend format
+                  node.data.conditions = convertV1BEToV2(node.data.conditions);
+                } else if (node.data.conditions.label && node.data.conditions.items) {
+                  // V1 Frontend format
+                  node.data.conditions = convertV1ToV2(node.data.conditions);
+                }
+                node.data.version = "2";
+              } else if (version === 2) {
+                // V2: Already in correct format, just add version field
+                node.data.version = "2";
+              }
+            }
+          }
+        });
+      }
+
       try {
         await pipelinesService.createPipeline({
           data: input,
