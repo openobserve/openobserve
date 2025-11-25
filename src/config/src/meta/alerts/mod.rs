@@ -1796,4 +1796,250 @@ mod test {
         // London is close to UTC (0 or +60 during BST)
         assert!(london_offset >= 0 && london_offset <= 60);
     }
+
+    #[test]
+    fn test_alert_condition_params_v2_deserialization() {
+        // Test V2 format deserialization
+        let v2_json = r#"{
+            "version": 2,
+            "conditions": {
+                "filterType": "group",
+                "logicalOperator": "AND",
+                "conditions": [
+                    {
+                        "filterType": "condition",
+                        "type": "condition",
+                        "column": "level",
+                        "operator": "=",
+                        "value": "error",
+                        "logicalOperator": "AND"
+                    },
+                    {
+                        "filterType": "condition",
+                        "type": "condition",
+                        "column": "service",
+                        "operator": "=",
+                        "value": "api",
+                        "logicalOperator": "OR"
+                    }
+                ]
+            }
+        }"#;
+
+        let result: Result<AlertConditionParams, _> = serde_json::from_str(v2_json);
+        assert!(result.is_ok(), "V2 deserialization failed: {:?}", result.err());
+
+        let params = result.unwrap();
+        match params {
+            AlertConditionParams::V2(group) => {
+                assert_eq!(group.filter_type, "group");
+                assert_eq!(group.logical_operator, LogicalOperator::And);
+                assert_eq!(group.conditions.len(), 2);
+            }
+            _ => panic!("Expected V2 variant"),
+        }
+    }
+
+    #[test]
+    fn test_alert_condition_params_v1_deserialization() {
+        // Test V1 format deserialization (without version field)
+        let v1_json = r#"{
+            "and": [
+                {
+                    "column": "level",
+                    "operator": "=",
+                    "value": "error",
+                    "ignore_case": false
+                },
+                {
+                    "column": "service",
+                    "operator": "=",
+                    "value": "api",
+                    "ignore_case": false
+                }
+            ]
+        }"#;
+
+        let result: Result<AlertConditionParams, _> = serde_json::from_str(v1_json);
+        assert!(result.is_ok(), "V1 deserialization failed: {:?}", result.err());
+
+        let params = result.unwrap();
+        match params {
+            AlertConditionParams::V1(conditions) => {
+                assert!(matches!(conditions, ConditionList::AndNode { .. }));
+            }
+            _ => panic!("Expected V1 variant"),
+        }
+    }
+
+    #[test]
+    fn test_query_condition_v2_deserialization() {
+        // Test full QueryCondition with V2 format
+        let query_condition_json = r#"{
+            "type": "custom",
+            "conditions": {
+                "version": 2,
+                "conditions": {
+                    "filterType": "group",
+                    "logicalOperator": "AND",
+                    "conditions": [
+                        {
+                            "filterType": "condition",
+                            "type": "condition",
+                            "column": "level",
+                            "operator": "=",
+                            "value": "error",
+                            "logicalOperator": "AND"
+                        },
+                        {
+                            "filterType": "condition",
+                            "type": "condition",
+                            "column": "service",
+                            "operator": "=",
+                            "value": "api",
+                            "logicalOperator": "OR"
+                        }
+                    ]
+                }
+            },
+            "sql": null,
+            "promql": null,
+            "aggregation": null,
+            "promql_condition": null,
+            "vrl_function": null,
+            "multi_time_range": null
+        }"#;
+
+        let result: Result<QueryCondition, _> = serde_json::from_str(query_condition_json);
+        assert!(result.is_ok(), "QueryCondition deserialization failed: {:?}", result.err());
+
+        let query_cond = result.unwrap();
+        assert_eq!(query_cond.query_type, QueryType::Custom);
+        assert!(query_cond.conditions.is_some());
+
+        match query_cond.conditions.unwrap() {
+            AlertConditionParams::V2(group) => {
+                assert_eq!(group.filter_type, "group");
+                assert_eq!(group.logical_operator, LogicalOperator::And);
+                assert_eq!(group.conditions.len(), 2);
+            }
+            _ => panic!("Expected V2 variant"),
+        }
+    }
+
+    #[test]
+    fn test_query_condition_v2_with_empty_strings() {
+        // Test with empty strings for optional fields (like the user's curl payload)
+        let query_condition_json = r#"{
+            "type": "custom",
+            "conditions": {
+                "version": 2,
+                "conditions": {
+                    "filterType": "group",
+                    "logicalOperator": "AND",
+                    "conditions": [
+                        {
+                            "filterType": "condition",
+                            "type": "condition",
+                            "column": "level",
+                            "operator": "=",
+                            "value": "error",
+                            "logicalOperator": "AND"
+                        },
+                        {
+                            "filterType": "condition",
+                            "type": "condition",
+                            "column": "service",
+                            "operator": "=",
+                            "value": "api",
+                            "logicalOperator": "OR"
+                        }
+                    ]
+                }
+            },
+            "sql": "",
+            "promql": "",
+            "aggregation": null,
+            "promql_condition": null,
+            "vrl_function": null,
+            "multi_time_range": []
+        }"#;
+
+        let result: Result<QueryCondition, _> = serde_json::from_str(query_condition_json);
+        assert!(result.is_ok(), "QueryCondition deserialization with empty strings failed: {:?}", result.err());
+
+        let query_cond = result.unwrap();
+        assert_eq!(query_cond.query_type, QueryType::Custom);
+        assert!(query_cond.conditions.is_some());
+
+        match query_cond.conditions.unwrap() {
+            AlertConditionParams::V2(group) => {
+                assert_eq!(group.filter_type, "group");
+                assert_eq!(group.logical_operator, LogicalOperator::And);
+                assert_eq!(group.conditions.len(), 2);
+            }
+            _ => panic!("Expected V2 variant"),
+        }
+
+        // Verify empty strings are treated as Some("") not None
+        assert!(query_cond.sql.is_some());
+        assert_eq!(query_cond.sql.unwrap(), "");
+    }
+
+    #[test]
+    fn test_exact_user_payload() {
+        // Test the exact structure from the user's curl command
+        let user_json = r#"{
+  "type": "custom",
+  "conditions": {
+    "version": 2,
+    "conditions": {
+      "filterType": "group",
+      "logicalOperator": "AND",
+      "conditions": [
+        {
+          "filterType": "condition",
+          "type": "condition",
+          "column": "level",
+          "operator": "=",
+          "value": "error",
+          "logicalOperator": "AND"
+        },
+        {
+          "filterType": "condition",
+          "type": "condition",
+          "column": "service",
+          "operator": "=",
+          "value": "api",
+          "logicalOperator": "OR"
+        }
+      ]
+    }
+  },
+  "sql": null,
+  "promql": null,
+  "aggregation": null,
+  "promql_condition": null,
+  "vrl_function": null,
+  "search_event_type": null,
+  "multi_time_range": null
+}"#;
+
+        println!("Testing user JSON...");
+        let result: Result<QueryCondition, _> = serde_json::from_str(user_json);
+
+        if let Err(ref e) = result {
+            println!("Deserialization error: {}", e);
+
+            // Try parsing just the conditions field
+            let value: serde_json::Value = serde_json::from_str(user_json).unwrap();
+            if let Some(conditions) = value.get("conditions") {
+                println!("Conditions value: {:#?}", conditions);
+                let cond_result: Result<AlertConditionParams, _> = serde_json::from_value(conditions.clone());
+                println!("Direct AlertConditionParams parse result: {:?}", cond_result);
+            }
+        }
+
+        assert!(result.is_ok(), "User payload deserialization failed: {:?}", result.err());
+    }
 }
