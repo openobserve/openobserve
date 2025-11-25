@@ -81,8 +81,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="store.state.selectedOrganization?.identifier"
       >
         <q-page-container v-if="isLoading">
-          <!-- Database Deprecation Warning Banner -->
-          <DatabaseDeprecationBanner />
           <router-view v-slot="{ Component }">
             <component :is="Component" @sendToAiChat="sendToAiChat" />
           </router-view>
@@ -203,7 +201,6 @@ import { openobserveRum } from "@openobserve/browser-rum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
-import DatabaseDeprecationBanner from "@/components/DatabaseDeprecationBanner.vue";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -242,7 +239,6 @@ export default defineComponent({
     PredefinedThemes,
     O2AIChat,
     GetStarted,
-    DatabaseDeprecationBanner,
   },
   methods: {
     navigateToDocs() {
