@@ -1200,7 +1200,10 @@
     "mapvalue": "Value",
     "source": "Source",
     "target": "Target",
-    "value": "Value"
+    "value": "Value",
+    "customChartTypeSelector": "Custom Chart Type Selector",
+    "customChartTypeSelectorHint": "Select a chart type from the ECharts library to get started with a basic code structure",
+    "selectChartType": "Select Chart Type"
   },
   "home": {
     "streams": "Streams",

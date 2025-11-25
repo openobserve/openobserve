@@ -300,6 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="layout-panel-container col">
                     <DashboardQueryBuilder
                       :dashboardData="currentDashboardData.data"
+                      @custom-chart-template-selected="handleCustomChartTemplateSelected"
                     />
                     <q-separator />
                     <VariablesValueSelector
@@ -600,10 +601,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="row card-container"
                 style="height: calc(100vh - 99px); overflow-y: auto"
               >
-                <div class="col scroll" style="height: 100%">
-                  <div
-                    class="layout-panel-container tw-h-[calc(100vh-200px)] col"
-                  >
+                <div class="col scroll" style="height: 100%; display: flex; flex-direction: column;">
+                  <!-- Custom Chart Type Selector -->
+                  <div class="q-pa-md layout-panel-container tw-h-[calc(100vh-200px)] col" style="border: 1px solid rgba(0, 0, 0, 0.12); border-radius: 4px; background-color: rgba(0, 0, 0, 0.02); margin-bottom: 12px; flex-shrink: 0;">
+                    <div class="text-subtitle2 q-mb-sm" style="font-weight: 600;">
+                      {{ t("panel.customChartTypeSelector") }}
+                      <q-icon name="info_outline" class="q-ml-xs" size="xs">
+                        <q-tooltip>
+                          {{ t("panel.customChartTypeSelectorHint") }}
+                        </q-tooltip>
+                      </q-icon>
+                    </div>
+                    <q-select
+                      v-model="selectedCustomChartType"
+                      :options="customChartTypeOptions"
+                      :label="t('panel.selectChartType')"
+                      dense
+                      outlined
+                      emit-value
+                      map-options
+                      @update:model-value="onCustomChartTypeSelected"
+                      data-test="custom-chart-type-selector"
+                      style="max-width: 400px;"
+                    >
+                      <template v-slot:prepend>
+                        <q-icon name="bar_chart" />
+                      </template>
+                    </q-select>
+                  </div>
+                  <div style="height: 500px; flex-shrink: 0;">
                     <q-splitter
                       class="query-editor-splitter"
                       v-model="splitterModel"
@@ -733,6 +759,7 @@ import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import useAiChat from "@/composables/useAiChat";
 import useStreams from "@/composables/useStreams";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
+import { customChartTemplates } from "@/components/dashboards/addPanel/customChartTemplates";
 import {
   createDashboardsContextProvider,
   contextRegistry,
@@ -820,6 +847,31 @@ export default defineComponent({
     const { getStream } = useStreams();
     const seriesData = ref([]);
     const shouldRefreshWithoutCache = ref(false);
+
+    // Custom Chart Type Selector
+    const selectedCustomChartType = ref(null);
+    const customChartTypeOptions = [
+      { label: "Basic Line Chart", value: "line-simple" },
+      { label: "Basic Bar Chart", value: "bar-simple" },
+      { label: "Basic Pie Chart", value: "pie-simple" },
+      { label: "Basic Scatter Chart", value: "scatter-simple" },
+      { label: "Radar Chart", value: "radar-simple" },
+      { label: "Gauge Chart", value: "gauge-simple" },
+      { label: "Funnel Chart", value: "funnel-simple" },
+      { label: "Heatmap", value: "heatmap-simple" },
+      { label: "Candlestick Chart", value: "candlestick-simple" },
+      { label: "Graph/Network", value: "graph-simple" },
+      { label: "Tree Chart", value: "tree-simple" },
+      { label: "Treemap", value: "treemap-simple" },
+      { label: "Sunburst", value: "sunburst-simple" },
+      { label: "Sankey Diagram", value: "sankey-simple" },
+      { label: "Boxplot", value: "boxplot-simple" },
+      { label: "Parallel Coordinates", value: "parallel-simple" },
+      { label: "Calendar Heatmap", value: "calendar-simple" },
+      { label: "Pictorial Bar", value: "pictorialBar-simple" },
+      { label: "ThemeRiver", value: "themeRiver-simple" },
+      { label: "Custom Series", value: "custom-simple" },
+    ];
 
     const seriesDataUpdate = (data: any) => {
       seriesData.value = data;
@@ -1498,6 +1550,21 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     };
 
+    // Handler for custom chart template selection
+    const handleCustomChartTemplateSelected = (templateCode: string) => {
+      // Update the custom chart content with the selected template
+      dashboardPanelData.data.customChartContent = templateCode;
+    };
+
+    // Handler for custom chart type selection from dropdown
+    const onCustomChartTypeSelected = (value: string) => {
+      if (!value) return;
+      const template = customChartTemplates[value];
+      if (template) {
+        dashboardPanelData.data.customChartContent = template;
+      }
+    };
+
     watch(
       () => dashboardPanelData.layout.splitter,
       (newVal) => {
@@ -1943,6 +2010,10 @@ export default defineComponent({
       savePanelChangesToDashboard,
       runQuery,
       layoutSplitterUpdated,
+      handleCustomChartTemplateSelected,
+      onCustomChartTypeSelected,
+      selectedCustomChartType,
+      customChartTypeOptions,
       expandedSplitterHeight,
       querySplitterUpdated,
       currentDashboard,
