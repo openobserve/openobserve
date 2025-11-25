@@ -79,52 +79,20 @@ class="tw-mx-1 tw-text-red-500" />
         />
       </div>
 
-      <!-- Analyze Button (shown when Duration filter exists) -->
+      <!-- Unified Analyze Dimensions Button (only shown when brush selection exists) -->
       <q-btn
-        v-if="hasDurationFilter"
+        v-if="hasAnyBrushSelection"
         outline
         dense
         no-caps
         color="primary"
         icon="analytics"
-        :label="t('latencyInsights.analyzeButton')"
+        label="Analyze Dimensions"
         class="analyze-button tw-h-[2rem]"
-        @click="openAnalysisDashboard"
-        data-test="analyze-button"
+        @click="openUnifiedAnalysisDashboard"
+        data-test="analyze-dimensions-button"
       >
-        <q-tooltip>{{ t('latencyInsights.analyzeTooltip') }}</q-tooltip>
-      </q-btn>
-
-      <!-- Volume Analysis Button (shown when Rate filter exists) -->
-      <q-btn
-        v-if="hasRateFilter"
-        outline
-        dense
-        no-caps
-        color="secondary"
-        icon="bar_chart"
-        :label="t('volumeInsights.analyzeButton')"
-        class="analyze-button tw-h-[2rem]"
-        @click="openVolumeAnalysisDashboard"
-        data-test="volume-analyze-button"
-      >
-        <q-tooltip>{{ t('volumeInsights.analyzeTooltip') }}</q-tooltip>
-      </q-btn>
-
-      <!-- Error Analysis Button (shown when Error filter exists) -->
-      <q-btn
-        v-if="hasErrorFilter"
-        outline
-        dense
-        no-caps
-        color="negative"
-        icon="error_outline"
-        label="Analyze Errors"
-        class="analyze-button tw-h-[2rem]"
-        @click="openErrorAnalysisDashboard"
-        data-test="error-analyze-button"
-      >
-        <q-tooltip>Analyze error distribution across dimensions</q-tooltip>
+        <q-tooltip>Analyze trace patterns across dimensions (Volume, Latency, Errors)</q-tooltip>
       </q-btn>
     </div>
 
@@ -157,43 +125,20 @@ class="tw-mx-1 tw-text-red-500" />
       @close="hideContextMenu"
     />
 
-    <!-- Latency Insights Dashboard -->
+    <!-- Unified Analysis Dashboard with Tabs -->
     <TracesAnalysisDashboard
       v-if="showAnalysisDashboard"
       :streamName="streamName"
       streamType="traces"
-      :timeRange="timeRange"
-      :durationFilter="analysisDurationFilter"
-      :baseFilter="filter"
-      :streamFields="streamFields"
-      analysisType="latency"
-      @close="showAnalysisDashboard = false"
-    />
-
-    <!-- Volume Insights Dashboard -->
-    <TracesAnalysisDashboard
-      v-if="showVolumeAnalysisDashboard"
-      :streamName="streamName"
-      streamType="traces"
       :timeRange="originalTimeRangeBeforeSelection || timeRange"
       :rateFilter="analysisRateFilter"
-      :baseFilter="filter"
-      :streamFields="streamFields"
-      analysisType="volume"
-      @close="showVolumeAnalysisDashboard = false"
-    />
-
-    <!-- Error Analysis Dashboard -->
-    <TracesAnalysisDashboard
-      v-if="showErrorAnalysisDashboard"
-      :streamName="streamName"
-      streamType="traces"
-      :timeRange="originalTimeRangeBeforeSelection || timeRange"
+      :durationFilter="analysisDurationFilter"
       :errorFilter="analysisErrorFilter"
       :baseFilter="filter"
       :streamFields="streamFields"
-      analysisType="error"
-      @close="showErrorAnalysisDashboard = false"
+      :analysisType="defaultAnalysisTab"
+      :availableAnalysisTypes="['volume', 'latency', 'error']"
+      @close="showAnalysisDashboard = false"
     />
   </div>
 </template>
@@ -265,19 +210,14 @@ const currentTimeObj = ref({
 
 const dashboardData = ref(null);
 
-// Latency Insights state
+// Unified Analysis Dashboard state
 const showAnalysisDashboard = ref(false);
 const analysisDurationFilter = ref({ start: 0, end: 0 });
-
-// Volume Insights state
-const showVolumeAnalysisDashboard = ref(false);
 const analysisRateFilter = ref({ start: 0, end: 0 });
+const analysisErrorFilter = ref({ start: 0, end: 0 });
+const defaultAnalysisTab = ref<"latency" | "volume" | "error">("volume");
 // Store the original time range before selection for baseline comparison
 const originalTimeRangeBeforeSelection = ref<TimeRange | null>(null);
-
-// Error Analysis state
-const showErrorAnalysisDashboard = ref(false);
-const analysisErrorFilter = ref({ start: 0, end: 0 });
 
 // Reactivity trigger for Map changes (Vue 3 doesn't track Map.set() automatically)
 const rangeFiltersVersion = ref(0);
@@ -355,6 +295,33 @@ const hasErrorFilter = computed(() => {
     }
   });
   return hasFilter;
+});
+
+// Check if ANY RED panel has a time-based brush selection
+// This controls the visibility of the "Analyze Dimensions" button
+// - Button shows ONLY when user has made a brush selection on Rate, Duration, or Errors panel
+// - Button hides when no selection exists (baseline = selected, no point in analysis)
+// - When button is clicked, analysis dashboard opens with comparison mode
+const hasAnyBrushSelection = computed(() => {
+  // Force reactivity by accessing rangeFiltersVersion
+  rangeFiltersVersion.value;
+
+  let hasSelection = false;
+  rangeFilters.value.forEach((filter) => {
+    // Check if any RED panel has a time range selection
+    if (
+      (filter.panelTitle === "Duration" ||
+       filter.panelTitle === "Rate" ||
+       filter.panelTitle === "Errors") &&
+      filter.timeStart !== null &&
+      filter.timeEnd !== null
+    ) {
+      hasSelection = true;
+    }
+  });
+
+  console.log('[Analyze Dimensions Button] Has brush selection:', hasSelection);
+  return hasSelection;
 });
 
 // Context menu state
@@ -562,6 +529,10 @@ const onDataZoom = ({
       createRangeFilter(data, -1, -1, timeStartMicros, timeEndMicros);
     } else {
       // For Duration/other panels: use actual Y-axis values (start1, end1)
+      // ALSO pass time range so all tabs can use it for comparison
+      const timeStartMicros = start * 1000;
+      const timeEndMicros = end * 1000;
+
       console.log('[Duration Selection] User selected duration range on Duration chart:', {
         startMs: start,
         endMs: end,
@@ -569,10 +540,12 @@ const onDataZoom = ({
         durationEndMs: end1,
         startTime: new Date(start).toISOString(),
         endTime: new Date(end).toISOString(),
-        durationRange: `${(start1 / 1000).toFixed(2)}s - ${(end1 / 1000).toFixed(2)}s`
+        durationRange: `${(start1 / 1000).toFixed(2)}s - ${(end1 / 1000).toFixed(2)}s`,
+        timeStartMicros,
+        timeEndMicros
       });
 
-      createRangeFilter(data, start1, end1);
+      createRangeFilter(data, start1, end1, timeStartMicros, timeEndMicros);
     }
 
     // All panels emit time-range-selected to update global datetime control
@@ -717,6 +690,80 @@ const openErrorAnalysisDashboard = () => {
   };
 
   showErrorAnalysisDashboard.value = true;
+};
+
+// Unified function to open analysis dashboard with all filters populated
+const openUnifiedAnalysisDashboard = () => {
+  // Populate all filter types from range filters
+  let durationStart = null, durationEnd = null, durationTimeStart = null, durationTimeEnd = null;
+  let rateStart = null, rateEnd = null, rateTimeStart = null, rateTimeEnd = null;
+  let errorStart = null, errorEnd = null, errorTimeStart = null, errorTimeEnd = null;
+  let latestFilterType = null;
+
+  rangeFilters.value.forEach((filter) => {
+    console.log('[Unified Analysis] Processing filter:', {
+      panelTitle: filter.panelTitle,
+      start: filter.start,
+      end: filter.end,
+      timeStart: filter.timeStart,
+      timeEnd: filter.timeEnd,
+      hasTimeRange: !!(filter.timeStart && filter.timeEnd)
+    });
+
+    if (filter.panelTitle === "Duration") {
+      durationStart = filter.start;
+      durationEnd = filter.end;
+      durationTimeStart = filter.timeStart;
+      durationTimeEnd = filter.timeEnd;
+      latestFilterType = "latency";
+    } else if (filter.panelTitle === "Rate") {
+      rateStart = filter.start;
+      rateEnd = filter.end;
+      rateTimeStart = filter.timeStart;
+      rateTimeEnd = filter.timeEnd;
+      latestFilterType = "volume";
+    } else if (filter.panelTitle === "Errors") {
+      errorStart = filter.start;
+      errorEnd = filter.end;
+      errorTimeStart = filter.timeStart;
+      errorTimeEnd = filter.timeEnd;
+      latestFilterType = "error";
+    }
+  });
+
+  // Set all filters
+  analysisDurationFilter.value = {
+    start: durationStart || 0,
+    end: durationEnd || Number.MAX_SAFE_INTEGER,
+    timeStart: durationTimeStart || undefined,
+    timeEnd: durationTimeEnd || undefined,
+  };
+
+  analysisRateFilter.value = {
+    start: rateStart || 0,
+    end: rateEnd || Number.MAX_SAFE_INTEGER,
+    timeStart: rateTimeStart || undefined,
+    timeEnd: rateTimeEnd || undefined,
+  };
+
+  analysisErrorFilter.value = {
+    start: errorStart || 0,
+    end: errorEnd || Number.MAX_SAFE_INTEGER,
+    timeStart: errorTimeStart || undefined,
+    timeEnd: errorTimeEnd || undefined,
+  };
+
+  // Set default tab based on most recent selection, or volume if no selection
+  defaultAnalysisTab.value = latestFilterType || "volume";
+
+  console.log('[Unified Analysis] Opening dashboard:', {
+    defaultTab: defaultAnalysisTab.value,
+    durationFilter: analysisDurationFilter.value,
+    rateFilter: analysisRateFilter.value,
+    errorFilter: analysisErrorFilter.value,
+  });
+
+  showAnalysisDashboard.value = true;
 };
 
 const handleContextMenuSelect = (selection: {

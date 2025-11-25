@@ -606,7 +606,8 @@
     "function_definition": "Function Definition"
   },
   "latencyInsights": {
-    "title": "Latency Insights",
+    "title": "Insights",
+    "tabLabel": "Latency",
     "analyzeButton": "Latency Analysis",
     "analyzeTooltip": "Analyze latency patterns across trace dimensions",
     "compareToLabel": "Compare to:",
@@ -625,12 +626,19 @@
     "p99": "P99"
   },
   "volumeInsights": {
-    "title": "Rate Insights",
+    "title": "Insights",
+    "tabLabel": "Rate",
     "analyzeButton": "Rate Analysis",
     "analyzeTooltip": "Analyze trace rate patterns across dimensions",
     "analyzeTooltipLogs": "Analyze dimension distribution for current time range",
     "rateLabel": "Rate:",
     "timeRangeLabel": "Time Range:"
+  },
+  "errorInsights": {
+    "title": "Insights",
+    "tabLabel": "Errors",
+    "errorSpikePeriod": "Error Spike Period:",
+    "errorsGreaterThan": "Errors >="
   },
   "confirmDialog": {
     "cancel": "Cancel",

@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw-text-lg tw-font-semibold">
               <template v-if="props.analysisType === 'latency'">{{ t('latencyInsights.title') }}</template>
               <template v-else-if="props.analysisType === 'volume'">{{ t('volumeInsights.title') }}</template>
-              <template v-else-if="props.analysisType === 'error'">Error Insights</template>
+              <template v-else-if="props.analysisType === 'error'">{{ t('errorInsights.title') }}</template>
             </div>
             <div class="tw-text-xs tw-text-gray-500">
               <span v-if="props.analysisType === 'latency' && durationFilter">
@@ -49,10 +49,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <span v-else-if="props.analysisType === 'error' && errorFilter">
                 <template v-if="errorFilter.timeStart && errorFilter.timeEnd">
-                  Error Spike Period: {{ formatTimestamp(errorFilter.timeStart) }} - {{ formatTimestamp(errorFilter.timeEnd) }}
+                  {{ t('errorInsights.errorSpikePeriod') }} {{ formatTimestamp(errorFilter.timeStart) }} - {{ formatTimestamp(errorFilter.timeEnd) }}
                 </template>
                 <template v-else>
-                  Errors >= {{ errorFilter.start }}
+                  {{ t('errorInsights.errorsGreaterThan') }} {{ errorFilter.start }}
                 </template>
               </span>
             </div>
@@ -93,6 +93,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </q-card-section>
 
+      <!-- Tabs (only shown if multiple analysis types available) -->
+      <q-tabs
+        v-if="showTabs"
+        v-model="activeAnalysisType"
+        dense
+        inline-label
+        class="tw-border-b tw-border-solid tw-border-[var(--o2-border-color)]"
+        active-color="primary"
+        indicator-color="primary"
+        align="left"
+      >
+        <q-tab
+          v-for="tab in availableTabs"
+          :key="tab.name"
+          :name="tab.name"
+          :label="tab.label"
+          :icon="tab.icon"
+          class="tw-min-h-[3rem]"
+        />
+      </q-tabs>
+
       <!-- Dashboard Content -->
       <q-card-section class="analysis-content tw-flex-1 tw-overflow-auto tw-p-0">
         <!-- Loading State -->
@@ -127,6 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Dashboard -->
         <RenderDashboardCharts
           v-else-if="dashboardData"
+          :key="`${activeAnalysisType}-${dashboardData.title}`"
           ref="dashboardChartsRef"
           :dashboardData="dashboardData"
           :currentTimeObj="currentTimeObj"
@@ -193,13 +215,15 @@ interface Props {
   streamName: string;
   streamType?: string; // logs or traces
   baseFilter?: string;
-  analysisType?: "latency" | "volume" | "error"; // New prop to distinguish analysis type
+  analysisType?: "latency" | "volume" | "error"; // Initial/default analysis type
+  availableAnalysisTypes?: Array<"latency" | "volume" | "error">; // Which tabs to show
   streamFields?: any[]; // Stream schema fields for smart dimension selection
   logSamples?: any[]; // Actual log data for sample-based analysis (logs only)
 }
 
 const props = withDefaults(defineProps<Props>(), {
   analysisType: "latency",
+  availableAnalysisTypes: () => ["volume"], // Default to just volume
 });
 
 const emit = defineEmits<{
@@ -215,6 +239,26 @@ const { generateDashboard } = useLatencyInsightsDashboard();
 const isOpen = ref(true);
 const dashboardData = ref<any>(null);
 const dashboardChartsRef = ref<any>(null);
+
+// Active tab management
+const activeAnalysisType = ref<"latency" | "volume" | "error">(props.analysisType);
+
+// Tab configuration
+const availableTabs = computed(() => {
+  return props.availableAnalysisTypes.map(type => {
+    switch (type) {
+      case 'volume':
+        return { name: 'volume', label: t('volumeInsights.tabLabel'), icon: 'trending_up' };
+      case 'latency':
+        return { name: 'latency', label: t('latencyInsights.tabLabel'), icon: 'schedule' };
+      case 'error':
+        return { name: 'error', label: t('errorInsights.tabLabel'), icon: 'error_outline' };
+    }
+  });
+});
+
+// Show tabs only if multiple analysis types available
+const showTabs = computed(() => props.availableAnalysisTypes.length > 1);
 
 // Baseline mode selection
 // For volume analysis: baseline mode is ignored, always uses global datetime control
@@ -336,16 +380,24 @@ const baselineTimeRange = computed(() => {
 
 const loadAnalysis = async () => {
   try {
+    console.log('='.repeat(80));
+    console.log(`[Analysis] ========== LOADING ${activeAnalysisType.value.toUpperCase()} ANALYSIS ==========`);
+    console.log('[Analysis] Active analysis type:', activeAnalysisType.value);
     console.log('[Analysis] Selected dimensions for analysis:', selectedDimensions.value);
     console.log('[Analysis] Available stream fields:', props.streamFields?.length || 0);
+    console.log('[Analysis] Stream type:', props.streamType);
+    console.log('[Analysis] Stream name:', props.streamName);
 
-    // Determine which filter to use based on analysis type
+    // Determine which filter to use based on active analysis type
     let filterConfig;
-    if (props.analysisType === 'latency') {
+    if (activeAnalysisType.value === 'latency') {
+      console.log('[Analysis] Using LATENCY filter:', props.durationFilter);
       filterConfig = { durationFilter: props.durationFilter, rateFilter: undefined, errorFilter: undefined };
-    } else if (props.analysisType === 'volume') {
+    } else if (activeAnalysisType.value === 'volume') {
+      console.log('[Analysis] Using VOLUME/RATE filter:', props.rateFilter);
       filterConfig = { durationFilter: undefined, rateFilter: props.rateFilter, errorFilter: undefined };
-    } else if (props.analysisType === 'error') {
+    } else if (activeAnalysisType.value === 'error') {
+      console.log('[Analysis] Using ERROR filter:', props.errorFilter);
       filterConfig = { durationFilter: undefined, rateFilter: undefined, errorFilter: props.errorFilter };
     }
 
@@ -359,22 +411,37 @@ const loadAnalysis = async () => {
       end: new Date(props.timeRange.endTime / 1000).toISOString(),
     });
 
-    if (props.analysisType === 'volume' && props.rateFilter?.timeStart && props.rateFilter?.timeEnd) {
+    // Check for ANY time-based filter (from any RED metrics panel)
+    // Use whichever filter has a time range selection - applies to ALL tabs
+    if (props.rateFilter?.timeStart && props.rateFilter?.timeEnd) {
       selectedTimeRange = {
         startTime: props.rateFilter.timeStart,
         endTime: props.rateFilter.timeEnd
       };
-      console.log('[Analysis] Using rate filter time range for selected:', {
+      console.log('[Analysis] ✅ Using RATE filter time range for selected (applies to all tabs):', {
         start: new Date(props.rateFilter.timeStart / 1000).toISOString(),
         end: new Date(props.rateFilter.timeEnd / 1000).toISOString(),
       });
-    } else if (props.analysisType === 'error' && props.errorFilter?.timeStart && props.errorFilter?.timeEnd) {
+    } else if (props.durationFilter?.timeStart && props.durationFilter?.timeEnd) {
+      selectedTimeRange = {
+        startTime: props.durationFilter.timeStart,
+        endTime: props.durationFilter.timeEnd
+      };
+      console.log('[Analysis] ✅ Using DURATION filter time range for selected (applies to all tabs):', {
+        start: new Date(props.durationFilter.timeStart / 1000).toISOString(),
+        end: new Date(props.durationFilter.timeEnd / 1000).toISOString(),
+      });
+    } else if (props.errorFilter?.timeStart && props.errorFilter?.timeEnd) {
       selectedTimeRange = {
         startTime: props.errorFilter.timeStart,
         endTime: props.errorFilter.timeEnd
       };
+      console.log('[Analysis] ✅ Using ERROR filter time range for selected (applies to all tabs):', {
+        start: new Date(props.errorFilter.timeStart / 1000).toISOString(),
+        end: new Date(props.errorFilter.timeEnd / 1000).toISOString(),
+      });
     } else {
-      console.log('[Analysis] Using global time range for selected (no filter or missing timeStart/timeEnd)');
+      console.log('[Analysis] ⚠️ No time-based filter found on any panel, using global time range for selected (baseline and selected will be the same)');
       console.log('[Analysis] Selected time range equals props.timeRange:', {
         start: new Date(selectedTimeRange.startTime / 1000).toISOString(),
         end: new Date(selectedTimeRange.endTime / 1000).toISOString(),
@@ -390,7 +457,7 @@ const loadAnalysis = async () => {
       ...filterConfig,
       baseFilter: props.baseFilter,
       dimensions: selectedDimensions.value,
-      analysisType: props.analysisType,
+      analysisType: activeAnalysisType.value,
     };
 
     console.log('[Analysis] Dashboard config for query generation:', {
@@ -427,17 +494,33 @@ const loadAnalysis = async () => {
 
     // Generate dashboard JSON with UNION queries
     console.log('[Analysis] Generating dashboard with', mockAnalyses.length, 'dimensions');
+    console.log('[Analysis] Mock analyses:', mockAnalyses.map(a => a.dimensionName));
+
     const dashboard = generateDashboard(mockAnalyses, config);
-    console.log('[Analysis] Dashboard generated:', {
-      title: dashboard.title,
-      panelCount: dashboard.tabs[0]?.panels?.length || 0,
-      panels: dashboard.tabs[0]?.panels?.map(p => ({ id: p.id, title: p.title })) || []
-    });
+
+    console.log('[Analysis] Dashboard generated successfully!');
+    console.log('[Analysis] Dashboard title:', dashboard.title);
+    console.log('[Analysis] Panel count:', dashboard.tabs[0]?.panels?.length || 0);
+    console.log('[Analysis] Panels:', dashboard.tabs[0]?.panels?.map(p => ({
+      id: p.id,
+      title: p.title,
+      hasQuery: !!p.queries?.[0]?.query,
+      queryLength: p.queries?.[0]?.query?.length || 0
+    })) || []);
+
+    // Log first query as sample
+    if (dashboard.tabs[0]?.panels?.[0]?.queries?.[0]?.query) {
+      console.log('[Analysis] Sample query (first panel):', dashboard.tabs[0].panels[0].queries[0].query.substring(0, 300) + '...');
+    }
+
     dashboardData.value = dashboard;
-    console.log('[Analysis] Dashboard data set, should trigger panel rendering');
+    console.log('[Analysis] Dashboard data set to reactive ref, panels should now render');
+    console.log('[Analysis] Current dashboardData panels count:', dashboardData.value?.tabs?.[0]?.panels?.length || 0);
+    console.log('='.repeat(80));
   } catch (err: any) {
-    console.error("[Analysis] Error loading analysis:", err);
-    showErrorNotification(err.message || "Failed to load analysis");
+    console.error("[Analysis] ❌ ERROR loading analysis:", err);
+    console.error("[Analysis] Error stack:", err.stack);
+    showErrorNotification(err.message || t('latencyInsights.failedToLoad'));
   }
 };
 
@@ -493,6 +576,25 @@ watch(
   () => {
     if (isOpen.value && !loading.value) {
       loadAnalysis();
+    }
+  }
+);
+
+// Reload when active analysis type (tab) changes
+watch(
+  () => activeAnalysisType.value,
+  (newTab, oldTab) => {
+    console.log(`[Analysis] 🔄 TAB CHANGED: ${oldTab} → ${newTab}`);
+    console.log('[Analysis] Modal open:', isOpen.value);
+    console.log('[Analysis] Currently loading:', loading.value);
+
+    if (isOpen.value && !loading.value) {
+      console.log(`[Analysis] ✅ Reloading analysis for ${newTab} tab`);
+      loadAnalysis();
+    } else if (loading.value) {
+      console.log('[Analysis] ⏳ Skipping reload - already loading');
+    } else if (!isOpen.value) {
+      console.log('[Analysis] ⏸️ Skipping reload - modal not open');
     }
   }
 );

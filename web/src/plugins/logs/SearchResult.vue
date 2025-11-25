@@ -81,16 +81,16 @@ color="warning" size="sm"> </q-icon>
             outline
             no-caps
             dense
-            color="secondary"
-            icon="bar_chart"
-            :label="t('volumeInsights.analyzeButton')"
+            color="primary"
+            icon="analytics"
+            label="Analyze Dimensions"
             class="q-ml-md"
             size="sm"
             @click="openVolumeAnalysisDashboard"
-            data-test="logs-volume-analysis-button"
+            data-test="logs-analyze-dimensions-button"
           >
             <q-tooltip>
-              {{ t('volumeInsights.analyzeTooltipLogs') }}
+              Analyze dimension distribution for current time range
             </q-tooltip>
           </q-btn>
         </div>
@@ -404,6 +404,7 @@ color="warning" size="xs"></q-icon> Error while
         "
         :logSamples="searchObj.data.queryResults.hits"
         analysisType="volume"
+        :availableAnalysisTypes="['volume']"
         @close="closeVolumeAnalysisDashboard"
       />
     </div>
