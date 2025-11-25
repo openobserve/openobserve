@@ -352,7 +352,8 @@ export const convertV1ToV2 = (v1Data: any, isFirstGroup: boolean = true): V2Grou
 
   const conditions: (V2Condition | V2Group)[] = items.map((item: any, index: number) => {
     // Check if it's a nested group
-    if (item.groupId && item.items) {
+    // V1 groups have 'items' array (and optionally 'label' and 'groupId')
+    if (item.items && Array.isArray(item.items)) {
       // It's a V1 group, convert recursively
       return convertV1ToV2(item, false);
     }
@@ -431,10 +432,8 @@ export const convertV1BEToV2 = (v1BEData: any): V2Group => {
     // Check if it's a nested group
     if (item.and || item.or) {
       // For nested groups, recursively convert
+      // The nested group will have its own logicalOperator determined by its own key (and/or)
       const nestedGroup = convertV1BEToV2(item);
-      // The nested group itself doesn't need a logicalOperator at its root level
-      // but we need to track it for UI purposes
-      nestedGroup.logicalOperator = logicalOperator;
       return nestedGroup;
     }
 
