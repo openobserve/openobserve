@@ -148,7 +148,20 @@ export function useLatencyInsightsDashboard() {
         GROUP BY ${dimensionName}
       `.trim();
 
-      const unionQuery = `${baselineQuery} UNION ${selectedQuery} ORDER BY trace_count DESC LIMIT 5`;
+      const unionQuery = `
+        SELECT * FROM (
+          ${baselineQuery}
+          UNION
+          ${selectedQuery}
+        )
+        ORDER BY
+          CASE series
+            WHEN 'Selected' THEN 1
+            WHEN 'Baseline' THEN 2
+          END,
+          trace_count DESC
+        LIMIT 10
+      `.trim();
 
       console.log(`[Query Generation] Volume analysis query for dimension "${dimensionName}":`, {
         baselineTimeRange: {
@@ -200,7 +213,20 @@ export function useLatencyInsightsDashboard() {
         GROUP BY ${dimensionName}
       `.trim();
 
-      const unionQuery = `${baselineQuery} UNION ${selectedQuery} ORDER BY error_percentage DESC LIMIT 5`;
+      const unionQuery = `
+        SELECT * FROM (
+          ${baselineQuery}
+          UNION
+          ${selectedQuery}
+        )
+        ORDER BY
+          CASE series
+            WHEN 'Selected' THEN 1
+            WHEN 'Baseline' THEN 2
+          END,
+          error_percentage DESC
+        LIMIT 10
+      `.trim();
 
       console.log(`[Query Generation] Error analysis query for dimension "${dimensionName}":`, {
         baselineTimeRange: {
@@ -241,7 +267,20 @@ export function useLatencyInsightsDashboard() {
         GROUP BY ${dimensionName}
       `.trim();
 
-      return `${baselineQuery} UNION ${selectedQuery} ORDER BY percentile_latency DESC LIMIT 5`;
+      return `
+        SELECT * FROM (
+          ${baselineQuery}
+          UNION
+          ${selectedQuery}
+        )
+        ORDER BY
+          CASE series
+            WHEN 'Selected' THEN 1
+            WHEN 'Baseline' THEN 2
+          END,
+          percentile_latency DESC
+        LIMIT 10
+      `.trim();
     }
   };
 
@@ -334,12 +373,12 @@ export function useLatencyInsightsDashboard() {
             rotate: 45,
           },
           color: isComparisonMode ? {
-            mode: "custom",
-            fixedColor: ["#1976d2", "#ffc107"],
+            mode: "palette-classic-by-series",
+            fixedColor: ["#ffc107", "#1976d2"],
             seriesBy: "last",
             colorBySeries: [
-              { name: "Baseline", color: "#1976d2" },
               { name: "Selected", color: "#ffc107" },
+              { name: "Baseline", color: "#1976d2" },
             ],
           } : {
             mode: "palette-classic-by-series",
