@@ -44,4 +44,4 @@ jobs:
               "text": "${{ steps.slack-msg.outputs.message }}"
             }
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.STALE_PR_SLACK_NOTIFICATION }}
