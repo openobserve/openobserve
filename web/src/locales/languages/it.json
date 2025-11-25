@@ -85,7 +85,8 @@
     "showMore": "Mostra altro",
     "contactUs": "Contattaci",
     "addFolder": "Aggiungi cartella",
-    "status": "Status"
+    "status": "Status",
+    "cancel": "Annulla"
   },
   "search": {
     "selectIndex": "Seleziona Stream First",

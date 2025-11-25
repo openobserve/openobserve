@@ -85,7 +85,8 @@
     "showMore": "显示更多",
     "contactUs": "联系我们",
     "addFolder": "添加文件夹",
-    "status": "状态"
+    "status": "状态",
+    "cancel": "取消"
   },
   "search": {
     "selectIndex": "选择数据流",

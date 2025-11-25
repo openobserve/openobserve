@@ -85,7 +85,8 @@
     "showMore": "Mostrar mais",
     "contactUs": "Entre em contato conosco",
     "addFolder": "Adicionar pasta",
-    "status": "Status"
+    "status": "Status",
+    "cancel": "Cancelar"
   },
   "search": {
     "selectIndex": "Selecione Stream First",
