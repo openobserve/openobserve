@@ -893,7 +893,10 @@ def test_dashboard_with_panel_filters(create_session, base_url):
                             "conditions": [
                                 {
                                     "type": "list",
-                                    "column": "status",
+                                    "column": {
+                                        "field": "status",
+                                        "streamAlias": ""
+                                    },
                                     "operator": "=",
                                     "value": "200",
                                     "values": ["200", "201"],
