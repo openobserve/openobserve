@@ -154,25 +154,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <!-- Dimension Selector Dialog -->
   <q-dialog v-model="showDimensionSelector">
-    <q-card style="min-width: 500px">
-      <q-card-section class="tw-border-b">
-        <div class="tw-text-lg tw-font-semibold">Select Dimensions</div>
-        <div class="tw-text-xs tw-text-gray-500">Choose dimensions to analyze</div>
+    <q-card style="min-width: 400px; max-width: 500px">
+      <q-card-section class="tw-p-4 tw-border-b">
+        <div class="tw-flex tw-items-center tw-justify-between">
+          <div class="tw-text-base tw-font-semibold">Select Dimensions</div>
+          <q-btn flat round dense icon="close" v-close-popup />
+        </div>
       </q-card-section>
 
-      <q-card-section class="tw-max-h-[400px] tw-overflow-auto">
-        <q-option-group
-          v-model="selectedDimensions"
-          :options="availableDimensions"
-          type="checkbox"
-          color="primary"
-        />
+      <q-card-section class="tw-p-0" style="max-height: 400px; overflow-y: auto">
+        <q-list>
+          <q-item
+            v-for="dimension in availableDimensions"
+            :key="dimension.value"
+            clickable
+            @click="toggleDimension(dimension.value)"
+            class="tw-py-2"
+          >
+            <q-item-section side>
+              <q-checkbox
+                :model-value="selectedDimensions.includes(dimension.value)"
+                @update:model-value="toggleDimension(dimension.value)"
+                color="primary"
+                dense
+              />
+            </q-item-section>
+            <q-item-section>
+              <q-item-label>{{ dimension.label }}</q-item-label>
+            </q-item-section>
+          </q-item>
+        </q-list>
       </q-card-section>
-
-      <q-card-actions align="right">
-        <q-btn flat label="Cancel" color="grey" v-close-popup />
-        <q-btn flat label="Apply" color="primary" v-close-popup />
-      </q-card-actions>
     </q-card>
   </q-dialog>
 </template>
@@ -336,6 +348,18 @@ const currentTimeObj = computed(() => ({
     end_time: new Date(baselineTimeRange.value.endTime / 1000),
   },
 }));
+
+// Toggle dimension selection
+const toggleDimension = (dimensionValue: string) => {
+  const index = selectedDimensions.value.indexOf(dimensionValue);
+  if (index > -1) {
+    // Remove dimension - create new array to trigger reactivity
+    selectedDimensions.value = selectedDimensions.value.filter(d => d !== dimensionValue);
+  } else {
+    // Add dimension - create new array to trigger reactivity
+    selectedDimensions.value = [...selectedDimensions.value, dimensionValue];
+  }
+};
 
 const baselineTimeRange = computed(() => {
   // Baseline is always the original/global time range (before brush selection)
