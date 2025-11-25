@@ -319,8 +319,11 @@ export function useLatencyInsightsDashboard() {
         decimals = 2;
       }
 
+      // Generate unique panel ID using dimension name to ensure stability
+      const dimensionHash = analysis.dimensionName.replace(/[^a-zA-Z0-9]/g, '_');
+
       return {
-        id: `Panel_${panelPrefix}_${index}`,
+        id: `Panel_${panelPrefix}_${dimensionHash}_${index}`,
         type: "bar",
         title: analysis.dimensionName,
         description,
@@ -454,7 +457,7 @@ export function useLatencyInsightsDashboard() {
           y: Math.floor(index / 3) * 16, // Row position
           w: 64, // Width (192/3 = 64 columns per panel)
           h: 16, // Height in rows
-          i: index,
+          i: `${panelPrefix}_${dimensionHash}_${index}`,
         },
         htmlContent: "",
         markdownContent: "",

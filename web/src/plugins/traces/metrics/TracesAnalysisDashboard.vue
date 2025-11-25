@@ -60,6 +60,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="tw-flex tw-items-center tw-gap-3">
+          <!-- Dimension selector button -->
+          <q-btn
+            outline
+            dense
+            no-caps
+            color="primary"
+            icon="tune"
+            :label="`Dimensions (${selectedDimensions.length})`"
+            @click="showDimensionSelector = true"
+            data-test="dimension-selector-button"
+          >
+            <q-tooltip>Add or remove dimensions to analyze</q-tooltip>
+          </q-btn>
+
           <q-btn
             flat
             round
@@ -126,15 +140,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Dashboard -->
         <RenderDashboardCharts
           v-else-if="dashboardData"
-          :key="`${activeAnalysisType}-${dashboardData.title}`"
+          :key="`${activeAnalysisType}-${dashboardRenderKey}`"
           ref="dashboardChartsRef"
           :dashboardData="dashboardData"
           :currentTimeObj="currentTimeObj"
-          :viewOnly="false"
+          :viewOnly="true"
           :allowAlertCreation="false"
           searchType="dashboards"
         />
       </q-card-section>
+    </q-card>
+  </q-dialog>
+
+  <!-- Dimension Selector Dialog -->
+  <q-dialog v-model="showDimensionSelector">
+    <q-card style="min-width: 500px">
+      <q-card-section class="tw-border-b">
+        <div class="tw-text-lg tw-font-semibold">Select Dimensions</div>
+        <div class="tw-text-xs tw-text-gray-500">Choose dimensions to analyze</div>
+      </q-card-section>
+
+      <q-card-section class="tw-max-h-[400px] tw-overflow-auto">
+        <q-option-group
+          v-model="selectedDimensions"
+          :options="availableDimensions"
+          type="checkbox"
+          color="primary"
+        />
+      </q-card-section>
+
+      <q-card-actions align="right">
+        <q-btn flat label="Cancel" color="grey" v-close-popup />
+        <q-btn flat label="Apply" color="primary" v-close-popup />
+      </q-card-actions>
     </q-card>
   </q-dialog>
 </template>
@@ -145,6 +183,7 @@ import {
   computed,
   watch,
   defineAsyncComponent,
+  nextTick,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -217,6 +256,8 @@ const { generateDashboard } = useLatencyInsightsDashboard();
 const isOpen = ref(true);
 const dashboardData = ref<any>(null);
 const dashboardChartsRef = ref<any>(null);
+const showDimensionSelector = ref(false);
+const dashboardRenderKey = ref(0); // Only increment on full reload to avoid re-rendering on panel append
 
 // Active tab management
 const activeAnalysisType = ref<"latency" | "volume" | "error">(props.analysisType);
@@ -243,7 +284,7 @@ const showTabs = computed(() => props.availableAnalysisTypes.length > 1);
  * - For logs: Uses sample-based analysis with schema metadata
  * - For traces: Uses OpenTelemetry semantic conventions
  */
-const selectedDimensions = computed(() => {
+const getInitialDimensions = () => {
   const streamType = props.streamType || "traces";
   const schemaFields = (props.streamFields || []).map((f: any) => ({
     name: f.name || f,
@@ -268,6 +309,19 @@ const selectedDimensions = computed(() => {
   // Fallback for logs without samples
   console.log("[Analysis] Using schema-based dimension selection (fallback)");
   return selectDimensionsFromData([], schemaFields, 6);
+};
+
+// Selected dimensions (user can modify)
+const selectedDimensions = ref<string[]>(getInitialDimensions());
+
+// Available dimensions for dropdown (all stream fields)
+const availableDimensions = computed(() => {
+  return (props.streamFields || [])
+    .map((f: any) => ({
+      label: f.name || f,
+      value: f.name || f,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label));
 });
 
 const currentOrgIdentifier = computed(() => {
@@ -437,8 +491,10 @@ const loadAnalysis = async () => {
     }
 
     dashboardData.value = dashboard;
+    dashboardRenderKey.value++; // Increment to force re-render on full reload
     console.log('[Analysis] Dashboard data set to reactive ref, panels should now render');
     console.log('[Analysis] Current dashboardData panels count:', dashboardData.value?.tabs?.[0]?.panels?.length || 0);
+    console.log('[Analysis] Dashboard render key:', dashboardRenderKey.value);
     console.log('='.repeat(80));
   } catch (err: any) {
     console.error("[Analysis] ❌ ERROR loading analysis:", err);
@@ -491,6 +547,173 @@ watch(
     }
   },
   { immediate: true }
+);
+
+// Add new dimension panels without re-rendering existing ones
+const addDimensionPanels = async (addedDimensions: string[]) => {
+  if (!dashboardData.value || !dashboardData.value.tabs?.[0]?.panels) {
+    console.log('[Analysis] ⚠️ No dashboard data to append to, doing full reload');
+    loadAnalysis();
+    return;
+  }
+
+  try {
+    // Get current config from existing dashboard setup
+    const currentPanels = dashboardData.value.tabs[0].panels;
+    const existingCount = currentPanels.length;
+
+    console.log(`[Analysis] Current panel count: ${existingCount}`);
+    console.log(`[Analysis] Adding ${addedDimensions.length} new dimension(s)`);
+
+    // Build config (reuse logic from loadAnalysis)
+    let filterConfig: any = {};
+    if (activeAnalysisType.value === 'latency') {
+      filterConfig = { durationFilter: props.durationFilter, rateFilter: undefined, errorFilter: undefined };
+    } else if (activeAnalysisType.value === 'volume') {
+      filterConfig = { durationFilter: undefined, rateFilter: props.rateFilter, errorFilter: undefined };
+    } else if (activeAnalysisType.value === 'error') {
+      filterConfig = { durationFilter: undefined, rateFilter: undefined, errorFilter: props.errorFilter };
+    }
+
+    let selectedTimeRange = props.timeRange;
+    if (props.rateFilter?.timeStart && props.rateFilter?.timeEnd) {
+      selectedTimeRange = { startTime: props.rateFilter.timeStart, endTime: props.rateFilter.timeEnd };
+    } else if (props.durationFilter?.timeStart && props.durationFilter?.timeEnd) {
+      selectedTimeRange = { startTime: props.durationFilter.timeStart, endTime: props.durationFilter.timeEnd };
+    } else if (props.errorFilter?.timeStart && props.errorFilter?.timeEnd) {
+      selectedTimeRange = { startTime: props.errorFilter.timeStart, endTime: props.errorFilter.timeEnd };
+    }
+
+    const config: LatencyInsightsConfig = {
+      streamName: props.streamName,
+      streamType: props.streamType || "traces",
+      orgIdentifier: currentOrgIdentifier.value,
+      selectedTimeRange,
+      baselineTimeRange: baselineTimeRange.value,
+      ...filterConfig,
+      baseFilter: props.baseFilter,
+      dimensions: addedDimensions,
+      analysisType: activeAnalysisType.value,
+    };
+
+    // Generate mock analyses for new dimensions only
+    const mockAnalyses = addedDimensions.map((dimensionName) => ({
+      dimensionName,
+      data: [],
+      baselinePopulation: 0,
+      selectedPopulation: 0,
+      differenceScore: 0,
+    }));
+
+    // Generate new panels using the same logic as generateDashboard
+    const newPanels = generateDashboard(mockAnalyses, config).tabs[0].panels;
+
+    // Update layout positions for new panels to appear after existing ones
+    const timestamp = Date.now();
+    newPanels.forEach((panel, index) => {
+      const absoluteIndex = existingCount + index;
+      // Use a completely unique ID that includes timestamp to avoid any collision
+      const uniqueId = `${panel.layout.i}_${timestamp}_${absoluteIndex}`;
+      panel.layout = {
+        x: (absoluteIndex % 3) * 64,
+        y: Math.floor(absoluteIndex / 3) * 16,
+        w: 64,
+        h: 16,
+        i: uniqueId,
+      };
+      // Also update the panel ID to match
+      panel.id = `${panel.id}_${timestamp}`;
+    });
+
+    console.log(`[Analysis] ✅ Appending ${newPanels.length} new panels`);
+    console.log('[Analysis] Existing panel count:', existingCount);
+    console.log('[Analysis] New panel layouts:', newPanels.map(p => ({ title: p.title, layout: p.layout })));
+    console.log('[Analysis] Existing panel layouts:', currentPanels.slice(0, 3).map(p => ({ title: p.title, layout: p.layout })));
+
+    // Create a new dashboard object to ensure Vue detects the change
+    // We need to increment the render key to force grid re-layout, but this will cause re-queries
+    // Unfortunately, without modifying RenderDashboardCharts to cache panel data, we can't avoid this
+    const updatedDashboard = {
+      ...dashboardData.value,
+      tabs: [
+        {
+          ...dashboardData.value.tabs[0],
+          panels: [...currentPanels, ...newPanels],
+        },
+        ...dashboardData.value.tabs.slice(1),
+      ],
+    };
+
+    dashboardData.value = updatedDashboard;
+
+    // DON'T increment dashboardRenderKey - let Vue's reactivity handle it
+    // Since each panel has a unique ID (item.id + timestamp), Vue will only render the new panel
+    console.log('[Analysis] ✅ Not incrementing render key - Vue should only render new panels');
+
+    // Wait for DOM to update, then refresh GridStack to position new panels
+    await nextTick();
+    if (dashboardChartsRef.value?.refreshGridStack) {
+      console.log('[Analysis] 🔄 Calling refreshGridStack to position new panels');
+      await dashboardChartsRef.value.refreshGridStack();
+    }
+
+    console.log(`[Analysis] ✅ Total panels now: ${dashboardData.value.tabs[0].panels.length}`);
+  } catch (err: any) {
+    console.error('[Analysis] ❌ Error adding panels:', err);
+    console.log('[Analysis] Falling back to full reload');
+    loadAnalysis();
+  }
+};
+
+// Reload when selected dimensions change
+watch(
+  selectedDimensions,
+  (newDimensions, oldDimensions) => {
+    console.log('[Analysis] 🔍 Dimension watcher triggered');
+    console.log('[Analysis] Old dimensions:', oldDimensions);
+    console.log('[Analysis] New dimensions:', newDimensions);
+    console.log('[Analysis] isOpen:', isOpen.value, 'loading:', loading.value);
+
+    // Skip if this is the initial load (already handled by isOpen watcher)
+    if (!oldDimensions || oldDimensions.length === 0) {
+      console.log('[Analysis] ⏭️ Skipping: Initial load');
+      return;
+    }
+
+    // Check if dimensions actually changed
+    const changed = newDimensions.length !== oldDimensions.length ||
+      newDimensions.some((d, i) => d !== oldDimensions[i]);
+
+    if (!changed) {
+      console.log('[Analysis] ⏭️ Skipping: Dimensions unchanged');
+      return;
+    }
+
+    const addedDimensions = newDimensions.filter(d => !oldDimensions.includes(d));
+    const removedDimensions = oldDimensions.filter(d => !newDimensions.includes(d));
+
+    console.log(`[Analysis] 🔄 Dimensions changed: ${oldDimensions.length} → ${newDimensions.length}`);
+    console.log(`[Analysis] Removed:`, removedDimensions);
+    console.log(`[Analysis] Added:`, addedDimensions);
+
+    if (isOpen.value && newDimensions.length > 0) {
+      if (removedDimensions.length > 0) {
+        // If dimensions were removed, we need to regenerate to remove panels
+        console.log(`[Analysis] ✅ Regenerating dashboard (dimensions removed)`);
+        dashboardData.value = null;
+        nextTick(() => {
+          loadAnalysis();
+        });
+      } else if (addedDimensions.length > 0) {
+        // If only added, append new panels without regenerating existing ones
+        console.log(`[Analysis] ✅ Adding new panels for:`, addedDimensions);
+        addDimensionPanels(addedDimensions);
+      }
+    } else {
+      console.log('[Analysis] ⚠️ Not reloading: isOpen=', isOpen.value, 'dimensionsCount=', newDimensions.length);
+    }
+  },
+  { deep: true }
 );
 
 // Reload when active analysis type (tab) changes
