@@ -55,7 +55,7 @@ static GLOBAL_CACHE: Lazy<Vec<RwLock<MetricsIndex>>> = Lazy::new(|| {
 
 pub async fn init() -> Result<()> {
     let cfg = get_config();
-    if !cfg.common.metrics_cache_enabled {
+    if !cfg.common.result_cache_enabled {
         return Ok(());
     }
 
@@ -352,7 +352,7 @@ pub async fn set(
 /// load the cache item from the secondary storage
 pub async fn load(cache_key: &str) -> Result<()> {
     let cfg = get_config();
-    if !cfg.common.metrics_cache_enabled {
+    if !cfg.common.result_cache_enabled {
         return Ok(());
     }
     let Some((key, start, end)) = parse_cache_item_key(cache_key) else {
