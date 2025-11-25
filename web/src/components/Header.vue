@@ -150,17 +150,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="warning"
             size="24px"
             class="header-icon"
-            :style="{
-              color:
-                store.state.zoConfig.ingestion_quota_used >= 95
-                  ? 'red'
-                  : 'orange',
-            }"
+            :style="{ color: ingestionQuotaColor }"
           ></q-icon>
         </div>
         <q-tooltip anchor="top middle" self="bottom middle">
-          Warning: {{ store.state.zoConfig.ingestion_quota_used }}% of
-          ingestion limit used
+          Warning: {{ ingestionQuotaPercentage }}% of ingestion limit used
         </q-tooltip>
       </q-btn>
 
@@ -558,7 +552,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, PropType } from "vue";
+import { defineComponent, PropType, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
@@ -663,6 +657,16 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n();
 
+    // Computed property for ingestion quota percentage
+    const ingestionQuotaPercentage = computed(() => {
+      return Math.ceil(props.store.state.zoConfig.ingestion_quota_used * 100) / 100 || 0;
+    });
+
+    // Computed property for ingestion quota warning color
+    const ingestionQuotaColor = computed(() => {
+      return props.store.state.zoConfig.ingestion_quota_used >= 95 ? 'red' : 'orange';
+    });
+
     // Event handlers that emit to parent component
     const updateOrganization = () => {
       emit("updateOrganization");
@@ -719,6 +723,8 @@ export default defineComponent({
       t,
       outlinedSettings,
       getImageURL,
+      ingestionQuotaPercentage,
+      ingestionQuotaColor,
       updateOrganization,
       goToHome,
       toggleAIChat,

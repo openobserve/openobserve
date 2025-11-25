@@ -189,7 +189,13 @@ const collectorCmd = computed(() => {
   --set exporters."otlphttp/openobserve".endpoint=${endpoint.value.url}/api/${props.currOrgIdentifier}  \\
   --set exporters."otlphttp/openobserve".headers.Authorization="Basic [BASIC_PASSCODE]"  \\
   --set exporters."otlphttp/openobserve_k8s_events".endpoint=${endpoint.value.url}/api/${props.currOrgIdentifier}  \\
-  --set exporters."otlphttp/openobserve_k8s_events".headers.Authorization="Basic [BASIC_PASSCODE]"`;
+  --set exporters."otlphttp/openobserve_k8s_events".headers.Authorization="Basic [BASIC_PASSCODE]"
+  --set agent.service.pipelines.logs.exporters={otlphttp/openobserve} \\
+  --set agent.service.pipelines.metrics.exporters={otlphttp/openobserve} \\
+  --set gateway.service.pipelines.logs/k8s_events.exporters={otlphttp/openobserve_k8s_events} \\
+  --set gateway.service.pipelines.logs/k8s_pods.exporters={otlphttp/openobserve} \\
+  --set gateway.service.pipelines.metrics.exporters={otlphttp/openobserve} \\
+  --set gateway.service.pipelines.traces.exporters={servicegraph,otlphttp/openobserve}`;
 });
 
 const collectorCmdThisCluster = computed(() => {
@@ -200,6 +206,12 @@ const collectorCmdThisCluster = computed(() => {
   --set exporters."otlphttp/openobserve".headers.Authorization="Basic [BASIC_PASSCODE]"  \\
   --set exporters."otlphttp/openobserve_k8s_events".endpoint=http://o2-openobserve-router.openobserve.svc.cluster.local:5080/api/${props.currOrgIdentifier}  \\
   --set exporters."otlphttp/openobserve_k8s_events".headers.Authorization="Basic [BASIC_PASSCODE]" \\
+  --set agent.service.pipelines.logs.exporters={otlphttp/openobserve} \\
+  --set agent.service.pipelines.metrics.exporters={otlphttp/openobserve} \\
+  --set gateway.service.pipelines.logs/k8s_events.exporters={otlphttp/openobserve_k8s_events} \\
+  --set gateway.service.pipelines.logs/k8s_pods.exporters={otlphttp/openobserve} \\
+  --set gateway.service.pipelines.metrics.exporters={otlphttp/openobserve} \\
+  --set gateway.service.pipelines.traces.exporters={servicegraph,otlphttp/openobserve}
   --create-namespace`;
 });
 
