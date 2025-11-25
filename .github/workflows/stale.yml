@@ -14,7 +14,7 @@ jobs:
       - uses: actions/stale@v9
         with:
           stale-pr-message: "This PR has been inactive for 14 days. Please update or we will close it soon."
-          days-before-stale: 14
+          days-before-stale: 7
           days-before-close: 7
           close-pr-message: "Closing PR due to inactivity. Feel free to reopen if needed."
           stale-pr-label: "stale"
