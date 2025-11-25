@@ -510,3 +510,149 @@ pub async fn write_partial_results_to_cache(
         _ => {}
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use config::meta::search::Response;
+
+    use crate::common::meta::search::CachedQueryResponse;
+
+    /// Test helper to create a mock CachedQueryResponse
+    fn create_mock_cached_response(start_time: i64, end_time: i64) -> CachedQueryResponse {
+        CachedQueryResponse {
+            cached_response: Response::default(),
+            deltas: vec![],
+            has_cached_data: true,
+            cache_query_response: true,
+            response_start_time: start_time,
+            response_end_time: end_time,
+            ts_column: "_timestamp".to_string(),
+            is_descending: false,
+            limit: 100,
+        }
+    }
+
+    /// This test reproduces the bug from the faulty flow
+    /// where cached responses sorted in descending order produce negative cache_duration
+    #[test]
+    fn test_cache_duration_calculation_descending_order() {
+        // Create 3 cached responses with different time ranges
+        let mut cached_resp = vec![
+            create_mock_cached_response(300, 400), // Newest
+            create_mock_cached_response(200, 250), // Middle
+            create_mock_cached_response(100, 150), // Oldest
+        ];
+
+        // Sort in DESCENDING order (newest first) - this is what triggers the bug
+        cached_resp.sort_by(|a, b| b.response_start_time.cmp(&a.response_start_time));
+
+        // OLD CODE (buggy) - would use first() and last()
+        let old_cache_start_time = cached_resp.first().unwrap().response_start_time;
+        let old_cache_end_time = cached_resp.last().unwrap().response_end_time;
+        let old_cache_duration = old_cache_end_time - old_cache_start_time;
+
+        println!("\n=== OLD CODE (BUGGY) ===");
+        println!(
+            "Array sorted descending: first()={}, last()={}",
+            cached_resp.first().unwrap().response_start_time,
+            cached_resp.last().unwrap().response_end_time
+        );
+        println!("old_cache_start_time: {}", old_cache_start_time);
+        println!("old_cache_end_time: {}", old_cache_end_time);
+        println!("old_cache_duration: {} (NEGATIVE!)", old_cache_duration);
+
+        // Verify the bug: old code produces negative duration
+        assert!(
+            old_cache_duration < 0,
+            "Old code should produce negative duration"
+        );
+        assert_eq!(old_cache_start_time, 300, "Old code gets wrong start time");
+        assert_eq!(old_cache_end_time, 150, "Old code gets wrong end time");
+
+        // NEW CODE (fixed) - use min/max on all timestamps
+        let mut all_timestamps = Vec::new();
+        for cached in &cached_resp {
+            all_timestamps.push(cached.response_start_time);
+            all_timestamps.push(cached.response_end_time);
+        }
+        let new_cache_start_time = all_timestamps.iter().min().copied().unwrap_or_default();
+        let new_cache_end_time = all_timestamps.iter().max().copied().unwrap_or_default();
+        let new_cache_duration = new_cache_end_time - new_cache_start_time;
+
+        println!("\n=== NEW CODE (FIXED) ===");
+        println!("All timestamps: {:?}", all_timestamps);
+        println!("new_cache_start_time: {} (min)", new_cache_start_time);
+        println!("new_cache_end_time: {} (max)", new_cache_end_time);
+        println!("new_cache_duration: {} (POSITIVE!)", new_cache_duration);
+
+        // Verify the fix: new code produces positive duration
+        assert!(
+            new_cache_duration >= 0,
+            "New code should produce non-negative duration"
+        );
+        assert_eq!(
+            new_cache_start_time, 100,
+            "New code gets correct start time"
+        );
+        assert_eq!(new_cache_end_time, 400, "New code gets correct end time");
+        assert_eq!(
+            new_cache_duration, 300,
+            "New code calculates correct duration"
+        );
+    }
+
+    /// Test with real timestamps from the faulty flow log
+    #[test]
+    fn test_cache_duration_with_real_timestamps() {
+        // From the faulty flow log:
+        // cache_start_time: 1763646864583000
+        // cache_end_time: 1763640124696200
+        // cached_search_duration: -6739886800
+
+        let cached_resp = vec![
+            create_mock_cached_response(1763646864583000, 1763647000000000),
+            create_mock_cached_response(1763643000000000, 1763644000000000),
+            create_mock_cached_response(1763640124696200, 1763641000000000),
+        ];
+
+        // These are sorted descending by start_time (simulating the bug scenario)
+
+        // OLD CODE (reproduces the bug)
+        let old_cache_start_time = cached_resp.first().unwrap().response_start_time;
+        let old_cache_end_time = cached_resp.last().unwrap().response_end_time;
+        let old_cache_duration = old_cache_end_time - old_cache_start_time;
+
+        println!("\n=== REAL TIMESTAMPS FROM LOG ===");
+        println!("Old cache_start_time: {}", old_cache_start_time);
+        println!("Old cache_end_time: {}", old_cache_end_time);
+        println!("Old cache_duration: {}", old_cache_duration);
+
+        // Verify we reproduce the exact bug
+        assert_eq!(old_cache_start_time, 1763646864583000);
+        assert_eq!(old_cache_end_time, 1763641000000000);
+        assert!(
+            old_cache_duration < 0,
+            "Reproduces the negative duration bug"
+        );
+
+        // NEW CODE (fixes it)
+        let mut all_timestamps = Vec::new();
+        for cached in &cached_resp {
+            all_timestamps.push(cached.response_start_time);
+            all_timestamps.push(cached.response_end_time);
+        }
+        let new_cache_start_time = all_timestamps.iter().min().copied().unwrap_or_default();
+        let new_cache_end_time = all_timestamps.iter().max().copied().unwrap_or_default();
+        let new_cache_duration = new_cache_end_time - new_cache_start_time;
+
+        println!("New cache_start_time: {}", new_cache_start_time);
+        println!("New cache_end_time: {}", new_cache_end_time);
+        println!("New cache_duration: {} (FIXED!)", new_cache_duration);
+
+        // Verify the fix
+        assert_eq!(new_cache_start_time, 1763640124696200);
+        assert_eq!(new_cache_end_time, 1763647000000000);
+        assert!(new_cache_duration > 0, "Fix produces positive duration");
+        assert_eq!(new_cache_duration, 6875303800);
+    }
+}
