@@ -35,7 +35,7 @@ export class AlertDestinationsPage {
         this.confirmButton = '[data-test="confirm-button"]';
         this.deleteDestinationButton = '[data-test="alert-destination-list-{destinationName}-delete-destination"]';
         this.importJsonFileTab = '[data-test="tab-import_json_file"]';
-        this.destinationImportFileInput = '[data-test="destination-import-json-file-input"]';
+        this.destinationImportFileInput = '[data-test="destination-import-file-input"]';
         this.destinationCountText = 'Alert Destinations';
         this.destinationInUseMessage = 'Destination is currently used by alert:';
     }
@@ -351,7 +351,15 @@ export class AlertDestinationsPage {
     async importDestinationFromFile(filePath, templateName, destinationName) {
         await this.page.locator(this.destinationImportButton).click();
         await this.page.locator(this.importJsonFileTab).click();
-        await this.page.locator(this.destinationImportFileInput).setInputFiles(filePath);
+
+        // Try original locator first, fallback to new locator if it fails
+        try {
+            await this.page.locator('[data-test="destination-import-json-file-input"]').setInputFiles(filePath, { timeout: 5000 });
+        } catch (error) {
+            // Fallback to new locator
+            await this.page.locator(this.destinationImportFileInput).setInputFiles(filePath);
+        }
+
         await this.page.waitForTimeout(2000); // Wait for JSON to load
         await this.page.locator(this.destinationImportJsonBtn).click();
         await this.page.waitForTimeout(1000); // Wait for error message

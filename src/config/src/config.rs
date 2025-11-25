@@ -1014,6 +1014,12 @@ pub struct Common {
     )]
     // in seconds
     pub usage_publish_interval: i64,
+    #[env_config(
+        name = "ZO_ERROR_PUBLISH_TIMEOUT_SECS",
+        default = 2,
+        help = "timeout in seconds for publishing error data to self-reporting queue"
+    )]
+    pub error_publish_timeout_secs: u64,
     // MMDB
     #[env_config(name = "ZO_MMDB_DATA_DIR")] // ./data/openobserve/mmdb/
     pub mmdb_data_dir: String,
@@ -1674,6 +1680,8 @@ pub struct Compact {
     #[env_config(name = "ZO_COMPACT_FILE_LIST_DELETED_MODE", default = "deleted")]
     // "history" "deleted" "none"
     pub file_list_deleted_mode: String,
+    #[env_config(name = "ZO_COMPACT_FILE_LIST_DELETED_BATCH_SIZE", default = 1000)]
+    pub file_list_deleted_batch_size: usize,
     #[env_config(
         name = "ZO_COMPACT_BATCH_SIZE",
         default = 0,
@@ -1696,6 +1704,12 @@ pub struct Compact {
     pub pending_jobs_metric_interval: u64,
     #[env_config(name = "ZO_COMPACT_MAX_GROUP_FILES", default = 10000)]
     pub max_group_files: usize,
+    #[env_config(
+        name = "ZO_COMPACT_RETENTION_ALLOWED_HOURS",
+        default = "",
+        help = "Comma-separated list of hours (0-23) when retention can run. Empty means run at all hours. Example: 5,6,8"
+    )]
+    pub retention_allowed_hours: String,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
@@ -2543,6 +2557,19 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!(
             "Meta store is MySQL, you must set ZO_META_MYSQL_DSN"
         ));
+    }
+
+    // Print MySQL deprecation warning (logger not initialized yet at this stage)
+    if cfg.common.meta_store.starts_with("mysql") {
+        eprintln!("╔════════════════════════════════════════════════════════════════════════════╗");
+        eprintln!(
+            "║                              ⚠️  WARNING  ⚠️                                 ║"
+        );
+        eprintln!("║                                                                            ║");
+        eprintln!("║  MySQL support is DEPRECATED and will be removed in future.                ║");
+        eprintln!("║  Please migrate to PostgreSQL.                                             ║");
+        eprintln!("║                                                                            ║");
+        eprintln!("╚════════════════════════════════════════════════════════════════════════════╝");
     }
 
     // If the default scrape interval is less than 5s, raise an error
