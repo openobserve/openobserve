@@ -100,7 +100,7 @@ async fn search_in_cluster(
 
     // cache disabled if result cache is disabled or use_cache is false or start == end or step == 0
     let cache_disabled =
-        !cfg.common.metrics_cache_enabled || !req.use_cache || start == end || step == 0;
+        !cfg.common.result_cache_enabled || !req.use_cache || start == end || step == 0;
     // adjust start and end time
     let (start, end) = adjust_start_end(start, end, step);
 
@@ -144,11 +144,13 @@ async fn search_in_cluster(
         match cache::get(query, start, end, step).await {
             Ok(Some((new_start, values))) => {
                 let took = start_time.elapsed().as_millis() as i32;
+                let cache_ratio = (new_start - start) as f64 / (end - start) as f64;
                 config::metrics::QUERY_METRICS_CACHE_RATIO
                     .with_label_values(&[&req.org_id])
-                    .observe((new_start - start) as f64 / (end - start) as f64);
+                    .observe(cache_ratio);
                 log::info!(
-                    "[trace_id {trace_id}] promql->search->cache: hit cache, took: {took} ms"
+                    "[trace_id {trace_id}] promql->search->cache: hit cache, cache ratio: {:.2}%, took: {took} ms",
+                    cache_ratio * 100.0,
                 );
                 (new_start, values)
             }
@@ -348,7 +350,7 @@ async fn search_in_cluster(
     .await;
 
     // cache the result
-    if cfg.common.metrics_cache_enabled
+    if cfg.common.result_cache_enabled
         && let Some(matrix) = values.get_ref_matrix_values()
         && let Err(err) = cache::set(
             trace_id,
