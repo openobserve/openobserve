@@ -414,6 +414,11 @@ mod tests {
             query_took: None,
             scheduler_trace_id: None,
             time_in_queue_ms: None,
+            dedup_enabled: None,
+            dedup_suppressed: None,
+            dedup_count: None,
+            grouped: None,
+            group_size: None,
         }
     }
 
