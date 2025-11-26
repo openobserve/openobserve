@@ -176,13 +176,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <h3 class="feature-title">Enterprise License Details</h3>
               </div>
-              <q-btn
-                no-caps
-                label="Manage License"
-                @click="navigateToLicense"
-                size="sm"
-                class="o2-primary-button"
-              />
             </div>
 
             <div v-if="loadingLicense" class="tw-text-center tw-py-8">
@@ -201,14 +194,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div v-if="licenseData && licenseData.installation_id" class="tw-text-xs tw-opacity-70 tw-mb-2">
                     Installation ID: <code class="tw-px-2 tw-py-1 tw-rounded tw-bg-black tw-bg-opacity-10">{{ licenseData.installation_id }}</code>
                   </div>
-                  <q-btn
-                    color="primary"
-                    no-caps
-                    label="Get License"
-                    @click="navigateToLicense"
-                    size="sm"
-                    unelevated
-                  />
                 </div>
               </div>
             </div>
@@ -335,43 +320,6 @@ export default defineComponent({
       }
     };
 
-    const navigateToLicense = () => {
-      // Get meta org identifier
-      const metaOrgIdentifier = store.state.zoConfig.meta_org;
-
-      // Find the meta org from the organizations list
-      const metaOrg = store.state.organizations?.find(
-        (org: any) => org.identifier === metaOrgIdentifier
-      );
-
-      if (metaOrg) {
-        // Create the org option object so that it will be used to switch to meta org
-        const metaOrgOption = {
-          label: metaOrg.name,
-          id: metaOrg.id,
-          identifier: metaOrg.identifier,
-          user_email: store.state.userInfo.email,
-          ingest_threshold: metaOrg.ingest_threshold,
-          search_threshold: metaOrg.search_threshold,
-        };
-
-        // Set the selected organization using dispatch
-        store.dispatch("setSelectedOrganization", metaOrgOption);
-
-        // Navigate to license page with the meta org identifier
-        router.push({
-          name: 'license',
-          query: { org_identifier: metaOrgIdentifier }
-        });
-      } else {
-        // Fallback: just navigate to license page with meta org identifier
-        router.push({
-          name: 'license',
-          query: { org_identifier: metaOrgIdentifier }
-        });
-      }
-    };
-
     onMounted(() => {
       loadLicenseData();
     });
@@ -386,7 +334,6 @@ export default defineComponent({
       licenseData,
       loadingLicense,
       formatLicenseDate,
-      navigateToLicense,
     };
   },
 });
