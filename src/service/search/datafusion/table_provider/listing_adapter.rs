@@ -23,7 +23,7 @@ use datafusion::{
     datasource::{
         TableType,
         listing::{ListingTable, ListingTableConfig},
-        physical_plan::{FileGroup, FileScanConfig},
+        physical_plan::{FileGroup, FileScanConfig, ParquetSource},
         schema_adapter::DefaultSchemaAdapterFactory,
     },
     execution::cache::cache_manager::FileStatisticsCache,
@@ -35,7 +35,7 @@ use rayon::prelude::*;
 use tonic::async_trait;
 
 use crate::service::search::{
-    datafusion::table_provider::helpers::{apply_filter, generate_access_plan},
+    datafusion::table_provider::helpers::{apply_filter, generate_row_selection},
     index::IndexCondition,
 };
 
@@ -173,6 +173,12 @@ fn handler_tantivy_index(
             .as_any()
             .downcast_ref::<FileScanConfig>()
     {
+        let is_parquet = config
+            .file_source()
+            .as_any()
+            .downcast_ref::<ParquetSource>()
+            .is_some();
+
         let mut file_groups = config.file_groups.clone();
 
         if reverse {
@@ -187,6 +193,7 @@ fn handler_tantivy_index(
             file_groups = new_file_groups;
         }
 
+        let start_time = std::time::Instant::now();
         let new_file_groups: Vec<_> = file_groups
             .into_par_iter()
             .map(|file_group| {
@@ -194,7 +201,7 @@ fn handler_tantivy_index(
                     .into_inner()
                     .into_iter()
                     .map(|mut file| {
-                        if let Some(access_plan) = generate_access_plan(&file) {
+                        if let Some(access_plan) = generate_row_selection(&file, is_parquet) {
                             file = file.with_extensions(access_plan);
                         }
                         file
@@ -211,7 +218,8 @@ fn handler_tantivy_index(
         let files_nums = new_file_groups.iter().map(|g| g.len()).sum::<usize>();
 
         log::info!(
-            "[trace_id {trace_id}] parquet scan exec, file groups: {groups_len}, max group len: {max_group_len}, total files: {files_nums}",
+            "[trace_id {trace_id}] parquet scan exec, file groups: {groups_len}, max group len: {max_group_len}, total files: {files_nums}, elapsed: {:?}",
+            start_time.elapsed(),
         );
 
         let mut config = config.clone();

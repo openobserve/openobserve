@@ -34,7 +34,7 @@ pub fn get(trace_id: &str) -> Result<Vec<ObjectMeta>, anyhow::Error> {
     Ok(data)
 }
 
-pub async fn set(trace_id: &str, schema_key: &str, files: &[FileKey]) {
+pub async fn set(trace_id: &str, schema_key: &str, files: Vec<FileKey>) {
     let key = format!("{trace_id}/schema={schema_key}");
     let mut values = Vec::with_capacity(files.len());
     let mut segment_data = hashbrown::HashMap::new();
@@ -55,8 +55,8 @@ pub async fn set(trace_id: &str, schema_key: &str, files: &[FileKey]) {
             e_tag: None,
             version: None,
         });
-        if let Some(bin_data) = file.segment_ids.as_ref() {
-            segment_data.insert(file.key.clone(), bin_data.clone());
+        if let Some(bin_data) = file.segment_ids {
+            segment_data.insert(file.key, bin_data);
         }
     }
     let _ = FILES.insert_async(key.clone(), values).await;

@@ -178,7 +178,7 @@ async fn inner_exec(
         target_partitions: partitions,
     };
     let table = TableBuilder::new()
-        .build(session, dump_files, schema.clone())
+        .build(session, dump_files.to_vec(), schema.clone())
         .await?;
     let ctx = DataFusionContextBuilder::new()
         .trace_id(trace_id)

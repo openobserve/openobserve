@@ -46,10 +46,14 @@ use datafusion::{
     },
 };
 use hashbrown::HashMap;
+use vortex_buffer::Buffer;
+use vortex_scan::Selection;
 
 use crate::service::search::{datafusion::storage, index::IndexCondition};
 
-pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessPlan>> {
+pub fn generate_access_plan(
+    file: &PartitionedFile,
+) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
     let row_ids = storage::file_list::get_segment_ids(file.path().as_ref())?;
     let stats = file.statistics.as_ref()?;
     let Precision::Exact(num_rows) = stats.num_rows else {
@@ -104,6 +108,31 @@ pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessP
         access_plan
     );
     Some(Arc::new(access_plan))
+}
+
+pub fn generate_row_selection(
+    file: &PartitionedFile,
+    is_parquet: bool,
+) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
+    if is_parquet {
+        return generate_access_plan(file) as _;
+    }
+    let row_ids = storage::file_list::get_segment_ids(file.path().as_ref())?;
+    let stats = file.statistics.as_ref()?;
+    let Precision::Exact(_num_rows) = stats.num_rows else {
+        return None;
+    };
+
+    // Convert BitVec to Buffer<u64> for vortex Selection
+    let indices: Vec<u64> = row_ids
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, bit)| if *bit { Some(idx as u64) } else { None })
+        .collect();
+
+    let buffer = Buffer::from(indices);
+    let selection = Selection::IncludeByIndex(buffer);
+    Some(Arc::new(selection))
 }
 
 fn wrap_filter(

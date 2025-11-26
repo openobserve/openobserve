@@ -247,7 +247,7 @@ pub(crate) async fn create_context(
         target_partitions,
     };
 
-    let ctx = register_table(&session, schema.clone(), stream_name, &files, &[]).await?;
+    let ctx = register_table(&session, schema.clone(), stream_name, files, &[]).await?;
 
     Ok(Some((ctx, schema, scan_stats)))
 }

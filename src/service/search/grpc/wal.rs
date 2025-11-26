@@ -220,7 +220,7 @@ pub async fn search_parquet(
         .fst_fields(fst_fields.clone())
         .build(
             session,
-            &files,
+            files,
             Arc::new(schema.as_ref().clone().with_metadata(Default::default())),
         )
         .await

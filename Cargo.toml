@@ -100,6 +100,7 @@ vortex-io.workspace = true
 vortex-session.workspace = true
 vortex.workspace = true
 vortex-datafusion.workspace = true
+vortex-scan.workspace = true
 object_store.workspace = true
 env_logger.workspace = true
 faststr.workspace = true
@@ -283,6 +284,7 @@ vortex = { git = "https://github.com/haohuaijin/vortex", rev = "366bc1099f5fb0f7
     "tokio",
 ] }
 vortex-datafusion = { git = "https://github.com/haohuaijin/vortex", rev = "366bc1099f5fb0f716cbd38e028a869ac792872c" }
+vortex-scan = { git = "https://github.com/haohuaijin/vortex", rev = "366bc1099f5fb0f716cbd38e028a869ac792872c", features = ["roaring"] }
 sqlparser = { version = "0.58.0", features = ["serde", "visitor"] }
 dotenv_config = "0.2.2"
 dotenvy = "0.15.7"

@@ -838,7 +838,7 @@ pub async fn merge_files(
 
     let table = match TableBuilder::new()
         .sorted_by_time(true)
-        .build(session, &files, latest_schema.clone())
+        .build(session, files.clone(), latest_schema.clone())
         .await
     {
         Ok(table) => table,

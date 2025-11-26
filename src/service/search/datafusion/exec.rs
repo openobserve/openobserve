@@ -627,7 +627,7 @@ pub async fn register_table(
     session: &SearchSession,
     schema: Arc<Schema>,
     table_name: &str,
-    files: &[FileKey],
+    files: Vec<FileKey>,
     sort_key: &[(String, bool)],
 ) -> Result<SessionContext> {
     // only sort by timestamp desc
@@ -692,7 +692,7 @@ impl TableBuilder {
     pub async fn build(
         self,
         session: SearchSession,
-        files: &[FileKey],
+        files: Vec<FileKey>,
         schema: Arc<Schema>,
     ) -> Result<Arc<dyn TableProvider>> {
         let cfg = get_config();
@@ -727,24 +727,30 @@ impl TableBuilder {
                 .with_file_sort_order(vec![vec![col(TIMESTAMP_COL_NAME).sort(false, false)]]);
         }
 
+        let start = std::time::Instant::now();
         // change all files suffix from .parquet to .vortex
         let files = files
             .into_iter()
-            .cloned()
             .map(|mut f| {
                 if f.key.ends_with(".parquet") {
                     f.key = f.key.replace(".parquet", ".vortex");
                 }
-                f.clone()
+                f
             })
             .collect::<Vec<_>>();
 
+        log::info!(
+            "[trace_id: {}] TableBuilder::build prepare file list took {} ms",
+            session.id,
+            start.elapsed().as_millis()
+        );
+
         let schema_key = schema.hash_key();
         let prefix = if session.storage_type == StorageType::Memory {
-            file_list::set(&session.id, &schema_key, &files).await;
+            file_list::set(&session.id, &schema_key, files.clone()).await;
             format!("memory:///{}/schema={}/", session.id, schema_key)
         } else if session.storage_type == StorageType::Wal {
-            file_list::set(&session.id, &schema_key, &files).await;
+            file_list::set(&session.id, &schema_key, files).await;
             format!("wal:///{}/schema={}/", session.id, schema_key)
         } else {
             return Err(DataFusionError::Execution(format!(
@@ -752,6 +758,13 @@ impl TableBuilder {
                 session.storage_type,
             )));
         };
+
+        log::info!(
+            "[trace_id: {}] TableBuilder::build total prepare file list took {} ms",
+            session.id,
+            start.elapsed().as_millis()
+        );
+
         let prefix = match ListingTableUrl::parse(prefix) {
             Ok(url) => url,
             Err(e) => {
@@ -1274,7 +1287,7 @@ mod tests {
             }];
             let sort_key = vec![(TIMESTAMP_COL_NAME.to_string(), true)];
 
-            let result = register_table(&session, schema, "test_table", &files, &sort_key).await;
+            let result = register_table(&session, schema, "test_table", files, &sort_key).await;
 
             // Should create context successfully
             assert!(result.is_ok());
@@ -1315,7 +1328,7 @@ mod tests {
 
             let builder = TableBuilder::new().sorted_by_time(true);
 
-            let result = builder.build(session, &files, schema).await;
+            let result = builder.build(session, files, schema).await;
             assert!(result.is_ok());
 
             Ok(())
