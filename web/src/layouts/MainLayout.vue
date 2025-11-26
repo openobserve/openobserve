@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:is-hovered="isHovered = $event"
         @update-organization="updateOrganization"
         @go-to-home="goToHome"
-        @toggle-ai-chat="toggleAIChat"
+        @toggleAIChat="toggleAIChat"
         @open-slack="openSlack"
         @navigateToOpenAPI="navigateToOpenAPI"
         @navigate-to-docs="navigateToDocs"
