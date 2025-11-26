@@ -6,14 +6,6 @@
         <br />
         <span class="o2-license-subtitle">Please update your license by contacting your administrator.</span>
         </div>
-        <div class="col-2 q-mt-sm">
-        <q-btn 
-            @click="$emit('updateLicense')" 
-            class="cursor-pointer text-capitalize bg-primary text-white q-px-md q-py-sm rounded-md float-right"
-            dense
-            no-caps
-        >Update License Key</q-btn>
-        </div>
   </div>
     </div>
 </template>
@@ -33,7 +25,8 @@ export default defineComponent({
     const showLicenseExpiryWarning = computed(() => {
       if (!store.state.zoConfig.license_expiry) return false;
       const now = Date.now();
-      const expiryDate = store.state.zoConfig.license_expiry;
+      //convert micro to millseconds
+      const expiryDate = store.state.zoConfig.license_expiry / 1000;
       const daysUntilExpiry = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
       return daysUntilExpiry < 14;
     });
