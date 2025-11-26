@@ -839,7 +839,7 @@ async fn handle_alert_triggers(
         trigger_data_stream.end_time = alert_end_time;
 
         // Mark dedup status for history (if dedup was enabled, alert passed through)
-        if alert.deduplication.as_ref().map_or(false, |d| d.enabled) {
+        if alert.deduplication.as_ref().is_some_and(|d| d.enabled) {
             trigger_data_stream.dedup_enabled = Some(true);
             trigger_data_stream.dedup_suppressed = Some(false);
         }
