@@ -706,9 +706,9 @@ mod tests {
         assert!(json.get("semantic_field_groups").is_none());
         // time_window_minutes should be omitted when None
         assert!(json.get("time_window_minutes").is_none());
-        // cross_alert_dedup should be false by default
+        // alert_dedup_enabled should be false by default
         assert_eq!(
-            json.get("cross_alert_dedup").and_then(|v| v.as_bool()),
+            json.get("alert_dedup_enabled").and_then(|v| v.as_bool()),
             Some(false)
         );
     }
