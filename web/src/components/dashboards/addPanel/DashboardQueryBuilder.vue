@@ -1223,15 +1223,26 @@ export default defineComponent({
         }
       };
 
+      const setShowFieldAsJsonForField = (field: any) => {
+        if (
+          field.showFieldAsJson === undefined ||
+          field.showFieldAsJson === null
+        ) {
+          field.showFieldAsJson = false;
+        }
+      };
+
       // Only X and Y axes for table charts
       if (currentQuery?.fields?.x) {
         currentQuery.fields.x.forEach((field: any) => {
           setTreatAsNonTimestampForField(field);
+          setShowFieldAsJsonForField(field);
         });
       }
       if (currentQuery?.fields?.y) {
         currentQuery.fields.y.forEach((field: any) => {
           setTreatAsNonTimestampForField(field);
+          setShowFieldAsJsonForField(field);
         });
       }
     };
