@@ -719,7 +719,11 @@ async fn handle_alert_triggers(
                 // Mark as grouped for history tracking
                 trigger_data_stream.dedup_enabled = Some(true);
                 trigger_data_stream.grouped = Some(true);
-                trigger_data_stream.group_size = Some(if batch_ready { grouping_config.max_group_size as i32 } else { 1 });
+                trigger_data_stream.group_size = Some(if batch_ready {
+                    grouping_config.max_group_size as i32
+                } else {
+                    1
+                });
 
                 // Alert added to batch, don't send individual notification
                 trigger_data.period_end_time = if should_store_last_end_time {
