@@ -608,6 +608,8 @@ const useLogs = () => {
       if (
         Object.hasOwn(parsedSQL, "from") &&
         parsedSQL.from.length <= 1 &&
+        parsedSQL.from.length > 0 &&
+        parsedSQL.from[0]?.table &&
         parsedSQL._next == null
       ) {
         newParsedSQL.where = parsedSQL.where;

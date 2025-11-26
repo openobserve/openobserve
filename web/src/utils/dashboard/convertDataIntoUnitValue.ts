@@ -1639,6 +1639,8 @@ export const validatePanel = (
   isFieldsValidationRequired: boolean = true,
   allStreamFields: any[] = [],
   pageKey: string = "dashboard",
+  store: any,
+  checkTimestampAlias: any,
 ) => {
   // Get current query index
   const currentQueryIndex = panelData?.layout?.currentQueryIndex || 0;
@@ -1648,6 +1650,22 @@ export const validatePanel = (
 
   // Validate panel content based on type
   validatePanelContentByType(panelData?.data, errors);
+
+  // Validate timestamp alias for SQL queries with custom query mode
+  if (panelData?.data?.queryType === "sql") {
+    const timestampColumn =
+      store.state.zoConfig.timestamp_column || "_timestamp";
+
+    panelData?.data?.queries?.forEach((queryObj: any, index: number) => {
+      if (queryObj?.query && queryObj?.customQuery) {
+        if (!checkTimestampAlias(queryObj.query)) {
+          errors.push(
+            `Alias '${timestampColumn}' is not allowed.`,
+          );
+        }
+      }
+    });
+  }
 
   if (isPromQLMode) {
     // 1. Chart type: only specific chart types are supported for PromQL

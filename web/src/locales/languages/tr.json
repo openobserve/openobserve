@@ -1,7 +1,6 @@
 {
   "common": {
     "close": "Kapat",
-    "cancel": "İptal",
     "ok": "Tamam.",
     "apply": "Uygula",
     "startTime": "Başlangıç saati",
@@ -86,7 +85,8 @@
     "showMore": "Daha Fazlasını Göster",
     "contactUs": "Bize Ulaşın",
     "addFolder": "Klasör Ekle",
-    "status": "Durum"
+    "status": "Durum",
+    "cancel": "İptal"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",

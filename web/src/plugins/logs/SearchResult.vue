@@ -75,6 +75,24 @@ color="warning" size="sm"> </q-icon>
               {{ searchObj.data.histogram.errorMsg }}
             </q-tooltip>
           </div>
+          <!-- Volume Analysis Button -->
+          <q-btn
+            v-if="searchObj.data?.queryResults?.hits?.length > 0 && !searchObj.meta.sqlMode"
+            outline
+            no-caps
+            dense
+            color="primary"
+            icon="analytics"
+            :label="t('latencyInsights.analyzeButtonLabel')"
+            class="q-ml-md"
+            size="sm"
+            @click="openVolumeAnalysisDashboard"
+            data-test="logs-analyze-dimensions-button"
+          >
+            <q-tooltip>
+              {{ t('volumeInsights.analyzeTooltipLogs') }}
+            </q-tooltip>
+          </q-btn>
         </div>
 
         <div class="col-5 text-right q-pr-sm q-gutter-xs pagination-block">
@@ -370,6 +388,25 @@ color="warning" size="xs"></q-icon> Error while
         :totalPatterns="patternsState?.patterns?.patterns?.length || 0"
         @navigate="navigatePatternDetail"
       />
+
+      <!-- Volume Analysis Dashboard -->
+      <TracesAnalysisDashboard
+        v-if="showVolumeAnalysisDashboard"
+        :streamName="searchObj.data.stream.selectedStream[0]"
+        streamType="logs"
+        :timeRange="originalTimeRangeBeforeSelection || volumeAnalysisTimeRange"
+        :rateFilter="hasHistogramSelection ? histogramSelectionRange : undefined"
+        :baseFilter="searchObj.data.editorValue"
+        :streamFields="
+          searchObj.data.stream.userDefinedSchema?.length > 0
+            ? searchObj.data.stream.userDefinedSchema
+            : searchObj.data.stream.selectedStreamFields
+        "
+        :logSamples="searchObj.data.queryResults.hits"
+        analysisType="volume"
+        :availableAnalysisTypes="['volume']"
+        @close="closeVolumeAnalysisDashboard"
+      />
     </div>
   </div>
 </template>
@@ -425,6 +462,9 @@ export default defineComponent({
     ),
     PatternDetailsDialog: defineAsyncComponent(
       () => import("./patterns/PatternDetailsDialog.vue"),
+    ),
+    TracesAnalysisDashboard: defineAsyncComponent(
+      () => import("../traces/metrics/TracesAnalysisDashboard.vue"),
     ),
   },
   emits: [
@@ -575,7 +615,44 @@ export default defineComponent({
     },
     onChartUpdate({ start, end }: { start: any; end: any }) {
       this.searchObj.meta.showDetailTab = false;
+
+      // Store the original time range BEFORE updating datetime (for volume analysis baseline)
+      if (start && end && !this.originalTimeRangeBeforeSelection) {
+        this.originalTimeRangeBeforeSelection = {
+          startTime: this.searchObj.data.datetime.startTime,
+          endTime: this.searchObj.data.datetime.endTime,
+        };
+        console.log('[Logs Volume Analysis] Stored original time range before selection:', {
+          start: new Date(this.originalTimeRangeBeforeSelection.startTime / 1000).toISOString(),
+          end: new Date(this.originalTimeRangeBeforeSelection.endTime / 1000).toISOString(),
+        });
+      }
+
       this.$emit("update:datetime", { start, end });
+
+      // Track histogram selection for volume analysis
+      // Chart emits timestamps in milliseconds, convert to microseconds for OpenObserve
+      if (start && end) {
+        this.hasHistogramSelection = true;
+        this.histogramSelectionRange = {
+          start: -1,  // Placeholder to indicate time-based selection (not Y-axis)
+          end: -1,    // Placeholder to indicate time-based selection (not Y-axis)
+          timeStart: start * 1000,  // Convert ms to microseconds
+          timeEnd: end * 1000       // Convert ms to microseconds
+        };
+        console.log('[Logs Volume Analysis] Histogram selection range:', {
+          timeStart: new Date(start).toISOString(),
+          timeEnd: new Date(end).toISOString(),
+          timeStartMicros: start * 1000,
+          timeEndMicros: end * 1000,
+        });
+      } else {
+        console.log('[Logs Volume Analysis] Histogram selection cleared (zoom reset)');
+        this.hasHistogramSelection = false;
+        this.histogramSelectionRange = { start: 0, end: 0, timeStart: undefined, timeEnd: undefined };
+        // Reset original time range when selection is cleared
+        this.originalTimeRangeBeforeSelection = null;
+      }
     },
     onTimeBoxed(obj: any) {
       this.searchObj.meta.showDetailTab = false;
@@ -617,6 +694,12 @@ export default defineComponent({
     const totalHeight = ref(0);
     const selectedPattern = ref(null);
     const showPatternDetails = ref(false);
+
+    // Volume Analysis state
+    const showVolumeAnalysisDashboard = ref(false);
+    const hasHistogramSelection = ref(false);
+    const histogramSelectionRange = ref({ start: 0, end: 0, timeStart: undefined, timeEnd: undefined });
+    const originalTimeRangeBeforeSelection = ref<{ startTime: number; endTime: number } | null>(null);
 
     const searchTableRef: any = ref(null);
 
@@ -992,6 +1075,15 @@ export default defineComponent({
       searchObj.meta.showDetailTab = false;
     };
 
+    // Volume Analysis functions
+    const openVolumeAnalysisDashboard = () => {
+      showVolumeAnalysisDashboard.value = true;
+    };
+
+    const closeVolumeAnalysisDashboard = () => {
+      showVolumeAnalysisDashboard.value = false;
+    };
+
     const resetPlotChart = computed(() => {
       return searchObj.meta.resetPlotChart;
     });
@@ -1000,6 +1092,12 @@ export default defineComponent({
       if (newVal) {
         plotChart.value = {};
         searchObj.meta.resetPlotChart = false;
+
+        // Clear histogram selection when chart is reset
+        console.log('[Logs Volume Analysis] Chart reset, clearing histogram selection');
+        hasHistogramSelection.value = false;
+        histogramSelectionRange.value = { start: 0, end: 0, timeStart: undefined, timeEnd: undefined };
+        originalTimeRangeBeforeSelection.value = null;
       }
     });
 
@@ -1014,6 +1112,39 @@ export default defineComponent({
         // });
       },
       { deep: true },
+    );
+
+    // Watch for datetime changes from outside (datetime picker, search button, etc.)
+    // Clear histogram selection when datetime changes not from brush selection
+    watch(
+      () => ({
+        start: searchObj.data.datetime.startTime,
+        end: searchObj.data.datetime.endTime,
+      }),
+      (newTime, oldTime) => {
+        // Only clear if this is NOT from a brush selection (onChartUpdate sets both together)
+        // We can detect this by checking if the time change is significant (> 1 second difference from histogram range)
+        const histogramStartTime = histogramSelectionRange.value.timeStart
+          ? histogramSelectionRange.value.timeStart / 1000 // Convert to ms
+          : null;
+        const histogramEndTime = histogramSelectionRange.value.timeEnd
+          ? histogramSelectionRange.value.timeEnd / 1000 // Convert to ms
+          : null;
+
+        const isFromBrushSelection =
+          histogramStartTime &&
+          histogramEndTime &&
+          Math.abs((newTime.start / 1000) - histogramStartTime) < 1000 && // Within 1 second
+          Math.abs((newTime.end / 1000) - histogramEndTime) < 1000;
+
+        if (!isFromBrushSelection && oldTime && (newTime.start !== oldTime.start || newTime.end !== oldTime.end)) {
+          console.log('[Logs Volume Analysis] Datetime changed from outside, clearing histogram selection');
+          hasHistogramSelection.value = false;
+          histogramSelectionRange.value = { start: 0, end: 0, timeStart: undefined, timeEnd: undefined };
+          originalTimeRangeBeforeSelection.value = null;
+        }
+      },
+      { deep: true }
     );
 
     const selectedStreamFullTextSearchKeys = computed(() => {
@@ -1076,10 +1207,16 @@ export default defineComponent({
       patternsColumns,
       selectedPattern,
       showPatternDetails,
+      hasHistogramSelection,
+      histogramSelectionRange,
+      originalTimeRangeBeforeSelection,
+      showVolumeAnalysisDashboard,
       openPatternDetails,
       navigatePatternDetail,
       addPatternToSearch,
       extractConstantsFromPattern,
+      openVolumeAnalysisDashboard,
+      closeVolumeAnalysisDashboard,
     };
   },
   computed: {
@@ -1094,6 +1231,14 @@ export default defineComponent({
     },
     reDrawChartData() {
       return this.searchObj.data.histogram;
+    },
+    volumeAnalysisTimeRange() {
+      // Use histogram selection if available, otherwise use current time range
+      const hasSelection = this.histogramSelectionRange.start && this.histogramSelectionRange.end;
+      return {
+        startTime: hasSelection ? this.histogramSelectionRange.start : this.searchObj.data.datetime.startTime,
+        endTime: hasSelection ? this.histogramSelectionRange.end : this.searchObj.data.datetime.endTime,
+      };
     },
   },
   watch: {

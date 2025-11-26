@@ -22,6 +22,7 @@ import { validatePanel } from "@/utils/dashboard/convertDataIntoUnitValue";
 import useStreams from "./useStreams";
 import useValuesWebSocket from "./dashboard/useValuesWebSocket";
 import queryService from "@/services/search";
+import logsUtils from "./useLogs/logsUtils";
 import { buildSQLChartQuery, geoMapChart, mapChart, sankeyChartQuery } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 
 const colors = [
@@ -2380,7 +2381,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       return query;
     }
   };
-
+const { checkTimestampAlias } = logsUtils();
   // Replace the existing validatePanel function with a wrapper that calls the generic function
   const validatePanelWrapper = (
     errors: string[],
@@ -2396,7 +2397,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ...dashboardPanelData.meta.stream.customQueryFields,
       ],
       pageKey,
-    );
+    , store, checkTimestampAlias);
   };
 
   const VARIABLE_PLACEHOLDER = "substituteValue";
