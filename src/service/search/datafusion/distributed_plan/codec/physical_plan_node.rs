@@ -18,7 +18,7 @@ use std::sync::Arc;
 use datafusion::{
     common::{Result, internal_err},
     error::DataFusionError,
-    execution::FunctionRegistry,
+    execution::TaskContext,
     physical_plan::ExecutionPlan,
 };
 use datafusion_proto::physical_plan::PhysicalExtensionCodec;
@@ -36,17 +36,14 @@ use crate::service::search::datafusion::distributed_plan::empty_exec::NewEmptyEx
 
 /// A PhysicalExtensionCodec that can serialize and deserialize ChildExec
 #[derive(Debug)]
-pub struct PhysicalPlanNodePhysicalExtensionCodec {
-    #[allow(dead_code)]
-    pub org_id: String,
-}
+pub struct PhysicalPlanNodePhysicalExtensionCodec {}
 
 impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
     fn try_decode(
         &self,
         buf: &[u8],
         inputs: &[Arc<dyn ExecutionPlan>],
-        registry: &dyn FunctionRegistry,
+        ctx: &TaskContext,
     ) -> Result<Arc<dyn ExecutionPlan>> {
         let proto = cluster_rpc::PhysicalPlanNode::decode(buf).map_err(|e| {
             DataFusionError::Internal(format!(
@@ -55,23 +52,23 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
         })?;
         match proto.plan {
             Some(cluster_rpc::physical_plan_node::Plan::EmptyExec(node)) => {
-                super::empty_exec::try_decode(node, inputs, registry)
+                super::empty_exec::try_decode(node, inputs, ctx)
             }
             #[cfg(feature = "enterprise")]
             Some(cluster_rpc::physical_plan_node::Plan::AggregateTopk(node)) => {
-                super::aggregate_topk_exec::try_decode(node, inputs, registry)
+                super::aggregate_topk_exec::try_decode(node, inputs, ctx)
             }
             #[cfg(feature = "enterprise")]
             Some(cluster_rpc::physical_plan_node::Plan::StreamingAggs(node)) => {
-                super::streaming_aggs_exec::try_decode(node, inputs, registry, &self.org_id)
+                super::streaming_aggs_exec::try_decode(node, inputs, ctx)
             }
             #[cfg(feature = "enterprise")]
             Some(cluster_rpc::physical_plan_node::Plan::TmpExec(node)) => {
-                super::tmp_exec::try_decode(node, inputs, registry)
+                super::tmp_exec::try_decode(node, inputs, ctx)
             }
             #[cfg(feature = "enterprise")]
             Some(cluster_rpc::physical_plan_node::Plan::EnrichmentExec(node)) => {
-                super::enrichment_exec::try_decode(node, inputs, registry)
+                super::enrichment_exec::try_decode(node, inputs, ctx)
             }
             #[cfg(not(feature = "enterprise"))]
             Some(_) => {
@@ -130,12 +127,13 @@ mod tests {
         ));
 
         // encode
-        let proto = super::super::get_physical_extension_codec("test".to_string());
+        let proto = super::super::get_physical_extension_codec();
         let plan_bytes = physical_plan_to_bytes_with_extension_codec(plan.clone(), &proto).unwrap();
 
         // decode
         let ctx = datafusion::prelude::SessionContext::new();
-        let plan2 = physical_plan_from_bytes_with_extension_codec(&plan_bytes, &ctx, &proto)?;
+        let plan2 =
+            physical_plan_from_bytes_with_extension_codec(&plan_bytes, &ctx.task_ctx(), &proto)?;
         let plan2 = plan2.as_any().downcast_ref::<NewEmptyExec>().unwrap();
         let plan = plan.as_any().downcast_ref::<NewEmptyExec>().unwrap();
 

@@ -2200,15 +2200,6 @@ export default defineComponent({
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;
         }
-        
-        // validate that timestamp column is not used as an alias
-        if (!checkTimestampAlias(logsPageQuery)) {
-          showErrorNotification(
-            `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`,
-          );
-          variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
-          return null;
-        }
 
         /* ------------------------------------------------------------- */
         /* 1) Fetch schema for the user query                            */

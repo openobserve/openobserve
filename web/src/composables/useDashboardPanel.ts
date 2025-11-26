@@ -27,6 +27,7 @@ import { extractFields, getStreamNameFromQuery } from "@/utils/query/sqlUtils";
 import { validatePanel } from "@/utils/dashboard/convertDataIntoUnitValue";
 import useValuesWebSocket from "./dashboard/useValuesWebSocket";
 import queryService from "@/services/search";
+import logsUtils from "./useLogs/logsUtils";
 
 const colors = [
   "#5960b2",
@@ -2997,7 +2998,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     },
     { deep: true },
   );
-
+const { checkTimestampAlias } = logsUtils();
   // Replace the existing validatePanel function with a wrapper that calls the generic function
   const validatePanelWrapper = (
     errors: string[],
@@ -3007,7 +3008,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ...selectedStreamFieldsBasedOnUserDefinedSchema.value,
       ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
       ...dashboardPanelData.meta.stream.customQueryFields,
-    ], pageKey);
+    ], pageKey, store, checkTimestampAlias);
   };
 
   const VARIABLE_PLACEHOLDER = "substituteValue";
