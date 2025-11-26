@@ -1,29 +1,49 @@
 name: Bug Report
-description: Report a bug in the OpenObserve
+description: Report a bug in OpenObserve - Test cases will be generated from this report
 labels: ["☢️ Bug"]
+title: "[BUG] "
 
 body:
-  - type: dropdown
+  - type: markdown
+    attributes:
+      value: |
+        ## Bug Report Template
+        Please provide detailed information to help us understand and reproduce the bug.
+        **This information will be used to automatically generate test cases for TestDino.**
+
+  - type: checkboxes
     id: affected-functionalities
     attributes:
-      label: Which OpenObserve functionalities are the source of the bug?
+      label: Which OpenObserve functionalities are affected?
+      description: Select all that apply
       options:
-        - login
-        - home
-        - log search
-        - dashboards
-        - users
-        - streams
-        - functions
-        - ingestion
-        - alerts
-        - localization
-        - pipeline
-        - metrics
-        - traces
-        - real user monitoring
-        - Don't known / other
-      multiple: true
+        - label: Login
+        - label: Landing Page
+        - label: Logs
+        - label: Dashboards
+        - label: Streams
+        - label: Functions
+        - label: Ingestion
+        - label: Alerts
+        - label: Pipelines
+        - label: Metrics
+        - label: Traces
+        - label: Real User Monitoring (RUM)
+        - label: Reports
+        - label: Data Sources
+        - label: IAM
+        - label: Management
+        - label: Cosmetic
+        - label: Not Known / Other
+    validations:
+      required: true
+
+  - type: input
+    id: dev-story
+    attributes:
+      label: Related Developer Story/Issue
+      description: Link to the GitHub issue/story where this feature was developed
+      placeholder: "#1234 or https://github.com/openobserve/openobserve/issues/1234 or 'Not Available'"
     validations:
       required: true
 
@@ -31,6 +51,7 @@ body:
     id: is-regression
     attributes:
       label: Is this a regression?
+      description: Did this work in a previous version?
       options:
         - 'Yes'
         - 'No'
@@ -40,33 +61,168 @@ body:
   - type: textarea
     id: description
     attributes:
-      label: Description
+      label: Bug Description
+      description: Detailed description of what the bug is
+      placeholder: "When clicking the login button on mobile devices (iOS Safari), nothing happens. The button appears to be clickable but no navigation or action occurs."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Expected Behavior
+      description: What should happen?
+      placeholder: "Clicking the login button should navigate to the login page and display the credentials form."
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual_behavior
+    attributes:
+      label: Actual Behavior
+      description: What actually happens?
+      placeholder: "Nothing happens when the button is clicked. No navigation, no error message, no console errors."
     validations:
       required: true
 
   - type: input
     id: reproduction
     attributes:
-      label: Please provide a link to a minimal reproduction of the bug
+      label: Link to Minimal Reproduction
+      description: Please provide a link to a minimal reproduction of the bug (optional but helpful)
+      placeholder: "https://github.com/username/reproduction-repo"
 
   - type: textarea
     id: exception-or-error
     attributes:
-      label: Please provide the exception or error you saw
-      render: true
+      label: Exception or Error Messages
+      description: Please provide any exception or error messages you saw (console logs, stack traces, etc.)
+      render: shell
+      placeholder: |
+        TypeError: Cannot read property 'navigate' of undefined
+        at onClick (Button.tsx:42)
 
   - type: textarea
     id: environment
     attributes:
-      label: Please provide the version you discovered this bug in (check about page for version information)
-      render: true
+      label: Environment Details
+      description: Version information and environment details (check About page)
+      render: yaml
       placeholder: |
         Version: v0.0.1
         Commit Hash: 9d65f4640b55a952149df8daad5a01d5ff219497
         Build Date: 2023-02-13T11:29:53Z
         OS: linux x64
+        Browser: Safari 16.5 (iOS)
+        Device: iPhone 14 Pro
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        ## TestDino Test Case Information
+        The following fields will be used to generate test cases in TestDino under the **Bugs** suite.
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: "QA Context: How much impact does this bug have on the system's functionality?"
+      options:
+        - blocker - System is unusable
+        - critical - Major functionality is broken
+        - major - Important functionality is impaired
+        - minor - Minor loss of functionality
+        - trivial - Cosmetic issue only
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: "QA Context: How urgently should this bug be fixed based on business impact?"
+      options:
+        - high - Must be fixed ASAP
+        - medium - Should be fixed soon
+        - low - Can wait for regular release
+    validations:
+      required: true
+
+  - type: dropdown
+    id: test-type
+    attributes:
+      label: Test Type
+      description: What type of testing is needed to verify this bug?
+      options:
+        - functional - Tests core functionality
+        - regression - Tests to prevent regression
+        - integration - Tests system integration
+        - e2e - End-to-end user flow
+        - ui - User interface testing
+        - api - Backend API testing
+        - performance - Performance testing
+        - security - Security testing
+    validations:
+      required: true
 
   - type: textarea
-    id: other
+    id: steps_to_reproduce
     attributes:
-      label: Anything else?
+      label: Steps to Reproduce (Optional)
+      description: Provide step-by-step instructions to reproduce the bug
+      placeholder: |
+        1. Open OpenObserve application on iOS Safari
+        2. Navigate to home page
+        3. Click on login button in top-right corner
+        4. Observe no response
+
+  - type: textarea
+    id: preconditions
+    attributes:
+      label: Preconditions
+      description: What conditions must be met before reproducing this bug?
+      placeholder: |
+        - User is not logged in
+        - Using iOS Safari browser (version 16.5+)
+        - Application is on home page
+        - Network connection is stable
+    validations:
+      required: true
+
+  - type: textarea
+    id: postconditions
+    attributes:
+      label: Postconditions
+      description: What should be the state after the bug is fixed and tested?
+      placeholder: |
+        - User successfully navigates to login page
+        - Login form is displayed correctly
+        - Test data is cleaned up
+
+  - type: textarea
+    id: test_data
+    attributes:
+      label: Test Data (Optional)
+      description: Any specific data needed to reproduce (usernames, test accounts, sample data, etc.)
+      placeholder: |
+        - Test URL: https://staging.openobserve.ai
+        - Test account: testuser@example.com
+        - Environment: staging
+        - Sample log data: (if applicable)
+
+  - type: input
+    id: tags
+    attributes:
+      label: Tags / Labels
+      description: Comma-separated tags for the test case
+      placeholder: "regression, mobile, login, critical"
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots / Videos
+      description: Add screenshots, screen recordings, or additional visual context
+      placeholder: "Drag and drop images or paste URLs here"
