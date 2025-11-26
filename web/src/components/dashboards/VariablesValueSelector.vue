@@ -224,7 +224,7 @@ export default defineComponent({
     );
 
     const variableLog = (name: string, message: string) => {
-      // console.log(`[Variable: ${name}] ${message}`);
+      console.log(`[Variable: ${name}] ${message}`);
     };
 
     // ================== [END] FOR DEBUGGING PURPOSES ONLY ==================
@@ -1194,6 +1194,65 @@ export default defineComponent({
           const parentVariables =
             variablesDependencyGraph[name].parentVariables;
 
+          const areParentsReady = parentVariables.every(
+            (parentName: string) => {
+              const parentVariable = variablesData.values.find(
+                (v: any) => v.name === parentName,
+              );
+
+              variableLog(
+                variableObject.name,
+                `Parent variable readiness with parent ${JSON.stringify(parentVariable)}`,
+              );
+
+              const isReady =
+                parentVariable &&
+                parentVariable.isVariablePartialLoaded &&
+                parentVariable.value !== null &&
+                parentVariable.value !== undefined &&
+                (!Array.isArray(parentVariable.value) ||
+                  parentVariable.value.length > 0);
+              variableLog(
+                variableObject.name,
+                `Parent variable ${parentName} is ready: ${isReady}`,
+              );
+              if (!isReady && parentVariable) {
+                variableLog(
+                  variableObject.name,
+                  `Parent variable ${parentName} is not ready: ${JSON.stringify(parentVariable)}`,
+                );
+                // Reset this variable since parent is not ready
+                resetVariableState(variableObject);
+                variableObject.isVariableLoadingPending = true;
+                variableObject.isVariablePartialLoaded = true;
+                variableObject.isLoading = false;
+              }
+              return isReady;
+            },
+          );
+
+          variableLog(
+            variableObject.name,
+            `Parent variables readiness: ${areParentsReady}`,
+          );
+          variableLog(
+            variableObject.name,
+            `Parent variables: ${JSON.stringify(parentVariables)}`,
+          );
+
+          if (!areParentsReady) {
+            variableLog(
+              variableObject.name,
+              `Parent variables are not ready, skipping variable load`,
+            );
+            // Just update loading states but don't reset value if already set
+            variableObject.isLoading = false;
+            variableObject.isVariablePartialLoaded = false;
+            variableObject.isVariableLoadingPending = true;
+            resolve(false);
+            return;
+          }
+
           // Check if any parent has no data (empty options)
           const hasParentWithNoData = parentVariables.some(
             (parentName: string) => {
@@ -1230,56 +1289,8 @@ export default defineComponent({
             // Update old variables data to reflect the reset
             oldVariablesData[variableObject.name] = variableObject.value;
 
-            // emitVariablesData();
+            emitVariablesData();
             resolve(true);
-            return;
-          }
-
-          const areParentsReady = parentVariables.every(
-            (parentName: string) => {
-              const parentVariable = variablesData.values.find(
-                (v: any) => v.name === parentName,
-              );
-
-              variableLog(
-                variableObject.name,
-                `Parent variable readiness with parent ${JSON.stringify(parentVariable)}`,
-              );
-
-              const isReady =
-                parentVariable &&
-                parentVariable.isVariablePartialLoaded &&
-                parentVariable.value !== null &&
-                parentVariable.value !== undefined &&
-                (!Array.isArray(parentVariable.value) ||
-                  parentVariable.value.length > 0);
-
-              if (!isReady && parentVariable) {
-                // Reset this variable since parent is not ready
-                resetVariableState(variableObject);
-                variableObject.isVariableLoadingPending = true;
-                variableObject.isVariablePartialLoaded = true;
-                variableObject.isLoading = false;
-              }
-              return isReady;
-            },
-          );
-
-          variableLog(
-            variableObject.name,
-            `Parent variables readiness: ${areParentsReady}`,
-          );
-
-          if (!areParentsReady) {
-            variableLog(
-              variableObject.name,
-              `Parent variables are not ready, skipping variable load`,
-            );
-            // Just update loading states but don't reset value if already set
-            variableObject.isLoading = false;
-            variableObject.isVariablePartialLoaded = false;
-            variableObject.isVariableLoadingPending = true;
-            resolve(false);
             return;
           }
         }
