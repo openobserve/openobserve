@@ -2020,7 +2020,7 @@ export default defineComponent({
     };
 
     const handleChartApiError = (errorMessage: any) => {
-      cancelFieldExtraction();
+      variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
     };
 
     // [START] cancel running queries
