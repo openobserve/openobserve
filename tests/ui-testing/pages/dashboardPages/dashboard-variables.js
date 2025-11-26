@@ -19,13 +19,19 @@ export default class DashboardVariables {
     filterConfig = null, // optional filter configuration { filterName, operator, value }
     showMultipleValues = false // if true, toggles the show multiple values option
   ) {
-    // Open Variable Tab
-    await this.page
-      .locator('[data-test="dashboard-settings-variable-tab"]')
-      .click();
+    // Wait for the settings panel to be fully opened and variable tab to be available
+    const variableTab = this.page.locator('[data-test="dashboard-settings-variable-tab"]');
+    await variableTab.waitFor({ state: "attached", timeout: 10000 });
+    await variableTab.waitFor({ state: "visible", timeout: 10000 });
+
+    // Additional wait for panel animation and stability
+    await this.page.waitForTimeout(500);
+
+    // Click the Variable Tab
+    await variableTab.click();
 
     // Add Variable
-    await this.page.locator('[data-test="dashboard-variable-add-btn"]').click();
+    await this.page.locator('[data-test="dashboard-variable-add-btn"]').click({timeout:5000});
     await this.page.locator('[data-test="dashboard-variable-name"]').fill(name);
 
     // Select Stream Type
@@ -52,19 +58,66 @@ export default class DashboardVariables {
       .click();
 
     // Select Field
-    await this.page
-      .locator('[data-test="dashboard-variable-field-select"]')
-      .click();
-    await this.page
-      .locator('[data-test="dashboard-variable-field-select"]')
-      .fill(field);
-    await this.page.getByText(field).click();
+    const fieldSelect = this.page.locator('[data-test="dashboard-variable-field-select"]');
+    await fieldSelect.click();
+    await fieldSelect.fill(field);
+
+    // Wait for dropdown to have options available
+    await this.page.waitForFunction(
+      () => {
+        const options = document.querySelectorAll('[role="option"]');
+        return options.length > 0;
+      },
+      { timeout: 10000, polling: 100 }
+    );
+
+    // Try to select the field from dropdown - use multiple strategies
+    let fieldSelected = false;
+
+    // Strategy 1: Try exact match
+    try {
+      const fieldOption = this.page.getByRole("option", { name: field, exact: true });
+      await fieldOption.waitFor({ state: "visible", timeout: 5000 });
+      await fieldOption.click();
+      fieldSelected = true;
+    } catch (e) {
+      // Strategy 2: Try partial match
+      try {
+        const fieldOption = this.page.getByRole("option", { name: field, exact: false }).first();
+        await fieldOption.waitFor({ state: "visible", timeout: 5000 });
+        await fieldOption.click();
+        fieldSelected = true;
+      } catch (e2) {
+        // Strategy 3: Use keyboard to select the first visible option
+        try {
+          await this.page.keyboard.press('ArrowDown');
+          // Wait for selection to be highlighted
+          await this.page.waitForFunction(
+            () => {
+              const highlighted = document.querySelector('[role="option"][aria-selected="true"]') ||
+                                 document.querySelector('[role="option"].q-manual-focusable--focused') ||
+                                 document.querySelector('[role="option"].q-focusable--focused');
+              return highlighted !== null;
+            },
+            { timeout: 3000, polling: 100 }
+          );
+          await this.page.keyboard.press('Enter');
+          fieldSelected = true;
+        } catch (e3) {
+          fieldSelected = false;
+        }
+      }
+    }
+
+    if (!fieldSelected) {
+      throw new Error(`Failed to select field: ${field}`);
+    }
 
     // Add Filter Configuration if provided
     if (filterConfig) {
 
       const addFilterBtn = this.page.locator('[data-test="dashboard-add-filter-btn"]');
-      await addFilterBtn.waitFor({ state: "visible", timeout: 10000 });
+      await addFilterBtn.waitFor({ state: "visible", timeout: 5000 });
       await addFilterBtn.click();
       
       // Wait for and interact with Filter Name selector
