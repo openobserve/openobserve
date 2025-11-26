@@ -1,7 +1,7 @@
 <template>
     <!-- Preview Section (only for root level) -->
     <div v-if="depth === 0 && previewString"
-         class="tw-mb-2 tw-p-2 tw-rounded tw-border"
+         class="tw-mb-2 tw-p-2 tw-rounded tw-border tw-w-full"
          :class="store.state.theme === 'dark' ? 'tw-bg-gray-800 tw-border-gray-700' : 'tw-bg-gray-50 tw-border-gray-300'">
       <div class="tw-flex tw-items-center tw-gap-1 tw-cursor-pointer tw-min-w-0" @click="showPreview = !showPreview">
         <q-icon
