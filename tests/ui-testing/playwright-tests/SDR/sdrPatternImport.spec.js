@@ -52,6 +52,7 @@ test.describe("SDR Pattern Import Tests", { tag: '@enterprise' }, () => {
     if (pgpPrivateKeyId) {
       await pm.sdrPatternsPage.clickDeletePattern(pgpPrivateKeyId);
       await pm.sdrPatternsPage.confirmDelete();
+      await page.waitForLoadState('networkidle');
       await page.waitForTimeout(1000);
     }
 
@@ -61,12 +62,13 @@ test.describe("SDR Pattern Import Tests", { tag: '@enterprise' }, () => {
     if (pgpPublicKeyId) {
       await pm.sdrPatternsPage.clickDeletePattern(pgpPublicKeyId);
       await pm.sdrPatternsPage.confirmDelete();
+      await page.waitForLoadState('networkidle');
       await page.waitForTimeout(1000);
     }
 
     // Step 4: Verify patterns are deleted
     testLogger.info('Verifying patterns are deleted');
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(2000);
     const pgpPrivateDeleted = await pm.sdrPatternsPage.verifyPatternNotVisibleInList('PGP Private Key');
     const pgpPublicDeleted = await pm.sdrPatternsPage.verifyPatternNotVisibleInList('PGP Public Key');
 
