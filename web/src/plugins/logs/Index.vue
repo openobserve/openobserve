@@ -319,7 +319,6 @@ size="md" />
               :searchResponse="searchResponseForVisualization"
               :is_ui_histogram="shouldUseHistogramQuery"
               :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
-              @handleChartApiError="handleChartApiError"
             ></VisualizeLogsQuery>
           </div>
         </template>
@@ -1188,8 +1187,8 @@ export default defineComponent({
 
     // Helper function for handling the visualize tab
     async function handleVisualizeTab() {
-      await handleRunQueryFn();
-      variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
+      handleRunQueryFn();
+      // variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
     }
 
     const refreshTimezone = () => {
