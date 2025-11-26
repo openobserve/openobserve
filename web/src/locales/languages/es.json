@@ -1,7 +1,6 @@
 {
   "common": {
     "close": "Cerrar",
-    "cancel": "Cancelar",
     "ok": "Aceptar",
     "apply": "Aplicar",
     "startTime": "Hora de inicio",
@@ -86,7 +85,8 @@
     "showMore": "Mostrar más",
     "contactUs": "Póngase en contacto con nosotros",
     "addFolder": "Agregar carpeta",
-    "status": "Estado"
+    "status": "Estado",
+    "cancel": "Cancelar"
   },
   "search": {
     "selectIndex": "Selecciona el índice primero",

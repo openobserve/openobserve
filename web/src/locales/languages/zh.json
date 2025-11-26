@@ -1,7 +1,6 @@
 {
   "common": {
     "close": "关闭",
-    "cancel": "取消",
     "ok": "确定",
     "apply": "应用",
     "startTime": "开始时间",
@@ -86,7 +85,8 @@
     "showMore": "显示更多",
     "contactUs": "联系我们",
     "addFolder": "添加文件夹",
-    "status": "状态"
+    "status": "状态",
+    "cancel": "取消"
   },
   "search": {
     "selectIndex": "选择数据流",

@@ -1,7 +1,6 @@
 {
   "common": {
     "close": "Fechar",
-    "cancel": "Cancelar",
     "ok": "Ok",
     "apply": "Aplique",
     "startTime": "Hora de início",
@@ -86,7 +85,8 @@
     "showMore": "Mostrar mais",
     "contactUs": "Entre em contato conosco",
     "addFolder": "Adicionar pasta",
-    "status": "Status"
+    "status": "Status",
+    "cancel": "Cancelar"
   },
   "search": {
     "selectIndex": "Selecione Stream First",

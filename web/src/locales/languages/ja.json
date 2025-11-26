@@ -1,7 +1,6 @@
 {
   "common": {
     "close": "閉じる",
-    "cancel": "キャンセル",
     "ok": "OK",
     "apply": "適用",
     "startTime": "開始時間",
@@ -86,7 +85,8 @@
     "showMore": "さらに表示",
     "contactUs": "お問い合わせ",
     "addFolder": "[フォルダを追加]",
-    "status": "ステータス"
+    "status": "ステータス",
+    "cancel": "[キャンセル]"
   },
   "search": {
     "metrics": "メトリクス",
