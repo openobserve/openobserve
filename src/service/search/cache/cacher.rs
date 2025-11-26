@@ -889,10 +889,8 @@ fn calculate_deltas_multi(
         // overlap with the first cached bucket.
         let delta_end_time = if histogram_interval > 0 && !meta.cached_response.hits.is_empty() {
             // Get the timestamp of the first cached bucket
-            let first_bucket_ts =
-                get_ts_value(&meta.ts_column, meta.cached_response.hits.first().unwrap());
             // The delta should end at the start of this bucket (which is already aligned)
-            first_bucket_ts
+            get_ts_value(&meta.ts_column, meta.cached_response.hits.first().unwrap())
         } else {
             meta.response_start_time
         };

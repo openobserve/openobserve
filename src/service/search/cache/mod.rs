@@ -748,7 +748,7 @@ fn deduplicate_histogram_buckets(
 
     for hit in hits {
         let ts = get_ts_value(ts_column, &hit);
-        buckets.entry(ts).or_insert_with(Vec::new).push(hit);
+        buckets.entry(ts).or_default().push(hit);
     }
 
     // Merge duplicate buckets
@@ -992,17 +992,15 @@ pub async fn write_results(
         };
 
     // For histogram queries, verify we have at least one complete interval to cache
-    if histogram_interval_micros.is_some() {
-        if cache_end_boundary <= cache_start_boundary {
-            log::info!(
-                "[trace_id {trace_id}] No complete histogram intervals to cache (data: {}-{}, boundaries: {}-{}), skipping caching",
-                data_start_time,
-                data_end_time,
-                cache_start_boundary,
-                cache_end_boundary
-            );
-            return;
-        }
+    if histogram_interval_micros.is_some() && cache_end_boundary <= cache_start_boundary {
+        log::info!(
+            "[trace_id {trace_id}] No complete histogram intervals to cache (data: {}-{}, boundaries: {}-{}), skipping caching",
+            data_start_time,
+            data_end_time,
+            cache_start_boundary,
+            cache_end_boundary
+        );
+        return;
     }
 
     // Track if we need to recalculate timestamp range after filtering
