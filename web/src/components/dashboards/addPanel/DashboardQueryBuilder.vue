@@ -228,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   dashboardPanelData.layout.currentQueryIndex
                                 ].fields.x[index].showFieldAsJson
                               "
-                              :label="'Show field as JSON'"
+                              :label="'Render Data as JSON / Array'"
                               dense
                             />
                           </div>
@@ -764,7 +764,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               dashboardPanelData.layout.currentQueryIndex
                             ].fields.y[index].showFieldAsJson
                           "
-                          :label="'Show field as JSON'"
+                          :label="'Render Data as JSON / Array'"
                           dense
                         />
                       </div>
