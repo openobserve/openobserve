@@ -408,7 +408,6 @@ mod tests {
                 "conditions": [
                     {
                         "filterType": "condition",
-                        "type": "condition",
                         "column": "status",
                         "operator": "=",
                         "value": "error",
@@ -416,7 +415,6 @@ mod tests {
                     },
                     {
                         "filterType": "condition",
-                        "type": "condition",
                         "column": "level",
                         "operator": "=",
                         "value": "critical",
@@ -447,7 +445,6 @@ mod tests {
                 "conditions": [
                     {
                         "filterType": "condition",
-                        "type": "condition",
                         "column": "status",
                         "operator": "=",
                         "value": "error",
@@ -459,7 +456,6 @@ mod tests {
                         "conditions": [
                             {
                                 "filterType": "condition",
-                                "type": "condition",
                                 "column": "service",
                                 "operator": "=",
                                 "value": "api",
@@ -467,7 +463,6 @@ mod tests {
                             },
                             {
                                 "filterType": "condition",
-                                "type": "condition",
                                 "column": "service",
                                 "operator": "=",
                                 "value": "web",
