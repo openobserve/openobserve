@@ -392,11 +392,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
         <div
-          style="width: 430px; height: 320px; position: sticky; top: 0 "
+          style="width: 430px; height: 100%; position: sticky; top: 0 "
           class=" col-2"
         >
           <preview-alert
-            style="border: 1px solid #ececec; height: 300px; width: 430px;"
+            style="border: 1px solid #ececec; height: 100%; width: 430px;"
             ref="previewAlertRef"
             :formData="formData"
             :query="previewQuery"
