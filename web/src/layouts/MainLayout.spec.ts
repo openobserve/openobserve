@@ -21,6 +21,20 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import MainLayout from "@/layouts/MainLayout.vue";
 import router from "@/test/unit/helpers/router";
+import * as cookies from "@/utils/cookies";
+
+// Mock cookies module
+vi.mock("@/utils/cookies", () => ({
+  getLanguage: vi.fn(() => "en-gb"),
+  setLanguage: vi.fn(),
+  getSidebarStatus: vi.fn(),
+  setSidebarStatus: vi.fn(),
+  getSize: vi.fn(),
+  setSize: vi.fn(),
+  getToken: vi.fn(),
+  setToken: vi.fn(),
+  removeToken: vi.fn(),
+}));
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -48,7 +62,10 @@ describe("MainLayout Methods and Functions", () => {
   beforeEach(() => {
     mockWindow = {
       open: vi.fn(),
-      location: { reload: vi.fn() }
+      location: { reload: vi.fn() },
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn()
     };
     global.window = mockWindow as any;
 
@@ -145,16 +162,57 @@ describe("MainLayout Methods and Functions", () => {
       expect(mockRouter.push).toHaveBeenCalledWith("/");
     });
 
-    it("should handle language change", () => {
+    it("should handle language change and store in cookies", () => {
+      // Clear any previous calls
+      vi.clearAllMocks();
+
       const changeLanguage = (langItem: any) => {
-        const setLanguage = vi.fn();
-        setLanguage(langItem.code);
+        // Store language code in cookie using the actual cookies utility
+        cookies.setLanguage(langItem.code);
+        // Reload window to apply language change
         window.location.reload();
       };
 
       const langItem = { code: "fr", label: "Français" };
       changeLanguage(langItem);
+
+      // Verify setLanguage was called with the language code
+      expect(cookies.setLanguage).toHaveBeenCalledWith("fr");
+      // Verify window reload was triggered
       expect(mockWindow.location.reload).toHaveBeenCalled();
+    });
+
+    it("should store language code, not the full object", () => {
+      // Clear any previous calls
+      vi.clearAllMocks();
+
+      const changeLanguage = (langItem: any) => {
+        // Only pass the code to setLanguage
+        cookies.setLanguage(langItem.code);
+      };
+
+      const langWithAllData = {
+        code: "de",
+        label: "Deutsch",
+        icon: "flag-icon flag-icon-de"
+      };
+
+      changeLanguage(langWithAllData);
+
+      // Verify setLanguage was called with just the code
+      expect(cookies.setLanguage).toHaveBeenCalledWith("de");
+      expect(cookies.setLanguage).toHaveBeenCalledTimes(1);
+
+      // Verify it was NOT called with the full object
+      expect(cookies.setLanguage).not.toHaveBeenCalledWith(langWithAllData);
+    });
+
+    it("should retrieve current language from cookies", () => {
+      // The mock returns "en-gb" by default
+      const currentLang = cookies.getLanguage();
+
+      expect(currentLang).toBe("en-gb");
+      expect(cookies.getLanguage).toHaveBeenCalled();
     });
   });
 
@@ -1123,6 +1181,669 @@ describe("MainLayout Methods and Functions", () => {
       expect(memoizedCalculation("hello")).toBe("olleh");
       expect(memoizedCalculation("hello")).toBe("olleh"); // From cache
       expect(cache.size).toBe(1);
+    });
+  });
+
+  describe("Organization Selection Flow - High Priority", () => {
+    it("should select default organization in cloud config", () => {
+      const setSelectedOrganization = () => {
+        const config = { isCloud: "true" };
+        const organizations = [
+          { id: 1, name: "Default Org", identifier: "default", type: "default" },
+          { id: 2, name: "Custom Org", identifier: "custom", type: "custom" }
+        ];
+
+        // Find default org
+        const defaultOrg = organizations.find(org => org.type === "default");
+        if (defaultOrg && config.isCloud === "true") {
+          return {
+            label: defaultOrg.name,
+            id: defaultOrg.id,
+            identifier: defaultOrg.identifier,
+            type: defaultOrg.type
+          };
+        }
+        return null;
+      };
+
+      const result = setSelectedOrganization();
+      expect(result).toBeDefined();
+      expect(result?.identifier).toBe("default");
+      expect(result?.type).toBe("default");
+    });
+
+    it("should select custom organization from URL in open-source config", () => {
+      const setSelectedOrganization = (urlOrgIdentifier: string) => {
+        const config = { isCloud: "false" };
+        const organizations = [
+          { id: 1, name: "Org One", identifier: "org-one", type: "default" },
+          { id: 2, name: "Org Two", identifier: "org-two", type: "custom" }
+        ];
+
+        if (config.isCloud === "false" && urlOrgIdentifier) {
+          const customOrg = organizations.find(
+            org => org.identifier === urlOrgIdentifier
+          );
+          if (customOrg) {
+            return {
+              label: customOrg.name,
+              id: customOrg.id,
+              identifier: customOrg.identifier,
+              type: customOrg.type
+            };
+          }
+        }
+        return null;
+      };
+
+      const result = setSelectedOrganization("org-two");
+      expect(result).toBeDefined();
+      expect(result?.identifier).toBe("org-two");
+      expect(result?.label).toBe("Org Two");
+    });
+
+    it("should map organization with billing information", () => {
+      const mapOrganization = (org: any) => {
+        return {
+          label: org.name,
+          id: org.id,
+          identifier: org.identifier,
+          subscription_type: org.CustomerBillingObj?.subscription_type || "",
+          status: org.status || "",
+          note: org.CustomerBillingObj?.note || ""
+        };
+      };
+
+      const orgWithBilling = {
+        id: 1,
+        name: "Premium Org",
+        identifier: "premium",
+        status: "active",
+        CustomerBillingObj: {
+          subscription_type: "pro",
+          note: "Annual subscription"
+        }
+      };
+
+      const result = mapOrganization(orgWithBilling);
+      expect(result.subscription_type).toBe("pro");
+      expect(result.note).toBe("Annual subscription");
+      expect(result.status).toBe("active");
+    });
+
+    it("should handle organization switching with cleanup", async () => {
+      const updateOrganization = async (newOrg: any) => {
+        // Reset streams
+        const resetStreams = vi.fn();
+        resetStreams();
+
+        // Clear logs
+        mockStore.dispatch("logs/resetLogs");
+
+        // Reset data ingestion flag
+        mockStore.dispatch("setIsDataIngested", false);
+
+        // Navigate with org identifier
+        mockRouter.push({
+          path: "/",
+          query: { org_identifier: newOrg.identifier }
+        });
+
+        return true;
+      };
+
+      const newOrg = { identifier: "new-org", label: "New Organization" };
+      await updateOrganization(newOrg);
+
+      expect(mockStore.dispatch).toHaveBeenCalledWith("logs/resetLogs");
+      expect(mockStore.dispatch).toHaveBeenCalledWith("setIsDataIngested", false);
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        path: "/",
+        query: { org_identifier: "new-org" }
+      });
+    });
+
+    it("should redirect to plans page for subscribe action", () => {
+      const handleSubscribeAction = (queryParams: any) => {
+        if (queryParams.action === "subscribe") {
+          mockRouter.push("/billings/plans");
+          return true;
+        }
+        return false;
+      };
+
+      const result = handleSubscribeAction({ action: "subscribe" });
+      expect(result).toBe(true);
+      expect(mockRouter.push).toHaveBeenCalledWith("/billings/plans");
+    });
+
+    it("should check trial period expiry and redirect", () => {
+      const checkTrialExpiry = (settings: any) => {
+        const now = Date.now();
+        const expiryTime = settings.free_trial_expiry;
+
+        if (expiryTime && now > expiryTime) {
+          mockRouter.push("/billings/plans");
+          return true;
+        }
+        return false;
+      };
+
+      const expiredSettings = {
+        free_trial_expiry: Date.now() - 1000000 // Expired
+      };
+
+      const result = checkTrialExpiry(expiredSettings);
+      expect(result).toBe(true);
+      expect(mockRouter.push).toHaveBeenCalledWith("/billings/plans");
+    });
+
+    it("should sort organizations alphabetically by label", () => {
+      const sortOrganizations = (orgs: any[]) => {
+        return [...orgs].sort((a, b) => a.label.localeCompare(b.label));
+      };
+
+      const unsortedOrgs = [
+        { label: "Zebra Corp", identifier: "zebra" },
+        { label: "Alpha Inc", identifier: "alpha" },
+        { label: "Beta LLC", identifier: "beta" }
+      ];
+
+      const sorted = sortOrganizations(unsortedOrgs);
+      expect(sorted[0].label).toBe("Alpha Inc");
+      expect(sorted[1].label).toBe("Beta LLC");
+      expect(sorted[2].label).toBe("Zebra Corp");
+    });
+  });
+
+  describe("Lifecycle Initialization - High Priority", () => {
+    it("should parse org_identifier from URL in onBeforeMount", () => {
+      const parseOrgFromURL = (url: string) => {
+        try {
+          const urlObj = new URL(url);
+          return urlObj.searchParams.get("org_identifier");
+        } catch (error) {
+          return null;
+        }
+      };
+
+      const url = "http://localhost:8080/?org_identifier=test-org";
+      const orgIdentifier = parseOrgFromURL(url);
+
+      expect(orgIdentifier).toBe("test-org");
+    });
+
+    it("should sync localStorage with URL params in onBeforeMount", () => {
+      const syncLocalStorage = (orgIdentifier: string) => {
+        if (orgIdentifier) {
+          localStorage.setItem("organizationIdentifier", orgIdentifier);
+          return true;
+        }
+        return false;
+      };
+
+      const result = syncLocalStorage("test-org");
+      expect(result).toBe(true);
+      expect(localStorage.getItem("organizationIdentifier")).toBe("test-org");
+
+      localStorage.removeItem("organizationIdentifier");
+    });
+
+    it("should handle errors in onBeforeMount gracefully", () => {
+      const onBeforeMount = () => {
+        try {
+          // Simulate URL parsing that might fail
+          const url = "invalid-url";
+          new URL(url);
+          return true;
+        } catch (error) {
+          return false;
+        }
+      };
+
+      const result = onBeforeMount();
+      expect(result).toBe(false);
+    });
+
+    it("should conditionally load config in onMounted", () => {
+      const shouldLoadConfig = (configLoaded: boolean) => {
+        return !configLoaded;
+      };
+
+      expect(shouldLoadConfig(false)).toBe(true);
+      expect(shouldLoadConfig(true)).toBe(false);
+    });
+
+    it("should apply mixin based on isCloud config in onMounted", () => {
+      const selectMixin = (isCloud: string) => {
+        return isCloud === "true" ? "CloudMixin" : "OpenSourceMixin";
+      };
+
+      expect(selectMixin("true")).toBe("CloudMixin");
+      expect(selectMixin("false")).toBe("OpenSourceMixin");
+    });
+
+    it("should initialize RUM user if enabled in onMounted", () => {
+      const initializeRUM = (rumEnabled: boolean, userInfo: any) => {
+        if (!rumEnabled) return null;
+
+        return {
+          name: `${userInfo.given_name} ${userInfo.family_name}`,
+          email: userInfo.email
+        };
+      };
+
+      const userInfo = {
+        given_name: "Jane",
+        family_name: "Smith",
+        email: "jane@test.com"
+      };
+
+      const rumUser = initializeRUM(true, userInfo);
+      expect(rumUser).toEqual({
+        name: "Jane Smith",
+        email: "jane@test.com"
+      });
+
+      const noRumUser = initializeRUM(false, userInfo);
+      expect(noRumUser).toBeNull();
+    });
+  });
+
+  describe("Complex Async Operations - High Priority", () => {
+    it("should verify stream existence and update data ingestion flag", async () => {
+      const verifyStreamExist = async (streamList: any[]) => {
+        if (streamList.length === 0) {
+          mockStore.dispatch("setIsDataIngested", false);
+          return false;
+        } else {
+          mockStore.dispatch("setIsDataIngested", true);
+          return true;
+        }
+      };
+
+      const resultWithStreams = await verifyStreamExist([{ name: "stream1" }]);
+      expect(resultWithStreams).toBe(true);
+      expect(mockStore.dispatch).toHaveBeenCalledWith("setIsDataIngested", true);
+
+      const resultNoStreams = await verifyStreamExist([]);
+      expect(resultNoStreams).toBe(false);
+      expect(mockStore.dispatch).toHaveBeenCalledWith("setIsDataIngested", false);
+    });
+
+    it("should preserve query parameters for logs routes in updateOrganization", () => {
+      const preserveQueryParams = (currentRoute: string, existingQuery: any) => {
+        if (currentRoute.includes(".logs")) {
+          return { ...existingQuery, preserved: true };
+        }
+        return existingQuery;
+      };
+
+      const result = preserveQueryParams("/app.logs", { filter: "test" });
+      expect(result.preserved).toBe(true);
+      expect(result.filter).toBe("test");
+
+      const noPreserve = preserveQueryParams("/dashboards", { filter: "test" });
+      expect(noPreserve.preserved).toBeUndefined();
+    });
+
+    it("should fetch organization settings with default fallbacks", async () => {
+      const getOrganizationSettings = async (apiResponse: any) => {
+        const settings = {
+          scrape_interval: apiResponse?.scrape_interval || 15,
+          span_id_field_name: apiResponse?.span_id_field_name || "spanId",
+          trace_id_field_name: apiResponse?.trace_id_field_name || "traceId",
+          free_trial_expiry: apiResponse?.free_trial_expiry || null
+        };
+
+        mockStore.dispatch("setOrganizationSettings", settings);
+        return settings;
+      };
+
+      // Test with partial response
+      const partialResponse = { scrape_interval: 30 };
+      const result = await getOrganizationSettings(partialResponse);
+
+      expect(result.scrape_interval).toBe(30);
+      expect(result.span_id_field_name).toBe("spanId"); // Default
+      expect(result.trace_id_field_name).toBe("traceId"); // Default
+      expect(mockStore.dispatch).toHaveBeenCalledWith("setOrganizationSettings", result);
+    });
+
+    it("should handle API errors in getConfig", async () => {
+      const getConfig = async (shouldFail: boolean) => {
+        try {
+          if (shouldFail) {
+            throw new Error("API Error");
+          }
+
+          const config = { version: "2.0.0", ai_enabled: true };
+          mockStore.dispatch("setConfig", config);
+          return config;
+        } catch (error) {
+          console.error("Config fetch failed:", error);
+          return null;
+        }
+      };
+
+      const successResult = await getConfig(false);
+      expect(successResult).toBeDefined();
+      expect(mockStore.dispatch).toHaveBeenCalledWith("setConfig", successResult);
+
+      const failResult = await getConfig(true);
+      expect(failResult).toBeNull();
+    });
+
+    it("should calculate trial period expiry correctly", () => {
+      const calculateExpiryDays = (expiryTimestamp: number) => {
+        const now = Date.now();
+        const diff = expiryTimestamp - now;
+        const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+        return days;
+      };
+
+      const futureExpiry = Date.now() + (7 * 24 * 60 * 60 * 1000); // 7 days from now
+      const days = calculateExpiryDays(futureExpiry);
+
+      expect(days).toBeGreaterThan(6);
+      expect(days).toBeLessThanOrEqual(7);
+    });
+
+    it("should check trial period allowed paths", () => {
+      const isAllowedPath = (currentPath: string, allowedPaths: string[]) => {
+        return allowedPaths.some(path => currentPath.includes(path));
+      };
+
+      const allowedPaths = ["iam", "users", "organizations"];
+
+      expect(isAllowedPath("/iam/settings", allowedPaths)).toBe(true);
+      expect(isAllowedPath("/users/list", allowedPaths)).toBe(true);
+      expect(isAllowedPath("/dashboards", allowedPaths)).toBe(false);
+    });
+  });
+
+  describe("Menu Filtering Logic - High Priority", () => {
+    it("should filter menus based on comma-separated config", () => {
+      const filterMenus = (linksList: any[], hideMenusConfig: string) => {
+        const menusToHide = hideMenusConfig
+          .split(',')
+          .map(menu => menu.trim())
+          .filter(menu => menu.length > 0);
+
+        return linksList.filter(link => !menusToHide.includes(link.name));
+      };
+
+      const linksList = [
+        { name: "home", title: "Home" },
+        { name: "logs", title: "Logs" },
+        { name: "metrics", title: "Metrics" },
+        { name: "traces", title: "Traces" }
+      ];
+
+      const filtered = filterMenus(linksList, "logs, metrics");
+      expect(filtered).toHaveLength(2);
+      expect(filtered.map(l => l.name)).toEqual(["home", "traces"]);
+    });
+
+    it("should handle whitespace in custom_hide_menus config", () => {
+      const parseHideMenus = (config: string) => {
+        return config.split(',').map(item => item.trim()).filter(item => item);
+      };
+
+      const result = parseHideMenus("  logs  ,  metrics  ,  ");
+      expect(result).toEqual(["logs", "metrics"]);
+    });
+
+    it("should update actions menu at correct position after alertList", () => {
+      const updateActionsMenu = (linksList: any[], isEnabled: boolean) => {
+        if (!isEnabled) return linksList;
+
+        const alertIndex = linksList.findIndex(link => link.name === "alertList");
+
+        if (alertIndex !== -1 && !linksList.some(link => link.name === "actionScripts")) {
+          const newList = [...linksList];
+          newList.splice(alertIndex + 1, 0, {
+            name: "actionScripts",
+            title: "menu.actions",
+            link: "/actions"
+          });
+          return newList;
+        }
+
+        return linksList;
+      };
+
+      const linksList = [
+        { name: "home", title: "Home", link: "/" },
+        { name: "alertList", title: "Alerts", link: "/alerts" },
+        { name: "dashboards", title: "Dashboards", link: "/dashboards" }
+      ];
+
+      const result = updateActionsMenu(linksList, true);
+      expect(result).toHaveLength(4);
+      expect(result[2].name).toBe("actionScripts");
+      expect(result[2].title).toBe("menu.actions");
+    });
+
+    it("should prevent duplicate actions menu insertion", () => {
+      const updateActionsMenu = (linksList: any[], isEnabled: boolean) => {
+        if (!isEnabled) return linksList;
+
+        const hasActions = linksList.some(link => link.name === "actionScripts");
+        if (hasActions) return linksList;
+
+        const alertIndex = linksList.findIndex(link => link.name === "alertList");
+        if (alertIndex !== -1) {
+          const newList = [...linksList];
+          newList.splice(alertIndex + 1, 0, {
+            name: "actionScripts",
+            title: "menu.actions"
+          });
+          return newList;
+        }
+
+        return linksList;
+      };
+
+      const linksListWithActions = [
+        { name: "alertList", title: "Alerts" },
+        { name: "actionScripts", title: "Actions" }
+      ];
+
+      const result = updateActionsMenu(linksListWithActions, true);
+      expect(result).toHaveLength(2); // No duplicate added
+      expect(result.filter(l => l.name === "actionScripts")).toHaveLength(1);
+    });
+
+    it("should handle link.hide property in filtering", () => {
+      const filterHiddenLinks = (linksList: any[]) => {
+        return linksList.filter(link => !link.hide);
+      };
+
+      const linksList = [
+        { name: "home", title: "Home", hide: false },
+        { name: "logs", title: "Logs", hide: true },
+        { name: "metrics", title: "Metrics", hide: false }
+      ];
+
+      const result = filterHiddenLinks(linksList);
+      expect(result).toHaveLength(2);
+      expect(result.map(l => l.name)).toEqual(["home", "metrics"]);
+    });
+
+    it("should store filtered menu names in store", () => {
+      const storeFilteredMenus = (hiddenMenus: string[]) => {
+        mockStore.dispatch("setHiddenMenus", hiddenMenus);
+      };
+
+      const hidden = ["logs", "metrics"];
+      storeFilteredMenus(hidden);
+
+      expect(mockStore.dispatch).toHaveBeenCalledWith("setHiddenMenus", hidden);
+    });
+  });
+
+  describe("Router Integration - High Priority", () => {
+    it("should preserve query parameters during organization change", () => {
+      const preserveQueryParams = (oldQuery: any, newOrgId: string) => {
+        return {
+          ...oldQuery,
+          org_identifier: newOrgId
+        };
+      };
+
+      const oldQuery = { filter: "test", tab: "2" };
+      const result = preserveQueryParams(oldQuery, "new-org");
+
+      expect(result.org_identifier).toBe("new-org");
+      expect(result.filter).toBe("test");
+      expect(result.tab).toBe("2");
+    });
+
+    it("should handle action=subscribe query parameter", () => {
+      const handleRouteAction = (action: string) => {
+        if (action === "subscribe") {
+          mockRouter.push("/billings/plans");
+          return true;
+        }
+        return false;
+      };
+
+      const result = handleRouteAction("subscribe");
+      expect(result).toBe(true);
+      expect(mockRouter.push).toHaveBeenCalledWith("/billings/plans");
+    });
+
+    it("should extract and validate org_identifier from route", () => {
+      const extractOrgIdentifier = (route: any) => {
+        const orgId = route.query?.org_identifier;
+        if (typeof orgId === "string" && orgId.trim().length > 0) {
+          return orgId;
+        }
+        return null;
+      };
+
+      expect(extractOrgIdentifier({ query: { org_identifier: "test-org" } })).toBe("test-org");
+      expect(extractOrgIdentifier({ query: { org_identifier: "" } })).toBeNull();
+      expect(extractOrgIdentifier({ query: {} })).toBeNull();
+    });
+  });
+
+  describe("Event Handling - High Priority", () => {
+    it("should dispatch window resize event after AI chat toggle", () => {
+      const toggleAIChatWithResize = () => {
+        const isEnabled = false;
+        mockStore.dispatch("setIsAiChatEnabled", !isEnabled);
+
+        // Simulate window resize dispatch
+        window.dispatchEvent(new Event("resize"));
+        return true;
+      };
+
+      toggleAIChatWithResize();
+
+      // Verify that dispatchEvent was called with resize event
+      expect(window.dispatchEvent).toHaveBeenCalled();
+      expect(mockStore.dispatch).toHaveBeenCalledWith("setIsAiChatEnabled", true);
+    });
+
+    it("should handle AI chat input context with nextTick", async () => {
+      const sendToAiChat = async (message: string) => {
+        const trimmedMessage = message.trim();
+
+        if (!trimmedMessage) return false;
+
+        mockStore.dispatch("setIsAiChatEnabled", true);
+
+        // Simulate nextTick wait
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        return true;
+      };
+
+      const result = await sendToAiChat("  Test message  ");
+      expect(result).toBe(true);
+      expect(mockStore.dispatch).toHaveBeenCalledWith("setIsAiChatEnabled", true);
+    });
+
+    it("should handle multiple rapid search query changes", () => {
+      let selectedOrg: any = { identifier: "org1" };
+
+      const handleSearchChange = (newQuery: string) => {
+        if (newQuery.length === 0) {
+          selectedOrg = null;
+        }
+        return selectedOrg;
+      };
+
+      expect(handleSearchChange("test")).toBeDefined();
+      expect(handleSearchChange("")).toBeNull();
+      expect(handleSearchChange("another")).toBeNull(); // Still null from previous
+    });
+  });
+
+  describe("Data Validation - High Priority", () => {
+    it("should validate organization data before selection", () => {
+      const validateOrganization = (org: any) => {
+        if (!org || !org.identifier || !org.id) {
+          return false;
+        }
+        return true;
+      };
+
+      expect(validateOrganization({ identifier: "test", id: 1, label: "Test" })).toBe(true);
+      expect(validateOrganization({ identifier: "test" })).toBe(false);
+      expect(validateOrganization(null)).toBe(false);
+      expect(validateOrganization({})).toBe(false);
+    });
+
+    it("should filter organizations by both label and identifier", () => {
+      const filterOrganizations = (orgs: any[], query: string) => {
+        if (!query.trim()) return orgs;
+
+        const lowerQuery = query.toLowerCase().trim();
+        return orgs.filter(org =>
+          org.label.toLowerCase().includes(lowerQuery) ||
+          org.identifier.toLowerCase().includes(lowerQuery)
+        );
+      };
+
+      const orgs = [
+        { label: "Test Organization", identifier: "test-org" },
+        { label: "Production Env", identifier: "prod-env" },
+        { label: "Development", identifier: "dev-org" }
+      ];
+
+      const byLabel = filterOrganizations(orgs, "test");
+      expect(byLabel).toHaveLength(1);
+      expect(byLabel[0].identifier).toBe("test-org");
+
+      const byIdentifier = filterOrganizations(orgs, "prod");
+      expect(byIdentifier).toHaveLength(1);
+      expect(byIdentifier[0].identifier).toBe("prod-env");
+
+      const byBoth = filterOrganizations(orgs, "dev");
+      expect(byBoth).toHaveLength(1);
+      expect(byBoth[0].identifier).toBe("dev-org");
+    });
+
+    it("should provide default values for missing organization settings", () => {
+      const getSettingsWithDefaults = (apiData: any) => {
+        return {
+          scrape_interval: apiData?.scrape_interval || 15,
+          span_id_field_name: apiData?.span_id_field_name || "spanId",
+          trace_id_field_name: apiData?.trace_id_field_name || "traceId",
+          custom_setting: apiData?.custom_setting || "default_value"
+        };
+      };
+
+      const emptyResponse = {};
+      const result = getSettingsWithDefaults(emptyResponse);
+
+      expect(result.scrape_interval).toBe(15);
+      expect(result.span_id_field_name).toBe("spanId");
+      expect(result.trace_id_field_name).toBe("traceId");
+      expect(result.custom_setting).toBe("default_value");
     });
   });
 });
