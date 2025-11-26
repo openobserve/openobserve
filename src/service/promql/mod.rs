@@ -56,7 +56,7 @@ pub trait TableProvider: Sync + Send + 'static {
         stream_name: &str,
         time_range: (i64, i64),
         machers: Matchers,
-        label_selector: Option<HashSet<String>>,
+        label_selector: HashSet<String>,
         filters: &mut [(String, Vec<String>)],
     ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats)>>;
 }

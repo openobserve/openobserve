@@ -19,7 +19,10 @@ use arrow::array::Array;
 use async_recursion::async_recursion;
 use config::{
     TIMESTAMP_COL_NAME,
-    meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL, value::*},
+    meta::{
+        promql::{EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL, value::*},
+        search::ScanStats,
+    },
     utils::{
         hash::{Sum64, gxhash},
         json,
@@ -66,8 +69,8 @@ pub struct Engine {
     ctx: Arc<PromqlContext>,
     /// Evaluation context for promql queries
     eval_ctx: EvalContext,
-    /// Filters to include certain columns
-    col_filters: Option<HashSet<String>>,
+    /// Only select columns with certain labels
+    label_selector: HashSet<String>,
     /// The result type of the query
     result_type: Option<String>,
 }
@@ -77,7 +80,7 @@ impl Engine {
         Self {
             ctx,
             eval_ctx,
-            col_filters: Some(HashSet::new()),
+            label_selector: HashSet::new(),
             result_type: None,
             trace_id: trace_id.to_string(),
         }
@@ -136,7 +139,7 @@ impl Engine {
                     match card {
                         VectorMatchCardinality::ManyToOne(_)
                         | VectorMatchCardinality::OneToMany(_) => {
-                            self.col_filters = None;
+                            self.label_selector.clear();
                         }
                         _ => {}
                     }
@@ -175,12 +178,12 @@ impl Engine {
         if let Some(label_modifier) = modifier {
             match op.id() {
                 // topk and bottomk query all columns when with modifiers
-                token::T_TOPK | token::T_BOTTOMK => self.col_filters = None,
+                token::T_TOPK | token::T_BOTTOMK => self.label_selector.clear(),
                 _ => {
-                    if let (Some(col_filters), LabelModifier::Include(labels)) =
-                        (&mut self.col_filters, label_modifier)
+                    if let (label_selector, LabelModifier::Include(labels)) =
+                        (&mut self.label_selector, label_modifier)
                     {
-                        col_filters.extend(labels.labels.iter().cloned());
+                        label_selector.extend(labels.labels.iter().cloned());
                     }
                 }
             }
@@ -546,7 +549,7 @@ impl Engine {
             metric
                 .samples
                 .sort_unstable_by(|a, b| a.timestamp.cmp(&b.timestamp));
-            if self.ctx.query_exemplars && metric.exemplars.is_some() {
+            if self.ctx.query_ctx.query_exemplars && metric.exemplars.is_some() {
                 metric
                     .exemplars
                     .as_mut()
@@ -614,45 +617,81 @@ impl Engine {
                 }
             })
             .collect::<Vec<(_, _)>>();
+
+        // check for super cluster
+        #[cfg(feature = "enterprise")]
+        let (super_tx, mut super_rx) =
+            tokio::sync::mpsc::channel::<Result<(HashMap<u64, RangeValue>, ScanStats)>>(1);
+        #[cfg(feature = "enterprise")]
+        if self.ctx.query_ctx.is_super_cluster {
+            let trace_id = self.ctx.query_ctx.trace_id.clone();
+            let query_ctx = self.ctx.query_ctx.clone();
+            let step = self.eval_ctx.step;
+            let selector = selector.clone();
+            let label_selector = self.label_selector.clone();
+            tokio::task::spawn(async move {
+                let ret = o2_enterprise::enterprise::metrics::super_cluster::selector_load_data(
+                    query_ctx,
+                    selector,
+                    &label_selector,
+                    start,
+                    end,
+                    step,
+                )
+                .await;
+                if let Err(e) = super_tx.send(ret).await {
+                    log::error!(
+                        "[trace_id: {trace_id}] [PromQL] Failed to send super cluster result to channel, error: {e:?}",
+                    );
+                }
+                drop(super_tx);
+            });
+        } else {
+            drop(super_tx);
+        }
+
         let ctxs = self
             .ctx
             .table_provider
             .create_context(
-                &self.ctx.org_id,
+                &self.ctx.query_ctx.org_id,
                 table_name,
                 (start, end),
                 selector.matchers.clone(),
-                self.col_filters.clone(),
+                self.label_selector.clone(),
                 &mut filters,
             )
             .await?;
 
+        let mut label_selector = self.label_selector.clone();
+        label_selector.extend(self.ctx.label_selector.iter().cloned());
+
         let mut tasks = Vec::with_capacity(ctxs.len());
         for (ctx, schema, scan_stats) in ctxs {
+            let query_ctx = self.ctx.query_ctx.clone();
             let selector = selector.clone();
-            let col_filters = &self.col_filters;
-            let query_exemplars = self.ctx.query_exemplars;
-            let query_data = self.ctx.query_data;
-            let trace_id = self.trace_id.to_string();
-            let task = tokio::time::timeout(Duration::from_secs(self.ctx.timeout), async move {
-                selector_load_data_from_datafusion(
-                    &trace_id,
-                    ctx,
-                    schema,
-                    selector,
-                    start,
-                    end,
-                    col_filters,
-                    query_exemplars,
-                    query_data,
-                )
-                .await
-            });
+            let label_selector = label_selector.clone();
+            let task = tokio::time::timeout(
+                Duration::from_secs(self.ctx.query_ctx.timeout),
+                async move {
+                    selector_load_data_from_datafusion(
+                        query_ctx,
+                        ctx,
+                        schema,
+                        selector,
+                        label_selector,
+                        start,
+                        end,
+                    )
+                    .await
+                },
+            );
             tasks.push(task);
             // update stats
             let mut ctx_scan_stats = self.ctx.scan_stats.write().await;
             ctx_scan_stats.add(&scan_stats);
         }
+
         let task_results = try_join_all(tasks)
             .await
             .map_err(|e| DataFusionError::Plan(format!("task error: {e}")))?;
@@ -672,6 +711,39 @@ impl Engine {
                     metrics.insert(key, value);
                 }
             }
+        }
+
+        // check for super cluster
+        #[cfg(feature = "enterprise")]
+        if self.ctx.query_ctx.is_super_cluster {
+            let (metric, stats) = match super_rx.recv().await {
+                Some(Ok(ret)) => ret,
+                Some(Err(e)) => {
+                    log::error!(
+                        "[trace_id: {}] [PromQL] Super cluster result channel error: {e:?}",
+                        self.trace_id
+                    );
+                    return Err(e);
+                }
+                None => {
+                    log::error!(
+                        "[trace_id: {}] [PromQL] Super cluster result channel is closed",
+                        self.trace_id
+                    );
+                    return Err(DataFusionError::Plan(
+                        "super cluster result channel is closed".to_string(),
+                    ));
+                }
+            };
+            for (key, value) in metric {
+                if let Some(metric) = metrics.get_mut(&key) {
+                    metric.extend(value);
+                } else {
+                    metrics.insert(key, value);
+                }
+            }
+            let mut ctx_scan_stats = self.ctx.scan_stats.write().await;
+            ctx_scan_stats.add(&stats);
         }
 
         log::info!(
@@ -1113,15 +1185,13 @@ impl Engine {
 
 #[allow(clippy::too_many_arguments)]
 async fn selector_load_data_from_datafusion(
-    trace_id: &str,
+    query_ctx: Arc<QueryContext>,
     ctx: SessionContext,
     schema: Arc<Schema>,
     selector: VectorSelector,
+    label_selector: HashSet<String>,
     start: i64,
     end: i64,
-    label_selector: &Option<HashSet<String>>,
-    query_exemplars: bool,
-    query_data: bool,
 ) -> Result<HashMap<u64, RangeValue>> {
     let start_time = std::time::Instant::now();
     let table_name = selector.name.as_ref().unwrap();
@@ -1138,13 +1208,14 @@ async fn selector_load_data_from_datafusion(
 
     df_group = apply_matchers(df_group, &schema, &selector.matchers)?;
 
-    match apply_label_selector(df_group, &schema, label_selector) {
+    match apply_label_selector(df_group, &schema, &label_selector) {
         Some(dataframe) => df_group = dataframe,
         None => return Ok(HashMap::default()),
     }
 
     // check if exemplars field is exists
-    if query_exemplars {
+
+    if query_ctx.query_exemplars {
         let schema = df_group.schema().as_arrow();
         if schema.field_with_name(EXEMPLARS_LABEL).is_err() {
             return Ok(HashMap::default());
@@ -1172,14 +1243,15 @@ async fn selector_load_data_from_datafusion(
     // get hash & timestamp
     let start1 = std::time::Instant::now();
     let hash_field_type = schema.field_with_name(HASH_LABEL).unwrap().data_type();
-    let (mut metrics, timestamp_set) = if query_exemplars {
+    let (mut metrics, timestamp_set) = if query_ctx.query_exemplars {
         load_exemplars_from_datafusion(hash_field_type, df_group.clone()).await?
     } else {
         load_samples_from_datafusion(hash_field_type, df_group.clone()).await?
     };
 
     log::info!(
-        "[trace_id: {trace_id}] load hashing and sample took: {:?}, metrics count: {}, timestamp count: {}",
+        "[trace_id: {}] load hashing and sample took: {:?}, metrics count: {}, timestamp count: {}",
+        query_ctx.trace_id,
         start1.elapsed(),
         metrics.len(),
         timestamp_set.len()
@@ -1198,7 +1270,8 @@ async fn selector_load_data_from_datafusion(
         .await?;
 
     log::info!(
-        "[trace_id: {trace_id}] load all labels took: {:?}",
+        "[trace_id: {}] load all labels took: {:?}",
+        query_ctx.trace_id,
         start2.elapsed()
     );
 
@@ -1234,7 +1307,7 @@ async fn selector_load_data_from_datafusion(
                     continue;
                 }
                 labels.clear(); // reset and reuse the same vector
-                if query_data {
+                if query_ctx.query_data {
                     labels.push(Arc::new(Label {
                         name: HASH_LABEL.to_string(),
                         value: hash.to_string(),
@@ -1267,7 +1340,7 @@ async fn selector_load_data_from_datafusion(
                     continue;
                 }
                 labels.clear(); // reset and reuse the same vector
-                if query_data {
+                if query_ctx.query_data {
                     labels.push(Arc::new(Label {
                         name: HASH_LABEL.to_string(),
                         value: hash.to_string(),
@@ -1291,8 +1364,9 @@ async fn selector_load_data_from_datafusion(
     }
 
     log::info!(
-        "[trace_id: {trace_id}] load data from datafusion took: {:?}",
-        start_time.elapsed()
+        "[trace_id: {}] load data from datafusion took: {:?}",
+        query_ctx.trace_id,
+        start_time.elapsed(),
     );
 
     Ok(metrics)
@@ -1567,33 +1641,33 @@ mod tests {
     #[test]
     fn test_engine_new() {
         // Test basic engine creation with a simple mock
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
 
-        assert_eq!(engine.trace_id, "test_trace");
-        assert!(engine.col_filters.is_some());
+        assert_eq!(engine.trace_id, trace_id.to_string());
+        assert!(!engine.label_selector.is_empty());
         assert!(engine.result_type.is_none());
     }
 
     #[test]
     fn test_extract_columns_from_prom_expr_number_literal() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -1605,14 +1679,14 @@ mod tests {
 
     #[test]
     fn test_extract_columns_from_prom_expr_string_literal() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -1626,14 +1700,14 @@ mod tests {
 
     #[test]
     fn test_extract_columns_from_prom_expr_paren() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -1648,14 +1722,14 @@ mod tests {
 
     #[test]
     fn test_extract_columns_from_prom_expr_unary() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -1670,14 +1744,14 @@ mod tests {
 
     #[test]
     fn test_extract_columns_from_prom_expr_binary() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -1697,14 +1771,14 @@ mod tests {
 
     #[test]
     fn test_extract_columns_from_prom_expr_binary_with_modifier() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -1731,14 +1805,14 @@ mod tests {
 
     #[test]
     fn test_extract_columns_from_prom_expr_binary_with_many_to_one() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -1763,20 +1837,20 @@ mod tests {
 
         let result = engine.extract_columns_from_prom_expr(&expr);
         assert!(result.is_ok());
-        // Should clear col_filters for ManyToOne
-        assert!(engine.col_filters.is_none());
+        // Should clear label_selector for ManyToOne
+        assert!(engine.label_selector.is_empty());
     }
 
     #[test]
     fn test_extract_columns_from_prom_expr_aggregate() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -1795,14 +1869,14 @@ mod tests {
 
     #[test]
     fn test_extract_columns_from_prom_expr_aggregate_with_param() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -1822,14 +1896,14 @@ mod tests {
 
     #[test]
     fn test_extract_columns_from_prom_expr_subquery() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -1849,14 +1923,14 @@ mod tests {
 
     #[test]
     fn test_extract_columns_from_prom_expr_call() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -1876,14 +1950,14 @@ mod tests {
 
     #[test]
     fn test_extract_columns_from_prom_expr_call_with_args() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -1906,14 +1980,14 @@ mod tests {
 
     #[test]
     fn test_extract_columns_from_prom_expr_extension() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -1935,33 +2009,33 @@ mod tests {
 
     #[test]
     fn test_extract_columns_from_modifier_none() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
 
         engine.extract_columns_from_modifier(&None, &create_test_token());
-        // Should not change col_filters
-        assert!(engine.col_filters.is_some());
+        // Should not change label_selector
+        assert!(!engine.label_selector.is_empty());
     }
 
     #[test]
     fn test_extract_columns_from_modifier_topk() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -1971,20 +2045,20 @@ mod tests {
         }));
 
         engine.extract_columns_from_modifier(&modifier, &create_test_token());
-        // Should clear col_filters for topk
-        assert!(engine.col_filters.is_some());
+        // Should clear label_selector for topk
+        assert!(!engine.label_selector.is_empty());
     }
 
     #[test]
     fn test_extract_columns_from_modifier_bottomk() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -1994,20 +2068,20 @@ mod tests {
         }));
 
         engine.extract_columns_from_modifier(&modifier, &create_test_token());
-        // Should clear col_filters for bottomk
-        assert!(engine.col_filters.is_some());
+        // Should clear label_selector for bottomk
+        assert!(!engine.label_selector.is_empty());
     }
 
     #[test]
     fn test_extract_columns_from_modifier_include() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2017,23 +2091,22 @@ mod tests {
         }));
 
         engine.extract_columns_from_modifier(&modifier, &create_test_token());
-        // Should add labels to col_filters
-        assert!(engine.col_filters.is_some());
-        let filters = engine.col_filters.as_ref().unwrap();
-        assert!(filters.contains("env"));
-        assert!(filters.contains("service"));
+        // Should add labels to label_selector
+        assert!(!engine.label_selector.is_empty());
+        assert!(engine.label_selector.contains("env"));
+        assert!(engine.label_selector.contains("service"));
     }
 
     #[test]
     fn test_extract_columns_from_modifier_exclude() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2043,20 +2116,20 @@ mod tests {
         }));
 
         engine.extract_columns_from_modifier(&modifier, &create_test_token());
-        // Should not change col_filters for exclude
-        assert!(engine.col_filters.is_some());
+        // Should not change label_selector for exclude
+        assert!(!engine.label_selector.is_empty());
     }
 
     #[tokio::test]
     async fn test_exec_expr_number_literal() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2074,14 +2147,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_expr_string_literal() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2101,14 +2174,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_expr_paren() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2130,14 +2203,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_expr_unary_float() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2159,14 +2232,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_expr_unary_vector() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2192,14 +2265,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_expr_binary_float_float() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2225,14 +2298,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_expr_binary_none_none() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2257,14 +2330,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_expr_subquery() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2291,14 +2364,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_expr_subquery_with_offset() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2326,14 +2399,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_expr_subquery_vector() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2362,14 +2435,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_expr_subquery_float() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2393,14 +2466,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_expr_aggregate() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2421,14 +2494,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_expr_call() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2450,14 +2523,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_expr_extension() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2478,14 +2551,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_expr_vector_selector() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2516,14 +2589,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_expr_matrix_selector() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2559,14 +2632,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2582,14 +2655,14 @@ mod tests {
 
     #[test]
     fn test_ensure_two_args() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2614,14 +2687,14 @@ mod tests {
 
     #[test]
     fn test_ensure_three_args() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2647,14 +2720,14 @@ mod tests {
 
     #[test]
     fn test_ensure_ge_three_args() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2681,14 +2754,14 @@ mod tests {
 
     #[test]
     fn test_ensure_five_args() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2716,14 +2789,14 @@ mod tests {
 
     #[test]
     fn test_parse_f64_else_err() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2740,14 +2813,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_call_expr_first_arg() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2769,14 +2842,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_call_expr_second_arg() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2799,14 +2872,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_call_expr_third_arg() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2830,14 +2903,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_call_expr_fourth_arg() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2862,14 +2935,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_call_expr_fifth_arg() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2898,6 +2971,20 @@ mod tests {
         token::TokenType::new(token::T_ADD)
     }
 
+    // Helper function to create test QueryContext
+    fn create_test_query_ctx(trace_id: &str, org_id: &str, timeout: u64) -> Arc<QueryContext> {
+        Arc::new(QueryContext {
+            trace_id: trace_id.to_string(),
+            org_id: org_id.to_string(),
+            query_exemplars: false,
+            query_data: false,
+            need_wal: false,
+            use_cache: false,
+            is_super_cluster: false,
+            timeout,
+        })
+    }
+
     // Helper function to create test EvalContext
     fn create_test_eval_ctx() -> EvalContext {
         EvalContext::new(
@@ -2919,7 +3006,7 @@ mod tests {
             _stream_name: &str,
             _time_range: (i64, i64),
             _machers: promql_parser::label::Matchers,
-            _label_selector: Option<HashSet<String>>,
+            _label_selector: HashSet<String>,
             _filters: &mut [(String, Vec<String>)],
         ) -> datafusion::error::Result<
             Vec<(
@@ -2934,14 +3021,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_eval_vector_selector_basic() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -2970,14 +3057,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_eval_vector_selector_with_offset() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -3006,14 +3093,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_eval_vector_selector_with_negative_offset() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -3042,14 +3129,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_eval_matrix_selector_basic() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );
@@ -3080,14 +3167,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_eval_matrix_selector_with_offset() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
         let mut engine = Engine::new(
-            "test_trace",
+            trace_id,
             Arc::new(PromqlContext::new(
-                "test_org",
+                create_test_query_ctx(trace_id, org_id, 30),
                 SimpleMockProvider,
-                false,
-                false,
-                30,
+                vec![],
             )),
             create_test_eval_ctx(),
         );

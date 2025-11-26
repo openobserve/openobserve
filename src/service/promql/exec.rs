@@ -32,8 +32,9 @@ use crate::service::promql::{
 
 #[derive(Clone)]
 pub struct PromqlContext {
-    pub org_id: String,
+    pub query_ctx: Arc<QueryContext>,
     pub table_provider: Arc<Box<dyn TableProvider>>,
+    pub label_selector: Vec<String>,
     /// The time boundaries for the evaluation. If start equals end an instant
     /// is evaluated.
     pub start: i64,
@@ -42,36 +43,26 @@ pub struct PromqlContext {
     pub interval: i64,
     /// Default look back from sample search.
     pub lookback_delta: i64,
-    pub query_exemplars: bool,
-    pub query_data: bool,
     pub scan_stats: Arc<RwLock<ScanStats>>,
-    pub timeout: u64, // seconds, query timeout
 }
 
 impl PromqlContext {
-    pub fn new<P>(
-        org_id: &str,
-        provider: P,
-        query_exemplars: bool,
-        query_data: bool,
-        timeout: u64,
-    ) -> Self
+    #[allow(clippy::too_many_arguments)]
+    pub fn new<P>(query_ctx: Arc<QueryContext>, provider: P, label_selector: Vec<String>) -> Self
     where
         P: TableProvider,
     {
         let now = micros_since_epoch(SystemTime::now());
         let five_min = micros(DEFAULT_LOOKBACK);
         Self {
-            org_id: org_id.to_string(),
+            query_ctx,
             table_provider: Arc::new(Box::new(provider)),
+            label_selector,
             start: now,
             end: now,
             interval: five_min,
-            query_exemplars,
-            query_data,
             lookback_delta: five_min,
             scan_stats: Arc::new(RwLock::new(ScanStats::default())),
-            timeout,
         }
     }
 

@@ -51,11 +51,13 @@ impl From<crate::service::promql::MetricsQueryRequest> for cluster_rpc::MetricsQ
             step: req.step,
             query_exemplars: req.query_exemplars,
             query_data: false,
+            label_selector: vec![],
         };
 
+        let trace_id = ider::generate_trace_id();
         let job = cluster_rpc::Job {
-            trace_id: ider::generate_trace_id(),
-            job: "".to_string(),
+            trace_id: trace_id.to_string(),
+            job: trace_id[..7].to_string(),
             stage: 0,
             partition: 0,
         };

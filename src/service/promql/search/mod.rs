@@ -27,10 +27,7 @@ use config::{
         self_reporting::usage::{RequestStats, UsageType},
         stream::StreamType,
     },
-    utils::{
-        rand::generate_random_string,
-        time::{now_micros, second_micros},
-    },
+    utils::time::{now_micros, second_micros},
 };
 use futures::future::try_join_all;
 use hashbrown::HashMap;
@@ -99,6 +96,7 @@ async fn search_in_cluster(
         step,
         query_exemplars,
         query_data: _,
+        label_selector: _,
     } = req.query.as_ref().unwrap();
 
     // cache disabled if result cache is disabled or use_cache is false or start == end or step == 0
@@ -196,7 +194,7 @@ async fn search_in_cluster(
 
     let job = cluster_rpc::Job {
         trace_id: trace_id.to_string(),
-        job: generate_random_string(7),
+        job: trace_id[..7].to_string(),
         stage: 0,
         partition: 0,
     };

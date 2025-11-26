@@ -60,12 +60,10 @@ pub fn apply_matchers(df: DataFrame, schema: &Schema, matchers: &Matchers) -> Re
 pub fn apply_label_selector(
     df: DataFrame,
     schema: &Schema,
-    label_selectors: &Option<HashSet<String>>,
+    label_selector: &HashSet<String>,
 ) -> Option<DataFrame> {
     let mut df = df;
-    if let Some(label_selector) = label_selectors
-        && !label_selector.is_empty()
-    {
+    if !label_selector.is_empty() {
         let schema_fields = schema
             .fields()
             .iter()

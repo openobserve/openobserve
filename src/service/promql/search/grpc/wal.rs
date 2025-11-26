@@ -57,7 +57,7 @@ pub(crate) async fn create_context(
     stream_name: &str,
     time_range: (i64, i64),
     matchers: Matchers,
-    label_selector: Option<HashSet<String>>,
+    label_selector: HashSet<String>,
 ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats)>> {
     let mut resp = vec![];
     // fetch all schema versions, get latest schema
@@ -123,7 +123,7 @@ async fn get_wal_batches(
     schema: Arc<Schema>,
     time_range: (i64, i64),
     matchers: Matchers,
-    label_selector: Option<HashSet<String>>,
+    label_selector: HashSet<String>,
 ) -> Result<(ScanStats, Vec<RecordBatch>, Arc<Schema>)> {
     let cfg = get_config();
     let nodes = get_cached_online_ingester_nodes().await;

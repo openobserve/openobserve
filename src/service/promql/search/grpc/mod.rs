@@ -56,7 +56,7 @@ impl TableProvider for StorageProvider {
         stream_name: &str,
         time_range: (i64, i64),
         matchers: Matchers,
-        label_selector: Option<HashSet<String>>,
+        label_selector: HashSet<String>,
         filters: &mut [(String, Vec<String>)],
     ) -> datafusion::error::Result<Vec<(SessionContext, Arc<Schema>, ScanStats)>> {
         let mut ctxs = Vec::new();
@@ -327,15 +327,23 @@ pub async fn search_inner(
         config::get_config().limit.query_timeout
     };
 
+    let query_ctx = Arc::new(value::QueryContext {
+        trace_id: trace_id.to_string(),
+        org_id: org_id.to_string(),
+        query_exemplars: query.query_exemplars,
+        query_data: query.query_data,
+        need_wal: req.need_wal,
+        use_cache: req.use_cache,
+        is_super_cluster: req.is_super_cluster,
+        timeout,
+    });
     let mut ctx = PromqlContext::new(
-        org_id,
+        query_ctx,
         StorageProvider {
             trace_id: trace_id.to_string(),
             need_wal: req.need_wal,
         },
-        query.query_exemplars,
-        query.query_data,
-        timeout,
+        query.label_selector.clone(),
     );
 
     let (value, result_type, mut scan_stats) = if query.query_exemplars {

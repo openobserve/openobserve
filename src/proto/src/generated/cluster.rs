@@ -510,6 +510,8 @@ pub struct MetricsQueryStmt {
     pub query_exemplars: bool,
     #[prost(bool, tag = "6")]
     pub query_data: bool,
+    #[prost(string, repeated, tag = "7")]
+    pub label_selector: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(serde::Serialize)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -702,7 +704,7 @@ pub mod metrics_client {
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
-            let codec = tonic::codec::ProstCodec::default();
+            let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static("/cluster.Metrics/Data");
             let mut req = request.into_request();
             req.extensions_mut().insert(GrpcMethod::new("cluster.Metrics", "Data"));
@@ -894,7 +896,7 @@ pub mod metrics_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = DataSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
+                        let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
                                 accept_compression_encodings,

@@ -25,12 +25,13 @@ message MetricsQueryRequest {
 }
 
 message MetricsQueryStmt {
-    string            query = 1;
-    int64             start = 2;
-    int64               end = 3;
-    int64              step = 4;
-    bool    query_exemplars = 5;
-    bool         query_data = 6;
+    string                    query = 1;
+    int64                     start = 2;
+    int64                       end = 3;
+    int64                      step = 4;
+    bool            query_exemplars = 5;
+    bool                 query_data = 6;
+    repeated string  label_selector = 7;
 }
 
 message MetricsQueryResponse {
