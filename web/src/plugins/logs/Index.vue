@@ -1187,8 +1187,9 @@ export default defineComponent({
     }
 
     // Helper function for handling the visualize tab
-    function handleVisualizeTab() {
-      handleRunQueryFn();
+    async function handleVisualizeTab() {
+      await handleRunQueryFn();
+      variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
     }
 
     const refreshTimezone = () => {
@@ -2020,7 +2021,9 @@ export default defineComponent({
     };
 
     const handleChartApiError = (errorMessage: any) => {
-      variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
+      const errorList = visualizeErrorData.errors;
+      errorList.splice(0);
+      errorList.push(errorMessage);
     };
 
     // [START] cancel running queries

@@ -677,10 +677,9 @@ describe("Logs Index", async () => {
     expect(setCustomDate).toHaveBeenCalledWith('absolute', date);
   });
 
-  it("Should handle chart API error without throwing", async () => {
-    expect(() => wrapper.vm.handleChartApiError('some-error')).not.toThrow();
-    expect(() => wrapper.vm.handleChartApiError({ message: 'error object' })).not.toThrow();
-    expect(() => wrapper.vm.handleChartApiError(null)).not.toThrow();
+   it("Should handle chart API error and populate errors list", async () => {
+    wrapper.vm.handleChartApiError('some-error');
+    expect(wrapper.vm.visualizeErrorData.errors).toEqual(['some-error']);
   });
 
   it("Should watch runQuery and trigger runQueryFn when true", async () => {
