@@ -1,4 +1,4 @@
-name: Bug Report (WIP - Do not use)
+name: Bug Report
 description: Report a bug in OpenObserve
 labels: ["☢️ Bug"]
  
@@ -6,15 +6,16 @@ body:
   - type: markdown
     attributes:
       value: |
-        ## Bug Report Template
         Please provide detailed information to help us understand and reproduce the bug.
+
+        **Reminder:** If you can, please assign this issue to the appropriate team member and set a milestone after creating it.
 
   - type: textarea
     id: description
     attributes:
       label: Bug Description
-      description: Detailed description of what the bug is
-      placeholder: "When clicking the login button on mobile devices (iOS Safari), nothing happens. The button appears to be clickable but no navigation or action occurs."
+      description: Detailed description of what the bug is. You can also attach screenshots or videos by dragging and dropping them here.
+      placeholder: "Example: When clicking the login button on mobile devices (iOS Safari), nothing happens. The button appears to be clickable but no navigation or action occurs."
     validations:
       required: true
 
@@ -88,13 +89,6 @@ body:
         Device: iPhone 14 Pro
     validations:
       required: true
-
-  - type: textarea
-    id: screenshots
-    attributes:
-      label: Screenshots / Videos
-      description: Add screenshots, screen recordings, or additional visual context
-      placeholder: "Drag and drop images or paste URLs here"
 
   - type: checkboxes
     id: affected-functionalities
