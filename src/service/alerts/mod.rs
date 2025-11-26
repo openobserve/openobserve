@@ -21,8 +21,8 @@ use config::{
     TIMESTAMP_COL_NAME, ider,
     meta::{
         alerts::{
-            AggFunction, AlertConditionParams, Condition, ConditionList, Operator, QueryCondition, QueryType,
-            TriggerCondition, TriggerEvalResults,
+            AggFunction, AlertConditionParams, Condition, ConditionList, Operator, QueryCondition,
+            QueryType, TriggerCondition, TriggerEvalResults,
         },
         cluster::RoleGroup,
         search::{SearchEventContext, SearchEventType, SqlQuery},
@@ -748,13 +748,7 @@ impl ConditionListExt for AlertConditionParams {
     async fn to_sql(&self, schema: &Schema) -> Result<String, anyhow::Error> {
         match self {
             AlertConditionParams::V1(conditions) => conditions.to_sql(schema).await,
-            AlertConditionParams::V2(_conditions) => {
-                // V2 format (ConditionGroup) doesn't have to_sql support yet
-                // For now, return an error or implement basic support
-                Err(anyhow::anyhow!(
-                    "SQL generation for v2 condition format not yet supported in alerts"
-                ))
-            }
+            AlertConditionParams::V2(conditions) => conditions.to_sql(schema).await,
         }
     }
 
@@ -762,6 +756,95 @@ impl ConditionListExt for AlertConditionParams {
         match self {
             AlertConditionParams::V1(conditions) => conditions.is_empty().await,
             AlertConditionParams::V2(conditions) => conditions.conditions.is_empty(),
+        }
+    }
+}
+
+// Trait and implementation for ConditionGroup (V2 format)
+#[async_trait]
+pub trait ConditionGroupExt: Sync + Send + 'static {
+    async fn to_sql(&self, schema: &Schema) -> Result<String, anyhow::Error>;
+}
+
+#[async_trait]
+impl ConditionGroupExt for config::meta::alerts::ConditionGroup {
+    async fn to_sql(&self, schema: &Schema) -> Result<String, anyhow::Error> {
+        if self.conditions.is_empty() {
+            return Ok("".to_string());
+        }
+
+        // Convert items to SQL left-to-right with operators
+        let mut sql_parts = Vec::new();
+        for item in &self.conditions {
+            sql_parts.push(condition_item_to_sql(item, schema).await?);
+        }
+
+        // Apply logical operators left-to-right
+        // Each condition's logical_operator determines how it combines with the NEXT condition
+        if sql_parts.len() == 1 {
+            return Ok(format!("({})", sql_parts[0]));
+        }
+
+        let mut result = sql_parts[0].clone();
+        for i in 0..self.conditions.len() - 1 {
+            let current_item = &self.conditions[i];
+            let next_sql = &sql_parts[i + 1];
+
+            match current_item.logical_operator() {
+                config::meta::alerts::LogicalOperator::And => {
+                    result = format!("({} AND {})", result, next_sql);
+                }
+                config::meta::alerts::LogicalOperator::Or => {
+                    result = format!("({} OR {})", result, next_sql);
+                }
+            }
+        }
+
+        Ok(result)
+    }
+}
+
+// Helper function to convert a ConditionItem to SQL
+async fn condition_item_to_sql(
+    item: &config::meta::alerts::ConditionItem,
+    schema: &Schema,
+) -> Result<String, anyhow::Error> {
+    match item {
+        config::meta::alerts::ConditionItem::Condition {
+            column,
+            operator,
+            value,
+            ignore_case,
+            ..
+        } => {
+            // Create a Condition struct to use with build_expr
+            let condition = config::meta::alerts::Condition {
+                column: column.clone(),
+                operator: *operator,
+                value: value.clone(),
+                ignore_case: ignore_case.unwrap_or(false),
+            };
+
+            let data_type = match schema.field_with_name(&condition.column) {
+                Ok(field) => field.data_type(),
+                Err(_) => {
+                    return Err(anyhow::anyhow!("Column {} not found", &condition.column));
+                }
+            };
+
+            build_expr(&condition, "", data_type)
+        }
+        config::meta::alerts::ConditionItem::Group {
+            conditions,
+            logical_operator,
+        } => {
+            // Recursively handle nested group
+            let nested_group = config::meta::alerts::ConditionGroup {
+                filter_type: "group".to_string(),
+                logical_operator: *logical_operator,
+                conditions: conditions.clone(),
+            };
+            nested_group.to_sql(schema).await
         }
     }
 }
@@ -993,4 +1076,315 @@ fn build_expr(
         }
     };
     Ok(expr)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arrow_schema::{DataType, Field, Schema};
+    use config::meta::alerts::{ConditionGroup, ConditionItem, LogicalOperator, Operator};
+    use config::utils::json::Value;
+
+    #[tokio::test]
+    async fn test_condition_group_to_sql_simple() {
+        // Create a simple schema
+        let schema = Schema::new(vec![
+            Field::new("level", DataType::Utf8, false),
+            Field::new("service", DataType::Utf8, false),
+        ]);
+
+        // Create a simple condition group: level = 'error' AND service = 'api'
+        let condition_group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![
+                ConditionItem::Condition {
+                    column: "level".to_string(),
+                    operator: Operator::EqualTo,
+                    value: Value::String("error".to_string()),
+                    ignore_case: None,
+                    logical_operator: LogicalOperator::And,
+                },
+                ConditionItem::Condition {
+                    column: "service".to_string(),
+                    operator: Operator::EqualTo,
+                    value: Value::String("api".to_string()),
+                    ignore_case: None,
+                    logical_operator: LogicalOperator::Or,
+                },
+            ],
+        };
+
+        let sql = condition_group.to_sql(&schema).await.unwrap();
+
+        // Should produce: ("level" = 'error' AND "service" = 'api')
+        assert_eq!(sql, "(\"level\" = 'error' AND \"service\" = 'api')");
+    }
+
+    #[tokio::test]
+    async fn test_condition_group_to_sql_with_or() {
+        let schema = Schema::new(vec![
+            Field::new("level", DataType::Utf8, false),
+            Field::new("status", DataType::Utf8, false),
+        ]);
+
+        // Create condition group: level = 'error' OR status = 'critical'
+        let condition_group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![
+                ConditionItem::Condition {
+                    column: "level".to_string(),
+                    operator: Operator::EqualTo,
+                    value: Value::String("error".to_string()),
+                    ignore_case: None,
+                    logical_operator: LogicalOperator::Or,
+                },
+                ConditionItem::Condition {
+                    column: "status".to_string(),
+                    operator: Operator::EqualTo,
+                    value: Value::String("critical".to_string()),
+                    ignore_case: None,
+                    logical_operator: LogicalOperator::And,
+                },
+            ],
+        };
+
+        let sql = condition_group.to_sql(&schema).await.unwrap();
+
+        // Should produce: ("level" = 'error' OR "status" = 'critical')
+        assert_eq!(sql, "(\"level\" = 'error' OR \"status\" = 'critical')");
+    }
+
+    #[tokio::test]
+    async fn test_condition_group_to_sql_nested_groups() {
+        let schema = Schema::new(vec![
+            Field::new("level", DataType::Utf8, false),
+            Field::new("service", DataType::Utf8, false),
+            Field::new("status", DataType::Utf8, false),
+        ]);
+
+        // Create nested condition group:
+        // level = 'error' AND (service = 'api' OR service = 'web')
+        let condition_group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![
+                ConditionItem::Condition {
+                    column: "level".to_string(),
+                    operator: Operator::EqualTo,
+                    value: Value::String("error".to_string()),
+                    ignore_case: None,
+                    logical_operator: LogicalOperator::And,
+                },
+                ConditionItem::Group {
+                    logical_operator: LogicalOperator::Or,
+                    conditions: vec![
+                        ConditionItem::Condition {
+                            column: "service".to_string(),
+                            operator: Operator::EqualTo,
+                            value: Value::String("api".to_string()),
+                            ignore_case: None,
+                            logical_operator: LogicalOperator::Or,
+                        },
+                        ConditionItem::Condition {
+                            column: "service".to_string(),
+                            operator: Operator::EqualTo,
+                            value: Value::String("web".to_string()),
+                            ignore_case: None,
+                            logical_operator: LogicalOperator::And,
+                        },
+                    ],
+                },
+            ],
+        };
+
+        let sql = condition_group.to_sql(&schema).await.unwrap();
+
+        // Exact SQL match for nested group:
+        // level = 'error' AND (service = 'api' OR service = 'web')
+        assert_eq!(
+            sql,
+            "(\"level\" = 'error' AND (\"service\" = 'api' OR \"service\" = 'web'))"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_condition_group_to_sql_numeric_conditions() {
+        let schema = Schema::new(vec![
+            Field::new("count", DataType::Int64, false),
+            Field::new("temperature", DataType::Float64, false),
+        ]);
+
+        // Create condition group: count > 100 AND temperature >= 50.5
+        let condition_group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![
+                ConditionItem::Condition {
+                    column: "count".to_string(),
+                    operator: Operator::GreaterThan,
+                    value: Value::Number(serde_json::Number::from(100)),
+                    ignore_case: None,
+                    logical_operator: LogicalOperator::And,
+                },
+                ConditionItem::Condition {
+                    column: "temperature".to_string(),
+                    operator: Operator::GreaterThanEquals,
+                    value: Value::Number(serde_json::Number::from_f64(50.5).unwrap()),
+                    ignore_case: None,
+                    logical_operator: LogicalOperator::Or,
+                },
+            ],
+        };
+
+        let sql = condition_group.to_sql(&schema).await.unwrap();
+
+        // Should produce: ("count" > 100 AND "temperature" >= 50.5)
+        assert_eq!(sql, "(\"count\" > 100 AND \"temperature\" >= 50.5)");
+    }
+
+    #[tokio::test]
+    async fn test_condition_group_to_sql_contains_operator() {
+        let schema = Schema::new(vec![
+            Field::new("message", DataType::Utf8, false),
+        ]);
+
+        // Create condition group with Contains operator
+        let condition_group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![
+                ConditionItem::Condition {
+                    column: "message".to_string(),
+                    operator: Operator::Contains,
+                    value: Value::String("error".to_string()),
+                    ignore_case: None,
+                    logical_operator: LogicalOperator::And,
+                },
+            ],
+        };
+
+        let sql = condition_group.to_sql(&schema).await.unwrap();
+
+        // Contains should generate str_match function
+        assert_eq!(sql, "(str_match(\"message\", 'error'))");
+    }
+
+    #[tokio::test]
+    async fn test_condition_group_to_sql_empty_conditions() {
+        let schema = Schema::new(Vec::<Field>::new());
+
+        // Empty condition group should return empty string
+        let condition_group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![],
+        };
+
+        let sql = condition_group.to_sql(&schema).await.unwrap();
+        assert_eq!(sql, "");
+    }
+
+    #[tokio::test]
+    async fn test_condition_group_to_sql_single_condition() {
+        let schema = Schema::new(vec![
+            Field::new("level", DataType::Utf8, false),
+        ]);
+
+        // Single condition should be wrapped in parentheses
+        let condition_group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![
+                ConditionItem::Condition {
+                    column: "level".to_string(),
+                    operator: Operator::EqualTo,
+                    value: Value::String("error".to_string()),
+                    ignore_case: None,
+                    logical_operator: LogicalOperator::And,
+                },
+            ],
+        };
+
+        let sql = condition_group.to_sql(&schema).await.unwrap();
+
+        assert_eq!(sql, "(\"level\" = 'error')");
+    }
+
+    #[tokio::test]
+    async fn test_condition_group_to_sql_mixed_and_or_same_level() {
+        let schema = Schema::new(vec![
+            Field::new("level", DataType::Utf8, false),
+            Field::new("status", DataType::Utf8, false),
+            Field::new("service", DataType::Utf8, false),
+        ]);
+
+        // Create condition group with mixed operators at same level:
+        // level = 'error' AND status = 'active' OR service = 'api'
+        // This tests left-to-right evaluation: (level = 'error' AND status = 'active') OR service = 'api'
+        let condition_group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![
+                ConditionItem::Condition {
+                    column: "level".to_string(),
+                    operator: Operator::EqualTo,
+                    value: Value::String("error".to_string()),
+                    ignore_case: None,
+                    logical_operator: LogicalOperator::And, // Combines with next using AND
+                },
+                ConditionItem::Condition {
+                    column: "status".to_string(),
+                    operator: Operator::EqualTo,
+                    value: Value::String("active".to_string()),
+                    ignore_case: None,
+                    logical_operator: LogicalOperator::Or, // Combines with next using OR
+                },
+                ConditionItem::Condition {
+                    column: "service".to_string(),
+                    operator: Operator::EqualTo,
+                    value: Value::String("api".to_string()),
+                    ignore_case: None,
+                    logical_operator: LogicalOperator::And, // Last one doesn't matter
+                },
+            ],
+        };
+
+        let sql = condition_group.to_sql(&schema).await.unwrap();
+
+        // Verify left-to-right evaluation with proper parentheses
+        // ((level = 'error' AND status = 'active') OR service = 'api')
+        assert_eq!(
+            sql,
+            "((\"level\" = 'error' AND \"status\" = 'active') OR \"service\" = 'api')"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_condition_group_to_sql_missing_column() {
+        let schema = Schema::new(vec![
+            Field::new("level", DataType::Utf8, false),
+        ]);
+
+        // Reference non-existent column
+        let condition_group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![
+                ConditionItem::Condition {
+                    column: "nonexistent".to_string(),
+                    operator: Operator::EqualTo,
+                    value: Value::String("error".to_string()),
+                    ignore_case: None,
+                    logical_operator: LogicalOperator::And,
+                },
+            ],
+        };
+
+        let result = condition_group.to_sql(&schema).await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Column nonexistent not found"));
+    }
 }
