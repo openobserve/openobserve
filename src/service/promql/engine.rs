@@ -19,10 +19,7 @@ use arrow::array::Array;
 use async_recursion::async_recursion;
 use config::{
     TIMESTAMP_COL_NAME,
-    meta::{
-        promql::{EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL, value::*},
-        search::ScanStats,
-    },
+    meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL, value::*},
     utils::{
         hash::{Sum64, gxhash},
         json,
@@ -620,8 +617,9 @@ impl Engine {
 
         // check for super cluster
         #[cfg(feature = "enterprise")]
-        let (super_tx, mut super_rx) =
-            tokio::sync::mpsc::channel::<Result<(HashMap<u64, RangeValue>, ScanStats)>>(1);
+        let (super_tx, mut super_rx) = tokio::sync::mpsc::channel::<
+            Result<(HashMap<u64, RangeValue>, config::meta::search::ScanStats)>,
+        >(1);
         #[cfg(feature = "enterprise")]
         if self.ctx.query_ctx.is_super_cluster {
             let trace_id = self.ctx.query_ctx.trace_id.clone();
