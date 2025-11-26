@@ -319,6 +319,7 @@ size="md" />
               :searchResponse="searchResponseForVisualization"
               :is_ui_histogram="shouldUseHistogramQuery"
               :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
+              @handleChartApiError="handleChartApiError"
             ></VisualizeLogsQuery>
           </div>
         </template>
@@ -2019,9 +2020,7 @@ export default defineComponent({
     };
 
     const handleChartApiError = (errorMessage: any) => {
-      const errorList = visualizeErrorData.errors;
-      errorList.splice(0);
-      errorList.push(errorMessage);
+      cancelFieldExtraction();
     };
 
     // [START] cancel running queries
@@ -2133,15 +2132,6 @@ export default defineComponent({
         ) {
           showErrorNotification(
             "Multiple SQL queries are not allowed to visualize",
-          );
-          variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
-          return null;
-        }
-        
-        // validate that timestamp column is not used as an alias
-        if (!checkTimestampAlias(logsPageQuery)) {
-          showErrorNotification(
-            `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`,
           );
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;
