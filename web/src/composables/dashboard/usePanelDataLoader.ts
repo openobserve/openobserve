@@ -21,6 +21,7 @@ import {
   onMounted,
   onUnmounted,
   toRaw,
+  nextTick,
 } from "vue";
 import queryService from "../../services/search";
 import { useStore } from "vuex";
@@ -1023,6 +1024,9 @@ export const usePanelDataLoader = (
                     message: `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`,
                     code: "400",
                   };
+                  addTraceId("tempTraceId");
+                  await nextTick();
+                  removeTraceId("tempTraceId");
                   state.loading = false;
                   // Skip this iteration and continue with next query/time shift
                   continue;
@@ -1301,6 +1305,9 @@ export const usePanelDataLoader = (
                   code: "400",
                 };
                 state.loading = false;
+                addTraceId("tempTraceId");
+                await nextTick();
+                removeTraceId("tempTraceId");
                 // Skip executing this query and move to next
                 continue;
               }

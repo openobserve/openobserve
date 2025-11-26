@@ -677,7 +677,7 @@ describe("Logs Index", async () => {
     expect(setCustomDate).toHaveBeenCalledWith('absolute', date);
   });
 
-   it("Should handle chart API error and populate errors list", async () => {
+  it("Should handle chart API error and populate errors list", async () => {
     wrapper.vm.handleChartApiError('some-error');
     expect(wrapper.vm.visualizeErrorData.errors).toEqual(['some-error']);
   });

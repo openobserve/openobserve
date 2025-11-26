@@ -1186,9 +1186,8 @@ export default defineComponent({
     }
 
     // Helper function for handling the visualize tab
-    async function handleVisualizeTab() {
+    function handleVisualizeTab() {
       handleRunQueryFn();
-      // variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
     }
 
     const refreshTimezone = () => {
