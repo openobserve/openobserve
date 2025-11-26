@@ -47,7 +47,6 @@ pub struct PromqlContext {
 }
 
 impl PromqlContext {
-    #[allow(clippy::too_many_arguments)]
     pub fn new<P>(query_ctx: Arc<QueryContext>, provider: P, label_selector: Vec<String>) -> Self
     where
         P: TableProvider,

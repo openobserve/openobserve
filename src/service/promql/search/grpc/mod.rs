@@ -100,7 +100,7 @@ pub async fn search(
     req: &cluster_rpc::MetricsQueryRequest,
 ) -> Result<cluster_rpc::MetricsQueryResponse> {
     let cfg = config::get_config();
-    let start_time = std::time::Instant::now();
+    let start_ts = std::time::Instant::now();
     let query = req.query.as_ref().unwrap();
 
     let start = query.start;
@@ -114,7 +114,7 @@ pub async fn search(
         results.push(search_inner(req).await?);
     } else {
         // 1. get max records stream
-        let start_time = std::time::Instant::now();
+        let start_ts = std::time::Instant::now();
         let file_list = match get_max_file_list(&trace_id, org_id, &query.query, start, end).await {
             Ok(v) => v,
             Err(e) => {
@@ -126,11 +126,11 @@ pub async fn search(
         };
         log::info!(
             "[trace_id {trace_id}] promql->search->grpc: get max records stream, took: {} ms",
-            start_time.elapsed().as_millis()
+            start_ts.elapsed().as_millis()
         );
 
         // 2. generate search group with max records stream
-        let start_time = std::time::Instant::now();
+        let start_ts = std::time::Instant::now();
         let memory_limit = cfg.memory_cache.datafusion_max_size; // bytes
         let group = match generate_search_group(memory_limit, file_list, start, end, step).await {
             Ok(v) => v,
@@ -146,7 +146,7 @@ pub async fn search(
         }
         log::info!(
             "[trace_id {trace_id}] promql->search->grpc: generate search group, took: {} ms",
-            start_time.elapsed().as_millis()
+            start_ts.elapsed().as_millis()
         );
 
         // 3. search each group
@@ -159,7 +159,7 @@ pub async fn search(
             let resp = search_inner(&req).await?;
             log::info!(
                 "[trace_id {trace_id}] promql->search->grpc: group[{start}, {end}] get resp, took: {} ms",
-                start_time.elapsed().as_millis()
+                start_ts.elapsed().as_millis()
             );
             results.push(resp);
         }
@@ -167,7 +167,7 @@ pub async fn search(
 
     let mut resp = cluster_rpc::MetricsQueryResponse {
         job: req.job.clone(),
-        took: start_time.elapsed().as_millis() as i32,
+        took: start_ts.elapsed().as_millis() as i32,
         result_type: results[0].1.clone(),
         ..Default::default()
     };
@@ -226,15 +226,19 @@ pub async fn data(
         }
     });
 
+    let start_ts = std::time::Instant::now();
     if start == end {
         let ret = search_inner(req).await?;
         if let Err(e) = data_tx.send(ret).await {
             log::error!("[trace_id {trace_id}] promql->data->grpc: send data error: {e}");
         }
+        log::info!(
+            "[trace_id {trace_id}] promql->data->grpc: get data done, took: {} ms",
+            start_ts.elapsed().as_millis()
+        );
         return Ok(());
     }
     // 1. get max records stream
-    let start_time = std::time::Instant::now();
     let file_list = match get_max_file_list(&trace_id, org_id, &query.query, start, end).await {
         Ok(v) => v,
         Err(e) => {
@@ -246,11 +250,11 @@ pub async fn data(
     };
     log::info!(
         "[trace_id {trace_id}] promql->data->grpc: get max records stream, took: {} ms",
-        start_time.elapsed().as_millis()
+        start_ts.elapsed().as_millis()
     );
 
     // 2. generate search group with max records stream
-    let start_time = std::time::Instant::now();
+    let start_ts = std::time::Instant::now();
     let memory_limit = cfg.memory_cache.datafusion_max_size; // bytes
     let group = match generate_search_group(memory_limit, file_list, start, end, step).await {
         Ok(v) => v,
@@ -266,7 +270,7 @@ pub async fn data(
     }
     log::info!(
         "[trace_id {trace_id}] promql->data->grpc: generate data group, took: {} ms",
-        start_time.elapsed().as_millis()
+        start_ts.elapsed().as_millis()
     );
 
     // 3. search each group
@@ -279,7 +283,7 @@ pub async fn data(
         let resp = search_inner(&req).await?;
         log::info!(
             "[trace_id {trace_id}] promql->data->grpc: group[{start}, {end}] get resp, took: {} ms",
-            start_time.elapsed().as_millis()
+            start_ts.elapsed().as_millis()
         );
         if let Err(e) = data_tx.send(resp).await {
             log::error!(
@@ -293,7 +297,7 @@ pub async fn data(
 
     log::info!(
         "[trace_id {trace_id}] promql->data->grpc: get data done, took: {} ms",
-        start_time.elapsed().as_millis()
+        start_ts.elapsed().as_millis()
     );
 
     Ok(())
