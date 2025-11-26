@@ -222,7 +222,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="'Drag & drop or click to upload'"
             counter
             :counter-label="counterLabelFn"
-            max-file-size="20481"
             accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
             @rejected="onRejected"
             dense
@@ -301,7 +300,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="'Drag & drop or click to upload'"
             counter
             :counter-label="counterLabelFn"
-            max-file-size="20481"
             accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
             @rejected="onRejected"
             dense
@@ -914,7 +912,7 @@ export default defineComponent({
       filesDark,
       logoThemeToDelete,
       counterLabelFn(CounterLabelParams: { filesNumber: any; totalSize: any }) {
-        return `(Only .png, .jpg, .jpeg, .gif, .bmp formats & size <=20kb & Max Size: 150x30px) ${CounterLabelParams.filesNumber} file | ${CounterLabelParams.totalSize}`;
+        return `(Only .png, .jpg, .jpeg, .gif, .bmp formats & Max Size: 150x30px) ${CounterLabelParams.filesNumber} file | ${CounterLabelParams.totalSize}`;
       },
       filesImages: ref(null),
       filesMaxSize: ref(null),

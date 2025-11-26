@@ -403,7 +403,7 @@ export default defineComponent({
         if(!startTime) {
           $q.notify({
             type: "negative",
-            message: "Invalid start datetime",
+            message: "The selected start time is  invalid. Please choose a valid time",
             timeout: 5000,
           });
           isLoading.value = false;
@@ -412,7 +412,7 @@ export default defineComponent({
         if(!endTime){
           $q.notify({
             type: "negative",
-            message: "Invalid end datetime",
+            message: "The selected end time is  invalid. Please choose a valid time",
             timeout: 5000,
           });
           isLoading.value = false;

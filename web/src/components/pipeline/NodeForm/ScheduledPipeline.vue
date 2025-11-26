@@ -2177,11 +2177,11 @@ const runQuery = async () => {
   //check if datetime is present or not 
   //else show the error message
   if(!dateTime.value.startTime) {
-    notificationMsgValue.value = "Invalid start datetime";
+    notificationMsgValue.value = "The selected start time is  invalid. Please choose a valid time.";
     return null;
   }
   if(!dateTime.value.endTime){
-     notificationMsgValue.value = "Invalid end datetime";
+     notificationMsgValue.value = "The selected end time is  invalid. Please choose a valid time.";
      return null;
   }
   if (tab.value == "sql") {
