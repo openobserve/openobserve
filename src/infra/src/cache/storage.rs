@@ -125,7 +125,11 @@ impl ObjectStoreExt for CacheFS {
         options: GetOptions,
     ) -> Result<GetResult> {
         let path = location.to_string();
-        if let Ok(data) = file_data::get_opts(account, &path, None, false).await {
+        let range = options
+            .range
+            .as_ref()
+            .map(|r| r.as_range(u64::MAX).unwrap());
+        if let Ok(data) = file_data::get_opts(account, &path, range.clone(), false).await {
             let meta = ObjectMeta {
                 location: location.clone(),
                 last_modified: *BASE_TIME,
@@ -133,14 +137,12 @@ impl ObjectStoreExt for CacheFS {
                 e_tag: None,
                 version: None,
             };
-            let (range, data) = match options.range {
-                Some(range) => {
-                    let r = range
-                        .as_range(data.len() as u64)
-                        .map_err(|e| crate::storage::Error::BadRange(e.to_string()))?;
-                    (r.clone(), data.slice(r.start as usize..r.end as usize))
-                }
-                None => (0..data.len() as u64, data),
+            let range = match range {
+                Some(r) => r,
+                None => Range {
+                    start: 0,
+                    end: data.len() as u64,
+                },
             };
             return Ok(GetResult {
                 payload: GetResultPayload::Stream(
