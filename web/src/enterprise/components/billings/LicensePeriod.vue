@@ -1,5 +1,5 @@
 <template>
-    <div v-if="showLicenseExpiryWarning && config.isEnterprise == 'true'" class="full-width license-expiry-container q-pa-md gradient-banner">
+    <div v-if="showLicenseExpiryWarning && config.isEnterprise == 'true' && config.isCloud === 'false'" class="full-width license-expiry-container q-pa-md gradient-banner">
         <div class="row" >
         <div class="col">
         <span class="o2-license-message">{{ getLicenseExpiryMessage() }}</span>
