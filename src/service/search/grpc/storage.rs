@@ -20,7 +20,7 @@ use arrow_schema::Schema;
 use config::{
     INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
-    get_config, is_local_disk_storage,
+    get_config,
     meta::{
         bitvec::BitVec,
         inverted_index::IndexOptimizeMode,
@@ -208,7 +208,8 @@ pub async fn search(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load files {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
+                "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load files {}, memory
+    cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
                 query.org_id,
                 query.stream_type,
                 query.stream_name,
@@ -224,7 +225,8 @@ pub async fn search(
                 .search_role("follower".to_string())
                 .duration(cache_start.elapsed().as_millis() as usize)
                 .desc(format!(
-                    "load files {}, memory cached {}, disk cached {}, scan_size {}, compressed_size {}",
+                    "load files {}, memory cached {}, disk cached {}, scan_size {},
+    compressed_size {}",
                     scan_stats.querier_files,
                     scan_stats.querier_memory_cached_files,
                     scan_stats.querier_disk_cached_files,
@@ -296,6 +298,10 @@ pub async fn cache_files(
     scan_stats: &mut ScanStats,
     file_type: &str,
 ) -> Result<(file_data::CacheType, u64, u64), Error> {
+    if file_type == "parquet" {
+        return Ok((file_data::CacheType::None, files.len() as u64, 0));
+    }
+
     // check how many files already cached
     let mut cached_files = HashSet::with_capacity(files.len());
     let (mut cache_hits, mut cache_misses) = (0, 0);
@@ -361,9 +367,7 @@ pub async fn cache_files(
     {
         // if scan_compressed_size < ZO_MEMORY_CACHE_SKIP_SIZE, use memory cache
         file_data::CacheType::Memory
-    } else if !is_local_disk_storage()
-        && cfg.disk_cache.enabled
-        && scan_stats.compressed_size < cfg.disk_cache.skip_size as i64
+    } else if cfg.disk_cache.enabled && scan_stats.compressed_size < cfg.disk_cache.skip_size as i64
     {
         // if scan_compressed_size < ZO_DISK_CACHE_SKIP_SIZE, use disk cache
         file_data::CacheType::Disk

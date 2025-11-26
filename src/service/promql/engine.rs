@@ -1301,6 +1301,9 @@ async fn load_samples_from_datafusion(
             target_partitions,
         ),
     )?);
+
+    config::meta::plan::print_plan(plan.as_ref());
+
     let streams = execute_stream_partitioned(plan, ctx)?;
 
     let mut tasks = Vec::new();

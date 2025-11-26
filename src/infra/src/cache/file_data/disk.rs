@@ -33,7 +33,14 @@ use config::{
 };
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
+use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use tokio::sync::RwLock;
+use tokio_util::compat::TokioAsyncWriteCompatExt;
+use vortex::VortexSessionDefault;
+use vortex_array::{Array, ArrayRef, IntoArray, arrays::ChunkedArray, arrow::FromArrowArray};
+use vortex_file::WriteOptionsSessionExt;
+use vortex_io::{AsyncWriteAdapter, session::RuntimeSessionExt};
+use vortex_session::VortexSession;
 
 use super::CacheStrategy;
 use crate::{cache::meta::ResultCacheMeta, storage};
@@ -916,17 +923,94 @@ pub async fn get_dir() -> String {
     FILES[0].read().await.root_dir.clone()
 }
 
+/// Convert parquet bytes to vortex format
+async fn convert_parquet_to_vortex(parquet_bytes: &[u8]) -> Result<Bytes, anyhow::Error> {
+    // Create a ParquetRecordBatchReader from bytes
+    let reader = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(parquet_bytes.to_vec()))?
+        .with_batch_size(8192)
+        .build()?;
+
+    // Convert Arrow record batches to Vortex chunks
+    let chunks: Vec<ArrayRef> = reader
+        .map(|batch_result| {
+            let batch = batch_result?;
+            Ok(ArrayRef::from_arrow(batch, false))
+        })
+        .collect::<Result<Vec<_>, anyhow::Error>>()?;
+
+    // Create a ChunkedArray from all chunks - the dtype is inferred from the first chunk
+    if chunks.is_empty() {
+        return Err(anyhow::anyhow!("No data chunks in parquet file"));
+    }
+    let dtype = chunks[0].dtype().clone();
+    let vortex_array = ChunkedArray::try_new(chunks, dtype)?.into_array();
+
+    // Create a tokio file from the buffer for async writing
+    let tmp_path = format!(
+        "{}/{}",
+        get_config().common.data_tmp_dir,
+        config::ider::generate()
+    );
+    tokio::fs::create_dir_all(&get_config().common.data_tmp_dir).await?;
+
+    let output_file = tokio::fs::File::create(&tmp_path).await?;
+    let compat_writer = output_file.compat_write();
+    let mut writer = AsyncWriteAdapter(compat_writer);
+
+    // Create a Vortex session and write the data
+    let session = VortexSession::default().with_tokio();
+    session
+        .write_options()
+        .write(&mut writer, vortex_array.to_array_stream())
+        .await?;
+
+    // Read the vortex file into bytes
+    let vortex_bytes = tokio::fs::read(&tmp_path).await?;
+
+    // Clean up the temporary file
+    let _ = tokio::fs::remove_file(&tmp_path).await;
+
+    Ok(Bytes::from(vortex_bytes))
+}
+
 pub async fn download(
     account: &str,
     file: &str,
     size: Option<usize>,
 ) -> Result<usize, anyhow::Error> {
     let (data_len, data_bytes) = super::download_from_storage(account, file, size).await?;
-    if let Err(e) = set(file, data_bytes).await {
+
+    // Check if this is a parquet file and convert to vortex
+    let (cache_file, cache_bytes) = if file.ends_with(".parquet") {
+        log::info!("Converting parquet file {} to vortex format", file);
+        let start = std::time::Instant::now();
+        match convert_parquet_to_vortex(&data_bytes).await {
+            Ok(vortex_bytes) => {
+                let vortex_file = file.replace(".parquet", ".vortex");
+                log::info!(
+                    "Successfully converted {file} to vortex format, original size: {data_len}, vortex size: {}, took: {} ms",
+                    vortex_bytes.len(),
+                    start.elapsed().as_millis()
+                );
+                (vortex_file, vortex_bytes)
+            }
+            Err(e) => {
+                log::warn!(
+                    "Failed to convert {} to vortex format: {}, using original parquet",
+                    file,
+                    e
+                );
+                (file.to_string(), data_bytes)
+            }
+        }
+    } else {
+        (file.to_string(), data_bytes)
+    };
+
+    let data_len = cache_bytes.len();
+    if let Err(e) = set(&cache_file, cache_bytes).await {
         return Err(anyhow::anyhow!(
-            "set file {} to disk cache failed: {}",
-            file,
-            e
+            "set file {cache_file} to disk cache failed: {e}",
         ));
     };
     Ok(data_len)

@@ -172,6 +172,7 @@ pub async fn grpc_search_multi(
     Ok(response)
 }
 
+#[allow(dead_code)]
 #[tracing::instrument(name = "service:search:grpc_search_partition", skip_all)]
 pub async fn grpc_search_partition(
     trace_id: &str,

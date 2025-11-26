@@ -29,7 +29,6 @@ use datafusion::{
     arrow::datatypes::{DataType, Schema},
     catalog::TableProvider,
     datasource::{
-        file_format::parquet::ParquetFormat,
         listing::{ListingOptions, ListingTableConfig, ListingTableUrl},
         object_store::{DefaultObjectStoreRegistry, ObjectStoreRegistry},
     },
@@ -49,6 +48,9 @@ use datafusion::{
 };
 use futures::TryStreamExt;
 use parquet::{arrow::AsyncArrowWriter, file::metadata::KeyValue};
+use vortex::VortexSessionDefault;
+use vortex_datafusion::VortexFormat;
+use vortex_session::VortexSession;
 #[cfg(feature = "enterprise")]
 use {
     arrow::array::Int64Array,
@@ -714,10 +716,10 @@ impl TableBuilder {
         .await?;
 
         // Configure listing options
-        let file_format = ParquetFormat::default();
-        let mut listing_options = ListingOptions::new(Arc::new(file_format))
+        let vortex_session = VortexSession::default();
+        let mut listing_options = ListingOptions::new(Arc::new(VortexFormat::new(vortex_session)))
             .with_target_partitions(target_partitions)
-            .with_collect_stat(true); // current is default to true
+            .with_collect_stat(false); // current is default to true
 
         if self.sorted_by_time {
             // specify sort columns for parquet file
@@ -725,12 +727,24 @@ impl TableBuilder {
                 .with_file_sort_order(vec![vec![col(TIMESTAMP_COL_NAME).sort(false, false)]]);
         }
 
+        // change all files suffix from .parquet to .vortex
+        let files = files
+            .into_iter()
+            .cloned()
+            .map(|mut f| {
+                if f.key.ends_with(".parquet") {
+                    f.key = f.key.replace(".parquet", ".vortex");
+                }
+                f.clone()
+            })
+            .collect::<Vec<_>>();
+
         let schema_key = schema.hash_key();
         let prefix = if session.storage_type == StorageType::Memory {
-            file_list::set(&session.id, &schema_key, files).await;
+            file_list::set(&session.id, &schema_key, &files).await;
             format!("memory:///{}/schema={}/", session.id, schema_key)
         } else if session.storage_type == StorageType::Wal {
-            file_list::set(&session.id, &schema_key, files).await;
+            file_list::set(&session.id, &schema_key, &files).await;
             format!("wal:///{}/schema={}/", session.id, schema_key)
         } else {
             return Err(DataFusionError::Execution(format!(
