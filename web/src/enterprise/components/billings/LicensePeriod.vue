@@ -33,7 +33,8 @@ export default defineComponent({
     const showLicenseExpiryWarning = computed(() => {
       if (!store.state.zoConfig.license_expiry) return false;
       const now = Date.now();
-      const expiryDate = store.state.zoConfig.license_expiry;
+      //convert micro to millseconds
+      const expiryDate = store.state.zoConfig.license_expiry / 1000;
       const daysUntilExpiry = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
       return daysUntilExpiry < 14;
     });
