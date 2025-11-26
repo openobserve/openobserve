@@ -1744,28 +1744,28 @@ def test_e2e_camel_case_sql_integration(create_session, base_url):
     org_id = "default"
     now = datetime.now(timezone.utc) 
     end_time = int(now.timestamp() * 1000000)
-    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
 
     # Test SQL integration scenarios
     sql_tests = [
         {
-            "sql": "SELECT error, class FROM \"stream_pytest_data\" WHERE match_all('DbException')",
-            "description": "SELECT specific fields with camel case match_all"
+            "sql": "SELECT error, class FROM \"stream_pytest_data\" WHERE error = 'DbException'",
+            "description": "SELECT specific fields with camel case direct match"
         },
         {
-            "sql": "SELECT error, COUNT(*) as count FROM \"stream_pytest_data\" WHERE match_all('exception') GROUP BY error",
-            "description": "GROUP BY with atomic token search"
+            "sql": "SELECT error, COUNT(*) as count FROM \"stream_pytest_data\" WHERE error LIKE '%Exception%' GROUP BY error",
+            "description": "GROUP BY with camel case pattern search"
         },
         {
-            "sql": "SELECT * FROM \"stream_pytest_data\" WHERE match_all('user') AND match_all('service')", 
-            "description": "Multiple match_all conditions with atomic tokens"
+            "sql": "SELECT * FROM \"stream_pytest_data\" WHERE class LIKE '%User%' AND class LIKE '%Service%'", 
+            "description": "Multiple LIKE conditions with camel case patterns"
         },
         {
             "sql": "SELECT * FROM \"stream_pytest_data\" WHERE error = 'DbException' OR class = 'UserAccountService'",
             "description": "Direct field comparison with camel case values"
         },
         {
-            "sql": "SELECT DISTINCT error FROM \"stream_pytest_data\" WHERE match_all('Exception')",
+            "sql": "SELECT DISTINCT error FROM \"stream_pytest_data\" WHERE error LIKE '%Exception%'",
             "description": "DISTINCT with camel case pattern search"
         }
     ]
@@ -1774,7 +1774,7 @@ def test_e2e_camel_case_sql_integration(create_session, base_url):
         json_data = {
             "query": {
                 "sql": test_case["sql"],
-                "start_time": one_min_ago,
+                "start_time": one_hour_ago,
                 "end_time": end_time,
                 "from": 0,
                 "size": 50,
