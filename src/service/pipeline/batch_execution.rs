@@ -45,8 +45,7 @@ use tokio::{
 use crate::{
     common::infra::config::QUERY_FUNCTIONS,
     service::{
-        alerts::ConditionExt,
-        filters::ConditionGroupExt,
+        alerts::{ConditionExt, ConditionGroupExt},
         ingestion::{apply_vrl_fn, compile_vrl_function},
         self_reporting::publish_error,
     },

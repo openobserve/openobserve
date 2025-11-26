@@ -232,7 +232,7 @@ impl Serialize for ConditionParams {
             ConditionParams::V2 { conditions } => {
                 // V2: Include version field
                 let mut state = serializer.serialize_struct("ConditionParams", 2)?;
-                state.serialize_field("version", "2")?;
+                state.serialize_field("version", &2)?;
                 state.serialize_field("conditions", conditions)?;
                 state.end()
             }
@@ -477,5 +477,69 @@ mod tests {
 
         let nested_node_data = json::from_value::<NodeData>(nested_payload);
         assert!(nested_node_data.is_ok());
+    }
+
+    #[test]
+    fn test_deserialize_v2_nested_condition_nodes() {
+        let json_str = r#"[
+  {
+    "id": "7035edaa-e96c-4114-8b3c-6c77db44418d",
+    "data": {
+      "node_type": "condition",
+      "version": 2,
+      "conditions": {
+        "filterType": "group",
+        "logicalOperator": "AND",
+        "conditions": [
+          {
+            "filterType": "condition",
+            "column": "kubernetes_annotations_prometheus_io_path",
+            "operator": "=",
+            "value": "asdfa",
+            "logicalOperator": "AND"
+          },
+          {
+            "filterType": "group",
+            "logicalOperator": "AND",
+            "conditions": [
+              {
+                "filterType": "condition",
+                "column": "distinct_field_hc_0",
+                "operator": "=",
+                "value": "123",
+                "logicalOperator": "OR"
+              },
+              {
+                "filterType": "condition",
+                "column": "kubernetes_annotations_prometheus_io_path",
+                "operator": "=",
+                "value": "123",
+                "logicalOperator": "AND"
+              }
+            ]
+          },
+          {
+            "filterType": "condition",
+            "column": "kubernetes_container_hash",
+            "operator": "=",
+            "value": "dasfg",
+            "logicalOperator": "AND"
+          }
+        ]
+      }
+    },
+    "position": {
+      "x": 271.25,
+      "y": 335
+    },
+    "io_type": "default"
+  }
+]"#;
+        let result: Result<Vec<Node>, _> = json::from_str(json_str);
+        match &result {
+            Ok(nodes) => println!("✓ Successfully deserialized {} nodes", nodes.len()),
+            Err(e) => println!("✗ Deserialization error: {}", e),
+        }
+        assert!(result.is_ok(), "Failed to deserialize: {:?}", result.err());
     }
 }
