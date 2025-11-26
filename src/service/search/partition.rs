@@ -204,8 +204,19 @@ impl PartitionGenerator {
         let mut end = new_end;
         while end > new_start {
             let start = max(end - step, new_start);
-            partitions.push([start, end]);
-            end = start;
+
+            // For histogram queries, check if the next iteration would create a partition
+            // smaller than min_step. If so, extend the current partition to cover it.
+            let remaining_duration = start - new_start;
+            if remaining_duration > 0 && remaining_duration < self.min_step {
+                // The remaining range is too small for a separate partition
+                // Extend current partition to cover the entire remaining range
+                partitions.push([new_start, end]);
+                break; // We've covered the entire range
+            } else {
+                partitions.push([start, end]);
+                end = start;
+            }
         }
 
         // We need to reverse partitions if query is ASC order

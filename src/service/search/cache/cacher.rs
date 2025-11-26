@@ -883,20 +883,21 @@ fn calculate_deltas_multi(
 
     for meta in results {
         cache_duration += meta.response_end_time - meta.response_start_time;
+
+        // For histogram queries, align delta boundaries to histogram intervals to prevent
+        // overlapping buckets. The delta should end at an interval boundary that doesn't
+        // overlap with the first cached bucket.
         let delta_end_time = if histogram_interval > 0 && !meta.cached_response.hits.is_empty() {
-            // If histogram interval > 0, we need to adjust the end time to the nearest interval
-            let mut end_time = meta.response_start_time;
-            if end_time % histogram_interval != 0 {
-                end_time = end_time - (end_time % histogram_interval);
-                if end_time < start_time {
-                    end_time = start_time;
-                }
-            }
-            end_time
+            // Get the timestamp of the first cached bucket
+            let first_bucket_ts =
+                get_ts_value(&meta.ts_column, meta.cached_response.hits.first().unwrap());
+            // The delta should end at the start of this bucket (which is already aligned)
+            first_bucket_ts
         } else {
             meta.response_start_time
         };
-        if meta.response_start_time > current_end_time {
+
+        if delta_end_time > current_end_time {
             // There is a gap (delta) between current coverage and the next meta
             deltas.push(QueryDelta {
                 delta_start_time: current_end_time,
@@ -913,16 +914,27 @@ fn calculate_deltas_multi(
             .last()
             .is_some_and(|last_meta| !last_meta.cached_response.hits.is_empty())
     {
-        // Adding histogram interval to the current end time to ensure the next query
-        // fetches the data after the last cache result timestamp, thereby avoiding duplicates
-        let mut expected_delta_start_time = current_end_time + histogram_interval.abs();
-        if expected_delta_start_time > end_time {
-            expected_delta_start_time = current_end_time;
+        // For histogram queries, align delta boundaries to histogram intervals to prevent
+        // overlapping buckets. If current_end_time = Nov 24 10:00 and interval = 1 day,
+        // we should start the delta at Nov 25 00:00 (next day boundary) to avoid querying
+        // the Nov 24 bucket again.
+        let delta_start_time = if histogram_interval > 0 {
+            // Round up to the next interval boundary
+            if current_end_time % histogram_interval == 0 {
+                current_end_time
+            } else {
+                current_end_time - (current_end_time % histogram_interval) + histogram_interval
+            }
+        } else {
+            current_end_time
+        };
+
+        if delta_start_time < end_time {
+            deltas.push(QueryDelta {
+                delta_start_time,
+                delta_end_time: end_time,
+            });
         }
-        deltas.push(QueryDelta {
-            delta_start_time: expected_delta_start_time,
-            delta_end_time: end_time,
-        });
     }
 
     // remove all deltas that are within the cache duration
