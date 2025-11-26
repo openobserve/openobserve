@@ -560,9 +560,10 @@ export class SDRPatternsPage {
 
   async verifyPatternNotVisibleInList(patternName, exact = true) {
     testLogger.info(`Verifying pattern NOT visible in list: ${patternName}`);
+    await this.page.waitForLoadState('networkidle');
     await this.searchPattern(patternName);
-    await this.page.waitForTimeout(1000);
-    const isVisible = await this.page.getByText(patternName, { exact }).isVisible({ timeout: 2000 }).catch(() => false);
+    await this.page.waitForTimeout(2000);
+    const isVisible = await this.page.getByText(patternName, { exact }).isVisible({ timeout: 3000 }).catch(() => false);
     await this.emptySearchInput();
 
     if (!isVisible) {
