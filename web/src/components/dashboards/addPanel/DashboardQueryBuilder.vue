@@ -753,6 +753,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :label="'Mark this field as non-timestamp'"
                         dense
                       />
+                      <q-checkbox
+                        v-if="dashboardPanelData.data.type === 'table'"
+                        v-model="
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].fields.y[index].showFieldAsJson
+                        "
+                        :label="'Show field as JSON'"
+                        dense
+                        class="q-mt-xs"
+                      />
                     </div>
                     <div
                       style="width: 100%"
