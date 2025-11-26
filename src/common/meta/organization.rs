@@ -372,6 +372,8 @@ impl Default for OrganizationSetting {
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
 pub struct OrganizationSettingResponse {
     pub data: OrganizationSetting,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deduplication_config: Option<serde_json::Value>,
 }
 
 /// Request struct for node listing with region filtering
@@ -716,6 +718,7 @@ mod tests {
         let setting = OrganizationSetting::default();
         let response = OrganizationSettingResponse {
             data: setting.clone(),
+            deduplication_config: None,
         };
 
         assert_eq!(

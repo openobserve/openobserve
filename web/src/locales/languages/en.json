@@ -1246,6 +1246,7 @@
   },
   "settings": {
     "header": "Management",
+    "alertCorrelation": "Alert Deduplication",
     "userKeyLabel": "User Key",
     "rumKeyLabel": "RUM Key",
     "newUserKeyBtnLbl": "Add User Key",

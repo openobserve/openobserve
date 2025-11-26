@@ -691,6 +691,209 @@ pub static META_NUM_ALERTS: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+
+// Alert deduplication metrics
+pub static ALERT_DEDUP_SUPPRESSED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "alert_dedup_suppressed_total",
+            "Total number of alerts suppressed by deduplication",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "alert_name", "dedup_type"],
+    )
+    .expect("Metric created")
+});
+
+pub static ALERT_DEDUP_PASSED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "alert_dedup_passed_total",
+            "Total number of alerts that passed deduplication",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "alert_name"],
+    )
+    .expect("Metric created")
+});
+
+pub static ALERT_DEDUP_ERRORS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "alert_dedup_errors_total",
+            "Total deduplication processing errors",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "error_type"],
+    )
+    .expect("Metric created")
+});
+
+// Alert correlation metrics
+pub static CORRELATION_INCIDENTS_CREATED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "correlation_incidents_created_total",
+            "Total number of incidents created by alert correlation",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+pub static CORRELATION_ALERTS_MATCHED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "correlation_alerts_matched_total",
+            "Total number of alerts matched to incidents",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "match_type"], // match_type: semantic_fields, temporal_only
+    )
+    .expect("Metric created")
+});
+
+pub static CORRELATION_MATCH_CONFIDENCE: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "correlation_match_confidence",
+            "Correlation match confidence distribution",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "confidence"], // confidence: high, medium, low
+    )
+    .expect("Metric created")
+});
+
+pub static CORRELATION_PROCESSING_DURATION_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "correlation_processing_duration_seconds",
+            "Time spent processing alert correlation",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "operation"], // operation: find_match, create_incident, update_incident
+    )
+    .expect("Metric created")
+});
+
+pub static CORRELATION_INCIDENT_ALERTS_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "correlation_incident_alerts_count",
+            "Number of alerts in incidents by confidence level",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "confidence"],
+    )
+    .expect("Metric created")
+});
+
+pub static CORRELATION_INCIDENTS_RESOLVED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "correlation_incidents_resolved_total",
+            "Total number of incidents resolved",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+pub static CORRELATION_INCIDENT_DURATION_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "correlation_incident_duration_seconds",
+            "Time from incident creation to resolution",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![
+            60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 14400.0, 28800.0,
+        ]), // 1min to 8 hours
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+// Alert grouping/batching metrics
+pub static ALERT_GROUPING_BATCHES_PENDING: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "alert_grouping_batches_pending",
+            "Current number of pending alert batches",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+pub static ALERT_GROUPING_NOTIFICATIONS_SENT_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "alert_grouping_notifications_sent_total",
+            "Total number of grouped notifications sent",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "send_strategy", "reason"],
+    )
+    .expect("Metric created")
+});
+
+pub static ALERT_GROUPING_BATCH_SIZE: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "alert_grouping_batch_size",
+            "Number of alerts per grouped notification",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![1.0, 2.0, 3.0, 5.0, 10.0, 25.0, 50.0, 100.0]),
+        &["organization", "send_strategy"],
+    )
+    .expect("Metric created")
+});
+
+pub static ALERT_GROUPING_WAIT_TIME: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "alert_grouping_wait_time_seconds",
+            "Time batches waited before sending (seconds)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![5.0, 10.0, 15.0, 20.0, 30.0, 45.0, 60.0, 90.0, 120.0]),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+pub static ALERT_GROUPING_SEND_ERRORS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "alert_grouping_send_errors_total",
+            "Total grouped notification send failures",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "error_type"],
+    )
+    .expect("Metric created")
+});
 pub static META_NUM_DASHBOARDS: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new("meta_num_dashboards", "Metadata dashboard nums")
@@ -1374,6 +1577,57 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(META_NUM_DASHBOARDS.clone()))
+        .expect("Metric registered");
+
+    // alert deduplication metrics
+    registry
+        .register(Box::new(ALERT_DEDUP_SUPPRESSED_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(ALERT_DEDUP_PASSED_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(ALERT_DEDUP_ERRORS_TOTAL.clone()))
+        .expect("Metric registered");
+
+    // alert correlation metrics
+    registry
+        .register(Box::new(CORRELATION_INCIDENTS_CREATED_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(CORRELATION_ALERTS_MATCHED_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(CORRELATION_MATCH_CONFIDENCE.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(CORRELATION_PROCESSING_DURATION_SECONDS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(CORRELATION_INCIDENT_ALERTS_COUNT.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(CORRELATION_INCIDENTS_RESOLVED_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(CORRELATION_INCIDENT_DURATION_SECONDS.clone()))
+        .expect("Metric registered");
+
+    // alert grouping metrics
+    registry
+        .register(Box::new(ALERT_GROUPING_BATCHES_PENDING.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(ALERT_GROUPING_NOTIFICATIONS_SENT_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(ALERT_GROUPING_BATCH_SIZE.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(ALERT_GROUPING_WAIT_TIME.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(ALERT_GROUPING_SEND_ERRORS_TOTAL.clone()))
         .expect("Metric registered");
 
     // db stats

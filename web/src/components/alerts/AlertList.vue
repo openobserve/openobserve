@@ -88,13 +88,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-ml-sm o2-secondary-button tw-h-[36px]"
             no-caps
             flat
-            label="View History"
-            @click="goToAlertHistory"
-            data-test="alert-history-btn"
-            icon="history"
-          >
-            <q-tooltip>View alert execution history</q-tooltip>
-          </q-btn>
+            :label="t('settings.header')"
+            @click="showCorrelationDrawer = true"
+            data-test="correlation-settings-btn"
+            icon="settings"
+          />
           <q-btn
             class="q-ml-sm o2-secondary-button tw-h-[36px]"
             no-caps
@@ -117,6 +115,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
+
+    <!-- Dedup Summary Cards (Enterprise Only) -->
+    <DedupSummaryCards
+      v-if="!showAddAlertDialog && !showImportAlertDialog && store.state.zoConfig.is_enterprise"
+      class="tw-px-[0.625rem]"
+    />
+
     <div
       v-if="!showAddAlertDialog && !showImportAlertDialog"
       class="full-width alert-list-table"
@@ -142,8 +147,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #after>
           <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
             <div class="tw-h-full card-container">
+              <!-- Incidents View -->
+              <IncidentList v-if="activeTab === 'incidents'" />
               <!-- Alert List Table -->
               <q-table
+                v-else
                 v-model:selected="selectedAlerts"
                 :selected-rows-label="getSelectedString"
                 selection="multiple"
@@ -209,7 +217,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <q-td v-for="col in columns" :key="col.name" :props="props">
                       <template v-if="col.name === 'name'">
-                        {{ computedName(props.row[col.field]) }}
+                        <div class="flex items-center tw-gap-2">
+                          <span>{{ computedName(props.row[col.field]) }}</span>
+                          <q-badge
+                            v-if="props.row.deduplication?.enabled"
+                            color="primary"
+                            outline
+                            dense
+                            class="tw-text-[10px]"
+                          >
+                            <q-icon name="filter_alt" size="10px" class="q-mr-xs" />
+                            Dedup
+                            <q-icon
+                              v-if="props.row.deduplication?.grouping?.enabled"
+                              name="group_work"
+                              size="10px"
+                              class="q-ml-xs"
+                              color="amber"
+                            />
+                            <q-tooltip class="bg-grey-8">
+                              <div>Deduplication: Enabled</div>
+                              <div v-if="props.row.deduplication?.fingerprint_fields?.length">
+                                Fields: {{ props.row.deduplication.fingerprint_fields.join(', ') }}
+                              </div>
+                              <div v-if="props.row.deduplication?.time_window_minutes">
+                                Window: {{ props.row.deduplication.time_window_minutes }} minutes
+                              </div>
+                              <div v-if="props.row.deduplication?.grouping?.enabled">
+                                Grouping: {{ props.row.deduplication.grouping.group_wait_seconds }}s wait
+                              </div>
+                            </q-tooltip>
+                          </q-badge>
+                        </div>
                         <q-tooltip
                           v-if="props.row[col.field]?.length > 30"
                           class="alert-name-tooltip"
@@ -536,6 +575,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:templates="getTemplates"
       />
     </template>
+
+    <!-- Correlation Settings Drawer -->
+    <q-drawer
+      v-model="showCorrelationDrawer"
+      side="right"
+      :width="800"
+      bordered
+      overlay
+      behavior="mobile"
+      data-test="correlation-settings-drawer"
+    >
+      <div class="tw-h-full tw-flex tw-flex-col">
+        <!-- Drawer Header -->
+        <div class="tw-px-6 tw-py-4 tw-border-b tw-flex tw-items-center tw-justify-between">
+          <div class="tw-flex tw-items-center">
+            <q-icon name="group_work" size="24px" class="tw-mr-2" />
+            <h6 class="tw-text-lg tw-font-semibold tw-m-0">
+              {{ t('settings.alertCorrelation') }}
+            </h6>
+          </div>
+          <q-btn
+            flat
+            round
+            dense
+            icon="close"
+            @click="showCorrelationDrawer = false"
+            data-test="close-correlation-drawer"
+          />
+        </div>
+
+        <!-- Drawer Content -->
+        <div class="tw-flex-1 tw-overflow-y-auto">
+          <OrganizationDeduplicationSettings
+            :org-id="store.state.selectedOrganization.identifier"
+            :config="store.state.organizationSettings?.deduplication_config"
+            @saved="onCorrelationSettingsSaved"
+            @cancel="showCorrelationDrawer = false"
+          />
+        </div>
+      </div>
+    </q-drawer>
+
     <ConfirmDialog
       title="Delete Alert"
       message="Are you sure you want to delete this alert?"
@@ -795,6 +876,9 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import ImportAlert from "@/components/alerts/ImportAlert.vue";
+import OrganizationDeduplicationSettings from "@/components/alerts/OrganizationDeduplicationSettings.vue";
+import DedupSummaryCards from "@/components/alerts/DedupSummaryCards.vue";
+import IncidentList from "@/components/alerts/IncidentList.vue";
 import {
   getImageURL,
   getUUID,
@@ -830,6 +914,8 @@ export default defineComponent({
     NoData,
     ConfirmDialog,
     ImportAlert,
+    OrganizationDeduplicationSettings,
+    DedupSummaryCards,
     FolderList,
     MoveAcrossFolders,
     AppTabs,
@@ -866,6 +952,7 @@ export default defineComponent({
     const showHistoryDrawer = ref(false);
     const selectedHistoryAlertId = ref("");
     const selectedHistoryAlertName = ref("");
+    const showCorrelationDrawer = ref(false);
 
     const { getStreams } = useStreams();
 
@@ -1012,6 +1099,10 @@ export default defineComponent({
       {
         label: t("alerts.realTime"),
         value: "realTime",
+      },
+      {
+        label: "Incidents",
+        value: "incidents",
       },
     ]);
 
@@ -1987,6 +2078,12 @@ export default defineComponent({
       });
     };
 
+    const onCorrelationSettingsSaved = async () => {
+      // Reload organization settings to get updated dedup config
+      await store.dispatch("getDefaultOrganizationSettings");
+      showCorrelationDrawer.value = false;
+    };
+
     const exportAlert = async (row: any) => {
       // Find the alert based on uuid
       const alertToBeExported = await getAlertById(row.alert_id);
@@ -2478,6 +2575,8 @@ export default defineComponent({
       showHistoryDrawer,
       selectedHistoryAlertId,
       selectedHistoryAlertName,
+      showCorrelationDrawer,
+      onCorrelationSettingsSaved,
       refreshImportedAlerts,
       folderIdToBeCloned,
       updateFolderIdToBeCloned,

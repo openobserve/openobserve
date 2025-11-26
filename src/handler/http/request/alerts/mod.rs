@@ -46,10 +46,13 @@ use crate::{
     },
 };
 
+pub mod dedup_stats;
+pub mod deduplication;
 #[allow(deprecated)]
 pub mod deprecated;
 pub mod destinations;
 pub mod history;
+pub mod incidents;
 pub mod templates;
 
 impl From<AlertError> for HttpResponse {

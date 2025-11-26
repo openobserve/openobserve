@@ -83,6 +83,17 @@ pub struct AlertHistoryEntry {
     pub evaluation_took_in_secs: Option<f64>,
     pub source_node: Option<String>,
     pub query_took: Option<i64>,
+    // Deduplication information
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dedup_enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dedup_suppressed: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dedup_count: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grouped: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group_size: Option<i32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -520,6 +531,18 @@ pub async fn get_alert_history(
                 .and_then(|v| v.as_str())
                 .map(String::from),
             query_took: hit.get("query_took").and_then(|v| v.as_i64()),
+            // Deduplication fields - populated from trigger data if available
+            dedup_enabled: hit.get("dedup_enabled").and_then(|v| v.as_bool()),
+            dedup_suppressed: hit.get("dedup_suppressed").and_then(|v| v.as_bool()),
+            dedup_count: hit
+                .get("dedup_count")
+                .and_then(|v| v.as_i64())
+                .map(|v| v as i32),
+            grouped: hit.get("grouped").and_then(|v| v.as_bool()),
+            group_size: hit
+                .get("group_size")
+                .and_then(|v| v.as_i64())
+                .map(|v| v as i32),
         });
     }
 
@@ -599,6 +622,11 @@ mod tests {
             evaluation_took_in_secs: Some(1.5),
             source_node: Some("node1".to_string()),
             query_took: Some(100),
+            dedup_enabled: None,
+            dedup_suppressed: None,
+            dedup_count: None,
+            grouped: None,
+            group_size: None,
         };
 
         assert_eq!(entry.alert_name, "test_alert");
@@ -644,6 +672,11 @@ mod tests {
             evaluation_took_in_secs: None,
             source_node: None,
             query_took: None,
+            dedup_enabled: None,
+            dedup_suppressed: None,
+            dedup_count: None,
+            grouped: None,
+            group_size: None,
         };
 
         let response = AlertHistoryResponse {
@@ -678,6 +711,11 @@ mod tests {
             evaluation_took_in_secs: Some(5.5),
             source_node: Some("node2".to_string()),
             query_took: Some(500),
+            dedup_enabled: None,
+            dedup_suppressed: None,
+            dedup_count: None,
+            grouped: None,
+            group_size: None,
         };
 
         assert_eq!(entry.status, "error");

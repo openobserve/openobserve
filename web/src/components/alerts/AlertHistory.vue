@@ -220,6 +220,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-td>
           </template> -->
 
+          <template #body-cell-dedup="props">
+            <q-td :props="props">
+              <!-- Not deduplicated or dedup not enabled -->
+              <span v-if="!props.row.dedup_enabled" class="text-grey-5">
+                -
+              </span>
+
+              <!-- Suppressed by deduplication -->
+              <div v-else-if="props.row.dedup_suppressed" class="text-negative">
+                <q-icon name="block" size="sm" />
+                <q-tooltip class="bg-grey-8">
+                  Suppressed by deduplication
+                  <div v-if="props.row.dedup_count" class="text-caption">
+                    {{ props.row.dedup_count }} occurrence{{ props.row.dedup_count > 1 ? 's' : '' }}
+                  </div>
+                </q-tooltip>
+              </div>
+
+              <!-- Grouped notification -->
+              <div v-else-if="props.row.grouped" class="text-primary flex items-center justify-center">
+                <q-icon name="group_work" size="sm" />
+                <span class="text-caption q-ml-xs">×{{ props.row.group_size || 1 }}</span>
+                <q-tooltip class="bg-grey-8">
+                  Grouped notification
+                  <div class="text-caption">
+                    {{ props.row.group_size }} alerts batched together
+                  </div>
+                </q-tooltip>
+              </div>
+
+              <!-- Sent (passed dedup) -->
+              <div v-else class="text-positive flex items-center justify-center">
+                <q-icon name="check_circle" size="sm" />
+                <span v-if="props.row.dedup_count && props.row.dedup_count > 1" class="text-caption q-ml-xs">
+                  ×{{ props.row.dedup_count }}
+                </span>
+                <q-tooltip class="bg-grey-8">
+                  Notification sent
+                  <div v-if="props.row.dedup_count && props.row.dedup_count > 1" class="text-caption">
+                    {{ props.row.dedup_count }} occurrences deduplicated
+                  </div>
+                </q-tooltip>
+              </div>
+            </q-td>
+          </template>
+
           <template #body-cell-actions="props">
             <q-td :props="props">
               <q-btn
@@ -678,6 +724,14 @@ const columns = ref([
     align: "center",
     sortable: true,
     style: "width: 50px;",
+  },
+  {
+    name: "dedup",
+    label: "Dedup",
+    field: "dedup",
+    align: "center",
+    sortable: false,
+    style: "width: 80px;",
   },
   // {
   //   name: "error",

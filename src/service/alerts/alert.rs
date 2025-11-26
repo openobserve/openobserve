@@ -2523,7 +2523,7 @@ mod tests {
         let json_str2 = r#"{"level": "warn", "job": "test2"}"#;
 
         // Simulate rows_tpl_val containing Value::String with JSON content
-        let rows_tpl_val = vec![
+        let rows_tpl_val = [
             Value::String(json_str1.to_string()),
             Value::String(json_str2.to_string()),
         ];
@@ -2532,9 +2532,8 @@ mod tests {
         let mut parsed_values = Vec::new();
         for v in rows_tpl_val.iter() {
             if let Value::String(s) = v {
-                match serde_json::from_str::<Value>(s) {
-                    Ok(parsed) => parsed_values.push(parsed),
-                    Err(_) => {}
+                if let Ok(parsed) = serde_json::from_str::<Value>(s) {
+                    parsed_values.push(parsed)
                 }
             } else {
                 parsed_values.push(v.clone());
