@@ -34,7 +34,7 @@ export default defineComponent({
     const getLicenseExpiryMessage = () => {
       if (!store.state.zoConfig.license_expiry) return '';
       const now = Date.now();
-      const expiryDate = store.state.zoConfig.license_expiry;
+      const expiryDate = store.state.zoConfig.license_expiry / 1000;
       const daysUntilExpiry = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
       
       if (daysUntilExpiry > 1) {
