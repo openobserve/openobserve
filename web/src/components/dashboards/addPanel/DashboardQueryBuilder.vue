@@ -210,26 +210,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-if="dashboardPanelData.data.type === 'table'"
                           class="q-mt-sm q-mb-sm"
                         >
-                          <q-checkbox
-                            v-model="
-                              dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].fields.x[index].treatAsNonTimestamp
-                            "
-                            :label="'Mark this field as non-timestamp'"
-                            dense
-                          />
-                          <q-checkbox
-                            v-if="dashboardPanelData.data.type === 'table'"
-                            v-model="
-                              dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].fields.x[index].showFieldAsJson
-                            "
-                            :label="'Show field as JSON'"
-                            dense
-                            class="q-mt-xs"
-                          />
+                          <div>
+                            <q-checkbox
+                              v-model="
+                                dashboardPanelData.data.queries[
+                                  dashboardPanelData.layout.currentQueryIndex
+                                ].fields.x[index].treatAsNonTimestamp
+                              "
+                              :label="'Mark this field as non-timestamp'"
+                              dense
+                            />
+                          </div>
+                          <div class="q-mt-xs">
+                            <q-checkbox
+                              v-model="
+                                dashboardPanelData.data.queries[
+                                  dashboardPanelData.layout.currentQueryIndex
+                                ].fields.x[index].showFieldAsJson
+                              "
+                              :label="'Show field as JSON'"
+                              dense
+                            />
+                          </div>
                         </div>
 
                         <div
@@ -744,26 +746,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="dashboardPanelData.data.type === 'table'"
                       class="q-mt-sm q-mb-sm"
                     >
-                      <q-checkbox
-                        v-model="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.y[index].treatAsNonTimestamp
-                        "
-                        :label="'Mark this field as non-timestamp'"
-                        dense
-                      />
-                      <q-checkbox
-                        v-if="dashboardPanelData.data.type === 'table'"
-                        v-model="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.y[index].showFieldAsJson
-                        "
-                        :label="'Show field as JSON'"
-                        dense
-                        class="q-mt-xs"
-                      />
+                      <div>
+                        <q-checkbox
+                          v-model="
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.y[index].treatAsNonTimestamp
+                          "
+                          :label="'Mark this field as non-timestamp'"
+                          dense
+                        />
+                      </div>
+                      <div class="q-mt-xs">
+                        <q-checkbox
+                          v-model="
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.y[index].showFieldAsJson
+                          "
+                          :label="'Show field as JSON'"
+                          dense
+                        />
+                      </div>
                     </div>
                     <div
                       style="width: 100%"
