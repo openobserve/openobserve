@@ -764,6 +764,11 @@ mod tests {
             query_took: Some(500),
             scheduler_trace_id: Some("trace123".to_string()),
             time_in_queue_ms: Some(100),
+            dedup_enabled: None,
+            dedup_suppressed: None,
+            dedup_count: None,
+            grouped: None,
+            group_size: None,
         };
 
         let json = serde_json::to_string(&trigger_data).unwrap();
