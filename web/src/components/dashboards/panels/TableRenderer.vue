@@ -37,7 +37,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template v-slot:body-cell="props">
       <q-td :props="props" :style="getStyle(props)">
-        {{ props.value == 'undefined' || props.value === null ? '' : props.value }}
+        <!-- Use JsonFieldRenderer if column is marked as JSON -->
+        <JsonFieldRenderer
+          v-if="props.col.showFieldAsJson"
+          :value="props.value"
+        />
+        <!-- Otherwise show normal value -->
+        <template v-else>
+          {{
+            props.value == "undefined" || props.value === null
+              ? ""
+              : props.value
+          }}
+        </template>
       </q-td>
     </template>
   </q-table>
@@ -50,9 +62,13 @@ import { defineComponent, ref } from "vue";
 import { findFirstValidMappedValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { useStore } from "vuex";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
+import JsonFieldRenderer from "./JsonFieldRenderer.vue";
 
 export default defineComponent({
   name: "TableRenderer",
+  components: {
+    JsonFieldRenderer,
+  },
   props: {
     data: {
       required: true,

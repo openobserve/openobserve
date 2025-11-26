@@ -247,6 +247,11 @@ export const convertTableData = (
         obj["colorMode"] = "auto";
       }
 
+      // pass showFieldAsJson flag to renderer
+      if (it.showFieldAsJson) {
+        obj["showFieldAsJson"] = true;
+      }
+
       obj["format"] = (val: any) => {
         // value mapping - use cached lookup
         const valueMapping = lookupValueMapping(val, valueMappingCache);
