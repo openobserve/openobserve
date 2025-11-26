@@ -57,13 +57,27 @@ jobs:
 
           # Method 1: Check using git diff with before/after SHAs
           if [ "${{ github.event.before }}" != "" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
-            echo "Comparing ${{ github.event.before }} with ${{ github.sha }}"
-            CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
-            echo "Changed files in this push:"
-            echo "$CHANGED_FILES"
+            echo "Attempting to compare ${{ github.event.before }} with ${{ github.sha }}"
 
-            if echo "$CHANGED_FILES" | grep -q "web/src/locales/languages/en.json"; then
-              EN_JSON_CHANGED=true
+            # Check if before commit exists (handles force push/rebase)
+            if git cat-file -e ${{ github.event.before }} 2>/dev/null; then
+              echo "Before commit exists, comparing..."
+              CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
+              echo "Changed files in this push:"
+              echo "$CHANGED_FILES"
+
+              if echo "$CHANGED_FILES" | grep -q "web/src/locales/languages/en.json"; then
+                EN_JSON_CHANGED=true
+              fi
+            else
+              echo "⚠️  Before commit doesn't exist (force push/rebase), checking last commit..."
+              CHANGED_FILES=$(git show --name-only --pretty="" HEAD)
+              echo "Changed files in last commit:"
+              echo "$CHANGED_FILES"
+
+              if echo "$CHANGED_FILES" | grep -q "web/src/locales/languages/en.json"; then
+                EN_JSON_CHANGED=true
+              fi
             fi
           else
             # Method 2: For first push or workflow_dispatch, check last commit
