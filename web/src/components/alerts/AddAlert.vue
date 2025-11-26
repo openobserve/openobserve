@@ -1539,6 +1539,13 @@ export default defineComponent({
       // When user updated query and click on save
       await new Promise((resolve) => setTimeout(resolve, 500));
 
+      // Ensure all accordion sections are expanded before validation
+      this.expandState.alertSetup = true;
+      this.expandState.queryMode = true;
+      this.expandState.thresholds = true;
+      this.expandState.realTimeMode = true;
+      this.expandState.advancedSetup = true;
+      await nextTick(); // Wait for DOM to update with all expanded sections
 
       if (
         this.formData.is_real_time == "false" &&
