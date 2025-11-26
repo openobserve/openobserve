@@ -6,14 +6,6 @@
         <br />
         <span class="o2-license-subtitle">Please update your license by contacting your administrator.</span>
         </div>
-        <div class="col-2 q-mt-sm">
-        <q-btn 
-            @click="$emit('updateLicense')" 
-            class="cursor-pointer text-capitalize bg-primary text-white q-px-md q-py-sm rounded-md float-right"
-            dense
-            no-caps
-        >Update License Key</q-btn>
-        </div>
   </div>
     </div>
 </template>
