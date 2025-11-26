@@ -327,8 +327,8 @@ jobs:
               # Try to get last failed tests from TestDino
               # Redirect stderr to /dev/null to avoid capturing npm warnings
               if LAST_FAILED_FLAGS="$(npx tdpw last-failed --cache-id "$CACHE_ID" 2>/dev/null)"; then
-                # Trim whitespace (original working logic - no filtering)
-                LAST_FAILED_FLAGS="$(echo "$LAST_FAILED_FLAGS" | xargs)"
+                # Trim whitespace using parameter expansion (safer than xargs for quoted strings)
+                LAST_FAILED_FLAGS="$(echo "$LAST_FAILED_FLAGS" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
 
                 if [ -n "$LAST_FAILED_FLAGS" ] && [ "$LAST_FAILED_FLAGS" != "No failed tests found" ]; then
                   echo "::notice::✅ Found failed tests from previous run."

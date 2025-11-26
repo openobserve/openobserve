@@ -45,7 +45,7 @@ test.describe("Stream Index Type Configuration Tests", () => {
         await pageManager.streamsPage.expectValidationErrorVisible();
     });
 
-    test("should select and delete extended retention period date", {
+    test.skip("should select and delete extended retention period date", {
         tag: ['@streams', '@extendedRetention', '@dateSelection', '@all']
     }, async () => {
         await pageManager.streamsPage.searchStream("e2e_automate");

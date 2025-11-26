@@ -220,12 +220,7 @@ async fn handle_alert_triggers(
                     start_time: now,
                     end_time: now,
                     next_run_at: now,
-                    skipped_alerts_count: None,
-                    delay_in_secs: None,
-                    evaluation_took_in_secs: None,
-                    query_took: None,
-                    success_response: None,
-                    is_partial: None,
+                    ..Default::default()
                 });
                 return Err(anyhow::anyhow!("Alert not found"));
             }
@@ -269,12 +264,7 @@ async fn handle_alert_triggers(
                     start_time: now,
                     end_time: now,
                     next_run_at: now,
-                    skipped_alerts_count: None,
-                    delay_in_secs: None,
-                    evaluation_took_in_secs: None,
-                    query_took: None,
-                    success_response: None,
-                    is_partial: None,
+                    ..Default::default()
                 });
                 return Err(anyhow::anyhow!("Error getting alert by id: {}", e));
             }
@@ -469,15 +459,11 @@ async fn handle_alert_triggers(
                 end_time: *skipped_last_timestamp,
                 retries: trigger.retries,
                 delay_in_secs: Some(Duration::microseconds(delay).num_seconds()),
-                error: None,
-                success_response: None,
-                is_partial: None,
-                evaluation_took_in_secs: None,
                 source_node: Some(source_node.clone()),
-                query_took: None,
                 scheduler_trace_id: Some(scheduler_trace_id.clone()),
                 time_in_queue_ms: Some(time_in_queue),
                 skipped_alerts_count: Some(skipped_alerts_count as i64),
+                ..Default::default()
             });
         }
         log::info!(
@@ -521,7 +507,7 @@ async fn handle_alert_triggers(
         query_took: None,
         scheduler_trace_id: Some(scheduler_trace_id.clone()),
         time_in_queue_ms: Some(time_in_queue),
-        skipped_alerts_count: None,
+        ..Default::default()
     };
 
     let evaluation_took = Instant::now();
@@ -643,6 +629,115 @@ async fn handle_alert_triggers(
 
     // send notification
     if let Some(data) = trigger_results.data {
+        // Check if grouping is enabled BEFORE deduplication (enterprise-only feature)
+        #[cfg(feature = "enterprise")]
+        let grouping_enabled = alert
+            .deduplication
+            .as_ref()
+            .and_then(|d| d.grouping.as_ref())
+            .map(|g| g.enabled)
+            .unwrap_or(false);
+
+        #[cfg(not(feature = "enterprise"))]
+        let grouping_enabled = false;
+
+        if grouping_enabled {
+            #[cfg(feature = "enterprise")]
+            {
+                let grouping_config = alert
+                    .deduplication
+                    .as_ref()
+                    .and_then(|d| d.grouping.as_ref())
+                    .unwrap();
+
+                // Calculate fingerprint for grouping
+                let fingerprint = if let Some(dedup_config) = alert.deduplication.as_ref() {
+                    let org_config =
+                        match crate::service::alerts::org_config::get_deduplication_config(
+                            &new_trigger.org,
+                        )
+                        .await
+                        {
+                            Ok(Some(config)) => Some(config),
+                            _ => None,
+                        };
+
+                    if let Some(first_row) = data.first() {
+                        crate::service::alerts::deduplication::calculate_fingerprint(
+                            &alert,
+                            first_row,
+                            dedup_config,
+                            org_config.as_ref(),
+                        )
+                    } else {
+                        alert.get_unique_key()
+                    }
+                } else {
+                    alert.get_unique_key()
+                };
+
+                log::debug!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Adding alert to batch, org: {}, alert: {}, fingerprint: {}, rows: {}",
+                    &new_trigger.org,
+                    &alert.name,
+                    fingerprint,
+                    data.len()
+                );
+
+                // Add to batch
+                let batch_ready = crate::service::alerts::grouping::add_to_batch(
+                    fingerprint.clone(),
+                    new_trigger.org.clone(),
+                    alert.clone(),
+                    data.clone(),
+                    grouping_config.group_wait_seconds,
+                    grouping_config.max_group_size,
+                );
+
+                if batch_ready {
+                    log::info!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Batch {} reached max size, sending immediately",
+                        fingerprint
+                    );
+                    if let Some(batch) =
+                        crate::service::alerts::grouping::get_ready_batch(&fingerprint)
+                        && let Err(e) =
+                            crate::job::alert_grouping::send_grouped_notification_sync(batch).await
+                    {
+                        log::error!(
+                            "[SCHEDULER trace_id {scheduler_trace_id}] Failed to send grouped notification: {}",
+                            e
+                        );
+                    }
+                } else {
+                    log::debug!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Alert added to batch, waiting for more alerts or timeout, fingerprint: {}",
+                        fingerprint
+                    );
+                }
+
+                // Mark as grouped for history tracking
+                trigger_data_stream.dedup_enabled = Some(true);
+                trigger_data_stream.grouped = Some(true);
+                trigger_data_stream.group_size = Some(if batch_ready {
+                    grouping_config.max_group_size as i32
+                } else {
+                    1
+                });
+
+                // Alert added to batch, don't send individual notification
+                trigger_data.period_end_time = if should_store_last_end_time {
+                    Some(trigger_results.end_time)
+                } else {
+                    None
+                };
+                new_trigger.data = json::to_string(&trigger_data).unwrap();
+                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                publish_triggers_usage(trigger_data_stream);
+                return Ok(());
+            }
+        }
+
         // Apply deduplication if enabled (enterprise-only feature)
         #[cfg(feature = "enterprise")]
         let data = if let Some(db) = ORM_CLIENT.get() {
@@ -660,6 +755,11 @@ async fn handle_alert_triggers(
                             &new_trigger.org,
                             &new_trigger.module_key
                         );
+
+                        // Mark as suppressed for history tracking
+                        trigger_data_stream.dedup_enabled = Some(true);
+                        trigger_data_stream.dedup_suppressed = Some(true);
+
                         // All results were deduplicated, skip notification
                         // Still update the trigger timing
                         trigger_data.period_end_time = if should_store_last_end_time {
@@ -737,6 +837,14 @@ async fn handle_alert_triggers(
         );
         trigger_data_stream.start_time = alert_start_time;
         trigger_data_stream.end_time = alert_end_time;
+
+        // Mark dedup status for history (if dedup was enabled, alert passed through)
+        if alert.deduplication.as_ref().is_some_and(|d| d.enabled) {
+            trigger_data_stream.dedup_enabled = Some(true);
+            trigger_data_stream.dedup_suppressed = Some(false);
+        }
+
+        // No grouping - send individual notification
         match alert
             .send_notification(
                 &data,
@@ -1014,7 +1122,7 @@ async fn handle_report_triggers(
                 query_took: None,
                 scheduler_trace_id: Some(scheduler_trace_id.clone()),
                 time_in_queue_ms: Some(Duration::microseconds(time_in_queue).num_milliseconds()),
-                skipped_alerts_count: None,
+                ..Default::default()
             });
             return Err(anyhow::anyhow!(
                 "Error getting report: {report_id}, error: {e}"
@@ -1148,7 +1256,7 @@ async fn handle_report_triggers(
         query_took: None,
         scheduler_trace_id: Some(scheduler_trace_id.clone()),
         time_in_queue_ms: Some(Duration::microseconds(time_in_queue).num_milliseconds()),
-        skipped_alerts_count: None,
+        ..Default::default()
     };
 
     if trigger.retries >= max_retries {
@@ -1311,7 +1419,7 @@ async fn handle_derived_stream_triggers(
                     query_took: None,
                     scheduler_trace_id: Some(scheduler_trace_id.clone()),
                     time_in_queue_ms: Some(time_in_queue),
-                    skipped_alerts_count: None,
+                    ..Default::default()
                 };
 
                 log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {err_msg}");
@@ -1381,7 +1489,7 @@ async fn handle_derived_stream_triggers(
             query_took: None,
             scheduler_trace_id: Some(scheduler_trace_id.clone()),
             time_in_queue_ms: Some(time_in_queue),
-            skipped_alerts_count: None,
+            ..Default::default()
         };
         log::info!("[SCHEDULER trace_id {scheduler_trace_id}] {msg}");
         new_trigger_data.reset();
@@ -1420,7 +1528,7 @@ async fn handle_derived_stream_triggers(
             query_took: None,
             scheduler_trace_id: Some(scheduler_trace_id.clone()),
             time_in_queue_ms: Some(time_in_queue),
-            skipped_alerts_count: None,
+            ..Default::default()
         };
         log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {err_msg}");
         new_trigger_data.reset();
@@ -1569,7 +1677,7 @@ async fn handle_derived_stream_triggers(
         query_took: None,
         scheduler_trace_id: Some(scheduler_trace_id.clone()),
         time_in_queue_ms: Some(time_in_queue),
-        skipped_alerts_count: None,
+        ..Default::default()
     };
 
     // conditionally modify supposed_to_be_run_at

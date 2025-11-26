@@ -372,6 +372,11 @@ mod tests {
             query_took: None,
             scheduler_trace_id: None,
             time_in_queue_ms: None,
+            dedup_enabled: None,
+            dedup_suppressed: None,
+            dedup_count: None,
+            grouped: None,
+            group_size: None,
         };
 
         let result = queue
@@ -893,6 +898,11 @@ mod tests {
             query_took: None,
             scheduler_trace_id: None,
             time_in_queue_ms: None,
+            dedup_enabled: None,
+            dedup_suppressed: None,
+            dedup_count: None,
+            grouped: None,
+            group_size: None,
         };
 
         let error_data = error::ErrorData {
@@ -956,6 +966,11 @@ mod tests {
             query_took: None,
             scheduler_trace_id: None,
             time_in_queue_ms: None,
+            dedup_enabled: None,
+            dedup_suppressed: None,
+            dedup_count: None,
+            grouped: None,
+            group_size: None,
         };
 
         let trigger_data2 = TriggerData {
@@ -1009,6 +1024,11 @@ mod tests {
             query_took: None,
             scheduler_trace_id: None,
             time_in_queue_ms: None,
+            dedup_enabled: None,
+            dedup_suppressed: None,
+            dedup_count: None,
+            grouped: None,
+            group_size: None,
         };
 
         // Should succeed when queue has space
