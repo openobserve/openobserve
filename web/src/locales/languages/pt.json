@@ -869,7 +869,15 @@
     "panelDuplicatedSuccessfully": "Painel duplicado com sucesso",
     "panelDuplicationFailed": "Falha na duplicação do painel",
     "mapname": "Nome",
-    "mapvalue": "Valor"
+    "mapvalue": "Valor",
+    "joins": "Junta-se",
+    "addJoin": "Adicionar junção",
+    "removeJoin": "Remover junção",
+    "leftJoin": "Junção à esquerda",
+    "innerJoin": "Junção interna",
+    "rightJoin": "Junção correta",
+    "addClause": "Adicionar cláusula",
+    "removeClause": "Remover cláusula"
   },
   "home": {
     "streams": "Transmissões",
@@ -1244,7 +1252,8 @@
     "domainSettingsSaved": "Configurações de domínio salvas com sucesso",
     "errorSavingDomainSettings": "Erro ao salvar as configurações do domínio",
     "noDomainMessage": "Nenhum domínio configurado. Adicione domínios acima para restringir o acesso.",
-    "license": "Licença"
+    "license": "Licença",
+    "alertCorrelation": "Desduplicação de alertas"
   },
   "iam": {
     "users": "Usuários",
@@ -1302,7 +1311,8 @@
     "view": "Visualizar",
     "delay": "Atraso",
     "history": "História do pipeline",
-    "searchHistory": "Insira o nome do pipeline"
+    "searchHistory": "Insira o nome do pipeline",
+    "destination_type": "Tipo de destino"
   },
   "reports": {
     "header": "Relatórios",
@@ -1587,5 +1597,47 @@
   },
   "alert_list": {
     "alert_details": "Detalhes do alerta"
+  },
+  "latencyInsights": {
+    "title": "Percepções",
+    "tabLabel": "Latência",
+    "analyzeButton": "Análise de latência",
+    "analyzeTooltip": "Analise padrões de latência em todas as dimensões de rastreamento",
+    "compareToLabel": "Compare com:",
+    "fullTimeRange": "Intervalo de tempo integral",
+    "beforePeriod": "Antes do período selecionado",
+    "afterPeriod": "Após o período selecionado",
+    "durationLabel": "Duração:",
+    "analyzingDimensions": "Analisando dimensões...",
+    "computingDistributions": "Computando distribuições de frequência em {count} dimensões",
+    "failedToLoad": "Falha ao carregar a análise",
+    "retryButton": "Tente novamente",
+    "percentileLabel": "Percentil de latência",
+    "p50Median": "P50 (mediana)",
+    "p75": "P75",
+    "p95": "P95",
+    "p99": "P99",
+    "dimensionsButton": "Campos ({count})",
+    "dimensionsTooltip": "Adicione ou remova dimensões para analisar",
+    "selectDimensions": "Selecionar campos",
+    "analyzeButtonLabel": "Analisar",
+    "refreshTooltip": "Atualize a análise com o percentil atualizado",
+    "customSQLFieldsDisabled": "A seleção de campo não está disponível para consultas SQL personalizadas. As dimensões são extraídas dos resultados da sua consulta.",
+    "timeRangeSelected": "Intervalo de tempo selecionado"
+  },
+  "volumeInsights": {
+    "title": "Percepções",
+    "tabLabel": "Tarifa",
+    "analyzeButton": "Análise de taxas",
+    "analyzeTooltip": "Analise padrões de taxa de rastreamento em todas as dimensões",
+    "analyzeTooltipLogs": "Analise a distribuição de dimensões para o intervalo de tempo atual",
+    "rateLabel": "Tarifa:",
+    "timeRangeLabel": "Intervalo de tempo:"
+  },
+  "errorInsights": {
+    "title": "Percepções",
+    "tabLabel": "Erros",
+    "errorSpikePeriod": "Período de pico de erro:",
+    "errorsGreaterThan": "Erros >="
   }
 }

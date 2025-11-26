@@ -869,7 +869,15 @@
     "panelDuplicatedSuccessfully": "패널 복제 성공",
     "panelDuplicationFailed": "패널 복제 실패",
     "mapname": "이름",
-    "mapvalue": "가치"
+    "mapvalue": "가치",
+    "joins": "참여하다",
+    "addJoin": "조인 추가",
+    "removeJoin": "제거 조인",
+    "leftJoin": "왼쪽 조인",
+    "innerJoin": "내부 조인",
+    "rightJoin": "오른쪽 조인",
+    "addClause": "조항 추가",
+    "removeClause": "조항 제거"
   },
   "home": {
     "streams": "스트림",
@@ -1244,7 +1252,8 @@
     "domainSettingsSaved": "도메인 설정이 성공적으로 저장됨",
     "errorSavingDomainSettings": "도메인 설정을 저장하는 중 오류 발생",
     "noDomainMessage": "도메인이 구성되지 않았습니다.위에 도메인을 추가하여 액세스를 제한하세요.",
-    "license": "라이선스"
+    "license": "라이선스",
+    "alertCorrelation": "경고 중복 제거"
   },
   "iam": {
     "users": "유저",
@@ -1302,7 +1311,8 @@
     "view": "보기",
     "delay": "지연",
     "history": "파이프라인 역사",
-    "searchHistory": "파이프라인 이름 입력"
+    "searchHistory": "파이프라인 이름 입력",
+    "destination_type": "목적지 유형"
   },
   "reports": {
     "header": "보고서",
@@ -1587,5 +1597,47 @@
   },
   "alert_list": {
     "alert_details": "경고 세부 정보"
+  },
+  "latencyInsights": {
+    "title": "인사이트",
+    "tabLabel": "지연 시간",
+    "analyzeButton": "지연 시간 분석",
+    "analyzeTooltip": "트레이스 차원 전반의 지연 패턴 분석",
+    "compareToLabel": "비교 대상:",
+    "fullTimeRange": "풀 타임 레인지",
+    "beforePeriod": "선택한 기간 이전",
+    "afterPeriod": "선택한 기간 이후",
+    "durationLabel": "기간:",
+    "analyzingDimensions": "치수 분석 중...",
+    "computingDistributions": "{count} 차원에 걸친 주파수 분포 계산",
+    "failedToLoad": "분석을 로드하지 못했습니다.",
+    "retryButton": "재시도",
+    "percentileLabel": "지연 백분위수",
+    "p50Median": "P50 (중앙값)",
+    "p75": "P75",
+    "p95": "P95",
+    "p99": "P99",
+    "dimensionsButton": "필드 ({개수})",
+    "dimensionsTooltip": "분석할 차원 추가 또는 제거",
+    "selectDimensions": "필드 선택",
+    "analyzeButtonLabel": "분석",
+    "refreshTooltip": "업데이트된 백분위수로 분석 새로 고침",
+    "customSQLFieldsDisabled": "사용자 지정 SQL 쿼리에는 필드 선택을 사용할 수 없습니다.차원은 쿼리 결과에서 추출됩니다.",
+    "timeRangeSelected": "시간 범위 선택"
+  },
+  "volumeInsights": {
+    "title": "인사이트",
+    "tabLabel": "요율",
+    "analyzeButton": "요금 분석",
+    "analyzeTooltip": "차원 전반의 트레이스 레이트 패턴 분석",
+    "analyzeTooltipLogs": "현재 시간 범위의 차원 분포 분석",
+    "rateLabel": "요금:",
+    "timeRangeLabel": "시간 범위:"
+  },
+  "errorInsights": {
+    "title": "인사이트",
+    "tabLabel": "오류",
+    "errorSpikePeriod": "오류 스파이크 기간:",
+    "errorsGreaterThan": "오류 >="
   }
 }

@@ -869,7 +869,15 @@
     "panelDuplicatedSuccessfully": "Panneau dupliqué avec succès",
     "panelDuplicationFailed": "La duplication du panneau a échoué",
     "mapname": "Nom",
-    "mapvalue": "Valeur"
+    "mapvalue": "Valeur",
+    "joins": "Rejoint",
+    "addJoin": "Ajouter Rejoindre",
+    "removeJoin": "Supprimer Rejoindre",
+    "leftJoin": "Rejoindre à gauche",
+    "innerJoin": "Jointure intérieure",
+    "rightJoin": "Adhérez à droite",
+    "addClause": "Ajouter une clause",
+    "removeClause": "Supprimer la clause"
   },
   "home": {
     "streams": "Ruisseaux",
@@ -1244,7 +1252,8 @@
     "domainSettingsSaved": "Les paramètres du domaine ont été enregistrés avec succès",
     "errorSavingDomainSettings": "Erreur lors de l'enregistrement des paramètres du domaine",
     "noDomainMessage": "Aucun domaine n'a été configuré. Ajoutez des domaines ci-dessus pour restreindre l'accès.",
-    "license": "Licence"
+    "license": "Licence",
+    "alertCorrelation": "Déduplication des alertes"
   },
   "iam": {
     "users": "Les utilisateurs",
@@ -1302,7 +1311,8 @@
     "view": "Afficher",
     "delay": "Retard",
     "history": "Historique du pipeline",
-    "searchHistory": "Entrez le nom du pipeline"
+    "searchHistory": "Entrez le nom du pipeline",
+    "destination_type": "Type de destination"
   },
   "reports": {
     "header": "Rapports",
@@ -1587,5 +1597,47 @@
   },
   "alert_list": {
     "alert_details": "Détails de l'alerte"
+  },
+  "latencyInsights": {
+    "title": "Perspectives",
+    "tabLabel": "Latence",
+    "analyzeButton": "Analyse de latence",
+    "analyzeTooltip": "Analysez les modèles de latence selon les dimensions de la trace",
+    "compareToLabel": "Comparez avec :",
+    "fullTimeRange": "Plage horaire complète",
+    "beforePeriod": "Avant la période sélectionnée",
+    "afterPeriod": "Après la période sélectionnée",
+    "durationLabel": "Durée :",
+    "analyzingDimensions": "Analyse des dimensions...",
+    "computingDistributions": "Calcul des distributions de fréquences entre {count} dimensions",
+    "failedToLoad": "Impossible de charger l'analyse",
+    "retryButton": "Réessayez",
+    "percentileLabel": "Percentile de latence",
+    "p50Median": "P50 (médiane)",
+    "p75": "PAGE 75",
+    "p95": "PAGE 95",
+    "p99": "P99",
+    "dimensionsButton": "Champs ({count})",
+    "dimensionsTooltip": "Ajouter ou supprimer des dimensions à analyser",
+    "selectDimensions": "Sélectionnez les champs",
+    "analyzeButtonLabel": "Analyser",
+    "refreshTooltip": "Actualiser l'analyse avec un percentile mis à jour",
+    "customSQLFieldsDisabled": "La sélection de champs n'est pas disponible pour les requêtes SQL personnalisées. Les dimensions sont extraites des résultats de votre requête.",
+    "timeRangeSelected": "Plage de temps sélectionnée"
+  },
+  "volumeInsights": {
+    "title": "Perspectives",
+    "tabLabel": "Tarif",
+    "analyzeButton": "Analyse des taux",
+    "analyzeTooltip": "Analysez les modèles de taux de trace sur toutes les dimensions",
+    "analyzeTooltipLogs": "Analyser la distribution des dimensions pour la plage de temps actuelle",
+    "rateLabel": "Tarif :",
+    "timeRangeLabel": "Plage de temps :"
+  },
+  "errorInsights": {
+    "title": "Perspectives",
+    "tabLabel": "Erreurs",
+    "errorSpikePeriod": "Période de pointe d'erreur :",
+    "errorsGreaterThan": "Erreurs >="
   }
 }

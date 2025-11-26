@@ -869,7 +869,15 @@
     "panelDuplicatedSuccessfully": "Panel Başarıyla Çoğaltıldı",
     "panelDuplicationFailed": "Panel çoğaltma başarısız oldu",
     "mapname": "İsim",
-    "mapvalue": "Değer"
+    "mapvalue": "Değer",
+    "joins": "Katılır",
+    "addJoin": "Katıl Ekle",
+    "removeJoin": "Katılmayı Kaldır",
+    "leftJoin": "Sol Katılım",
+    "innerJoin": "İç Katılım",
+    "rightJoin": "Sağ Katıl",
+    "addClause": "Madde Ekle",
+    "removeClause": "Maddeyi Kaldır"
   },
   "home": {
     "streams": "Akışlar",
@@ -1244,7 +1252,8 @@
     "domainSettingsSaved": "Etki alanı ayarları başarıyla kaydedildi",
     "errorSavingDomainSettings": "Etki alanı ayarlarını kaydederken hata oluştu",
     "noDomainMessage": "Yapılandırılmış etki alanı yok. Erişimi kısıtlamak için yukarıya alan adlarını ekleyin.",
-    "license": "Lisans"
+    "license": "Lisans",
+    "alertCorrelation": "Uyarı Tekilleştirme"
   },
   "iam": {
     "users": "Kullanıcılar",
@@ -1302,7 +1311,8 @@
     "view": "Görünüm",
     "delay": "Gecikme",
     "history": "Boru Hattı Geçmişi",
-    "searchHistory": "Boru Hattı Adını Girin"
+    "searchHistory": "Boru Hattı Adını Girin",
+    "destination_type": "Hedef Türü"
   },
   "reports": {
     "header": "Raporlar",
@@ -1587,5 +1597,47 @@
   },
   "alert_list": {
     "alert_details": "Uyarı Ayrıntıları"
+  },
+  "latencyInsights": {
+    "title": "İçgörüler",
+    "tabLabel": "Gecikme",
+    "analyzeButton": "Gecikme Analizi",
+    "analyzeTooltip": "İzleme boyutlarındaki gecikme kalıplarını analiz edin",
+    "compareToLabel": "Karşılaştır:",
+    "fullTimeRange": "Tam zaman aralığı",
+    "beforePeriod": "Seçilen dönemden önce",
+    "afterPeriod": "Seçilen dönemden sonra",
+    "durationLabel": "Süre:",
+    "analyzingDimensions": "Boyutları analiz ediyor...",
+    "computingDistributions": "{count} boyutları arasındaki frekans dağılımlarını hesaplama",
+    "failedToLoad": "Analiz yüklenemedi",
+    "retryButton": "Tekrar dene",
+    "percentileLabel": "Gecikme Yüzdesi",
+    "p50Median": "P50 (Medyan)",
+    "p75": "P75",
+    "p95": "P95",
+    "p99": "P99",
+    "dimensionsButton": "Alanlar ({count})",
+    "dimensionsTooltip": "Analiz edilecek boyut ekleme veya kaldırma",
+    "selectDimensions": "Alanları Seç",
+    "analyzeButtonLabel": "Analiz",
+    "refreshTooltip": "Güncellenmiş yüzdelik ile analizi yenileyin",
+    "customSQLFieldsDisabled": "Alan seçimi özel SQL sorguları için kullanılamaz. Boyutlar, sorgu sonuçlarınızdan çıkarılır.",
+    "timeRangeSelected": "Seçilen Zaman Aralığı"
+  },
+  "volumeInsights": {
+    "title": "İçgörüler",
+    "tabLabel": "Oranı",
+    "analyzeButton": "Oran Analizi",
+    "analyzeTooltip": "Boyutlardaki izleme hızı modellerini analiz edin",
+    "analyzeTooltipLogs": "Geçerli zaman aralığı için boyut dağılımını analiz edin",
+    "rateLabel": "Oranı:",
+    "timeRangeLabel": "Zaman Aralığı:"
+  },
+  "errorInsights": {
+    "title": "İçgörüler",
+    "tabLabel": "Hatalar",
+    "errorSpikePeriod": "Hata Artış Süresi:",
+    "errorsGreaterThan": "Hatalar >="
   }
 }
