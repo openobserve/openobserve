@@ -221,7 +221,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </tr>
                       <tr>
                         <td class="tw-font-semibold">Expires At</td>
-                        <td>{{ formatLicenseDate(licenseData.license.expires_at) }}</td>
+                        <td>
+                          <div class="tw-flex tw-items-center tw-justify-start tw-gap-4">
+                            <span>{{ formatLicenseDate(licenseData.license.expires_at) }}</span>
+                            <q-badge v-if="licenseData?.expired" color="red">
+                              Expired
+                            </q-badge>
+                          </div>
+                        </td>
                       </tr>
                     </tbody>
                   </q-markup-table>
@@ -300,10 +307,13 @@ export default defineComponent({
     };
 
     const formatLicenseDate = (timestamp: number) => {
-      return new Date(timestamp / 1000).toLocaleDateString('en-US', {
+      return new Date(timestamp / 1000).toLocaleString('en-US', {
         year: 'numeric',
         month: 'short',
-        day: 'numeric'
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
       });
     };
 
