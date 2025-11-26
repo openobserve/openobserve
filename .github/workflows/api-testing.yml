@@ -51,36 +51,30 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Rust Toolchain
-        if: steps.check_changes.outputs.has_changes == 'true'
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2025-11-11
 
       - name: Setup Rust Cache
-        if: steps.check_changes.outputs.has_changes == 'true'
         uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
           prefix-key: api-testing
 
       - name: Install Protoc
-        if: steps.check_changes.outputs.has_changes == 'true'
         uses: arduino/setup-protoc@v3
         with:
           version: "21.12"
 
       - name: Build OpenObserve debug binary
-        if: steps.check_changes.outputs.has_changes == 'true'
         run: cargo build --features mimalloc
 
       - name: Setup Python
-        if: steps.check_changes.outputs.has_changes == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.11.6"
 
       - name: Setup rye
-        if: steps.check_changes.outputs.has_changes == 'true'
         uses: eifinger/setup-rye@v4
         with:
           enable-cache: true
@@ -88,25 +82,20 @@ jobs:
           version: "0.27.0"
 
       - name: Start OpenObserve
-        if: steps.check_changes.outputs.has_changes == 'true'
         run: target/debug/openobserve &
 
       - name: Wait for start
-        if: steps.check_changes.outputs.has_changes == 'true'
         run: sleep 15
 
       - name: Pin cpython
-        if: steps.check_changes.outputs.has_changes == 'true'
         run: rye pin cpython@3.11.6
         working-directory: tests/api-testing/
 
       - name: Rye sync
-        if: steps.check_changes.outputs.has_changes == 'true'
         run: rye sync
         working-directory: tests/api-testing/
 
       - name: Run tests
-        if: steps.check_changes.outputs.has_changes == 'true'
         run: |
           echo "=== Running regression tests with ZO_UTF8_VIEW_ENABLED=false ==="
           ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=false target/debug/openobserve > o2_utf8_false.log 2>&1 &
