@@ -81,6 +81,10 @@ export class LogsPage {
         this.errorMessage = '[data-test="logs-search-error-message"]';
         this.warningElement = 'text=warning Query execution';
         this.logsTable = '[data-test="logs-search-result-logs-table"]';
+        // Additional locators for multistream functionality
+        this.logsSearchIndexList = '[data-test="logs-search-index-list"]';
+        this.notificationErrorMessage = '.q-notification__message:has-text("error")';
+        this.vrlFunctionText = (text) => `text=${text}`;
         this.barChartCanvas = '[data-test="logs-search-result-bar-chart"] canvas';
         this.expandLabel = label => `Expand "${label}"`;
         this.collapseLabel = label => `Collapse "${label}"`;
@@ -2658,5 +2662,34 @@ export class LogsPage {
 
     async clickFirstExploreButton() {
         return await this.page.getByRole("button", { name: "Explore" }).first().click({ force: true });
+    }
+
+    // Additional methods for multistream functionality
+    async expectLogsSearchIndexListContainsText(text) {
+        return await expect(this.page.locator(this.logsSearchIndexList)).toContainText(text);
+    }
+
+    async getLogsTableContent() {
+        return await this.page.locator(this.logsTable).textContent();
+    }
+
+    async getLogsTableRowCount() {
+        return await this.page.locator(`${this.logsTable} tbody tr`).count();
+    }
+
+    async expectVrlFunctionVisible(functionText) {
+        return await expect(this.page.locator(this.vrlFunctionText(functionText))).toBeVisible();
+    }
+
+    async expectNotificationErrorNotVisible() {
+        return await expect(this.page.locator(this.notificationErrorMessage)).not.toBeVisible();
+    }
+
+    async expectErrorWhileFetchingNotVisible() {
+        return await expect(this.page.getByText('Error while fetching')).not.toBeVisible();
+    }
+
+    async fillQueryEditorWithRole(text) {
+        return await this.page.locator(this.queryEditor).getByRole('textbox', { name: 'Editor content' }).fill(text);
     }
 } 
