@@ -47,8 +47,6 @@ body:
       label: Related Story/Issue
       description: Link to the GitHub issue/story where this feature was developed
       placeholder: "#1234 or https://github.com/openobserve/openobserve/issues/1234 or 'Not Available'"
-    validations:
-      required: true
 
   - type: dropdown
     id: is-regression
@@ -64,15 +62,13 @@ body:
   - type: textarea
     id: steps_to_reproduce
     attributes:
-      label: Steps to Reproduce
+      label: Steps to Reproduce (Optional)
       description: Provide step-by-step instructions to reproduce the bug
       placeholder: |
         1. Open OpenObserve application on iOS Safari
         2. Navigate to home page
         3. Click on login button in top-right corner
         4. Observe no response
-    validations:
-      required: true
 
   - type: textarea
     id: environment
