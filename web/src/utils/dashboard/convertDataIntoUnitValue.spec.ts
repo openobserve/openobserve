@@ -28,28 +28,83 @@ import {
   findFirstValidMappedValue,
   validatePanel,
   validateDashboardJson,
-  validateSQLPanelFields
+  validateSQLPanelFields,
+  getUTCTimestampFromZonedTimestamp
 } from "@/utils/dashboard/convertDataIntoUnitValue";
 
-vi.mock("quasar", () => ({
-  date: {
-    formatDate: vi.fn((date, format) => {
-      // Simple mock implementation
-      if (format === "MMM DD, YYYY") return "Jan 01, 2024";
-      if (format === "HH:mm:ss") return "12:34:56";
-      return new Date(date).toISOString();
-    }),
-    subtractFromDate: vi.fn((date, obj) => {
-      const result = new Date(date);
-      if (obj.seconds) result.setSeconds(result.getSeconds() - obj.seconds);
-      if (obj.minutes) result.setMinutes(result.getMinutes() - obj.minutes);
-      if (obj.hours) result.setHours(result.getHours() - obj.hours);
-      if (obj.days) result.setDate(result.getDate() - obj.days);
-      if (obj.months) result.setMonth(result.getMonth() - obj.months);
-      return result;
-    })
-  }
+// Mock vuex store for logsUtils
+const mockVuexStore = {
+  state: {
+    zoConfig: {
+      timestamp_column: "_timestamp",
+    },
+    selectedOrganization: {
+      identifier: "test-org",
+    },
+  },
+};
+
+// Mock Vue router for logsUtils
+const mockVueRouter = {
+  currentRoute: {
+    value: {
+      name: "logs",
+      query: {},
+    },
+  },
+  push: vi.fn(),
+};
+
+// Mock search object for logsUtils
+const mockSearchState = {
+  data: {
+    query: "",
+  },
+};
+
+vi.mock("vuex", () => ({
+  useStore: () => mockVuexStore,
 }));
+
+vi.mock("vue-router", () => ({
+  useRouter: () => mockVueRouter,
+}));
+
+vi.mock("@/composables/useLogs/searchState", () => ({
+  searchState: () => ({
+    searchObj: mockSearchState,
+  }),
+}));
+
+// Import logsUtils after mocking dependencies
+import logsUtils from "@/composables/useLogs/logsUtils";
+
+vi.mock("quasar", async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    useQuasar: () => ({
+      notify: vi.fn(),
+    }),
+    date: {
+      formatDate: vi.fn((date, format) => {
+        // Simple mock implementation
+        if (format === "MMM DD, YYYY") return "Jan 01, 2024";
+        if (format === "HH:mm:ss") return "12:34:56";
+        return new Date(date).toISOString();
+      }),
+      subtractFromDate: vi.fn((date, obj) => {
+        const result = new Date(date);
+        if (obj.seconds) result.setSeconds(result.getSeconds() - obj.seconds);
+        if (obj.minutes) result.setMinutes(result.getMinutes() - obj.minutes);
+        if (obj.hours) result.setHours(result.getHours() - obj.hours);
+        if (obj.days) result.setDate(result.getDate() - obj.days);
+        if (obj.months) result.setMonth(result.getMonth() - obj.months);
+        return result;
+      })
+    }
+  };
+});
 
 vi.mock("@/utils/dashboard/colorPalette", () => ({
   getColorPalette: vi.fn(() => ["#FF5733", "#33FF57", "#3357FF", "#F333FF", "#33F3FF"])
@@ -60,6 +115,12 @@ vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
 }));
 
 describe("Dashboard Data Conversion Utils", () => {
+  // Use actual checkTimestampAlias from logsUtils
+  const { checkTimestampAlias } = logsUtils();
+
+  // Mock store for validatePanel tests
+  const mockStore = mockVuexStore;
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -1084,7 +1145,7 @@ describe("Dashboard Data Conversion Utils", () => {
         }
       };
       const errors = [];
-      validatePanel(panelData, errors, true, [{ name: "timestamp" }]);
+      validatePanel(panelData, errors, true, [{ name: "timestamp" }], "dashboard", mockStore, checkTimestampAlias);
       expect(errors).toContain("Add at least one field for the Y-Axis");
     });
 
@@ -1102,7 +1163,7 @@ describe("Dashboard Data Conversion Utils", () => {
         }
       };
       const errors = [];
-      validatePanel(panelData, errors, true, [{ name: "value" }]);
+      validatePanel(panelData, errors, true, [{ name: "value" }], "dashboard", mockStore, checkTimestampAlias);
       expect(errors).toContain("Add one fields for the X-Axis");
     });
 
@@ -1121,7 +1182,7 @@ describe("Dashboard Data Conversion Utils", () => {
         }
       };
       const errors = [];
-      validatePanel(panelData, errors, true, [{ name: "timestamp" }, { name: "value" }]);
+      validatePanel(panelData, errors, true, [{ name: "timestamp" }, { name: "value" }], "dashboard", mockStore, checkTimestampAlias);
       expect(errors).toContain("X-Axis field is not allowed for Metric chart");
     });
 
@@ -1140,7 +1201,7 @@ describe("Dashboard Data Conversion Utils", () => {
         }
       };
       const errors = [];
-      validatePanel(panelData, errors, true, [{ name: "value1" }, { name: "value2" }]);
+      validatePanel(panelData, errors, true, [{ name: "value1" }, { name: "value2" }], "dashboard", mockStore, checkTimestampAlias);
       expect(errors).toContain("Add one value field for gauge chart");
     });
 
@@ -1160,7 +1221,7 @@ describe("Dashboard Data Conversion Utils", () => {
         }
       };
       const errors = [];
-      validatePanel(panelData, errors, true, []);
+      validatePanel(panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
       expect(errors).toContain("Selected chart type is not supported for PromQL. Only line chart is supported.");
       expect(errors).toContain("X-Axis is not supported for PromQL. Remove anything added to the X-Axis.");
     });
@@ -1175,7 +1236,7 @@ describe("Dashboard Data Conversion Utils", () => {
         layout: { currentQueryIndex: 0 }
       };
       const errors = [];
-      validatePanel(panelData, errors, true, []);
+      validatePanel(panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
       expect(errors).toContain("Please enter your HTML code");
     });
 
@@ -1189,7 +1250,7 @@ describe("Dashboard Data Conversion Utils", () => {
         layout: { currentQueryIndex: 0 }
       };
       const errors = [];
-      validatePanel(panelData, errors, true, []);
+      validatePanel(panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
       expect(errors).toContain("Please enter your markdown code");
     });
 
@@ -1204,7 +1265,7 @@ describe("Dashboard Data Conversion Utils", () => {
         layout: { currentQueryIndex: 0 }
       };
       const errors = [];
-      validatePanel(panelData, errors, true, []);
+      validatePanel(panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
       // Check that it generates an error mentioning X-Axis (proving the ternary was hit)
       expect(errors.some(error => error.includes("X-Axis"))).toBe(true);
     });
@@ -1224,7 +1285,7 @@ describe("Dashboard Data Conversion Utils", () => {
       };
       const errors = [];
       const streamFields = [{ name: "valid_stream_field" }];
-      validatePanel(panelData, errors, true, streamFields);
+      validatePanel(panelData, errors, true, streamFields, "dashboard", mockStore, checkTimestampAlias);
       // With the new field structure using args, validation works differently
       // If fields have valid structure, no errors are generated
       expect(errors.length).toBeGreaterThanOrEqual(0);
@@ -1440,7 +1501,7 @@ describe("Dashboard Data Conversion Utils", () => {
         layout: { currentQueryIndex: 0 }
       };
       const errors = [];
-      validatePanel(panelData, errors, true, [{ name: "time" }, { name: "value" }]);
+      validatePanel(panelData, errors, true, [{ name: "time" }, { name: "value" }], "dashboard", mockStore, checkTimestampAlias);
       expect(errors).toContain("X-Axis field is not allowed for Metric chart");
     });
 
@@ -1459,7 +1520,7 @@ describe("Dashboard Data Conversion Utils", () => {
         layout: { currentQueryIndex: 0 }
       };
       const errors = [];
-      validatePanel(panelData, errors, true, [{ name: "value" }]);
+      validatePanel(panelData, errors, true, [{ name: "value" }], "dashboard", mockStore, checkTimestampAlias);
       expect(errors).toContain("Add one fields for the X-Axis");
     });
 
@@ -1478,7 +1539,7 @@ describe("Dashboard Data Conversion Utils", () => {
         layout: { currentQueryIndex: 0 }
       };
       const errors = [];
-      validatePanel(panelData, errors, true, [{ name: "time" }]);
+      validatePanel(panelData, errors, true, [{ name: "time" }], "dashboard", mockStore, checkTimestampAlias);
       expect(errors).toContain("Add at least one field for the Y-Axis");
     });
 
@@ -1743,7 +1804,7 @@ describe("Dashboard Data Conversion Utils", () => {
         }
       };
       const errors = [];
-      validatePanel(panelData, errors, true, []);
+      validatePanel(panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
       // Custom query mode validation works with new field structure
       expect(errors.length).toBeGreaterThanOrEqual(0);
     });
@@ -1902,7 +1963,7 @@ describe("Dashboard Data Conversion Utils", () => {
         layout: { currentQueryIndex: 0 }
       };
       const errors = [];
-      validatePanel(panelData, errors, true, []);
+      validatePanel(panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
       // Should use "First Column" as label
       expect(errors).toContain("Add at least one field on First Column or Other Columns");
     });
@@ -1922,7 +1983,7 @@ describe("Dashboard Data Conversion Utils", () => {
         layout: { currentQueryIndex: 0 }
       };
       const errors = [];
-      validatePanel(panelData, errors, true, []);
+      validatePanel(panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
       // Should use "Other Columns" as label - this is covered by the error message
       expect(errors).toContain("Add at least one field on First Column or Other Columns");
     });
@@ -2267,7 +2328,7 @@ describe("Dashboard Data Conversion Utils", () => {
         layout: { currentQueryIndex: 0 }
       };
       const errors = [];
-      validatePanel(panelData, errors, true, []);
+      validatePanel(panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
       expect(errors).toContain("Y-Axis is not supported for PromQL. Remove anything added to the Y-Axis.");
     });
 
@@ -2290,7 +2351,7 @@ describe("Dashboard Data Conversion Utils", () => {
         layout: { currentQueryIndex: 0 }
       };
       const errors = [];
-      validatePanel(panelData, errors, true, []);
+      validatePanel(panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
       expect(errors).toContain("Filters are not supported for PromQL. Remove anything added to the Filters.");
     });
 
@@ -2333,6 +2394,569 @@ describe("Dashboard Data Conversion Utils", () => {
       const errors = [];
       validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
       expect(errors).toContain("Unable to extract value field from the query.");
+    });
+
+    it("should cover stacked Y-axis pageKey=logs for lines 1018-1023", () => {
+      // Test to cover lines 1018-1023: pageKey === "logs" in stacked Y-axis error
+      const panelData = {
+        type: "stacked",
+        queries: [{
+          fields: {
+            x: [{ column: "time" }],
+            y: [], // Missing Y field
+            breakdown: [{ column: "category" }]
+          }
+        }]
+      };
+      const errors = [];
+      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      expect(errors).toContain("Unable to extract value field from the query.");
+    });
+
+    it("should cover stacked breakdown pageKey=logs for line 1027", () => {
+      // Test to cover line 1027: pageKey === "logs" in stacked breakdown error
+      const panelData = {
+        type: "stacked",
+        queries: [{
+          fields: {
+            x: [],
+            y: [{ column: "value" }],
+            breakdown: []
+          }
+        }]
+      };
+      const errors = [];
+      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      expect(errors).toContain("Unable to extract grouping field from the query.");
+    });
+
+    it("should validate join fields with missing stream for lines 1470-1472", () => {
+      // Test to cover lines 1470-1472: join stream validation
+      const panelData = {
+        data: {
+          type: "line",
+          queries: [{
+            fields: { x: [{ column: "time" }], y: [{ column: "value" }] },
+            joins: [{
+              // Missing stream
+              joinType: "inner",
+              conditions: [{ leftField: { field: "id" }, rightField: { field: "id" }, operation: "=" }]
+            }]
+          }]
+        },
+        layout: { currentQueryIndex: 0 }
+      };
+      const errors = [];
+      validatePanel(panelData, errors, true, [{ name: "time" }, { name: "value" }], "dashboard", mockStore, checkTimestampAlias);
+      expect(errors).toContain("Join #1: Stream is required");
+    });
+
+    it("should validate join fields with missing joinType for lines 1475-1477", () => {
+      // Test to cover lines 1475-1477: join type validation
+      const panelData = {
+        data: {
+          type: "line",
+          queries: [{
+            fields: { x: [{ column: "time" }], y: [{ column: "value" }] },
+            joins: [{
+              stream: "stream2",
+              // Missing joinType
+              conditions: [{ leftField: { field: "id" }, rightField: { field: "id" }, operation: "=" }]
+            }]
+          }]
+        },
+        layout: { currentQueryIndex: 0 }
+      };
+      const errors = [];
+      validatePanel(panelData, errors, true, [{ name: "time" }, { name: "value" }], "dashboard", mockStore, checkTimestampAlias);
+      expect(errors).toContain("Join #1: Join type is required");
+    });
+
+    it("should validate join fields with missing conditions for lines 1482-1484", () => {
+      // Test to cover lines 1482-1484: join conditions validation
+      const panelData = {
+        data: {
+          type: "line",
+          queries: [{
+            fields: { x: [{ column: "time" }], y: [{ column: "value" }] },
+            joins: [{
+              stream: "stream2",
+              joinType: "inner",
+              conditions: [] // Empty conditions
+            }]
+          }]
+        },
+        layout: { currentQueryIndex: 0 }
+      };
+      const errors = [];
+      validatePanel(panelData, errors, true, [{ name: "time" }, { name: "value" }], "dashboard", mockStore, checkTimestampAlias);
+      expect(errors).toContain("Join #1: Conditions are required");
+    });
+
+    it("should validate join condition leftField for lines 1489-1493", () => {
+      // Test to cover lines 1489-1493: leftField validation
+      const panelData = {
+        data: {
+          type: "line",
+          queries: [{
+            fields: { x: [{ column: "time" }], y: [{ column: "value" }] },
+            joins: [{
+              stream: "stream2",
+              joinType: "inner",
+              conditions: [{
+                leftField: {}, // Missing field property
+                rightField: { field: "id" },
+                operation: "="
+              }]
+            }]
+          }]
+        },
+        layout: { currentQueryIndex: 0 }
+      };
+      const errors = [];
+      validatePanel(panelData, errors, true, [{ name: "time" }, { name: "value" }], "dashboard", mockStore, checkTimestampAlias);
+      expect(errors).toContain("Join #1: Condition #1: Left field is required");
+    });
+
+    it("should validate join condition rightField for lines 1496-1500", () => {
+      // Test to cover lines 1496-1500: rightField validation
+      const panelData = {
+        data: {
+          type: "line",
+          queries: [{
+            fields: { x: [{ column: "time" }], y: [{ column: "value" }] },
+            joins: [{
+              stream: "stream2",
+              joinType: "inner",
+              conditions: [{
+                leftField: { field: "id" },
+                rightField: {}, // Missing field property
+                operation: "="
+              }]
+            }]
+          }]
+        },
+        layout: { currentQueryIndex: 0 }
+      };
+      const errors = [];
+      validatePanel(panelData, errors, true, [{ name: "time" }, { name: "value" }], "dashboard", mockStore, checkTimestampAlias);
+      expect(errors).toContain("Join #1: Condition #1: Right field is required");
+    });
+
+    it("should validate join condition operation for lines 1503-1507", () => {
+      // Test to cover lines 1503-1507: operation validation
+      const panelData = {
+        data: {
+          type: "line",
+          queries: [{
+            fields: { x: [{ column: "time" }], y: [{ column: "value" }] },
+            joins: [{
+              stream: "stream2",
+              joinType: "inner",
+              conditions: [{
+                leftField: { field: "id" },
+                rightField: { field: "id" }
+                // Missing operation
+              }]
+            }]
+          }]
+        },
+        layout: { currentQueryIndex: 0 }
+      };
+      const errors = [];
+      validatePanel(panelData, errors, true, [{ name: "time" }, { name: "value" }], "dashboard", mockStore, checkTimestampAlias);
+      expect(errors).toContain("Join #1: Condition #1: Operation is required");
+    });
+
+    it("should validate multiple joins for lines 1514-1517", () => {
+      // Test to cover lines 1514-1517: validateJoinFields with multiple joins
+      const panelData = {
+        data: {
+          type: "line",
+          queries: [{
+            fields: { x: [{ column: "time" }], y: [{ column: "value" }] },
+            joins: [
+              {
+                // First join missing stream
+                joinType: "inner",
+                conditions: [{ leftField: { field: "id" }, rightField: { field: "id" }, operation: "=" }]
+              },
+              {
+                stream: "stream3",
+                // Second join missing joinType
+                conditions: [{ leftField: { field: "id" }, rightField: { field: "id" }, operation: "=" }]
+              }
+            ]
+          }]
+        },
+        layout: { currentQueryIndex: 0 }
+      };
+      const errors = [];
+      validatePanel(panelData, errors, true, [{ name: "time" }, { name: "value" }], "dashboard", mockStore, checkTimestampAlias);
+      expect(errors).toContain("Join #1: Stream is required");
+      expect(errors).toContain("Join #2: Join type is required");
+    });
+
+    it("should validate filter conditions for lines 1552-1556", () => {
+      // Test to cover lines 1552-1556: filter conditions validation in validatePanelFields
+      const panel = {
+        type: "line",
+        queries: [{
+          fields: {
+            x: [{ alias: "time", args: [{ type: "field", value: { field: "timestamp", streamAlias: null } }] }],
+            y: [{ alias: "val", args: [{ type: "field", value: { field: "value", streamAlias: null } }] }],
+            filter: {
+              conditions: [
+                { filterType: "condition", type: "list", column: "status", values: [] }
+              ]
+            }
+          }
+        }]
+      };
+      const errors = validateDashboardJson({
+        dashboardId: "test",
+        title: "Test",
+        version: "v3",
+        tabs: [{
+          tabId: "tab1",
+          name: "Tab 1",
+          panels: [{
+            id: "panel1",
+            ...panel,
+            title: "Panel 1",
+            layout: { x: 0, y: 0, w: 12, h: 6, i: "panel1" }
+          }]
+        }]
+      });
+      expect(errors.some(error => error.includes("Filter:"))).toBe(true);
+    });
+
+    it("should validate timestamp alias in SQL queries for lines 1656-1668", () => {
+      // Test to cover lines 1656-1668: timestamp alias validation in custom queries
+      const mockStore = {
+        state: {
+          zoConfig: {
+            timestamp_column: "_timestamp"
+          }
+        }
+      };
+      const checkTimestampAlias = (query: string) => {
+        return !query.includes("AS _timestamp");
+      };
+
+      const panelData = {
+        data: {
+          type: "line",
+          queryType: "sql",
+          queries: [{
+            query: "SELECT field AS _timestamp FROM stream",
+            customQuery: true,
+            fields: { x: [], y: [] }
+          }]
+        },
+        layout: { currentQueryIndex: 0 }
+      };
+      const errors = [];
+      validatePanel(panelData, errors, false, [], "dashboard", mockStore, checkTimestampAlias);
+      expect(errors).toContain("Alias '_timestamp' is not allowed.");
+    });
+
+    it("should handle error instance in validateDashboardJson for lines 1983-1990", () => {
+      // Test to cover lines 1983-1990: error instanceof Error check
+      const panel = {
+        id: "panel1",
+        type: "line",
+        title: "Panel 1",
+        layout: { x: 0, y: 0, w: 12, h: 6, i: "panel1" },
+        queries: [{
+          fields: {
+            x: [],
+            y: []
+          }
+        }]
+      };
+
+      const errors = validateDashboardJson({
+        dashboardId: "test",
+        title: "Test",
+        version: "v3",
+        tabs: [{
+          tabId: "tab1",
+          name: "Tab 1",
+          panels: [panel]
+        }]
+      });
+
+      // The function should handle any errors gracefully
+      expect(Array.isArray(errors)).toBe(true);
+    });
+  });
+
+  describe("getUTCTimestampFromZonedTimestamp", () => {
+    it("should convert zoned timestamp to UTC for lines 2059-2070", () => {
+      // Test to cover lines 2059-2070: timezone conversion
+      const timestampMs = new Date("2023-01-01T12:00:00Z").getTime();
+      const result = getUTCTimestampFromZonedTimestamp(timestampMs, "America/New_York");
+
+      expect(result).toBeDefined();
+      expect(typeof result).toBe("number");
+      expect(result).toBeGreaterThan(0);
+    });
+
+    it("should return null for zero timestamp for line 2062", () => {
+      // Test to cover line 2062: early return for falsy timestamp
+      const result = getUTCTimestampFromZonedTimestamp(0, "America/New_York");
+      expect(result).toBeNull();
+    });
+
+    it("should handle null timestamp for line 2062", () => {
+      // Test to cover line 2062: early return for null timestamp
+      const result = getUTCTimestampFromZonedTimestamp(null as any, "America/New_York");
+      expect(result).toBeNull();
+    });
+
+    it("should convert to microseconds for line 2069", () => {
+      // Test to cover line 2069: Math.trunc(utcMs * 1000)
+      // The function converts from timezone to UTC, then multiplies by 1000 to get microseconds
+      const timestampMs = 1000;
+      const result = getUTCTimestampFromZonedTimestamp(timestampMs, "UTC");
+
+      // Since we're using UTC timezone, the result should be close to timestampMs * 1000
+      // But the fromZonedTime function may adjust for timezone offset
+      expect(result).toBeDefined();
+      expect(typeof result).toBe("number");
+      // Verify it's in microseconds range (should be much larger than milliseconds)
+      expect(result).toBeGreaterThan(timestampMs);
+    });
+
+    it("should handle different timezones", () => {
+      const timestampMs = new Date("2023-06-15T12:00:00Z").getTime();
+
+      const utcResult = getUTCTimestampFromZonedTimestamp(timestampMs, "UTC");
+      const tokyoResult = getUTCTimestampFromZonedTimestamp(timestampMs, "Asia/Tokyo");
+      const londonResult = getUTCTimestampFromZonedTimestamp(timestampMs, "Europe/London");
+
+      expect(utcResult).toBeDefined();
+      expect(tokyoResult).toBeDefined();
+      expect(londonResult).toBeDefined();
+
+      // Results should be different for different timezones
+      expect(utcResult).not.toBe(tokyoResult);
+    });
+  });
+
+  describe("Chart Field Validation - Logs Page Context", () => {
+    it("should skip validation when chartType or fields are missing", () => {
+      // Test to cover line 897-899: early return when chartType or fields is missing
+      const errors: string[] = [];
+
+      // Call with undefined chartType
+      validateSQLPanelFields({ type: undefined, queries: [{ fields: { x: [], y: [] } }] }, 0, "X-Axis", "Y-Axis", errors, true);
+      expect(errors.length).toBe(0);
+
+      // Call with null fields
+      validateSQLPanelFields({ type: "line", queries: [{ fields: null }] }, 0, "X-Axis", "Y-Axis", errors, true);
+      expect(errors.length).toBe(0);
+    });
+
+    it("should validate metric chart with missing value field in logs context", () => {
+      const panelData = {
+        type: "metric",
+        queries: [{
+          fields: {
+            x: [],
+            y: [] // Empty Y field
+          }
+        }]
+      };
+      const errors: string[] = [];
+      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      expect(errors).toContain("Unable to extract value field from the query.");
+    });
+
+    it("should validate metric chart with disallowed grouping field in logs context", () => {
+      const panelData = {
+        type: "metric",
+        queries: [{
+          fields: {
+            x: [{ column: "time" }], // Should not have X-axis
+            y: [{ column: "value" }]
+          }
+        }]
+      };
+      const errors: string[] = [];
+      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      expect(errors).toContain("Grouping field is not allowed for Metric chart");
+    });
+
+    it("should validate gauge chart with missing value field in logs context", () => {
+      const panelData = {
+        type: "gauge",
+        queries: [{
+          fields: {
+            x: [],
+            y: [] // Empty Y field
+          }
+        }]
+      };
+      const errors: string[] = [];
+      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      expect(errors).toContain("Unable to extract value field from the query.");
+    });
+
+    it("should validate gauge chart with invalid number of label fields in logs context", () => {
+      const panelData = {
+        type: "gauge",
+        queries: [{
+          fields: {
+            x: [{ column: "cat1" }, { column: "cat2" }], // Multiple X fields (not allowed)
+            y: [{ column: "value" }]
+          }
+        }]
+      };
+      const errors: string[] = [];
+      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      expect(errors).toContain("Unable to extract grouping field from the query.");
+    });
+
+    it("should validate bar chart with missing value field in logs context", () => {
+      const panelData = {
+        type: "bar",
+        queries: [{
+          fields: {
+            x: [{ column: "category" }],
+            y: [] // Empty Y field
+          }
+        }]
+      };
+      const errors: string[] = [];
+      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      expect(errors).toContain("Unable to extract value field from the query.");
+    });
+
+    it("should validate bar chart with missing grouping field in logs context", () => {
+      const panelData = {
+        type: "bar",
+        queries: [{
+          fields: {
+            x: [], // Empty X field
+            y: [{ column: "value" }]
+          }
+        }]
+      };
+      const errors: string[] = [];
+      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      expect(errors).toContain("Unable to extract grouping field from the query.");
+    });
+
+    it("should validate table chart with no fields in logs context", () => {
+      const panelData = {
+        type: "table",
+        queries: [{
+          fields: {
+            x: [],
+            y: []
+          }
+        }]
+      };
+      const errors: string[] = [];
+      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      expect(errors).toContain("Unable to extract fields from the query.");
+    });
+
+    it("should validate heatmap with missing Y-axis field in logs context", () => {
+      const panelData = {
+        type: "heatmap",
+        queries: [{
+          fields: {
+            x: [{ column: "x" }],
+            y: [], // Empty Y field
+            z: [{ column: "z" }]
+          }
+        }]
+      };
+      const errors: string[] = [];
+      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      expect(errors).toContain("Unable to extract grouping field from the query.");
+    });
+
+    it("should validate heatmap with missing X-axis field in logs context", () => {
+      const panelData = {
+        type: "heatmap",
+        queries: [{
+          fields: {
+            x: [], // Empty X field
+            y: [{ column: "y" }],
+            z: [{ column: "z" }]
+          }
+        }]
+      };
+      const errors: string[] = [];
+      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      expect(errors).toContain("Unable to extract second level grouping field from the query.");
+    });
+
+    it("should validate heatmap with missing Z-axis field in logs context", () => {
+      const panelData = {
+        type: "heatmap",
+        queries: [{
+          fields: {
+            x: [{ column: "x" }],
+            y: [{ column: "y" }],
+            z: [] // Empty Z field
+          }
+        }]
+      };
+      const errors: string[] = [];
+      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      expect(errors).toContain("Unable to extract value field from the query.");
+    });
+
+    it("should validate stacked chart with missing value field in logs context", () => {
+      const panelData = {
+        type: "stacked",
+        queries: [{
+          fields: {
+            x: [{ column: "time" }],
+            y: [], // Empty Y field
+            breakdown: [{ column: "category" }]
+          }
+        }]
+      };
+      const errors: string[] = [];
+      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
+      expect(errors).toContain("Unable to extract value field from the query.");
+    });
+
+    it("should handle validation errors gracefully in dashboard JSON validation", () => {
+      const panel = {
+        id: "panel1",
+        type: "line",
+        title: "Panel 1",
+        layout: { x: 0, y: 0, w: 12, h: 6, i: "panel1" },
+        queries: [{
+          fields: {
+            x: [],
+            y: []
+          }
+        }]
+      };
+
+      const errors = validateDashboardJson({
+        dashboardId: "test",
+        title: "Test",
+        version: "v3",
+        tabs: [{
+          tabId: "tab1",
+          name: "Tab 1",
+          panels: [panel]
+        }]
+      });
+
+      // The function should handle errors gracefully
+      expect(Array.isArray(errors)).toBe(true);
+      // Should have validation errors for the panel
+      expect(errors.length).toBeGreaterThan(0);
     });
   });
 });
