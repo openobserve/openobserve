@@ -1029,10 +1029,10 @@ mod tests {
             );
         }
 
-        let expected_deltas = vec![QueryDelta {
-            delta_start_time: 1747659555000000,
-            delta_end_time: 1747659600000000,
-        }];
+        // After the fix, deltas are aligned to histogram intervals.
+        // The remaining time (45 seconds) is less than the histogram interval (1 hour),
+        // so no delta is created to avoid querying partial histogram buckets.
+        let expected_deltas: Vec<QueryDelta> = vec![];
         assert_eq!(deltas, expected_deltas);
     }
 
