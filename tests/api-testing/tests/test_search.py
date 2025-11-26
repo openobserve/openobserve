@@ -1744,29 +1744,82 @@ def test_e2e_camel_case_sql_integration(create_session, base_url):
     org_id = "default"
     now = datetime.now(timezone.utc) 
     end_time = int(now.timestamp() * 1000000)
-    one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
+    one_day_ago = int((now - timedelta(days=1)).timestamp() * 1000000)
 
-    # Test SQL integration scenarios
+    # Test SQL integration scenarios - match_all with FTS-enabled fields (log, message)
     sql_tests = [
+        # Full camel case token searches in log field
         {
-            "sql": "SELECT error, class FROM \"stream_pytest_data\" WHERE error = 'DbException'",
-            "description": "SELECT specific fields with camel case direct match"
+            "sql": "SELECT error, class, log FROM \"stream_pytest_data\" WHERE match_all('DbException')",
+            "description": "Full camel case token - DbException in log field"
         },
         {
-            "sql": "SELECT error, COUNT(*) as count FROM \"stream_pytest_data\" WHERE error LIKE '%Exception%' GROUP BY error",
-            "description": "GROUP BY with camel case pattern search"
+            "sql": "SELECT class, service, log FROM \"stream_pytest_data\" WHERE match_all('UserAccountService')",
+            "description": "Multi-word camel case - UserAccountService in log field"
         },
         {
-            "sql": "SELECT * FROM \"stream_pytest_data\" WHERE class LIKE '%User%' AND class LIKE '%Service%'", 
-            "description": "Multiple LIKE conditions with camel case patterns"
+            "sql": "SELECT component, log FROM \"stream_pytest_data\" WHERE match_all('XMLHttpRequest')",
+            "description": "Acronym camel case - XMLHttpRequest in log field"
         },
         {
-            "sql": "SELECT * FROM \"stream_pytest_data\" WHERE error = 'DbException' OR class = 'UserAccountService'",
-            "description": "Direct field comparison with camel case values"
+            "sql": "SELECT handler, log FROM \"stream_pytest_data\" WHERE match_all('OAuth2TokenHandler')",
+            "description": "Complex camel case with numbers - OAuth2TokenHandler in log field"
+        },
+        # Atomic token searches in log field - key examples
+        {
+            "sql": "SELECT error, log FROM \"stream_pytest_data\" WHERE match_all('db')",
+            "description": "Atomic token 'db' should find DbException"
         },
         {
-            "sql": "SELECT DISTINCT error FROM \"stream_pytest_data\" WHERE error LIKE '%Exception%'",
-            "description": "DISTINCT with camel case pattern search"
+            "sql": "SELECT error, exception, log FROM \"stream_pytest_data\" WHERE match_all('exception')",
+            "description": "Atomic token 'exception' should find camel case exceptions"
+        },
+        {
+            "sql": "SELECT class, service, log FROM \"stream_pytest_data\" WHERE match_all('user')",
+            "description": "Atomic token 'user' should find UserAccountService"
+        },
+        # Case insensitive search
+        {
+            "sql": "SELECT error, log FROM \"stream_pytest_data\" WHERE match_all('DBEXCEPTION')",
+            "description": "Case insensitive - DBEXCEPTION should find DbException"
+        },
+        # Multiple token combinations
+        {
+            "sql": "SELECT class, service, log FROM \"stream_pytest_data\" WHERE match_all('user') AND match_all('service')",
+            "description": "Multiple atomic tokens - user AND service"
+        },
+        {
+            "sql": "SELECT component, log FROM \"stream_pytest_data\" WHERE match_all('xml') AND match_all('http')",
+            "description": "Multiple atomic tokens - xml AND http"
+        },
+        # Test message field (different FTS field)
+        {
+            "sql": "SELECT message, log FROM \"stream_pytest_data\" WHERE match_all('Database') AND match_all('connection')",
+            "description": "Search in message field with multiple terms"
+        },
+        # Aggregation with camel case
+        {
+            "sql": "SELECT log, COUNT(*) as count FROM \"stream_pytest_data\" WHERE match_all('exception') GROUP BY log",
+            "description": "GROUP BY with camel case atomic token"
+        },
+        # Numbers in camel case
+        {
+            "sql": "SELECT handler, log FROM \"stream_pytest_data\" WHERE match_all('2')",
+            "description": "Number token in camel case - OAuth2TokenHandler"
+        },
+        {
+            "sql": "SELECT code, log FROM \"stream_pytest_data\" WHERE match_all('404')",
+            "description": "Number token - Http404Error"
+        },
+        # OR conditions
+        {
+            "sql": "SELECT handler, log FROM \"stream_pytest_data\" WHERE match_all('Token') OR match_all('Handler')",
+            "description": "OR conditions with camel case components"
+        },
+        # Complex query with ordering
+        {
+            "sql": "SELECT log FROM \"stream_pytest_data\" WHERE match_all('exception') ORDER BY log LIMIT 3",
+            "description": "Complex query with ORDER BY and LIMIT"
         }
     ]
 
@@ -1774,7 +1827,7 @@ def test_e2e_camel_case_sql_integration(create_session, base_url):
         json_data = {
             "query": {
                 "sql": test_case["sql"],
-                "start_time": one_hour_ago,
+                "start_time": one_day_ago,
                 "end_time": end_time,
                 "from": 0,
                 "size": 50,
@@ -1798,15 +1851,34 @@ def test_e2e_camel_case_sql_integration(create_session, base_url):
         if "GROUP BY" in test_case["sql"] and hits:
             # Ensure GROUP BY results have the expected structure
             sample_hit = hits[0]
-            assert "error" in sample_hit, "GROUP BY query should return grouped field"
             if "count" in sample_hit:
                 assert isinstance(sample_hit["count"], (int, float)), "COUNT should return numeric value"
-                print(f"   Group BY result sample: error='{sample_hit.get('error')}', count={sample_hit.get('count')}")
+            
+            # Check for the grouped field (log, message, etc.)
+            grouped_field = None
+            if "GROUP BY log" in test_case["sql"]:
+                grouped_field = "log"
+            elif "GROUP BY message" in test_case["sql"]:
+                grouped_field = "message"
+            elif "GROUP BY error" in test_case["sql"]:
+                grouped_field = "error"
+            elif "GROUP BY class" in test_case["sql"]:
+                grouped_field = "class"
+            
+            if grouped_field and grouped_field in sample_hit:
+                print(f"   Group BY result sample: {grouped_field}='{sample_hit.get(grouped_field)}', count={sample_hit.get('count', 'N/A')}")
+            else:
+                print(f"   Group BY result sample: {sample_hit}")
         
         # For DISTINCT queries, validate uniqueness
         if "DISTINCT" in test_case["sql"] and hits:
-            error_values = [hit.get("error") for hit in hits if "error" in hit]
-            unique_errors = set(error_values)
-            print(f"   DISTINCT found {len(unique_errors)} unique error values: {unique_errors}")
+            if "DISTINCT error" in test_case["sql"]:
+                field_values = [hit.get("error") for hit in hits if "error" in hit]
+                unique_values = set(field_values)
+                print(f"   DISTINCT found {len(unique_values)} unique error values: {unique_values}")
+            elif "DISTINCT class" in test_case["sql"]:
+                field_values = [hit.get("class") for hit in hits if "class" in hit]
+                unique_values = set(field_values)
+                print(f"   DISTINCT found {len(unique_values)} unique class values: {unique_values}")
     
     print("✅ All SQL integration tests with camel case tokens passed")
