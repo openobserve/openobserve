@@ -195,4 +195,24 @@ test.describe("Sanity Test Cases", () => {
   test.skip("create template, destination and alert and then delete it", async ({ page }) => {
     // Alert workflow test implementation
   });
+
+  // DELIBERATE FAILURE TEST - For testing TestDino cache and rerun optimization
+  test("TESTDINO_CACHE_TEST - This test will fail deliberately", async ({ page }) => {
+    testLogger.info('🧪 Running deliberate failure test to verify TestDino caching');
+    testLogger.info('This test should:');
+    testLogger.info('1. Wait for 3.5 minutes then fail on first run');
+    testLogger.info('2. Get cached by TestDino');
+    testLogger.info('3. On rerun, ONLY this test should run (not all GeneralTests)');
+
+    // Wait for 3.5 minutes (210 seconds)
+    testLogger.info('⏳ Waiting for 3.5 minutes before failing...');
+    await page.waitForTimeout(210000); // 3.5 minutes = 210,000 milliseconds
+
+    testLogger.info('⏰ 3.5 minutes elapsed, now triggering deliberate failure');
+
+    // Deliberate assertion failure
+    expect(true).toBe(false); // This will always fail
+
+    testLogger.info('❌ This line should never execute');
+  });
 });
