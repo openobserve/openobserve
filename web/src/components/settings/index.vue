@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                 </q-route-tab>
                 <q-route-tab
-                    v-if="config.isEnterprise == 'true' && isMetaOrg"
+                    v-if="config.isEnterprise == 'true' && isMetaOrg && config.isCloud === 'false'"
                     data-test="license-tab"
                     name="license"
                     :to="{
@@ -297,7 +297,7 @@ export default defineComponent({
 
       }
       else if (router.currentRoute.value.name === "license") {
-        if(!isMetaOrg.value || config.isEnterprise === "false") {
+        if(!isMetaOrg.value || config.isEnterprise === "false" || config.isCloud === 'true') {
           settingsTab.value = "general";
           router.push({
             path: "/settings/general",
