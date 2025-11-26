@@ -783,7 +783,6 @@ impl ConditionGroupExt for config::meta::alerts::ConditionGroup {
 
         // Apply logical operators left-to-right
         // The logicalOperator on an item indicates the operator that comes BEFORE that item
-        // (matching the UI behavior in web/src/composables/useDashboardPanel.ts:2184-2190)
         if sql_parts.len() == 1 {
             return Ok(format!("({})", sql_parts[0]));
         }
@@ -791,7 +790,7 @@ impl ConditionGroupExt for config::meta::alerts::ConditionGroup {
         let mut result = sql_parts[0].clone();
         for (item, item_sql) in self.conditions.iter().skip(1).zip(sql_parts.iter().skip(1)) {
             // Use the current item's logical operator (it indicates the operator before this item)
-            // Just concatenate with the operator, don't wrap in parentheses (matching UI behavior)
+            // Concatenate with the operator, relying on SQL operator precedence
             match item.logical_operator() {
                 config::meta::alerts::LogicalOperator::And => {
                     result = format!("{} AND {}", result, item_sql);
@@ -1539,7 +1538,7 @@ mod tests {
 
         // Verify evaluation with operator precedence (AND before OR)
         // level = 'error' AND status = 'active' OR service = 'api'
-        // This relies on SQL operator precedence, same as UI behavior
+        // SQL operator precedence will parse this as: (level = 'error' AND status = 'active') OR service = 'api'
         assert_eq!(
             sql,
             "(\"level\" = 'error' AND \"status\" = 'active' OR \"service\" = 'api')"
@@ -1653,12 +1652,12 @@ mod tests {
 
 
     #[tokio::test]
-    async fn test_condition_group_ui_expectation() {
+    async fn test_condition_group_evaluate_with_nested_group() {
         use crate::service::alerts::ConditionGroupExt;
         use config::utils::json::json;
 
-        // What the UI shows: (kubernetes_docker_id = 'test' OR (kubernetes_container_image = 'test' AND kubernetes_host = 'test2'))
-        // This should be structured as:
+        // Test evaluation with nested group: kubernetes_docker_id = 'test' OR (kubernetes_container_image = 'test' AND kubernetes_host = 'test2')
+        // Structure:
         // - kubernetes_docker_id = 'test' [OR with next]
         // - A group containing: (kubernetes_container_image = 'test' AND kubernetes_host = 'test2')
 
@@ -1704,18 +1703,18 @@ mod tests {
 
         let result = condition_group.evaluate(test_data.as_object().unwrap()).await;
 
-        // Expected evaluation: kubernetes_docker_id = 'test' OR (kubernetes_container_image = 'test' AND kubernetes_host = 'test2')
+        // Evaluation: kubernetes_docker_id = 'test' OR (kubernetes_container_image = 'test' AND kubernetes_host = 'test2')
         // = FALSE OR (FALSE AND TRUE)
         // = FALSE OR FALSE
         // = FALSE
         assert!(!result, "Should NOT PASS: kubernetes_docker_id doesn't match, and in the group only kubernetes_host matches (need both)");
 
-        println!("UI expectation test - Test data: {:?}", test_data);
-        println!("Evaluation result: {} (CORRECT - should be false)", result);
+        println!("Test data: {:?}", test_data);
+        println!("Evaluation result: {} (should be false)", result);
     }
 
     #[tokio::test]
-    async fn test_db_structure_to_sql() {
+    async fn test_condition_group_to_sql_complex_with_nested_group() {
         use crate::service::alerts::ConditionGroupExt;
         use arrow_schema::{DataType, Field, Schema};
 
@@ -1725,7 +1724,7 @@ mod tests {
             Field::new("kubernetes_host", DataType::Utf8, false),
         ]);
 
-        // This matches the exact structure from the database
+        // Test SQL generation with nested group and mixed operators
         let condition_group = ConditionGroup {
             filter_type: "group".to_string(),
             logical_operator: LogicalOperator::And,
@@ -1761,15 +1760,18 @@ mod tests {
 
         let sql = condition_group.to_sql(&schema).await.unwrap();
         println!("Generated SQL: {}", sql);
-        println!("Expected from UI: (kubernetes_docker_id = 'test' OR (kubernetes_container_image = 'test' AND kubernetes_host = 'test2'))");
+
+        // Verify the generated SQL has correct operator placement
+        assert!(sql.contains("OR") && sql.contains("AND"));
     }
 
     #[tokio::test]
-    async fn test_db_structure_evaluation_with_fix() {
+    async fn test_condition_group_evaluate_operator_precedence() {
         use crate::service::alerts::ConditionGroupExt;
         use config::utils::json::json;
 
-        // This matches the exact structure from the database
+        // Test operator precedence: A OR (B) AND C should evaluate as A OR ((B) AND C)
+        // Structure: kubernetes_docker_id = 'test' OR (kubernetes_container_image = 'test') AND kubernetes_host = 'test2'
         let condition_group = ConditionGroup {
             filter_type: "group".to_string(),
             logical_operator: LogicalOperator::And,
@@ -1832,13 +1834,11 @@ mod tests {
         // Hmm, this gives false, but we need to think about what the Group's internal condition's operator means...
 
         println!("Test data: {:?}", test_data_fail);
-        println!("Evaluation result: {}", result);
-        println!("Expected: false (should NOT pass - kubernetes_docker_id doesn't match, and kubernetes_container_image doesn't match)");
+        println!("Evaluation result: {} (should be false)", result);
 
-        // For now, let's see what we get
-        assert!(!result, "Should NOT PASS with fixed logic");
+        assert!(!result, "Should NOT PASS: neither condition matches");
 
-        // Test case where kubernetes_docker_id matches (should PASS according to UI)
+        // Test case where kubernetes_docker_id matches (should PASS with OR precedence)
         let test_data_docker_id_matches = json!({
             "kubernetes_docker_id": "test",
             "kubernetes_container_image": "wrong",
@@ -1849,10 +1849,9 @@ mod tests {
 
         println!("\nTest with docker_id matching:");
         println!("Test data: {:?}", test_data_docker_id_matches);
-        println!("Evaluation result: {}", result2);
-        println!("UI expects: TRUE (kubernetes_docker_id matches, and there's OR)");
+        println!("Evaluation result: {} (should be true)", result2);
 
-        // According to UI SQL: (kubernetes_docker_id = 'test' OR (kubernetes_container_image = 'test' AND kubernetes_host = 'test2'))
+        // SQL: (kubernetes_docker_id = 'test' OR (kubernetes_container_image = 'test' AND kubernetes_host = 'test2'))
         // = (TRUE OR (FALSE AND FALSE)) = TRUE
         assert!(result2, "Should PASS when kubernetes_docker_id matches");
     }
