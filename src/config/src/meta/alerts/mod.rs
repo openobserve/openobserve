@@ -638,7 +638,7 @@ impl std::fmt::Display for Operator {
 // This provides an alternative to the tree-based ConditionList (v1) for expressing
 // mixed boolean operations with natural left-to-right ordering
 
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize, ToSchema)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum LogicalOperator {
     And,
@@ -649,8 +649,6 @@ pub enum LogicalOperator {
 #[serde(tag = "filterType", rename_all = "lowercase")]
 pub enum ConditionItem {
     Condition {
-        #[serde(rename = "type")]
-        type_field: String, // Always "condition"
         column: String,
         operator: Operator,
         #[schema(value_type = Object)]
@@ -693,7 +691,7 @@ pub struct ConditionGroup {
 impl ConditionGroup {
     /// Checks if the condition group has conditions
     pub fn has_conditions(&self) -> bool {
-        self.conditions.len() > 1
+        !self.conditions.is_empty()
     }
 
     /// Validates the condition group structure
@@ -704,8 +702,9 @@ impl ConditionGroup {
                 self.filter_type
             ));
         }
+
         if !self.has_conditions() {
-            return Err("ConditionGroup must have at least two conditions".to_string());
+            return Err("Condition Group should have atleast 1 condition".to_owned());
         }
         Ok(())
     }
@@ -732,15 +731,13 @@ impl<'de> Deserialize<'de> for AlertConditionParams {
         let value = Value::deserialize(deserializer)?;
 
         // Get version field, default to 1 if not present
-        let version = value
-            .get("version")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(1);
+        let version = value.get("version").and_then(|v| v.as_u64()).unwrap_or(1);
 
         match version {
             1 => {
-                let conditions: ConditionList = serde_json::from_value(value)
-                    .map_err(|e| D::Error::custom(format!("Failed to parse V1 conditions: {}", e)))?;
+                let conditions: ConditionList = serde_json::from_value(value).map_err(|e| {
+                    D::Error::custom(format!("Failed to parse V1 conditions: {}", e))
+                })?;
                 Ok(AlertConditionParams::V1(conditions))
             }
             2 => {
@@ -750,7 +747,9 @@ impl<'de> Deserialize<'de> for AlertConditionParams {
                     .ok_or_else(|| D::Error::custom("conditions field missing for v2"))?;
 
                 let conditions: ConditionGroup = serde_json::from_value(conditions_value.clone())
-                    .map_err(|e| D::Error::custom(format!("Failed to parse V2 conditions: {}", e)))?;
+                    .map_err(|e| {
+                    D::Error::custom(format!("Failed to parse V2 conditions: {}", e))
+                })?;
                 Ok(AlertConditionParams::V2(conditions))
             }
             _ => Err(D::Error::custom(format!(
@@ -1549,7 +1548,6 @@ mod test {
             "conditions": [
                 {
                     "filterType": "condition",
-                    "type": "condition",
                     "column": "status",
                     "operator": "=",
                     "value": "error",
@@ -1557,7 +1555,6 @@ mod test {
                 },
                 {
                     "filterType": "condition",
-                    "type": "condition",
                     "column": "level",
                     "operator": "=",
                     "value": "critical",
@@ -1585,7 +1582,6 @@ mod test {
             "conditions": [
                 {
                     "filterType": "condition",
-                    "type": "condition",
                     "column": "status",
                     "operator": "=",
                     "value": "error",
@@ -1593,11 +1589,10 @@ mod test {
                 },
                 {
                     "filterType": "group",
-                    "logicalOperator": "OR",
+                    "logicalOperator": "AND",
                     "conditions": [
                         {
                             "filterType": "condition",
-                            "type": "condition",
                             "column": "service",
                             "operator": "=",
                             "value": "api",
@@ -1605,14 +1600,12 @@ mod test {
                         },
                         {
                             "filterType": "condition",
-                            "type": "condition",
                             "column": "service",
                             "operator": "=",
                             "value": "web",
                             "logicalOperator": "AND"
                         }
-                    ],
-                    "logicalOperator": "AND"
+                    ]
                 }
             ]
         }"#;
@@ -1631,7 +1624,6 @@ mod test {
     #[test]
     fn test_condition_item_logical_operator() {
         let condition_item = ConditionItem::Condition {
-            type_field: "condition".to_string(),
             column: "status".to_string(),
             operator: Operator::EqualTo,
             value: Value::String("error".to_string()),
@@ -1657,7 +1649,6 @@ mod test {
             logical_operator: LogicalOperator::And,
             conditions: vec![
                 ConditionItem::Condition {
-                    type_field: "condition".to_string(),
                     column: "status".to_string(),
                     operator: Operator::EqualTo,
                     value: Value::String("error".to_string()),
@@ -1665,7 +1656,6 @@ mod test {
                     logical_operator: LogicalOperator::And,
                 },
                 ConditionItem::Condition {
-                    type_field: "condition".to_string(),
                     column: "level".to_string(),
                     operator: Operator::EqualTo,
                     value: Value::String("critical".to_string()),
@@ -1682,7 +1672,6 @@ mod test {
             logical_operator: LogicalOperator::And,
             conditions: vec![
                 ConditionItem::Condition {
-                    type_field: "condition".to_string(),
                     column: "status".to_string(),
                     operator: Operator::EqualTo,
                     value: Value::String("error".to_string()),
@@ -1690,7 +1679,6 @@ mod test {
                     logical_operator: LogicalOperator::And,
                 },
                 ConditionItem::Condition {
-                    type_field: "condition".to_string(),
                     column: "level".to_string(),
                     operator: Operator::EqualTo,
                     value: Value::String("critical".to_string()),
@@ -1808,7 +1796,6 @@ mod test {
                 "conditions": [
                     {
                         "filterType": "condition",
-                        "type": "condition",
                         "column": "level",
                         "operator": "=",
                         "value": "error",
@@ -1816,7 +1803,6 @@ mod test {
                     },
                     {
                         "filterType": "condition",
-                        "type": "condition",
                         "column": "service",
                         "operator": "=",
                         "value": "api",
@@ -1827,7 +1813,11 @@ mod test {
         }"#;
 
         let result: Result<AlertConditionParams, _> = serde_json::from_str(v2_json);
-        assert!(result.is_ok(), "V2 deserialization failed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "V2 deserialization failed: {:?}",
+            result.err()
+        );
 
         let params = result.unwrap();
         match params {
@@ -1861,7 +1851,11 @@ mod test {
         }"#;
 
         let result: Result<AlertConditionParams, _> = serde_json::from_str(v1_json);
-        assert!(result.is_ok(), "V1 deserialization failed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "V1 deserialization failed: {:?}",
+            result.err()
+        );
 
         let params = result.unwrap();
         match params {
@@ -1885,7 +1879,6 @@ mod test {
                     "conditions": [
                         {
                             "filterType": "condition",
-                            "type": "condition",
                             "column": "level",
                             "operator": "=",
                             "value": "error",
@@ -1893,7 +1886,6 @@ mod test {
                         },
                         {
                             "filterType": "condition",
-                            "type": "condition",
                             "column": "service",
                             "operator": "=",
                             "value": "api",
@@ -1911,7 +1903,11 @@ mod test {
         }"#;
 
         let result: Result<QueryCondition, _> = serde_json::from_str(query_condition_json);
-        assert!(result.is_ok(), "QueryCondition deserialization failed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "QueryCondition deserialization failed: {:?}",
+            result.err()
+        );
 
         let query_cond = result.unwrap();
         assert_eq!(query_cond.query_type, QueryType::Custom);
@@ -1940,7 +1936,6 @@ mod test {
                     "conditions": [
                         {
                             "filterType": "condition",
-                            "type": "condition",
                             "column": "level",
                             "operator": "=",
                             "value": "error",
@@ -1948,7 +1943,6 @@ mod test {
                         },
                         {
                             "filterType": "condition",
-                            "type": "condition",
                             "column": "service",
                             "operator": "=",
                             "value": "api",
@@ -1966,7 +1960,11 @@ mod test {
         }"#;
 
         let result: Result<QueryCondition, _> = serde_json::from_str(query_condition_json);
-        assert!(result.is_ok(), "QueryCondition deserialization with empty strings failed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "QueryCondition deserialization with empty strings failed: {:?}",
+            result.err()
+        );
 
         let query_cond = result.unwrap();
         assert_eq!(query_cond.query_type, QueryType::Custom);
@@ -1999,7 +1997,6 @@ mod test {
       "conditions": [
         {
           "filterType": "condition",
-          "type": "condition",
           "column": "level",
           "operator": "=",
           "value": "error",
@@ -2007,7 +2004,6 @@ mod test {
         },
         {
           "filterType": "condition",
-          "type": "condition",
           "column": "service",
           "operator": "=",
           "value": "api",
@@ -2035,11 +2031,19 @@ mod test {
             let value: serde_json::Value = serde_json::from_str(user_json).unwrap();
             if let Some(conditions) = value.get("conditions") {
                 println!("Conditions value: {:#?}", conditions);
-                let cond_result: Result<AlertConditionParams, _> = serde_json::from_value(conditions.clone());
-                println!("Direct AlertConditionParams parse result: {:?}", cond_result);
+                let cond_result: Result<AlertConditionParams, _> =
+                    serde_json::from_value(conditions.clone());
+                println!(
+                    "Direct AlertConditionParams parse result: {:?}",
+                    cond_result
+                );
             }
         }
 
-        assert!(result.is_ok(), "User payload deserialization failed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "User payload deserialization failed: {:?}",
+            result.err()
+        );
     }
 }
