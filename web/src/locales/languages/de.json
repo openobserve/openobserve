@@ -1244,7 +1244,8 @@
     "domainSettingsSaved": "Die Domain-Einstellungen wurden erfolgreich gespeichert",
     "errorSavingDomainSettings": "Fehler beim Speichern der Domain-Einstellungen",
     "noDomainMessage": "Keine Domänen konfiguriert. Fügen Sie oben die Domains hinzu, um den Zugriff einzuschränken.",
-    "license": "Lizenz"
+    "license": "Lizenz",
+    "alertCorrelation": "Warnungs-Deduplizierung"
   },
   "iam": {
     "users": "Nutzer",
@@ -1302,7 +1303,8 @@
     "view": "Ansicht",
     "delay": "Verzögerung",
     "history": "Historie der Pipeline",
-    "searchHistory": "Pipeline-Namen eingeben"
+    "searchHistory": "Pipeline-Namen eingeben",
+    "destination_type": "Art des Reiseziels"
   },
   "reports": {
     "header": "Berichte",
@@ -1587,5 +1589,47 @@
   },
   "alert_list": {
     "alert_details": "Details zur Warnung"
+  },
+  "latencyInsights": {
+    "title": "Einblicke",
+    "tabLabel": "Latenz",
+    "analyzeButton": "Latenzanalyse",
+    "analyzeTooltip": "Analysieren Sie Latenzmuster über alle Trace-Dimensionen hinweg",
+    "compareToLabel": "Vergleiche mit:",
+    "fullTimeRange": "Voller Zeitbereich",
+    "beforePeriod": "Vor dem ausgewählten Zeitraum",
+    "afterPeriod": "Nach dem ausgewählten Zeitraum",
+    "durationLabel": "Dauer:",
+    "analyzingDimensions": "Dimensionen werden analysiert...",
+    "computingDistributions": "Berechnung von Frequenzverteilungen über {count} -Dimensionen",
+    "failedToLoad": "Analyse konnte nicht geladen werden",
+    "retryButton": "Erneut versuchen",
+    "percentileLabel": "Latenzperzentil",
+    "p50Median": "P50 (Median)",
+    "p75": "S.75",
+    "p95": "P95",
+    "p99": "P99",
+    "dimensionsButton": "Felder ({count})",
+    "dimensionsTooltip": "Zu analysierende Dimensionen hinzufügen oder entfernen",
+    "selectDimensions": "Wählen Sie Felder",
+    "analyzeButtonLabel": "Analysieren",
+    "refreshTooltip": "Analyse mit aktualisiertem Perzentil aktualisieren",
+    "customSQLFieldsDisabled": "Die Feldauswahl ist für benutzerdefinierte SQL-Abfragen nicht verfügbar. Dimensionen werden aus Ihren Abfrageergebnissen extrahiert.",
+    "timeRangeSelected": "Ausgewählter Zeitbereich"
+  },
+  "volumeInsights": {
+    "title": "Einblicke",
+    "tabLabel": "Bewerte",
+    "analyzeButton": "Ratenanalyse",
+    "analyzeTooltip": "Analysieren Sie Trace-Muster über Dimensionen hinweg",
+    "analyzeTooltipLogs": "Analysieren Sie die Dimensionsverteilung für den aktuellen Zeitraum",
+    "rateLabel": "Rate:",
+    "timeRangeLabel": "Zeitbereich:"
+  },
+  "errorInsights": {
+    "title": "Einblicke",
+    "tabLabel": "Fehler",
+    "errorSpikePeriod": "Zeitraum der Fehlerspitzen:",
+    "errorsGreaterThan": "Fehler >="
   }
 }
