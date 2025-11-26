@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Enterprise License Details Section -->
-        <div v-if="config.isEnterprise == 'true'" class="tw-mt-4">
+        <div v-if="config.isEnterprise == 'true' && config.isCloud === 'false'" class="tw-mt-4">
           <div class="feature-card">
             <div class="tw-flex tw-items-center tw-justify-between tw-mb-4">
               <div class="tw-flex tw-items-center tw-gap-3">
