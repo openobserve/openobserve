@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @go-to-home="goToHome"
         @toggle-ai-chat="toggleAIChat"
         @open-slack="openSlack"
-        @navigate-to-open-api="navigateToOpenAPI"
+        @navigateToOpenAPI="navigateToOpenAPI"
         @navigate-to-docs="navigateToDocs"
         @change-language="changeLanguage"
         @open-predefined-themes="openPredefinedThemes"
