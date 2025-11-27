@@ -492,6 +492,14 @@ pub struct MetricsQueryRequest {
     pub timeout: i64,
     #[prost(bool, tag = "9")]
     pub use_cache: bool,
+    #[prost(string, tag = "10")]
+    pub search_event_type: ::prost::alloc::string::String,
+    #[prost(string, repeated, tag = "11")]
+    pub regions: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(string, repeated, tag = "12")]
+    pub clusters: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(bool, tag = "13")]
+    pub is_super_cluster: bool,
 }
 #[derive(serde::Serialize)]
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
@@ -506,6 +514,10 @@ pub struct MetricsQueryStmt {
     pub step: i64,
     #[prost(bool, tag = "5")]
     pub query_exemplars: bool,
+    #[prost(bool, tag = "6")]
+    pub query_data: bool,
+    #[prost(string, repeated, tag = "7")]
+    pub label_selector: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(serde::Serialize)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -682,6 +694,28 @@ pub mod metrics_client {
             req.extensions_mut().insert(GrpcMethod::new("cluster.Metrics", "Query"));
             self.inner.unary(req, path, codec).await
         }
+        /// Server-streaming RPC: Data will stream multiple MetricsQueryResponse messages
+        pub async fn data(
+            &mut self,
+            request: impl tonic::IntoRequest<super::MetricsQueryRequest>,
+        ) -> std::result::Result<
+            tonic::Response<tonic::codec::Streaming<super::MetricsQueryResponse>>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic_prost::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/cluster.Metrics/Data");
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("cluster.Metrics", "Data"));
+            self.inner.server_streaming(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -704,6 +738,17 @@ pub mod metrics_server {
             tonic::Response<super::MetricsQueryResponse>,
             tonic::Status,
         >;
+        /// Server streaming response type for the Data method.
+        type DataStream: tonic::codegen::tokio_stream::Stream<
+                Item = std::result::Result<super::MetricsQueryResponse, tonic::Status>,
+            >
+            + std::marker::Send
+            + 'static;
+        /// Server-streaming RPC: Data will stream multiple MetricsQueryResponse messages
+        async fn data(
+            &self,
+            request: tonic::Request<super::MetricsQueryRequest>,
+        ) -> std::result::Result<tonic::Response<Self::DataStream>, tonic::Status>;
     }
     #[derive(Debug)]
     pub struct MetricsServer<T> {
@@ -822,6 +867,52 @@ pub mod metrics_server {
                                 max_encoding_message_size,
                             );
                         let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/cluster.Metrics/Data" => {
+                    #[allow(non_camel_case_types)]
+                    struct DataSvc<T: Metrics>(pub Arc<T>);
+                    impl<
+                        T: Metrics,
+                    > tonic::server::ServerStreamingService<super::MetricsQueryRequest>
+                    for DataSvc<T> {
+                        type Response = super::MetricsQueryResponse;
+                        type ResponseStream = T::DataStream;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::ResponseStream>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::MetricsQueryRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Metrics>::data(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let method = DataSvc(inner);
+                        let codec = tonic_prost::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.server_streaming(method, req).await;
                         Ok(res)
                     };
                     Box::pin(fut)

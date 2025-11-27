@@ -26,7 +26,7 @@ use serde::{
 
 use crate::{
     FxIndexMap,
-    meta::promql::NAME_LABEL,
+    meta::{promql::NAME_LABEL, search::SearchEventType},
     utils::{json, sort::sort_float},
 };
 
@@ -404,10 +404,10 @@ pub struct EvalContext {
 impl EvalContext {
     pub fn new(start: i64, end: i64, step: i64, trace_id: String) -> Self {
         Self {
+            trace_id,
             start,
             end,
             step,
-            trace_id,
         }
     }
 
@@ -427,6 +427,21 @@ impl EvalContext {
                 .collect()
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct QueryContext {
+    pub trace_id: String,
+    pub org_id: String,
+    pub query_exemplars: bool,
+    pub query_data: bool,
+    pub need_wal: bool,
+    pub use_cache: bool,
+    pub timeout: u64, // seconds, query timeout
+    pub search_event_type: Option<SearchEventType>,
+    pub regions: Vec<String>,
+    pub clusters: Vec<String>,
+    pub is_super_cluster: bool,
 }
 
 #[derive(Debug, Default, Clone)]

@@ -248,6 +248,9 @@ async fn query(
         step: 300_000_000, // 5m
         query_exemplars: false,
         use_cache: None,
+        search_type: None,
+        regions: vec![],
+        clusters: vec![],
     };
 
     search(&trace_id, org_id, req, user_email, timeout).await
@@ -598,6 +601,9 @@ async fn query_range(
         step,
         query_exemplars,
         use_cache: req.use_cache,
+        search_type: req.search_type,
+        regions: req.regions,
+        clusters: req.clusters,
     };
     if let Some(use_streaming) = req.use_streaming
         && use_streaming
@@ -1169,7 +1175,24 @@ async fn search(
     user_email: &str,
     timeout: i64,
 ) -> Result<HttpResponse, Error> {
-    match promql::search::search(trace_id, org_id, &req, user_email, timeout).await {
+    // check super cluster
+    #[cfg(not(feature = "enterprise"))]
+    let is_super_cluster = false;
+    #[cfg(feature = "enterprise")]
+    let is_super_cluster = o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled;
+
+    match promql::search::search(
+        trace_id,
+        org_id,
+        &req,
+        user_email,
+        timeout,
+        is_super_cluster,
+    )
+    .await
+    {
         Ok(data) if !req.query_exemplars => Ok(HttpResponse::Ok().json(
             config::meta::promql::ApiFuncResponse::ok(
                 config::meta::promql::QueryResult {
@@ -1207,6 +1230,14 @@ async fn search_streaming(
     user_email: &str,
     timeout: i64,
 ) -> Result<HttpResponse, Error> {
+    // check super cluster
+    #[cfg(not(feature = "enterprise"))]
+    let is_super_cluster = false;
+    #[cfg(feature = "enterprise")]
+    let is_super_cluster = o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled;
+
     let partitions = generate_search_partition(&req.query, req.start, req.end, req.step);
     log::info!(
         "[HTTP2_STREAM PromQL trace_id {trace_id}] Generated {} partitions for streaming search",
@@ -1225,7 +1256,16 @@ async fn search_streaming(
             let mut req = req.clone();
             req.start = start;
             req.end = end;
-            match promql::search::search(&req_trace_id, &org_id, &req, &user_email, timeout).await {
+            match promql::search::search(
+                &req_trace_id,
+                &org_id,
+                &req,
+                &user_email,
+                timeout,
+                is_super_cluster,
+            )
+            .await
+            {
                 Ok(data) => {
                     let res = StreamResponses::PromqlResponse {
                         data: config::meta::promql::QueryResult {

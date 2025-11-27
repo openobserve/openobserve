@@ -147,18 +147,8 @@ async fn register() -> Result<()> {
         id: new_node_id,
         uuid: LOCAL_NODE.uuid.clone(),
         name: cfg.common.instance_name.clone(),
-        http_addr: format!(
-            "{}://{}:{}",
-            get_http_schema(),
-            get_local_http_ip(),
-            cfg.http.port
-        ),
-        grpc_addr: format!(
-            "{}://{}:{}",
-            get_grpc_schema(),
-            get_local_grpc_ip(),
-            cfg.grpc.port
-        ),
+        http_addr: get_local_http_addr(),
+        grpc_addr: get_local_grpc_addr(),
         role: LOCAL_NODE.role.clone(),
         role_group: LOCAL_NODE.role_group,
         cpu_num: cfg.limit.cpu_num as u64,
@@ -229,18 +219,8 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
             id: LOCAL_NODE_ID.load(Ordering::Relaxed),
             uuid: LOCAL_NODE.uuid.clone(),
             name: cfg.common.instance_name.clone(),
-            http_addr: format!(
-                "{}://{}:{}",
-                get_http_schema(),
-                get_local_http_ip(),
-                cfg.http.port
-            ),
-            grpc_addr: format!(
-                "{}://{}:{}",
-                get_grpc_schema(),
-                get_local_grpc_ip(),
-                cfg.grpc.port
-            ),
+            http_addr: get_local_http_addr(),
+            grpc_addr: get_local_grpc_addr(),
             role: LOCAL_NODE.role.clone(),
             role_group: LOCAL_NODE.role_group,
             cpu_num: cfg.limit.cpu_num as u64,

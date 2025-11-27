@@ -16,9 +16,53 @@
 use hashbrown::HashMap;
 use proto::prometheus_rpc;
 use regex::Regex;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use strum::Display;
 use utoipa::ToSchema;
+
+use crate::meta::search::SearchEventType;
+
+/// Custom deserializer that accepts either a comma-separated string or a string array
+fn deserialize_string_or_vec<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::{self, SeqAccess, Visitor};
+
+    struct StringOrVec;
+
+    impl<'de> Visitor<'de> for StringOrVec {
+        type Value = Vec<String>;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a string or array of strings")
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            if value.is_empty() {
+                Ok(Vec::new())
+            } else {
+                Ok(value.split(',').map(|s| s.trim().to_string()).collect())
+            }
+        }
+
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+        where
+            A: SeqAccess<'de>,
+        {
+            let mut vec = Vec::new();
+            while let Some(item) = seq.next_element::<String>()? {
+                vec.push(item);
+            }
+            Ok(vec)
+        }
+    }
+
+    deserializer.deserialize_any(StringOrVec)
+}
 
 pub mod grpc;
 pub mod value;
@@ -152,6 +196,12 @@ pub struct RequestRangeQuery {
     pub use_cache: Option<bool>,
     /// Use streaming output.
     pub use_streaming: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub search_type: Option<SearchEventType>,
+    #[serde(default, deserialize_with = "deserialize_string_or_vec")]
+    pub regions: Vec<String>, // default query all regions, local: only query local region clusters
+    #[serde(default, deserialize_with = "deserialize_string_or_vec")]
+    pub clusters: Vec<String>, // default query all clusters, local: only query local cluster
 }
 
 #[derive(Debug, Deserialize)]
@@ -374,6 +424,33 @@ mod tests {
         assert_eq!(MetricType::StateSet.to_string(), "stateset");
         assert_eq!(format!("{}", MetricType::Unknown), "unknown");
         assert_eq!(MetricType::Unknown.to_string(), "unknown");
+    }
+
+    #[test]
+    fn test_deserialize_string_or_vec() {
+        // Test with comma-separated string
+        let json = r#"{"regions": "region1,region2,region3", "clusters": "cluster1"}"#;
+        let result: RequestRangeQuery = serde_json::from_str(json).unwrap();
+        assert_eq!(result.regions, vec!["region1", "region2", "region3"]);
+        assert_eq!(result.clusters, vec!["cluster1"]);
+
+        // Test with array
+        let json = r#"{"regions": ["region1", "region2"], "clusters": ["cluster1", "cluster2"]}"#;
+        let result: RequestRangeQuery = serde_json::from_str(json).unwrap();
+        assert_eq!(result.regions, vec!["region1", "region2"]);
+        assert_eq!(result.clusters, vec!["cluster1", "cluster2"]);
+
+        // Test with empty string
+        let json = r#"{"regions": "", "clusters": []}"#;
+        let result: RequestRangeQuery = serde_json::from_str(json).unwrap();
+        assert!(result.regions.is_empty());
+        assert!(result.clusters.is_empty());
+
+        // Test with default (missing fields)
+        let json = r#"{}"#;
+        let result: RequestRangeQuery = serde_json::from_str(json).unwrap();
+        assert!(result.regions.is_empty());
+        assert!(result.clusters.is_empty());
     }
 
     #[test]

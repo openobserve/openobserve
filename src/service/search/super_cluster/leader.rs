@@ -84,8 +84,8 @@ pub async fn search(
         return Ok((vec![], ScanStats::new(), 0, false, "".to_string()));
     }
 
-    // 2. get nodes
-    let get_node_start = std::time::Instant::now();
+    // 2. get clusters
+    let get_cluster_start = std::time::Instant::now();
     let role_group = req
         .search_event_type
         .as_ref()
@@ -95,16 +95,17 @@ pub async fn search(
                 .map(RoleGroup::from)
         })
         .unwrap_or(Some(RoleGroup::Interactive));
-    let nodes = get_cluster_nodes(trace_id, req_regions, req_clusters, role_group).await?;
+    let clusters = get_cluster_nodes(trace_id, req_regions, req_clusters, role_group).await?;
+    let clusters_num = clusters.len();
     log::info!(
         "{}",
         search_inspector_fields(
-            format!("[trace_id {trace_id}] super get nodes: {}", nodes.len()),
+            format!("[trace_id {trace_id}] super get clusters: {clusters_num}"),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
-                .component("super get nodes".to_string())
+                .component("super get clusters".to_string())
                 .search_role("super".to_string())
-                .duration(get_node_start.elapsed().as_millis() as usize)
+                .duration(get_cluster_start.elapsed().as_millis() as usize)
                 .build()
         )
     );
@@ -153,7 +154,7 @@ pub async fn search(
 
     let trace_id_move = trace_id.to_string();
     let query_task = DATAFUSION_RUNTIME.spawn(async move {
-        run_datafusion(trace_id_move, req, sql, nodes)
+        run_datafusion(trace_id_move, req, sql, clusters)
             .instrument(datafusion_span)
             .await
     });

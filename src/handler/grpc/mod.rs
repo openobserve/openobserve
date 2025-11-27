@@ -50,11 +50,14 @@ impl From<crate::service::promql::MetricsQueryRequest> for cluster_rpc::MetricsQ
             end: req.end,
             step: req.step,
             query_exemplars: req.query_exemplars,
+            query_data: false,
+            label_selector: vec![],
         };
 
+        let trace_id = ider::generate_trace_id();
         let job = cluster_rpc::Job {
-            trace_id: ider::generate_trace_id(),
-            job: "".to_string(),
+            trace_id: trace_id.to_string(),
+            job: trace_id[..7].to_string(),
             stage: 0,
             partition: 0,
         };
@@ -64,8 +67,12 @@ impl From<crate::service::promql::MetricsQueryRequest> for cluster_rpc::MetricsQ
             org_id: "".to_string(),
             need_wal: false,
             query: Some(req_query),
-            timeout: 0,
             use_cache: req.use_cache.unwrap_or(true),
+            timeout: 0,
+            search_event_type: req.search_type.map(|v| v.to_string()).unwrap_or_default(),
+            regions: req.regions.clone(),
+            clusters: req.clusters.clone(),
+            is_super_cluster: false,
         }
     }
 }
