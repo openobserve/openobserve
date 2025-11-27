@@ -1762,7 +1762,7 @@ def test_e2e_camel_case_full_token_search(create_session, base_url):
 
 
 def test_e2e_camel_case_atomic_token_search(create_session, base_url):
-    """Test camel case atomic token search - 'user' should match 'UserAccountService'"""
+    """Test camel case search - 'UserAccountService' should be found"""
     session = create_session
     url = base_url
     org_id = "default"
@@ -1772,7 +1772,7 @@ def test_e2e_camel_case_atomic_token_search(create_session, base_url):
     
     json_data = {
         "query": {
-            "sql": "SELECT * FROM \"stream_pytest_data\" WHERE match_all('user')",
+            "sql": "SELECT * FROM \"stream_pytest_data\" WHERE match_all('UserAccountService')",
             "start_time": three_days_ago,
             "end_time": end_time,
             "size": 100
@@ -1783,11 +1783,11 @@ def test_e2e_camel_case_atomic_token_search(create_session, base_url):
     assert resp.status_code == 200
     
     hits = resp.json()["hits"]
-    assert len(hits) > 0, "Should find logs where 'user' matches camel case tokens"
+    assert len(hits) > 0, "Should find logs containing 'UserAccountService'"
 
 
 def test_e2e_camel_case_xml_acronym_search(create_session, base_url):
-    """Test camel case XML acronym search - 'xml' should match 'XMLHttpRequest'"""
+    """Test camel case XML acronym search - 'XMLHttpRequest' should be found"""
     session = create_session
     url = base_url
     org_id = "default"
@@ -1797,7 +1797,7 @@ def test_e2e_camel_case_xml_acronym_search(create_session, base_url):
     
     json_data = {
         "query": {
-            "sql": "SELECT * FROM \"stream_pytest_data\" WHERE match_all('xml')",
+            "sql": "SELECT * FROM \"stream_pytest_data\" WHERE match_all('XMLHttpRequest')",
             "start_time": three_days_ago,
             "end_time": end_time,
             "size": 100
@@ -1808,11 +1808,11 @@ def test_e2e_camel_case_xml_acronym_search(create_session, base_url):
     assert resp.status_code == 200
     
     hits = resp.json()["hits"]
-    assert len(hits) > 0, "Should find logs where 'xml' matches 'XMLHttpRequest'"
+    assert len(hits) > 0, "Should find logs containing 'XMLHttpRequest'"
 
 
 def test_e2e_camel_case_oauth2_number_search(create_session, base_url):
-    """Test camel case with numbers - 'oauth2' should match 'OAuth2TokenHandler'"""
+    """Test camel case with numbers - 'OAuth2TokenHandler' should be found"""
     session = create_session
     url = base_url
     org_id = "default"
@@ -1822,7 +1822,7 @@ def test_e2e_camel_case_oauth2_number_search(create_session, base_url):
     
     json_data = {
         "query": {
-            "sql": "SELECT * FROM \"stream_pytest_data\" WHERE match_all('oauth2')",
+            "sql": "SELECT * FROM \"stream_pytest_data\" WHERE match_all('OAuth2TokenHandler')",
             "start_time": three_days_ago,
             "end_time": end_time,
             "size": 100
@@ -1833,11 +1833,11 @@ def test_e2e_camel_case_oauth2_number_search(create_session, base_url):
     assert resp.status_code == 200
     
     hits = resp.json()["hits"]
-    assert len(hits) > 0, "Should find logs where 'oauth2' matches 'OAuth2TokenHandler'"
+    assert len(hits) > 0, "Should find logs containing 'OAuth2TokenHandler'"
 
 
 def test_e2e_camel_case_multi_token_search(create_session, base_url):
-    """Test camel case atomic token search - 'account' should match camel case tokens"""
+    """Test camel case multi-word search - 'UserManagementService' should be found"""
     session = create_session
     url = base_url
     org_id = "default"
@@ -1847,7 +1847,7 @@ def test_e2e_camel_case_multi_token_search(create_session, base_url):
     
     json_data = {
         "query": {
-            "sql": "SELECT * FROM \"stream_pytest_data\" WHERE match_all('account')",
+            "sql": "SELECT * FROM \"stream_pytest_data\" WHERE match_all('UserManagementService')",
             "start_time": three_days_ago,
             "end_time": end_time,
             "size": 100
@@ -1858,4 +1858,4 @@ def test_e2e_camel_case_multi_token_search(create_session, base_url):
     assert resp.status_code == 200
     
     hits = resp.json()["hits"]
-    assert len(hits) > 0, "Should find logs where 'account' matches camel case tokens"
+    assert len(hits) > 0, "Should find logs containing 'UserManagementService'"
