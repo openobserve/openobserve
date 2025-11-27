@@ -738,8 +738,44 @@ export default defineComponent({
 
       // 6. Validate 'query_condition' field
       if (input.query_condition && input.query_condition.conditions) {
-        const validateCondition = (condition: any) => {
-          // Check if it's a simple condition
+        const validateV2Condition = (item: any): boolean => {
+          if (item.filterType === 'group') {
+            // V2 group - validate it has conditions array
+            if (!Array.isArray(item.conditions)) {
+              alertErrors.push(
+                `Alert - ${index}: V2 group must have a conditions array.`,
+              );
+              return false;
+            }
+            // Recursively validate nested conditions
+            return item.conditions.every((nestedItem: any) => validateV2Condition(nestedItem));
+          } else if (item.filterType === 'condition') {
+            // V2 condition - validate required fields
+            if (!item.column || !item.operator || item.value === undefined) {
+              alertErrors.push(
+                `Alert - ${index}: V2 condition must have column, operator, and value.`,
+              );
+              return false;
+            }
+            // Validate operator for custom type
+            if (
+              input.query_condition.type === "custom" &&
+              !["=", ">", "<", ">=", "<=", "Contains", "NotContains","contains","not_contains"].includes(
+                item.operator,
+              )
+            ) {
+              alertErrors.push(
+                `Alert - ${index}: Invalid operator '${item.operator}'. Allowed: '=', '>', '<', '>=', '<=', 'Contains', 'NotContains'.`,
+              );
+              return false;
+            }
+            return true;
+          }
+          return true;
+        };
+
+        const validateV1Condition = (condition: any) => {
+          // Check if it's a simple condition (V0/V1 format)
           if (condition.column && condition.operator && condition.value !== undefined) {
             if (
               input.query_condition.type === "custom" &&
@@ -754,7 +790,7 @@ export default defineComponent({
             return;
           }
 
-          // Check if it's a nested condition with 'and' or 'or'
+          // Check if it's a nested condition with 'and' or 'or' (V1 format)
           if (condition.and || condition.or) {
             const conditions = condition.and || condition.or;
             if (!Array.isArray(conditions)) {
@@ -763,7 +799,7 @@ export default defineComponent({
               );
               return;
             }
-            conditions.forEach(validateCondition);
+            conditions.forEach(validateV1Condition);
             return;
           }
 
@@ -773,19 +809,35 @@ export default defineComponent({
           );
         };
 
-        // Handle both array format and nested format
-        if (Array.isArray(input.query_condition.conditions)) {
-          // Old format - array of conditions
-          input.query_condition.conditions.forEach((condition:any) => {
-            if (!condition.column || !condition.operator || !condition.value) {
+        let conditionsToValidate = input.query_condition.conditions;
+
+        // Check if conditions is wrapped with version field (new format from backend)
+        if (conditionsToValidate.version !== undefined) {
+          // Wrapped format: { version: 2, conditions: {...} }
+          conditionsToValidate = conditionsToValidate.conditions;
+        }
+
+        // Determine format and validate accordingly
+        if (Array.isArray(conditionsToValidate)) {
+          // V0 format - flat array of conditions
+          conditionsToValidate.forEach((condition:any) => {
+            if (!condition.column || !condition.operator || condition.value === undefined) {
               alertErrors.push(
                 `Alert - ${index}: Each query condition must have 'column', 'operator', and 'value'.`,
               );
             }
           });
+        } else if (conditionsToValidate.filterType === 'group') {
+          // V2 format - new structure with filterType
+          validateV2Condition(conditionsToValidate);
+        } else if (conditionsToValidate.and || conditionsToValidate.or) {
+          // V1 format - nested conditions with and/or
+          validateV1Condition(conditionsToValidate);
         } else {
-          // New format - nested conditions with and/or
-          validateCondition(input.query_condition.conditions);
+          // Unknown format
+          alertErrors.push(
+            `Alert - ${index}: Unrecognized query condition format.`,
+          );
         }
       }
       // 7. Validate 'sql' and 'promql'
