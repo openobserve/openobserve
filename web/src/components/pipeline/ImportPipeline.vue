@@ -1128,23 +1128,106 @@ export default defineComponent({
       };
 
       const validateConditionNode = (input: any) => {
-        const isValid = !input.nodes.some((node: any) => {
-          return (
-            node.io_type == "default" &&
-            node.data.node_type == "condition" &&
-            !node.data.conditions
-          );
+        let hasErrors = false;
+
+        input.nodes.forEach((node: any, nodeIndex: number) => {
+          if (node.io_type === "default" && node.data.node_type === "condition") {
+            // Check if conditions exist
+            if (!node.data.conditions) {
+              pipelineErrors.push({
+                message: `Pipeline - ${index}, Node ${nodeIndex}: Condition is required`,
+                field: "empty_condition",
+              });
+              hasErrors = true;
+              return;
+            }
+
+            // Validate the condition format (V0, V1, or V2)
+            const validateV2Condition = (item: any): boolean => {
+              if (item.filterType === 'group') {
+                if (!Array.isArray(item.conditions)) {
+                  pipelineErrors.push({
+                    message: `Pipeline - ${index}, Node ${nodeIndex}: V2 group must have a conditions array.`,
+                    field: "condition_format",
+                  });
+                  return false;
+                }
+                return item.conditions.every((nestedItem: any) => validateV2Condition(nestedItem));
+              } else if (item.filterType === 'condition') {
+                if (!item.column || !item.operator || item.value === undefined) {
+                  pipelineErrors.push({
+                    message: `Pipeline - ${index}, Node ${nodeIndex}: V2 condition must have column, operator, and value.`,
+                    field: "condition_format",
+                  });
+                  return false;
+                }
+                return true;
+              }
+              return true;
+            };
+
+            const validateV1Condition = (condition: any): boolean => {
+              if (condition.column && condition.operator && condition.value !== undefined) {
+                return true;
+              }
+              if (condition.and || condition.or) {
+                const conditions = condition.and || condition.or;
+                if (!Array.isArray(conditions)) {
+                  pipelineErrors.push({
+                    message: `Pipeline - ${index}, Node ${nodeIndex}: V1 'and'/'or' conditions must be an array.`,
+                    field: "condition_format",
+                  });
+                  return false;
+                }
+                return conditions.every((cond: any) => validateV1Condition(cond));
+              }
+              return false;
+            };
+
+            let conditionsToValidate = node.data.conditions;
+
+            // Determine format and validate
+            if (Array.isArray(conditionsToValidate)) {
+              // V0 format - flat array
+              const valid = conditionsToValidate.every((condition: any) => {
+                return condition.column && condition.operator && condition.value !== undefined;
+              });
+              if (!valid) {
+                pipelineErrors.push({
+                  message: `Pipeline - ${index}, Node ${nodeIndex}: V0 format - each condition must have column, operator, and value.`,
+                  field: "condition_format",
+                });
+                hasErrors = true;
+              }
+            } else if (conditionsToValidate.filterType === 'group') {
+              // V2 format
+              if (!validateV2Condition(conditionsToValidate)) {
+                hasErrors = true;
+              }
+            } else if (conditionsToValidate.and || conditionsToValidate.or) {
+              // V1 format
+              if (!validateV1Condition(conditionsToValidate)) {
+                pipelineErrors.push({
+                  message: `Pipeline - ${index}, Node ${nodeIndex}: Invalid V1 condition format.`,
+                  field: "condition_format",
+                });
+                hasErrors = true;
+              }
+            } else {
+              pipelineErrors.push({
+                message: `Pipeline - ${index}, Node ${nodeIndex}: Unrecognized condition format.`,
+                field: "condition_format",
+              });
+              hasErrors = true;
+            }
+          }
         });
-        return isValid;
+
+        return !hasErrors;
       };
       validateFunctionNode(input, index);
-      //validate condition node
-      if (!validateConditionNode(input)) {
-        pipelineErrors.push({
-          message: `Pipeline - ${index}: Condition is required`,
-          field: "empty_condition",
-        });
-      }
+      //validate condition node - errors are added inside the function
+      validateConditionNode(input);
       const isValidRemoteDestination = validateRemoteDestination(input);
       if (!isValidRemoteDestination) {
         pipelineErrors.push({
@@ -1176,29 +1259,34 @@ export default defineComponent({
       if (input.nodes && Array.isArray(input.nodes)) {
         input.nodes.forEach((node: any) => {
           if (node.data?.node_type === "condition" && node.data?.conditions) {
+            let convertedConditions = node.data.conditions;
+
             // Check if version field is already present (V2)
-            if (node.data.version !== "2" && node.data.version !== 2) {
-              const version = detectConditionsVersion(node.data.conditions);
+            if (node.data.version !== 2 && node.data.version !== "2") {
+              const version = detectConditionsVersion(convertedConditions);
 
               if (version === 0) {
                 // V0: Flat array format - convert to V2
-                node.data.conditions = convertV0ToV2(node.data.conditions);
-                node.data.version = "2";
+                convertedConditions = convertV0ToV2(convertedConditions);
               } else if (version === 1) {
                 // V1: Tree-based format - convert to V2
-                if (node.data.conditions.and || node.data.conditions.or) {
+                if (convertedConditions.and || convertedConditions.or) {
                   // V1 Backend format
-                  node.data.conditions = convertV1BEToV2(node.data.conditions);
-                } else if (node.data.conditions.label && node.data.conditions.items) {
+                  convertedConditions = convertV1BEToV2(convertedConditions);
+                } else if (convertedConditions.label && convertedConditions.items) {
                   // V1 Frontend format
-                  node.data.conditions = convertV1ToV2(node.data.conditions);
+                  convertedConditions = convertV1ToV2(convertedConditions);
                 }
-                node.data.version = "2";
-              } else if (version === 2) {
-                // V2: Already in correct format, just add version field
-                node.data.version = "2";
               }
+              // For version === 2, convertedConditions is already in correct format
+
+              // Update node data with converted conditions
+              node.data.conditions = convertedConditions;
             }
+
+            // Ensure version is set as integer (matching Condition.vue structure)
+            // Backend expects: node.data = { node_type: "condition", version: 2, conditions: {...} }
+            node.data.version = 2;
           }
         });
       }

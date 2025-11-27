@@ -305,7 +305,7 @@ const getTruncatedConditions = (conditionData) => {
   // Handle null/undefined
   if (!conditionData) return '';
 
-  // Build preview string recursively (similar to alert preview)
+  // Build preview string recursively
   const buildPreviewString = (node) => {
     if (!node) return '';
 
