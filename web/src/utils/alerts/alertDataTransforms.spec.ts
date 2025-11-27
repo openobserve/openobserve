@@ -1751,6 +1751,314 @@ describe('alertDataTransforms - V2 Structure Tests', () => {
         expect(nestedGroup.conditions[0].logicalOperator).toBe('AND');
         expect(nestedGroup.conditions[1].logicalOperator).toBe('AND');
       });
+
+      it('SCENARIO 13: Only conditions (no nested groups)', () => {
+        // V1: Multiple conditions, no groups
+        // job = 'sde' OR job = 'swe' OR level >= 'senior'
+        const v1BEData = {
+          or: [
+            { column: 'job', operator: '=', value: 'sde', ignore_case: false },
+            { column: 'job', operator: '=', value: 'swe', ignore_case: true },
+            { column: 'level', operator: '>=', value: 'senior', ignore_case: false }
+          ]
+        };
+
+        const result = convertV1BEToV2(v1BEData);
+
+        expect(result.logicalOperator).toBe('OR');
+        expect(result.conditions).toHaveLength(3);
+
+        // All should be conditions, no groups
+        expect(result.conditions[0].filterType).toBe('condition');
+        expect(result.conditions[0].column).toBe('job');
+        expect(result.conditions[0].logicalOperator).toBe('OR');
+
+        expect(result.conditions[1].filterType).toBe('condition');
+        expect(result.conditions[1].column).toBe('job');
+        expect(result.conditions[1].logicalOperator).toBe('OR');
+
+        expect(result.conditions[2].filterType).toBe('condition');
+        expect(result.conditions[2].column).toBe('level');
+        expect(result.conditions[2].logicalOperator).toBe('OR');
+      });
+
+      it('SCENARIO 14: Only nested groups (no direct conditions)', () => {
+        // V1: Multiple nested groups, no conditions at top level
+        // (job = 'sde' AND level = 'senior') OR (status = 'active' AND type = 'urgent')
+        const v1BEData = {
+          or: [
+            {
+              and: [
+                { column: 'job', operator: '=', value: 'sde', ignore_case: false },
+                { column: 'level', operator: '=', value: 'senior', ignore_case: false }
+              ]
+            },
+            {
+              and: [
+                { column: 'status', operator: '=', value: 'active', ignore_case: false },
+                { column: 'type', operator: '=', value: 'urgent', ignore_case: false }
+              ]
+            }
+          ]
+        };
+
+        const result = convertV1BEToV2(v1BEData);
+
+        expect(result.logicalOperator).toBe('OR');
+        expect(result.conditions).toHaveLength(2);
+
+        // Both should be groups
+        expect(result.conditions[0].filterType).toBe('group');
+        expect(result.conditions[0].logicalOperator).toBe('OR'); // From parent
+        expect((result.conditions[0] as any).conditions).toHaveLength(2);
+        expect((result.conditions[0] as any).conditions[0].logicalOperator).toBe('AND');
+        expect((result.conditions[0] as any).conditions[1].logicalOperator).toBe('AND');
+
+        expect(result.conditions[1].filterType).toBe('group');
+        expect(result.conditions[1].logicalOperator).toBe('OR'); // From parent
+        expect((result.conditions[1] as any).conditions).toHaveLength(2);
+        expect((result.conditions[1] as any).conditions[0].logicalOperator).toBe('AND');
+        expect((result.conditions[1] as any).conditions[1].logicalOperator).toBe('AND');
+      });
+
+      it('SCENARIO 15: Group then condition', () => {
+        // V1: Group first, then condition
+        // (job = 'sde' AND level = 'senior') OR status = 'active'
+        const v1BEData = {
+          or: [
+            {
+              and: [
+                { column: 'job', operator: '=', value: 'sde', ignore_case: false },
+                { column: 'level', operator: '=', value: 'senior', ignore_case: false }
+              ]
+            },
+            { column: 'status', operator: '=', value: 'active', ignore_case: false }
+          ]
+        };
+
+        const result = convertV1BEToV2(v1BEData);
+
+        expect(result.logicalOperator).toBe('OR');
+        expect(result.conditions).toHaveLength(2);
+
+        // First should be group
+        expect(result.conditions[0].filterType).toBe('group');
+        expect(result.conditions[0].logicalOperator).toBe('OR');
+
+        // Second should be condition
+        expect(result.conditions[1].filterType).toBe('condition');
+        expect(result.conditions[1].column).toBe('status');
+        expect(result.conditions[1].logicalOperator).toBe('OR');
+      });
+
+      it('SCENARIO 16: Condition then group then condition', () => {
+        // V1: condition, group, condition pattern
+        // job = 'sde' OR (level = 'senior' AND type = 'urgent') OR status = 'active'
+        const v1BEData = {
+          or: [
+            { column: 'job', operator: '=', value: 'sde', ignore_case: false },
+            {
+              and: [
+                { column: 'level', operator: '=', value: 'senior', ignore_case: false },
+                { column: 'type', operator: '=', value: 'urgent', ignore_case: false }
+              ]
+            },
+            { column: 'status', operator: '=', value: 'active', ignore_case: false }
+          ]
+        };
+
+        const result = convertV1BEToV2(v1BEData);
+
+        expect(result.logicalOperator).toBe('OR');
+        expect(result.conditions).toHaveLength(3);
+
+        // First: condition
+        expect(result.conditions[0].filterType).toBe('condition');
+        expect(result.conditions[0].column).toBe('job');
+        expect(result.conditions[0].logicalOperator).toBe('OR');
+
+        // Second: group
+        expect(result.conditions[1].filterType).toBe('group');
+        expect(result.conditions[1].logicalOperator).toBe('OR'); // From parent
+
+        // Third: condition
+        expect(result.conditions[2].filterType).toBe('condition');
+        expect(result.conditions[2].column).toBe('status');
+        expect(result.conditions[2].logicalOperator).toBe('OR');
+      });
+
+      it('SCENARIO 17: Multiple groups interspersed with conditions', () => {
+        // V1: Complex pattern: cond, group, cond, group, cond
+        // A OR (B AND C) OR D OR (E AND F) OR G
+        const v1BEData = {
+          or: [
+            { column: 'A', operator: '=', value: '1', ignore_case: false },
+            {
+              and: [
+                { column: 'B', operator: '=', value: '2', ignore_case: false },
+                { column: 'C', operator: '=', value: '3', ignore_case: false }
+              ]
+            },
+            { column: 'D', operator: '=', value: '4', ignore_case: false },
+            {
+              and: [
+                { column: 'E', operator: '=', value: '5', ignore_case: false },
+                { column: 'F', operator: '=', value: '6', ignore_case: false }
+              ]
+            },
+            { column: 'G', operator: '=', value: '7', ignore_case: false }
+          ]
+        };
+
+        const result = convertV1BEToV2(v1BEData);
+
+        expect(result.logicalOperator).toBe('OR');
+        expect(result.conditions).toHaveLength(5);
+
+        // Check pattern: cond, group, cond, group, cond
+        expect(result.conditions[0].filterType).toBe('condition');
+        expect(result.conditions[0].logicalOperator).toBe('OR');
+
+        expect(result.conditions[1].filterType).toBe('group');
+        expect(result.conditions[1].logicalOperator).toBe('OR');
+
+        expect(result.conditions[2].filterType).toBe('condition');
+        expect(result.conditions[2].logicalOperator).toBe('OR');
+
+        expect(result.conditions[3].filterType).toBe('group');
+        expect(result.conditions[3].logicalOperator).toBe('OR');
+
+        expect(result.conditions[4].filterType).toBe('condition');
+        expect(result.conditions[4].logicalOperator).toBe('OR');
+      });
+
+      it('SCENARIO 18: AND with only groups', () => {
+        // V1: AND with multiple nested OR groups
+        // (status = 'active' OR status = 'pending') AND (type = 'urgent' OR type = 'high') AND (level = 'critical' OR level = 'error')
+        const v1BEData = {
+          and: [
+            {
+              or: [
+                { column: 'status', operator: '=', value: 'active', ignore_case: false },
+                { column: 'status', operator: '=', value: 'pending', ignore_case: false }
+              ]
+            },
+            {
+              or: [
+                { column: 'type', operator: '=', value: 'urgent', ignore_case: false },
+                { column: 'type', operator: '=', value: 'high', ignore_case: false }
+              ]
+            },
+            {
+              or: [
+                { column: 'level', operator: '=', value: 'critical', ignore_case: false },
+                { column: 'level', operator: '=', value: 'error', ignore_case: false }
+              ]
+            }
+          ]
+        };
+
+        const result = convertV1BEToV2(v1BEData);
+
+        expect(result.logicalOperator).toBe('AND');
+        expect(result.conditions).toHaveLength(3);
+
+        // All should be groups with AND from parent
+        result.conditions.forEach((item: any) => {
+          expect(item.filterType).toBe('group');
+          expect(item.logicalOperator).toBe('AND'); // From parent
+          expect(item.conditions).toHaveLength(2);
+          expect(item.conditions[0].logicalOperator).toBe('OR'); // Internal
+          expect(item.conditions[1].logicalOperator).toBe('OR'); // Internal
+        });
+      });
+
+      it('SCENARIO 19: Alternating pattern with different depths', () => {
+        // V1: Complex alternating with nested depth
+        // A AND (B OR C) AND D AND (E OR (F AND G))
+        const v1BEData = {
+          and: [
+            { column: 'A', operator: '=', value: '1', ignore_case: false },
+            {
+              or: [
+                { column: 'B', operator: '=', value: '2', ignore_case: false },
+                { column: 'C', operator: '=', value: '3', ignore_case: false }
+              ]
+            },
+            { column: 'D', operator: '=', value: '4', ignore_case: false },
+            {
+              or: [
+                { column: 'E', operator: '=', value: '5', ignore_case: false },
+                {
+                  and: [
+                    { column: 'F', operator: '=', value: '6', ignore_case: false },
+                    { column: 'G', operator: '=', value: '7', ignore_case: false }
+                  ]
+                }
+              ]
+            }
+          ]
+        };
+
+        const result = convertV1BEToV2(v1BEData);
+
+        expect(result.logicalOperator).toBe('AND');
+        expect(result.conditions).toHaveLength(4);
+
+        // Pattern: cond, group, cond, group
+        expect(result.conditions[0].filterType).toBe('condition');
+        expect(result.conditions[1].filterType).toBe('group');
+        expect(result.conditions[2].filterType).toBe('condition');
+        expect(result.conditions[3].filterType).toBe('group');
+
+        // Check deeply nested group
+        const deepGroup = result.conditions[3] as any;
+        expect(deepGroup.conditions).toHaveLength(2);
+        expect(deepGroup.conditions[0].filterType).toBe('condition');
+        expect(deepGroup.conditions[1].filterType).toBe('group');
+        expect(deepGroup.conditions[1].logicalOperator).toBe('OR'); // From parent OR group
+      });
+
+      it('SCENARIO 20: Three consecutive groups', () => {
+        // V1: Three groups in a row
+        // (A AND B) OR (C AND D) OR (E AND F)
+        const v1BEData = {
+          or: [
+            {
+              and: [
+                { column: 'A', operator: '=', value: '1', ignore_case: false },
+                { column: 'B', operator: '=', value: '2', ignore_case: false }
+              ]
+            },
+            {
+              and: [
+                { column: 'C', operator: '=', value: '3', ignore_case: false },
+                { column: 'D', operator: '=', value: '4', ignore_case: false }
+              ]
+            },
+            {
+              and: [
+                { column: 'E', operator: '=', value: '5', ignore_case: false },
+                { column: 'F', operator: '=', value: '6', ignore_case: false }
+              ]
+            }
+          ]
+        };
+
+        const result = convertV1BEToV2(v1BEData);
+
+        expect(result.logicalOperator).toBe('OR');
+        expect(result.conditions).toHaveLength(3);
+
+        // All should be groups
+        result.conditions.forEach((item: any) => {
+          expect(item.filterType).toBe('group');
+          expect(item.logicalOperator).toBe('OR'); // From parent
+          expect(item.conditions).toHaveLength(2);
+          expect(item.conditions[0].logicalOperator).toBe('AND');
+          expect(item.conditions[1].logicalOperator).toBe('AND');
+        });
+      });
     });
   });
 
