@@ -137,7 +137,15 @@ pub async fn otlp_json(
             )));
         }
     };
-    match handle_otlp_request(org_id, request, OtlpRequestType::HttpJson, in_stream_name, user_email).await {
+    match handle_otlp_request(
+        org_id,
+        request,
+        OtlpRequestType::HttpJson,
+        in_stream_name,
+        user_email,
+    )
+    .await
+    {
         Ok(v) => Ok(v),
         Err(e) => {
             log::error!("[TRACES:OTLP] Error while handling http trace request: {e}");
@@ -564,7 +572,13 @@ pub async fn handle_otlp_request(
         return format_response(partial_success, req_type);
     }
 
-    if let Err(e) = write_traces_by_stream(org_id, (started_at, &start), json_data_by_stream, user_email).await
+    if let Err(e) = write_traces_by_stream(
+        org_id,
+        (started_at, &start),
+        json_data_by_stream,
+        user_email,
+    )
+    .await
     {
         log::error!("Error while writing traces: {e}");
         // Check if this is a schema validation error (InvalidData)
@@ -711,7 +725,13 @@ pub async fn ingest_json(
         return format_response(partial_success, req_type);
     }
 
-    if let Err(e) = write_traces_by_stream(org_id, (started_at, &start), json_data_by_stream, user_email).await
+    if let Err(e) = write_traces_by_stream(
+        org_id,
+        (started_at, &start),
+        json_data_by_stream,
+        user_email,
+    )
+    .await
     {
         log::error!("Error while writing traces: {e}");
         // Check if this is a schema validation error (InvalidData)

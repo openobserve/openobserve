@@ -24,7 +24,8 @@ use crate::service::ingestion::check_ingestion_allowed;
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::{
-        extractors::Headers, request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+        extractors::Headers,
+        request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
     },
     service::metrics,
 };
