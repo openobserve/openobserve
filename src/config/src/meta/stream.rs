@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, fmt::Display, str::FromStr};
+use std::{cmp::max, fmt::Display, str::FromStr, sync::Arc};
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use hashbrown::HashMap;
@@ -259,7 +259,7 @@ pub struct FileKey {
     pub key: String,
     pub meta: FileMeta,
     pub deleted: bool,
-    pub segment_ids: Option<BitVec>,
+    pub segment_ids: Option<Arc<BitVec>>,
 }
 
 impl FileKey {
@@ -286,7 +286,7 @@ impl FileKey {
     }
 
     pub fn with_segment_ids(&mut self, segment_ids: BitVec) {
-        self.segment_ids = Some(segment_ids);
+        self.segment_ids = Some(Arc::new(segment_ids));
     }
 }
 

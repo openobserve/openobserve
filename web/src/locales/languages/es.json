@@ -1244,7 +1244,8 @@
     "domainSettingsSaved": "La configuración del dominio se guardó correctamente",
     "errorSavingDomainSettings": "Error al guardar la configuración del dominio",
     "noDomainMessage": "No hay dominios configurados. Agregue los dominios anteriores para restringir el acceso.",
-    "license": "Licencia"
+    "license": "Licencia",
+    "alertCorrelation": "Deduplicación de alertas"
   },
   "iam": {
     "users": "Usuarios",
@@ -1302,7 +1303,8 @@
     "view": "Ver",
     "delay": "Retraso",
     "history": "Historia del oleoducto",
-    "searchHistory": "Introduzca el nombre del oleoducto"
+    "searchHistory": "Introduzca el nombre del oleoducto",
+    "destination_type": "Tipo de destino"
   },
   "reports": {
     "header": "Informes",
@@ -1587,5 +1589,47 @@
   },
   "alert_list": {
     "alert_details": "Detalles de la alerta"
+  },
+  "latencyInsights": {
+    "title": "Perspectivas",
+    "tabLabel": "Latencia",
+    "analyzeButton": "Análisis de latencia",
+    "analyzeTooltip": "Analice los patrones de latencia en todas las dimensiones de seguimiento",
+    "compareToLabel": "Compare con:",
+    "fullTimeRange": "Rango de tiempo completo",
+    "beforePeriod": "Antes del período seleccionado",
+    "afterPeriod": "Después del período seleccionado",
+    "durationLabel": "Duración:",
+    "analyzingDimensions": "Analizando las dimensiones...",
+    "computingDistributions": "Calcular distribuciones de frecuencias en dimensiones de {count}",
+    "failedToLoad": "No se pudo cargar el análisis",
+    "retryButton": "Reintentar",
+    "percentileLabel": "Percentil de latencia",
+    "p50Median": "P50 (mediana)",
+    "p75": "P75",
+    "p95": "P95",
+    "p99": "P99",
+    "dimensionsButton": "Campos ({count})",
+    "dimensionsTooltip": "Agregar o eliminar dimensiones para analizar",
+    "selectDimensions": "Seleccione campos",
+    "analyzeButtonLabel": "Analiza",
+    "refreshTooltip": "Actualice el análisis con un percentil actualizado",
+    "customSQLFieldsDisabled": "La selección de campos no está disponible para las consultas SQL personalizadas. Las dimensiones se extraen de los resultados de la consulta.",
+    "timeRangeSelected": "Intervalo de tiempo seleccionado"
+  },
+  "volumeInsights": {
+    "title": "Perspectivas",
+    "tabLabel": "Tarifa",
+    "analyzeButton": "Análisis de tarifas",
+    "analyzeTooltip": "Analice los patrones de velocidad de rastreo en todas las dimensiones",
+    "analyzeTooltipLogs": "Analice la distribución de dimensiones para el rango de tiempo actual",
+    "rateLabel": "Tarifa:",
+    "timeRangeLabel": "Intervalo de tiempo:"
+  },
+  "errorInsights": {
+    "title": "Perspectivas",
+    "tabLabel": "Errores",
+    "errorSpikePeriod": "Período de pico de error:",
+    "errorsGreaterThan": "Errores >="
   }
 }

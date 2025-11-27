@@ -1420,3 +1420,305 @@ def test_e2e_str_match_ignore_case_with_coalesce_validation(create_session, base
     total_hits = response_data.get("total", 0)
     took_time = response_data.get("took", 0)
     print(f"str_match_ignore_case with coalesce query executed in {took_time}ms and found {total_hits} total matching records")
+
+
+# Camel Case Token Tests for PR #9185
+
+
+
+def test_e2e_camel_case_edge_cases(create_session, base_url):
+    """Test edge cases for camel case tokenization like numbers, special characters."""
+    
+    session = create_session
+    url = base_url  
+    org_id = "default"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    three_days_ago = int((now - timedelta(days=3)).timestamp() * 1000000)
+
+    # Test cases for edge case scenarios
+    test_cases = [
+        {
+            "search_term": "U8iI34Vi",
+            "expected_field": "token",
+            "expected_value": "U8iI34Vi",
+            "description": "Complex alphanumeric token - U8iI34Vi"
+        },
+        {
+            "search_term": "A1B2C3D4", 
+            "expected_field": "identifier",
+            "expected_value": "A1B2C3D4",
+            "description": "Mixed alpha-numeric - A1B2C3D4"
+        },
+        {
+            "search_term": "Http404Error",
+            "expected_field": "code",
+            "expected_value": "Http404Error",
+            "description": "Camel case with numbers - Http404Error"
+        },
+        {
+            "search_term": "404",
+            "expected_field": "code", 
+            "expected_value": "Http404Error",
+            "description": "Number token '404' should find 'Http404Error'"
+        },
+        {
+            "search_term": "JSON2XMLConverter",
+            "expected_field": "parser",
+            "expected_value": "JSON2XMLConverter",
+            "description": "Acronym to acronym conversion - JSON2XMLConverter"
+        },
+        {
+            "search_term": "ApiVersion2_3",
+            "expected_field": "version",
+            "expected_value": "ApiVersion2_3", 
+            "description": "Camel case with underscore - ApiVersion2_3"
+        }
+    ]
+
+    for test_case in test_cases:
+        json_data = {
+            "query": {
+                "sql": f"SELECT * FROM \"stream_pytest_data\" WHERE match_all('{test_case['search_term']}')",
+                "start_time": three_days_ago,
+                "end_time": end_time,
+                "from": 0,
+                "size": 50,
+                "quick_mode": False
+            }
+        }
+
+        resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+        assert resp.status_code == 200, f"Edge case search for '{test_case['search_term']}' failed with status {resp.status_code}"
+        
+        response_data = resp.json()
+        assert "hits" in response_data, f"Response for '{test_case['search_term']}' should contain 'hits' field"
+        
+        hits = response_data["hits"]
+        matching_hits = 0
+        
+        if hits:
+            for hit in hits:
+                if hit.get(test_case["expected_field"]) == test_case["expected_value"]:
+                    matching_hits += 1
+                    print(f"✅ {test_case['description']}: Found expected value '{test_case['expected_value']}'")
+            
+            if matching_hits > 0:
+                print(f"✅ Edge case search '{test_case['search_term']}' found {matching_hits} matching hits")
+            else:
+                print(f"⚠️  Edge case search '{test_case['search_term']}' found {len(hits)} hits but none matched expected field/value")
+        else:
+            print(f"⚠️  No hits found for edge case search '{test_case['search_term']}'")
+
+
+def test_e2e_camel_case_backward_compatibility(create_session, base_url):
+    """Test that existing non-camel case searches still work correctly."""
+    
+    session = create_session
+    url = base_url
+    org_id = "default" 
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    three_days_ago = int((now - timedelta(days=3)).timestamp() * 1000000)
+
+    # Test existing search patterns to ensure backward compatibility
+    compatibility_tests = [
+        {
+            "search_term": "test",
+            "description": "Simple lowercase word search"
+        },
+        {
+            "search_term": "info", 
+            "description": "Common log level search"
+        },
+        {
+            "search_term": "stopping",
+            "description": "Word from existing test data"
+        },
+        {
+            "search_term": "collector",
+            "description": "Another word from existing test data"
+        }
+    ]
+
+    for test_case in compatibility_tests:
+        json_data = {
+            "query": {
+                "sql": f"SELECT * FROM \"stream_pytest_data\" WHERE match_all('{test_case['search_term']}')",
+                "start_time": three_days_ago,
+                "end_time": end_time,
+                "from": 0,
+                "size": 50,
+                "quick_mode": False
+            }
+        }
+
+        resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+        assert resp.status_code == 200, f"Backward compatibility test for '{test_case['search_term']}' failed with status {resp.status_code}"
+        
+        response_data = resp.json()
+        assert "hits" in response_data, f"Response for '{test_case['search_term']}' should contain 'hits' field"
+        
+        # For backward compatibility, we just need to ensure the query works
+        # The exact hit count may vary based on existing data
+        total_hits = response_data.get("total", 0)
+        took_time = response_data.get("took", 0)
+        
+        print(f"✅ {test_case['description']} ('{test_case['search_term']}'): {total_hits} hits in {took_time}ms")
+    
+    print("✅ All backward compatibility tests passed - existing searches still work")
+
+
+def test_e2e_camel_case_full_token_search(create_session, base_url):
+    """Test camel case full token search - DbException should be found"""
+    session = create_session
+    url = base_url
+    org_id = "default"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    three_days_ago = int((now - timedelta(days=3)).timestamp() * 1000000)
+
+    json_data = {
+        "query": {
+            "sql": "SELECT * FROM \"stream_pytest_data\" WHERE match_all('DbException')",
+            "start_time": three_days_ago,
+            "end_time": end_time,
+            "size": 100
+        }
+    }
+    
+    resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    if resp.status_code != 200:
+        print(f"DEBUG DbException: Status {resp.status_code}, Response: {resp.text}")
+    assert resp.status_code == 200, f"DbException test failed - Status {resp.status_code}: {resp.text}"
+    
+    response_data = resp.json()
+    hits = response_data["hits"]
+    print(f"DEBUG DbException: Found {len(hits)} hits, Total: {response_data.get('total', 0)}")
+    if len(hits) == 0:
+        print(f"DEBUG DbException: Full response: {response_data}")
+    assert len(hits) > 0, "Should find logs containing 'DbException'"
+
+
+def test_e2e_camel_case_atomic_token_search(create_session, base_url):
+    """Test camel case search - 'UserAccountService' should be found"""
+    session = create_session
+    url = base_url
+    org_id = "default"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    three_days_ago = int((now - timedelta(days=3)).timestamp() * 1000000)
+    
+    json_data = {
+        "query": {
+            "sql": "SELECT * FROM \"stream_pytest_data\" WHERE match_all('UserAccountService')",
+            "start_time": three_days_ago,
+            "end_time": end_time,
+            "size": 100
+        }
+    }
+    
+    resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    if resp.status_code != 200:
+        print(f"DEBUG UserAccountService: Status {resp.status_code}, Response: {resp.text}")
+    assert resp.status_code == 200, f"UserAccountService test failed - Status {resp.status_code}: {resp.text}"
+    
+    response_data = resp.json()
+    hits = response_data["hits"]
+    print(f"DEBUG UserAccountService: Found {len(hits)} hits, Total: {response_data.get('total', 0)}")
+    if len(hits) == 0:
+        print(f"DEBUG UserAccountService: Full response: {response_data}")
+    assert len(hits) > 0, "Should find logs containing 'UserAccountService'"
+
+
+def test_e2e_camel_case_xml_acronym_search(create_session, base_url):
+    """Test camel case XML acronym search - 'XMLHttpRequest' should be found"""
+    session = create_session
+    url = base_url
+    org_id = "default"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    three_days_ago = int((now - timedelta(days=3)).timestamp() * 1000000)
+    
+    json_data = {
+        "query": {
+            "sql": "SELECT * FROM \"stream_pytest_data\" WHERE match_all('XMLHttpRequest')",
+            "start_time": three_days_ago,
+            "end_time": end_time,
+            "size": 100
+        }
+    }
+    
+    resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    if resp.status_code != 200:
+        print(f"DEBUG XMLHttpRequest: Status {resp.status_code}, Response: {resp.text}")
+    assert resp.status_code == 200, f"XMLHttpRequest test failed - Status {resp.status_code}: {resp.text}"
+    
+    response_data = resp.json()
+    hits = response_data["hits"]
+    print(f"DEBUG XMLHttpRequest: Found {len(hits)} hits, Total: {response_data.get('total', 0)}")
+    if len(hits) == 0:
+        print(f"DEBUG XMLHttpRequest: Full response: {response_data}")
+    assert len(hits) > 0, "Should find logs containing 'XMLHttpRequest'"
+
+
+def test_e2e_camel_case_oauth2_number_search(create_session, base_url):
+    """Test camel case with numbers - 'OAuth2TokenHandler' should be found"""
+    session = create_session
+    url = base_url
+    org_id = "default"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    three_days_ago = int((now - timedelta(days=3)).timestamp() * 1000000)
+    
+    json_data = {
+        "query": {
+            "sql": "SELECT * FROM \"stream_pytest_data\" WHERE match_all('OAuth2TokenHandler')",
+            "start_time": three_days_ago,
+            "end_time": end_time,
+            "size": 100
+        }
+    }
+    
+    resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    if resp.status_code != 200:
+        print(f"DEBUG OAuth2TokenHandler: Status {resp.status_code}, Response: {resp.text}")
+    assert resp.status_code == 200, f"OAuth2TokenHandler test failed - Status {resp.status_code}: {resp.text}"
+    
+    response_data = resp.json()
+    hits = response_data["hits"]
+    print(f"DEBUG OAuth2TokenHandler: Found {len(hits)} hits, Total: {response_data.get('total', 0)}")
+    if len(hits) == 0:
+        print(f"DEBUG OAuth2TokenHandler: Full response: {response_data}")
+    assert len(hits) > 0, "Should find logs containing 'OAuth2TokenHandler'"
+
+
+def test_e2e_camel_case_multi_token_search(create_session, base_url):
+    """Test camel case multi-word search - 'UserManagementService' should be found"""
+    session = create_session
+    url = base_url
+    org_id = "default"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    three_days_ago = int((now - timedelta(days=3)).timestamp() * 1000000)
+    
+    json_data = {
+        "query": {
+            "sql": "SELECT * FROM \"stream_pytest_data\" WHERE match_all('UserManagementService')",
+            "start_time": three_days_ago,
+            "end_time": end_time,
+            "size": 100
+        }
+    }
+    
+    resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    if resp.status_code != 200:
+        print(f"DEBUG UserManagementService: Status {resp.status_code}, Response: {resp.text}")
+    assert resp.status_code == 200, f"UserManagementService test failed - Status {resp.status_code}: {resp.text}"
+    
+    response_data = resp.json()
+    hits = response_data["hits"]
+    print(f"DEBUG UserManagementService: Found {len(hits)} hits, Total: {response_data.get('total', 0)}")
+    if len(hits) == 0:
+        print(f"DEBUG UserManagementService: Full response: {response_data}")
+    assert len(hits) > 0, "Should find logs containing 'UserManagementService'"

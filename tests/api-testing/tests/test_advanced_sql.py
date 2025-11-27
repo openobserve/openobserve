@@ -26,9 +26,9 @@ def test_e2e_error_rate_analysis(create_session, base_url):
                 COALESCE(kubernetes_namespace_name, 'default') AS environment
             FROM "stream_pytest_data"
             WHERE (level IS NOT NULL)
-            GROUP BY component, environment
-            HAVING inforate >= 0
-            ORDER BY inforate DESC
+            GROUP BY COALESCE(kubernetes_container_name, 'unknown'), COALESCE(kubernetes_namespace_name, 'default')
+            HAVING (100.0 * COUNT(CASE WHEN level = 'info' THEN 1 END) / CAST(COUNT(_timestamp) AS FLOAT)) >= 0
+            ORDER BY (100.0 * COUNT(CASE WHEN level = 'info' THEN 1 END) / CAST(COUNT(_timestamp) AS FLOAT)) DESC
             LIMIT 50""",
             "start_time": one_hour_ago,
             "end_time": end_time,
@@ -82,8 +82,8 @@ def test_e2e_performance_percentiles(create_session, base_url):
                 approx_percentile_cont(CAST(floatvalue AS FLOAT), 0.50) AS p50
             FROM "stream_pytest_data"
             WHERE (floatvalue IS NOT NULL)
-            GROUP BY _time
-            ORDER BY _time""",
+            GROUP BY histogram(_timestamp)
+            ORDER BY histogram(_timestamp)""",
             "start_time": one_hour_ago,
             "end_time": end_time,
             "from": 0,
@@ -143,8 +143,8 @@ def test_e2e_log_volume_analysis(create_session, base_url):
                 ROUND(100.0 * SUM(CASE WHEN COALESCE(level, '') = 'info' THEN 1 ELSE 0 END) / COUNT(_timestamp), 2) AS info_rate,
                 COALESCE(kubernetes_container_name, 'unknown') AS component
             FROM "stream_pytest_data"
-            GROUP BY time_bucket, component
-            ORDER BY time_bucket ASC, info_rate DESC""",
+            GROUP BY histogram(_timestamp), COALESCE(kubernetes_container_name, 'unknown')
+            ORDER BY histogram(_timestamp) ASC, ROUND(100.0 * SUM(CASE WHEN COALESCE(level, '') = 'info' THEN 1 ELSE 0 END) / COUNT(_timestamp), 2) DESC""",
             "start_time": one_hour_ago,
             "end_time": end_time,
             "from": 0,
@@ -197,8 +197,8 @@ def test_e2e_source_analysis(create_session, base_url):
                 COALESCE(kubernetes_namespace_name, 'default') AS source_group,
                 COUNT(_timestamp) AS log_count
             FROM "stream_pytest_data"
-            GROUP BY platform, source_group
-            ORDER BY log_count DESC""",
+            GROUP BY COALESCE(kubernetes_container_name, 'unknown'), COALESCE(kubernetes_namespace_name, 'default')
+            ORDER BY COUNT(_timestamp) DESC""",
             "start_time": one_hour_ago,
             "end_time": end_time,
             "from": 0,
@@ -252,8 +252,8 @@ def test_e2e_host_performance(create_session, base_url):
                 MAX(floatvalue) AS max_float_value
             FROM "stream_pytest_data"
             WHERE floatvalue IS NOT NULL
-            GROUP BY hostname
-            ORDER BY avg_float_value DESC
+            GROUP BY COALESCE(kubernetes_container_name, 'unknown')
+            ORDER BY AVG(floatvalue) DESC
             LIMIT 20""",
             "start_time": one_hour_ago,
             "end_time": end_time,
@@ -306,8 +306,8 @@ def test_e2e_component_percentiles(create_session, base_url):
                 COUNT(_timestamp) AS requests
             FROM "stream_pytest_data"
             WHERE floatvalue > 0
-            GROUP BY component
-            ORDER BY p99_took DESC
+            GROUP BY COALESCE(kubernetes_container_name, 'unknown')
+            ORDER BY approx_percentile_cont(CAST(floatvalue AS Float), 0.99) DESC
             LIMIT 15""",
             "start_time": one_hour_ago,
             "end_time": end_time,
@@ -368,8 +368,8 @@ def test_e2e_api_log_analysis(create_session, base_url):
             FROM "stream_pytest_data"
             WHERE kubernetes_namespace_name IS NOT NULL
                 AND message LIKE '%bulk%'
-            GROUP BY api, log_level, component, platform
-            ORDER BY api, counter DESC""",
+            GROUP BY COALESCE(kubernetes_container_name, 'unknown'), level, COALESCE(kubernetes_namespace_name, 'default')
+            ORDER BY COALESCE(kubernetes_container_name, 'unknown'), COUNT(_timestamp) DESC""",
             "start_time": one_hour_ago,
             "end_time": end_time,
             "from": 0,
@@ -428,8 +428,16 @@ def test_e2e_error_categorization(create_session, base_url):
             FROM "stream_pytest_data"
             WHERE 
                 log IS NOT NULL AND log != ''
-            GROUP BY log_category, _date
-            ORDER BY count DESC
+            GROUP BY CASE 
+                    WHEN str_match_ignore_case(log, 'level=error')
+                        THEN 'Level Error'
+                    WHEN str_match_ignore_case(log, 'level=warn')
+                        THEN 'Level Warning'
+                    WHEN str_match_ignore_case(log, 'forbidden')
+                        THEN 'Permission Forbidden'
+                    ELSE 'Other Log Types'
+                END, date_format(_timestamp, '%Y-%m-%d', 'UTC')
+            ORDER BY count(_timestamp) DESC
             LIMIT 15""",
             "start_time": one_hour_ago,
             "end_time": end_time,
@@ -480,7 +488,7 @@ def test_e2e_metadata_extraction(create_session, base_url):
                 count(_timestamp) AS count
             FROM "stream_pytest_data"
             WHERE str_match_ignore_case(log, 'caller=')
-            GROUP BY caller""",
+            GROUP BY array_extract(regexp_match(log, 'caller=([^\\s]+)'), 1)""",
             "start_time": one_hour_ago,
             "end_time": end_time,
             "from": 0,
@@ -551,8 +559,8 @@ def test_e2e_time_series_window_functions(create_session, base_url):
                 END AS growth_rate_percent
             FROM "stream_pytest_data"
             WHERE kubernetes_namespace_name IN ('production', 'staging', 'monitoring', 'default')
-            GROUP BY time_bucket, environment
-            ORDER BY time_bucket, environment""",
+            GROUP BY histogram(_timestamp), kubernetes_namespace_name
+            ORDER BY histogram(_timestamp), kubernetes_namespace_name""",
             "start_time": one_hour_ago,
             "end_time": end_time,
             "from": 0,
@@ -638,9 +646,9 @@ def test_e2e_advanced_regex_json_path(create_session, base_url):
                 AND method IS NOT NULL
                 AND took IS NOT NULL
                 AND code IS NOT NULL
-            GROUP BY api_group, endpoint, http_method
+            GROUP BY regexp_match(message, '/api/([^/]+)')[1], regexp_match(message, '/([^?/]+)(?:\\?|$)')[1], method
             HAVING COUNT(*) >= 1
-            ORDER BY error_count DESC, avg_response_time DESC""",
+            ORDER BY COUNT(CASE WHEN CAST(code AS INT) >= 400 THEN 1 END) DESC, AVG(CAST(took AS FLOAT)) DESC""",
             "start_time": one_hour_ago,
             "end_time": end_time,
             "from": 0,
@@ -708,7 +716,7 @@ def test_e2e_complex_nested_aggregation(create_session, base_url):
                     AVG(CASE WHEN took IS NOT NULL THEN CAST(took AS FLOAT) ELSE NULL END) AS avg_latency
                 FROM "stream_pytest_data"
                 WHERE kubernetes_namespace_name IS NOT NULL
-                GROUP BY environment, service
+                GROUP BY kubernetes_namespace_name, kubernetes_container_name
             ),
             env_totals AS (
                 SELECT 
@@ -738,7 +746,7 @@ def test_e2e_complex_nested_aggregation(create_session, base_url):
             FROM env_metrics em
             JOIN env_totals et ON em.environment = et.environment
             WHERE em.log_count > 0
-            ORDER BY em.environment, issue_rank""",
+            ORDER BY em.environment, RANK() OVER (PARTITION BY em.environment ORDER BY em.issue_count DESC)""",
             "start_time": one_hour_ago,
             "end_time": end_time,
             "from": 0,

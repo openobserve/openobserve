@@ -37,118 +37,17 @@ use std::sync::Arc;
 use arrow_schema::{DataType, Schema, SchemaRef};
 use config::PARQUET_MAX_ROW_GROUP_SIZE;
 use datafusion::{
-    common::{
-        Column, DataFusionError, Result, project_schema,
-        stats::Precision,
-        tree_node::{TreeNode, TreeNodeRecursion},
-    },
-    datasource::{
-        listing::{ListingTableUrl, PartitionedFile},
-        physical_plan::parquet::ParquetAccessPlan,
-    },
-    logical_expr::{Expr, Volatility},
+    common::{DataFusionError, Result, project_schema, stats::Precision},
+    datasource::{listing::PartitionedFile, physical_plan::parquet::ParquetAccessPlan},
     parquet::arrow::arrow_reader::{RowSelection, RowSelector},
     physical_plan::{
         ExecutionPlan, PhysicalExpr, expressions::CastExpr, filter::FilterExec,
         projection::ProjectionExec,
     },
 };
-use futures::{TryStreamExt, stream::BoxStream};
 use hashbrown::HashMap;
-use object_store::ObjectStore;
 
 use crate::service::search::{datafusion::storage, index::IndexCondition};
-
-/// Check whether the given expression can be resolved using only the columns `col_names`.
-/// This means that if this function returns true:
-/// - the table provider can filter the table partition values with this expression
-/// - the expression can be marked as `TableProviderFilterPushDown::Exact` once this filtering was
-///   performed
-pub fn expr_applicable_for_cols(col_names: &[String], expr: &Expr) -> bool {
-    let mut is_applicable = true;
-    expr.apply(|expr| {
-        match expr {
-            Expr::Column(Column { name, .. }) => {
-                is_applicable &= col_names.contains(name);
-                if is_applicable {
-                    Ok(TreeNodeRecursion::Jump)
-                } else {
-                    Ok(TreeNodeRecursion::Stop)
-                }
-            }
-            Expr::Literal(..)
-            | Expr::Alias(_)
-            | Expr::OuterReferenceColumn(..)
-            | Expr::ScalarVariable(..)
-            | Expr::Not(_)
-            | Expr::IsNotNull(_)
-            | Expr::IsNull(_)
-            | Expr::IsTrue(_)
-            | Expr::IsFalse(_)
-            | Expr::IsUnknown(_)
-            | Expr::IsNotTrue(_)
-            | Expr::IsNotFalse(_)
-            | Expr::IsNotUnknown(_)
-            | Expr::Negative(_)
-            | Expr::Cast { .. }
-            | Expr::TryCast { .. }
-            | Expr::BinaryExpr { .. }
-            | Expr::Between { .. }
-            | Expr::Like { .. }
-            | Expr::SimilarTo { .. }
-            | Expr::InList { .. }
-            | Expr::Exists { .. }
-            | Expr::InSubquery(_)
-            | Expr::ScalarSubquery(_)
-            | Expr::GroupingSet(_)
-            | Expr::Case { .. } => Ok(TreeNodeRecursion::Continue),
-
-            Expr::ScalarFunction(scalar_function) => {
-                match scalar_function.func.signature().volatility {
-                    Volatility::Immutable => Ok(TreeNodeRecursion::Continue),
-                    // TODO: Stable functions could be `applicable`, but that would require access
-                    // to the context
-                    Volatility::Stable | Volatility::Volatile => {
-                        is_applicable = false;
-                        Ok(TreeNodeRecursion::Stop)
-                    }
-                }
-            }
-
-            // TODO other expressions are not handled yet:
-            // - AGGREGATE, WINDOW and SORT should not end up in filter conditions, except maybe in
-            //   some edge cases
-            // - Can `Wildcard` be considered as a `Literal`?
-            // - ScalarVariable could be `applicable`, but that would require access to the context
-            Expr::AggregateFunction { .. }
-            | Expr::WindowFunction { .. }
-            | Expr::Unnest { .. }
-            | Expr::Placeholder(_) => {
-                is_applicable = false;
-                Ok(TreeNodeRecursion::Stop)
-            }
-            #[allow(deprecated)]
-            Expr::Wildcard { .. } => {
-                unreachable!("datafusion should not generate wildcard expression after v46");
-            }
-        }
-    })
-    .unwrap();
-    is_applicable
-}
-
-/// List all files in the table path
-pub async fn list_files<'a>(
-    store: &'a dyn ObjectStore,
-    table_path: &'a ListingTableUrl,
-) -> Result<BoxStream<'a, Result<PartitionedFile>>> {
-    Ok(Box::pin(
-        store
-            .list(Some(table_path.prefix()))
-            .map_err(|e| DataFusionError::ObjectStore(Box::new(e)))
-            .map_ok(|object_meta| object_meta.into()),
-    ))
-}
 
 pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessPlan>> {
     let row_ids = storage::file_list::get_segment_ids(file.path().as_ref())?;
@@ -260,49 +159,5 @@ pub fn apply_filter(
         wrap_filter(condition, schema, fst_fields, exec_plan, filter_projection)
     } else {
         Ok(exec_plan)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::ops::Not;
-
-    use datafusion::logical_expr::{case, col, lit};
-
-    use super::*;
-
-    #[test]
-    fn test_expr_applicable_for_cols() {
-        assert!(expr_applicable_for_cols(
-            &[String::from("c1")],
-            &Expr::eq(col("c1"), lit("value"))
-        ));
-        assert!(!expr_applicable_for_cols(
-            &[String::from("c1")],
-            &Expr::eq(col("c2"), lit("value"))
-        ));
-        assert!(!expr_applicable_for_cols(
-            &[String::from("c1")],
-            &Expr::eq(col("c1"), col("c2"))
-        ));
-        assert!(expr_applicable_for_cols(
-            &[String::from("c1"), String::from("c2")],
-            &Expr::eq(col("c1"), col("c2"))
-        ));
-        assert!(expr_applicable_for_cols(
-            &[String::from("c1"), String::from("c2")],
-            &(Expr::eq(col("c1"), col("c2").alias("c2_alias"))).not()
-        ));
-        assert!(expr_applicable_for_cols(
-            &[String::from("c1"), String::from("c2")],
-            &(case(col("c1"))
-                .when(lit("v1"), lit(true))
-                .otherwise(lit(false))
-                .expect("valid case expr"))
-        ));
-        // static expression not relevant in this context but we
-        // test it as an edge case anyway in case we want to generalize
-        // this helper function
-        assert!(expr_applicable_for_cols(&[], &lit(true)));
     }
 }

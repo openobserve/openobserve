@@ -3,8 +3,12 @@ import pytest
 import os
 import random
 import string
+import logging
 from pathlib import Path
 import base64
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 BASE_URL = os.environ["ZO_BASE_URL"]
 root_dir = Path(__file__).parent.parent.parent
@@ -55,13 +59,22 @@ def ingest_data():
     """Ingest data into the openobserve running instance."""
 
     session = _create_session_inner()
-    # Open the json data file and read it
+    
+    # Ingest main test data
     with open(root_dir / "test-data/logs_data.json") as f:
         data = f.read()
 
     stream_name = "stream_pytest_data"
     org = "default"
     url = f"{BASE_URL}api/{org}/{stream_name}/_json"
-    resp = session.post(url, data=data, headers={"Content-Type": "application/json"})
-    print("Data ingested successfully, status code: ", resp.status_code)
-    return resp.status_code == 200
+    resp1 = session.post(url, data=data, headers={"Content-Type": "application/json"})
+    logging.info("Main data ingested successfully, status code: %s", resp1.status_code)
+    
+    # Ingest camel case test data
+    with open(root_dir / "test-data/match_all.json") as f:
+        camel_data = f.read()
+    
+    resp2 = session.post(url, data=camel_data, headers={"Content-Type": "application/json"})
+    logging.info("Camel case data ingested successfully, status code: %s", resp2.status_code)
+    
+    return resp1.status_code == 200 and resp2.status_code == 200
