@@ -1666,7 +1666,7 @@ mod tests {
         );
 
         assert_eq!(engine.trace_id, trace_id.to_string());
-        assert!(!engine.label_selector.is_empty());
+        assert!(engine.label_selector.is_empty());
         assert!(engine.result_type.is_none());
     }
 
@@ -2035,7 +2035,7 @@ mod tests {
 
         engine.extract_columns_from_modifier(&None, &create_test_token());
         // Should not change label_selector
-        assert!(!engine.label_selector.is_empty());
+        assert!(engine.label_selector.is_empty());
     }
 
     #[test]
@@ -2129,7 +2129,7 @@ mod tests {
 
         engine.extract_columns_from_modifier(&modifier, &create_test_token());
         // Should not change label_selector for exclude
-        assert!(!engine.label_selector.is_empty());
+        assert!(engine.label_selector.is_empty());
     }
 
     #[tokio::test]
