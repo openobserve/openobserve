@@ -342,7 +342,8 @@ export const convertV1ToV2 = (v1Data: any, isFirstGroup: boolean = true): V2Grou
   if (v1Data.filterType === "group") {
     return v1Data;
   }
-
+  // ["c1","c2","g1","c3","g4"]
+  // ["g1"]
   const items = v1Data.items || [];
   const label = v1Data.label || "and";
   const logicalOperator = label.toUpperCase() as "AND" | "OR";
@@ -426,8 +427,21 @@ export const convertV1BEToV2 = (v1BEData: any): V2Group => {
   //     "group2"
   //   ]
   // }
+  // only group
+  // {
+  //   "or":[
+  //      "g1"
+  //   ]
+  // }
+  //only condition
+  // {
+  //   "or":[
+  //      "c1"
+  //   ]
+  // }
+  // 
   // here also if we dont have that key we will return empty list
-  const keys = Object.keys(v1BEData);
+  const keys = Object.keys(v1BEData); //or / and
   if (keys.length === 0) {
     return {
       filterType: "group",
@@ -436,12 +450,16 @@ export const convertV1BEToV2 = (v1BEData: any): V2Group => {
     };
   }
 
-  const operatorKey = keys[0]; // "and" or "or"
+  const operatorKey = keys[0]; // "and" or "or" ["or"]
   // here we will get operator key and based on that we will extract all the condition and groups
   // items will be after extracting 
   // ["cond1", "cond2", "group1", "cond3", "group2"]
+  //if only group is there
+  // ["group1"]
   const items = v1BEData[operatorKey];
   const logicalOperator = operatorKey.toUpperCase() as "AND" | "OR";
+  //in recursive call
+  //the current logicalOperator will be and
 
   const conditions: (V2Condition | V2Group)[] = items.map((item: any, index: number) => {
     // Check if it's a nested group
