@@ -28,7 +28,6 @@ use config::{
 use datafusion::{
     arrow::datatypes::{DataType, Schema},
     catalog::TableProvider,
-    common::Column,
     config::Dialect,
     datasource::{
         file_format::parquet::ParquetFormat,
