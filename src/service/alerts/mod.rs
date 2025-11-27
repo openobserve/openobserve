@@ -799,14 +799,7 @@ impl ConditionGroupExt for config::meta::alerts::ConditionItem {
                 ignore_case,
                 ..
             } => {
-                evaluate_condition(
-                    row,
-                    column,
-                    operator,
-                    value,
-                    ignore_case.unwrap_or(false),
-                )
-                .await
+                evaluate_condition(row, column, operator, value, ignore_case.unwrap_or(false)).await
             }
             config::meta::alerts::ConditionItem::Group { conditions, .. } => {
                 evaluate_condition_items(conditions, row).await
@@ -1243,10 +1236,13 @@ fn build_expr(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use arrow_schema::{DataType, Field, Schema};
-    use config::meta::alerts::{ConditionGroup, ConditionItem, LogicalOperator, Operator};
-    use config::utils::json::Value;
+    use config::{
+        meta::alerts::{ConditionGroup, ConditionItem, LogicalOperator, Operator},
+        utils::json::Value,
+    };
+
+    use super::*;
 
     #[tokio::test]
     async fn test_condition_group_to_sql_simple() {
@@ -1349,7 +1345,8 @@ mod tests {
                             operator: Operator::EqualTo,
                             value: Value::String("api".to_string()),
                             ignore_case: None,
-                            logical_operator: LogicalOperator::And, // Not used (first item in group)
+                            logical_operator: LogicalOperator::And, /* Not used (first item in
+                                                                     * group) */
                         },
                         ConditionItem::Condition {
                             column: "service".to_string(),
@@ -1410,23 +1407,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_condition_group_to_sql_contains_operator() {
-        let schema = Schema::new(vec![
-            Field::new("message", DataType::Utf8, false),
-        ]);
+        let schema = Schema::new(vec![Field::new("message", DataType::Utf8, false)]);
 
         // Create condition group with Contains operator
         let condition_group = ConditionGroup {
             filter_type: "group".to_string(),
             logical_operator: LogicalOperator::And,
-            conditions: vec![
-                ConditionItem::Condition {
-                    column: "message".to_string(),
-                    operator: Operator::Contains,
-                    value: Value::String("error".to_string()),
-                    ignore_case: None,
-                    logical_operator: LogicalOperator::And,
-                },
-            ],
+            conditions: vec![ConditionItem::Condition {
+                column: "message".to_string(),
+                operator: Operator::Contains,
+                value: Value::String("error".to_string()),
+                ignore_case: None,
+                logical_operator: LogicalOperator::And,
+            }],
         };
 
         let sql = condition_group.to_sql(&schema).await.unwrap();
@@ -1452,23 +1445,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_condition_group_to_sql_single_condition() {
-        let schema = Schema::new(vec![
-            Field::new("level", DataType::Utf8, false),
-        ]);
+        let schema = Schema::new(vec![Field::new("level", DataType::Utf8, false)]);
 
         // Single condition should be wrapped in parentheses
         let condition_group = ConditionGroup {
             filter_type: "group".to_string(),
             logical_operator: LogicalOperator::And,
-            conditions: vec![
-                ConditionItem::Condition {
-                    column: "level".to_string(),
-                    operator: Operator::EqualTo,
-                    value: Value::String("error".to_string()),
-                    ignore_case: None,
-                    logical_operator: LogicalOperator::And,
-                },
-            ],
+            conditions: vec![ConditionItem::Condition {
+                column: "level".to_string(),
+                operator: Operator::EqualTo,
+                value: Value::String("error".to_string()),
+                ignore_case: None,
+                logical_operator: LogicalOperator::And,
+            }],
         };
 
         let sql = condition_group.to_sql(&schema).await.unwrap();
@@ -1486,7 +1475,8 @@ mod tests {
 
         // Create condition group with mixed operators at same level:
         // level = 'error' AND status = 'active' OR service = 'api'
-        // This tests left-to-right evaluation: (level = 'error' AND status = 'active') OR service = 'api'
+        // This tests left-to-right evaluation: (level = 'error' AND status = 'active') OR service =
+        // 'api'
         let condition_group = ConditionGroup {
             filter_type: "group".to_string(),
             logical_operator: LogicalOperator::And,
@@ -1519,7 +1509,8 @@ mod tests {
 
         // Verify evaluation with operator precedence (AND before OR)
         // level = 'error' AND status = 'active' OR service = 'api'
-        // SQL operator precedence will parse this as: (level = 'error' AND status = 'active') OR service = 'api'
+        // SQL operator precedence will parse this as: (level = 'error' AND status = 'active') OR
+        // service = 'api'
         assert_eq!(
             sql,
             "(\"level\" = 'error' AND \"status\" = 'active' OR \"service\" = 'api')"
@@ -1528,38 +1519,40 @@ mod tests {
 
     #[tokio::test]
     async fn test_condition_group_to_sql_missing_column() {
-        let schema = Schema::new(vec![
-            Field::new("level", DataType::Utf8, false),
-        ]);
+        let schema = Schema::new(vec![Field::new("level", DataType::Utf8, false)]);
 
         // Reference non-existent column
         let condition_group = ConditionGroup {
             filter_type: "group".to_string(),
             logical_operator: LogicalOperator::And,
-            conditions: vec![
-                ConditionItem::Condition {
-                    column: "nonexistent".to_string(),
-                    operator: Operator::EqualTo,
-                    value: Value::String("error".to_string()),
-                    ignore_case: None,
-                    logical_operator: LogicalOperator::And,
-                },
-            ],
+            conditions: vec![ConditionItem::Condition {
+                column: "nonexistent".to_string(),
+                operator: Operator::EqualTo,
+                value: Value::String("error".to_string()),
+                ignore_case: None,
+                logical_operator: LogicalOperator::And,
+            }],
         };
 
         let result = condition_group.to_sql(&schema).await;
 
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Column nonexistent not found"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Column nonexistent not found")
+        );
     }
 
     #[tokio::test]
     async fn test_condition_group_evaluate_complex() {
-        use crate::service::alerts::ConditionGroupExt;
         use config::utils::json::json;
 
-        // Test the condition: kubernetes_docker_id = 'test' OR (kubernetes_container_image = 'test' AND kubernetes_host = 'test2')
-        // With proper Group logic structure
+        use crate::service::alerts::ConditionGroupExt;
+
+        // Test the condition: kubernetes_docker_id = 'test' OR (kubernetes_container_image = 'test'
+        // AND kubernetes_host = 'test2') With proper Group logic structure
         let condition_group = ConditionGroup {
             filter_type: "group".to_string(),
             logical_operator: LogicalOperator::And,
@@ -1600,8 +1593,13 @@ mod tests {
             "kubernetes_host": "test2",
             "log": "request id : camelcase"
         });
-        let result = condition_group.evaluate(test_data_fail.as_object().unwrap()).await;
-        assert!(!result, "Should NOT pass: kubernetes_docker_id doesn't match, and kubernetes_container_image doesn't match");
+        let result = condition_group
+            .evaluate(test_data_fail.as_object().unwrap())
+            .await;
+        assert!(
+            !result,
+            "Should NOT pass: kubernetes_docker_id doesn't match, and kubernetes_container_image doesn't match"
+        );
 
         // Test case 2: Data that should pass (first condition matches)
         let test_data_pass1 = json!({
@@ -1609,8 +1607,13 @@ mod tests {
             "kubernetes_container_image": "anything",
             "kubernetes_host": "anything"
         });
-        let result = condition_group.evaluate(test_data_pass1.as_object().unwrap()).await;
-        assert!(result, "Should pass: first condition matches (kubernetes_docker_id = 'test')");
+        let result = condition_group
+            .evaluate(test_data_pass1.as_object().unwrap())
+            .await;
+        assert!(
+            result,
+            "Should pass: first condition matches (kubernetes_docker_id = 'test')"
+        );
 
         // Test case 3: Data that should pass (nested group matches)
         let test_data_pass2 = json!({
@@ -1618,8 +1621,13 @@ mod tests {
             "kubernetes_container_image": "test",
             "kubernetes_host": "test2"
         });
-        let result = condition_group.evaluate(test_data_pass2.as_object().unwrap()).await;
-        assert!(result, "Should pass: nested group matches (kubernetes_container_image = 'test' AND kubernetes_host = 'test2')");
+        let result = condition_group
+            .evaluate(test_data_pass2.as_object().unwrap())
+            .await;
+        assert!(
+            result,
+            "Should pass: nested group matches (kubernetes_container_image = 'test' AND kubernetes_host = 'test2')"
+        );
 
         // Test case 4: Data that should NOT pass (only one condition in nested group matches)
         let test_data_fail2 = json!({
@@ -1627,18 +1635,23 @@ mod tests {
             "kubernetes_container_image": "test",
             "kubernetes_host": "wrong_host"
         });
-        let result = condition_group.evaluate(test_data_fail2.as_object().unwrap()).await;
-        assert!(!result, "Should NOT pass: only kubernetes_container_image matches, but kubernetes_host doesn't");
+        let result = condition_group
+            .evaluate(test_data_fail2.as_object().unwrap())
+            .await;
+        assert!(
+            !result,
+            "Should NOT pass: only kubernetes_container_image matches, but kubernetes_host doesn't"
+        );
     }
-
 
     #[tokio::test]
     async fn test_condition_group_evaluate_with_nested_group() {
-        use crate::service::alerts::ConditionGroupExt;
         use config::utils::json::json;
 
-        // Test evaluation with nested group: kubernetes_docker_id = 'test' OR (kubernetes_container_image = 'test' AND kubernetes_host = 'test2')
-        // Structure:
+        use crate::service::alerts::ConditionGroupExt;
+
+        // Test evaluation with nested group: kubernetes_docker_id = 'test' OR
+        // (kubernetes_container_image = 'test' AND kubernetes_host = 'test2') Structure:
         // - kubernetes_docker_id = 'test' [OR with next]
         // - A group containing: (kubernetes_container_image = 'test' AND kubernetes_host = 'test2')
 
@@ -1682,13 +1695,18 @@ mod tests {
             "kubernetes_host": "test2"
         });
 
-        let result = condition_group.evaluate(test_data.as_object().unwrap()).await;
+        let result = condition_group
+            .evaluate(test_data.as_object().unwrap())
+            .await;
 
-        // Evaluation: kubernetes_docker_id = 'test' OR (kubernetes_container_image = 'test' AND kubernetes_host = 'test2')
-        // = FALSE OR (FALSE AND TRUE)
+        // Evaluation: kubernetes_docker_id = 'test' OR (kubernetes_container_image = 'test' AND
+        // kubernetes_host = 'test2') = FALSE OR (FALSE AND TRUE)
         // = FALSE OR FALSE
         // = FALSE
-        assert!(!result, "Should NOT PASS: kubernetes_docker_id doesn't match, and in the group only kubernetes_host matches (need both)");
+        assert!(
+            !result,
+            "Should NOT PASS: kubernetes_docker_id doesn't match, and in the group only kubernetes_host matches (need both)"
+        );
 
         println!("Test data: {:?}", test_data);
         println!("Evaluation result: {} (should be false)", result);
@@ -1696,8 +1714,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_condition_group_to_sql_complex_with_nested_group() {
-        use crate::service::alerts::ConditionGroupExt;
         use arrow_schema::{DataType, Field, Schema};
+
+        use crate::service::alerts::ConditionGroupExt;
 
         let schema = Schema::new(vec![
             Field::new("kubernetes_docker_id", DataType::Utf8, false),
@@ -1719,15 +1738,13 @@ mod tests {
                 },
                 ConditionItem::Group {
                     logical_operator: LogicalOperator::Or,
-                    conditions: vec![
-                        ConditionItem::Condition {
-                            column: "kubernetes_container_image".to_string(),
-                            operator: Operator::EqualTo,
-                            value: Value::String("test".to_string()),
-                            ignore_case: None,
-                            logical_operator: LogicalOperator::And,
-                        },
-                    ],
+                    conditions: vec![ConditionItem::Condition {
+                        column: "kubernetes_container_image".to_string(),
+                        operator: Operator::EqualTo,
+                        value: Value::String("test".to_string()),
+                        ignore_case: None,
+                        logical_operator: LogicalOperator::And,
+                    }],
                 },
                 ConditionItem::Condition {
                     column: "kubernetes_host".to_string(),
@@ -1748,11 +1765,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_condition_group_evaluate_operator_precedence() {
-        use crate::service::alerts::ConditionGroupExt;
         use config::utils::json::json;
 
+        use crate::service::alerts::ConditionGroupExt;
+
         // Test operator precedence: A OR (B) AND C should evaluate as A OR ((B) AND C)
-        // Structure: kubernetes_docker_id = 'test' OR (kubernetes_container_image = 'test') AND kubernetes_host = 'test2'
+        // Structure: kubernetes_docker_id = 'test' OR (kubernetes_container_image = 'test') AND
+        // kubernetes_host = 'test2'
         let condition_group = ConditionGroup {
             filter_type: "group".to_string(),
             logical_operator: LogicalOperator::And,
@@ -1766,15 +1785,13 @@ mod tests {
                 },
                 ConditionItem::Group {
                     logical_operator: LogicalOperator::Or,
-                    conditions: vec![
-                        ConditionItem::Condition {
-                            column: "kubernetes_container_image".to_string(),
-                            operator: Operator::EqualTo,
-                            value: Value::String("test".to_string()),
-                            ignore_case: None,
-                            logical_operator: LogicalOperator::And,
-                        },
-                    ],
+                    conditions: vec![ConditionItem::Condition {
+                        column: "kubernetes_container_image".to_string(),
+                        operator: Operator::EqualTo,
+                        value: Value::String("test".to_string()),
+                        ignore_case: None,
+                        logical_operator: LogicalOperator::And,
+                    }],
                 },
                 ConditionItem::Condition {
                     column: "kubernetes_host".to_string(),
@@ -1793,7 +1810,9 @@ mod tests {
             "kubernetes_host": "test2"
         });
 
-        let result = condition_group.evaluate(test_data_fail.as_object().unwrap()).await;
+        let result = condition_group
+            .evaluate(test_data_fail.as_object().unwrap())
+            .await;
 
         // With the fix:
         // - Between Item0 and Group: use Group's operator = OR
@@ -1803,16 +1822,14 @@ mod tests {
         //
         // Wait, we still need to process Item2 (kubernetes_host)...
         // Let me trace through:
-        // - i=0: result = kubernetes_docker_id = 'test' = false
-        //        next = Group = kubernetes_container_image = 'test' = false
-        //        operator = Group's OR
-        //        result = false OR false = false
-        // - i=1: result = false (from above)
-        //        next = kubernetes_host = 'test2' = true
-        //        operator = Group.conditions[0].logicalOperator = AND
-        //        result = false AND true = false
+        // - i=0: result = kubernetes_docker_id = 'test' = false next = Group =
+        //   kubernetes_container_image = 'test' = false operator = Group's OR result = false OR
+        //   false = false
+        // - i=1: result = false (from above) next = kubernetes_host = 'test2' = true operator =
+        //   Group.conditions[0].logicalOperator = AND result = false AND true = false
         //
-        // Hmm, this gives false, but we need to think about what the Group's internal condition's operator means...
+        // Hmm, this gives false, but we need to think about what the Group's internal condition's
+        // operator means...
 
         println!("Test data: {:?}", test_data_fail);
         println!("Evaluation result: {} (should be false)", result);
@@ -1826,21 +1843,24 @@ mod tests {
             "kubernetes_host": "wrong"
         });
 
-        let result2 = condition_group.evaluate(test_data_docker_id_matches.as_object().unwrap()).await;
+        let result2 = condition_group
+            .evaluate(test_data_docker_id_matches.as_object().unwrap())
+            .await;
 
         println!("\nTest with docker_id matching:");
         println!("Test data: {:?}", test_data_docker_id_matches);
         println!("Evaluation result: {} (should be true)", result2);
 
-        // SQL: (kubernetes_docker_id = 'test' OR (kubernetes_container_image = 'test' AND kubernetes_host = 'test2'))
-        // = (TRUE OR (FALSE AND FALSE)) = TRUE
+        // SQL: (kubernetes_docker_id = 'test' OR (kubernetes_container_image = 'test' AND
+        // kubernetes_host = 'test2')) = (TRUE OR (FALSE AND FALSE)) = TRUE
         assert!(result2, "Should PASS when kubernetes_docker_id matches");
     }
 
     #[tokio::test]
     async fn test_deeply_nested_groups_with_precedence() {
-        use crate::service::alerts::ConditionGroupExt;
         use config::utils::json::json;
+
+        use crate::service::alerts::ConditionGroupExt;
 
         // Complex nested structure: A OR (B AND C OR (D AND E)) AND F
         // This tests: nested groups + operator precedence at multiple levels
@@ -1911,8 +1931,10 @@ mod tests {
         // With precedence: TRUE OR (FALSE AND FALSE)
         // = TRUE OR FALSE = TRUE ✓
         let test1 = json!({"A": "match", "B": "no", "C": "no", "D": "no", "E": "no", "F": "no"});
-        assert!(condition_group.evaluate(test1.as_object().unwrap()).await,
-                "Should PASS: A matches, and there's OR before the group");
+        assert!(
+            condition_group.evaluate(test1.as_object().unwrap()).await,
+            "Should PASS: A matches, and there's OR before the group"
+        );
 
         // Test case 2: D and E match (inner nested group), and F matches
         // A OR (B AND C OR (D AND E)) AND F
@@ -1921,9 +1943,12 @@ mod tests {
         // = FALSE OR TRUE AND TRUE
         // With precedence: FALSE OR (TRUE AND TRUE)
         // = FALSE OR TRUE = TRUE ✓
-        let test2 = json!({"A": "no", "B": "no", "C": "no", "D": "match", "E": "match", "F": "match"});
-        assert!(condition_group.evaluate(test2.as_object().unwrap()).await,
-                "Should PASS: Inner nested group (D AND E) matches, plus F matches");
+        let test2 =
+            json!({"A": "no", "B": "no", "C": "no", "D": "match", "E": "match", "F": "match"});
+        assert!(
+            condition_group.evaluate(test2.as_object().unwrap()).await,
+            "Should PASS: Inner nested group (D AND E) matches, plus F matches"
+        );
 
         // Test case 3: B and C match, and F matches
         // A OR (B AND C OR (D AND E)) AND F
@@ -1932,9 +1957,12 @@ mod tests {
         // = FALSE OR TRUE AND TRUE
         // With precedence: FALSE OR (TRUE AND TRUE)
         // = FALSE OR TRUE = TRUE ✓
-        let test3 = json!({"A": "no", "B": "match", "C": "match", "D": "no", "E": "no", "F": "match"});
-        assert!(condition_group.evaluate(test3.as_object().unwrap()).await,
-                "Should PASS: B AND C match, plus F matches");
+        let test3 =
+            json!({"A": "no", "B": "match", "C": "match", "D": "no", "E": "no", "F": "match"});
+        assert!(
+            condition_group.evaluate(test3.as_object().unwrap()).await,
+            "Should PASS: B AND C match, plus F matches"
+        );
 
         // Test case 4: Only F matches (should fail)
         // A OR (B AND C OR (D AND E)) AND F
@@ -1944,8 +1972,10 @@ mod tests {
         // With precedence: FALSE OR (FALSE AND TRUE)
         // = FALSE OR FALSE = FALSE ✓
         let test4 = json!({"A": "no", "B": "no", "C": "no", "D": "no", "E": "no", "F": "match"});
-        assert!(!condition_group.evaluate(test4.as_object().unwrap()).await,
-                "Should FAIL: Only F matches, but the OR part fails");
+        assert!(
+            !condition_group.evaluate(test4.as_object().unwrap()).await,
+            "Should FAIL: Only F matches, but the OR part fails"
+        );
 
         println!("✓ All deeply nested group tests with operator precedence passed!");
     }
