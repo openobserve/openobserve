@@ -462,12 +462,25 @@ export default class LogsVisualise {
     await this.addToDashboardBtn.waitFor({ state: "visible", timeout: 5000 });
     await this.addToDashboardBtn.click();
 
-    // Wait for and click new dashboard option
-    await this.newDashboardBtn.waitFor({ state: "visible", timeout: 5000 });
+    // Wait for the "Add to Dashboard" side panel to fully load
+    const sidePanelTitle = this.page.locator('[data-test="schema-title-text"]');
+    await sidePanelTitle.waitFor({ state: "visible", timeout: 10000 });
+    await sidePanelTitle.waitFor({ state: "attached", timeout: 5000 });
+
+    // Wait for the "new dashboard" button to be visible and stable
+    await this.newDashboardBtn.waitFor({ state: "visible", timeout: 10000 });
+    await this.newDashboardBtn.waitFor({ state: "attached", timeout: 5000 });
+    // await this.page.waitForTimeout(500);
+
+    // Click new dashboard option
     await this.newDashboardBtn.click();
 
+    // Wait for the "New dashboard" dialog to open and stabilize
+    await this.dashboardNameInput.waitFor({ state: "visible", timeout: 10000 });
+    await this.dashboardNameInput.waitFor({ state: "attached", timeout: 5000 });
+    // await this.page.waitForTimeout(500);
+
     // Fill dashboard name
-    await this.dashboardNameInput.waitFor({ state: "visible", timeout: 5000 });
     await this.dashboardNameInput.click();
     await this.dashboardNameInput.fill(randomDashboardName);
 
