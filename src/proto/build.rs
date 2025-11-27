@@ -21,24 +21,13 @@ fn main() -> Result<()> {
 
     let out = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap());
 
-    tonic_build::configure()
-        .type_attribute("FileList", "#[derive(Eq)]")
+    tonic_prost_build::configure()
         .type_attribute("FileList", "#[derive(serde::Serialize)]")
-        .type_attribute("FileKey", "#[derive(Eq)]")
         .type_attribute("FileKey", "#[derive(serde::Serialize)]")
-        .type_attribute("IdxFileName", "#[derive(Eq)]")
-        .type_attribute("FileMeta", "#[derive(Eq)]")
         .type_attribute("FileMeta", "#[derive(serde::Serialize)]")
-        .type_attribute("Job", "#[derive(Eq)]")
         .type_attribute("Job", "#[derive(serde::Serialize)]")
-        .type_attribute("Partition", "#[derive(Eq)]")
-        .type_attribute("SearchQuery", "#[derive(Eq)]")
-        .type_attribute("SearchRequest", "#[derive(Eq)]")
-        .type_attribute("SearchResponse", "#[derive(Eq)]")
         .type_attribute("SearchResponse", "#[derive(serde::Serialize)]")
-        .type_attribute("SearchAggRequest", "#[derive(Eq)]")
         .type_attribute("SearchAggRequest", "#[derive(serde::Serialize)]")
-        .type_attribute("SearchAggResponse", "#[derive(Eq)]")
         .type_attribute("SearchAggResponse", "#[derive(serde::Serialize)]")
         .type_attribute("Series", "#[derive(serde::Serialize)]")
         .type_attribute("Label", "#[derive(serde::Deserialize,serde::Serialize)]")
@@ -51,7 +40,6 @@ fn main() -> Result<()> {
         .type_attribute("MetricsQueryStmt", "#[derive(serde::Serialize)]")
         .type_attribute("MetricsQueryRequest", "#[derive(serde::Serialize)]")
         .type_attribute("MetricsQueryResponse", "#[derive(serde::Serialize)]")
-        .type_attribute("ScanStats", "#[derive(Eq)]")
         .type_attribute("ScanStats", "#[derive(serde::Serialize)]")
         .type_attribute(
             "PhysicalPlanNode.plan",
@@ -88,7 +76,7 @@ fn main() -> Result<()> {
         .unwrap();
     file.write_all(code.as_str().as_ref()).unwrap();
 
-    tonic_build::configure()
+    tonic_prost_build::configure()
         .type_attribute(
             "MetricMetadata",
             "#[derive(serde::Deserialize,serde::Serialize)]",

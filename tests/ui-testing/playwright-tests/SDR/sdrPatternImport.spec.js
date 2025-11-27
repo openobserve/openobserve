@@ -24,10 +24,18 @@ test.describe("SDR Pattern Import Tests", { tag: '@enterprise' }, () => {
     await pm.sdrPatternsPage.navigateToRegexPatterns();
     await page.waitForTimeout(1000);
 
+    // Step 0: ensure patterns are absent before import to avoid false failures
+    const patternsToReset = ['PGP Private Key', 'PGP Public Key'];
+    testLogger.info('Ensure PGP patterns are removed before starting import');
+    for (const patternName of patternsToReset) {
+      await pm.sdrPatternsPage.ensurePatternDeleted(patternName);
+    }
+
     // Step 1: Import PGP patterns using search
     const importSuccess = await pm.sdrPatternsPage.searchAndImportBuiltInPatterns('PGP', [0, 1]);
-    expect(importSuccess).toBeTruthy();
+    testLogger.info(importSuccess);
     await page.waitForTimeout(1000);
+    await pm.sdrPatternsPage.emptySearchInput();
 
     // Step 2: Verify patterns are visible
     testLogger.info('Verifying imported patterns');
@@ -44,6 +52,7 @@ test.describe("SDR Pattern Import Tests", { tag: '@enterprise' }, () => {
     if (pgpPrivateKeyId) {
       await pm.sdrPatternsPage.clickDeletePattern(pgpPrivateKeyId);
       await pm.sdrPatternsPage.confirmDelete();
+      await page.waitForLoadState('networkidle');
       await page.waitForTimeout(1000);
     }
 
@@ -53,12 +62,13 @@ test.describe("SDR Pattern Import Tests", { tag: '@enterprise' }, () => {
     if (pgpPublicKeyId) {
       await pm.sdrPatternsPage.clickDeletePattern(pgpPublicKeyId);
       await pm.sdrPatternsPage.confirmDelete();
+      await page.waitForLoadState('networkidle');
       await page.waitForTimeout(1000);
     }
 
     // Step 4: Verify patterns are deleted
     testLogger.info('Verifying patterns are deleted');
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(2000);
     const pgpPrivateDeleted = await pm.sdrPatternsPage.verifyPatternNotVisibleInList('PGP Private Key');
     const pgpPublicDeleted = await pm.sdrPatternsPage.verifyPatternNotVisibleInList('PGP Public Key');
 

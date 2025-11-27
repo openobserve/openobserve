@@ -45,6 +45,7 @@ export class LogsPage {
         this.relative15MinButton = '[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block';
         this.relative6WeeksButton = '[data-test="date-time-relative-6-w-btn"] > .q-btn__content';
         this.relative30SecondsButton = '[data-test="date-time-relative-30-s-btn"] > .q-btn__content > .block';
+        this.relative1HourButton = '[data-test="date-time-relative-1-h-btn"]';
         this.absoluteTab = '[data-test="date-time-absolute-tab"]';
         this.scheduleText = '[data-test="date-time-btn"]';
         this.timeZoneDropdown = '[data-test="timezone-select"]';
@@ -80,6 +81,10 @@ export class LogsPage {
         this.errorMessage = '[data-test="logs-search-error-message"]';
         this.warningElement = 'text=warning Query execution';
         this.logsTable = '[data-test="logs-search-result-logs-table"]';
+        // Additional locators for multistream functionality
+        this.logsSearchIndexList = '[data-test="logs-search-index-list"]';
+        this.notificationErrorMessage = '.q-notification__message:has-text("error")';
+        this.vrlFunctionText = (text) => `text=${text}`;
         this.barChartCanvas = '[data-test="logs-search-result-bar-chart"] canvas';
         this.expandLabel = label => `Expand "${label}"`;
         this.collapseLabel = label => `Collapse "${label}"`;
@@ -227,10 +232,19 @@ export class LogsPage {
     }
 
     async selectIndexAndStreamJoin() {
+        // Select both default and e2e_automate streams for join queries
         await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
         await this.page.waitForTimeout(3000);
+
+        // Select default stream
         await this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first().click();
         await this.page.waitForTimeout(1000);
+
+        // Select e2e_automate stream (dropdown stays open after first selection)
+        await this.page.locator('[data-test="log-search-index-list-stream-toggle-e2e_automate"] div').first().click();
+        await this.page.waitForTimeout(1000);
+
+        // Close dropdown
         await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
     }
 
@@ -595,6 +609,10 @@ export class LogsPage {
     async waitForSearchResultAndCheckText(expectedText) {
         await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]');
         await expect(this.page.locator('[data-test="logs-search-result-logs-table"]')).toContainText(expectedText);
+    }
+
+    async expectLogsTableRowCount(count) {
+        return await expect(this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr')).toHaveCount(count);
     }
 
     // Time and date methods
@@ -1774,6 +1792,29 @@ export class LogsPage {
         return await expect(this.page.locator(this.pagination)).not.toBeVisible();
     }
 
+    async expectResultPaginationVisible() {
+        return await expect(this.page.locator(this.resultPagination)).toBeVisible();
+    }
+
+    async clickPaginationPage(pageNumber) {
+        return await this.page.locator(`${this.resultPagination} .q-btn`).filter({ hasText: pageNumber.toString() }).first().click();
+    }
+
+    async getPaginationPageCount() {
+        const pageButtons = this.page.locator(`${this.resultPagination} .q-btn`).filter({ hasText: /^\d+$/ });
+        return await pageButtons.count();
+    }
+
+    async getPaginationPageClasses(pageNumber) {
+        const pageButton = this.page.locator(`${this.resultPagination} .q-btn`).filter({ hasText: pageNumber.toString() }).first();
+        return await pageButton.getAttribute('class');
+    }
+
+    async isPaginationPageActive(pageNumber) {
+        const classes = await this.getPaginationPageClasses(pageNumber);
+        return classes && (classes.includes('bg-primary') || classes.includes('unelevated'));
+    }
+
     async expectSQLPaginationNotVisible() {
         return await expect(this.page.locator(this.sqlPagination)).not.toBeVisible();
     }
@@ -2531,5 +2572,124 @@ export class LogsPage {
 
     async waitForUI(timeout = 500) {
         await this.page.waitForTimeout(timeout);
+    }
+
+    // Methods specifically for multistream testing that don't already exist
+    async navigateToHome() {
+        return await this.page.locator('[data-test="menu-link-\\/-item"]').click();
+    }
+
+    async fillStreamFilter(streamName) {
+        return await this.page.locator('[data-test="log-search-index-list-select-stream"]').fill(streamName);
+    }
+
+    async toggleStreamSelection(streamName) {
+        return await this.page.locator(`[data-test="log-search-index-list-stream-toggle-${streamName}"] div`).nth(2).click();
+    }
+
+    async toggleQueryModeEditor() {
+        return await this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] div').first().click();
+    }
+
+    async clickMonacoEditor() {
+        return await this.page.locator('#fnEditor').locator('.monaco-editor').click();
+    }
+
+    async fillMonacoEditor(text) {
+        return await this.page.locator('#fnEditor').locator('.inputarea').fill(text);
+    }
+
+    async getCellByName(name) {
+        return await this.page.getByRole('cell', { name });
+    }
+
+    async clickCellByName(name) {
+        return await this.page.getByRole('cell', { name }).click();
+    }
+
+    async clickTableExpandMenuFirst() {
+        return await this.page.locator('[data-test="table-row-expand-menu"]').first().click({ force: true });
+    }
+
+    async clickTimestampColumnMenu() {
+        return await this.page.locator('[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]').click();
+    }
+
+    async clickDateTimeButton() {
+        return await this.page.locator('[data-test="date-time-btn"]').click();
+    }
+
+    async selectRelative6Hours() {
+        return await this.page.locator('[data-test="date-time-relative-6-h-btn"]').click();
+    }
+
+    async selectRelative1Hour() {
+        return await this.page.locator(this.relative1HourButton).click();
+    }
+
+    async clickAbsoluteTimeTab() {
+        return await this.page.locator('[data-test="date-time-absolute-tab"]').click();
+    }
+
+    async fillStartDate(date) {
+        return await this.page.locator('[data-test="date-time-absolute-start-date"]').fill(date);
+    }
+
+    async fillEndDate(date) {
+        return await this.page.locator('[data-test="date-time-absolute-end-date"]').fill(date);
+    }
+
+    async clickApplyDateRange() {
+        return await this.page.locator('[data-test="date-time-btn-apply"]').click();
+    }
+
+    async searchFieldByName(fieldName) {
+        return await this.page.locator('[data-cy="index-field-search-input"]').fill(fieldName);
+    }
+
+    async navigateToStreams() {
+        return await this.page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
+    }
+
+    async navigateToStreamsAlternate() {
+        return await this.page.locator('[data-test="menu-link-\\/streams-item"]').click({ force: true });
+    }
+
+    async searchStreamByPlaceholder(searchText) {
+        await this.page.getByPlaceholder("Search Stream").click();
+        return await this.page.getByPlaceholder("Search Stream").fill(searchText);
+    }
+
+    async clickFirstExploreButton() {
+        return await this.page.getByRole("button", { name: "Explore" }).first().click({ force: true });
+    }
+
+    // Additional methods for multistream functionality
+    async expectLogsSearchIndexListContainsText(text) {
+        return await expect(this.page.locator(this.logsSearchIndexList)).toContainText(text);
+    }
+
+    async getLogsTableContent() {
+        return await this.page.locator(this.logsTable).textContent();
+    }
+
+    async getLogsTableRowCount() {
+        return await this.page.locator(`${this.logsTable} tbody tr`).count();
+    }
+
+    async expectVrlFunctionVisible(functionText) {
+        return await expect(this.page.locator(this.vrlFunctionText(functionText))).toBeVisible();
+    }
+
+    async expectNotificationErrorNotVisible() {
+        return await expect(this.page.locator(this.notificationErrorMessage)).not.toBeVisible();
+    }
+
+    async expectErrorWhileFetchingNotVisible() {
+        return await expect(this.page.getByText('Error while fetching')).not.toBeVisible();
+    }
+
+    async fillQueryEditorWithRole(text) {
+        return await this.page.locator(this.queryEditor).getByRole('textbox', { name: 'Editor content' }).fill(text);
     }
 } 

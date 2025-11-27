@@ -92,9 +92,24 @@ export interface TemplateData extends Template {
 export interface Headers {
   [key: string]: string;
 }
+export interface DestinationMetadata {
+  // Splunk specific fields
+  source?: string;
+  sourcetype?: string;
+  hostname?: string;
+  // Elasticsearch specific fields
+  _index?: string;
+  // Datadog specific fields
+  ddsource?: string;
+  ddtags?: string;
+  service?: string;
+  // hostname is shared between Splunk and Datadog
+}
+
 export interface Destination {
   name: string;
   url?: string;
+  url_endpoint?: string; // Frontend only - used for display/editing
   method?: string;
   skip_tls_verify?: boolean;
   headers?: Headers;
@@ -102,12 +117,16 @@ export interface Destination {
   emails?: string;
   type: "http" | "email" | "sns" | "action";
   action_id?: string;
-  output_format?: "json" | "ndjson";
+  output_format?: "json" | "ndjson" | "nestedevent" | string; // string allows esbulk with dynamic index
+  destination_type?: string; // Frontend internal use
+  destination_type_name?: string; // From backend
+  esbulk_index?: string; // For esbulk format index name
+  metadata?: DestinationMetadata; // Destination-specific metadata as JSON object
 }
 
 export interface DestinationPayload {
   name: string;
-  url?: string;
+  url?: string; // Full URL (merged with endpoint before sending)
   method?: string;
   skip_tls_verify?: boolean;
   headers?: Headers;
@@ -115,7 +134,8 @@ export interface DestinationPayload {
   emails?: string[];
   type: "http" | "email" | "sns" | "action";
   action_id?: string;
-  output_format?: "json" | "ndjson";
+  output_format?: "json" | "ndjson" | "nestedevent" | string; // string allows esbulk with dynamic index
+  destination_type?: string; // New field added
 }
 
 // Destination object which is modified in frontend to display in table and form

@@ -28,6 +28,8 @@ use config::{
 use datafusion::{
     arrow::datatypes::{DataType, Schema},
     catalog::TableProvider,
+    common::Column,
+    config::Dialect,
     datasource::{
         file_format::parquet::ParquetFormat,
         listing::{ListingOptions, ListingTableConfig, ListingTableUrl},
@@ -400,7 +402,7 @@ pub fn create_session_config(
         .options_mut()
         .execution
         .listing_table_ignore_subdirectory = false;
-    config.options_mut().sql_parser.dialect = "PostgreSQL".to_string();
+    config.options_mut().sql_parser.dialect = Dialect::PostgreSQL;
 
     // based on data distributing, it only works for the data on a few records
     // config = config.set_bool("datafusion.execution.parquet.pushdown_filters", true);
@@ -996,7 +998,7 @@ mod tests {
                 .max(get_config().limit.datafusion_min_partition_num)
         );
         assert_eq!(config.options().execution.batch_size, PARQUET_BATCH_SIZE);
-        assert_eq!(config.options().sql_parser.dialect, "PostgreSQL");
+        assert_eq!(config.options().sql_parser.dialect, Dialect::PostgreSQL);
         assert!(!config.options().execution.listing_table_ignore_subdirectory);
         assert!(config.information_schema());
 
