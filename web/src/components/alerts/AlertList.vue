@@ -1310,66 +1310,27 @@ export default defineComponent({
           //localAllAlerts is the alerts that we use to store
           localAllAlerts = localAllAlerts.map((data: any) => {
             let conditions = "--";
-            //this is deprecated because we are using the new condition format
-            //the new format looks like this
-            //             {
-            //     "or": [
-            //         {
-            //             "column": "_timestamp",
-            //             "operator": "<=",
-            //             "value": "100",
-            //             "ignore_case": false
-            //         },
-            //         {
-            //             "column": "job",
-            //             "operator": "not_contains",
-            //             "value": "12",
-            //             "ignore_case": true
-            //         },
-            //         {
-            //             "or": [
-            //                 {
-            //                     "column": "job",
-            //                     "operator": "contains",
-            //                     "value": "1222",
-            //                     "ignore_case": true
-            //                 },
-            //                 {
-            //                     "column": "level",
-            //                     "operator": "not_contains",
-            //                     "value": "dsff",
-            //                     "ignore_case": true
-            //                 },
-            //                 {
-            //                     "or": [
-            //                         {
-            //                             "column": "job",
-            //                             "operator": "=",
-            //                             "value": "111",
-            //                             "ignore_case": true
-            //                         },
-            //                         {
-            //                             "column": "level",
-            //                             "operator": "contains",
-            //                             "value": "1222",
-            //                             "ignore_case": true
-            //                         }
-            //                     ]
-            //                 },
-            //                 {
-            //                     "column": "log",
-            //                     "operator": "!=",
-            //                     "value": "33",
-            //                     "ignore_case": true
-            //                 }
-            //             ]
-            //         }
-            //     ]
-            // }  
-            //converted into 
-            // (_timestamp <= '100' OR job not_contains '12' OR (job contains '1222' OR level not_contains 'dsff' OR (job = '111' OR level contains '1222') OR log != '33')) 
+
+            // Handle different condition formats based on structure
             if (Object.keys(data.condition).length && data.condition.type == 'custom') {
-              conditions = transformToExpression(data.condition.conditions)
+              const conditionData = data.condition.conditions;
+
+              // Detect format by structure, not by version field (more reliable)
+              if (conditionData?.filterType === 'group') {
+                // V2 format: {filterType: "group", logicalOperator: "AND", conditions: [...]}
+                // This works whether or not there's a version field
+                conditions = transformV2ToExpression(conditionData);
+              } else if (conditionData?.version === 2 && conditionData?.conditions) {
+                // V2 format with version wrapper: {version: 2, conditions: {filterType: "group", ...}}
+                conditions = transformV2ToExpression(conditionData.conditions);
+              } else if (conditionData?.or || conditionData?.and) {
+                // V1 format: {or: [...]} or {and: [...]}
+                conditions = transformToExpression(conditionData);
+              } else {
+                // V0 format (legacy query_condition) or other formats
+                // Try to display as-is if it's a string, otherwise show placeholder
+                conditions = typeof conditionData === 'string' ? conditionData : '--';
+              }
             } else if (data.condition.sql) {
               conditions = data.condition.sql;
             } else if (data.condition.promql) {
@@ -2345,6 +2306,7 @@ export default defineComponent({
       folderIdToBeCloned.value = folderId.value;
     };
 
+    // V1 format: {or: [...]} or {and: [...]}
     function transformToExpression(data: any, wrap = true): any {
         if (!data) return null;
 
@@ -2367,6 +2329,46 @@ export default defineComponent({
 
         const joined = parts.join(` ${label} `);
         return wrap ? `(${joined})` : joined;
+      }
+
+      // V2 format: {filterType: "group", logicalOperator: "AND", conditions: [...]}
+      function transformV2ToExpression(group: any, isRoot = true): string {
+        if (!group || !group.conditions || group.conditions.length === 0) {
+          return '';
+        }
+
+        const parts: string[] = [];
+
+        group.conditions.forEach((item: any, index: number) => {
+          if (item.filterType === 'group') {
+            // Nested group - recursively build expression
+            const nestedExpr = transformV2ToExpression(item, false);
+            if (nestedExpr) {
+              // Use parent group's logicalOperator for the operator before nested groups
+              if (index > 0) {
+                parts.push(`${group.logicalOperator} (${nestedExpr})`);
+              } else {
+                parts.push(`(${nestedExpr})`);
+              }
+            }
+          } else {
+            // Condition
+            const column = item.column || 'field';
+            const operator = item.operator || '=';
+            const value = typeof item.value === 'string' ? `'${item.value}'` : item.value;
+            const conditionStr = `${column} ${operator} ${value}`;
+
+            // Add operator before condition (except for first item)
+            if (index > 0 && item.logicalOperator) {
+              parts.push(`${item.logicalOperator} ${conditionStr}`);
+            } else {
+              parts.push(conditionStr);
+            }
+          }
+        });
+
+        const joined = parts.join(' ');
+        return isRoot ? `(${joined})` : joined;
       }
       //this function is used to filter the alerts by the local search not the global search
       //this will be used when the user is searching for the alerts in the same folder
