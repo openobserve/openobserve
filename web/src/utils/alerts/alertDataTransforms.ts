@@ -423,18 +423,22 @@ export const convertV1BEToV2 = (v1BEData: any): V2Group => {
   const items = v1BEData[operatorKey];
   const logicalOperator = operatorKey.toUpperCase() as "AND" | "OR";
 
-  const conditions: (V2Condition | V2Group)[] = items.map((item: any) => {
+  const conditions: (V2Condition | V2Group)[] = items.map((item: any, index: number) => {
     // Check if it's a nested group
     if (item.and || item.or) {
       // For nested groups, recursively convert
-      // The nested group will have its own logicalOperator determined by its own key (and/or)
-      const nestedGroup = convertV1BEToV2(item);
+      const nestedGroup = convertV1BEToV2(item, logicalOperator);
+
+      // CRITICAL: The nested group's logicalOperator should be set to the PARENT's operator
+      // This is used to determine what operator comes BEFORE this group
+      nestedGroup.logicalOperator = logicalOperator;
+
       return nestedGroup;
     }
 
     // It's a condition
-    // In V2, each condition's logicalOperator determines how it connects to the NEXT item
-    // So all conditions in this group should have the same operator (from the group level in V1)
+    // The condition's logicalOperator is the parent group's operator
+    // (All items in a group use the same operator from the parent)
     const condition: V2Condition = {
       filterType: "condition",
       column: item.column || "",
