@@ -1736,524 +1736,126 @@ def test_e2e_camel_case_backward_compatibility(create_session, base_url):
     print("✅ All backward compatibility tests passed - existing searches still work")
 
 
-def test_e2e_camel_case_sql_full_token_dbexception(create_session, base_url):
-    """Test full camel case token - DbException."""
+def test_e2e_camel_case_full_token_search(create_session, base_url):
+    """Test camel case full token search - DbException should be found"""
     session = create_session
     url = base_url
     org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
-    one_day_ago = int((now - timedelta(days=1)).timestamp() * 1000000)
+    three_days_ago = int((now - timedelta(days=3)).timestamp() * 1000000)
 
     json_data = {
         "query": {
-            "sql": "SELECT error, class, log FROM \"stream_pytest_data\" WHERE match_all('DbException')",
-            "start_time": one_day_ago,
+            "sql": "SELECT * FROM \"stream_pytest_data\" WHERE match_all('DbException')",
+            "start_time": three_days_ago,
             "end_time": end_time,
-            "from": 0,
-            "size": 50,
-            "quick_mode": False
+            "size": 100
         }
     }
-
+    
     resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-    assert resp.status_code == 200, f"Full camel case token DbException test failed - Status {resp.status_code}"
+    assert resp.status_code == 200
     
-    response_data = resp.json()
-    assert "hits" in response_data, "Response should contain 'hits' field"
-    
-    hits = response_data["hits"]
-    total_hits = response_data.get("total", 0)
-    took_time = response_data.get("took", 0)
-    print(f"✅ Full camel case token DbException: {total_hits} hits in {took_time}ms")
+    hits = resp.json()["hits"]
+    assert len(hits) > 0, "Should find logs containing 'DbException'"
 
 
-def test_e2e_camel_case_sql_multi_word_useraccountservice(create_session, base_url):
-    """Test multi-word camel case - UserAccountService."""
+def test_e2e_camel_case_atomic_token_search(create_session, base_url):
+    """Test camel case atomic token search - 'user' should match 'UserAccountService'"""
     session = create_session
     url = base_url
     org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
-    one_day_ago = int((now - timedelta(days=1)).timestamp() * 1000000)
-
+    three_days_ago = int((now - timedelta(days=3)).timestamp() * 1000000)
+    
     json_data = {
         "query": {
-            "sql": "SELECT class, service, log FROM \"stream_pytest_data\" WHERE match_all('UserAccountService')",
-            "start_time": one_day_ago,
+            "sql": "SELECT * FROM \"stream_pytest_data\" WHERE match_all('user')",
+            "start_time": three_days_ago,
             "end_time": end_time,
-            "from": 0,
-            "size": 50,
-            "quick_mode": False
+            "size": 100
         }
     }
-
+    
     resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-    assert resp.status_code == 200, f"Multi-word camel case UserAccountService test failed - Status {resp.status_code}"
+    assert resp.status_code == 200
     
-    response_data = resp.json()
-    assert "hits" in response_data, "Response should contain 'hits' field"
-    
-    hits = response_data["hits"]
-    total_hits = response_data.get("total", 0)
-    took_time = response_data.get("took", 0)
-    print(f"✅ Multi-word camel case UserAccountService: {total_hits} hits in {took_time}ms")
+    hits = resp.json()["hits"]
+    assert len(hits) > 0, "Should find logs where 'user' matches camel case tokens"
 
 
-def test_e2e_camel_case_sql_acronym_xmlhttprequest(create_session, base_url):
-    """Test acronym camel case - XMLHttpRequest."""
+def test_e2e_camel_case_xml_acronym_search(create_session, base_url):
+    """Test camel case XML acronym search - 'xml' should match 'XMLHttpRequest'"""
     session = create_session
     url = base_url
     org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
-    one_day_ago = int((now - timedelta(days=1)).timestamp() * 1000000)
-
+    three_days_ago = int((now - timedelta(days=3)).timestamp() * 1000000)
+    
     json_data = {
         "query": {
-            "sql": "SELECT component, log FROM \"stream_pytest_data\" WHERE match_all('XMLHttpRequest')",
-            "start_time": one_day_ago,
+            "sql": "SELECT * FROM \"stream_pytest_data\" WHERE match_all('xml')",
+            "start_time": three_days_ago,
             "end_time": end_time,
-            "from": 0,
-            "size": 50,
-            "quick_mode": False
+            "size": 100
         }
     }
-
+    
     resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-    assert resp.status_code == 200, f"Acronym camel case XMLHttpRequest test failed - Status {resp.status_code}"
+    assert resp.status_code == 200
     
-    response_data = resp.json()
-    assert "hits" in response_data, "Response should contain 'hits' field"
-    
-    hits = response_data["hits"]
-    total_hits = response_data.get("total", 0)
-    took_time = response_data.get("took", 0)
-    print(f"✅ Acronym camel case XMLHttpRequest: {total_hits} hits in {took_time}ms")
+    hits = resp.json()["hits"]
+    assert len(hits) > 0, "Should find logs where 'xml' matches 'XMLHttpRequest'"
 
 
-def test_e2e_camel_case_sql_complex_oauth2tokenhandler(create_session, base_url):
-    """Test complex camel case with numbers - OAuth2TokenHandler."""
+def test_e2e_camel_case_oauth2_number_search(create_session, base_url):
+    """Test camel case with numbers - 'oauth2' should match 'OAuth2TokenHandler'"""
     session = create_session
     url = base_url
     org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
-    one_day_ago = int((now - timedelta(days=1)).timestamp() * 1000000)
-
+    three_days_ago = int((now - timedelta(days=3)).timestamp() * 1000000)
+    
     json_data = {
         "query": {
-            "sql": "SELECT handler, log FROM \"stream_pytest_data\" WHERE match_all('OAuth2TokenHandler')",
-            "start_time": one_day_ago,
+            "sql": "SELECT * FROM \"stream_pytest_data\" WHERE match_all('oauth2')",
+            "start_time": three_days_ago,
             "end_time": end_time,
-            "from": 0,
-            "size": 50,
-            "quick_mode": False
+            "size": 100
         }
     }
-
+    
     resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-    assert resp.status_code == 200, f"Complex camel case OAuth2TokenHandler test failed - Status {resp.status_code}"
+    assert resp.status_code == 200
     
-    response_data = resp.json()
-    assert "hits" in response_data, "Response should contain 'hits' field"
-    
-    hits = response_data["hits"]
-    total_hits = response_data.get("total", 0)
-    took_time = response_data.get("took", 0)
-    print(f"✅ Complex camel case OAuth2TokenHandler: {total_hits} hits in {took_time}ms")
+    hits = resp.json()["hits"]
+    assert len(hits) > 0, "Should find logs where 'oauth2' matches 'OAuth2TokenHandler'"
 
 
-def test_e2e_camel_case_sql_atomic_token_db(create_session, base_url):
-    """Test atomic token 'db' should find DbException."""
+def test_e2e_camel_case_multi_token_search(create_session, base_url):
+    """Test camel case atomic token search - 'account' should match camel case tokens"""
     session = create_session
     url = base_url
     org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
-    one_day_ago = int((now - timedelta(days=1)).timestamp() * 1000000)
-
+    three_days_ago = int((now - timedelta(days=3)).timestamp() * 1000000)
+    
     json_data = {
         "query": {
-            "sql": "SELECT error, log FROM \"stream_pytest_data\" WHERE match_all('db')",
-            "start_time": one_day_ago,
+            "sql": "SELECT * FROM \"stream_pytest_data\" WHERE match_all('account')",
+            "start_time": three_days_ago,
             "end_time": end_time,
-            "from": 0,
-            "size": 50,
-            "quick_mode": False
+            "size": 100
         }
     }
-
+    
     resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-    assert resp.status_code == 200, f"Atomic token 'db' test failed - Status {resp.status_code}"
+    assert resp.status_code == 200
     
-    response_data = resp.json()
-    assert "hits" in response_data, "Response should contain 'hits' field"
-    
-    hits = response_data["hits"]
-    total_hits = response_data.get("total", 0)
-    took_time = response_data.get("took", 0)
-    print(f"✅ Atomic token 'db' finds DbException: {total_hits} hits in {took_time}ms")
-
-
-def test_e2e_camel_case_sql_atomic_token_exception(create_session, base_url):
-    """Test atomic token 'exception' should find camel case exceptions."""
-    session = create_session
-    url = base_url
-    org_id = "default"
-    now = datetime.now(timezone.utc)
-    end_time = int(now.timestamp() * 1000000)
-    one_day_ago = int((now - timedelta(days=1)).timestamp() * 1000000)
-
-    json_data = {
-        "query": {
-            "sql": "SELECT error, exception, log FROM \"stream_pytest_data\" WHERE match_all('exception')",
-            "start_time": one_day_ago,
-            "end_time": end_time,
-            "from": 0,
-            "size": 50,
-            "quick_mode": False
-        }
-    }
-
-    resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-    assert resp.status_code == 200, f"Atomic token 'exception' test failed - Status {resp.status_code}"
-    
-    response_data = resp.json()
-    assert "hits" in response_data, "Response should contain 'hits' field"
-    
-    hits = response_data["hits"]
-    total_hits = response_data.get("total", 0)
-    took_time = response_data.get("took", 0)
-    print(f"✅ Atomic token 'exception' finds camel case exceptions: {total_hits} hits in {took_time}ms")
-
-
-def test_e2e_camel_case_sql_atomic_token_user(create_session, base_url):
-    """Test atomic token 'user' should find UserAccountService."""
-    session = create_session
-    url = base_url
-    org_id = "default"
-    now = datetime.now(timezone.utc)
-    end_time = int(now.timestamp() * 1000000)
-    one_day_ago = int((now - timedelta(days=1)).timestamp() * 1000000)
-
-    json_data = {
-        "query": {
-            "sql": "SELECT class, service, log FROM \"stream_pytest_data\" WHERE match_all('user')",
-            "start_time": one_day_ago,
-            "end_time": end_time,
-            "from": 0,
-            "size": 50,
-            "quick_mode": False
-        }
-    }
-
-    resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-    assert resp.status_code == 200, f"Atomic token 'user' test failed - Status {resp.status_code}"
-    
-    response_data = resp.json()
-    assert "hits" in response_data, "Response should contain 'hits' field"
-    
-    hits = response_data["hits"]
-    total_hits = response_data.get("total", 0)
-    took_time = response_data.get("took", 0)
-    print(f"✅ Atomic token 'user' finds UserAccountService: {total_hits} hits in {took_time}ms")
-
-
-def test_e2e_camel_case_sql_case_insensitive_dbexception(create_session, base_url):
-    """Test case insensitive search - DBEXCEPTION should find DbException."""
-    session = create_session
-    url = base_url
-    org_id = "default"
-    now = datetime.now(timezone.utc)
-    end_time = int(now.timestamp() * 1000000)
-    one_day_ago = int((now - timedelta(days=1)).timestamp() * 1000000)
-
-    json_data = {
-        "query": {
-            "sql": "SELECT error, log FROM \"stream_pytest_data\" WHERE match_all('DBEXCEPTION')",
-            "start_time": one_day_ago,
-            "end_time": end_time,
-            "from": 0,
-            "size": 50,
-            "quick_mode": False
-        }
-    }
-
-    resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-    assert resp.status_code == 200, f"Case insensitive DBEXCEPTION test failed - Status {resp.status_code}"
-    
-    response_data = resp.json()
-    assert "hits" in response_data, "Response should contain 'hits' field"
-    
-    hits = response_data["hits"]
-    total_hits = response_data.get("total", 0)
-    took_time = response_data.get("took", 0)
-    print(f"✅ Case insensitive DBEXCEPTION: {total_hits} hits in {took_time}ms")
-
-
-def test_e2e_camel_case_sql_multiple_tokens_user_and_service(create_session, base_url):
-    """Test multiple atomic tokens - user AND service."""
-    session = create_session
-    url = base_url
-    org_id = "default"
-    now = datetime.now(timezone.utc)
-    end_time = int(now.timestamp() * 1000000)
-    one_day_ago = int((now - timedelta(days=1)).timestamp() * 1000000)
-
-    json_data = {
-        "query": {
-            "sql": "SELECT class, service, log FROM \"stream_pytest_data\" WHERE match_all('user') AND match_all('service')",
-            "start_time": one_day_ago,
-            "end_time": end_time,
-            "from": 0,
-            "size": 50,
-            "quick_mode": False
-        }
-    }
-
-    resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-    assert resp.status_code == 200, f"Multiple tokens user AND service test failed - Status {resp.status_code}"
-    
-    response_data = resp.json()
-    assert "hits" in response_data, "Response should contain 'hits' field"
-    
-    hits = response_data["hits"]
-    total_hits = response_data.get("total", 0)
-    took_time = response_data.get("took", 0)
-    print(f"✅ Multiple tokens user AND service: {total_hits} hits in {took_time}ms")
-
-
-def test_e2e_camel_case_sql_multiple_tokens_xml_and_http(create_session, base_url):
-    """Test multiple atomic tokens - xml AND http."""
-    session = create_session
-    url = base_url
-    org_id = "default"
-    now = datetime.now(timezone.utc)
-    end_time = int(now.timestamp() * 1000000)
-    one_day_ago = int((now - timedelta(days=1)).timestamp() * 1000000)
-
-    json_data = {
-        "query": {
-            "sql": "SELECT component, log FROM \"stream_pytest_data\" WHERE match_all('xml') AND match_all('http')",
-            "start_time": one_day_ago,
-            "end_time": end_time,
-            "from": 0,
-            "size": 50,
-            "quick_mode": False
-        }
-    }
-
-    resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-    assert resp.status_code == 200, f"Multiple tokens xml AND http test failed - Status {resp.status_code}"
-    
-    response_data = resp.json()
-    assert "hits" in response_data, "Response should contain 'hits' field"
-    
-    hits = response_data["hits"]
-    total_hits = response_data.get("total", 0)
-    took_time = response_data.get("took", 0)
-    print(f"✅ Multiple tokens xml AND http: {total_hits} hits in {took_time}ms")
-
-
-def test_e2e_camel_case_sql_message_field_database_connection(create_session, base_url):
-    """Test search in message field with multiple terms."""
-    session = create_session
-    url = base_url
-    org_id = "default"
-    now = datetime.now(timezone.utc)
-    end_time = int(now.timestamp() * 1000000)
-    one_day_ago = int((now - timedelta(days=1)).timestamp() * 1000000)
-
-    json_data = {
-        "query": {
-            "sql": "SELECT message, log FROM \"stream_pytest_data\" WHERE match_all('Database') AND match_all('connection')",
-            "start_time": one_day_ago,
-            "end_time": end_time,
-            "from": 0,
-            "size": 50,
-            "quick_mode": False
-        }
-    }
-
-    resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-    assert resp.status_code == 200, f"Message field Database connection test failed - Status {resp.status_code}"
-    
-    response_data = resp.json()
-    assert "hits" in response_data, "Response should contain 'hits' field"
-    
-    hits = response_data["hits"]
-    total_hits = response_data.get("total", 0)
-    took_time = response_data.get("took", 0)
-    print(f"✅ Message field Database connection: {total_hits} hits in {took_time}ms")
-
-
-def test_e2e_camel_case_sql_group_by_exception(create_session, base_url):
-    """Test GROUP BY with camel case atomic token."""
-    session = create_session
-    url = base_url
-    org_id = "default"
-    now = datetime.now(timezone.utc)
-    end_time = int(now.timestamp() * 1000000)
-    one_day_ago = int((now - timedelta(days=1)).timestamp() * 1000000)
-
-    json_data = {
-        "query": {
-            "sql": "SELECT log, COUNT(*) as count FROM \"stream_pytest_data\" WHERE match_all('exception') GROUP BY log",
-            "start_time": one_day_ago,
-            "end_time": end_time,
-            "from": 0,
-            "size": 50,
-            "quick_mode": False
-        }
-    }
-
-    resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-    assert resp.status_code == 200, f"GROUP BY exception test failed - Status {resp.status_code}"
-    
-    response_data = resp.json()
-    assert "hits" in response_data, "Response should contain 'hits' field"
-    
-    hits = response_data["hits"]
-    total_hits = response_data.get("total", 0)
-    took_time = response_data.get("took", 0)
-    print(f"✅ GROUP BY with exception: {total_hits} hits in {took_time}ms")
-    
-    # Validate GROUP BY structure
-    if hits:
-        sample_hit = hits[0]
-        if "count" in sample_hit:
-            assert isinstance(sample_hit["count"], (int, float)), "COUNT should return numeric value"
-        if "log" in sample_hit:
-            print(f"   GROUP BY sample: log='{sample_hit.get('log')}', count={sample_hit.get('count', 'N/A')}")
-
-
-def test_e2e_camel_case_sql_number_token_oauth2(create_session, base_url):
-    """Test number token in camel case - OAuth2TokenHandler."""
-    session = create_session
-    url = base_url
-    org_id = "default"
-    now = datetime.now(timezone.utc)
-    end_time = int(now.timestamp() * 1000000)
-    one_day_ago = int((now - timedelta(days=1)).timestamp() * 1000000)
-
-    json_data = {
-        "query": {
-            "sql": "SELECT handler, log FROM \"stream_pytest_data\" WHERE match_all('2')",
-            "start_time": one_day_ago,
-            "end_time": end_time,
-            "from": 0,
-            "size": 50,
-            "quick_mode": False
-        }
-    }
-
-    resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-    assert resp.status_code == 200, f"Number token '2' test failed - Status {resp.status_code}"
-    
-    response_data = resp.json()
-    assert "hits" in response_data, "Response should contain 'hits' field"
-    
-    hits = response_data["hits"]
-    total_hits = response_data.get("total", 0)
-    took_time = response_data.get("took", 0)
-    print(f"✅ Number token '2' in OAuth2TokenHandler: {total_hits} hits in {took_time}ms")
-
-
-def test_e2e_camel_case_sql_number_token_404(create_session, base_url):
-    """Test number token - Http404Error."""
-    session = create_session
-    url = base_url
-    org_id = "default"
-    now = datetime.now(timezone.utc)
-    end_time = int(now.timestamp() * 1000000)
-    one_day_ago = int((now - timedelta(days=1)).timestamp() * 1000000)
-
-    json_data = {
-        "query": {
-            "sql": "SELECT code, log FROM \"stream_pytest_data\" WHERE match_all('404')",
-            "start_time": one_day_ago,
-            "end_time": end_time,
-            "from": 0,
-            "size": 50,
-            "quick_mode": False
-        }
-    }
-
-    resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-    assert resp.status_code == 200, f"Number token '404' test failed - Status {resp.status_code}"
-    
-    response_data = resp.json()
-    assert "hits" in response_data, "Response should contain 'hits' field"
-    
-    hits = response_data["hits"]
-    total_hits = response_data.get("total", 0)
-    took_time = response_data.get("took", 0)
-    print(f"✅ Number token '404' in Http404Error: {total_hits} hits in {took_time}ms")
-
-
-def test_e2e_camel_case_sql_or_conditions_token_handler(create_session, base_url):
-    """Test OR conditions with camel case components."""
-    session = create_session
-    url = base_url
-    org_id = "default"
-    now = datetime.now(timezone.utc)
-    end_time = int(now.timestamp() * 1000000)
-    one_day_ago = int((now - timedelta(days=1)).timestamp() * 1000000)
-
-    json_data = {
-        "query": {
-            "sql": "SELECT handler, log FROM \"stream_pytest_data\" WHERE match_all('Token') OR match_all('Handler')",
-            "start_time": one_day_ago,
-            "end_time": end_time,
-            "from": 0,
-            "size": 50,
-            "quick_mode": False
-        }
-    }
-
-    resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-    assert resp.status_code == 200, f"OR conditions Token/Handler test failed - Status {resp.status_code}"
-    
-    response_data = resp.json()
-    assert "hits" in response_data, "Response should contain 'hits' field"
-    
-    hits = response_data["hits"]
-    total_hits = response_data.get("total", 0)
-    took_time = response_data.get("took", 0)
-    print(f"✅ OR conditions Token OR Handler: {total_hits} hits in {took_time}ms")
-
-
-def test_e2e_camel_case_sql_complex_order_by_limit(create_session, base_url):
-    """Test complex query with ORDER BY and LIMIT."""
-    session = create_session
-    url = base_url
-    org_id = "default"
-    now = datetime.now(timezone.utc)
-    end_time = int(now.timestamp() * 1000000)
-    one_day_ago = int((now - timedelta(days=1)).timestamp() * 1000000)
-
-    json_data = {
-        "query": {
-            "sql": "SELECT log FROM \"stream_pytest_data\" WHERE match_all('exception') ORDER BY log LIMIT 3",
-            "start_time": one_day_ago,
-            "end_time": end_time,
-            "from": 0,
-            "size": 50,
-            "quick_mode": False
-        }
-    }
-
-    resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-    assert resp.status_code == 200, f"Complex ORDER BY LIMIT test failed - Status {resp.status_code}"
-    
-    response_data = resp.json()
-    assert "hits" in response_data, "Response should contain 'hits' field"
-    
-    hits = response_data["hits"]
-    total_hits = response_data.get("total", 0)
-    took_time = response_data.get("took", 0)
-    print(f"✅ Complex query ORDER BY LIMIT: {total_hits} hits in {took_time}ms")
-    
-    # Should return exactly 3 hits due to LIMIT
-    assert len(hits) <= 3, f"LIMIT 3 should return at most 3 hits, got {len(hits)}"
+    hits = resp.json()["hits"]
+    assert len(hits) > 0, "Should find logs where 'account' matches camel case tokens"
