@@ -132,7 +132,7 @@ export const convertTableData = (
       const config = o?.config?.[0];
 
       if (alias && config) {
-        const aliasLower = alias;
+        const aliasLower = alias.toLowerCase();
         if (config.type === "unique_value_color") {
           const autoColor = config.autoColor;
           colorConfigMap[aliasLower] = { autoColor };
