@@ -1,7 +1,6 @@
 {
   "common": {
     "close": "닫기",
-    "cancel": "취소",
     "ok": "확인",
     "apply": "적용",
     "startTime": "시작 시간",
@@ -86,7 +85,8 @@
     "showMore": "더 보기",
     "contactUs": "문의하기",
     "addFolder": "폴더 추가",
-    "status": "상태"
+    "status": "상태",
+    "cancel": "취소"
   },
   "search": {
     "selectIndex": "스트림 우선 선택",

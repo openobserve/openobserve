@@ -1,18 +1,10 @@
 <template>
-    <div v-if="showLicenseExpiryWarning && config.isEnterprise == 'true'" class="full-width license-expiry-container q-pa-md gradient-banner">
+    <div v-if="showLicenseExpiryWarning && config.isEnterprise == 'true' && config.isCloud === 'false'" class="full-width license-expiry-container q-pa-md gradient-banner">
         <div class="row" >
         <div class="col">
         <span class="o2-license-message">{{ getLicenseExpiryMessage() }}</span>
         <br />
         <span class="o2-license-subtitle">Please update your license by contacting your administrator.</span>
-        </div>
-        <div class="col-2 q-mt-sm">
-        <q-btn 
-            @click="$emit('updateLicense')" 
-            class="cursor-pointer text-capitalize bg-primary text-white q-px-md q-py-sm rounded-md float-right"
-            dense
-            no-caps
-        >Update License Key</q-btn>
         </div>
   </div>
     </div>
@@ -33,7 +25,8 @@ export default defineComponent({
     const showLicenseExpiryWarning = computed(() => {
       if (!store.state.zoConfig.license_expiry) return false;
       const now = Date.now();
-      const expiryDate = store.state.zoConfig.license_expiry;
+      //convert micro to millseconds
+      const expiryDate = store.state.zoConfig.license_expiry / 1000;
       const daysUntilExpiry = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
       return daysUntilExpiry < 14;
     });
@@ -41,7 +34,7 @@ export default defineComponent({
     const getLicenseExpiryMessage = () => {
       if (!store.state.zoConfig.license_expiry) return '';
       const now = Date.now();
-      const expiryDate = store.state.zoConfig.license_expiry;
+      const expiryDate = store.state.zoConfig.license_expiry / 1000;
       const daysUntilExpiry = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
       
       if (daysUntilExpiry > 1) {
