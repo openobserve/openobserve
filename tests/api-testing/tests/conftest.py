@@ -3,6 +3,7 @@ import pytest
 import os
 import random
 import string
+import logging
 from pathlib import Path
 import base64
 
@@ -64,13 +65,13 @@ def ingest_data():
     org = "default"
     url = f"{BASE_URL}api/{org}/{stream_name}/_json"
     resp1 = session.post(url, data=data, headers={"Content-Type": "application/json"})
-    print("Main data ingested successfully, status code: ", resp1.status_code)
+    logging.info("Main data ingested successfully, status code: %s", resp1.status_code)
     
     # Ingest camel case test data
     with open(root_dir / "test-data/match_all.json") as f:
         camel_data = f.read()
     
     resp2 = session.post(url, data=camel_data, headers={"Content-Type": "application/json"})
-    print("Camel case data ingested successfully, status code: ", resp2.status_code)
+    logging.info("Camel case data ingested successfully, status code: %s", resp2.status_code)
     
     return resp1.status_code == 200 and resp2.status_code == 200
