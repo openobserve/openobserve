@@ -425,11 +425,11 @@ jobs:
 
                     # Check if there's a -g flag
                     if echo "$EXTRA_PW_FLAGS" | grep -q " -g "; then
-                      # Extract test name (after -g)
-                      TEST_NAME=$(echo "$EXTRA_PW_FLAGS" | sed 's/.*-g //')
+                      # Extract test name (after -g) and strip any surrounding quotes
+                      TEST_NAME=$(echo "$EXTRA_PW_FLAGS" | sed 's/.*-g //' | sed 's/^"\(.*\)"$/\1/')
 
                       echo "DEBUG: File path: $TEST_FILE_PATH"
-                      echo "DEBUG: Test name: $TEST_NAME"
+                      echo "DEBUG: Test name (unquoted): $TEST_NAME"
                       echo "::notice::🎯 OPTIMIZED RERUN: Running failed test from this shard"
                       echo "DEBUG: Final command: npx playwright test \"$TEST_FILE_PATH\" -g \"$TEST_NAME\""
 
