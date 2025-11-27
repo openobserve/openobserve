@@ -25,6 +25,10 @@ use rustls_pemfile::{certs, private_key};
 use x509_parser::prelude::*;
 
 pub fn http_tls_config() -> Result<rustls::ServerConfig, anyhow::Error> {
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("Failed to install rustls crypto provider");
+
     let cfg = config::get_config();
     let cert_file =
         &mut BufReader::new(std::fs::File::open(&cfg.http.tls_cert_path).map_err(|e| {
