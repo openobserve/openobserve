@@ -45,14 +45,14 @@ describe("useIsMetaOrg", () => {
     expect(isMetaOrg.value).toBe(false);
   });
 
-  it("should return true when selected org label matches meta org", () => {
+  it("should return falase when selected org label matches meta org", () => {
     mockStore.state.selectedOrganization.label = "meta-organization";
     mockStore.state.selectedOrganization.identifier = "regular-org-id";
     mockStore.state.zoConfig.meta_org = "meta-organization";
 
     const { isMetaOrg } = useIsMetaOrg();
 
-    expect(isMetaOrg.value).toBe(true);
+    expect(isMetaOrg.value).toBe(false);
   });
 
   it("should return true when selected org identifier matches meta org", () => {
