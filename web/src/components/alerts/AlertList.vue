@@ -84,7 +84,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-insights-btn"
             icon="insights"
           /> -->
+          <!-- hiding view history for cloud -->
           <q-btn
+            v-if="config.isCloud == 'false'"
             class="q-ml-sm o2-secondary-button tw-h-[36px]"
             no-caps
             flat
@@ -610,7 +612,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Alert History Table -->
-          <div class="tw-mb-6">
+          <div v-if="config.isCloud == 'false'" class="tw-mb-6">
             <div class="tw-text-sm tw-font-semibold tw-text-gray-600 tw-mb-3">Evaluation History</div>
 
             <div v-if="isLoadingHistory" class="tw-text-center tw-py-8">
@@ -2484,6 +2486,7 @@ export default defineComponent({
       transformToExpression,
       filterAlertsByQuery,
       bulkToggleAlerts,
+      config,
     };
   },
 });
