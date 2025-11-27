@@ -160,7 +160,6 @@ pub async fn search_parquet(
         return Ok((vec![], scan_stats));
     }
 
-    let files = files.to_vec();
     let scan_stats = match file_list::calculate_files_size(&files).await {
         Ok(size) => size,
         Err(err) => {

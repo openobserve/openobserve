@@ -139,7 +139,6 @@ pub async fn search(
     }
 
     let cfg = get_config();
-    let files = files.to_vec();
     let mut scan_stats = match file_list::calculate_files_size(&files).await {
         Ok(size) => size,
         Err(err) => {
