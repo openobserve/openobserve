@@ -131,7 +131,9 @@ impl Pipeline {
             if let NodeData::Condition(condition_params) = &node.data {
                 let has_empty_conditions = match condition_params {
                     components::ConditionParams::V1 { conditions } => !conditions.has_conditions(),
-                    components::ConditionParams::V2 { conditions } => conditions.conditions.is_empty(),
+                    components::ConditionParams::V2 { conditions } => {
+                        conditions.conditions.is_empty()
+                    }
                 };
                 if has_empty_conditions {
                     return Err(anyhow!("ConditionNode must have non-empty conditions"));
