@@ -116,6 +116,9 @@ impl ObjectStoreExt for CacheFS {
     }
 
     async fn get_range(&self, account: &str, location: &Path, range: Range<u64>) -> Result<Bytes> {
+        if range.start > range.end {
+            return Err(crate::storage::Error::BadRange(location.to_string()).into());
+        }
         let options = GetOptions {
             range: Some(range.into()),
             ..Default::default()
