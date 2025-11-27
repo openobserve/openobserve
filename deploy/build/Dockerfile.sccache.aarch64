@@ -1,4 +1,4 @@
-FROM public.ecr.aws/docker/library/rust:bookworm
+FROM public.ecr.aws/docker/library/rust:trixie
 
 RUN rustup toolchain install nightly-2025-11-11
 RUN rustup default nightly-2025-11-11

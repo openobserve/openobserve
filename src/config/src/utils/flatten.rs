@@ -417,19 +417,62 @@ mod tests {
             ]
         });
 
-        let expected_output = json!({
-            "firstname": "John",
-            "lastname": "Doe",
-            "age": 25,
-            "address_streetaddress": "123 Main St",
-            "address_city": "Anytown",
-            "address_state": "CA",
-            "address_postalcode": "12345",
-            "phonenumbers":"[{\"number\":\"555-555-1234\",\"type\":\"home\"},{\"number\":\"555-555-5678\",\"type\":\"work\"}]"
-        });
-
         let output = flatten(input).unwrap();
-        assert_eq!(output, expected_output);
+
+        // Check all fields except phonenumbers
+        assert_eq!(output["firstname"], "John");
+        assert_eq!(output["lastname"], "Doe");
+        assert_eq!(output["age"], 25);
+        assert_eq!(output["address_streetaddress"], "123 Main St");
+        assert_eq!(output["address_city"], "Anytown");
+        assert_eq!(output["address_state"], "CA");
+        assert_eq!(output["address_postalcode"], "12345");
+
+        // Parse and compare phonenumbers JSON to handle key ordering
+        let phonenumbers_str = output["phonenumbers"].as_str().unwrap();
+        let phonenumbers: serde_json::Value = serde_json::from_str(phonenumbers_str).unwrap();
+        let expected_phonenumbers = json!([
+            {"type": "home", "number": "555-555-1234"},
+            {"type": "work", "number": "555-555-5678"}
+        ]);
+        assert_eq!(phonenumbers, expected_phonenumbers);
+    }
+
+    fn compare_flattened_json(actual: &serde_json::Value, expected: &serde_json::Value) {
+        // Helper to compare JSON values, parsing embedded JSON strings
+        let actual_obj = actual.as_object().unwrap();
+        let expected_obj = expected.as_object().unwrap();
+
+        assert_eq!(
+            actual_obj.len(),
+            expected_obj.len(),
+            "Different number of fields"
+        );
+
+        for (key, expected_val) in expected_obj {
+            let actual_val = actual_obj
+                .get(key)
+                .unwrap_or_else(|| panic!("Missing key: {}", key));
+
+            if let (Some(actual_str), Some(expected_str)) =
+                (actual_val.as_str(), expected_val.as_str())
+            {
+                // Both are strings, try to parse as JSON
+                if let (Ok(actual_json), Ok(expected_json)) = (
+                    serde_json::from_str::<serde_json::Value>(actual_str),
+                    serde_json::from_str::<serde_json::Value>(expected_str),
+                ) {
+                    // Both strings contain valid JSON, compare them structurally
+                    assert_eq!(actual_json, expected_json, "JSON mismatch for key: {}", key);
+                } else {
+                    // Not JSON or parse failed, compare as strings
+                    assert_eq!(actual_str, expected_str, "String mismatch for key: {}", key);
+                }
+            } else {
+                // Non-string values, compare directly
+                assert_eq!(actual_val, expected_val, "Value mismatch for key: {}", key);
+            }
+        }
     }
 
     #[test]
@@ -512,17 +555,17 @@ mod tests {
         });
 
         let output = flatten_with_level(input.clone(), 0).unwrap();
-        assert_eq!(output, expected_output_level0);
+        compare_flattened_json(&output, &expected_output_level0);
         let output = flatten_with_level(input.clone(), 1).unwrap();
-        assert_eq!(output, expected_output_level1);
+        compare_flattened_json(&output, &expected_output_level1);
         let output = flatten_with_level(input.clone(), 2).unwrap();
-        assert_eq!(output, expected_output_level2);
+        compare_flattened_json(&output, &expected_output_level2);
         let output = flatten_with_level(input.clone(), 3).unwrap();
-        assert_eq!(output, expected_output_level3);
+        compare_flattened_json(&output, &expected_output_level3);
         let output = flatten_with_level(input.clone(), 4).unwrap();
-        assert_eq!(output, expected_output_level4);
+        compare_flattened_json(&output, &expected_output_level4);
         let output = flatten_with_level(input, 5).unwrap();
-        assert_eq!(output, expected_output_level4);
+        compare_flattened_json(&output, &expected_output_level4);
     }
 
     #[test]

@@ -6,6 +6,12 @@ import { PipelineDestinations } from '../../pages/pipelinesPages/pipelineDestina
 
 test.describe.configure({ mode: 'parallel' });
 
+test.use({
+  contextOptions: {
+    slowMo: 1000
+  }
+});
+
 test.describe("Pipeline Import", { tag: '@enterprise' }, () => {
     let loginPage, pipelinesEP, ingestionPage, pipelineDestinations;
 

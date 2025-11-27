@@ -88,7 +88,14 @@
                 </tr>
                 <tr>
                   <td class="text-weight-bold">Expires At</td>
-                  <td>{{ formatDate(licenseData.license.expires_at) }}</td>
+                  <td>
+                    <div class="tw-flex tw-items-center tw-justify-start tw-gap-4">
+                      <span>{{ formatDate(licenseData.license.expires_at) }}</span>
+                      <q-badge v-if="licenseData?.expired" color="red">
+                        Expired
+                      </q-badge>
+                    </div>
+                  </td>
                 </tr>
                 <tr>
                   <td class="text-weight-bold">Company</td>

@@ -45,9 +45,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Custom logo image - shows appropriate logo based on current theme -->
        <div class="tw-flex tw-items-center">
+        <!-- Dark mode: Show dark logo, fallback to light logo -->
         <img
           v-if="
             store.state.theme === 'dark' &&
+            store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
+            store.state.zoConfig?.custom_logo_dark_img != null
+          "
+          :src="
+            `data:image; base64, ` + store.state.zoConfig?.custom_logo_dark_img
+          "
+          style="max-width: 150px; max-height: 32px;"
+        />
+        <!-- Light mode: Show light logo, fallback to dark logo -->
+        <img
+          v-else-if="
+            store.state.theme === 'light' &&
+            store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
+            store.state.zoConfig?.custom_logo_img != null
+          "
+          :src="
+            `data:image; base64, ` + store.state.zoConfig?.custom_logo_img
+          "
+          style="max-width: 150px; max-height: 32px;"
+        />
+        <!-- Fallback: Show whichever logo exists (dark or light) -->
+        <img
+          v-else-if="
             store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
             store.state.zoConfig?.custom_logo_dark_img != null
           "
@@ -150,17 +174,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="warning"
             size="24px"
             class="header-icon"
-            :style="{
-              color:
-                store.state.zoConfig.ingestion_quota_used >= 95
-                  ? 'red'
-                  : 'orange',
-            }"
+            :style="{ color: ingestionQuotaColor }"
           ></q-icon>
         </div>
         <q-tooltip anchor="top middle" self="bottom middle">
-          Warning: {{ store.state.zoConfig.ingestion_quota_used }}% of
-          ingestion limit used
+          Warning: {{ ingestionQuotaPercentage }}% of ingestion limit used
         </q-tooltip>
       </q-btn>
 
@@ -558,7 +576,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, PropType } from "vue";
+import { defineComponent, PropType, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
@@ -663,6 +681,16 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n();
 
+    // Computed property for ingestion quota percentage
+    const ingestionQuotaPercentage = computed(() => {
+      return Math.ceil(props.store.state.zoConfig.ingestion_quota_used * 100) / 100 || 0;
+    });
+
+    // Computed property for ingestion quota warning color
+    const ingestionQuotaColor = computed(() => {
+      return props.store.state.zoConfig.ingestion_quota_used >= 95 ? 'red' : 'orange';
+    });
+
     // Event handlers that emit to parent component
     const updateOrganization = () => {
       emit("updateOrganization");
@@ -719,6 +747,8 @@ export default defineComponent({
       t,
       outlinedSettings,
       getImageURL,
+      ingestionQuotaPercentage,
+      ingestionQuotaColor,
       updateOrganization,
       goToHome,
       toggleAIChat,

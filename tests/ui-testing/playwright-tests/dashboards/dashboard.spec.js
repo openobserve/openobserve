@@ -9,8 +9,8 @@ import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/dashboard-time";
-import { waitForStreamComplete } from "../utils/streaming-helpers.js";
 import PageManager from "../../pages/page-manager";
+import { waitForStreamComplete, waitForTableWithData } from "../utils/streaming-helpers.js";
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
@@ -836,7 +836,13 @@ test.describe("dashboard UI testcases", () => {
 
     await pm.chartTypeSelector.searchAndAddField("xAxis1", "x");
     await pm.chartTypeSelector.searchAndAddField("yAxis1", "y");
+
+    // Apply chart and wait for streaming to complete
+    const streamPromise = waitForStreamComplete(page);
+    const initialStreamPromise = pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await streamPromise;
+    await initialStreamPromise;
 
     // Verify line chart data is rendered correctly
     await page.waitForSelector('[data-test="chart-renderer"]', {

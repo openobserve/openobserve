@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Enterprise License Details Section -->
-        <div v-if="config.isEnterprise == 'true'" class="tw-mt-4">
+        <div v-if="config.isEnterprise == 'true' && config.isCloud === 'false'" class="tw-mt-4">
           <div class="feature-card">
             <div class="tw-flex tw-items-center tw-justify-between tw-mb-4">
               <div class="tw-flex tw-items-center tw-gap-3">
@@ -176,13 +176,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <h3 class="feature-title">Enterprise License Details</h3>
               </div>
-              <q-btn
-                no-caps
-                label="Manage License"
-                @click="navigateToLicense"
-                size="sm"
-                class="o2-primary-button"
-              />
             </div>
 
             <div v-if="loadingLicense" class="tw-text-center tw-py-8">
@@ -201,14 +194,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div v-if="licenseData && licenseData.installation_id" class="tw-text-xs tw-opacity-70 tw-mb-2">
                     Installation ID: <code class="tw-px-2 tw-py-1 tw-rounded tw-bg-black tw-bg-opacity-10">{{ licenseData.installation_id }}</code>
                   </div>
-                  <q-btn
-                    color="primary"
-                    no-caps
-                    label="Get License"
-                    @click="navigateToLicense"
-                    size="sm"
-                    unelevated
-                  />
                 </div>
               </div>
             </div>
@@ -236,7 +221,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </tr>
                       <tr>
                         <td class="tw-font-semibold">Expires At</td>
-                        <td>{{ formatLicenseDate(licenseData.license.expires_at) }}</td>
+                        <td>
+                          <div class="tw-flex tw-items-center tw-justify-start tw-gap-4">
+                            <span>{{ formatLicenseDate(licenseData.license.expires_at) }}</span>
+                            <q-badge v-if="licenseData?.expired" color="red">
+                              Expired
+                            </q-badge>
+                          </div>
+                        </td>
                       </tr>
                     </tbody>
                   </q-markup-table>
@@ -315,10 +307,13 @@ export default defineComponent({
     };
 
     const formatLicenseDate = (timestamp: number) => {
-      return new Date(timestamp / 1000).toLocaleDateString('en-US', {
+      return new Date(timestamp / 1000).toLocaleString('en-US', {
         year: 'numeric',
         month: 'short',
-        day: 'numeric'
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
       });
     };
 
@@ -332,43 +327,6 @@ export default defineComponent({
         licenseData.value = null;
       } finally {
         loadingLicense.value = false;
-      }
-    };
-
-    const navigateToLicense = () => {
-      // Get meta org identifier
-      const metaOrgIdentifier = store.state.zoConfig.meta_org;
-
-      // Find the meta org from the organizations list
-      const metaOrg = store.state.organizations?.find(
-        (org: any) => org.identifier === metaOrgIdentifier
-      );
-
-      if (metaOrg) {
-        // Create the org option object so that it will be used to switch to meta org
-        const metaOrgOption = {
-          label: metaOrg.name,
-          id: metaOrg.id,
-          identifier: metaOrg.identifier,
-          user_email: store.state.userInfo.email,
-          ingest_threshold: metaOrg.ingest_threshold,
-          search_threshold: metaOrg.search_threshold,
-        };
-
-        // Set the selected organization using dispatch
-        store.dispatch("setSelectedOrganization", metaOrgOption);
-
-        // Navigate to license page with the meta org identifier
-        router.push({
-          name: 'license',
-          query: { org_identifier: metaOrgIdentifier }
-        });
-      } else {
-        // Fallback: just navigate to license page with meta org identifier
-        router.push({
-          name: 'license',
-          query: { org_identifier: metaOrgIdentifier }
-        });
       }
     };
 
@@ -386,7 +344,6 @@ export default defineComponent({
       licenseData,
       loadingLicense,
       formatLicenseDate,
-      navigateToLicense,
     };
   },
 });
