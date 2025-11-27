@@ -26,11 +26,15 @@ use config::{
     },
     utils::json,
 };
+use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use tokio::{
     sync::{Mutex, mpsc},
     time,
 };
+
+#[cfg(feature = "cloud")]
+use crate::service::organization;
 
 pub(super) static USAGE_QUEUE: Lazy<Arc<ReportingQueue>> =
     Lazy::new(|| Arc::new(initialize_usage_queue()));
@@ -227,6 +231,17 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
 
     let cfg = get_config();
 
+    #[cfg(not(feature = "enterprise"))]
+    let usage_reporting_mode = &cfg.common.usage_reporting_mode;
+    #[cfg(feature = "enterprise")]
+    let usage_reporting_mode = {
+        if cfg.common.usage_reporting_mode == "local" {
+            "local"
+        } else {
+            "both"
+        }
+    };
+
     if !usages.is_empty() {
         super::ingestion::ingest_usages(usages).await;
     }
@@ -243,15 +258,6 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
                 Vec::new()
             };
         additional_reporting_orgs.push(META_ORG_ID.to_string());
-
-        // If configured, automatically add each trigger's own org
-        if cfg.common.usage_report_to_own_org {
-            for trigger_json in &triggers {
-                if let Ok(trigger) = json::from_value::<TriggerData>(trigger_json.clone()) {
-                    additional_reporting_orgs.push(trigger.org.clone());
-                }
-            }
-        }
 
         additional_reporting_orgs.sort();
         additional_reporting_orgs.dedup();
@@ -273,7 +279,7 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
             if super::ingestion::ingest_reporting_data(triggers.clone(), trigger_stream)
                 .await
                 .is_err()
-                && &cfg.common.usage_reporting_mode != "dual"
+                && usage_reporting_mode != "both"
                 && !enqueued_on_failure
             {
                 // Only enqueue once on first failure , this brings risk that it may be duplicated
@@ -290,6 +296,39 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
                         );
                     }
                 }
+            }
+        }
+    }
+
+    let mut per_org_map = HashMap::new();
+    // If configured, automatically add each trigger's own org
+    if cfg.common.usage_report_to_own_org && usage_reporting_mode != "remote" {
+        for trigger_json in triggers {
+            if let Ok(trigger) = json::from_value::<TriggerData>(trigger_json.clone()) {
+                let org_id = &trigger.org;
+                #[cfg(feature = "cloud")]
+                match organization::is_org_in_free_trial_period(&org_id).await {
+                    Ok(ongoing) => {
+                        if !ongoing {
+                            continue;
+                        }
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "error checking for trial period for trigger ingestion for {org_id} : {e}"
+                        );
+                        continue;
+                    }
+                }
+                let entry = per_org_map.entry(org_id.clone()).or_insert(vec![]);
+                entry.push(trigger_json);
+            }
+        }
+        for (org, values) in per_org_map.into_iter() {
+            let trigger_stream = StreamParams::new(&org, TRIGGERS_STREAM, StreamType::Logs);
+
+            if let Err(e) = super::ingestion::ingest_reporting_data(values, trigger_stream).await {
+                log::error!("error in ingesting trigger data for {org} : {e}");
             }
         }
     }
