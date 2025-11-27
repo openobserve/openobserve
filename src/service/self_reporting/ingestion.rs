@@ -191,7 +191,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
             log::error!(
                 "[SELF-REPORTING] Error in ingesting usage data to internal ingestion: {e}"
             );
-            if cfg.common.usage_reporting_mode != "both" {
+            if usage_reporting_mode != "both" {
                 // on error in ingesting usage data, push back the data
                 tokio::spawn(async move {
                     for usage_data in curr_usages {
