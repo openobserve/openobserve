@@ -1244,7 +1244,8 @@
     "domainSettingsSaved": "Domeininstellingen succesvol opgeslagen",
     "errorSavingDomainSettings": "Fout bij opslaan van domeininstellingen",
     "noDomainMessage": "Geen domeinen geconfigureerd. Voeg hierboven domeinen toe om de toegang te beperken.",
-    "license": "Licentie"
+    "license": "Licentie",
+    "alertCorrelation": "Deduplicatie van waarschuwingen"
   },
   "iam": {
     "users": "Gebruikers",
@@ -1302,7 +1303,8 @@
     "view": "Bekijken",
     "delay": "Uitstel",
     "history": "Geschiedenis van pijpleidingen",
-    "searchHistory": "Voer de naam van de pipeline in"
+    "searchHistory": "Voer de naam van de pipeline in",
+    "destination_type": "Soort bestemming"
   },
   "reports": {
     "header": "Rapporten",
@@ -1587,5 +1589,47 @@
   },
   "alert_list": {
     "alert_details": "Details van de waarschuwing"
+  },
+  "latencyInsights": {
+    "title": "Inzichten",
+    "tabLabel": "Latentie",
+    "analyzeButton": "Latentieanalyse",
+    "analyzeTooltip": "Latentiepatronen analyseren voor alle spoordimensies",
+    "compareToLabel": "Vergelijk met:",
+    "fullTimeRange": "Voltijds bereik",
+    "beforePeriod": "Voor de geselecteerde periode",
+    "afterPeriod": "Na de geselecteerde periode",
+    "durationLabel": "Duur:",
+    "analyzingDimensions": "Dimensies analyseren...",
+    "computingDistributions": "Frequentieverdelingen berekenen over {count} dimensies",
+    "failedToLoad": "Het laden van de analyse is mislukt",
+    "retryButton": "Probeer het opnieuw",
+    "percentileLabel": "Latentiepercentiel",
+    "p50Median": "P50 (mediaan)",
+    "p75": "P75",
+    "p95": "P95",
+    "p99": "P99",
+    "dimensionsButton": "Velden ({count})",
+    "dimensionsTooltip": "Dimensies toevoegen of verwijderen om te analyseren",
+    "selectDimensions": "Velden selecteren",
+    "analyzeButtonLabel": "Analyseren",
+    "refreshTooltip": "Analyse vernieuwen met bijgewerkt percentiel",
+    "customSQLFieldsDisabled": "Veldselectie is niet beschikbaar voor aangepaste SQL-query's. Dimensies worden geëxtraheerd uit de resultaten van uw zoekopdracht.",
+    "timeRangeSelected": "Tijdbereik geselecteerd"
+  },
+  "volumeInsights": {
+    "title": "Inzichten",
+    "tabLabel": "Tarief",
+    "analyzeButton": "Tariefanalyse",
+    "analyzeTooltip": "Analyseer traceersnelheidspatronen in verschillende dimensies",
+    "analyzeTooltipLogs": "Analyseer de dimensieverdeling voor het huidige tijdbereik",
+    "rateLabel": "Tarief:",
+    "timeRangeLabel": "Tijdbereik:"
+  },
+  "errorInsights": {
+    "title": "Inzichten",
+    "tabLabel": "Fouten",
+    "errorSpikePeriod": "Fout: piekperiode:",
+    "errorsGreaterThan": "Fouten >="
   }
 }
