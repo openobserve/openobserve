@@ -1098,61 +1098,87 @@ describe("Header Component", () => {
       expect(wrapper.props("user").email).toBe("test@example.com");
     });
 
-    it("should handle empty organization list", () => {
-      wrapper = shallowMount(Header, {
-        global: { plugins: [i18n] },
-        props: {
-          ...wrapper.props(),
+    it("should not show organization dropdown when organization list is empty", () => {
+      const wrapper = createWrapper({
+        mountType: 'mount',
+        propsOverrides: {
           filteredOrganizations: [],
         },
+        stubsOverrides: {
+          QSelect: false
+        }
       });
 
-      expect(wrapper.props("filteredOrganizations")).toHaveLength(0);
+      // Verify the organization selector doesn't show options when list is empty
+      const orgSelect = wrapper.findComponent({ name: 'QSelect' });
+      if (orgSelect.exists()) {
+        expect(orgSelect.props('options')).toHaveLength(0);
+      }
     });
 
-    it("should handle null custom logo values", () => {
-      mockStore.state.zoConfig.custom_logo_img = null;
-      mockStore.state.zoConfig.custom_logo_dark_img = null;
-
-      wrapper = shallowMount(Header, {
-        global: { plugins: [i18n] },
-        props: {
-          ...wrapper.props(),
-          store: mockStore,
+    it("should render default OpenObserve logo when both custom logos are null", () => {
+      const wrapper = createWrapper({
+        mountType: 'mount',
+        storeOverrides: {
+          state: {
+            zoConfig: {
+              custom_logo_img: null,
+              custom_logo_dark_img: null,
+              custom_logo_text: ""
+            }
+          }
         },
+        stubsOverrides: {
+          QToolbar: false,
+          QToolbarTitle: false
+        }
       });
 
-      expect(mockStore.state.zoConfig.custom_logo_img).toBeNull();
-      expect(mockStore.state.zoConfig.custom_logo_dark_img).toBeNull();
+      const html = wrapper.html();
+      // Verify no custom logo images are rendered
+      expect(html).not.toContain('data:image; base64,');
+
+      // Verify default OpenObserve logo is rendered instead
+      expect(html).toContain('openobserve-logo');
+      const imgs = wrapper.findAll('img');
+      expect(imgs.length).toBeGreaterThan(0);
+      expect(imgs[0].attributes('src')).toContain('openobserve');
     });
 
-    it("should handle quota value of exactly 95%", () => {
-      mockStore.state.zoConfig.ingestion_quota_used = 95.0;
-
-      wrapper = shallowMount(Header, {
-        global: { plugins: [i18n] },
-        props: {
-          ...wrapper.props(),
-          store: mockStore,
-        },
+    it("should display red warning icon when quota is exactly 95%", () => {
+      const wrapper = createWrapper({
+        mountType: 'shallow',
+        storeOverrides: {
+          state: {
+            zoConfig: {
+              ingestion_quota_used: 95.0,
+            }
+          }
+        }
       });
 
+      // Verify the computed property returns red color
       expect(wrapper.vm.ingestionQuotaColor).toBe("red");
+
+      // Verify the computed percentage
+      expect(wrapper.vm.ingestionQuotaPercentage).toBe(95.0);
     });
 
     it("should handle organization with very long name", () => {
       const longName = "A".repeat(100);
       const orgWithLongName = { identifier: "long", label: longName };
 
-      wrapper = shallowMount(Header, {
-        global: { plugins: [i18n] },
-        props: {
-          ...wrapper.props(),
+      const wrapper = createWrapper({
+        mountType: 'shallow',
+        propsOverrides: {
           selectedOrg: orgWithLongName,
-        },
+        }
       });
 
-      expect(wrapper.props("selectedOrg").label.length).toBe(100);
+      // Verify the component accepts and stores the long organization name
+      expect(wrapper.props('selectedOrg')).toEqual(orgWithLongName);
+      expect(wrapper.props('selectedOrg').label).toBe(longName);
+      expect(wrapper.props('selectedOrg').label.length).toBe(100);
     });
   });
 

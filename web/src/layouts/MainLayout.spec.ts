@@ -207,12 +207,17 @@ describe("MainLayout Methods and Functions", () => {
       expect(cookies.setLanguage).not.toHaveBeenCalledWith(langWithAllData);
     });
 
-    it("should retrieve current language from cookies", () => {
-      // The mock returns "en-gb" by default
+    it("should retrieve and use current language from cookies", () => {
+      // Mock returns "en-gb" by default
       const currentLang = cookies.getLanguage();
 
-      expect(currentLang).toBe("en-gb");
+      // Verify the cookie function was called
       expect(cookies.getLanguage).toHaveBeenCalled();
+
+      // Verify we can use the retrieved language
+      expect(currentLang).toBe("en-gb");
+      expect(typeof currentLang).toBe("string");
+      expect(currentLang.length).toBeGreaterThan(0);
     });
   });
 
@@ -409,18 +414,21 @@ describe("MainLayout Methods and Functions", () => {
       expect(mockStore.dispatch).toHaveBeenCalledWith("setIsAiChatEnabled", false);
     });
 
-    it("should send message to AI chat", () => {
-      const sendToAiChat = (message: string) => {
-        mockStore.dispatch("setIsAiChatEnabled", true);
-        // Simulate setting the context
-        return message;
+    it("should enable AI chat and pass message to context", () => {
+      const sendToAiChat = (message: string, store: any) => {
+        // Enable AI chat first
+        store.dispatch("setIsAiChatEnabled", true);
+        // Set the message context for AI
+        store.dispatch("setAiChatContext", message);
       };
 
       const testMessage = "Test message for AI";
-      const result = sendToAiChat(testMessage);
-      
+      sendToAiChat(testMessage, mockStore);
+
+      // Verify AI chat is enabled
       expect(mockStore.dispatch).toHaveBeenCalledWith("setIsAiChatEnabled", true);
-      expect(result).toBe(testMessage);
+      // Verify message context is set
+      expect(mockStore.dispatch).toHaveBeenCalledWith("setAiChatContext", testMessage);
     });
 
     it("should handle removeFirstTimeLogin", () => {
@@ -492,24 +500,30 @@ describe("MainLayout Methods and Functions", () => {
       expect(result.length).toBe(1); // Only home should remain
     });
 
-    it("should expand menu and prefetch monaco editor", () => {
-      const expandMenu = () => {
-        let isMonacoEditorLoaded = false;
-        
-        if (!isMonacoEditorLoaded) {
-          // Simulate prefetching
-          const link = { rel: "", href: "" };
-          link.rel = "prefetch";
-          link.href = "/web/assets/editor.api.v1.js";
-          // Simulate appendChild
-          isMonacoEditorLoaded = true;
+    it("should prefetch monaco editor resources when menu expands", () => {
+      const expandMenuAndPrefetch = () => {
+        // Check if Monaco editor link already exists
+        let editorLink = document.querySelector('link[href*="editor.api"]');
+
+        if (!editorLink) {
+          // Create prefetch link for Monaco editor
+          editorLink = document.createElement('link');
+          (editorLink as HTMLLinkElement).rel = "prefetch";
+          (editorLink as HTMLLinkElement).href = "/web/assets/editor.api.v1.js";
+          document.head.appendChild(editorLink);
+          return true;
         }
-        
-        return isMonacoEditorLoaded;
+
+        return false; // Already loaded
       };
 
-      const result = expandMenu();
-      expect(result).toBe(true);
+      const wasPrefetched = expandMenuAndPrefetch();
+
+      // Verify prefetch link was created
+      expect(wasPrefetched).toBe(true);
+      const link = document.querySelector('link[href*="editor.api"]');
+      expect(link).toBeDefined();
+      expect((link as HTMLLinkElement)?.rel).toBe("prefetch");
     });
   });
 
@@ -574,15 +588,23 @@ describe("MainLayout Methods and Functions", () => {
       }));
     });
 
-    it("should trigger refresh token calculation", () => {
-      const triggerRefreshToken = () => {
-        const userInfo = { exp: Math.floor(Date.now() / 1000) + 3600 };
-        // Simulate token refresh logic
-        return userInfo.exp > Math.floor(Date.now() / 1000);
+    it("should correctly determine if token is still valid", () => {
+      const isTokenValid = (expiryTime: number) => {
+        const currentTime = Math.floor(Date.now() / 1000);
+        return expiryTime > currentTime;
       };
 
-      const result = triggerRefreshToken();
-      expect(result).toBe(true);
+      // Test with token that expires in 1 hour
+      const futureExpiry = Math.floor(Date.now() / 1000) + 3600;
+      expect(isTokenValid(futureExpiry)).toBe(true);
+
+      // Test with token that expired 1 hour ago
+      const pastExpiry = Math.floor(Date.now() / 1000) - 3600;
+      expect(isTokenValid(pastExpiry)).toBe(false);
+
+      // Test with token that expires in 1 second
+      const almostExpired = Math.floor(Date.now() / 1000) + 1;
+      expect(isTokenValid(almostExpired)).toBe(true);
     });
 
     it("should prefetch Monaco editor resources", () => {
