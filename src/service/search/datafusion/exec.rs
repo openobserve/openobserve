@@ -626,7 +626,7 @@ pub async fn register_table(
     session: &SearchSession,
     schema: Arc<Schema>,
     table_name: &str,
-    files: &[FileKey],
+    files: Vec<FileKey>,
     sort_key: &[(String, bool)],
 ) -> Result<SessionContext> {
     // only sort by timestamp desc
@@ -691,7 +691,7 @@ impl TableBuilder {
     pub async fn build(
         self,
         session: SearchSession,
-        files: &[FileKey],
+        files: Vec<FileKey>,
         schema: Arc<Schema>,
     ) -> Result<Arc<dyn TableProvider>> {
         let cfg = get_config();
@@ -1261,7 +1261,7 @@ mod tests {
             }];
             let sort_key = vec![(TIMESTAMP_COL_NAME.to_string(), true)];
 
-            let result = register_table(&session, schema, "test_table", &files, &sort_key).await;
+            let result = register_table(&session, schema, "test_table", files, &sort_key).await;
 
             // Should create context successfully
             assert!(result.is_ok());
@@ -1302,7 +1302,7 @@ mod tests {
 
             let builder = TableBuilder::new().sorted_by_time(true);
 
-            let result = builder.build(session, &files, schema).await;
+            let result = builder.build(session, files, schema).await;
             assert!(result.is_ok());
 
             Ok(())

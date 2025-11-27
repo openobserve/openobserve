@@ -786,7 +786,7 @@ async fn merge_files(
     };
     let table = TableBuilder::new()
         .sorted_by_time(true)
-        .build(session, &new_file_list, schema.clone())
+        .build(session, new_file_list, schema.clone())
         .await?;
     let tables = vec![table];
 
