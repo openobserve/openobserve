@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use chrono::{TimeZone, Utc};
 use config::meta::{bitvec::BitVec, stream::FileKey};
 use object_store::ObjectMeta;
@@ -21,7 +23,7 @@ use scc::HashMap;
 
 use super::{ACCOUNT_SEPARATOR, TRACE_ID_SEPARATOR};
 
-type SegmentData = hashbrown::HashMap<String, BitVec>;
+type SegmentData = hashbrown::HashMap<String, Arc<BitVec>>;
 
 static FILES: Lazy<HashMap<String, Vec<ObjectMeta>>> = Lazy::new(Default::default);
 static SEGMENTS: Lazy<HashMap<String, SegmentData>> = Lazy::new(Default::default);
@@ -75,7 +77,7 @@ pub fn clear(trace_id: &str) {
     });
 }
 
-pub fn get_segment_ids(file_key: &str) -> Option<BitVec> {
+pub fn get_segment_ids(file_key: &str) -> Option<Arc<BitVec>> {
     let (trace_id, filename) = file_key.split_once("/$$/")?;
     SEGMENTS
         .get_sync(trace_id)

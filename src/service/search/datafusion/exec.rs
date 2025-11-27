@@ -719,7 +719,7 @@ impl TableBuilder {
         let vortex_session = VortexSession::default();
         let mut listing_options = ListingOptions::new(Arc::new(VortexFormat::new(vortex_session)))
             .with_target_partitions(target_partitions)
-            .with_collect_stat(false); // current is default to true
+            .with_collect_stat(true); // current is default to true
 
         if self.sorted_by_time {
             // specify sort columns for parquet file
