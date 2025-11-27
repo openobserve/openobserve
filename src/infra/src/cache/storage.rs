@@ -13,16 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{ops::Range, time::SystemTime};
+use std::ops::Range;
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use config::utils::time::BASE_TIME;
 use futures::{StreamExt, stream::BoxStream};
 use object_store::{
-    Attributes, Error, GetOptions, GetResult, GetResultPayload, ListResult, MultipartUpload,
-    OBJECT_STORE_COALESCE_DEFAULT, ObjectMeta, PutMultipartOptions, PutOptions, PutPayload,
-    PutResult, Result, coalesce_ranges, path::Path,
+    Error, GetOptions, GetResult, ListResult, MultipartUpload, OBJECT_STORE_COALESCE_DEFAULT,
+    ObjectMeta, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, coalesce_ranges,
+    path::Path,
 };
 use once_cell::sync::Lazy;
 
@@ -93,26 +93,9 @@ impl ObjectStoreExt for CacheFS {
 
     async fn get(&self, account: &str, location: &Path) -> Result<GetResult> {
         let path = location.to_string();
-        if let Ok(data) = file_data::get_opts(account, &path, None, false).await {
-            let meta = ObjectMeta {
-                location: location.clone(),
-                last_modified: *BASE_TIME,
-                size: data.len() as u64,
-                e_tag: None,
-                version: None,
-            };
-            let range = Range {
-                start: 0,
-                end: data.len() as u64,
-            };
-            return Ok(GetResult {
-                payload: GetResultPayload::Stream(
-                    futures::stream::once(async move { Ok(data) }).boxed(),
-                ),
-                attributes: Attributes::default(),
-                meta,
-                range,
-            });
+        let options = GetOptions::default();
+        if let Ok(res) = file_data::get_opts(account, &path, options, false).await {
+            return Ok(res);
         }
         // default to storage
         storage::get(account, &path).await
@@ -120,79 +103,27 @@ impl ObjectStoreExt for CacheFS {
 
     async fn get_opts(
         &self,
-        _account: &str,
+        account: &str,
         location: &Path,
         options: GetOptions,
     ) -> Result<GetResult> {
-        let path = std::path::PathBuf::from(format!("./data/openobserve/cache/{}", location));
-
-        let (metadata, file) = std::fs::File::open(&path)
-            .and_then(|f| Ok((f.metadata()?, f)))
-            .unwrap();
-
-        let last_modified = last_modified(&metadata);
-        let meta = ObjectMeta {
-            location: location.clone(),
-            last_modified,
-            size: metadata.len(),
-            e_tag: Some(get_etag(&metadata)),
-            version: None,
-        };
-        options.check_preconditions(&meta)?;
-
-        let range = match options.range {
-            Some(r) => r.as_range(meta.size).unwrap(),
-            None => 0..meta.size,
-        };
-
-        Ok(GetResult {
-            payload: GetResultPayload::File(file, path),
-            attributes: Attributes::default(),
-            range,
-            meta,
-        })
-
-        // println!("CacheFS get_opts called for account: {}, location: {}", account, location);
-        // let path = location.to_string();
-        // let range = options
-        //     .range
-        //     .as_ref()
-        //     .map(|r| r.as_range(u64::MAX).unwrap());
-        // if let Ok(data) = file_data::get_opts(account, &path, range.clone(), false).await {
-        //     let meta = ObjectMeta {
-        //         location: location.clone(),
-        //         last_modified: *BASE_TIME,
-        //         size: data.len() as u64,
-        //         e_tag: None,
-        //         version: None,
-        //     };
-        //     let range = match range {
-        //         Some(r) => r,
-        //         None => Range {
-        //             start: 0,
-        //             end: data.len() as u64,
-        //         },
-        //     };
-        //     return Ok(GetResult {
-        //         payload: GetResultPayload::Stream(
-        //             futures::stream::once(async move { Ok(data) }).boxed(),
-        //         ),
-        //         attributes: Attributes::default(),
-        //         meta,
-        //         range,
-        //     });
-        // }
-        // // default to storage
-        // storage::get_opts(account, &path, options).await
+        let path = location.to_string();
+        if let Ok(res) = file_data::get_opts(account, &path, options.clone(), false).await {
+            return Ok(res);
+        }
+        // default to storage
+        storage::get_opts(account, &path, options).await
     }
 
     async fn get_range(&self, account: &str, location: &Path, range: Range<u64>) -> Result<Bytes> {
-        if range.start > range.end {
-            return Err(crate::storage::Error::BadRange(location.to_string()).into());
-        }
-        let path = location.to_string();
-        let data = file_data::get_opts(account, &path, Some(range), true).await?;
-        Ok(data)
+        let options = GetOptions {
+            range: Some(range.into()),
+            ..Default::default()
+        };
+        self.get_opts(account, location, options)
+            .await?
+            .bytes()
+            .await
     }
 
     async fn get_ranges(
@@ -292,32 +223,6 @@ pub async fn get_range(account: &str, location: &Path, range: Range<u64>) -> Res
 
 pub async fn head(account: &str, location: &Path) -> Result<ObjectMeta> {
     DEFAULT.head(account, location).await
-}
-
-fn get_inode(metadata: &std::fs::Metadata) -> u64 {
-    std::os::unix::fs::MetadataExt::ino(metadata)
-}
-fn last_modified(metadata: &std::fs::Metadata) -> chrono::DateTime<chrono::Utc> {
-    metadata
-        .modified()
-        .expect("Modified file time should be supported on this platform")
-        .into()
-}
-
-fn get_etag(metadata: &std::fs::Metadata) -> String {
-    let inode = get_inode(metadata);
-    let size = metadata.len();
-    let mtime = metadata
-        .modified()
-        .ok()
-        .and_then(|mtime| mtime.duration_since(SystemTime::UNIX_EPOCH).ok())
-        .unwrap_or_default()
-        .as_micros();
-
-    // Use an ETag scheme based on that used by many popular HTTP servers
-    // <https://httpd.apache.org/docs/2.2/mod/core.html#fileetag>
-    // <https://stackoverflow.com/questions/47512043/how-etags-are-generated-and-configured>
-    format!("{inode:x}-{mtime:x}-{size:x}")
 }
 
 #[cfg(test)]
