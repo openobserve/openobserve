@@ -51,7 +51,11 @@ use crate::{
     )
 )]
 #[post("/{org_id}/ingest/metrics/_json")]
-pub async fn json(org_id: web::Path<String>, body: web::Bytes) -> Result<HttpResponse, Error> {
+pub async fn json(
+    org_id: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    body: web::Bytes,
+) -> Result<HttpResponse, Error> {
     // log start processing time
     let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
         config::utils::time::now_micros()
@@ -60,6 +64,7 @@ pub async fn json(org_id: web::Path<String>, body: web::Bytes) -> Result<HttpRes
     };
 
     let org_id = org_id.into_inner();
+    let user_email = &user_email.user_id;
 
     #[cfg(feature = "cloud")]
     match check_ingestion_allowed(&org_id, StreamType::Metrics, None).await {
@@ -74,7 +79,7 @@ pub async fn json(org_id: web::Path<String>, body: web::Bytes) -> Result<HttpRes
         }
     }
 
-    let mut resp = match metrics::json::ingest(&org_id, body).await {
+    let mut resp = match metrics::json::ingest(&org_id, body, user_email).await {
         Ok(v) => HttpResponse::Ok().json(v),
         Err(e) => {
             log::error!("Error processing request {org_id}/metrics/_json: {e}");

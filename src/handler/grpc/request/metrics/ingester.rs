@@ -49,7 +49,7 @@ impl MetricsService for MetricsIngester {
 
         let user_email = metadata
             .get("user_id")
-            .and_then(|id| id.to_str())
+            .and_then(|id| id.to_str().ok())
             .unwrap_or_default();
 
         let resp = crate::service::metrics::otlp::handle_otlp_request(
