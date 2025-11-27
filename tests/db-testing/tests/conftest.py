@@ -101,13 +101,18 @@ def query_api(openobserve_base_url, auth_credentials, test_org):
     def _query(sql: str, stream_name: str):
         url = f"{openobserve_base_url}/api/{test_org}/_search"
 
+        # Use a wider time range - last 24 hours to now + 1 hour
+        now_micros = int(time.time() * 1000000)
+        start_time = now_micros - (24 * 60 * 60 * 1000000)  # 24 hours ago
+        end_time = now_micros + (60 * 60 * 1000000)  # 1 hour in the future
+
         payload = {
             "query": {
                 "sql": sql,
                 "from": 0,
                 "size": 1000,
-                "start_time": 0,
-                "end_time": int(time.time() * 1000000)
+                "start_time": start_time,
+                "end_time": end_time
             }
         }
 

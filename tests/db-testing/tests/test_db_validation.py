@@ -27,14 +27,14 @@ class TestSchemaValidation:
         ingest_test_data(test_data)
 
         # Query the database to verify schema was created
+        # Note: meta table structure is (id, module, key1, key2, start_dt, value)
         db_cursor.execute("""
-            SELECT stream_name, stream_type, schema
+            SELECT key1, key2, value
             FROM meta
-            WHERE org_id = %s
-            AND module = 'schema'
+            WHERE module = 'schema'
             AND key1 = 'logs'
             AND key2 = %s
-        """, (test_org, test_stream))
+        """, (test_stream,))
 
         results = db_cursor.fetchall()
 
@@ -43,13 +43,14 @@ class TestSchemaValidation:
 
         # Verify schema contains expected fields
         for row in results:
-            stream_name, stream_type, schema_json = row
+            stream_type, stream_name, schema_json = row
             assert stream_name == test_stream
+            assert stream_type == 'logs'
             schema = json.loads(schema_json) if isinstance(schema_json, str) else schema_json
 
             # Check that schema contains our ingested fields
             # (Schema structure may vary based on your implementation)
-            print(f"Schema found: {schema}")
+            print(f"Schema found for {stream_type}/{stream_name}: {schema}")
 
 
 class TestDataIngestion:
@@ -89,17 +90,21 @@ class TestMetadataConsistency:
         Test that organization metadata is properly stored in the database.
         """
         # Query organization metadata from database
+        # Note: meta table doesn't have org_id column, organization info is in key1/key2
         db_cursor.execute("""
-            SELECT org_id, module, value
+            SELECT module, key1, key2, value
             FROM meta
-            WHERE org_id = %s
-            AND module = 'organization'
-        """, (test_org,))
+            WHERE module = 'organization'
+            LIMIT 10
+        """)
 
         results = db_cursor.fetchall()
 
-        # Verify organization exists in database
-        assert len(results) >= 0, f"Organization {test_org} metadata not found"
+        # Just verify we can query metadata table successfully
+        print(f"Found {len(results)} organization metadata entries")
+        if results:
+            for row in results[:3]:
+                print(f"  Organization entry: module={row[0]}, key1={row[1]}, key2={row[2]}")
 
 
 class TestTantivyIndexing:
@@ -149,7 +154,6 @@ class TestTantivyIndexing:
                 file,
                 records,
                 index_size,
-                index_footer_size,
                 original_size,
                 compressed_size
             FROM file_list
@@ -170,13 +174,12 @@ class TestTantivyIndexing:
         files_with_zero_index = []
 
         for row in results:
-            file_id, file_path, records, index_size, index_footer_size, original_size, compressed_size = row
+            file_id, file_path, records, index_size, original_size, compressed_size = row
             total_records += records
 
             print(f"File: {file_path}")
             print(f"  Records: {records}")
             print(f"  Index size: {index_size} bytes")
-            print(f"  Index footer size: {index_footer_size} bytes")
             print(f"  Original size: {original_size} bytes")
             print(f"  Compressed size: {compressed_size} bytes")
 
