@@ -1050,7 +1050,7 @@ pub async fn write_results(
     // For histogram queries, calculate cache boundaries based on actual bucket coverage.
     // A histogram bucket with timestamp T covers data from [T, T+interval).
     // The cache metadata should reflect this coverage, not just the bucket timestamps.
-    let (final_start_time, final_end_time) = if let Some(interval) = histogram_interval_micros {
+    let (cache_start_time, cache_end_time) = if let Some(interval) = histogram_interval_micros {
         // Get the first and last bucket timestamps from the filtered data
         let first_bucket_ts = get_ts_value(ts_column, res.hits.first().unwrap());
         let last_bucket_ts = get_ts_value(ts_column, res.hits.last().unwrap());
@@ -1083,7 +1083,7 @@ pub async fn write_results(
     };
 
     // 4. check if the time range is less than discard_duration
-    if (final_end_time - final_start_time) < delay_ts {
+    if (cache_end_time - cache_start_time) < delay_ts {
         log::info!("[trace_id {trace_id}] Time range is too short for caching, skipping caching");
         return;
     }
@@ -1091,8 +1091,8 @@ pub async fn write_results(
     // 5. cache to disk
     let file_name = format!(
         "{}_{}_{}_{}.json",
-        final_start_time,
-        final_end_time,
+        cache_start_time,
+        cache_end_time,
         if is_aggregate { 1 } else { 0 },
         if is_descending { 1 } else { 0 }
     );
@@ -1106,8 +1106,8 @@ pub async fn write_results(
             &file_name,
             res_cache,
             clear_cache,
-            Some(final_start_time),
-            Some(final_end_time),
+            Some(cache_start_time),
+            Some(cache_end_time),
         )
         .await
         {
@@ -1121,8 +1121,8 @@ pub async fn write_results(
                         .entry(query_key)
                         .or_insert_with(Vec::new)
                         .push(ResultCacheMeta {
-                            start_time: final_start_time,
-                            end_time: final_end_time,
+                            start_time: cache_start_time,
+                            end_time: cache_end_time,
                             is_aggregate,
                             is_descending,
                         });
