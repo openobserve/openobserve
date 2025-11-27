@@ -327,6 +327,9 @@ fn init_azure_config(
     if !config.secret_key.is_empty() {
         builder = builder.with_access_key(&config.secret_key);
     }
+    if !config.server_url.is_empty() {
+        builder = builder.with_endpoint(config.server_url.clone());
+    }
     builder.build()
 }
 
