@@ -15,14 +15,14 @@
 
 use std::sync::Arc;
 
-use config::utils::json;
+use bytes::Bytes;
+use infra::db::{delete_from_db_coordinator, put_into_db_coordinator};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 
-use crate::{
-    common::infra::config::USER_SESSIONS,
-    service::db::{self},
-};
+use crate::common::infra::config::USER_SESSIONS;
 
-// DBKey to set settings for an org
+// Key prefix for session events in coordinator
 pub const USER_SESSION_KEY: &str = "/user_sessions/";
 
 pub async fn get(session_id: &str) -> Result<String, anyhow::Error> {
@@ -32,43 +32,66 @@ pub async fn get(session_id: &str) -> Result<String, anyhow::Error> {
 
     // get from db
     log::warn!("Cache miss for user session, read from db: {}", session_id);
-    let val = db::get(&format!("{USER_SESSION_KEY}{session_id}")).await?;
-    // json format: convert bytes to string and trim any quotes
-    let val = String::from_utf8(val.to_vec())
-        .unwrap()
-        .trim_matches('"')
-        .to_string();
-    // cache it in memory
-    if !val.is_empty() {
-        USER_SESSIONS.insert(session_id.to_string(), val.to_string());
+
+    let session = infra::table::sessions::get(session_id).await?;
+
+    match session {
+        Some(session) => {
+            let access_token = session.access_token.clone();
+            // Cache it in memory
+            if !access_token.is_empty() {
+                USER_SESSIONS.insert(session_id.to_string(), access_token.clone());
+            }
+            Ok(access_token)
+        }
+        None => Err(anyhow::anyhow!("Session not found: {}", session_id)),
     }
-    Ok(val)
 }
 
 pub async fn set(session_id: &str, val: &str) -> Result<(), anyhow::Error> {
-    db::put(
-        &format!("{USER_SESSION_KEY}{session_id}"),
-        json::to_vec(&val).unwrap().into(),
-        db::NEED_WATCH,
-        None,
-    )
-    .await?;
+    infra::table::sessions::set(session_id, val).await?;
+    let key = format!("{USER_SESSION_KEY}{session_id}");
+    let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
+
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {
+        let _ =
+            o2_enterprise::enterprise::super_cluster::queue::put(&key, Bytes::new(), true, None)
+                .await
+                .map_err(|e| {
+                    log::error!("[SESSION] put to super cluster failed: {key} - {e}");
+                    e
+                });
+    }
+
+    USER_SESSIONS.insert(session_id.to_string(), val.to_string());
+
     Ok(())
 }
 
 pub async fn delete(session_id: &str) -> Result<(), anyhow::Error> {
-    Ok(db::delete(
-        &format!("{USER_SESSION_KEY}{session_id}"),
-        false,
-        db::NEED_WATCH,
-        None,
-    )
-    .await?)
+    infra::table::sessions::delete(session_id).await?;
+    let key = format!("{USER_SESSION_KEY}{session_id}");
+    let _ = delete_from_db_coordinator(&key, false, true, None).await;
+
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {
+        let _ = o2_enterprise::enterprise::super_cluster::queue::delete(&key, false, true, None)
+            .await
+            .map_err(|e| {
+                log::error!("[SESSION] delete to super cluster failed: {key} - {e}");
+                e
+            });
+    }
+
+    USER_SESSIONS.remove(session_id);
+
+    Ok(())
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = USER_SESSION_KEY;
-    let cluster_coordinator = db::get_coordinator().await;
+    let cluster_coordinator = infra::db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching user sessions");
@@ -76,56 +99,50 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         let ev = match events.recv().await {
             Some(ev) => ev,
             None => {
-                log::error!("watch_user: event channel closed");
+                log::error!("watch_sessions: event channel closed");
                 return Ok(());
             }
         };
         match ev {
-            db::Event::Put(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value: String = match db::get(&ev.key).await {
-                    Ok(val) => match json::from_slice(&val) {
-                        Ok(val) => val,
-                        Err(e) => {
-                            log::error!("Error getting value: {e}");
-                            continue;
+            infra::db::Event::Put(ev) => {
+                let session_id = ev.key.strip_prefix(key).unwrap();
+                match infra::table::sessions::get(session_id).await {
+                    Ok(Some(session)) => {
+                        if !session.access_token.is_empty() {
+                            USER_SESSIONS.insert(session_id.to_string(), session.access_token);
+                            log::debug!("Session added to cache: {}", session_id);
                         }
-                    },
-                    Err(e) => {
-                        log::error!("Error getting value: {e}");
-                        continue;
                     }
-                };
-                if item_value.is_empty() {
-                    continue;
+                    Ok(None) => {
+                        log::warn!("Session not found in DB: {}", session_id);
+                    }
+                    Err(e) => {
+                        log::error!("Error fetching session {}: {}", session_id, e);
+                    }
                 }
-                USER_SESSIONS.insert(item_key.to_string(), item_value);
             }
-            db::Event::Delete(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
-                USER_SESSIONS.remove(item_key);
+            infra::db::Event::Delete(ev) => {
+                let session_id = ev.key.strip_prefix(key).unwrap();
+                USER_SESSIONS.remove(session_id);
+                log::debug!("Session removed from cache: {}", session_id);
             }
-            db::Event::Empty => {}
+            infra::db::Event::Empty => {}
         }
     }
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let key = USER_SESSION_KEY;
-    let ret = db::list(key).await?;
-    for (item_key, item_value) in ret {
-        let session_id = item_key.strip_prefix(key).unwrap();
-        let json_val: String = match json::from_slice(&item_value) {
-            Ok(val) => val,
-            Err(_) => {
-                continue;
-            }
-        };
-        if json_val.is_empty() {
-            continue;
+    let sessions_list = infra::table::sessions::list().await?;
+
+    for session in sessions_list {
+        if !session.access_token.is_empty() {
+            USER_SESSIONS.insert(session.session_id, session.access_token);
         }
-        USER_SESSIONS.insert(session_id.to_owned(), json_val);
     }
-    log::info!("User Sessions Cached");
+
+    log::info!(
+        "User Sessions Cached: {} sessions loaded",
+        USER_SESSIONS.len()
+    );
     Ok(())
 }
