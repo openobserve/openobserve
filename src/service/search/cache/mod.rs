@@ -1055,29 +1055,43 @@ pub async fn write_results(
         let first_bucket_ts = get_ts_value(ts_column, res.hits.first().unwrap());
         let last_bucket_ts = get_ts_value(ts_column, res.hits.last().unwrap());
 
-        // Align first bucket to interval boundary (round up to ensure complete bucket)
-        let aligned_start = if first_bucket_ts % interval == 0 {
-            first_bucket_ts
-        } else {
-            first_bucket_ts - (first_bucket_ts % interval) + interval
-        };
+        // Bucket timestamps should already be aligned since filtering uses cache_start_boundary
+        // If not aligned, this indicates a data consistency issue
+        if first_bucket_ts % interval != 0 {
+            log::warn!(
+                "[trace_id {trace_id}] First bucket timestamp {} is not aligned to interval {} (remainder: {}). This indicates unexpected data.",
+                first_bucket_ts,
+                interval,
+                first_bucket_ts % interval
+            );
+        }
+        if last_bucket_ts % interval != 0 {
+            log::warn!(
+                "[trace_id {trace_id}] Last bucket timestamp {} is not aligned to interval {} (remainder: {}). This indicates unexpected data.",
+                last_bucket_ts,
+                interval,
+                last_bucket_ts % interval
+            );
+        }
 
-        // For the end boundary, use last_bucket_ts + interval because the bucket
-        // covers [last_bucket_ts, last_bucket_ts + interval)
-        let aligned_end = last_bucket_ts + interval;
+        // Cache start is the first bucket timestamp
+        // Cache end is last_bucket_ts + interval because the bucket covers [last_bucket_ts,
+        // last_bucket_ts + interval)
+        let cache_start = first_bucket_ts;
+        let cache_end = last_bucket_ts + interval;
 
         // Verify we have valid boundaries
-        if aligned_end <= aligned_start {
+        if cache_end <= cache_start {
             log::info!(
-                "[trace_id {trace_id}] No valid histogram intervals after alignment (first_bucket: {}, last_bucket: {}, aligned: {}-{}), skipping caching",
+                "[trace_id {trace_id}] No valid histogram intervals (first_bucket: {}, last_bucket: {}, cache: {}-{}), skipping caching",
                 first_bucket_ts,
                 last_bucket_ts,
-                aligned_start,
-                aligned_end
+                cache_start,
+                cache_end
             );
             return;
         }
-        (aligned_start, aligned_end)
+        (cache_start, cache_end)
     } else {
         (final_start_time, final_end_time)
     };
