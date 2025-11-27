@@ -27,8 +27,8 @@
   "dependencies": {
     "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
     "@joakimono/echarts-extension-leaflet": "^1.0.2",
-    "@openobserve/browser-logs": "^0.2.11",
-    "@openobserve/browser-rum": "^0.2.11",
+    "@openobserve/browser-logs": "^0.2.12-beta.1",
+    "@openobserve/browser-rum": "^0.2.12-beta.1",
     "@openobserve/node-sql-parser": "^0.1.5",
     "@openobserve/rrweb-player": "^0.1.1",
     "@quasar/extras": "^1.16.16",
