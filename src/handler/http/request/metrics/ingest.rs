@@ -22,8 +22,10 @@ use config::meta::stream::StreamType;
 #[cfg(feature = "cloud")]
 use crate::service::ingestion::check_ingestion_allowed;
 use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
-    handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
+    handler::http::{
+        extractors::Headers, request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+    },
     service::metrics,
 };
 
@@ -110,6 +112,7 @@ pub async fn json(org_id: web::Path<String>, body: web::Bytes) -> Result<HttpRes
 #[post("/{org_id}/v1/metrics")]
 pub async fn otlp_metrics_write(
     org_id: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
     req: HttpRequest,
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
@@ -121,6 +124,7 @@ pub async fn otlp_metrics_write(
     };
 
     let org_id = org_id.into_inner();
+    let user_email = &user_email.user_id;
 
     #[cfg(feature = "cloud")]
     match check_ingestion_allowed(&org_id, StreamType::Metrics, None).await {
@@ -137,9 +141,9 @@ pub async fn otlp_metrics_write(
 
     let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
     let mut resp = if content_type.eq(CONTENT_TYPE_PROTO) {
-        metrics::otlp::otlp_proto(&org_id, body).await?
+        metrics::otlp::otlp_proto(&org_id, body, user_email).await?
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
-        metrics::otlp::otlp_json(&org_id, body).await?
+        metrics::otlp::otlp_json(&org_id, body, user_email).await?
     } else {
         HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST,

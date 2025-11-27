@@ -54,11 +54,17 @@ impl TraceService for TraceServer {
             in_stream_name = Some(stream_name.to_str().unwrap());
         };
 
+        let user_email = metadata
+            .get("user_id")
+            .and_then(|id| id.to_str())
+            .unwrap_or_default();
+
         let resp = handle_otlp_request(
             org_id.unwrap().to_str().unwrap(),
             in_req,
             OtlpRequestType::Grpc,
             in_stream_name,
+            user_email,
         )
         .await;
         if resp.is_ok() {
