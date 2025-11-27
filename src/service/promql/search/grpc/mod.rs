@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::HashSet,
     sync::Arc,
     time::{Duration, UNIX_EPOCH},
 };
@@ -23,16 +22,18 @@ use async_trait::async_trait;
 use config::{
     meta::{
         promql::value,
-        search::ScanStats,
+        search::{ScanStats, SearchEventType},
         stream::{FileKey, PartitionTimeLevel, StreamType},
     },
     utils::time::{now_micros, second_micros},
 };
 use datafusion::{arrow::datatypes::Schema, error::DataFusionError, prelude::SessionContext};
+use hashbrown::HashSet;
 use infra::errors::Result;
 use promql_parser::{label::Matchers, parser};
 use proto::cluster_rpc;
 use rayon::slice::ParallelSliceMut;
+use tokio::sync::mpsc;
 
 use crate::service::{
     promql::{DEFAULT_LOOKBACK, PromqlContext, TableProvider, name_visitor},
@@ -55,10 +56,10 @@ impl TableProvider for StorageProvider {
         stream_name: &str,
         time_range: (i64, i64),
         matchers: Matchers,
-        label_selector: Option<HashSet<String>>,
+        label_selector: HashSet<String>,
         filters: &mut [(String, Vec<String>)],
     ) -> datafusion::error::Result<Vec<(SessionContext, Arc<Schema>, ScanStats)>> {
-        let mut resp = Vec::new();
+        let mut ctxs = Vec::new();
         // register storage table
         let trace_id = self.trace_id.to_owned() + "-storage-" + stream_name;
         let ctx = storage::create_context(
@@ -71,7 +72,7 @@ impl TableProvider for StorageProvider {
         )
         .await?;
         if let Some(ctx) = ctx {
-            resp.push(ctx);
+            ctxs.push(ctx);
         }
 
         // register Wal table
@@ -87,10 +88,10 @@ impl TableProvider for StorageProvider {
             )
             .await?;
             for ctx in wal_ctx_list {
-                resp.push(ctx);
+                ctxs.push(ctx);
             }
         }
-        Ok(resp)
+        Ok(ctxs)
     }
 }
 
@@ -99,7 +100,7 @@ pub async fn search(
     req: &cluster_rpc::MetricsQueryRequest,
 ) -> Result<cluster_rpc::MetricsQueryResponse> {
     let cfg = config::get_config();
-    let start_time = std::time::Instant::now();
+    let start_ts = std::time::Instant::now();
     let query = req.query.as_ref().unwrap();
 
     let start = query.start;
@@ -113,7 +114,7 @@ pub async fn search(
         results.push(search_inner(req).await?);
     } else {
         // 1. get max records stream
-        let start_time = std::time::Instant::now();
+        let start_ts = std::time::Instant::now();
         let file_list = match get_max_file_list(&trace_id, org_id, &query.query, start, end).await {
             Ok(v) => v,
             Err(e) => {
@@ -125,11 +126,11 @@ pub async fn search(
         };
         log::info!(
             "[trace_id {trace_id}] promql->search->grpc: get max records stream, took: {} ms",
-            start_time.elapsed().as_millis()
+            start_ts.elapsed().as_millis()
         );
 
         // 2. generate search group with max records stream
-        let start_time = std::time::Instant::now();
+        let start_ts = std::time::Instant::now();
         let memory_limit = cfg.memory_cache.datafusion_max_size; // bytes
         let group = match generate_search_group(memory_limit, file_list, start, end, step).await {
             Ok(v) => v,
@@ -145,7 +146,7 @@ pub async fn search(
         }
         log::info!(
             "[trace_id {trace_id}] promql->search->grpc: generate search group, took: {} ms",
-            start_time.elapsed().as_millis()
+            start_ts.elapsed().as_millis()
         );
 
         // 3. search each group
@@ -158,7 +159,7 @@ pub async fn search(
             let resp = search_inner(&req).await?;
             log::info!(
                 "[trace_id {trace_id}] promql->search->grpc: group[{start}, {end}] get resp, took: {} ms",
-                start_time.elapsed().as_millis()
+                start_ts.elapsed().as_millis()
             );
             results.push(resp);
         }
@@ -166,13 +167,13 @@ pub async fn search(
 
     let mut resp = cluster_rpc::MetricsQueryResponse {
         job: req.job.clone(),
-        took: start_time.elapsed().as_millis() as i32,
+        took: start_ts.elapsed().as_millis() as i32,
         result_type: results[0].1.clone(),
         ..Default::default()
     };
 
     let mut scan_stats = ScanStats::default();
-    for (value, _, stats) in results {
+    for (value, _result_type, stats, _took) in results {
         add_value(&mut resp, value);
         scan_stats.add(&stats);
     }
@@ -181,10 +182,132 @@ pub async fn search(
     Ok(resp)
 }
 
+#[tracing::instrument(name = "promql:search:grpc:data", skip_all, fields(org_id = req.org_id))]
+pub async fn data(
+    req: &cluster_rpc::MetricsQueryRequest,
+    tx: mpsc::Sender<Result<cluster_rpc::MetricsQueryResponse, tonic::Status>>,
+) -> Result<()> {
+    let cfg = config::get_config();
+    let query = req.query.as_ref().unwrap();
+
+    let start = query.start;
+    let end = query.end;
+    let step = query.step;
+    let trace_id = req.job.as_ref().unwrap().trace_id.to_string();
+    let org_id = &req.org_id;
+
+    let (data_tx, mut data_rx) = mpsc::channel::<(value::Value, String, ScanStats, i64)>(2);
+    let data_trace_id = trace_id.clone();
+    let job = req.job.clone();
+    tokio::task::spawn(async move {
+        loop {
+            match data_rx.recv().await {
+                None => {
+                    log::info!("[trace_id {data_trace_id}] promql->data->grpc: data streaming end");
+                    break;
+                }
+                Some((value, result_type, stats, took)) => {
+                    let mut resp = cluster_rpc::MetricsQueryResponse {
+                        job: job.clone(),
+                        took: took as i32,
+                        result_type: result_type.clone(),
+                        ..Default::default()
+                    };
+
+                    add_value(&mut resp, value);
+                    resp.scan_stats = Some(cluster_rpc::ScanStats::from(&stats));
+                    if let Err(e) = tx.send(Ok(resp)).await {
+                        log::error!(
+                            "[trace_id {data_trace_id}] promql->data->grpc: group[{start}, {end}] data streaming error: {e}",
+                        );
+                    }
+                }
+            }
+        }
+    });
+
+    let start_ts = std::time::Instant::now();
+    if start == end {
+        let ret = search_inner(req).await?;
+        if let Err(e) = data_tx.send(ret).await {
+            log::error!("[trace_id {trace_id}] promql->data->grpc: send data error: {e}");
+        }
+        log::info!(
+            "[trace_id {trace_id}] promql->data->grpc: get data done, took: {} ms",
+            start_ts.elapsed().as_millis()
+        );
+        return Ok(());
+    }
+    // 1. get max records stream
+    let file_list = match get_max_file_list(&trace_id, org_id, &query.query, start, end).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!(
+                "[trace_id {trace_id}] promql->data->grpc: get max records stream error: {e}"
+            );
+            return Err(e);
+        }
+    };
+    log::info!(
+        "[trace_id {trace_id}] promql->data->grpc: get max records stream, took: {} ms",
+        start_ts.elapsed().as_millis()
+    );
+
+    // 2. generate search group with max records stream
+    let start_ts = std::time::Instant::now();
+    let memory_limit = cfg.memory_cache.datafusion_max_size; // bytes
+    let group = match generate_search_group(memory_limit, file_list, start, end, step).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!(
+                "[trace_id {trace_id}] promql->data->grpc: generate search group error: {e}"
+            );
+            return Err(e);
+        }
+    };
+    if group.len() > 1 {
+        log::info!("[trace_id {trace_id}] promql->data->grpc: get groups {group:?}");
+    }
+    log::info!(
+        "[trace_id {trace_id}] promql->data->grpc: generate data group, took: {} ms",
+        start_ts.elapsed().as_millis()
+    );
+
+    // 3. search each group
+    for (start, end) in group {
+        let mut req = req.clone();
+        req.need_wal =
+            end >= now_micros() - second_micros(cfg.limit.max_file_retention_time as i64 * 3);
+        req.query.as_mut().unwrap().start = start;
+        req.query.as_mut().unwrap().end = end;
+        let resp = search_inner(&req).await?;
+        log::info!(
+            "[trace_id {trace_id}] promql->data->grpc: group[{start}, {end}] get resp, took: {} ms",
+            start_ts.elapsed().as_millis()
+        );
+        if let Err(e) = data_tx.send(resp).await {
+            log::error!(
+                "[trace_id {trace_id}] promql->data->grpc: group[{start}, {end}] send data error: {e}"
+            );
+            return Err(infra::errors::Error::Message(format!(
+                "Send to stream error: {e}"
+            )));
+        }
+    }
+
+    log::info!(
+        "[trace_id {trace_id}] promql->data->grpc: get data done, took: {} ms",
+        start_ts.elapsed().as_millis()
+    );
+
+    Ok(())
+}
+
 #[tracing::instrument(name = "promql:search:grpc:search_inner", skip_all, fields(org_id = req.org_id))]
 pub async fn search_inner(
     req: &cluster_rpc::MetricsQueryRequest,
-) -> Result<(value::Value, String, ScanStats)> {
+) -> Result<(value::Value, String, ScanStats, i64)> {
+    let start = std::time::Instant::now();
     let trace_id = req.job.as_ref().unwrap().trace_id.to_string();
     let org_id = &req.org_id;
     let query = req.query.as_ref().unwrap();
@@ -208,14 +331,26 @@ pub async fn search_inner(
         config::get_config().limit.query_timeout
     };
 
+    let query_ctx = Arc::new(value::QueryContext {
+        trace_id: trace_id.to_string(),
+        org_id: org_id.to_string(),
+        query_exemplars: query.query_exemplars,
+        query_data: query.query_data,
+        need_wal: req.need_wal,
+        use_cache: req.use_cache,
+        timeout,
+        search_event_type: SearchEventType::try_from(req.search_event_type.as_str()).ok(),
+        regions: req.regions.clone(),
+        clusters: req.clusters.clone(),
+        is_super_cluster: req.is_super_cluster,
+    });
     let mut ctx = PromqlContext::new(
-        org_id,
+        query_ctx,
         StorageProvider {
             trace_id: trace_id.to_string(),
             need_wal: req.need_wal,
         },
-        query.query_exemplars,
-        timeout,
+        query.label_selector.clone(),
     );
 
     let (value, result_type, mut scan_stats) = if query.query_exemplars {
@@ -232,7 +367,8 @@ pub async fn search_inner(
     search::datafusion::storage::file_list::clear(&trace_id);
 
     scan_stats.format_to_mb();
-    Ok((value, result_type, scan_stats))
+    let took = start.elapsed().as_millis() as i64;
+    Ok((value, result_type, scan_stats, took))
 }
 
 async fn get_max_file_list(
