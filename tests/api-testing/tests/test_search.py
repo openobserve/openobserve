@@ -1434,7 +1434,7 @@ def test_e2e_camel_case_edge_cases(create_session, base_url):
     org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
-    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    three_days_ago = int((now - timedelta(days=3)).timestamp() * 1000000)
 
     # Test cases for edge case scenarios
     test_cases = [
@@ -1480,7 +1480,7 @@ def test_e2e_camel_case_edge_cases(create_session, base_url):
         json_data = {
             "query": {
                 "sql": f"SELECT * FROM \"stream_pytest_data\" WHERE match_all('{test_case['search_term']}')",
-                "start_time": one_min_ago,
+                "start_time": three_days_ago,
                 "end_time": end_time,
                 "from": 0,
                 "size": 50,
@@ -1519,7 +1519,7 @@ def test_e2e_camel_case_backward_compatibility(create_session, base_url):
     org_id = "default" 
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
-    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    three_days_ago = int((now - timedelta(days=3)).timestamp() * 1000000)
 
     # Test existing search patterns to ensure backward compatibility
     compatibility_tests = [
@@ -1545,7 +1545,7 @@ def test_e2e_camel_case_backward_compatibility(create_session, base_url):
         json_data = {
             "query": {
                 "sql": f"SELECT * FROM \"stream_pytest_data\" WHERE match_all('{test_case['search_term']}')",
-                "start_time": one_min_ago,
+                "start_time": three_days_ago,
                 "end_time": end_time,
                 "from": 0,
                 "size": 50,

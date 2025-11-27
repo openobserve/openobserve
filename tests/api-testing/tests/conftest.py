@@ -7,6 +7,9 @@ import logging
 from pathlib import Path
 import base64
 
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 BASE_URL = os.environ["ZO_BASE_URL"]
 root_dir = Path(__file__).parent.parent.parent
 
