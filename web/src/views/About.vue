@@ -244,11 +244,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <tbody>
                       <tr>
                         <td class="tw-font-semibold">Ingestion Type</td>
-                        <td>{{ licenseData.license.limits?.Ingestion?.typ || 'PerDayCount' }}</td>
+                        <td>{{ !licenseData?.expired && licenseData.license.limits?.Ingestion?.typ ? licenseData.license.limits.Ingestion.typ : 'PerDayCount' }}</td>
                       </tr>
                       <tr>
                         <td class="tw-font-semibold">Ingestion Limit</td>
-                        <td>{{ licenseData.license.limits?.Ingestion?.value ? `${licenseData.license.limits.Ingestion.value} GB / day` : '100 GB / day' }}</td>
+                        <td>{{ !licenseData?.expired && licenseData.license.limits?.Ingestion?.value ? `${licenseData.license.limits.Ingestion.value} GB / day` : '100 GB / day' }}</td>
                       </tr>
                       <tr v-if="licenseData.ingestion_used !== undefined">
                         <td class="tw-font-semibold">Today's Usage</td>
@@ -331,7 +331,10 @@ export default defineComponent({
     };
 
     onMounted(() => {
-      loadLicenseData();
+      //we dont need to make licensedata call for cloud 
+      if(config.isCloud == 'false'){
+        loadLicenseData();
+      }
     });
 
     return {
