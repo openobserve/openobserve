@@ -360,7 +360,7 @@ async fn search_in_cluster(
             end,
             step,
             matrix.to_vec(),
-            use_cache, // if the query with use_cache, we should update the exist cache
+            !use_cache, // if the query with use_cache=false, we should update the exist cache
         )
         .await
     {
