@@ -393,7 +393,7 @@ urlencoding = "2.1"
 utoipa = { version = "5", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "9", features = ["actix-web"] }
 uuid = { version = "1.18.1", features = ["v7"] }
-vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", branch = "v0.49.0-24092025" }
-vrl = { version = "0.26.0", features = ["value", "compiler", "test"] }
+vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", branch = "v0.51" }
+vrl = { version = "0.28.1", features = ["arbitrary", "value", "compiler", "test"] }
 zip = "6.0.0"
 zstd = "0.13"
