@@ -15,13 +15,17 @@ service Metrics {
 }
 
 message MetricsQueryRequest {
-    Job                 job = 1;
-    string           org_id = 2;
-    bool           need_wal = 4;
-    MetricsQueryStmt  query = 5;
-    int64           timeout = 8;
-    bool          use_cache = 9;
-    bool  is_super_cluster = 10;
+    Job                   job = 1;
+    string             org_id = 2;
+    bool             need_wal = 4;
+    MetricsQueryStmt    query = 5;
+    int64             timeout = 8;
+    bool            use_cache = 9;
+    string search_event_type = 10;
+    repeated string  regions = 11;
+    repeated string clusters = 12;
+    bool    is_super_cluster = 13;
+
 }
 
 message MetricsQueryStmt {

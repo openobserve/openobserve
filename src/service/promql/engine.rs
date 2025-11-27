@@ -631,6 +631,7 @@ impl Engine {
                 let ret = o2_enterprise::enterprise::metrics::super_cluster::selector_load_data(
                     query_ctx,
                     selector,
+                    range,
                     &label_selector,
                     start,
                     end,
@@ -660,6 +661,20 @@ impl Engine {
                 &mut filters,
             )
             .await?;
+
+        // check if we need to load data from local cluster
+        #[cfg(feature = "enterprise")]
+        let ctxs = if self.ctx.query_ctx.is_super_cluster
+            && !o2_enterprise::enterprise::super_cluster::search::has_local_cluster(
+                self.ctx.query_ctx.regions.clone(),
+                self.ctx.query_ctx.clusters.clone(),
+            )
+            .await
+        {
+            vec![]
+        } else {
+            ctxs
+        };
 
         let mut label_selector = self.label_selector.clone();
         label_selector.extend(self.ctx.label_selector.iter().cloned());
@@ -1181,7 +1196,6 @@ impl Engine {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn selector_load_data_from_datafusion(
     query_ctx: Arc<QueryContext>,
     ctx: SessionContext,
@@ -2978,8 +2992,11 @@ mod tests {
             query_data: false,
             need_wal: false,
             use_cache: false,
-            is_super_cluster: false,
             timeout,
+            search_event_type: None,
+            regions: vec![],
+            clusters: vec![],
+            is_super_cluster: false,
         })
     }
 

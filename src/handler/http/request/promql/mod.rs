@@ -248,6 +248,9 @@ async fn query(
         step: 300_000_000, // 5m
         query_exemplars: false,
         use_cache: None,
+        search_type: None,
+        regions: vec![],
+        clusters: vec![],
     };
 
     search(&trace_id, org_id, req, user_email, timeout).await
@@ -598,6 +601,9 @@ async fn query_range(
         step,
         query_exemplars,
         use_cache: req.use_cache,
+        search_type: req.search_type,
+        regions: req.regions,
+        clusters: req.clusters,
     };
     if let Some(use_streaming) = req.use_streaming
         && use_streaming

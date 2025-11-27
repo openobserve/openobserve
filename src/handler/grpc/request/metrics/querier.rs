@@ -89,6 +89,18 @@ impl Metrics for MetricsQuerier {
         let mut req: MetricsQueryRequest = req.into_inner();
         req.query.as_mut().unwrap().query_data = true;
 
+        log::info!(
+            "[trace_id {}] promql->data->grpc: org_id: {}, use_cache: {}, time_range: [{},{}), step: {}, query: {}, label_selector: {:?}",
+            req.job.as_ref().unwrap().trace_id,
+            req.org_id,
+            req.use_cache,
+            req.query.as_ref().unwrap().start,
+            req.query.as_ref().unwrap().end,
+            req.query.as_ref().unwrap().step,
+            req.query.as_ref().unwrap().query,
+            req.query.as_ref().unwrap().label_selector,
+        );
+
         // spawn a task to push streaming responses
         tokio::task::spawn(async move {
             if let Err(e) = crate::service::promql::search::grpc::data(&req, tx).await {

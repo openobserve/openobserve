@@ -19,7 +19,7 @@ use std::{
 };
 
 use async_trait::async_trait;
-use config::meta::search::ScanStats;
+use config::meta::search::{ScanStats, SearchEventType};
 use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContext};
 use hashbrown::HashSet;
 use promql_parser::label::Matchers;
@@ -69,6 +69,9 @@ pub struct MetricsQueryRequest {
     pub step: i64,
     pub query_exemplars: bool,
     pub use_cache: Option<bool>,
+    pub search_type: Option<SearchEventType>,
+    pub regions: Vec<String>,
+    pub clusters: Vec<String>,
 }
 
 /// Converts `t` to the number of microseconds elapsed since the beginning of

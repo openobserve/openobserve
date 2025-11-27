@@ -492,7 +492,13 @@ pub struct MetricsQueryRequest {
     pub timeout: i64,
     #[prost(bool, tag = "9")]
     pub use_cache: bool,
-    #[prost(bool, tag = "10")]
+    #[prost(string, tag = "10")]
+    pub search_event_type: ::prost::alloc::string::String,
+    #[prost(string, repeated, tag = "11")]
+    pub regions: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(string, repeated, tag = "12")]
+    pub clusters: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(bool, tag = "13")]
     pub is_super_cluster: bool,
 }
 #[derive(serde::Serialize)]

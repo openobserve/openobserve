@@ -99,16 +99,15 @@ async fn search_in_cluster(
         label_selector: _,
     } = req.query.as_ref().unwrap();
 
-    // cache disabled if result cache is disabled or use_cache is false or start == end or step == 0
-    let cache_disabled =
-        !cfg.common.result_cache_enabled || !req.use_cache || start == end || step == 0;
+    // cache enabled if result cache is enabled and use_cache is true and start != end
+    let use_cache = cfg.common.result_cache_enabled && req.use_cache && start != end;
     // adjust start and end time
     let (start, end) = adjust_start_end(start, end, step);
 
     log::info!(
         "[trace_id {trace_id}] promql->search->start: org_id: {}, use_cache: {}, time_range: [{},{}), step: {}, query: {}",
         req.org_id,
-        !cache_disabled,
+        use_cache,
         start,
         end,
         step,
@@ -138,7 +137,7 @@ async fn search_in_cluster(
 
     // get cache data
     let original_start = start;
-    let (start, cached_values) = if cache_disabled {
+    let (start, cached_values) = if !use_cache {
         (start, vec![])
     } else {
         let start_time = std::time::Instant::now();
@@ -361,7 +360,7 @@ async fn search_in_cluster(
             end,
             step,
             matrix.to_vec(),
-            cache_disabled, // if the query with cache_disabled, we should update the exist cache
+            use_cache, // if the query with use_cache, we should update the exist cache
         )
         .await
     {

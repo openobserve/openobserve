@@ -22,7 +22,7 @@ use async_trait::async_trait;
 use config::{
     meta::{
         promql::value,
-        search::ScanStats,
+        search::{ScanStats, SearchEventType},
         stream::{FileKey, PartitionTimeLevel, StreamType},
     },
     utils::time::{now_micros, second_micros},
@@ -338,8 +338,11 @@ pub async fn search_inner(
         query_data: query.query_data,
         need_wal: req.need_wal,
         use_cache: req.use_cache,
-        is_super_cluster: req.is_super_cluster,
         timeout,
+        search_event_type: SearchEventType::try_from(req.search_event_type.as_str()).ok(),
+        regions: req.regions.clone(),
+        clusters: req.clusters.clone(),
+        is_super_cluster: req.is_super_cluster,
     });
     let mut ctx = PromqlContext::new(
         query_ctx,

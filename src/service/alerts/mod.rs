@@ -183,6 +183,9 @@ impl QueryConditionExt for QueryCondition {
                     ),
                     query_exemplars: false,
                     use_cache: None,
+                    search_type: Some(SearchEventType::Alerts),
+                    regions: vec![],
+                    clusters: vec![],
                 };
                 // check super cluster
                 #[cfg(not(feature = "enterprise"))]
