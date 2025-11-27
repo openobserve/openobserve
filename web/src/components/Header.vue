@@ -45,9 +45,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Custom logo image - shows appropriate logo based on current theme -->
        <div class="tw-flex tw-items-center">
+        <!-- Dark mode: Show dark logo, fallback to light logo -->
         <img
           v-if="
             store.state.theme === 'dark' &&
+            store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
+            store.state.zoConfig?.custom_logo_dark_img != null
+          "
+          :src="
+            `data:image; base64, ` + store.state.zoConfig?.custom_logo_dark_img
+          "
+          style="max-width: 150px; max-height: 32px;"
+        />
+        <!-- Light mode: Show light logo, fallback to dark logo -->
+        <img
+          v-else-if="
+            store.state.theme === 'light' &&
+            store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
+            store.state.zoConfig?.custom_logo_img != null
+          "
+          :src="
+            `data:image; base64, ` + store.state.zoConfig?.custom_logo_img
+          "
+          style="max-width: 150px; max-height: 32px;"
+        />
+        <!-- Fallback: Show whichever logo exists (dark or light) -->
+        <img
+          v-else-if="
             store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
             store.state.zoConfig?.custom_logo_dark_img != null
           "
