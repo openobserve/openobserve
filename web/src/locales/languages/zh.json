@@ -1240,7 +1240,8 @@
     "domainSettingsSaved": "域名设置已成功保存",
     "errorSavingDomainSettings": "保存域名设置时出错",
     "noDomainMessage": "未配置任何域。在上方添加域名以限制访问权限。",
-    "license": "执照"
+    "license": "执照",
+    "alertCorrelation": "重复数据删除警报"
   },
   "iam": {
     "users": "用户",
@@ -1298,7 +1299,8 @@
     "view": "查看",
     "delay": "延迟",
     "history": "管道历史",
-    "searchHistory": "输入管道名称"
+    "searchHistory": "输入管道名称",
+    "destination_type": "目的地类型"
   },
   "reports": {
     "header": "报表",
@@ -1583,5 +1585,47 @@
   },
   "alert_list": {
     "alert_details": "警报详情"
+  },
+  "latencyInsights": {
+    "title": "见解",
+    "tabLabel": "延迟",
+    "analyzeButton": "延迟分析",
+    "analyzeTooltip": "分析跟踪维度的延迟模式",
+    "compareToLabel": "比较一下：",
+    "fullTimeRange": "全时段",
+    "beforePeriod": "在选定时间段之前",
+    "afterPeriod": "在选定时间段之后",
+    "durationLabel": "时长：",
+    "analyzingDimensions": "正在分析维度...",
+    "computingDistributions": "计算 {count} 维度的频率分布",
+    "failedToLoad": "加载分析失败",
+    "retryButton": "重试",
+    "percentileLabel": "延迟百分比",
+    "p50Median": "P50（中位数）",
+    "p75": "P75",
+    "p95": "P95",
+    "p99": "P99",
+    "dimensionsButton": "字段 ({count})",
+    "dimensionsTooltip": "添加或移除要分析的维度",
+    "selectDimensions": "选择字段",
+    "analyzeButtonLabel": "分析",
+    "refreshTooltip": "使用更新的百分位数刷新分析",
+    "customSQLFieldsDisabled": "字段选择不适用于自定义 SQL 查询。维度是从您的查询结果中提取的。",
+    "timeRangeSelected": "时间范围已选择"
+  },
+  "volumeInsights": {
+    "title": "见解",
+    "tabLabel": "费率",
+    "analyzeButton": "费率分析",
+    "analyzeTooltip": "分析各个维度的追踪率模式",
+    "analyzeTooltipLogs": "分析当前时间范围内的维度分布",
+    "rateLabel": "费率：",
+    "timeRangeLabel": "时间范围："
+  },
+  "errorInsights": {
+    "title": "见解",
+    "tabLabel": "错误",
+    "errorSpikePeriod": "错误峰值周期：",
+    "errorsGreaterThan": "错误 >="
   }
 }
