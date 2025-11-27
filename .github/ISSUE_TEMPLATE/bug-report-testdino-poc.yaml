@@ -29,6 +29,8 @@ body:
         - P1 - High
         - P2 - Medium
         - P3 - Low
+    validations:
+      required: true
 
   - type: dropdown
     id: severity
@@ -40,6 +42,8 @@ body:
         - Major
         - Minor
         - Trivial
+    validations:
+      required: true
 
   - type: input
     id: related-story
