@@ -1755,9 +1755,15 @@ def test_e2e_camel_case_full_token_search(create_session, base_url):
     }
     
     resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-    assert resp.status_code == 200
+    if resp.status_code != 200:
+        print(f"DEBUG DbException: Status {resp.status_code}, Response: {resp.text}")
+    assert resp.status_code == 200, f"DbException test failed - Status {resp.status_code}: {resp.text}"
     
-    hits = resp.json()["hits"]
+    response_data = resp.json()
+    hits = response_data["hits"]
+    print(f"DEBUG DbException: Found {len(hits)} hits, Total: {response_data.get('total', 0)}")
+    if len(hits) == 0:
+        print(f"DEBUG DbException: Full response: {response_data}")
     assert len(hits) > 0, "Should find logs containing 'DbException'"
 
 
@@ -1780,9 +1786,15 @@ def test_e2e_camel_case_atomic_token_search(create_session, base_url):
     }
     
     resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-    assert resp.status_code == 200
+    if resp.status_code != 200:
+        print(f"DEBUG UserAccountService: Status {resp.status_code}, Response: {resp.text}")
+    assert resp.status_code == 200, f"UserAccountService test failed - Status {resp.status_code}: {resp.text}"
     
-    hits = resp.json()["hits"]
+    response_data = resp.json()
+    hits = response_data["hits"]
+    print(f"DEBUG UserAccountService: Found {len(hits)} hits, Total: {response_data.get('total', 0)}")
+    if len(hits) == 0:
+        print(f"DEBUG UserAccountService: Full response: {response_data}")
     assert len(hits) > 0, "Should find logs containing 'UserAccountService'"
 
 
@@ -1805,9 +1817,15 @@ def test_e2e_camel_case_xml_acronym_search(create_session, base_url):
     }
     
     resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-    assert resp.status_code == 200
+    if resp.status_code != 200:
+        print(f"DEBUG XMLHttpRequest: Status {resp.status_code}, Response: {resp.text}")
+    assert resp.status_code == 200, f"XMLHttpRequest test failed - Status {resp.status_code}: {resp.text}"
     
-    hits = resp.json()["hits"]
+    response_data = resp.json()
+    hits = response_data["hits"]
+    print(f"DEBUG XMLHttpRequest: Found {len(hits)} hits, Total: {response_data.get('total', 0)}")
+    if len(hits) == 0:
+        print(f"DEBUG XMLHttpRequest: Full response: {response_data}")
     assert len(hits) > 0, "Should find logs containing 'XMLHttpRequest'"
 
 
@@ -1830,9 +1848,15 @@ def test_e2e_camel_case_oauth2_number_search(create_session, base_url):
     }
     
     resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-    assert resp.status_code == 200
+    if resp.status_code != 200:
+        print(f"DEBUG OAuth2TokenHandler: Status {resp.status_code}, Response: {resp.text}")
+    assert resp.status_code == 200, f"OAuth2TokenHandler test failed - Status {resp.status_code}: {resp.text}"
     
-    hits = resp.json()["hits"]
+    response_data = resp.json()
+    hits = response_data["hits"]
+    print(f"DEBUG OAuth2TokenHandler: Found {len(hits)} hits, Total: {response_data.get('total', 0)}")
+    if len(hits) == 0:
+        print(f"DEBUG OAuth2TokenHandler: Full response: {response_data}")
     assert len(hits) > 0, "Should find logs containing 'OAuth2TokenHandler'"
 
 
@@ -1855,7 +1879,13 @@ def test_e2e_camel_case_multi_token_search(create_session, base_url):
     }
     
     resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-    assert resp.status_code == 200
+    if resp.status_code != 200:
+        print(f"DEBUG UserManagementService: Status {resp.status_code}, Response: {resp.text}")
+    assert resp.status_code == 200, f"UserManagementService test failed - Status {resp.status_code}: {resp.text}"
     
-    hits = resp.json()["hits"]
+    response_data = resp.json()
+    hits = response_data["hits"]
+    print(f"DEBUG UserManagementService: Found {len(hits)} hits, Total: {response_data.get('total', 0)}")
+    if len(hits) == 0:
+        print(f"DEBUG UserManagementService: Full response: {response_data}")
     assert len(hits) > 0, "Should find logs containing 'UserManagementService'"
