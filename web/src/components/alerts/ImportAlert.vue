@@ -1001,29 +1001,36 @@ export default defineComponent({
       // VERSION DETECTION AND CONVERSION
       // Convert V0 and V1 conditions to V2 format before creating alert
       if (input.query_condition && input.query_condition.conditions) {
-        // Check if version field is already present (V2)
-        if (input.query_condition.version !== "2" && input.query_condition.version !== 2) {
-          const version = detectConditionsVersion(input.query_condition.conditions);
+        let convertedConditions = input.query_condition.conditions;
 
-          if (version === 0) {
-            // V0: Flat array format - convert to V2
-            input.query_condition.conditions = convertV0ToV2(input.query_condition.conditions);
-            input.query_condition.version = "2";
-          } else if (version === 1) {
-            // V1: Tree-based format - convert to V2
-            if (input.query_condition.conditions.and || input.query_condition.conditions.or) {
-              // V1 Backend format
-              input.query_condition.conditions = convertV1BEToV2(input.query_condition.conditions);
-            } else if (input.query_condition.conditions.label && input.query_condition.conditions.items) {
-              // V1 Frontend format
-              input.query_condition.conditions = convertV1ToV2(input.query_condition.conditions);
-            }
-            input.query_condition.version = "2";
-          } else if (version === 2) {
-            // V2: Already in correct format, just add version field
-            input.query_condition.version = "2";
+        // Check if it's already wrapped with version
+        if (convertedConditions.version === 2 || convertedConditions.version === "2") {
+          // Already wrapped, extract the inner conditions for detection
+          convertedConditions = convertedConditions.conditions;
+        }
+
+        const version = detectConditionsVersion(convertedConditions);
+
+        if (version === 0) {
+          // V0: Flat array format - convert to V2
+          convertedConditions = convertV0ToV2(convertedConditions);
+        } else if (version === 1) {
+          // V1: Tree-based format - convert to V2
+          if (convertedConditions.and || convertedConditions.or) {
+            // V1 Backend format
+            convertedConditions = convertV1BEToV2(convertedConditions);
+          } else if (convertedConditions.label && convertedConditions.items) {
+            // V1 Frontend format
+            convertedConditions = convertV1ToV2(convertedConditions);
           }
         }
+        // For version === 2, convertedConditions is already in correct format
+
+        // Backend expects: query_condition: { conditions: { version: 2, conditions: {...} } }
+        input.query_condition.conditions = {
+          version: 2,
+          conditions: convertedConditions,
+        };
       }
 
       try {
