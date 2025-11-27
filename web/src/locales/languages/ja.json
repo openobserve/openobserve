@@ -1258,7 +1258,8 @@
     "domainSettingsSaved": "ドメイン設定は正常に保存されました",
     "errorSavingDomainSettings": "ドメイン設定を保存中にエラーが発生しました",
     "noDomainMessage": "ドメインが設定されていません。上記にドメインを追加してアクセスを制限してください。",
-    "license": "ライセンス"
+    "license": "ライセンス",
+    "alertCorrelation": "アラート重複排除"
   },
   "iam": {
     "users": "ユーザー",
@@ -1316,7 +1317,8 @@
     "view": "表示",
     "delay": "ディレイ",
     "history": "パイプライン履歴",
-    "searchHistory": "パイプライン名を入力"
+    "searchHistory": "パイプライン名を入力",
+    "destination_type": "デスティネーションタイプ"
   },
   "reports": {
     "header": "レポート",
@@ -1580,5 +1582,47 @@
   },
   "alert_list": {
     "alert_details": "アラートの詳細"
+  },
+  "latencyInsights": {
+    "title": "インサイト",
+    "tabLabel": "レイテンシー",
+    "analyzeButton": "レイテンシー分析",
+    "analyzeTooltip": "トレースディメンション全体のレイテンシーパターンを分析",
+    "compareToLabel": "比較対象:",
+    "fullTimeRange": "フルタイムレンジ",
+    "beforePeriod": "選択した期間の前",
+    "afterPeriod": "選択した期間の後",
+    "durationLabel": "所要時間:",
+    "analyzingDimensions": "ディメンションを解析中...",
+    "computingDistributions": "{count} 次元にわたる度数分布の計算",
+    "failedToLoad": "分析を読み込めませんでした",
+    "retryButton": "リトライ",
+    "percentileLabel": "レイテンシーパーセンタイル",
+    "p50Median": "P50 (中央値)",
+    "p75": "75",
+    "p95": "95",
+    "p99": "99",
+    "dimensionsButton": "フィールド ({count})",
+    "dimensionsTooltip": "分析するディメンションを追加または削除する",
+    "selectDimensions": "[フィールドを選択]",
+    "analyzeButtonLabel": "分析",
+    "refreshTooltip": "パーセンタイルを更新して分析を更新",
+    "customSQLFieldsDisabled": "フィールド選択はカスタム SQL クエリでは使用できません。ディメンションはクエリ結果から抽出されます。",
+    "timeRangeSelected": "選択した時間範囲"
+  },
+  "volumeInsights": {
+    "title": "インサイト",
+    "tabLabel": "レート",
+    "analyzeButton": "レート分析",
+    "analyzeTooltip": "さまざまなディメンションにわたるトレースレートパターンを分析",
+    "analyzeTooltipLogs": "現在の時間範囲のディメンション分布を分析",
+    "rateLabel": "レート:",
+    "timeRangeLabel": "時間範囲:"
+  },
+  "errorInsights": {
+    "title": "インサイト",
+    "tabLabel": "エラー",
+    "errorSpikePeriod": "エラースパイク期間:",
+    "errorsGreaterThan": "エラー >="
   }
 }
