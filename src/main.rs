@@ -321,7 +321,10 @@ async fn main() -> Result<(), anyhow::Error> {
 
             // init service graph workers
             #[cfg(feature = "enterprise")]
-            if cfg.service_graph.enabled {
+            if o2_enterprise::enterprise::common::config::get_config()
+                .service_graph
+                .enabled
+            {
                 log::info!("Initializing service graph background workers");
                 openobserve::service::traces::service_graph::init_background_workers();
             }
