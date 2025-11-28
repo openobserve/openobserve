@@ -59,17 +59,21 @@ use crate::{
 #[post("/{org_id}/prometheus/api/v1/write")]
 pub async fn remote_write(
     org_id: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
     req: HttpRequest,
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
+    let user_email = &user_email.user_id;
     let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
     if content_type == "application/x-protobuf" {
-        Ok(match metrics::prom::remote_write(&org_id, body).await {
-            Ok(_) => HttpResponse::Ok().into(),
-            Err(e) => HttpResponse::BadRequest()
-                .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e)),
-        })
+        Ok(
+            match metrics::prom::remote_write(&org_id, body, user_email).await {
+                Ok(_) => HttpResponse::Ok().into(),
+                Err(e) => HttpResponse::BadRequest()
+                    .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e)),
+            },
+        )
     } else {
         Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST,
