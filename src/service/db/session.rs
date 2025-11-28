@@ -51,16 +51,17 @@ pub async fn get(session_id: &str) -> Result<String, anyhow::Error> {
 pub async fn set(session_id: &str, val: &str) -> Result<(), anyhow::Error> {
     infra::table::sessions::set(session_id, val).await?;
     let key = format!("{USER_SESSION_KEY}{session_id}");
-    let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
+    if let Err(e) = put_into_db_coordinator(&key, Bytes::new(), true, None).await {
+        log::error!("[SESSION] Failed to sync session to coordinator: {key} - {e}");
+    }
 
     #[cfg(feature = "enterprise")]
     if get_o2_config().super_cluster.enabled {
         let _ =
             o2_enterprise::enterprise::super_cluster::queue::put(&key, Bytes::new(), true, None)
                 .await
-                .map_err(|e| {
+                .inspect_err(|e| {
                     log::error!("[SESSION] put to super cluster failed: {key} - {e}");
-                    e
                 });
     }
 
@@ -72,15 +73,16 @@ pub async fn set(session_id: &str, val: &str) -> Result<(), anyhow::Error> {
 pub async fn delete(session_id: &str) -> Result<(), anyhow::Error> {
     infra::table::sessions::delete(session_id).await?;
     let key = format!("{USER_SESSION_KEY}{session_id}");
-    let _ = delete_from_db_coordinator(&key, false, true, None).await;
+    if let Err(e) = delete_from_db_coordinator(&key, false, true, None).await {
+        log::error!("[SESSION] Failed to delete session from coordinator: {key} - {e}");
+    }
 
     #[cfg(feature = "enterprise")]
     if get_o2_config().super_cluster.enabled {
         let _ = o2_enterprise::enterprise::super_cluster::queue::delete(&key, false, true, None)
             .await
-            .map_err(|e| {
+            .inspect_err(|e| {
                 log::error!("[SESSION] delete to super cluster failed: {key} - {e}");
-                e
             });
     }
 
@@ -114,10 +116,17 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         }
                     }
                     Ok(None) => {
-                        log::warn!("Session not found in DB: {}", session_id);
+                        log::warn!(
+                            "Got coordinator message, but session id not found in DB: {}",
+                            session_id
+                        );
                     }
                     Err(e) => {
-                        log::error!("Error fetching session {}: {}", session_id, e);
+                        log::error!(
+                            "Error fetching session after coordinator message {}: {}",
+                            session_id,
+                            e
+                        );
                     }
                 }
             }

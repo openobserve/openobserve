@@ -26,12 +26,20 @@ pub struct Migration;
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         let txn = manager.get_connection().begin().await?;
-        meta::Entity::delete_many()
+        match meta::Entity::delete_many()
             .filter(meta::Column::Module.eq("user_sessions"))
             .exec(&txn)
-            .await?;
-        txn.commit().await?;
-        Ok(())
+            .await
+        {
+            Ok(_) => {
+                txn.commit().await?;
+                Ok(())
+            }
+            Err(e) => {
+                txn.rollback().await?;
+                Err(e)
+            }
+        }
     }
 
     async fn down(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
