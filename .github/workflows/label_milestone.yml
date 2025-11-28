@@ -1,0 +1,38 @@
+name: Auto Label and Milestone
+
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+# on:
+#   pull_request_review:
+#     types: [submitted]
+
+on:
+  pull_request:
+
+jobs:
+  label_and_milestone:
+    if: github.event.review.state == 'approved'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5 
+      - name: add label to PR
+        run: gh pr edit "$NUMBER" --add-label "$LABELS"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.number }}
+          LABELS: Needs-Testing
+      - name: get milestone name
+        run: |
+          echo "MILESTONE=$(node .github/get_next_milestone.js)" >> $GITHUB_ENV
+      - name: add PR to milestone
+        run: gh pr edit "$NUMBER" -m "$MILESTONE"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.number }}
+          MILESTONE: ${{ env.MILESTONE }}
