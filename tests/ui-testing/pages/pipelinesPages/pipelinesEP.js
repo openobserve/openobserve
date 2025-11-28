@@ -118,13 +118,14 @@ export class PipelinesEP {
         await this.page.locator(this.pipelineImportNameInput).click();
         await this.page.locator(this.pipelineImportNameInput).fill(name);
 
-        // Check if stream dropdown is visible for error-0-1
-        const streamDropdown = this.page.locator('[data-test="pipeline-import-error-0-1"]').getByText('arrow_drop_down');
-        const isStreamDropdownVisible = await streamDropdown.isVisible().catch(() => false);
+        // Check if stream dropdown is visible for error-0-1 by checking if error-0-3 exists
+        // If error-0-3 exists, it means we have the new flow with stream dropdown
+        const error03Exists = await this.page.locator('[data-test="pipeline-import-error-0-3"]').count() > 0;
 
-        if (isStreamDropdownVisible) {
+        if (error03Exists) {
             // New flow: Stream dropdown is visible
             // First: Click on the stream dropdown for error-0-1
+            const streamDropdown = this.page.locator('[data-test="pipeline-import-error-0-1"]').getByText('arrow_drop_down');
             await streamDropdown.waitFor({ state: 'visible' });
             await streamDropdown.click();
 
