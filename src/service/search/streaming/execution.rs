@@ -765,6 +765,8 @@ async fn send_partial_search_resp(
 
 /// Clear streaming aggregation cache files for the given streaming_id
 /// This should be called once before processing partitions when clear_cache is true
+#[deprecated]
+#[allow(dead_code)]
 #[cfg(feature = "enterprise")]
 async fn clear_streaming_agg_cache(
     trace_id: &str,
