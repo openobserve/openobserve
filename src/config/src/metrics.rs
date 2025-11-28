@@ -268,6 +268,60 @@ pub static PATTERN_EXTRACTION_TIME: Lazy<HistogramVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// service discovery metrics (enterprise feature)
+pub static SERVICE_STREAMS_SERVICES_DISCOVERED: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "service_streams_services_discovered_total",
+            "Total number of services discovered",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type"],
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_PROCESSING_TIME: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "service_streams_processing_time_seconds",
+            "Service discovery processing time in seconds",
+        )
+        .namespace(NAMESPACE)
+        .buckets(vec![0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0])
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_HIGH_CARDINALITY_BLOCKED: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "service_streams_high_cardinality_blocked_total",
+            "Total number of high-cardinality dimensions blocked",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "dimension"],
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_DIMENSION_CARDINALITY: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "service_streams_dimension_cardinality",
+            "Current cardinality (unique stream count) for each dimension",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "dimension"],
+    )
+    .expect("Metric created")
+});
+
 // querier memory cache stats
 pub static QUERY_MEMORY_CACHE_LIMIT_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
@@ -1353,6 +1407,18 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(PATTERN_EXTRACTION_TIME.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_SERVICES_DISCOVERED.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_PROCESSING_TIME.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_HIGH_CARDINALITY_BLOCKED.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_DIMENSION_CARDINALITY.clone()))
         .expect("Metric registered");
 
     // querier stats

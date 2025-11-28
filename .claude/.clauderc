@@ -7,5 +7,6 @@
 - **Always run non-release builds**: Use `cargo build` without the `--release` flag for all builds
 - **Never build the UI**: The UI is running in dev mode separately, so skip any `npm run build` or UI build steps
 - **Use debug profile**: When running cargo commands (build, test, run, etc.), always use the debug/non-release profile
+- **Always check env file for any enviornment variables**: /Users/ashishkolhe/Documents/github/openobserve/.env
 
 These instructions apply to all cargo operations unless explicitly told otherwise by the user.

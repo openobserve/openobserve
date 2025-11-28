@@ -229,6 +229,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     );
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { db::ai_prompts::watch().await });
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(
+        async move { o2_enterprise::enterprise::service_streams::cache::watch().await },
+    );
 
     // pipeline not used on compactors
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
@@ -278,6 +282,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::ai_prompts::cache()
         .await
         .expect("ai prompts cache failed");
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::service_streams::cache::init_cache()
+        .await
+        .expect("service discovery cache failed");
 
     #[cfg(feature = "enterprise")]
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
@@ -312,6 +320,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { alert_manager::run().await });
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { alert_grouping::process_expired_batches().await });
+    // Note: Service discovery extraction runs automatically during parquet file processing
+    // See src/job/files/parquet.rs:queue_services_from_parquet for implementation
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(async move {
+        o2_enterprise::enterprise::service_streams::batch_processor::run().await
+    });
     tokio::task::spawn(async move { file_downloader::run().await });
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { pipeline::run().await });
