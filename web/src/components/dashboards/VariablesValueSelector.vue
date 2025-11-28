@@ -349,7 +349,7 @@ export default defineComponent({
       response: any,
       variableObject: any,
     ) => {
-      variableLog(variableObject.name, `Received response...`);
+      // variableLog(variableObject.name, `Received response...`);
 
       if (!variableObject) {
         return;
@@ -390,10 +390,10 @@ export default defineComponent({
             (field: any) => field.field === variableObject.query_data.field,
           );
 
-          variableLog(
-            variableObject.name,
-            `Processing response... ${JSON.stringify(fieldHit?.values?.length)}`,
-          );
+          // variableLog(
+          //   variableObject.name,
+          //   `Processing response... ${JSON.stringify(fieldHit?.values?.length)}`,
+          // );
           if (fieldHit) {
             // Initialize options array if it doesn't exist
             if (!Array.isArray(variableObject.options)) {
@@ -404,10 +404,10 @@ export default defineComponent({
               fieldHit.values.length > 0 &&
               variableObject.isVariablePartialLoaded === false;
 
-            variableLog(
-              variableObject.name,
-              `Is first response: ${JSON.stringify(isFirstResponse)}`,
-            );
+            // variableLog(
+            //   variableObject.name,
+            //   `Is first response: ${JSON.stringify(isFirstResponse)}`,
+            // );
 
             // Process the first response
             const newOptions = fieldHit.values
@@ -471,10 +471,10 @@ export default defineComponent({
               a.label.localeCompare(b.label),
             );
 
-            variableLog(
-              variableObject.name,
-              `Received options being set: ${JSON.stringify(variableObject.options)}`,
-            );
+            // variableLog(
+            //   variableObject.name,
+            //   `Received options being set: ${JSON.stringify(variableObject.options)}`,
+            // );
 
             const originalValue = JSON.parse(
               JSON.stringify(variableObject.value),
@@ -483,10 +483,10 @@ export default defineComponent({
             if (isFirstResponse) {
               // Update options and handle first response
               if (oldVariablesData[variableObject.name] !== undefined) {
-                variableLog(
-                  variableObject.name,
-                  `Old values before processing: ${JSON.stringify(oldVariablesData[variableObject.name])}`,
-                );
+                // variableLog(
+                //   variableObject.name,
+                //   `Old values before processing: ${JSON.stringify(oldVariablesData[variableObject.name])}`,
+                // );
 
                 const oldValues = Array.isArray(
                   oldVariablesData[variableObject.name],
@@ -496,10 +496,10 @@ export default defineComponent({
 
                 handleQueryValuesLogic(variableObject, oldValues);
               } else {
-                variableLog(
-                  variableObject.name,
-                  `Old values not found, setting default value`,
-                );
+                // variableLog(
+                //   variableObject.name,
+                //   `Old values not found, setting default value`,
+                // );
 
                 variableObject.value = variableObject.options.length
                   ? variableObject.options[0].value
@@ -681,10 +681,10 @@ export default defineComponent({
           options: item.options || [],
         };
 
-        variableLog(
-          variableData.name,
-          `Initializing with initial value: ${JSON.stringify(initialValue)} and object ${JSON.stringify(variableData)}`,
-        );
+        // variableLog(
+        //   variableData.name,
+        //   `Initializing with initial value: ${JSON.stringify(initialValue)} and object ${JSON.stringify(variableData)}`,
+        // );
 
         // Set custom values immediately if they exist and no URL value is present
         if (
@@ -716,10 +716,10 @@ export default defineComponent({
           }
         }
 
-        variableLog(
-          variableData.name,
-          `Final value after initialization: ${JSON.stringify(variableData)}`,
-        );
+        // variableLog(
+        //   variableData.name,
+        //   `Final value after initialization: ${JSON.stringify(variableData)}`,
+        // );
 
         // push the variable to the list
         variablesData.values.push(variableData);
@@ -727,10 +727,10 @@ export default defineComponent({
         // set old variables data
         oldVariablesData[item.name] = initialValue;
 
-        variableLog(
-          variableData.name,
-          `Old Values after initialization: ${JSON.stringify(oldVariablesData)}`,
-        );
+        // variableLog(
+        //   variableData.name,
+        //   `Old Values after initialization: ${JSON.stringify(oldVariablesData)}`,
+        // );
       });
 
       // if showDynamicFilters is true, add the Dynamic filters variable
@@ -770,10 +770,10 @@ export default defineComponent({
     const rejectAllPromises = () => {
       Object.keys(currentlyExecutingPromises).forEach((key) => {
         if (currentlyExecutingPromises[key]) {
-          variableLog(
-            key,
-            `Rejecting currently executing promise: ${currentlyExecutingPromises[key]}`,
-          );
+          // variableLog(
+          //   key,
+          //   `Rejecting currently executing promise: ${currentlyExecutingPromises[key]}`,
+          // );
           currentlyExecutingPromises[key](false);
         }
       });
@@ -1299,7 +1299,7 @@ export default defineComponent({
         variableObject.isLoading = true;
         variableObject.isVariablePartialLoaded = false;
         emitVariablesData();
-
+        console.log("variableObject", variableObject);
         try {
           const success = await handleVariableType(
             variableObject,
@@ -1326,19 +1326,19 @@ export default defineComponent({
       isInitialLoad: boolean = false,
       searchText?: string,
     ) => {
-      variableLog(
-        variableObject.name,
-        `Handling variable type: ${variableObject.type},  ${isInitialLoad}`,
-      );
+      // variableLog(
+      //   variableObject.name,
+      //   `Handling variable type: ${variableObject.type},  ${isInitialLoad}`,
+      // );
       switch (variableObject.type) {
         case "query_values": {
           // for initial loading check if the value is already available,
           // do not load the values
           if (isInitialLoad && !searchText) {
-            variableLog(
-              variableObject.name,
-              `Initial load check for variable: ${variableObject.name}, value: ${JSON.stringify(variableObject)}`,
-            );
+            // variableLog(
+            //   variableObject.name,
+            //   `Initial load check for variable: ${variableObject.name}, value: ${JSON.stringify(variableObject)}`,
+            // );
             // check for value not null or in case of array it should not be empty array
             // if the value is already set, we don't need to load it again
             if (
@@ -1401,10 +1401,10 @@ export default defineComponent({
       variableObject: any,
       searchText?: string,
     ) => {
-      variableLog(
-        variableObject.name,
-        `Building query context for variable: ${variableObject.name}${searchText ? ` with search: ${searchText}` : ""}`,
-      );
+      // variableLog(
+      //   variableObject.name,
+      //   `Building query context for variable: ${variableObject.name}${searchText ? ` with search: ${searchText}` : ""}`,
+      // );
 
       const timestamp_column =
         store.state.zoConfig.timestamp_column || "_timestamp";
@@ -1657,37 +1657,37 @@ export default defineComponent({
       isInitialLoad: boolean = false, // this important for the the children load while initial loading
     ) => {
       try {
-        variableLog(
-          variableObject.name,
-          `finalizePartialVariableLoading: ${success}, ${JSON.stringify(variableObject)}`,
-        );
+        // variableLog(
+        //   variableObject.name,
+        //   `finalizePartialVariableLoading: ${success}, ${JSON.stringify(variableObject)}`,
+        // );
 
         const { name } = variableObject;
 
         variableObject.isVariablePartialLoaded = success;
 
         // Update old variables data
-        // oldVariablesData[name] = variableObject.value;
+        oldVariablesData[name] = variableObject.value;
 
         // Don't load child variables on dropdown open events
         // Load child variables if any
         const childVariables =
           variablesDependencyGraph[name]?.childVariables || [];
 
-        variableLog(
-          variableObject.name,
-          `finalizePartialVariableLoading: child variables: ${JSON.stringify(childVariables)}`,
-        );
+        // variableLog(
+        //   variableObject.name,
+        //   `finalizePartialVariableLoading: child variables: ${JSON.stringify(childVariables)}`,
+        // );
 
         if (childVariables.length > 0) {
           const childVariableObjects = variablesData.values.filter(
             (variable: any) => childVariables.includes(variable.name),
           );
 
-          variableLog(
-            variableObject.name,
-            `Old Varilables Data: ${JSON.stringify(oldVariablesData)}`,
-          );
+          // variableLog(
+          //   variableObject.name,
+          //   `Old Varilables Data: ${JSON.stringify(oldVariablesData)}`,
+          // );
           for (const childVariable of childVariableObjects) {
             await loadSingleVariableDataByName(childVariable, false);
           }
@@ -1711,10 +1711,10 @@ export default defineComponent({
         // When a dropdown is opened, only load the variable data
         await loadSingleVariableDataByName(variableObject);
       } catch (error) {
-        variableLog(
-          variableObject.name,
-          `Error loading variable options for ${variableObject.name}: ${error.message}`,
-        );
+        // variableLog(
+        //   variableObject.name,
+        //   `Error loading variable options for ${variableObject.name}: ${error.message}`,
+        // );
       }
     };
 
@@ -1865,10 +1865,10 @@ export default defineComponent({
 
       const currentVariable = variablesData.values[variableIndex];
 
-      variableLog(
-        currentVariable.name,
-        `onVariablesValueUpdated: ${JSON.stringify(currentVariable)}`,
-      );
+      // variableLog(
+      //   currentVariable.name,
+      //   `onVariablesValueUpdated: ${JSON.stringify(currentVariable)}`,
+      // );
 
       // if currentVariable is undefined, return
       if (!currentVariable) {
@@ -1981,7 +1981,7 @@ export default defineComponent({
     const cancelAllVariableOperations = (variableName: string) => {
       // 1. Cancel any ongoing promise-based operations
       if (currentlyExecutingPromises[variableName]) {
-        variableLog(variableName, "Canceling currently executing promise");
+        // variableLog(variableName, "Canceling currently executing promise");
         currentlyExecutingPromises[variableName](false);
         currentlyExecutingPromises[variableName] = null;
       }
