@@ -178,6 +178,7 @@ pub async fn search(
         Some((query.start_time, query.end_time)),
         in_req.search_type.map(|v| v.to_string()),
         in_req.query.histogram_interval,
+        in_req.clear_cache,
     );
     if in_req.query.streaming_output && !in_req.query.track_total_hits {
         request.set_streaming_output(true, in_req.query.streaming_id.clone());

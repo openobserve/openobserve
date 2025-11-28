@@ -56,6 +56,7 @@ pub(crate) fn try_decode(
         node.target_partitions as usize,
         node.is_complete_cache_hit,
         aggregate_plan,
+        node.overwrite_cache,
     )))
 }
 
@@ -80,6 +81,7 @@ pub(crate) fn try_encode(node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Res
             .map(|v| v.as_ref().to_string())
             .collect(),
         aggregate_plan: Some(aggregate_plan),
+        overwrite_cache: node.overwrite_cache(),
     };
     let proto = cluster_rpc::PhysicalPlanNode {
         plan: Some(cluster_rpc::physical_plan_node::Plan::StreamingAggs(
@@ -155,6 +157,7 @@ mod tests {
             1,
             false,
             Arc::new(agg_plan),
+            false,
         ));
 
         // encode
@@ -237,6 +240,7 @@ mod tests {
             1,
             false,
             Arc::new(agg_plan),
+            false,
         ));
 
         // encode

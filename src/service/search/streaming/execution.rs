@@ -108,26 +108,6 @@ pub async fn do_partitioned_search(
         );
     }
 
-    // If clear_cache is set, delete streaming aggregation cache files before processing
-    #[cfg(feature = "enterprise")]
-    if is_streaming_aggs
-        && req.clear_cache
-        && let Some(streaming_id) = &partition_resp.streaming_id
-        && let Err(e) = clear_streaming_agg_cache(
-            trace_id,
-            streaming_id,
-            req.query.start_time,
-            req.query.end_time,
-        )
-        .await
-    {
-        log::error!(
-            "[HTTP2_STREAM] [trace_id: {}] Failed to clear cache: {}",
-            trace_id,
-            e
-        );
-    }
-
     // The order by for the partitions is the same as the order by in the query
     // unless the query is a dashboard or histogram
     let mut partition_order_by = req_order_by;
