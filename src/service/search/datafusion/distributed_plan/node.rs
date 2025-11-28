@@ -31,6 +31,7 @@ pub struct RemoteScanNodes {
     pub equal_keys: HashMap<TableReference, Vec<KvItem>>,
     pub is_leader: bool, // for super cluster
     pub opentelemetry_context: opentelemetry::Context,
+    pub sampling_config: Option<proto::cluster_rpc::SamplingConfig>,
 }
 
 impl RemoteScanNodes {
@@ -42,6 +43,7 @@ impl RemoteScanNodes {
         equal_keys: HashMap<TableReference, Vec<KvItem>>,
         is_leader: bool,
         opentelemetry_context: opentelemetry::Context,
+        sampling_config: Option<proto::cluster_rpc::SamplingConfig>,
     ) -> Self {
         Self {
             req,
@@ -50,6 +52,7 @@ impl RemoteScanNodes {
             equal_keys,
             is_leader,
             opentelemetry_context,
+            sampling_config,
         }
     }
 
@@ -76,6 +79,7 @@ impl RemoteScanNodes {
             use_cache: self.req.use_cache,
             histogram_interval: self.req.histogram_interval,
             is_analyze: false, // set in distribute Analyze
+            sampling_config: self.sampling_config.clone(),
         };
 
         let index_info = IndexInfo {
@@ -173,6 +177,7 @@ pub struct SearchInfos {
     pub use_cache: bool,
     pub histogram_interval: i64,
     pub is_analyze: bool,
+    pub sampling_config: Option<proto::cluster_rpc::SamplingConfig>,
 }
 
 impl SearchInfos {
@@ -191,6 +196,7 @@ impl SearchInfos {
             use_cache: self.use_cache,
             histogram_interval: self.histogram_interval,
             is_analyze: self.is_analyze,
+            sampling_config: self.sampling_config.clone(),
         }
     }
 }

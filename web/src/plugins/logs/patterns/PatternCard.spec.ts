@@ -19,6 +19,7 @@ import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
 import PatternCard from "./PatternCard.vue";
 import store from "@/test/unit/helpers/store";
+import i18n from "@/locales";
 
 installQuasar({
   plugins: [quasar.Notify],
@@ -58,6 +59,7 @@ describe("PatternCard", () => {
         index: mockIndex,
       },
       global: {
+        plugins: [i18n],
         provide: { store },
         stubs: {
           EqualIcon: { template: '<div class="equal-icon"></div>' },
@@ -73,12 +75,6 @@ describe("PatternCard", () => {
   });
 
   describe("Pattern Display", () => {
-    it("should display pattern rank (index + 1)", () => {
-      const rank = wrapper.find('[data-test="pattern-card-0-rank"]');
-      expect(rank.exists()).toBe(true);
-      expect(rank.text()).toBe("1");
-    });
-
     it("should display pattern template", () => {
       const template = wrapper.find('[data-test="pattern-card-0-template"]');
       expect(template.exists()).toBe(true);
@@ -99,11 +95,11 @@ describe("PatternCard", () => {
       expect(percentage.text()).toBe("45.67%");
     });
 
-    it("should display info icon with tooltip", () => {
-      const infoIcon = wrapper.find(
-        '[data-test="pattern-card-0-info-icon"]',
+    it("should display details icon with tooltip", () => {
+      const detailsIcon = wrapper.find(
+        '[data-test="pattern-card-0-details-icon"]',
       );
-      expect(infoIcon.exists()).toBe(true);
+      expect(detailsIcon.exists()).toBe(true);
     });
   });
 
@@ -191,15 +187,14 @@ describe("PatternCard", () => {
   });
 
   describe("Multiple Patterns", () => {
-    it("should display correct rank for different indices", async () => {
+    it("should update data-test attribute for different indices", async () => {
       await wrapper.setProps({
         pattern: mockPattern,
         index: 5,
       });
 
-      const rank = wrapper.find('[data-test="pattern-card-5-rank"]');
-      expect(rank.exists()).toBe(true);
-      expect(rank.text()).toBe("6");
+      const card = wrapper.find('[data-test="pattern-card-5"]');
+      expect(card.exists()).toBe(true);
     });
   });
 });

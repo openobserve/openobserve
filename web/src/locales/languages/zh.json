@@ -202,7 +202,15 @@
     "physicalPlan": "物理计划",
     "totalTime": "总时间",
     "totalRows": "总行数",
-    "peakMemory": "峰值内存"
+    "peakMemory": "峰值内存",
+    "patternColumnHeader": "图案",
+    "occurrenceColumnHeader": "发生次数",
+    "percentageColumnHeader": "百分比",
+    "actionsColumnHeader": "行动",
+    "anomalyLabel": "异常",
+    "includePatternInSearch": "在搜索中加入模式",
+    "excludePatternFromSearch": "从搜索中排除模式",
+    "showPatternDetails": "显示详细信息（{变量} 变量，{示例} 示例）"
   },
   "menu": {
     "home": "主页",

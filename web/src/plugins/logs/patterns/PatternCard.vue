@@ -15,147 +15,97 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card
-    flat
-    class="tw-mb-[0.375rem] cursor-pointer tw-border tw-border-solid tw-border-[var(--o2-border-color)] hover:tw-bg-[var(--o2-hover-gray)]"
+  <div
+    class="tw-flex tw-items-center tw-border-b tw-border-[var(--o2-border-color)] tw-cursor-pointer hover:tw-bg-[var(--o2-hover-gray)] tw-py-2 tw-px-3"
     @click="$emit('click', pattern, index)"
     :data-test="`pattern-card-${index}`"
   >
-    <!-- Header with Rank and Stats - Compact -->
-    <q-card-section class="tw-p-[0.625rem]">
-      <div class="row items-center q-col-gutter-md no-wrap">
-        <div class="col-auto">
-          <q-avatar
-            size="2rem"
-            color="primary"
-            text-color="white"
-            class="text-weight-bold"
-            :data-test="`pattern-card-${index}-rank`"
-          >
-            {{ index + 1 }}
-          </q-avatar>
-        </div>
-        <div class="col">
-          <!-- Template shown first with info icon -->
-          <div class="tw-flex tw-items-center q-mb-xs">
-            <div
-              class="text-body2 ellipsis tw-text-[0.8rem] o2-monospace-font"
-              :class="
-                store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8'
-              "
-              :data-test="`pattern-card-${index}-template`"
-            >
-              {{ pattern.template }}
-            </div>
-            <q-icon
-              :name="outlinedInfo"
-              size="1rem"
-              class="q-ml-xs cursor-pointer"
-              :class="
-                store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
-              "
-              :data-test="`pattern-card-${index}-info-icon`"
-            >
-              <q-tooltip
-                anchor="center right"
-                self="center left"
-                max-width="18.75rem"
-                class="tw-text-[0.75rem]"
-              >
-                <div class="text-weight-bold q-mb-xs">
-                  Template vs Description
-                </div>
-                <div class="q-mb-xs">
-                  <strong>Template:</strong> {{ pattern.template }}
-                </div>
-                <div>
-                  <strong>Description:</strong> {{ pattern.description }}
-                </div>
-              </q-tooltip>
-            </q-icon>
-          </div>
-          <!-- Occurrences and percentage on second line -->
-          <div
-            class="text-caption"
-            :class="
-              store.state.theme === 'dark' ? 'text-grey-6' : 'text-grey-6'
-            "
-          >
-            <span
-              class="text-weight-bold text-primary"
-              :data-test="`pattern-card-${index}-frequency`"
-            >
-              {{ pattern.frequency.toLocaleString() }}
-            </span>
-            occurrences 
-            <span class="q-mx-xs">•</span>
-            <span
-              class="text-weight-bold text-primary"
-              :data-test="`pattern-card-${index}-percentage`"
-              >{{ pattern.percentage.toFixed(2) }}%</span
-            >
-            <span
-              v-if="pattern.is_anomaly"
-              class="text-negative text-weight-bold q-ml-sm"
-              :data-test="`pattern-card-${index}-anomaly-badge`"
-              >⚠️ ANOMALY</span
-            >
-          </div>
-        </div>
-        <div
-          class="col-auto row items-center q-gutter-xs pattern-block-actions"
-        >
-          <q-btn
-            size="0.375rem"
-            @click.stop="$emit('include', pattern)"
-            title="Include pattern in search"
-            round
-            flat
-            dense
-            :data-test="`pattern-card-${index}-include-btn`"
-          >
-            <q-icon color="currentColor">
-              <EqualIcon></EqualIcon>
-            </q-icon>
-          </q-btn>
-          <q-btn
-            size="0.375rem"
-            @click.stop="$emit('exclude', pattern)"
-            title="Exclude pattern from search"
-            round
-            flat
-            dense
-            :data-test="`pattern-card-${index}-exclude-btn`"
-          >
-            <q-icon class="tw-text-[var(--o2-text-color)]">
-              <NotEqualIcon></NotEqualIcon>
-            </q-icon>
-          </q-btn>
-          <q-icon
-            name="info"
-            size="1.0625rem"
-            class="cursor-pointer"
-            :data-test="`pattern-card-${index}-details-icon`"
-          >
-            <q-tooltip
-              >Show details ({{
-                pattern.examples?.[0]?.variables
-                  ? Object.keys(pattern.examples[0].variables).length
-                  : 0
-              }}
-              variables,
-              {{ pattern.examples?.length || 0 }} examples)</q-tooltip
-            >
-          </q-icon>
-        </div>
+    <!-- Pattern Column -->
+    <div class="tw-flex-1 tw-min-w-0 tw-pr-1">
+      <div
+        class="tw-text-xs tw-truncate o2-monospace-font"
+        :class="store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8'"
+        :data-test="`pattern-card-${index}-template`"
+        :title="pattern.template"
+      >
+        {{ pattern.template }}
       </div>
-    </q-card-section>
-  </q-card>
+      <span
+        v-if="pattern.is_anomaly"
+        class="text-negative text-weight-bold tw-text-[0.625rem]"
+        :data-test="`pattern-card-${index}-anomaly-badge`"
+        >⚠️ {{ t("search.anomalyLabel") }}</span
+      >
+    </div>
+
+    <!-- Occurrence Column -->
+    <div class="tw-w-16 tw-flex-shrink-0 tw-pr-1 tw-text-right">
+      <span
+        class="tw-text-xs text-weight-bold text-primary"
+        :data-test="`pattern-card-${index}-frequency`"
+      >
+        {{ pattern.frequency.toLocaleString() }}
+      </span>
+    </div>
+
+    <!-- Percentage Column -->
+    <div class="tw-w-14 tw-flex-shrink-0 tw-pr-1 tw-text-right">
+      <span
+        class="tw-text-xs text-weight-bold text-primary"
+        :data-test="`pattern-card-${index}-percentage`"
+        >{{ pattern.percentage.toFixed(2) }}%</span
+      >
+    </div>
+
+    <!-- Actions Column -->
+    <div class="tw-w-20 tw-flex-shrink-0 tw-flex tw-items-center">
+      <q-btn
+        size="6px"
+        @click.stop="$emit('include', pattern)"
+        :title="t('search.includePatternInSearch')"
+        round
+        :data-test="`pattern-card-${index}-include-btn`"
+      >
+        <q-icon style="height: 8px; width: 8px">
+          <EqualIcon></EqualIcon>
+        </q-icon>
+      </q-btn>
+      <q-btn
+        size="6px"
+        @click.stop="$emit('exclude', pattern)"
+        :title="t('search.excludePatternFromSearch')"
+        round
+        :data-test="`pattern-card-${index}-exclude-btn`"
+      >
+        <q-icon style="height: 8px; width: 8px">
+          <NotEqualIcon></NotEqualIcon>
+        </q-icon>
+      </q-btn>
+      <q-btn
+        size="6px"
+        class="cursor-pointer"
+        round
+        :data-test="`pattern-card-${index}-details-icon`"
+        @click.stop="$emit('click', pattern, index)"
+      >
+        <q-icon name="info" style="height: 8px; width: 8px">
+          <q-tooltip>{{
+            t("search.showPatternDetails", {
+              variables: pattern.examples?.[0]?.variables
+                ? Object.keys(pattern.examples[0].variables).length
+                : 0,
+              examples: pattern.examples?.length || 0,
+            })
+          }}</q-tooltip>
+        </q-icon>
+      </q-btn>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { useStore } from "vuex";
-import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
+import { useI18n } from "vue-i18n";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 
@@ -171,6 +121,7 @@ defineEmits<{
 }>();
 
 const store = useStore();
+const { t } = useI18n();
 </script>
 
 <style scoped lang="scss">

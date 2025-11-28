@@ -202,7 +202,15 @@
     "physicalPlan": "Plan físico",
     "totalTime": "Tiempo total",
     "totalRows": "Total de filas",
-    "peakMemory": "Memoria máxima"
+    "peakMemory": "Memoria máxima",
+    "patternColumnHeader": "Patrón",
+    "occurrenceColumnHeader": "Ocurrencia",
+    "percentageColumnHeader": "Porcentaje",
+    "actionsColumnHeader": "Acciones",
+    "anomalyLabel": "ANOMALÍA",
+    "includePatternInSearch": "Incluir patrón en la búsqueda",
+    "excludePatternFromSearch": "Excluir patrón de la búsqueda",
+    "showPatternDetails": "Mostrar detalles ({variables} variables, {ejemplos} ejemplos)"
   },
   "menu": {
     "home": "Inicio",

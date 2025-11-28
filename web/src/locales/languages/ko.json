@@ -202,7 +202,15 @@
     "physicalPlan": "물리적 계획",
     "totalTime": "총 시간",
     "totalRows": "총 행 수",
-    "peakMemory": "피크 메모리"
+    "peakMemory": "피크 메모리",
+    "patternColumnHeader": "패턴",
+    "occurrenceColumnHeader": "발생",
+    "percentageColumnHeader": "백분율",
+    "actionsColumnHeader": "액션",
+    "anomalyLabel": "변칙",
+    "includePatternInSearch": "검색에 패턴 포함",
+    "excludePatternFromSearch": "검색에서 패턴 제외",
+    "showPatternDetails": "세부 정보 보기 ({변수} 변수, {예제} 예제)"
   },
   "menu": {
     "home": "홈",

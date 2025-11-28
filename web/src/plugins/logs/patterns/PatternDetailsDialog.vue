@@ -125,10 +125,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- Description -->
+        <!-- Variables Summary -->
         <div class="tw-mb-[1rem]">
           <div class="text-subtitle2 text-weight-medium tw-mb-[0.375rem]">
-            Description
+            Variables
           </div>
           <div
             class="tw-px-[0.625rem] tw-py-[0.375rem] tw-rounded tw-border-l-[0.25rem] tw-border-solid tw-border-l-[var(--q-primary)]"
@@ -137,8 +137,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             {{
-              selectedPattern.pattern.description ||
-              "No description available"
+              selectedPattern.pattern.examples?.[0]?.variables
+                ? Object.keys(selectedPattern.pattern.examples[0].variables).length + " variable(s) detected"
+                : "No variables detected"
             }}
           </div>
         </div>

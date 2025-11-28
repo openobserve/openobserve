@@ -89,6 +89,21 @@ message SearchQuery {
     bool            skip_wal = 14;
     string         action_id = 15;
     int64 histogram_interval = 16;
+    // Simplified sampling: just specify ratio (0.0-1.0), backend uses optimal defaults
+    // Backend converts this to SamplingConfig for internal node communication
+    optional double sampling_ratio = 18;
+}
+
+// Sampling configuration for query performance optimization
+message SamplingConfig {
+    // Sampling ratio (0.0 to 1.0, e.g., 0.1 = 10% sample)
+    double sampling_ratio = 1;
+    // Sampling mode: "system" (row group level) or "bernoulli" (row level)
+    string sampling_mode = 2;
+    // Temporal strategy: "random" or "stratified"
+    string temporal_strategy = 3;
+    // Number of time buckets for stratified sampling (e.g., 24 for hourly over a day)
+    optional int32 num_time_strata = 4;
 }
 
 message SearchEventContext {

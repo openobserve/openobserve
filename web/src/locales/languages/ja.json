@@ -202,7 +202,15 @@
     "physicalPlan": "フィジカルプラン",
     "totalTime": "合計時間",
     "totalRows": "合計行数",
-    "peakMemory": "ピークメモリー"
+    "peakMemory": "ピークメモリー",
+    "patternColumnHeader": "パターン",
+    "occurrenceColumnHeader": "発生",
+    "percentageColumnHeader": "パーセンテージ",
+    "actionsColumnHeader": "[アクション]",
+    "anomalyLabel": "異常",
+    "includePatternInSearch": "検索にパターンを含める",
+    "excludePatternFromSearch": "検索からパターンを除外",
+    "showPatternDetails": "詳細を表示 ({変数} 変数、{例} 例)"
   },
   "menu": {
     "home": "ホーム",
