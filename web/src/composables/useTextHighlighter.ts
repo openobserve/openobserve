@@ -451,7 +451,7 @@ export function useTextHighlighter() {
   /**
    * Processes text segments with both semantic coloring and keyword highlighting
    * Quotes are always shown when requested, but background highlighting only applies to content
-   * 
+   *
    * @param segments - Array of text segments to process
    * @param keywords - Keywords to highlight
    * @param colors - Color theme object
@@ -462,9 +462,16 @@ export function useTextHighlighter() {
     // Always reconstruct the full text to handle merged consecutive quotes properly
     const fullText = segments.map(s => s.content).join('');
     const fullTextParts = splitTextByKeywords(fullText, keywords);
-    
+
+    let result = '';
+
+    // Add opening quote if requested
+    if (showQuotes) {
+      result += `<span style="color: ${colors.stringValue};">&quot;</span>`;
+    }
+
     // Process the full text as a single unit
-    return fullTextParts.map(part => {
+    result += fullTextParts.map(part => {
       const content = escapeHtml(part.text);
       if (part.isHighlighted) {
         return `<span style="background-color: rgb(255, 213, 0); color: black;">${content}</span>`;
@@ -474,6 +481,13 @@ export function useTextHighlighter() {
         return `<span style="color: ${semanticColor};">${content}</span>`;
       }
     }).join('');
+
+    // Add closing quote if requested
+    if (showQuotes) {
+      result += `<span style="color: ${colors.stringValue};">&quot;</span>`;
+    }
+
+    return result;
   }
 
   /**

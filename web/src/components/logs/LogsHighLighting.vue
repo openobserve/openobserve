@@ -129,23 +129,27 @@ const colorizedJson = computed((): string => {
   // Handle primitive data types
   if (typeof props.data !== "object") {
     const dataStr = String(props.data);
-    
+
     if (typeof props.data === "number") {
       // Detect timestamp-like numbers
+      // Numbers should never have quotes
       if (dataStr.length >= 13) {
-        return createStyledSpan(dataStr, currentColors.value.timestamp, props.queryString, props.showQuotes);
+        return createStyledSpan(dataStr, currentColors.value.timestamp, props.queryString, false);
       } else {
-        return createStyledSpan(dataStr, currentColors.value.numberValue, props.queryString, props.showQuotes);
+        return createStyledSpan(dataStr, currentColors.value.numberValue, props.queryString, false);
       }
     } else if (typeof props.data === "boolean") {
-      return createStyledSpan(String(props.data), currentColors.value.booleanValue, props.queryString, props.showQuotes);
+      // Booleans should never have quotes
+      return createStyledSpan(String(props.data), currentColors.value.booleanValue, props.queryString, false);
     } else if (props.data === null) {
-      return createStyledSpan("null", currentColors.value.nullValue, props.queryString, props.showQuotes);
+      // null should never have quotes
+      return createStyledSpan("null", currentColors.value.nullValue, props.queryString, false);
     } else {
+      // String values: use showQuotes from props
       return processTextWithHighlights(
-        dataStr, 
-        props.queryString, 
-        currentColors.value, 
+        dataStr,
+        props.queryString,
+        currentColors.value,
         props.showQuotes
       );
     }
@@ -230,21 +234,25 @@ function colorizeObject(obj: any, colors: any, showBraces = true, showQuotes = f
     // VALUES: Colored based on type + highlighted if matches search
     if (value === null) {
       // Example: null → <span style="color: #6B7280;">null</span>
-      parts.push(createStyledSpan("null", colors.nullValue, queryString, showQuotes));
+      // null values should never have quotes
+      parts.push(createStyledSpan("null", colors.nullValue, queryString, false));
     } else if (typeof value === "boolean") {
       // Example: true → <span style="color: #6D28D9;">true</span>
-      parts.push(createStyledSpan(String(value), colors.booleanValue, queryString, showQuotes));
+      // boolean values should never have quotes
+      parts.push(createStyledSpan(String(value), colors.booleanValue, queryString, false));
     } else if (typeof value === "number") {
       // Example: 42 → <span style="color: #2563EB;">42</span>
-      parts.push(createStyledSpan(String(value), colors.numberValue, queryString, showQuotes));
+      // number values should never have quotes
+      parts.push(createStyledSpan(String(value), colors.numberValue, queryString, false));
     } else if (typeof value === "string") {
       // STRING VALUES: Most complex case with semantic detection
       // Check if this looks like a log line with mixed content
       // Example: "GET /api/users 192.168.1.1 200" (has HTTP + IP)
       if (isLogLineWithMixedContent(value)) {
         // Mixed content processing (HTTP logs with IPs, URLs, etc.)
-        const processedLine = processTextWithHighlights(value, queryString, colors, false);
-        parts.push(showQuotes ? `"${processedLine}"` : processedLine);
+        // Always pass showQuotes to ensure consistent quote handling
+        const processedLine = processTextWithHighlights(value, queryString, colors, showQuotes);
+        parts.push(processedLine);
       } else {
         // Regular string processing with semantic detection
         // Example: "192.168.1.1" → IP color, "error message" → string color + highlighting
