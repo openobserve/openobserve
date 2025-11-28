@@ -11,11 +11,11 @@ permissions:
 #     types: [submitted]
 
 on:
-  pull_request:
+  push:
 
 jobs:
   label_and_milestone:
-    if: github.event.review.state == 'approved'
+    # if: github.event.review.state == 'approved'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5 
