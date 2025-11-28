@@ -1244,7 +1244,8 @@
     "domainSettingsSaved": "Impostazioni del dominio salvate con successo",
     "errorSavingDomainSettings": "Errore durante il salvataggio delle impostazioni del dominio",
     "noDomainMessage": "Nessun dominio configurato. Aggiungi i domini sopra per limitare l'accesso.",
-    "license": "Licenza"
+    "license": "Licenza",
+    "alertCorrelation": "Deduplicazione degli avvisi"
   },
   "iam": {
     "users": "Utenti",
@@ -1302,7 +1303,8 @@
     "view": "Visualizza",
     "delay": "Ritardo",
     "history": "Cronologia della pipeline",
-    "searchHistory": "Inserisci il nome della pipeline"
+    "searchHistory": "Inserisci il nome della pipeline",
+    "destination_type": "Tipo di destinazione"
   },
   "reports": {
     "header": "Rapporti",
@@ -1587,5 +1589,47 @@
   },
   "alert_list": {
     "alert_details": "Dettagli dell'avviso"
+  },
+  "latencyInsights": {
+    "title": "Approfondimenti",
+    "tabLabel": "Latenza",
+    "analyzeButton": "Analisi della latenza",
+    "analyzeTooltip": "Analizza i modelli di latenza tra le dimensioni della traccia",
+    "compareToLabel": "Confronta con:",
+    "fullTimeRange": "Intervallo di tempo pieno",
+    "beforePeriod": "Prima del periodo selezionato",
+    "afterPeriod": "Dopo il periodo selezionato",
+    "durationLabel": "Durata:",
+    "analyzingDimensions": "Analisi delle dimensioni...",
+    "computingDistributions": "Calcolo delle distribuzioni di frequenza tra {count} dimensioni",
+    "failedToLoad": "Impossibile caricare l'analisi",
+    "retryButton": "Riprova",
+    "percentileLabel": "Percentile di latenza",
+    "p50Median": "P50 (mediana)",
+    "p75": "P75",
+    "p95": "P95",
+    "p99": "P99",
+    "dimensionsButton": "Campi ({count})",
+    "dimensionsTooltip": "Aggiungere o rimuovere dimensioni da analizzare",
+    "selectDimensions": "Seleziona campi",
+    "analyzeButtonLabel": "Analizza",
+    "refreshTooltip": "Aggiorna l'analisi con il percentile aggiornato",
+    "customSQLFieldsDisabled": "La selezione dei campi non è disponibile per le query SQL personalizzate. Le dimensioni vengono estratte dai risultati della query.",
+    "timeRangeSelected": "Intervallo di tempo selezionato"
+  },
+  "volumeInsights": {
+    "title": "Approfondimenti",
+    "tabLabel": "Tariffa",
+    "analyzeButton": "Analisi dei tassi",
+    "analyzeTooltip": "Analizza i modelli di frequenza di tracciamento tra le dimensioni",
+    "analyzeTooltipLogs": "Analizza la distribuzione delle dimensioni per l'intervallo di tempo corrente",
+    "rateLabel": "Tariffa:",
+    "timeRangeLabel": "Intervallo di tempo:"
+  },
+  "errorInsights": {
+    "title": "Approfondimenti",
+    "tabLabel": "Errori",
+    "errorSpikePeriod": "Periodo di picco di errore:",
+    "errorsGreaterThan": "Errori >="
   }
 }

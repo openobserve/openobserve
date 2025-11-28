@@ -27,10 +27,7 @@ use config::{
         self_reporting::usage::{RequestStats, UsageType},
         stream::StreamType,
     },
-    utils::{
-        rand::generate_random_string,
-        time::{now_micros, second_micros},
-    },
+    utils::time::{now_micros, second_micros},
 };
 use futures::future::try_join_all;
 use hashbrown::HashMap;
@@ -73,10 +70,12 @@ pub async fn search(
     req: &MetricsQueryRequest,
     user_email: &str,
     timeout: i64,
+    is_super_cluster: bool,
 ) -> Result<Value> {
     let mut req: cluster_rpc::MetricsQueryRequest = req.to_owned().into();
     req.org_id = org_id.to_string();
     req.timeout = timeout;
+    req.is_super_cluster = is_super_cluster;
     search_in_cluster(trace_id, req, user_email).await
 }
 
@@ -96,18 +95,19 @@ async fn search_in_cluster(
         end,
         step,
         query_exemplars,
+        query_data: _,
+        label_selector: _,
     } = req.query.as_ref().unwrap();
 
-    // cache disabled if result cache is disabled or use_cache is false or start == end or step == 0
-    let cache_disabled =
-        !cfg.common.result_cache_enabled || !req.use_cache || start == end || step == 0;
+    // cache enabled if result cache is enabled and use_cache is true and start != end
+    let use_cache = cfg.common.result_cache_enabled && req.use_cache && start != end;
     // adjust start and end time
     let (start, end) = adjust_start_end(start, end, step);
 
     log::info!(
         "[trace_id {trace_id}] promql->search->start: org_id: {}, use_cache: {}, time_range: [{},{}), step: {}, query: {}",
         req.org_id,
-        !cache_disabled,
+        use_cache,
         start,
         end,
         step,
@@ -137,7 +137,7 @@ async fn search_in_cluster(
 
     // get cache data
     let original_start = start;
-    let (start, cached_values) = if cache_disabled {
+    let (start, cached_values) = if !use_cache {
         (start, vec![])
     } else {
         let start_time = std::time::Instant::now();
@@ -193,7 +193,7 @@ async fn search_in_cluster(
 
     let job = cluster_rpc::Job {
         trace_id: trace_id.to_string(),
-        job: generate_random_string(7),
+        job: trace_id[..7].to_string(),
         stage: 0,
         partition: 0,
     };
@@ -360,7 +360,7 @@ async fn search_in_cluster(
             end,
             step,
             matrix.to_vec(),
-            cache_disabled, // if the query with cache_disabled, we should update the exist cache
+            !use_cache, // if the query with use_cache=false, we should update the exist cache
         )
         .await
     {

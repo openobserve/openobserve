@@ -113,7 +113,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         if LOCAL_NODE.is_ingester() {
             let metrics = JsonEncoder::new().encode_to_string(&prom_data).unwrap();
             let bytes = bytes::Bytes::from(metrics);
-            match service::metrics::json::ingest(org, bytes).await {
+            match service::metrics::json::ingest(org, bytes, "").await {
                 Ok(_) => {
                     log::debug!("successfully ingested self-metrics");
                 }
