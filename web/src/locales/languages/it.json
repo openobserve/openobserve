@@ -202,7 +202,15 @@
     "physicalPlan": "Piano fisico",
     "totalTime": "Tempo totale",
     "totalRows": "Righe totali",
-    "peakMemory": "Memoria di picco"
+    "peakMemory": "Memoria di picco",
+    "patternColumnHeader": "Motivo",
+    "occurrenceColumnHeader": "Evento",
+    "percentageColumnHeader": "Percentuale",
+    "actionsColumnHeader": "Azioni",
+    "anomalyLabel": "ANOMALIA",
+    "includePatternInSearch": "Includi modello nella ricerca",
+    "excludePatternFromSearch": "Escludi il pattern dalla ricerca",
+    "showPatternDetails": "Mostra dettagli ({variabili}, {esempi} esempi)"
   },
   "menu": {
     "home": "Home",

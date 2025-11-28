@@ -183,13 +183,26 @@ impl QueryConditionExt for QueryCondition {
                     ),
                     query_exemplars: false,
                     use_cache: None,
+                    search_type: Some(SearchEventType::Alerts),
+                    regions: vec![],
+                    clusters: vec![],
                 };
-                let resp = match promql::search::search(&trace_id, org_id, &req, "", 0).await {
-                    Ok(v) => v,
-                    Err(_) => {
-                        return Ok(eval_results);
-                    }
-                };
+                // check super cluster
+                #[cfg(not(feature = "enterprise"))]
+                let is_super_cluster = false;
+                #[cfg(feature = "enterprise")]
+                let is_super_cluster = o2_enterprise::enterprise::common::config::get_config()
+                    .super_cluster
+                    .enabled;
+                let resp =
+                    match promql::search::search(&trace_id, org_id, &req, "", 0, is_super_cluster)
+                        .await
+                    {
+                        Ok(v) => v,
+                        Err(_) => {
+                            return Ok(eval_results);
+                        }
+                    };
                 let config::meta::promql::value::Value::Matrix(value) = resp else {
                     log::warn!(
                         "Alert evaluate: trace_id: {trace_id}, PromQL query {v} returned unexpected response: {resp:?}"
@@ -395,6 +408,8 @@ impl QueryConditionExt for QueryCondition {
                         None
                     },
                     skip_wal: false,
+                    sampling_config: None,
+                    sampling_ratio: None,
                     streaming_output: false,
                     streaming_id: None,
                     histogram_interval: 0,

@@ -118,43 +118,113 @@ export class PipelinesEP {
         await this.page.locator(this.pipelineImportNameInput).click();
         await this.page.locator(this.pipelineImportNameInput).fill(name);
 
-        // Wait for the first function name input field to be visible before clicking
-        await this.page.locator(this.pipelineImportErrorDestinationFunctionNameInput).waitFor({ state: 'visible' });
-        await this.page.locator(this.pipelineImportErrorDestinationFunctionNameInput).click();
+        // Check if stream dropdown is visible for error-0-1 by checking if error-0-3 exists
+        // If error-0-3 exists, it means we have the new flow with stream dropdown
+        const error03Exists = await this.page.locator('[data-test="pipeline-import-error-0-3"]').count() > 0;
 
-        // Wait for dropdown to open and scroll to find the option
-        await this.page.waitForTimeout(1000);
+        if (error03Exists) {
+            // New flow: Stream dropdown is visible
+            // First: Click on the stream dropdown for error-0-1
+            const streamDropdown = this.page.locator('[data-test="pipeline-import-error-0-1"]').getByText('arrow_drop_down');
+            await streamDropdown.waitFor({ state: 'visible' });
+            await streamDropdown.click();
 
-        // Try to find and scroll to the first function option
-        const option1 = this.page.getByRole('option', { name: functionName1 });
-        try {
-            await option1.scrollIntoViewIfNeeded({ timeout: 5000 });
-        } catch (error) {
-            // If scroll fails, wait a bit more for the dropdown to populate
+            // Wait for dropdown to open
+            await this.page.waitForTimeout(1000);
+
+            // Select the stream we are ingesting data to (e2e_automate stream)
+            const streamOption = this.page.getByRole('option', { name: 'e2e_automate', exact: true });
+            await streamOption.waitFor({ state: 'visible', timeout: 10000 });
+            await streamOption.click();
+
+            // Wait for dropdown to close
+            await this.page.waitForTimeout(2000);
+
+            // Second: Click on the function dropdown for error-0-2
+            await this.page.locator('[data-test="pipeline-import-error-0-2"]').getByText('arrow_drop_down').waitFor({ state: 'visible' });
+            await this.page.locator('[data-test="pipeline-import-error-0-2"]').getByText('arrow_drop_down').click();
+
+            // Wait for dropdown to open
+            await this.page.waitForTimeout(1000);
+
+            // Select the first function
+            const option1 = this.page.getByRole('option', { name: functionName1 });
+            try {
+                await option1.scrollIntoViewIfNeeded({ timeout: 5000 });
+            } catch (error) {
+                // If scroll fails, wait a bit more for the dropdown to populate
+                await this.page.waitForTimeout(2000);
+            }
+            await option1.waitFor({ state: 'visible', timeout: 10000 });
+            await option1.click();
+
+            // Wait for dropdown to close
+            await this.page.waitForTimeout(2000);
+
+            // Third: Click on the function dropdown for error-0-3
+            await this.page.locator('[data-test="pipeline-import-error-0-3"]').getByText('arrow_drop_down').waitFor({ state: 'visible' });
+            await this.page.locator('[data-test="pipeline-import-error-0-3"]').getByText('arrow_drop_down').click();
+
+            // Wait for dropdown to open
+            await this.page.waitForTimeout(1000);
+
+            // Select the second function
+            const option2 = this.page.getByRole('option', { name: functionName2 });
+            try {
+                await option2.scrollIntoViewIfNeeded({ timeout: 5000 });
+            } catch (error) {
+                // If scroll fails, wait a bit more for the dropdown to populate
+                await this.page.waitForTimeout(2000);
+            }
+            await option2.waitFor({ state: 'visible', timeout: 10000 });
+            await option2.click();
+
+            // Wait for dropdown to close
+            await this.page.waitForTimeout(2000);
+        } else {
+            // Old flow: Stream dropdown is not visible
+            // First: Click on the function dropdown for error-0-1
+            await this.page.locator(this.pipelineImportErrorDestinationFunctionNameInput).waitFor({ state: 'visible' });
+            await this.page.locator(this.pipelineImportErrorDestinationFunctionNameInput).click();
+
+            // Wait for dropdown to open
+            await this.page.waitForTimeout(1000);
+
+            // Select the first function
+            const option1 = this.page.getByRole('option', { name: functionName1 });
+            try {
+                await option1.scrollIntoViewIfNeeded({ timeout: 5000 });
+            } catch (error) {
+                // If scroll fails, wait a bit more for the dropdown to populate
+                await this.page.waitForTimeout(2000);
+            }
+            await option1.waitFor({ state: 'visible', timeout: 10000 });
+            await option1.locator('div').nth(2).click();
+
+            // Wait for dropdown to close
+            await this.page.waitForTimeout(2000);
+
+            // Second: Click on the function dropdown for error-0-2
+            await this.page.locator(this.pipelineImportErrorDestinationFunctionNameInput2).waitFor({ state: 'visible' });
+            await this.page.locator(this.pipelineImportErrorDestinationFunctionNameInput2).click();
+
+            // Wait for dropdown to open
+            await this.page.waitForTimeout(1000);
+
+            // Select the second function
+            const option2 = this.page.getByRole('option', { name: functionName2 });
+            try {
+                await option2.scrollIntoViewIfNeeded({ timeout: 5000 });
+            } catch (error) {
+                // If scroll fails, wait a bit more for the dropdown to populate
+                await this.page.waitForTimeout(2000);
+            }
+            await option2.waitFor({ state: 'visible', timeout: 10000 });
+            await option2.click();
+
+            // Wait for dropdown to close
             await this.page.waitForTimeout(2000);
         }
-
-        await option1.waitFor({ state: 'visible', timeout: 10000 });
-        await option1.locator('div').nth(2).click();
-
-        // Wait for the second function name input field to be visible before clicking
-        await this.page.locator(this.pipelineImportErrorDestinationFunctionNameInput2).waitFor({ state: 'visible' });
-        await this.page.locator(this.pipelineImportErrorDestinationFunctionNameInput2).click();
-
-        // Wait for dropdown to open and scroll to find the second option
-        await this.page.waitForTimeout(1000);
-
-        // Try to find and scroll to the second function option
-        const option2 = this.page.getByRole('option', { name: functionName2 });
-        try {
-            await option2.scrollIntoViewIfNeeded({ timeout: 5000 });
-        } catch (error) {
-            // If scroll fails, wait a bit more for the dropdown to populate
-            await this.page.waitForTimeout(2000);
-        }
-
-        await option2.waitFor({ state: 'visible', timeout: 10000 });
-        await option2.click();
     }
 
 

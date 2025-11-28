@@ -202,7 +202,15 @@
     "physicalPlan": "Fysiek plan",
     "totalTime": "Totale tijd",
     "totalRows": "Totaal aantal rijen",
-    "peakMemory": "Peak-geheugen"
+    "peakMemory": "Peak-geheugen",
+    "patternColumnHeader": "Patroon",
+    "occurrenceColumnHeader": "Voorkomen",
+    "percentageColumnHeader": "Percentage",
+    "actionsColumnHeader": "Acties",
+    "anomalyLabel": "ANOMALIE",
+    "includePatternInSearch": "Patroon opnemen in de zoekopdracht",
+    "excludePatternFromSearch": "Patroon uitsluiten van de zoekopdracht",
+    "showPatternDetails": "Details weergeven ({variabelen} variabelen, {voorbeelden} voorbeelden)"
   },
   "menu": {
     "home": "Home",

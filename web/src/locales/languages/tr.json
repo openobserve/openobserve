@@ -202,7 +202,15 @@
     "physicalPlan": "Fiziksel Plan",
     "totalTime": "Toplam Süre",
     "totalRows": "Toplam Satır",
-    "peakMemory": "Tepe Bellek"
+    "peakMemory": "Tepe Bellek",
+    "patternColumnHeader": "Desen",
+    "occurrenceColumnHeader": "Oluşum",
+    "percentageColumnHeader": "Yüzde",
+    "actionsColumnHeader": "Eylemler",
+    "anomalyLabel": "ANOMALİ",
+    "includePatternInSearch": "Aramaya desen dahil et",
+    "excludePatternFromSearch": "Deseni aramadan hariç tut",
+    "showPatternDetails": "Ayrıntıları göster ({değişkenler} değişkenler, {örnekler} örnekler)"
   },
   "menu": {
     "home": "Ana Sayfa",
