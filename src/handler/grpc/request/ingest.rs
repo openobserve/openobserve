@@ -83,7 +83,7 @@ impl Ingest for Ingester {
                     )))
                 } else {
                     let data = bytes::Bytes::from(in_data.data);
-                    crate::service::metrics::json::ingest(&org_id, data)
+                    crate::service::metrics::json::ingest(&org_id, data, "")
                         .await
                         .map(|_| ()) // we don't care about success response
                         .map_err(|e| Error::IngestionError(format!("error in ingesting metrics {e}")))
@@ -101,7 +101,8 @@ impl Ingest for Ingester {
                     )))
                 } else {
                     let data = bytes::Bytes::from(in_data.data);
-                    crate::service::traces::ingest_json(&org_id, data, OtlpRequestType::Grpc, &stream_name)
+                    // internal ingestion does not require email id
+                    crate::service::traces::ingest_json(&org_id, data, OtlpRequestType::Grpc, &stream_name, "")
                         .await
                         .map(|_| ()) // we don't care about success response
                         .map_err(|e| Error::IngestionError(format!("error in ingesting traces {e}")))

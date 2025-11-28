@@ -68,6 +68,7 @@ use crate::{
 pub async fn remote_write(
     org_id: &str,
     body: web::Bytes,
+    user_email: &str,
 ) -> std::result::Result<(), anyhow::Error> {
     // check system resource
     check_ingestion_allowed(org_id, StreamType::Metrics, None).await?;
@@ -572,6 +573,11 @@ pub async fn remote_write(
                         .map_or(0, |exec_pl| exec_pl.num_of_func())
                 });
         req_stats.response_time = start.elapsed().as_secs_f64();
+        req_stats.user_email = if user_email.is_empty() {
+            None
+        } else {
+            Some(user_email.to_string())
+        };
         report_request_usage_stats(
             req_stats,
             org_id,
