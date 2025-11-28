@@ -371,6 +371,7 @@ pub async fn get_partitions(
         false,
         false,
         false,
+        req.use_cache,
     )
     .instrument(tracing::info_span!(
         "src::service::search::stream_execution::get_partitions"

@@ -1494,6 +1494,7 @@ pub async fn search_partition(
         false,
         true,
         enable_align_histogram,
+        true,
     )
     .instrument(http_span)
     .await;
