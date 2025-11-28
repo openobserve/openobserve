@@ -20,9 +20,9 @@ use bytes::Bytes;
 use config::utils::time::BASE_TIME;
 use futures::{StreamExt, stream::BoxStream};
 use object_store::{
-    Attributes, Error, GetOptions, GetResult, GetResultPayload, ListResult, MultipartUpload,
-    OBJECT_STORE_COALESCE_DEFAULT, ObjectMeta, PutMultipartOptions, PutOptions, PutPayload,
-    PutResult, Result, coalesce_ranges, path::Path,
+    Error, GetOptions, GetResult, ListResult, MultipartUpload, OBJECT_STORE_COALESCE_DEFAULT,
+    ObjectMeta, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, coalesce_ranges,
+    path::Path,
 };
 use once_cell::sync::Lazy;
 
@@ -93,26 +93,9 @@ impl ObjectStoreExt for CacheFS {
 
     async fn get(&self, account: &str, location: &Path) -> Result<GetResult> {
         let path = location.to_string();
-        if let Ok(data) = file_data::get_opts(account, &path, None, false).await {
-            let meta = ObjectMeta {
-                location: location.clone(),
-                last_modified: *BASE_TIME,
-                size: data.len() as u64,
-                e_tag: None,
-                version: None,
-            };
-            let range = Range {
-                start: 0,
-                end: data.len() as u64,
-            };
-            return Ok(GetResult {
-                payload: GetResultPayload::Stream(
-                    futures::stream::once(async move { Ok(data) }).boxed(),
-                ),
-                attributes: Attributes::default(),
-                meta,
-                range,
-            });
+        let options = GetOptions::default();
+        if let Ok(res) = file_data::get_opts(account, &path, options, false).await {
+            return Ok(res);
         }
         // default to storage
         storage::get(account, &path).await
@@ -125,31 +108,8 @@ impl ObjectStoreExt for CacheFS {
         options: GetOptions,
     ) -> Result<GetResult> {
         let path = location.to_string();
-        if let Ok(data) = file_data::get_opts(account, &path, None, false).await {
-            let meta = ObjectMeta {
-                location: location.clone(),
-                last_modified: *BASE_TIME,
-                size: data.len() as u64,
-                e_tag: None,
-                version: None,
-            };
-            let (range, data) = match options.range {
-                Some(range) => {
-                    let r = range
-                        .as_range(data.len() as u64)
-                        .map_err(|e| crate::storage::Error::BadRange(e.to_string()))?;
-                    (r.clone(), data.slice(r.start as usize..r.end as usize))
-                }
-                None => (0..data.len() as u64, data),
-            };
-            return Ok(GetResult {
-                payload: GetResultPayload::Stream(
-                    futures::stream::once(async move { Ok(data) }).boxed(),
-                ),
-                attributes: Attributes::default(),
-                meta,
-                range,
-            });
+        if let Ok(res) = file_data::get_opts(account, &path, options.clone(), false).await {
+            return Ok(res);
         }
         // default to storage
         storage::get_opts(account, &path, options).await
@@ -159,9 +119,14 @@ impl ObjectStoreExt for CacheFS {
         if range.start > range.end {
             return Err(crate::storage::Error::BadRange(location.to_string()).into());
         }
-        let path = location.to_string();
-        let data = file_data::get_opts(account, &path, Some(range), true).await?;
-        Ok(data)
+        let options = GetOptions {
+            range: Some(range.into()),
+            ..Default::default()
+        };
+        self.get_opts(account, location, options)
+            .await?
+            .bytes()
+            .await
     }
 
     async fn get_ranges(
@@ -185,7 +150,7 @@ impl ObjectStoreExt for CacheFS {
                 location: location.clone(),
                 last_modified: *BASE_TIME,
                 size: size as u64,
-                e_tag: None,
+                e_tag: Some(format!("{:x}-{:x}", BASE_TIME.timestamp_micros(), size)),
                 version: None,
             });
         }
