@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="row !tw-m-0 tw-p-[0.375rem]">
       <div class="float-right col flex items-center">
         <!-- Tab Toggle Buttons -->
-        <div class="button-group logs-visualize-toggle element-box-shadow tw-mr-[0.375rem]">
+        <div v-if="store.state.zoConfig.service_graph_enabled" class="button-group logs-visualize-toggle element-box-shadow tw-mr-[0.375rem]">
           <div class="row">
             <div>
               <q-btn
