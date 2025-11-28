@@ -155,6 +155,10 @@ struct ConfigResponse<'a> {
     log_page_default_field_list: String,
     query_values_default_num: i64,
     mysql_deprecated_warning: bool,
+    #[cfg(feature = "enterprise")]
+    service_graph_enabled: bool,
+    #[cfg(not(feature = "enterprise"))]
+    service_graph_enabled: bool,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -307,6 +311,11 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(not(feature = "enterprise"))]
     let ai_enabled = false;
 
+    #[cfg(feature = "enterprise")]
+    let service_graph_enabled = o2cfg.service_graph.enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let service_graph_enabled = false;
+
     #[cfg(all(feature = "cloud", not(feature = "enterprise")))]
     let build_type = "cloud";
     #[cfg(feature = "enterprise")]
@@ -410,6 +419,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         ingestion_quota_used,
         query_values_default_num: cfg.limit.query_values_default_num,
         mysql_deprecated_warning: cfg.common.meta_store.starts_with("mysql"),
+        service_graph_enabled,
     }))
 }
 
