@@ -268,6 +268,17 @@ pub async fn search(
     if let Err(e) = req.decode() {
         return Ok(MetaHttpResponse::bad_request(e));
     }
+
+    // Sampling is not available for /_search endpoint
+    if req.query.sampling_config.is_some() || req.query.sampling_ratio.is_some() {
+        log::warn!(
+            "[trace_id {}] Sampling is not available for /_search endpoint. Ignoring sampling parameters.",
+            trace_id
+        );
+        req.query.sampling_config = None;
+        req.query.sampling_ratio = None;
+    }
+
     if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&req.query.sql) {
         req.query.sql = sql;
     };

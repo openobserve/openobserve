@@ -19,6 +19,7 @@ import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
 import PatternList from "./PatternList.vue";
 import store from "@/test/unit/helpers/store";
+import i18n from "@/locales";
 
 installQuasar({
   plugins: [quasar.Notify],
@@ -61,6 +62,7 @@ describe("PatternList", () => {
         totalLogsAnalyzed: 2791,
       },
       global: {
+        plugins: [i18n],
         provide: { store },
         stubs: {
           PatternCard: {
@@ -129,6 +131,7 @@ describe("PatternList", () => {
           loading: true,
         },
         global: {
+          plugins: [i18n],
           provide: { store },
         },
       });
@@ -159,6 +162,7 @@ describe("PatternList", () => {
           totalLogsAnalyzed: 100,
         },
         global: {
+          plugins: [i18n],
           provide: { store },
         },
       });
@@ -191,6 +195,7 @@ describe("PatternList", () => {
           loading: false,
         },
         global: {
+          plugins: [i18n],
           provide: { store },
         },
       });
@@ -209,6 +214,7 @@ describe("PatternList", () => {
           loading: false,
         },
         global: {
+          plugins: [i18n],
           provide: { store },
         },
       });
@@ -225,6 +231,7 @@ describe("PatternList", () => {
           loading: false,
         },
         global: {
+          plugins: [i18n],
           provide: { store },
         },
       });
