@@ -31,8 +31,6 @@ fn main() -> Result<()> {
             "SamplingConfig",
             "#[derive(serde::Serialize, serde::Deserialize)]",
         )
-        .type_attribute("SearchRequest", "#[derive(Eq)]")
-        .type_attribute("SearchResponse", "#[derive(Eq)]")
         .type_attribute("SearchResponse", "#[derive(serde::Serialize)]")
         .type_attribute("SearchAggRequest", "#[derive(serde::Serialize)]")
         .type_attribute("SearchAggResponse", "#[derive(serde::Serialize)]")
