@@ -468,7 +468,7 @@ WHERE {field} = '{value}'
         .chunks(cfg.common.file_list_dump_stats_chunk)
         .enumerate()
     {
-        let t = exec(&fake_trace_id, cfg.limit.cpu_num, chunk, &sql).await?;
+        let t = exec(&fake_trace_id, cfg.limit.cpu_num, chunk.to_vec(), &sql).await?;
         let ret = t
             .into_iter()
             .flat_map(record_batch_to_stats)
