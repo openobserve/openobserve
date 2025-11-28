@@ -15,102 +15,92 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card
-    flat
-    class="tw-mb-[0.375rem] cursor-pointer tw-border tw-border-solid tw-border-[var(--o2-border-color)] hover:tw-bg-[var(--o2-hover-gray)]"
+  <div
+    class="tw-flex tw-items-center tw-border-b tw-border-[var(--o2-border-color)] tw-cursor-pointer hover:tw-bg-[var(--o2-hover-gray)] tw-py-2 tw-px-3"
     @click="$emit('click', pattern, index)"
     :data-test="`pattern-card-${index}`"
   >
-    <!-- Three Column Layout: Pattern | Occurrence | Percentage -->
-    <q-card-section class="tw-p-[0.625rem]">
-      <div class="row items-center q-col-gutter-md no-wrap">
-        <!-- Pattern Column -->
-        <div class="col">
-          <div
-            class="text-body2 ellipsis tw-text-[0.8rem] o2-monospace-font"
-            :class="
-              store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8'
-            "
-            :data-test="`pattern-card-${index}-template`"
-          >
-            {{ pattern.template }}
-          </div>
-          <span
-            v-if="pattern.is_anomaly"
-            class="text-negative text-weight-bold text-caption"
-            :data-test="`pattern-card-${index}-anomaly-badge`"
-            >⚠️ {{ t("search.anomalyLabel") }}</span
-          >
-        </div>
-
-        <!-- Occurrence Column -->
-        <div class="col-auto" style="min-width: 120px">
-          <span
-            class="text-body2 text-weight-bold text-primary"
-            :data-test="`pattern-card-${index}-frequency`"
-          >
-            {{ pattern.frequency.toLocaleString() }}
-          </span>
-        </div>
-
-        <!-- Percentage Column -->
-        <div class="col-auto" style="min-width: 80px">
-          <span
-            class="text-body2 text-weight-bold text-primary"
-            :data-test="`pattern-card-${index}-percentage`"
-            >{{ pattern.percentage.toFixed(2) }}%</span
-          >
-        </div>
-
-        <!-- Actions Column -->
-        <div
-          class="col-auto row items-center q-gutter-xs pattern-block-actions"
-        >
-          <q-btn
-            size="0.375rem"
-            @click.stop="$emit('include', pattern)"
-            :title="t('search.includePatternInSearch')"
-            round
-            flat
-            dense
-            :data-test="`pattern-card-${index}-include-btn`"
-          >
-            <q-icon color="currentColor">
-              <EqualIcon></EqualIcon>
-            </q-icon>
-          </q-btn>
-          <q-btn
-            size="0.375rem"
-            @click.stop="$emit('exclude', pattern)"
-            :title="t('search.excludePatternFromSearch')"
-            round
-            flat
-            dense
-            :data-test="`pattern-card-${index}-exclude-btn`"
-          >
-            <q-icon class="tw-text-[var(--o2-text-color)]">
-              <NotEqualIcon></NotEqualIcon>
-            </q-icon>
-          </q-btn>
-          <q-icon
-            name="info"
-            size="1.0625rem"
-            class="cursor-pointer"
-            :data-test="`pattern-card-${index}-details-icon`"
-          >
-            <q-tooltip>{{
-              t("search.showPatternDetails", {
-                variables: pattern.examples?.[0]?.variables
-                  ? Object.keys(pattern.examples[0].variables).length
-                  : 0,
-                examples: pattern.examples?.length || 0,
-              })
-            }}</q-tooltip>
-          </q-icon>
-        </div>
+    <!-- Pattern Column -->
+    <div class="tw-flex-1 tw-min-w-0 tw-pr-1">
+      <div
+        class="tw-text-xs tw-truncate o2-monospace-font"
+        :class="store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8'"
+        :data-test="`pattern-card-${index}-template`"
+        :title="pattern.template"
+      >
+        {{ pattern.template }}
       </div>
-    </q-card-section>
-  </q-card>
+      <span
+        v-if="pattern.is_anomaly"
+        class="text-negative text-weight-bold tw-text-[0.625rem]"
+        :data-test="`pattern-card-${index}-anomaly-badge`"
+        >⚠️ {{ t("search.anomalyLabel") }}</span
+      >
+    </div>
+
+    <!-- Occurrence Column -->
+    <div class="tw-w-16 tw-flex-shrink-0 tw-pr-1 tw-text-right">
+      <span
+        class="tw-text-xs text-weight-bold text-primary"
+        :data-test="`pattern-card-${index}-frequency`"
+      >
+        {{ pattern.frequency.toLocaleString() }}
+      </span>
+    </div>
+
+    <!-- Percentage Column -->
+    <div class="tw-w-14 tw-flex-shrink-0 tw-pr-1 tw-text-right">
+      <span
+        class="tw-text-xs text-weight-bold text-primary"
+        :data-test="`pattern-card-${index}-percentage`"
+        >{{ pattern.percentage.toFixed(2) }}%</span
+      >
+    </div>
+
+    <!-- Actions Column -->
+    <div class="tw-w-20 tw-flex-shrink-0 tw-flex tw-items-center">
+      <q-btn
+        size="6px"
+        @click.stop="$emit('include', pattern)"
+        :title="t('search.includePatternInSearch')"
+        round
+        :data-test="`pattern-card-${index}-include-btn`"
+      >
+        <q-icon style="height: 8px; width: 8px">
+          <EqualIcon></EqualIcon>
+        </q-icon>
+      </q-btn>
+      <q-btn
+        size="6px"
+        @click.stop="$emit('exclude', pattern)"
+        :title="t('search.excludePatternFromSearch')"
+        round
+        :data-test="`pattern-card-${index}-exclude-btn`"
+      >
+        <q-icon style="height: 8px; width: 8px">
+          <NotEqualIcon></NotEqualIcon>
+        </q-icon>
+      </q-btn>
+      <q-btn
+        size="6px"
+        class="cursor-pointer"
+        round
+        :data-test="`pattern-card-${index}-details-icon`"
+        @click.stop="$emit('click', pattern, index)"
+      >
+        <q-icon name="info" style="height: 8px; width: 8px">
+          <q-tooltip>{{
+            t("search.showPatternDetails", {
+              variables: pattern.examples?.[0]?.variables
+                ? Object.keys(pattern.examples[0].variables).length
+                : 0,
+              examples: pattern.examples?.length || 0,
+            })
+          }}</q-tooltip>
+        </q-icon>
+      </q-btn>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">

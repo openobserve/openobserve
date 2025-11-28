@@ -15,17 +15,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw-flex-1 tw-overflow-hidden tw-py-[0.375rem]">
-    <!-- Table Header -->
-    <div
-      v-if="patterns?.length > 0"
-      class="tw-px-[0.625rem] tw-py-[0.5rem] tw-border-b tw-border-[var(--o2-border-color)] tw-bg-[var(--o2-bg-gray)]"
-    >
-      <div class="row items-center q-col-gutter-md no-wrap">
+  <div class="tw-flex-1 tw-overflow-hidden">
+    <!-- Patterns Table -->
+    <div v-if="patterns?.length > 0" class="tw-flex tw-flex-col tw-h-full">
+      <!-- Table Header -->
+      <div
+        class="tw-flex tw-items-center tw-py-2 tw-px-3 tw-border-b tw-border-[var(--o2-border-color)] tw-sticky tw-top-0 tw-z-10"
+        :style="{
+          background: store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
+        }"
+      >
         <!-- Pattern Column Header -->
-        <div class="col">
+        <div class="tw-flex-1 tw-min-w-0 tw-pr-1">
           <span
-            class="text-caption text-weight-bold"
+            class="tw-text-xs text-weight-bold"
             :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
           >
             {{ t("search.patternColumnHeader") }}
@@ -33,9 +36,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Occurrence Column Header -->
-        <div class="col-auto" style="min-width: 120px">
+        <div class="tw-w-16 tw-flex-shrink-0 tw-pr-1 tw-text-right">
           <span
-            class="text-caption text-weight-bold"
+            class="tw-text-xs text-weight-bold"
             :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
           >
             {{ t("search.occurrenceColumnHeader") }}
@@ -43,34 +46,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Percentage Column Header -->
-        <div class="col-auto" style="min-width: 80px">
+        <div class="tw-w-14 tw-flex-shrink-0 tw-pr-1 tw-text-right">
           <span
-            class="text-caption text-weight-bold"
+            class="tw-text-xs text-weight-bold"
             :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
           >
             {{ t("search.percentageColumnHeader") }}
           </span>
         </div>
 
-        <!-- Actions Column Header -->
-        <div class="col-auto" style="min-width: 120px">
-          <span
-            class="text-caption text-weight-bold"
-            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-          >
-            {{ t("search.actionsColumnHeader") }}
-          </span>
+        <!-- Actions Column - No Header -->
+        <div class="tw-w-20 tw-flex-shrink-0">
         </div>
       </div>
-    </div>
 
-    <!-- Patterns List with Virtual Scroll -->
-    <q-virtual-scroll
-      v-if="patterns?.length > 0"
-      :items="patterns"
+      <!-- Patterns List with Virtual Scroll -->
+      <q-virtual-scroll
+        :items="patterns"
         virtual-scroll-slice-size="5"
         v-slot="{ item: pattern, index }"
-        class="tw-h-full tw-pl-[0.375rem] tw-pr-[0.625rem]"
+        class="tw-flex-1"
       >
         <PatternCard
           :pattern="pattern"
@@ -80,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @exclude="$emit('add-to-search', pattern, 'exclude')"
         />
       </q-virtual-scroll>
+    </div>
 
     <!-- Loading State -->
     <div
@@ -141,5 +137,5 @@ defineEmits<{
 }>();
 
 const store = useStore();
-const { t } = useI18n();
+const { t} = useI18n();
 </script>
