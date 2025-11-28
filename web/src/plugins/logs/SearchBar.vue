@@ -1352,7 +1352,8 @@ class="q-pr-sm q-pt-xs" />
         size="6px"
         color="primary"
         @click="toggleAiAssistant"
-        class="tw-absolute tw-top-[3.3rem] tw-right-[3rem] tw-z-50"
+        class="tw-absolute tw-right-[3rem] tw-z-50"
+        :style="{ top: isAiAssistantVisible ? `calc(3.3rem + ${aiBarHeight}px)` : '3.3rem' }"
         aria-label="Show AI Assistant"
       ></q-btn>
       <q-btn
@@ -1362,7 +1363,8 @@ class="q-pr-sm q-pt-xs" />
         size="10px"
         color="primary"
         @click="isFocused = !isFocused"
-        class="tw-absolute tw-top-[3.3rem] tw-right-[1.2rem] tw-z-50"
+        class="tw-absolute tw-right-[1.2rem] tw-z-50"
+        :style="{ top: isAiAssistantVisible ? `calc(3.3rem + ${aiBarHeight}px)` : '3.3rem' }"
       >
       <Maximize size='0.8rem' v-if="!isFocused" />
       <Minimize size="0.8rem" v-else />
@@ -1840,6 +1842,7 @@ import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { Bookmark, ChartLine, ChartNoAxesColumn, RefreshCcw, ScanSearch, Share, Menu, Maximize, Minimize } from "lucide-vue-next";
 import { outlinedShowChart } from "@quasar/extras/material-icons-outlined";
 import useAiChat from "@/composables/useAiChat";
+import { useChatHistory } from "@/composables/useChatHistory";
 import { symOutlinedCollapseAll } from "@quasar/extras/material-symbols-outlined";
 
 const defaultValue: any = () => {
@@ -2004,49 +2007,81 @@ export default defineComponent({
     const store = useStore();
     const { showErrorNotification } = useNotifications();
     const { fetchAiChat } = useAiChat();
-    
-    // DB constants for AI chat history (same as O2AiChat.vue)
-    const DB_NAME = 'o2ChatDB';
-    const DB_VERSION = 1;
-    const STORE_NAME = 'chatHistory';
-    
-    // AI chat history functions
-    const initDB = () => {
-      return new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => resolve(request.result);
-        request.onupgradeneeded = (event) => {
-          const db = (event.target as IDBOpenDBRequest).result;
-          if (!db.objectStoreNames.contains(STORE_NAME)) {
-            const store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
-            store.createIndex('timestamp', 'timestamp', { unique: false });
-            store.createIndex('title', 'title', { unique: false });
-          }
-        };
-      });
-    };
-    
+    const { findOrCreateChatByModel, appendMessages } = useChatHistory();
+
     let searchBarChatId = ref<number | null>(null);
     
+    // Extract code from markdown code blocks or plain text
+    const extractCode = (response: string, mode: string) => {
+      let cleaned = response.trim();
+
+      // Remove markdown code blocks if present
+      // Matches ```sql\n...\n``` or ```\n...\n```
+      const codeBlockRegex = /```(?:sql|vrl)?\s*\n?([\s\S]*?)```/g;
+      const match = codeBlockRegex.exec(cleaned);
+
+      if (match && match[1]) {
+        cleaned = match[1].trim();
+      }
+
+      // Remove any leading/trailing explanations
+      // If there are multiple lines, try to find where the actual code starts
+      const lines = cleaned.split('\n');
+
+      if (mode === 'sql') {
+        // Find the first line that looks like SQL
+        const sqlStartIndex = lines.findIndex(line => {
+          const lower = line.toLowerCase().trim();
+          return lower.startsWith('select') ||
+                 lower.startsWith('with') ||
+                 lower.startsWith('insert') ||
+                 lower.startsWith('update') ||
+                 lower.startsWith('delete') ||
+                 lower.startsWith('create');
+        });
+
+        if (sqlStartIndex > 0) {
+          // Remove explanation lines before the SQL starts
+          cleaned = lines.slice(sqlStartIndex).join('\n').trim();
+        }
+      }
+
+      return cleaned;
+    };
+
     // SQL detection function
     const isValidSqlQuery = (response: string) => {
       const lowerResponse = response.toLowerCase().trim();
-      
+
       // Check for basic SQL keywords - must have SELECT and FROM, or WITH and FROM
       const hasSelect = lowerResponse.includes('select');
       const hasFrom = lowerResponse.includes('from');
       const hasWith = lowerResponse.includes('with');
-      
+
       // More lenient check - if it has any SQL keywords, consider it valid
       // This prevents false positives during streaming
-      return hasSelect || hasFrom || hasWith || 
-             lowerResponse.includes('where') || 
-             lowerResponse.includes('group by') || 
+      return hasSelect || hasFrom || hasWith ||
+             lowerResponse.includes('where') ||
+             lowerResponse.includes('group by') ||
              lowerResponse.includes('order by') ||
              lowerResponse.includes('insert') ||
              lowerResponse.includes('update') ||
              lowerResponse.includes('delete');
+    };
+
+    // VRL detection function
+    const isValidVrlFunction = (response: string) => {
+      const lowerResponse = response.toLowerCase().trim();
+
+      // Check for VRL-specific patterns
+      return lowerResponse.includes('fn(') ||
+             lowerResponse.includes('.') && (
+               lowerResponse.includes('parse_') ||
+               lowerResponse.includes('encode_') ||
+               lowerResponse.includes('decode_') ||
+               lowerResponse.includes('to_string') ||
+               lowerResponse.includes('to_int')
+             );
     };
     
     // Function to open AI chat sidebar
@@ -2081,49 +2116,18 @@ export default defineComponent({
     
     const findOrCreateSearchBarChat = async () => {
       try {
-        const db = await initDB();
-        const transaction = db.transaction(STORE_NAME, 'readonly');
-        const dbStore = transaction.objectStore(STORE_NAME);
-        
-        // Find existing SearchBar AI chat
-        const request = dbStore.openCursor();
-        return new Promise<number>((resolve) => {
-          request.onsuccess = async (event) => {
-            const cursor = (event.target as IDBRequest).result;
-            if (cursor) {
-              const chat = cursor.value;
-              if (chat.model === 'logs-page-ai-assistant') {
-                searchBarChatId.value = chat.id;
-                resolve(chat.id);
-                return;
-              }
-              cursor.continue();
-            } else {
-              // No existing chat found, create new one
-              const writeTransaction = db.transaction(STORE_NAME, 'readwrite');
-              const writeStore = writeTransaction.objectStore(STORE_NAME);
-              
-              const newChat = {
-                title: 'Logs Page AI Assistant',
-                timestamp: new Date().toISOString(),
-                model: 'logs-page-ai-assistant',
-                messages: []
-              };
-              
-              const addRequest = writeStore.add(newChat);
-              addRequest.onsuccess = () => {
-                searchBarChatId.value = addRequest.result as number;
-                resolve(addRequest.result as number);
-              };
-            }
-          };
-        });
+        const chatId = await findOrCreateChatByModel(
+          'logs-page-ai-assistant',
+          'Logs Page AI Assistant'
+        );
+        searchBarChatId.value = chatId;
+        return chatId;
       } catch (error) {
         console.error('Error finding/creating SearchBar chat:', error);
         return null;
       }
     };
-    
+
     const saveSearchBarAiToHistory = async (userMessage: string, aiResponse: string, mode: string) => {
       try {
         // Find or create the SearchBar chat entry
@@ -2131,38 +2135,16 @@ export default defineComponent({
         if (!chatId) {
           chatId = await findOrCreateSearchBarChat();
         }
-        
+
         if (!chatId) return;
-        
-        const db = await initDB();
-        const transaction = db.transaction(STORE_NAME, 'readwrite');
-        const dbStore = transaction.objectStore(STORE_NAME);
-        
-        // Get existing chat
-        const getRequest = dbStore.get(chatId);
-        getRequest.onsuccess = () => {
-          const existingChat = getRequest.result;
-          if (existingChat) {
-            // Append new messages
-            existingChat.messages.push(
-              { role: 'user', content: userMessage },
-              { role: 'assistant', content: aiResponse }
-            );
-            
-            // Update timestamp
-            existingChat.timestamp = new Date().toISOString();
-            
-            // Save updated chat
-            const updateRequest = dbStore.put(existingChat);
-            updateRequest.onsuccess = () => {
-              console.log('SearchBar AI messages appended to existing chat');
-            };
-            updateRequest.onerror = () => {
-              console.error('Error updating SearchBar AI chat:', updateRequest.error);
-            };
-          }
-        };
-        
+
+        // Append messages using the composable
+        await appendMessages(chatId, [
+          { role: 'user', content: userMessage },
+          { role: 'assistant', content: aiResponse }
+        ]);
+
+        console.log('SearchBar AI messages appended to existing chat');
       } catch (error) {
         console.error('Error saving SearchBar AI chat to history:', error);
       }
@@ -2291,42 +2273,24 @@ export default defineComponent({
           throw new Error('AI request failed');
         }
         
-        // Handle streaming response with real-time updates
+        // Handle streaming response - collect full response first
         let aiResponse = '';
-        let hasStartedReplacing = false;
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
-        
+
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          
+
           const chunk = decoder.decode(value);
           const lines = chunk.split('\n');
-          
+
           for (const line of lines) {
             if (line.startsWith('data: ')) {
               try {
                 const data = JSON.parse(line.substring(6));
                 if (data.content) {
                   aiResponse += data.content;
-                  
-                  // Only start replacing once we have content
-                  if (!hasStartedReplacing && aiResponse.trim()) {
-                    hasStartedReplacing = true;
-                  }
-                  
-                  if (hasStartedReplacing) {
-                    // Update the editor in real-time
-                    if (aiAssistantMode.value === 'sql') {
-                      searchObj.data.query = aiResponse;
-                    } else {
-                      searchObj.data.tempFunctionContent = aiResponse;
-                    }
-                    
-                    // Add a small delay for typewriter effect
-                    await new Promise(resolve => setTimeout(resolve, 30));
-                  }
                 }
               } catch (e) {
                 // Ignore JSON parse errors for non-JSON lines
@@ -2334,37 +2298,41 @@ export default defineComponent({
             }
           }
         }
-        
-        // After streaming is complete, check if SQL mode and validate the response
-        if (aiAssistantMode.value === 'sql' && aiResponse.trim()) {
-          // Simple test - if response doesn't contain basic SQL keywords, show error
-          const hasBasicSql = aiResponse.toLowerCase().includes('select') || 
-                             aiResponse.toLowerCase().includes('from') || 
-                             aiResponse.toLowerCase().includes('where') ||
-                             aiResponse.toLowerCase().includes('insert') ||
-                             aiResponse.toLowerCase().includes('update') ||
-                             aiResponse.toLowerCase().includes('delete');
-          
-          console.log('SQL Detection Debug:', {
+
+        // After streaming is complete, extract and validate the code
+        if (aiResponse.trim()) {
+          // Extract the actual code (remove markdown, explanations, etc.)
+          const extractedCode = extractCode(aiResponse, aiAssistantMode.value);
+
+          // Validate based on mode
+          const isValid = aiAssistantMode.value === 'sql'
+            ? isValidSqlQuery(extractedCode)
+            : isValidVrlFunction(extractedCode);
+
+          console.log('Code Validation Debug:', {
             mode: aiAssistantMode.value,
-            responseLength: aiResponse.length,
-            firstChars: aiResponse.substring(0, 50),
-            hasBasicSql: hasBasicSql,
-            currentErrorState: showErrorNotificationDot.value
+            rawResponseLength: aiResponse.length,
+            extractedCodeLength: extractedCode.length,
+            firstChars: extractedCode.substring(0, 100),
+            isValid: isValid
           });
-          
-          if (!hasBasicSql) {
-            showErrorNotificationDot.value = true;
-            console.log('🚨 NON-SQL DETECTED! Setting error notification to TRUE');
-          } else {
+
+          if (isValid) {
+            // Write the cleaned code to the editor
+            if (aiAssistantMode.value === 'sql') {
+              searchObj.data.query = extractedCode;
+            } else {
+              searchObj.data.tempFunctionContent = extractedCode;
+            }
             showErrorNotificationDot.value = false;
-            console.log('✅ SQL DETECTED! Setting error notification to FALSE');
+            console.log('✅ Valid code detected and written to editor');
+          } else {
+            showErrorNotificationDot.value = true;
+            console.log('🚨 Invalid code detected! Not writing to editor');
+            showErrorNotification(
+              `AI returned invalid ${aiAssistantMode.value.toUpperCase()} code. Please try rephrasing your query.`
+            );
           }
-          
-          // Force reactivity update
-          nextTick(() => {
-            console.log('After nextTick - showErrorNotificationDot:', showErrorNotificationDot.value);
-          });
         }
         
         // Save the conversation to history
