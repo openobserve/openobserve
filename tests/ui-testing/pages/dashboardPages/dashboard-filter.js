@@ -13,13 +13,30 @@ export default class DashboardFilter {
   ) {
     const idx = String(index);
 
-    // Step 1: Click on the initial field name if provided
-    if (initialFieldName) {
-      await this.page
-        .locator(
-          `[data-test="dashboard-add-condition-label-${idx}-${initialFieldName}"]`
-        )
-        .click();
+    // Step 1: Click on the filter condition button
+    // The label might have changed from previous edits, so we use a more flexible selector
+    if (initialFieldName || newFieldName || operator || value) {
+      // Try to find by the exact label first (for new filters)
+      const exactLabelButton = this.page.locator(
+        `[data-test="dashboard-add-condition-label-${idx}-${initialFieldName}"]`
+      );
+
+      const buttonExists = await exactLabelButton.count() > 0;
+
+      if (buttonExists) {
+        await exactLabelButton.click();
+      } else {
+        // If exact label doesn't exist, find the button by index using a partial match
+        // This handles cases where the label has changed due to previous edits
+        const allFilterButtons = this.page.locator(`[data-test^="dashboard-add-condition-label-${idx}-"]`);
+        const buttonCount = await allFilterButtons.count();
+
+        if (buttonCount > 0) {
+          await allFilterButtons.first().click();
+        } else {
+          throw new Error(`Could not find filter condition button at index ${idx}`);
+        }
+      }
     }
 
     // Step 2: Select the new field from dropdown
@@ -28,11 +45,25 @@ export default class DashboardFilter {
         `[data-test="dashboard-add-condition-column-${idx}}"]`
       );
       await fieldDropdown.click();
-      await fieldDropdown.fill(newFieldName);
-      await this.page
-        .getByRole("option", { name: newFieldName, exact: true })
-        .first()
-        .click();
+
+      // Find the input element within the StreamFieldSelect component
+      const inputField = fieldDropdown.locator('input[aria-label="Select Field"]');
+      await inputField.waitFor({ state: "visible" });
+      await inputField.fill(newFieldName);
+
+      // Wait for the dropdown menu to appear - use .last() to get the most recent menu
+      await this.page.locator('.q-menu[role="listbox"]').last().waitFor({ state: "visible", timeout: 5000 });
+
+      // The new StreamFieldSelect uses q-item elements within expansion items
+      // After filtering, we just need to find and click the matching q-item
+      // Use getByText to find the item-label with exact text match
+      const fieldItem = this.page
+        .locator('.q-item')
+        .filter({ hasText: newFieldName })
+        .first();
+
+      await fieldItem.waitFor({ state: "visible", timeout: 10000 });
+      await fieldItem.click();
     }
 
     // Step 3: Open the condition selector
@@ -267,14 +298,18 @@ export default class DashboardFilter {
         : allColumnLocators.last();
 
     await columnLocator.click();
-    await columnLocator.fill(newFieldName);
+
+    // Find the input element within the StreamFieldSelect component
+    const inputField = columnLocator.locator('input[aria-label="Select Field"]');
+    await inputField.waitFor({ state: "visible" });
+    await inputField.fill(newFieldName);
 
     // Wait for dropdown to appear after filling the value
     // await this.page
     //   .locator('div.q-menu[role="listbox"]')
     //   .waitFor({ state: "visible", timeout: 5000 });
-    await columnLocator.press("ArrowDown");
-    await columnLocator.press("Enter");
+    await inputField.press("ArrowDown");
+    await inputField.press("Enter");
   }
 
   // New robust function for nested group filter conditions
@@ -348,11 +383,15 @@ export default class DashboardFilter {
 
     await columnLocator.waitFor({ state: "visible", timeout: 5000 });
     await columnLocator.click();
-    await columnLocator.fill(fieldName);
+
+    // Find the input element within the StreamFieldSelect component
+    const inputField = columnLocator.locator('input[aria-label="Select Field"]');
+    await inputField.waitFor({ state: "visible" });
+    await inputField.fill(fieldName);
 
     // Wait for dropdown options to be available
     await this.page.locator('.q-menu[role="listbox"]').last().waitFor({ state: "visible", timeout: 3000 }).catch(() => {});
-    await columnLocator.press("ArrowDown");
-    await columnLocator.press("Enter");
+    await inputField.press("ArrowDown");
+    await inputField.press("Enter");
   }
 }
