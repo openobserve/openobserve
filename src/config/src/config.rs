@@ -1014,6 +1014,12 @@ pub struct Common {
     )]
     // in seconds
     pub usage_publish_interval: i64,
+    #[env_config(
+        name = "ZO_ERROR_PUBLISH_TIMEOUT_SECS",
+        default = 2,
+        help = "timeout in seconds for publishing error data to self-reporting queue"
+    )]
+    pub error_publish_timeout_secs: u64,
     // MMDB
     #[env_config(name = "ZO_MMDB_DATA_DIR")] // ./data/openobserve/mmdb/
     pub mmdb_data_dir: String,
@@ -1164,12 +1170,6 @@ pub struct Common {
         help = "Strategy to use for result cache, default is both, possible value - both, overlap, duration"
     )]
     pub result_cache_selection_strategy: String,
-    #[env_config(
-        name = "ZO_METRICS_CACHE_ENABLED",
-        default = true,
-        help = "Enable result cache for PromQL metrics queries"
-    )]
-    pub metrics_cache_enabled: bool,
     #[env_config(name = "ZO_SWAGGER_ENABLED", default = true)]
     pub swagger_enabled: bool,
     #[env_config(
@@ -2565,6 +2565,19 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         ));
     }
 
+    // Print MySQL deprecation warning (logger not initialized yet at this stage)
+    if cfg.common.meta_store.starts_with("mysql") {
+        eprintln!("╔════════════════════════════════════════════════════════════════════════════╗");
+        eprintln!(
+            "║                              ⚠️  WARNING  ⚠️                                 ║"
+        );
+        eprintln!("║                                                                            ║");
+        eprintln!("║  MySQL support is DEPRECATED and will be removed in future.                ║");
+        eprintln!("║  Please migrate to PostgreSQL.                                             ║");
+        eprintln!("║                                                                            ║");
+        eprintln!("╚════════════════════════════════════════════════════════════════════════════╝");
+    }
+
     // If the default scrape interval is less than 5s, raise an error
     if cfg.common.default_scrape_interval < 5 {
         return Err(anyhow::anyhow!(
@@ -2811,16 +2824,14 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // disable disk cache for local disk storage
     if cfg.common.is_local_storage
         && !cfg.common.result_cache_enabled
-        && !cfg.common.metrics_cache_enabled
         && !cfg.common.feature_query_streaming_aggs
     {
         cfg.disk_cache.enabled = false;
     }
 
-    // disable result cache and metrics cache if disk cache is disabled
+    // disable result cache if disk cache is disabled
     if !cfg.disk_cache.enabled {
         cfg.common.result_cache_enabled = false;
-        cfg.common.metrics_cache_enabled = false;
         cfg.common.feature_query_streaming_aggs = false;
     }
 
@@ -2918,6 +2929,8 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             .count(),
     );
     cfg.disk_cache.max_size /= cfg.disk_cache.bucket_num;
+    cfg.disk_cache.result_max_size /= cfg.disk_cache.bucket_num;
+    cfg.disk_cache.aggregation_max_size /= cfg.disk_cache.bucket_num;
     cfg.disk_cache.release_size /= cfg.disk_cache.bucket_num;
     cfg.disk_cache.gc_size /= cfg.disk_cache.bucket_num;
 

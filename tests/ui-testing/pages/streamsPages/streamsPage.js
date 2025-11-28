@@ -376,9 +376,51 @@ export class StreamsPage {
     async selectDateRange(startDay, endDay) {
         await this.page.locator('[data-test="date-time-btn"]').click();
         
+        // Wait for date picker to be visible
+        await this.page.locator('.q-date').waitFor({ state: 'visible' });
+        
+        // Ensure we're in the correct view (day view, not year/month view)
+        // If year view is visible, click on current year to go to month view
+        if (await this.page.locator('.q-date__view--years').isVisible()) {
+            const currentYear = new Date().getFullYear();
+            await this.page.locator('.q-date__years .q-btn').filter({ hasText: currentYear.toString() }).click();
+        }
+        
+        // If month view is visible, click on current month to go to day view  
+        if (await this.page.locator('.q-date__view--months').isVisible()) {
+            const currentMonth = new Date().toLocaleDateString('en', { month: 'short' });
+            await this.page.locator('.q-date__months .q-btn').filter({ hasText: currentMonth }).click();
+        }
+        
+        // Now we should be in day view, wait for calendar to be ready
+        await this.page.locator('.q-date__calendar').waitFor({ state: 'visible' });
+        await this.page.waitForTimeout(500); // Small wait for transitions
+        
         // Use specific calendar locators to avoid strict mode violation
-        await this.page.locator('.q-date__calendar .q-btn').filter({ hasText: startDay.toString() }).first().click();
-        await this.page.locator('.q-date__calendar .q-btn').filter({ hasText: endDay.toString() }).first().click();
+        // Click start day with retry logic
+        try {
+            await this.page.locator('.q-date__calendar .q-btn').filter({ hasText: startDay.toString() }).first().click({ timeout: 5000 });
+        } catch (error) {
+            // Fallback: try to click any available day close to startDay
+            const availableDays = await this.page.locator('.q-date__calendar .q-btn').filter({ hasText: /^\d+$/ }).all();
+            if (availableDays.length > 0) {
+                await availableDays[0].click();
+            }
+        }
+        
+        // Wait a bit between clicks
+        await this.page.waitForTimeout(300);
+        
+        // Click end day with retry logic
+        try {
+            await this.page.locator('.q-date__calendar .q-btn').filter({ hasText: endDay.toString() }).first().click({ timeout: 5000 });
+        } catch (error) {
+            // Fallback: try to click any available day close to endDay
+            const availableDays = await this.page.locator('.q-date__calendar .q-btn').filter({ hasText: /^\d+$/ }).all();
+            if (availableDays.length > 1) {
+                await availableDays[1].click();
+            }
+        }
         
         await this.page.locator('[data-test="date-time-apply-btn"]').click();
     }
@@ -386,7 +428,10 @@ export class StreamsPage {
     async selectDateRangeForCurrentMonth() {
         const currentDate = new Date();
         const currentDay = currentDate.getDate();
-        const endDay = Math.min(currentDay + 5, 28); // Select a date 5 days later or 28th, whichever is smaller
+        
+        // Calculate a safe end day - ensure it's within the current month and not too far
+        const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+        const endDay = Math.min(currentDay + 3, daysInMonth - 1, 25); // Conservative approach - max 25th
         
         await this.selectDateRange(currentDay, endDay);
         

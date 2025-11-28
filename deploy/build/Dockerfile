@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM public.ecr.aws/docker/library/node:24-trixie AS webBuilder
+FROM public.ecr.aws/docker/library/node:24-trixie AS webbuilder
 WORKDIR /web
 COPY ./web /web/
 
@@ -16,7 +16,7 @@ RUN rustc --version && sccache --version
 
 WORKDIR /openobserve
 COPY . /openobserve
-COPY --from=webBuilder /web/dist web/dist
+COPY --from=webbuilder /web/dist web/dist
 
 RUN cargo build --release
 

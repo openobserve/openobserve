@@ -392,11 +392,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
         <div
-          style="width: 430px; height: 320px; position: sticky; top: 0 "
+          style="width: 430px; height: 100%; position: sticky; top: 0 "
           class=" col-2"
         >
           <preview-alert
-            style="border: 1px solid #ececec; height: 300px; width: 430px;"
+            style="border: 1px solid #ececec; height: 100%; width: 430px;"
             ref="previewAlertRef"
             :formData="formData"
             :query="previewQuery"
@@ -1539,6 +1539,13 @@ export default defineComponent({
       // When user updated query and click on save
       await new Promise((resolve) => setTimeout(resolve, 500));
 
+      // Ensure all accordion sections are expanded before validation
+      this.expandState.alertSetup = true;
+      this.expandState.queryMode = true;
+      this.expandState.thresholds = true;
+      this.expandState.realTimeMode = true;
+      this.expandState.advancedSetup = true;
+      await nextTick(); // Wait for DOM to update with all expanded sections
 
       if (
         this.formData.is_real_time == "false" &&

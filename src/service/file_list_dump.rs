@@ -166,7 +166,7 @@ fn record_batch_to_stats(rb: RecordBatch) -> Vec<(String, StreamStats)> {
 async fn inner_exec(
     trace_id: &str,
     partitions: usize,
-    dump_files: &[FileKey],
+    dump_files: Vec<FileKey>,
     query: &str,
 ) -> Result<Vec<RecordBatch>, errors::Error> {
     let schema = super::super::job::FILE_LIST_SCHEMA.clone();
@@ -193,7 +193,7 @@ async fn inner_exec(
 async fn exec(
     trace_id: &str,
     partitions: usize,
-    dump_files: &[FileKey],
+    dump_files: Vec<FileKey>,
     query: &str,
 ) -> Result<Vec<RecordBatch>, errors::Error> {
     let trace_id = format!("{trace_id}-file-list-dump");
@@ -237,7 +237,7 @@ pub async fn query(
         range.0, max_ts_upper_bound, range.1
     );
 
-    let t = exec(trace_id, cfg.limit.cpu_num, &dump_files, &query).await?;
+    let t = exec(trace_id, cfg.limit.cpu_num, dump_files, &query).await?;
 
     let ret = t
         .into_iter()
@@ -282,7 +282,7 @@ pub async fn get_ids_in_range(
         range.0, max_ts_upper_bound, range.1
     );
 
-    let t = exec(trace_id, cfg.limit.cpu_num, &dump_files, &query).await?;
+    let t = exec(trace_id, cfg.limit.cpu_num, dump_files, &query).await?;
 
     let ret = t.into_iter().flat_map(record_batch_to_file_id).collect();
     let process_time = process_start.elapsed().as_millis();

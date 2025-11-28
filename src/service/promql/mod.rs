@@ -14,14 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::HashSet,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use async_trait::async_trait;
-use config::meta::search::ScanStats;
+use config::meta::search::{ScanStats, SearchEventType};
 use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContext};
+use hashbrown::HashSet;
 use promql_parser::label::Matchers;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -56,7 +56,7 @@ pub trait TableProvider: Sync + Send + 'static {
         stream_name: &str,
         time_range: (i64, i64),
         machers: Matchers,
-        label_selector: Option<HashSet<String>>,
+        label_selector: HashSet<String>,
         filters: &mut [(String, Vec<String>)],
     ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats)>>;
 }
@@ -69,6 +69,9 @@ pub struct MetricsQueryRequest {
     pub step: i64,
     pub query_exemplars: bool,
     pub use_cache: Option<bool>,
+    pub search_type: Option<SearchEventType>,
+    pub regions: Vec<String>,
+    pub clusters: Vec<String>,
 }
 
 /// Converts `t` to the number of microseconds elapsed since the beginning of
