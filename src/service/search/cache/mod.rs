@@ -803,6 +803,7 @@ fn merge_histogram_bucket(
     }
 
     // Sum all numeric fields across all bucket hits
+    // Normalize all numeric types to f64 for consistent aggregation
     for hit in &bucket_hits {
         if let Some(obj) = hit.as_object() {
             for (key, value) in obj {
@@ -810,14 +811,19 @@ fn merge_histogram_bucket(
                     continue; // Already handled
                 }
 
-                if let Some(num) = value.as_f64() {
-                    let current = merged.get(key).and_then(|v| v.as_f64()).unwrap_or(0.0);
-                    merged.insert(key.clone(), json::Value::from(current + num));
+                // Try to extract numeric value, normalizing to f64
+                let num_value = if let Some(num) = value.as_f64() {
+                    Some(num)
                 } else if let Some(num) = value.as_i64() {
-                    let current = merged.get(key).and_then(|v| v.as_i64()).unwrap_or(0);
-                    merged.insert(key.clone(), json::Value::from(current + num));
+                    Some(num as f64)
                 } else if let Some(num) = value.as_u64() {
-                    let current = merged.get(key).and_then(|v| v.as_u64()).unwrap_or(0);
+                    Some(num as f64)
+                } else {
+                    None
+                };
+
+                if let Some(num) = num_value {
+                    let current = merged.get(key).and_then(|v| v.as_f64()).unwrap_or(0.0);
                     merged.insert(key.clone(), json::Value::from(current + num));
                 }
             }
@@ -1328,5 +1334,50 @@ mod tests {
         }
         . = arr1_final"#;
         assert!(is_result_array_skip_vrl(query_fn));
+    }
+
+    #[test]
+    fn test_merge_histogram_bucket_mixed_numeric_types() {
+        use serde_json::json;
+
+        // Test merging buckets with mixed numeric types (i64, u64, f64)
+        let bucket_hits = vec![
+            json!({"_timestamp": 1000, "count": 5, "total": 100, "ratio": 0.5}),
+            json!({"_timestamp": 1000, "count": 3.0, "total": 50, "ratio": 0.3}),
+            json!({"_timestamp": 1000, "count": 2, "total": 25.5, "ratio": 0.2}),
+        ];
+
+        let result = merge_histogram_bucket(bucket_hits, "_timestamp", &vec![]);
+
+        // Verify timestamp is preserved
+        assert_eq!(result["_timestamp"], 1000);
+
+        // Verify numeric fields are summed correctly regardless of input type
+        // All should be normalized to f64
+        assert_eq!(result["count"].as_f64().unwrap(), 10.0); // 5 + 3.0 + 2
+        assert_eq!(result["total"].as_f64().unwrap(), 175.5); // 100 + 50 + 25.5
+        assert_eq!(result["ratio"].as_f64().unwrap(), 1.0); // 0.5 + 0.3 + 0.2
+    }
+
+    #[test]
+    fn test_merge_histogram_bucket_preserves_non_numeric() {
+        use serde_json::json;
+
+        let bucket_hits = vec![
+            json!({"_timestamp": 1000, "count": 5, "status": "success", "enabled": true}),
+            json!({"_timestamp": 1000, "count": 3, "status": "error", "enabled": false}),
+        ];
+
+        let result = merge_histogram_bucket(bucket_hits, "_timestamp", &vec![]);
+
+        // Verify timestamp is preserved from first hit
+        assert_eq!(result["_timestamp"], 1000);
+
+        // Verify numeric field is summed
+        assert_eq!(result["count"].as_f64().unwrap(), 8.0);
+
+        // Verify string and boolean fields are preserved from first hit
+        assert_eq!(result["status"], "success");
+        assert_eq!(result["enabled"], true);
     }
 }
