@@ -217,12 +217,13 @@ pub async fn add(
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Entity::insert(record)
-        .exec(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-
-    Ok(())
+    match Entity::insert(record).exec(client).await {
+        Ok(_) => Ok(()),
+        Err(e) => match e.sql_err() {
+            Some(SqlErr::UniqueConstraintViolation(_)) => Ok(()),
+            _ => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
+        },
+    }
 }
 
 pub async fn remove(org_id: &str, email: &str) -> Result<(), errors::Error> {
