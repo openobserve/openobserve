@@ -21,68 +21,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click="$emit('click', pattern, index)"
     :data-test="`pattern-card-${index}`"
   >
-    <!-- Header with Rank and Stats - Compact -->
+    <!-- Three Column Layout: Pattern | Occurrence | Percentage -->
     <q-card-section class="tw-p-[0.625rem]">
       <div class="row items-center q-col-gutter-md no-wrap">
-        <div class="col-auto">
-          <q-avatar
-            size="2rem"
-            color="primary"
-            text-color="white"
-            class="text-weight-bold"
-            :data-test="`pattern-card-${index}-rank`"
-          >
-            {{ index + 1 }}
-          </q-avatar>
-        </div>
+        <!-- Pattern Column -->
         <div class="col">
-          <!-- Template shown first -->
-          <div class="tw-flex tw-items-center q-mb-xs">
-            <div
-              class="text-body2 ellipsis tw-text-[0.8rem] o2-monospace-font"
-              :class="
-                store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8'
-              "
-              :data-test="`pattern-card-${index}-template`"
-            >
-              {{ pattern.template }}
-            </div>
-          </div>
-          <!-- Occurrences and percentage on second line -->
           <div
-            class="text-caption"
+            class="text-body2 ellipsis tw-text-[0.8rem] o2-monospace-font"
             :class="
-              store.state.theme === 'dark' ? 'text-grey-6' : 'text-grey-6'
+              store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8'
             "
+            :data-test="`pattern-card-${index}-template`"
           >
-            <span
-              class="text-weight-bold text-primary"
-              :data-test="`pattern-card-${index}-frequency`"
-            >
-              {{ pattern.frequency.toLocaleString() }}
-            </span>
-            occurrences 
-            <span class="q-mx-xs">•</span>
-            <span
-              class="text-weight-bold text-primary"
-              :data-test="`pattern-card-${index}-percentage`"
-              >{{ pattern.percentage.toFixed(2) }}%</span
-            >
-            <span
-              v-if="pattern.is_anomaly"
-              class="text-negative text-weight-bold q-ml-sm"
-              :data-test="`pattern-card-${index}-anomaly-badge`"
-              >⚠️ ANOMALY</span
-            >
+            {{ pattern.template }}
           </div>
+          <span
+            v-if="pattern.is_anomaly"
+            class="text-negative text-weight-bold text-caption"
+            :data-test="`pattern-card-${index}-anomaly-badge`"
+            >⚠️ {{ t("search.anomalyLabel") }}</span
+          >
         </div>
+
+        <!-- Occurrence Column -->
+        <div class="col-auto" style="min-width: 120px">
+          <span
+            class="text-body2 text-weight-bold text-primary"
+            :data-test="`pattern-card-${index}-frequency`"
+          >
+            {{ pattern.frequency.toLocaleString() }}
+          </span>
+        </div>
+
+        <!-- Percentage Column -->
+        <div class="col-auto" style="min-width: 80px">
+          <span
+            class="text-body2 text-weight-bold text-primary"
+            :data-test="`pattern-card-${index}-percentage`"
+            >{{ pattern.percentage.toFixed(2) }}%</span
+          >
+        </div>
+
+        <!-- Actions Column -->
         <div
           class="col-auto row items-center q-gutter-xs pattern-block-actions"
         >
           <q-btn
             size="0.375rem"
             @click.stop="$emit('include', pattern)"
-            title="Include pattern in search"
+            :title="t('search.includePatternInSearch')"
             round
             flat
             dense
@@ -95,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             size="0.375rem"
             @click.stop="$emit('exclude', pattern)"
-            title="Exclude pattern from search"
+            :title="t('search.excludePatternFromSearch')"
             round
             flat
             dense
@@ -111,15 +98,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="cursor-pointer"
             :data-test="`pattern-card-${index}-details-icon`"
           >
-            <q-tooltip
-              >Show details ({{
-                pattern.examples?.[0]?.variables
+            <q-tooltip>{{
+              t("search.showPatternDetails", {
+                variables: pattern.examples?.[0]?.variables
                   ? Object.keys(pattern.examples[0].variables).length
-                  : 0
-              }}
-              variables,
-              {{ pattern.examples?.length || 0 }} examples)</q-tooltip
-            >
+                  : 0,
+                examples: pattern.examples?.length || 0,
+              })
+            }}</q-tooltip>
           </q-icon>
         </div>
       </div>
@@ -129,6 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 
@@ -144,6 +131,7 @@ defineEmits<{
 }>();
 
 const store = useStore();
+const { t } = useI18n();
 </script>
 
 <style scoped lang="scss">

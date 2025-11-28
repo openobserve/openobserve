@@ -974,7 +974,6 @@ pub struct CancelQueryResponse {
     #[prost(bool, tag = "1")]
     pub is_success: bool,
 }
-#[derive(Eq)]
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct SearchRequest {
     #[prost(string, tag = "1")]
@@ -988,7 +987,6 @@ pub struct SearchRequest {
     #[prost(bytes = "vec", tag = "5")]
     pub request: ::prost::alloc::vec::Vec<u8>,
 }
-#[derive(Eq)]
 #[derive(serde::Serialize)]
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct SearchResponse {

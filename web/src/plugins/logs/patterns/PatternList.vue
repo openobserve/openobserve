@@ -16,6 +16,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw-flex-1 tw-overflow-hidden tw-py-[0.375rem]">
+    <!-- Table Header -->
+    <div
+      v-if="patterns?.length > 0"
+      class="tw-px-[0.625rem] tw-py-[0.5rem] tw-border-b tw-border-[var(--o2-border-color)] tw-bg-[var(--o2-bg-gray)]"
+    >
+      <div class="row items-center q-col-gutter-md no-wrap">
+        <!-- Pattern Column Header -->
+        <div class="col">
+          <span
+            class="text-caption text-weight-bold"
+            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+          >
+            {{ t("search.patternColumnHeader") }}
+          </span>
+        </div>
+
+        <!-- Occurrence Column Header -->
+        <div class="col-auto" style="min-width: 120px">
+          <span
+            class="text-caption text-weight-bold"
+            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+          >
+            {{ t("search.occurrenceColumnHeader") }}
+          </span>
+        </div>
+
+        <!-- Percentage Column Header -->
+        <div class="col-auto" style="min-width: 80px">
+          <span
+            class="text-caption text-weight-bold"
+            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+          >
+            {{ t("search.percentageColumnHeader") }}
+          </span>
+        </div>
+
+        <!-- Actions Column Header -->
+        <div class="col-auto" style="min-width: 120px">
+          <span
+            class="text-caption text-weight-bold"
+            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+          >
+            {{ t("search.actionsColumnHeader") }}
+          </span>
+        </div>
+      </div>
+    </div>
+
     <!-- Patterns List with Virtual Scroll -->
     <q-virtual-scroll
       v-if="patterns?.length > 0"
@@ -78,6 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import PatternCard from "./PatternCard.vue";
 
 defineProps<{
@@ -92,4 +141,5 @@ defineEmits<{
 }>();
 
 const store = useStore();
+const { t } = useI18n();
 </script>
