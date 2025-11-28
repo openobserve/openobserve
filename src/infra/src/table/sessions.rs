@@ -13,13 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::{sea_query::OnConflict, ColumnTrait, EntityTrait, QueryFilter, Set};
 
 use super::entity::sessions::{ActiveModel, Column, Entity, Model};
-use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
-    errors,
-};
+use crate::{db::{connect_to_orm, ORM_CLIENT}, errors};
 
 /// Gets a session by session_id
 pub async fn get(session_id: &str) -> Result<Option<Model>, errors::Error> {
@@ -31,34 +28,27 @@ pub async fn get(session_id: &str) -> Result<Option<Model>, errors::Error> {
     Ok(session)
 }
 
-/// Creates or updates a session
+/// Creates or updates a session atomically using upsert
 pub async fn set(session_id: &str, access_token: &str) -> Result<(), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = chrono::Utc::now().timestamp_micros();
 
-    // Check if session exists
-    let existing = Entity::find()
-        .filter(Column::SessionId.eq(session_id))
-        .one(client)
-        .await?;
+    // Use atomic upsert to avoid race conditions
+    let active_model = ActiveModel {
+        session_id: Set(session_id.to_string()),
+        access_token: Set(access_token.to_string()),
+        created_at: Set(now),
+        updated_at: Set(now),
+    };
 
-    if let Some(existing) = existing {
-        // Update existing session
-        let mut active_model: ActiveModel = existing.into();
-        active_model.access_token = Set(access_token.to_string());
-        active_model.updated_at = Set(now);
-        active_model.update(client).await?;
-    } else {
-        // Insert new session
-        let active_model = ActiveModel {
-            id: sea_orm::ActiveValue::NotSet,
-            session_id: Set(session_id.to_string()),
-            access_token: Set(access_token.to_string()),
-            created_at: Set(now),
-            updated_at: Set(now),
-        };
-        active_model.insert(client).await?;
-    }
+    Entity::insert(active_model)
+        .on_conflict(
+            OnConflict::column(Column::SessionId)
+                .update_columns([Column::AccessToken, Column::UpdatedAt])
+                .to_owned(),
+        )
+        .exec(client)
+        .await?;
 
     Ok(())
 }
