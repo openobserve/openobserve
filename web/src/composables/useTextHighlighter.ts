@@ -450,7 +450,7 @@ export function useTextHighlighter() {
 
   /**
    * Processes text segments with both semantic coloring and keyword highlighting
-   * Quotes are always shown when requested, but background highlighting only applies to content
+   * Each segment is processed individually to maintain semantic colorization
    *
    * @param segments - Array of text segments to process
    * @param keywords - Keywords to highlight
@@ -459,10 +459,6 @@ export function useTextHighlighter() {
    * @returns HTML string with applied styling
    */
   function processTextSegments(segments: Array<{ content: string; type: string }>, keywords: string[], colors: any, showQuotes: boolean = false): string {
-    // Always reconstruct the full text to handle merged consecutive quotes properly
-    const fullText = segments.map(s => s.content).join('');
-    const fullTextParts = splitTextByKeywords(fullText, keywords);
-
     let result = '';
 
     // Add opening quote if requested
@@ -470,16 +466,35 @@ export function useTextHighlighter() {
       result += `<span style="color: ${colors.stringValue};">&quot;</span>`;
     }
 
-    // Process the full text as a single unit
-    result += fullTextParts.map(part => {
-      const content = escapeHtml(part.text);
-      if (part.isHighlighted) {
-        return `<span style="background-color: rgb(255, 213, 0); color: black;">${content}</span>`;
-      } else {
-        const semanticType = detectSemanticType(part.text);
-        const semanticColor = getColorForType(semanticType, colors) || colors.stringValue;
-        return `<span style="color: ${semanticColor};">${content}</span>`;
+    // Process each segment individually to preserve semantic colorization
+    result += segments.map(segment => {
+      // For whitespace, just return as-is with no special styling
+      if (segment.type === "whitespace") {
+        return segment.content;
       }
+
+      // For bracketed content, preserve brackets with semantic color for content
+      if (segment.type === "bracketed") {
+        const innerContent = segment.content.slice(1, -1); // Remove brackets
+        const semanticType = detectSemanticType(innerContent);
+        const semanticColor = getColorForType(semanticType, colors) || colors.stringValue;
+        return `<span style="color: #9ca3af;">[</span><span style="color: ${semanticColor};">${escapeHtml(innerContent)}</span><span style="color: #9ca3af;">]</span>`;
+      }
+
+      // For regular tokens, split by keywords and apply semantic colors
+      const parts = splitTextByKeywords(segment.content, keywords);
+      return parts.map(part => {
+        const content = escapeHtml(part.text);
+        if (part.isHighlighted) {
+          // Highlighted keywords get yellow background
+          return `<span style="background-color: rgb(255, 213, 0); color: black;">${content}</span>`;
+        } else {
+          // Apply semantic colorization based on content type
+          const semanticType = detectSemanticType(part.text);
+          const semanticColor = getColorForType(semanticType, colors) || colors.stringValue;
+          return `<span style="color: ${semanticColor};">${content}</span>`;
+        }
+      }).join('');
     }).join('');
 
     // Add closing quote if requested
