@@ -1352,7 +1352,7 @@ class="q-pr-sm q-pt-xs" />
         size="6px"
         color="primary"
         @click="toggleAiAssistant"
-        class="tw-absolute tw-top-[3.1rem] tw-right-[3rem] tw-z-50"
+        class="tw-absolute tw-top-[3.3rem] tw-right-[3rem] tw-z-50"
         aria-label="Show AI Assistant"
       ></q-btn>
       <q-btn
