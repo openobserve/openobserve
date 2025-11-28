@@ -20,6 +20,25 @@ export default class DashboardCreate {
     this.backBtn = this.page.locator('[data-test="dashboard-back-btn"]');
   }
 
+  // Wait for dashboard UI to be fully stable before any interaction
+  async waitForDashboardUIStable() {
+    // Wait for search input to be stable
+    await this.searchDash.waitFor({ state: "visible", timeout: 30000 });
+    await this.searchDash.waitFor({ state: "attached", timeout: 5000 });
+
+    // Wait for "New Dashboard" button to be stable
+    await this.dashCreateBtn.waitFor({ state: "visible", timeout: 30000 });
+    await this.dashCreateBtn.waitFor({ state: "attached", timeout: 5000 });
+
+    // Wait for the import button to also be stable (confirms full header is loaded)
+    const importBtn = this.page.locator('[data-test="dashboard-import"]');
+    await importBtn.waitFor({ state: "visible", timeout: 10000 });
+    await importBtn.waitFor({ state: "attached", timeout: 5000 });
+
+    // Small wait for any animations to complete
+    await this.page.waitForTimeout(500);
+  }
+
   //Create Dashboard
   async createDashboard(dashboardName) {
     // Wait for the dashboard page to be fully loaded by checking for the search input

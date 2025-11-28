@@ -33,6 +33,9 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
+    // Wait for dashboard UI to be fully stable
+    await pm.dashboardCreate.waitForDashboardUIStable();
+
     // Create a new dashboard and add a panel
     await pm.dashboardCreate.createDashboard(randomDashboardName);
     await pm.dashboardCreate.addPanel();
@@ -70,6 +73,9 @@ test.describe("dashboard UI testcases", () => {
     // Navigate to the dashboards list
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
+
+     // Wait for dashboard UI to be fully stable
+     await pm.dashboardCreate.waitForDashboardUIStable();
 
     // Create a new dashboard and add a panel
     await pm.dashboardCreate.createDashboard(randomDashboardName);
@@ -215,6 +221,9 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
+     // Wait for dashboard UI to be fully stable
+     await pm.dashboardCreate.waitForDashboardUIStable();
+
     // Create a new dashboard and add a panel
     await pm.dashboardCreate.createDashboard(randomDashboardName);
     await pm.dashboardCreate.addPanel();
@@ -262,6 +271,8 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
+     // Wait for dashboard UI to be fully stable
+     await pm.dashboardCreate.waitForDashboardUIStable();
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
 
@@ -306,6 +317,9 @@ test.describe("dashboard UI testcases", () => {
     // Navigate to the dashboards list
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
+
+     // Wait for dashboard UI to be fully stable
+     await pm.dashboardCreate.waitForDashboardUIStable();
 
     // Create a new dashboard and add a panel
     await pm.dashboardCreate.createDashboard(randomDashboardName);
