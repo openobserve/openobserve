@@ -203,7 +203,7 @@ function buildSQLJoinsFromInput(
  */
 function buildFieldExpression(field: any, defaultStream: any): string {
   const sqlExpr = buildSQLQueryFromInput(field, defaultStream);
-  return sqlExpr ? `${sqlExpr} as ${field.alias}` : "";
+  return sqlExpr ? `${sqlExpr} as "${field.alias}"` : "";
 }
 
 /**
