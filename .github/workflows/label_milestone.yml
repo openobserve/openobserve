@@ -6,16 +6,13 @@ permissions:
   pull-requests: write
   issues: write
 
-# on:
-#   pull_request_review:
-#     types: [submitted]
-
 on:
-  push:
+  pull_request_review:
+    types: [submitted]
 
 jobs:
   label_and_milestone:
-    # if: github.event.review.state == 'approved'
+    if: github.event.review.state == 'approved'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5 
