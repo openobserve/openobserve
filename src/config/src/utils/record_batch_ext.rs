@@ -908,7 +908,7 @@ pub fn convert_json_to_record_batch(
     data: &[Arc<serde_json::Value>],
 ) -> Result<RecordBatch, ArrowError> {
     if data.is_empty() {
-        return RecordBatch::try_new(schema.clone(), vec![]);
+        return Ok(RecordBatch::new_empty(schema.clone()));
     }
 
     let records_len = data.len();
