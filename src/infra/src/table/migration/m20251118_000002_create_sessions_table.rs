@@ -20,24 +20,16 @@ use super::get_text_type;
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
-const SESSION_ID_IDX: &str = "sessions_session_id_idx";
-
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
             .create_table(create_sessions_table_statement())
             .await?;
-        manager
-            .create_index(create_sessions_session_id_idx_stmnt())
-            .await?;
         Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .drop_index(Index::drop().name(SESSION_ID_IDX).to_owned())
-            .await?;
         manager
             .drop_table(Table::drop().table(Sessions::Table).to_owned())
             .await?;
@@ -52,18 +44,11 @@ fn create_sessions_table_statement() -> TableCreateStatement {
         .table(Sessions::Table)
         .if_not_exists()
         .col(
-            // Auto-increment ID used only as primary key, not for business logic
-            // Session lookups use session_id (UUID), not this ID
-            ColumnDef::new(Sessions::Id)
-                .big_integer()
-                .not_null()
-                .auto_increment()
-                .primary_key(),
-        )
-        .col(
+            // session_id is the primary key - enforces uniqueness without extra index
             ColumnDef::new(Sessions::SessionId)
                 .string_len(36)
-                .not_null(),
+                .not_null()
+                .primary_key(),
         )
         .col(
             ColumnDef::new(Sessions::AccessToken)
@@ -75,22 +60,10 @@ fn create_sessions_table_statement() -> TableCreateStatement {
         .to_owned()
 }
 
-/// Statement to create unique index on session_id.
-fn create_sessions_session_id_idx_stmnt() -> IndexCreateStatement {
-    sea_query::Index::create()
-        .if_not_exists()
-        .name(SESSION_ID_IDX)
-        .table(Sessions::Table)
-        .unique()
-        .col(Sessions::SessionId)
-        .to_owned()
-}
-
 /// Identifiers used in queries on the sessions table.
 #[derive(DeriveIden)]
 pub(super) enum Sessions {
     Table,
-    Id,
     SessionId,
     AccessToken,
     CreatedAt,
