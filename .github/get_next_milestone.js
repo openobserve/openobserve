@@ -39,8 +39,8 @@ async function main() {
   const body = await res.json();
   let milestones = [];
   body.forEach((ms) => {
-    // always ignore backlog for auto labeling
-    if (ms.title == "Backlog") {
+    // always ignore backlog for auto labeling, and skip non-open milestones
+    if (ms.title == "Backlog" || ms.state !== "open") {
       return;
     }
 
