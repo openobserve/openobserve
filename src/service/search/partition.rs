@@ -214,7 +214,10 @@ impl PartitionGenerator {
                 partitions.push([new_start, end]);
                 break; // We've covered the entire range
             } else {
-                partitions.push([start, end]);
+                // Only push partition if it's not empty
+                if start < end {
+                    partitions.push([start, end]);
+                }
                 end = start;
             }
         }
