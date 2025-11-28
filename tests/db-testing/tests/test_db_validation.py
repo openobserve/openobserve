@@ -28,13 +28,15 @@ class TestSchemaValidation:
 
         # Query the database to verify schema was created
         # Note: meta table structure is (id, module, key1, key2, start_dt, value)
+        # key1 = org_id, key2 = stream_type/stream_name
+        stream_key = f"logs/{test_stream}"
         db_cursor.execute("""
             SELECT key1, key2, value
             FROM meta
             WHERE module = 'schema'
-            AND key1 = 'logs'
+            AND key1 = %s
             AND key2 = %s
-        """, (test_stream,))
+        """, (test_org, stream_key))
 
         results = db_cursor.fetchall()
 
@@ -43,14 +45,14 @@ class TestSchemaValidation:
 
         # Verify schema contains expected fields
         for row in results:
-            stream_type, stream_name, schema_json = row
-            assert stream_name == test_stream
-            assert stream_type == 'logs'
+            org_id, stream_path, schema_json = row
+            assert org_id == test_org
+            assert stream_path == stream_key
             schema = json.loads(schema_json) if isinstance(schema_json, str) else schema_json
 
             # Check that schema contains our ingested fields
             # (Schema structure may vary based on your implementation)
-            print(f"Schema found for {stream_type}/{stream_name}: {schema}")
+            print(f"Schema found for org '{org_id}' stream '{stream_path}': {schema}")
 
 
 class TestDataIngestion:
@@ -80,31 +82,6 @@ class TestDataIngestion:
         if hits:
             total = hits[0].get("total", 0)
             assert total >= 10, f"Expected at least 10 records, got {total}"
-
-
-class TestMetadataConsistency:
-    """Test metadata consistency between API and database."""
-
-    def test_organization_metadata(self, db_cursor, test_org):
-        """
-        Test that organization metadata is properly stored in the database.
-        """
-        # Query organization metadata from database
-        # Note: meta table doesn't have org_id column, organization info is in key1/key2
-        db_cursor.execute("""
-            SELECT module, key1, key2, value
-            FROM meta
-            WHERE module = 'organization'
-            LIMIT 10
-        """)
-
-        results = db_cursor.fetchall()
-
-        # Just verify we can query metadata table successfully
-        print(f"Found {len(results)} organization metadata entries")
-        if results:
-            for row in results[:3]:
-                print(f"  Organization entry: module={row[0]}, key1={row[1]}, key2={row[2]}")
 
 
 class TestTantivyIndexing:

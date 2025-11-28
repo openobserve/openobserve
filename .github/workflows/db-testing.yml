@@ -26,6 +26,8 @@ jobs:
   db_validation_tests:
     name: db_validation_tests
     runs-on: ubicloud-standard-8
+    permissions:
+      contents: read
 
     services:
       postgres:
