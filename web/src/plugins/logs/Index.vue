@@ -1314,6 +1314,16 @@ export default defineComponent({
     const collapseFieldList = () => {
       if (searchObj.meta.showFields) searchObj.meta.showFields = false;
       else searchObj.meta.showFields = true;
+
+      // Redraw chart after field list collapse/expand
+      nextTick(() => {
+        if (
+          searchObj.meta.showHistogram &&
+          searchResultRef.value?.reDrawChart
+        ) {
+          searchResultRef.value.reDrawChart();
+        }
+      });
     };
 
     const areStreamsPresent = computed(() => {
