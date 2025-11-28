@@ -985,16 +985,10 @@ async fn convert_parquet_to_vortex(parquet_bytes: &[u8]) -> Result<Bytes, anyhow
     let dtype = chunks[0].dtype().clone();
     let vortex_array = ChunkedArray::try_new(chunks, dtype)?.into_array();
 
-    // Create a tokio file from the buffer for async writing
-    let tmp_path = format!(
-        "{}/{}",
-        get_config().common.data_tmp_dir,
-        config::ider::generate()
-    );
-    tokio::fs::create_dir_all(&get_config().common.data_tmp_dir).await?;
-
-    let output_file = tokio::fs::File::create(&tmp_path).await?;
-    let compat_writer = output_file.compat_write();
+    // Create an in-memory buffer for async writing
+    let mut buffer = Vec::with_capacity(parquet_bytes.len());
+    let cursor = std::io::Cursor::new(&mut buffer);
+    let compat_writer = cursor.compat_write();
     let mut writer = AsyncWriteAdapter(compat_writer);
 
     // Create a Vortex session and write the data
@@ -1004,11 +998,8 @@ async fn convert_parquet_to_vortex(parquet_bytes: &[u8]) -> Result<Bytes, anyhow
         .write(&mut writer, vortex_array.to_array_stream())
         .await?;
 
-    // Read the vortex file into bytes
-    let vortex_bytes = tokio::fs::read(&tmp_path).await?;
-
-    // Clean up the temporary file
-    let _ = tokio::fs::remove_file(&tmp_path).await;
+    // The vortex_bytes are now in the buffer
+    let vortex_bytes = buffer;
 
     Ok(Bytes::from(vortex_bytes))
 }
