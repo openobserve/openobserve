@@ -233,6 +233,9 @@ function buildChartQuery(config: {
   const { queryData, dashboardPanelData } = config;
   const stream = queryData.fields.stream;
 
+  // Only use stream alias when joins exist
+  const streamAlias = queryData?.joins?.length > 0 ? stream : "";
+
   // Validate required fields
   if (config.requiredFields) {
     for (const fieldName of config.requiredFields) {
@@ -250,7 +253,7 @@ function buildChartQuery(config: {
   const selectExpressions: string[] = [];
   for (const fieldConfig of config.selectFields) {
     if (!fieldConfig || !fieldConfig.field) continue;
-    const expr = buildFieldExpression(fieldConfig.field, stream);
+    const expr = buildFieldExpression(fieldConfig.field, streamAlias);
     if (expr) selectExpressions.push(expr);
   }
 
