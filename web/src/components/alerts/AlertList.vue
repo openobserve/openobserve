@@ -576,14 +576,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw-flex-1 tw-overflow-y-auto tw-px-6 tw-py-4" v-if="selectedAlertDetails">
           <!-- Alert Name -->
           <div class="tw-mb-6">
-            <div class="tw-text-sm tw-font-semibold tw-text-gray-600 tw-mb-1">Alert Name</div>
+            <div class="tw-text-sm tw-font-semibold tw-mb-1" :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'">Alert Name</div>
             <div class="tw-text-base">{{ selectedAlertDetails.name }}</div>
           </div>
 
           <!-- SQL Query / Conditions -->
           <div class="tw-mb-6">
             <div class="tw-flex tw-items-center tw-justify-between tw-mb-2">
-              <div class="tw-text-sm tw-font-semibold tw-text-gray-600">
+              <div class="tw-text-sm tw-font-semibold" :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'">
                 {{ selectedAlertDetails.type == "sql" ? "SQL Query" : "Conditions" }}
               </div>
               <q-btn
@@ -598,7 +598,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-tooltip>Copy</q-tooltip>
               </q-btn>
             </div>
-            <pre class="tw-bg-gray-100 tw-p-3 tw-rounded tw-text-sm tw-overflow-x-auto" style="white-space: pre-wrap">{{
+            <pre :class="store.state.theme === 'dark' ? 'tw-bg-gray-800 tw-text-gray-200' : 'tw-bg-gray-100 tw-text-gray-900'" class="tw-p-3 tw-rounded tw-text-sm tw-overflow-x-auto" style="white-space: pre-wrap">{{
               selectedAlertDetails.conditions != "" && selectedAlertDetails.conditions != "--"
                 ? (selectedAlertDetails.type == 'sql' ? selectedAlertDetails.conditions : selectedAlertDetails.conditions.length != 2 ? `if ${selectedAlertDetails.conditions}` : 'No condition')
                 : "No condition"
@@ -607,20 +607,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Description -->
           <div class="tw-mb-6">
-            <div class="tw-text-sm tw-font-semibold tw-text-gray-600 tw-mb-2">Description</div>
-            <pre class="tw-bg-gray-100 tw-p-3 tw-rounded tw-text-sm" style="white-space: pre-wrap">{{ selectedAlertDetails.description || "No description" }}</pre>
+            <div class="tw-text-sm tw-font-semibold tw-mb-2" :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'">Description</div>
+            <pre :class="store.state.theme === 'dark' ? 'tw-bg-gray-800 tw-text-gray-200' : 'tw-bg-gray-100 tw-text-gray-900'" class="tw-p-3 tw-rounded tw-text-sm" style="white-space: pre-wrap">{{ selectedAlertDetails.description || "No description" }}</pre>
           </div>
 
           <!-- Alert History Table -->
           <div v-if="config.isCloud == 'false'" class="tw-mb-6">
-            <div class="tw-text-sm tw-font-semibold tw-text-gray-600 tw-mb-3">Evaluation History</div>
+            <div class="tw-text-sm tw-font-semibold tw-mb-3" :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'">Evaluation History</div>
 
             <div v-if="isLoadingHistory" class="tw-text-center tw-py-8">
               <q-spinner size="32px" color="primary" />
-              <div class="tw-text-sm tw-mt-3 tw-text-gray-600">Loading history...</div>
+              <div class="tw-text-sm tw-mt-3" :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'">Loading history...</div>
             </div>
 
-            <div v-else-if="expandedAlertHistory.length === 0" class="tw-text-center tw-py-8 tw-text-gray-500">
+            <div v-else-if="expandedAlertHistory.length === 0" class="tw-text-center tw-py-8" :class="store.state.theme === 'dark' ? 'tw-text-gray-500' : 'tw-text-gray-500'">
               <q-icon name="history" size="48px" class="tw-mb-2 tw-opacity-30" />
               <div class="tw-text-sm">No evaluation history available for this alert</div>
             </div>
