@@ -23,10 +23,14 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
-    common::meta::{
-        http::HttpResponse as MetaHttpResponse, ingestion::IngestionRequest,
-        middleware_data::RumExtraData,
+    common::{
+        meta::{
+            http::HttpResponse as MetaHttpResponse, ingestion::IngestionRequest,
+            middleware_data::RumExtraData,
+        },
+        utils::auth::UserEmail,
     },
+    handler::http::extractors::Headers,
     service::logs,
 };
 
@@ -116,18 +120,20 @@ pub struct View {
 #[post("/v1/{org_id}/rum")]
 pub async fn data(
     path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
     body: web::Bytes,
     rum_query_data: web::ReqData<RumExtraData>,
 ) -> Result<HttpResponse, Error> {
     let org_id: String = path.into_inner();
     let extend_json = &rum_query_data.data;
+    let user_email = &user_email.user_id;
     Ok(
         match logs::ingest::ingest(
             0,
             &org_id,
             RUM_DATA_STREAM,
             IngestionRequest::RUM(&body),
-            "",
+            user_email,
             Some(extend_json),
             false,
         )
@@ -164,18 +170,20 @@ pub async fn data(
 #[post("/v1/{org_id}/logs")]
 pub async fn log(
     path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
     body: web::Bytes,
     rum_query_data: web::ReqData<RumExtraData>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let extend_json = &rum_query_data.data;
+    let user_email = &user_email.user_id;
     Ok(
         match logs::ingest::ingest(
             0,
             &org_id,
             RUM_LOG_STREAM,
             IngestionRequest::RUM(&body),
-            "",
+            user_email,
             Some(extend_json),
             false,
         )
@@ -216,6 +224,7 @@ pub async fn log(
 #[post("/v1/{org_id}/replay")]
 pub async fn sessionreplay(
     path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
     payload: MultipartForm<SegmentEvent>,
     rum_query_data: web::ReqData<RumExtraData>,
 ) -> Result<HttpResponse, Error> {
@@ -237,13 +246,14 @@ pub async fn sessionreplay(
 
     let body = json::to_vec(&ingestion_payload).unwrap();
     let extend_json = &rum_query_data.data;
+    let user_email = &user_email.user_id;
     Ok(
         match logs::ingest::ingest(
             0,
             &org_id,
             RUM_SESSION_REPLAY_STREAM,
             IngestionRequest::RUM(&body.into()),
-            "",
+            user_email,
             Some(extend_json),
             false,
         )

@@ -19,6 +19,7 @@ use std::{
     ops::Range,
     path::{Path, PathBuf},
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    time::SystemTime,
 };
 
 use async_recursion::async_recursion;
@@ -32,6 +33,7 @@ use config::{
     },
 };
 use hashbrown::HashMap;
+use object_store::{GetOptions, GetResult, GetResultPayload, ObjectMeta};
 use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
 
@@ -491,6 +493,44 @@ fn get_file_reader(file: &str) -> Option<&FileData> {
         RESULT_FILES_READER.get(idx).unwrap()
     };
     Some(files)
+}
+
+pub async fn get_opts(file: &str, options: GetOptions) -> object_store::Result<GetResult> {
+    let Some(files) = get_file_reader(file) else {
+        return Err(object_store::Error::NotFound {
+            path: file.to_string(),
+            source: Box::new(std::io::Error::other("file not found")),
+        });
+    };
+    let path = PathBuf::from(files.get_file_path(file));
+    let (metadata, fp) = std::fs::File::open(&path)
+        .and_then(|f| Ok((f.metadata()?, f)))
+        .map_err(|e| object_store::Error::NotFound {
+            path: file.to_string(),
+            source: Box::new(e),
+        })?;
+
+    let last_modified = last_modified(&metadata);
+    let meta = ObjectMeta {
+        location: file.into(),
+        last_modified,
+        size: metadata.len(),
+        e_tag: Some(get_etag(&metadata)),
+        version: None,
+    };
+    options.check_preconditions(&meta)?;
+
+    let range = match options.range {
+        Some(r) => r.as_range(meta.size).unwrap(),
+        None => 0..meta.size,
+    };
+
+    Ok(GetResult {
+        payload: GetResultPayload::File(fp, path),
+        attributes: Default::default(),
+        range,
+        meta,
+    })
 }
 
 #[inline]
@@ -1009,6 +1049,24 @@ pub fn parse_aggregation_cache_key(
         is_descending: false,
     };
     Some((org_id, stream_type, query_key, meta))
+}
+
+fn last_modified(metadata: &std::fs::Metadata) -> chrono::DateTime<chrono::Utc> {
+    metadata
+        .modified()
+        .expect("Modified file time should be supported on this platform")
+        .into()
+}
+
+fn get_etag(metadata: &std::fs::Metadata) -> String {
+    let size = metadata.len();
+    let mtime = metadata
+        .modified()
+        .ok()
+        .and_then(|mtime| mtime.duration_since(SystemTime::UNIX_EPOCH).ok())
+        .unwrap_or_default()
+        .as_micros();
+    format!("{mtime:x}-{size:x}")
 }
 
 // Write data to a temporary random file and return the file path

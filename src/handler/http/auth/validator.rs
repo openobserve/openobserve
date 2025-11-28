@@ -648,7 +648,19 @@ pub async fn validator_rum(
     let token = query.get("oo-api-key").or_else(|| query.get("o2-api-key"));
     match token {
         Some(token) => match validate_token(token, org_id_end_point[0]).await {
-            Ok(_res) => Ok(req),
+            Ok(_res) => {
+                // Get user from token to set user_id header
+                if let Some(user) = users::get_user_by_token(org_id_end_point[0], token).await {
+                    let mut req = req;
+                    req.headers_mut().insert(
+                        header::HeaderName::from_static("user_id"),
+                        header::HeaderValue::from_str(&user.email).unwrap(),
+                    );
+                    Ok(req)
+                } else {
+                    Ok(req)
+                }
+            }
             Err(err) => {
                 log::error!(
                     "validate_token: Token not found for org_id: {}",
