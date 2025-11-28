@@ -119,7 +119,7 @@ impl super::FileList for PostgresFileList {
         let meta = &dump_file.meta;
         let now_ts = now_micros();
         DB_QUERY_NUMS
-            .with_label_values(&["insert", "file_list", ""])
+            .with_label_values(&["insert", "file_list"])
             .inc();
         if let Err(e) = sqlx::query(r#"INSERT INTO file_list (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) ON CONFLICT DO NOTHING;"#
@@ -160,7 +160,7 @@ impl super::FileList for PostgresFileList {
                 .join(",");
             let query_str = format!("delete FROM file_list WHERE id IN ({ids})");
             DB_QUERY_NUMS
-                .with_label_values(&["delete_by_ids", "file_list", ""])
+                .with_label_values(&["delete_by_ids", "file_list"])
                 .inc();
             let start = std::time::Instant::now();
             let res = sqlx::query(&query_str).execute(&mut *tx).await;
@@ -1577,7 +1577,7 @@ SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
         let pool = CLIENT_RO.clone();
 
         DB_QUERY_NUMS
-            .with_label_values(&["select", "file_list_jobs", ""])
+            .with_label_values(&["select", "file_list_jobs"])
             .inc();
         let ret = sqlx::query_as::<_, (i64,String, String, i64)>(
             r#"SELECT id, org, stream, offsets FROM file_list_jobs WHERE status = $1 AND dumped = $2 limit 1000"#,
@@ -1599,7 +1599,7 @@ SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
     async fn set_job_dumped_status(&self, id: i64, dumped: bool) -> Result<()> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["update", "file_list_jobs", ""])
+            .with_label_values(&["update", "file_list_jobs"])
             .inc();
         sqlx::query("UPDATE file_list_jobs SET dumped = $1 WHERE id = $2;")
             .bind(dumped)
