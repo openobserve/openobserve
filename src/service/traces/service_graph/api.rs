@@ -190,7 +190,7 @@ pub async fn get_store_stats(org_id: web::Path<String>) -> Result<HttpResponse, 
     let org_capacity_util = org_capacities.get(org_id.as_str()).copied().unwrap_or(0.0);
 
     let stats = json::json!({
-        "enabled": config::get_config().service_graph.enabled,
+        "enabled": o2_enterprise::enterprise::common::config::get_config().service_graph.enabled,
         "store_size": org_store_size,
         "capacity_utilization_percent": org_capacity_util,
         "shard_count": store.shard_count(),

@@ -385,7 +385,10 @@ pub async fn handle_otlp_request(
 
                 // Process span for service graph if enabled
                 #[cfg(feature = "enterprise")]
-                if cfg.service_graph.enabled {
+                if o2_enterprise::enterprise::common::config::get_config()
+                    .service_graph
+                    .enabled
+                {
                     // Wrap in catch_unwind to prevent panics from crashing trace ingestion
                     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                         log::trace!(
