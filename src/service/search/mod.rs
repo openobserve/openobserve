@@ -178,6 +178,7 @@ pub async fn search(
         Some((query.start_time, query.end_time)),
         in_req.search_type.map(|v| v.to_string()),
         in_req.query.histogram_interval,
+        in_req.clear_cache,
     );
     if in_req.query.streaming_output && !in_req.query.track_total_hits {
         request.set_streaming_output(true, in_req.query.streaming_id.clone());
@@ -620,6 +621,7 @@ pub async fn search_partition(
     skip_max_query_range: bool,
     is_http_req: bool,
     enable_align_histogram: bool,
+    use_aggs_cache: bool,
 ) -> Result<search::SearchPartitionResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -1037,23 +1039,26 @@ pub async fn search_partition(
             );
 
             // Discover existing cache files for this query
-            let cache_discovery_result = match discover_cache_for_query(
-                &cache_file_path,
-                query.start_time,
-                query.end_time,
-            )
-            .await
-            {
-                Ok(result) => result,
-                Err(e) => {
-                    log::warn!(
-                        "[trace_id {trace_id}] [streaming_id: {streaming_id}] Failed to discover cache: {e}, proceeding without cache optimization"
-                    );
-                    // Create empty discovery result to proceed without cache
-                    o2_enterprise::enterprise::search::cache::streaming_agg::CacheDiscoveryResult::empty(
-                        query.start_time,
-                        query.end_time,
-                    )
+            let cache_discovery_result = if !use_aggs_cache {
+                o2_enterprise::enterprise::search::cache::streaming_agg::CacheDiscoveryResult::empty(
+                    query.start_time,
+                    query.end_time,
+                )
+            } else {
+                match discover_cache_for_query(&cache_file_path, query.start_time, query.end_time)
+                    .await
+                {
+                    Ok(result) => result,
+                    Err(e) => {
+                        log::warn!(
+                            "[trace_id {trace_id}] [streaming_id: {streaming_id}] Failed to discover cache: {e}, proceeding without cache optimization"
+                        );
+                        // Create empty discovery result to proceed without cache
+                        o2_enterprise::enterprise::search::cache::streaming_agg::CacheDiscoveryResult::empty(
+                            query.start_time,
+                            query.end_time,
+                        )
+                    }
                 }
             };
 
@@ -1500,6 +1505,7 @@ pub async fn search_partition_multi(
             false,
             true,
             enable_align_histogram,
+            false, // disable aggs cache
         )
         .await
         {
