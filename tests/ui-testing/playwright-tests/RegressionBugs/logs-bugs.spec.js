@@ -76,9 +76,8 @@ test.describe("Logs Regression Bugs", () => {
     // Navigate to logs page
     await pm.logsPage.clickMenuLinkLogsItem();
 
-    // Click stream dropdown and select default stream
-    await pm.logsPage.clickStreamDropdown();
-    await pm.logsPage.selectDefaultStream();
+    // Select e2e_automate stream
+    await pm.logsPage.selectStream("e2e_automate");
 
     // Open date-time picker
     await pm.logsPage.clickDateTimeButton();
