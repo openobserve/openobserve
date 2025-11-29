@@ -70,7 +70,30 @@ impl SemanticFieldGroup {
             normalize,
         }
     }
+
+    /// Validate semantic field group ID format
+    pub fn validate_id(id: &str) -> bool {
+        if id.is_empty() {
+            return false;
+        }
+        // Lowercase, alphanumeric, dash-separated
+        id.chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+            && !id.starts_with('-')
+            && !id.ends_with('-')
+            && !id.contains("--")
+    }
+
     /// Get default semantic groups for common use cases
+    ///
+    /// ⚠️ **NOTE**: This is a minimal OSS fallback. The canonical source of defaults
+    /// for enterprise builds is in:
+    /// `o2-enterprise/o2_enterprise/src/enterprise/alerts/default_semantic_groups.json`
+    ///
+    /// Enterprise code should call
+    /// `o2_enterprise::enterprise::alerts::semantic_config::SemanticFieldGroup::load_defaults_from_file()`
+    /// instead.
+    #[allow(dead_code)]
     pub fn default_presets() -> Vec<Self> {
         vec![
             Self::new(
@@ -227,17 +250,15 @@ impl SemanticFieldGroup {
         ]
     }
 
-    /// Validate semantic field group ID format
-    pub fn validate_id(id: &str) -> bool {
-        if id.is_empty() {
-            return false;
-        }
-        // Lowercase, alphanumeric, dash-separated
-        id.chars()
-            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
-            && !id.starts_with('-')
-            && !id.ends_with('-')
-            && !id.contains("--")
+    /// Load default semantic groups
+    ///
+    /// For OSS builds, this returns the minimal preset.
+    /// For enterprise builds with full JSON, call
+    /// `o2_enterprise::enterprise::alerts::semantic_config::SemanticFieldGroup::load_defaults_from_file()`
+    /// instead.
+    pub fn load_defaults_from_file() -> Vec<Self> {
+        // OSS fallback: return minimal preset
+        Self::default_presets()
     }
 }
 
@@ -496,7 +517,7 @@ impl GlobalDeduplicationConfig {
     pub fn default_with_presets() -> Self {
         Self {
             enabled: false,
-            semantic_field_groups: SemanticFieldGroup::default_presets(),
+            semantic_field_groups: SemanticFieldGroup::load_defaults_from_file(),
             alert_dedup_enabled: false,
             alert_fingerprint_groups: vec![],
             time_window_minutes: None,
