@@ -1078,7 +1078,8 @@ pub async fn search_partition(
             );
 
             log::info!(
-                "[trace_id {trace_id}] [streaming_id: {streaming_id}] Partition strategy: requires_execution={}, execution_partitions={}",
+                "[trace_id {trace_id}] [streaming_id: {streaming_id}] Partition strategy: {}, requires_execution={}, execution_partitions={}",
+                partition_strategy.strategy_name(),
                 partition_strategy.requires_execution(),
                 partition_strategy.execution_partition_count()
             );

@@ -338,10 +338,11 @@ pub async fn do_partitioned_search(
                     if target_interval_mins > 0 {
                         use o2_enterprise::enterprise::search::cache::streaming_agg::delete_mismatched_interval_cache_files;
 
-                        // Delete synchronously to ensure cleanup completes before returning
                         match delete_mismatched_interval_cache_files(
                             streaming_id,
                             &cache_file_path,
+                            modified_start_time,
+                            modified_end_time,
                             target_interval_mins,
                         )
                         .await
