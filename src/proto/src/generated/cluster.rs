@@ -2821,6 +2821,8 @@ pub struct StreamingAggsExecNode {
     pub aggregate_plan: ::core::option::Option<
         ::datafusion_proto::protobuf::PhysicalPlanNode,
     >,
+    #[prost(bool, tag = "8")]
+    pub overwrite_cache: bool,
 }
 /// Search request
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -2872,6 +2874,8 @@ pub struct SearchInfo {
     pub is_analyze: bool,
     #[prost(message, optional, tag = "10")]
     pub sampling_config: ::core::option::Option<SamplingConfig>,
+    #[prost(bool, tag = "11")]
+    pub clear_cache: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IndexInfo {
