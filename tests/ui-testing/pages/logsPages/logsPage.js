@@ -130,6 +130,11 @@ export class LogsPage {
         this.cmLine = '.view-line';
         this.searchFunctionInput = { placeholder: 'Search Function' };
         this.timestampFieldTable = '[data-test="log-search-index-list-fields-table"]';
+
+        // Error handling locators
+        this.errorIcon = 'text=error';
+        this.resultErrorDetailsBtn = '[data-test="logs-page-result-error-details-btn"]';
+        this.searchDetailErrorMessage = '[data-test="logs-search-detail-error-message"]';
     }
 
 
@@ -2691,5 +2696,52 @@ export class LogsPage {
 
     async fillQueryEditorWithRole(text) {
         return await this.page.locator(this.queryEditor).getByRole('textbox', { name: 'Editor content' }).fill(text);
+    }
+
+    async clickStreamDropdown() {
+        return await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+    }
+
+    async selectDefaultStream() {
+        return await this.page.locator('#q-portal--menu--1').getByText('default').click();
+    }
+
+    async clickTimeCell() {
+        // Click on the time cell (access_time icon)
+        return await this.page.getByRole('cell', { name: ':' }).getByLabel('access_time').first().click();
+    }
+
+    async fillTimeCellWithInvalidValue(value) {
+        // Fill time cell with partial/invalid value
+        return await this.page.getByRole('cell', { name: ':' }).getByLabel('access_time').first().fill(value);
+    }
+
+    async expectErrorIconVisible() {
+        return await expect(this.page.getByText('error')).toBeVisible();
+    }
+
+    async expectResultErrorDetailsButtonVisible() {
+        return await expect(this.page.locator(this.resultErrorDetailsBtn)).toBeVisible();
+    }
+
+    async clickResultErrorDetailsButton() {
+        return await this.page.locator(this.resultErrorDetailsBtn).click();
+    }
+
+    async expectSearchDetailErrorMessageVisible() {
+        return await expect(this.page.locator(this.searchDetailErrorMessage)).toBeVisible();
+    }
+
+    async expectStartTimeVisible() {
+        return await expect(this.page.getByRole('cell', { name: 'Start time' })).toBeVisible();
+    }
+
+    async expectEndTimeVisible() {
+        return await expect(this.page.getByRole('cell', { name: 'End time' })).toBeVisible();
+    }
+
+    async clickOutsideTimeInput() {
+        // Click outside to trigger validation
+        return await this.page.locator('body').click({ position: { x: 0, y: 0 } });
     }
 } 
