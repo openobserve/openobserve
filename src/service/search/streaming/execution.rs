@@ -314,7 +314,58 @@ pub async fn do_partitioned_search(
     // Remove the streaming_aggs cache
     if is_streaming_aggs && partition_resp.streaming_id.is_some() {
         #[cfg(feature = "enterprise")]
-        streaming_aggs_exec::remove_cache(&partition_resp.streaming_id.unwrap())
+        {
+            let streaming_id = partition_resp.streaming_id.as_ref().unwrap();
+
+            // Delete mismatched-interval cache files BEFORE removing cache
+            // This ensures cache consistency - only files with the target interval are kept
+            // We do this before remove_cache() because we need GLOBAL_CACHE data
+            // Only runs when clear_cache is true (when overwrite_cache was requested)
+            //
+            // NOTE: There's a potential race condition if:
+            // - User1 refreshes cache with interval A (clear_cache=true)
+            // - User2 queries with interval B simultaneously
+            // - User2 might see partial results if deletion happens during cache discovery
+            if req.clear_cache {
+                // Get the cache file path and interval from GLOBAL_CACHE
+                if let Some(cache_file_path) = streaming_aggs_exec::GLOBAL_CACHE
+                    .id_cache
+                    .get_cache_file_path(streaming_id)
+                {
+                    let target_interval_mins =
+                        streaming_aggs_exec::GLOBAL_CACHE.get_cache_interval(streaming_id);
+
+                    if target_interval_mins > 0 {
+                        use o2_enterprise::enterprise::search::cache::streaming_agg::delete_mismatched_interval_cache_files;
+
+                        // Delete synchronously to ensure cleanup completes before returning
+                        match delete_mismatched_interval_cache_files(
+                            streaming_id,
+                            &cache_file_path,
+                            target_interval_mins,
+                        )
+                        .await
+                        {
+                            Ok(deleted_count) => {
+                                if deleted_count > 0 {
+                                    log::info!(
+                                        "[trace_id: {trace_id}] [streaming_id: {streaming_id}] Successfully deleted {deleted_count} mismatched-interval cache files (target_interval: {target_interval_mins}min)"
+                                    );
+                                }
+                            }
+                            Err(e) => {
+                                log::warn!(
+                                    "[trace_id: {trace_id}] [streaming_id: {streaming_id}] Failed to delete mismatched-interval cache files: {e:?}"
+                                );
+                                // Don't fail the query if cleanup fails
+                            }
+                        }
+                    }
+                }
+            }
+
+            streaming_aggs_exec::remove_cache(streaming_id)
+        }
     }
 
     Ok(())
