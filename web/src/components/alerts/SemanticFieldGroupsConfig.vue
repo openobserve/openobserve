@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Preset Templates -->
     <div class="row q-col-gutter-md q-mb-md">
-      <div class="col-12 col-md-6">
+      <div class="col-12 col-md-4">
         <q-select
           v-model="selectedPreset"
           :options="presetOptions"
@@ -55,7 +55,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-select>
       </div>
-      <div class="col-12 col-md-6 flex items-center">
+      <div class="col-12 col-md-8 flex items-center justify-end q-gutter-sm">
+        <q-btn
+          outline
+          color="primary"
+          label="Import from JSON"
+          icon="upload_file"
+          size="sm"
+          @click="navigateToImport"
+        />
         <q-btn
           color="primary"
           label="Add Custom Group"
@@ -120,7 +128,10 @@ class="q-mb-sm" />
 
 <script lang="ts" setup>
 import { ref, computed, watch } from "vue";
+import { useRouter } from "vue-router";
 import SemanticGroupItem from "./SemanticGroupItem.vue";
+
+const router = useRouter();
 
 interface SemanticGroup {
   id: string;
@@ -358,6 +369,12 @@ const removeGroup = (index: number) => {
   );
 
   emitUpdate();
+};
+
+const navigateToImport = () => {
+  router.push({
+    name: "importSemanticGroups",
+  });
 };
 
 const emitUpdate = () => {

@@ -378,6 +378,17 @@ const useRoutes = () => {
       },
     },
     {
+      path: "alerts/import-semantic-groups",
+      name: "importSemanticGroups",
+      component: () => import("@/components/alerts/ImportSemanticGroups.vue"),
+      meta: {
+        title: "Import Semantic Groups",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
       path: "short/:id",
       name: "shortUrl",
       component: ShortUrl,
