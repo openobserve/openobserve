@@ -1,7 +1,6 @@
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const { test, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const logData = require("../../fixtures/log.json");
 const logsdata = require("../../../test-data/logs_data.json");
 
 // Utility Functions
@@ -32,18 +31,6 @@ async function ingestTestData(page) {
     logsdata: logsdata
   });
   testLogger.debug('API response received', { response });
-}
-
-async function applyQueryButton(page) {
-  // click on the run query button
-  // Type the value of a variable into an input field
-  const search = page.waitForResponse(logData.applyQuery);
-  await page.waitForLoadState('networkidle');
-  await page.locator("[data-test='logs-search-bar-refresh-btn']").click({
-    force: true,
-  });
-  // get the data from the search variable
-  await expect.poll(async () => (await search).status()).toBe(200);
 }
 
 test.describe("Logs Regression Bugs", () => {
