@@ -2698,14 +2698,6 @@ export class LogsPage {
         return await this.page.locator(this.queryEditor).getByRole('textbox', { name: 'Editor content' }).fill(text);
     }
 
-    async clickStreamDropdown() {
-        return await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
-    }
-
-    async selectDefaultStream() {
-        return await this.page.locator('#q-portal--menu--1').getByText('default').click();
-    }
-
     async clickTimeCell() {
         // Click on the time cell (access_time icon)
         return await this.page.getByRole('cell', { name: ':' }).getByLabel('access_time').first().click();
