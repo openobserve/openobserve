@@ -65,7 +65,7 @@ use crate::{
             },
             inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
             sql::Sql,
-            utils::{AsyncDefer, ScanStatsVisitor, check_query_default_limit_exceeded},
+            utils::{ScanStatsVisitor, check_query_default_limit_exceeded},
         },
     },
 };
@@ -208,6 +208,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     )
     .await?;
 
+    // workgroup cleanup is automatic via _lock drop)
     #[cfg(feature = "enterprise")]
     let _lock = {
         // Predict workgroup first
@@ -254,11 +255,6 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     metrics::QUERY_RUNNING_NUMS
         .with_label_values(&[&sql.org_id])
         .inc();
-
-    // Setup cleanup for metrics (workgroup cleanup is automatic via _lock drop)
-    let trace_id_move = trace_id.to_string();
-    let org_id_move = sql.org_id.clone();
-    let _defer = AsyncDefer::new({});
 
     // 5. partition file list
     let partitioned_file_lists = partition_file_lists(file_id_list, &nodes, role_group).await?;
