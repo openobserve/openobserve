@@ -143,6 +143,7 @@ version = "2.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "24eda4e2a6e042aa4e55ac438a2ae052d3b5da0ecf83d7411e1a368946925208"
 dependencies = [
+ "actix-macros",
  "futures-core",
  "tokio",
 ]
@@ -6081,9 +6082,9 @@ dependencies = [
 
 [[package]]
 name = "jsonschema"
-version = "0.37.4"
+version = "0.37.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "73c9ffb2b5c56d58030e1b532d8e8389da94590515f118cf35b5cb68e4764a7e"
+checksum = "4543525fce6b350188b8c8cc9a275f2ff68be8f655558cd039745795077547e1"
 dependencies = [
  "ahash 0.8.11",
  "bytecount",
@@ -6097,7 +6098,7 @@ dependencies = [
  "num-cmp",
  "num-traits",
  "percent-encoding",
- "referencing 0.37.4",
+ "referencing 0.37.3",
  "regex",
  "regex-syntax",
  "reqwest",
@@ -8205,12 +8206,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
-name = "pastey"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57d6c094ee800037dff99e02cab0eaf3142826586742a270ab3d7a62656bd27a"
-
-[[package]]
 name = "pbkdf2"
 version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9631,9 +9626,9 @@ dependencies = [
 
 [[package]]
 name = "referencing"
-version = "0.37.4"
+version = "0.37.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4283168a506f0dcbdce31c9f9cce3129c924da4c6bca46e46707fcb746d2d70c"
+checksum = "15220c97dd63468dd770536d67748040b18cef01188b735ace92f83665c0f07d"
 dependencies = [
  "ahash 0.8.11",
  "fluent-uri 0.4.1",
@@ -9857,7 +9852,7 @@ dependencies = [
  "spin 0.5.2",
  "untrusted 0.7.1",
  "web-sys",
- "winapi",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -9955,38 +9950,7 @@ dependencies = [
  "paste",
  "pin-project-lite",
  "rand 0.9.2",
- "rmcp-macros 0.9.1",
- "schemars 1.1.0",
- "serde",
- "serde_json",
- "sse-stream",
- "thiserror 2.0.17",
- "tokio",
- "tokio-stream",
- "tokio-util 0.7.17",
- "tower-service",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "rmcp"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38b18323edc657390a6ed4d7a9110b0dec2dc3ed128eb2a123edfbafabdbddc5"
-dependencies = [
- "async-trait",
- "base64 0.22.1",
- "bytes",
- "chrono",
- "futures 0.3.31",
- "http 1.4.0",
- "http-body 1.0.1",
- "http-body-util",
- "pastey",
- "pin-project-lite",
- "rand 0.9.2",
- "rmcp-macros 0.10.0",
+ "rmcp-macros",
  "schemars 1.1.0",
  "serde",
  "serde_json",
@@ -10002,19 +9966,24 @@ dependencies = [
 
 [[package]]
 name = "rmcp-actix-web"
-version = "0.8.19"
+version = "0.8.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3dbc014fd3e9ff9414607f1edf03e624f725710e8fa8a5ee93ed116cf072b61c"
+checksum = "0c7597344af747d3c50681254ca7be9324f585f6fc438618bca66d0de3395e7b"
 dependencies = [
+ "actix-rt",
  "actix-web",
  "async-stream",
  "bon",
+ "bytes",
  "futures 0.3.31",
- "rmcp 0.10.0",
+ "http 1.4.0",
+ "rmcp",
  "serde",
  "serde_json",
+ "sse-stream",
  "tokio",
  "tokio-stream",
+ "tokio-util 0.7.17",
  "tracing",
 ]
 
@@ -10032,35 +10001,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "rmcp-macros"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c75d0a62676bf8c8003c4e3c348e2ceb6a7b3e48323681aaf177fdccdac2ce50"
-dependencies = [
- "darling 0.21.1",
- "proc-macro2",
- "quote",
- "serde_json",
- "syn 2.0.110",
-]
-
-[[package]]
 name = "rmcp-openapi"
-version = "0.20.6"
+version = "0.20.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8cd5cab75ed166bd5db8abc27d1dac5c031e2644ffca9e59e72ffd12c4201a5"
+checksum = "e3bbbbcfaa7062dee1de0cc09544e95a808f29266a0acb72aecfefa80e8e6364"
 dependencies = [
  "base64 0.22.1",
  "bon",
  "heck 0.5.0",
  "http 1.4.0",
  "indexmap 2.12.0",
- "jsonschema 0.37.4",
+ "jsonschema 0.37.3",
  "mime",
  "oas3",
  "regex",
  "reqwest",
- "rmcp 0.9.1",
+ "rmcp",
  "rmcp-actix-web",
  "schemars 1.1.0",
  "serde",
@@ -11811,7 +11767,7 @@ dependencies = [
  "ntapi",
  "once_cell",
  "rayon",
- "winapi",
+ "winapi 0.3.9",
 ]
 
 [[package]]
