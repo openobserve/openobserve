@@ -68,7 +68,7 @@ use {
         search::{
             TaskStatus, WorkGroup,
             cache::streaming_agg::{
-                create_aggregation_cache_file_path, discover_cache_for_query,
+                create_aggregation_cache_file_path, discover_cache_for_query_with_streaming_id,
                 generate_optimal_partitions, get_aggregation_cache_key_from_request,
             },
             cache_aggs_util,
@@ -1045,8 +1045,13 @@ pub async fn search_partition(
                     query.end_time,
                 )
             } else {
-                match discover_cache_for_query(&cache_file_path, query.start_time, query.end_time)
-                    .await
+                match discover_cache_for_query_with_streaming_id(
+                    &streaming_id,
+                    &cache_file_path,
+                    query.start_time,
+                    query.end_time,
+                )
+                .await
                 {
                     Ok(result) => result,
                     Err(e) => {
