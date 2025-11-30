@@ -310,12 +310,12 @@ describe("useStreams Composable", () => {
       // Test with specific stream type
       mockStore.state.streams.logs = { list: [{ name: "test" }] };
       expect(streamsInstance.isStreamFetched("logs")).toBe(true);
-      
+
       mockStore.state.streams.metrics = null;
       expect(streamsInstance.isStreamFetched("metrics")).toBe(false);
-      
+
       // Test with 'all'
-      mockStore.state.streams.areStreamsFetched = true;
+      mockStore.state.streams.areAllStreamsFetched = true;
       expect(streamsInstance.isStreamFetched("all")).toBe(true);
     });
 
