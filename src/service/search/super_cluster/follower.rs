@@ -274,6 +274,7 @@ pub async fn search(
         histogram_interval: req.histogram_interval,
         is_analyze: flight_request.search_info.is_analyze,
         sampling_config: flight_request.search_info.sampling_config.clone(),
+        clear_cache: req.overwrite_cache,
     };
 
     let context = tracing::Span::current().context();
