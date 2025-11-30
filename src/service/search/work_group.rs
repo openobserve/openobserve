@@ -181,6 +181,7 @@ pub async fn check_work_group(
     // Create cleanup guard
     let trace_id_owned = trace_id.to_string();
     let user_id_owned = user_id.map(|s| s.to_string());
+    let org_id_owned = org_id.to_string();
     let work_group_clone = work_group.clone();
     let caller_owned = caller.to_string();
     let guard = AsyncDefer::new(async move {
@@ -192,6 +193,11 @@ pub async fn check_work_group(
                 "[trace_id {trace_id_owned}] {caller_owned}->search: failed to mark work group as done: {e:?}"
             );
         }
+
+        metrics::QUERY_RUNNING_NUMS
+            .with_label_values(&[&org_id_owned])
+            .dec();
+        log::info!("[trace_id {trace_id_owned}] search completed, metrics decremented");
     });
 
     Ok(WorkGroupLock {

@@ -41,7 +41,6 @@ use infra::{
 };
 use itertools::Itertools;
 use parking_lot::Mutex;
-use tokio::time::Duration;
 use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -259,14 +258,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     // Setup cleanup for metrics (workgroup cleanup is automatic via _lock drop)
     let trace_id_move = trace_id.to_string();
     let org_id_move = sql.org_id.clone();
-    let _defer = AsyncDefer::new({
-        async move {
-            metrics::QUERY_RUNNING_NUMS
-                .with_label_values(&[&org_id_move])
-                .dec();
-            log::info!("[trace_id {trace_id_move}] search completed, metrics decremented");
-        }
-    });
+    let _defer = AsyncDefer::new({});
 
     // 5. partition file list
     let partitioned_file_lists = partition_file_lists(file_id_list, &nodes, role_group).await?;
@@ -361,7 +353,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     };
 
     // release source
-    drop(_defer);
+    drop(_lock);
 
     // 9. get data from datafusion
     let (data, mut scan_stats, partial_err): (Vec<RecordBatch>, ScanStats, String) = match task {
