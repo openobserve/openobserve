@@ -115,7 +115,7 @@ async fn search_in_cluster(
     let (start, end) = adjust_start_end(start, end, step);
 
     log::info!(
-        "[trace_id {trace_id}] promql->search->start-> no: org_id: {}, use_cache: {}, time_range: [{},{}), step: {}, query: {}",
+        "[trace_id {trace_id}] promql->search->start: org_id: {}, use_cache: {}, time_range: [{},{}), step: {}, query: {}",
         req.org_id,
         use_cache,
         start,
