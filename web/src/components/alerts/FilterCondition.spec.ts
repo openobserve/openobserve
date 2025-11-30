@@ -32,6 +32,7 @@ describe('FilterCondition.vue Branch Coverage', () => {
       column: '',
       operator: '',
       value: '',
+      logicalOperator: 'AND',
     },
     streamFields: [
       { label: 'Field 1', value: 'field1' },
@@ -41,6 +42,7 @@ describe('FilterCondition.vue Branch Coverage', () => {
     index: 0,
     label: 'AND',
     depth: 0,
+    isFirstInGroup: true,
   };
 
   beforeEach(() => {
@@ -68,12 +70,17 @@ describe('FilterCondition.vue Branch Coverage', () => {
       expect(labelElement.text().trim()).toBe('if');
     });
 
-    it('should show computed label when index is not 0', async () => {
+    it('should show lowercase operator when not first in group', async () => {
       const wrapper = mount(FilterCondition, {
         props: {
           ...defaultProps,
+          condition: {
+            ...defaultProps.condition,
+            logicalOperator: 'OR',
+          },
           index: 1, // Branch condition: index != 0
           depth: 0,
+          isFirstInGroup: false,
           label: 'OR',
         },
         global: {
@@ -84,17 +91,20 @@ describe('FilterCondition.vue Branch Coverage', () => {
         },
       });
 
-      // Branch: computedLabel (when index != 0)
-      const labelElement = wrapper.find('.tw-text-sm');
-      expect(labelElement.text().trim()).toBe('OR');
+      // Branch: computedLabel (when not first in group) - CSS lowercase applied
+      const labelElement = wrapper.find('.tw-lowercase');
+      // Text content is still 'OR' but CSS applies text-transform: lowercase
+      expect(labelElement.exists()).toBe(true);
+      expect(labelElement.text().trim()).toBe('OR'); // Content is uppercase, CSS transforms to lowercase visually
     });
 
-    it('should show "if" when index is 0 regardless of depth', async () => {
+    it('should show "if" only for first condition in root group (index 0, depth 0)', async () => {
       const wrapper = mount(FilterCondition, {
         props: {
           ...defaultProps,
           index: 0,
-          depth: 1, // Even with depth != 0, index 0 should show "if"
+          depth: 0, // V2: "if" only shown for root group first condition
+          isFirstInGroup: true,
           label: 'AND',
         },
         global: {
@@ -105,9 +115,33 @@ describe('FilterCondition.vue Branch Coverage', () => {
         },
       });
 
-      // Branch: index == 0 shows "if" regardless of depth (updated logic)
+      // Branch: index == 0 && depth == 0 shows "if"
       const labelElement = wrapper.find('.tw-text-sm');
       expect(labelElement.text().trim()).toBe('if');
+    });
+
+    it('should show empty space for first condition in nested groups', async () => {
+      const wrapper = mount(FilterCondition, {
+        props: {
+          ...defaultProps,
+          index: 0,
+          depth: 1, // Nested group
+          isFirstInGroup: true,
+          label: 'AND',
+        },
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+        },
+      });
+
+      // Branch: isFirstInGroup && depth > 0 shows empty space (no label)
+      const labelContainer = wrapper.find('.tw-min-w-\\[60px\\]');
+      expect(labelContainer.exists()).toBe(true);
+      // Should not contain operator label or "if"
+      expect(labelContainer.text().trim()).toBe('');
     });
   });
 
@@ -371,11 +405,16 @@ describe('FilterCondition.vue Branch Coverage', () => {
   });
 
   describe('Computed Label Branch Coverage', () => {
-    it('should return the correct computed label', async () => {
+    it('should return the correct computed label when not first in group', async () => {
       const wrapper = mount(FilterCondition, {
         props: {
           ...defaultProps,
           label: 'CUSTOM_LABEL',
+          isFirstInGroup: false, // V2: Only show label when not first
+          condition: {
+            ...defaultProps.condition,
+            logicalOperator: 'AND',
+          },
         },
         global: {
           plugins: [Quasar, mockI18n],
@@ -385,8 +424,26 @@ describe('FilterCondition.vue Branch Coverage', () => {
         },
       });
 
-      // Test computedLabel computed property
-      expect((wrapper.vm as any).computedLabel).toBe('CUSTOM_LABEL');
+      // Test computedLabel computed property - should return condition's logicalOperator
+      expect((wrapper.vm as any).computedLabel).toBe('AND');
+    });
+
+    it('should return empty string for first condition in group', async () => {
+      const wrapper = mount(FilterCondition, {
+        props: {
+          ...defaultProps,
+          isFirstInGroup: true, // First condition in group
+        },
+        global: {
+          plugins: [Quasar, mockI18n],
+          provide: {
+            store: mockStore,
+          },
+        },
+      });
+
+      // Test computedLabel computed property - should return empty string
+      expect((wrapper.vm as any).computedLabel).toBe('');
     });
   });
 });
