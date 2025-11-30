@@ -28,7 +28,7 @@ use config::{
         stream::{QueryPartitionStrategy, StreamType},
     },
     metrics,
-    utils::{json, time::now_micros},
+    utils::{json, stopwatch::StopWatch, time::now_micros},
 };
 use datafusion::{
     common::TableReference, physical_plan::visit_execution_plan, prelude::SessionContext,
@@ -41,6 +41,7 @@ use infra::{
 };
 use itertools::Itertools;
 use parking_lot::Mutex;
+use tokio::time::Duration;
 use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -77,7 +78,7 @@ use crate::{
     fields(org_id = req.org_id)
 )]
 pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<SearchResult> {
-    let start = std::time::Instant::now();
+    let mut stop_watch = StopWatch::new();
     let cfg = get_config();
     log::info!("[trace_id {trace_id}] flight->search: start {sql}");
 
@@ -108,7 +109,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     let file_id_list_vec = file_id_list.values().flatten().collect::<Vec<_>>();
     let file_id_list_num = file_id_list_vec.len();
     let file_id_list_records = file_id_list_vec.iter().map(|v| v.records).sum::<i64>();
-    let file_id_list_took = start.elapsed().as_millis() as usize;
+    let file_id_list_took = stop_watch.record_split("get_file_list").as_millis() as usize;
     log::info!(
         "{}",
         search_inspector_fields(
@@ -137,7 +138,6 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     };
 
     // 3. get nodes
-    let get_node_start = std::time::Instant::now();
     let is_local_mode = req.local_mode.unwrap_or_default();
     let role_group = if is_local_mode {
         None
@@ -184,7 +184,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
                 .node_name(LOCAL_NODE.name.clone())
                 .component("flight:leader get nodes".to_string())
                 .search_role("leader".to_string())
-                .duration(get_node_start.elapsed().as_millis() as usize)
+                .duration(stop_watch.record_split("get_nodes").as_millis() as usize)
                 .desc(format!(
                     "get nodes num: {}, querier num: {}",
                     nodes.len(),
@@ -199,22 +199,53 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
         .with_label_values(&[&req.org_id])
         .inc();
 
-    // 4. check work group
-    let file_list_took = start.elapsed().as_millis() as usize;
     #[cfg(not(feature = "enterprise"))]
-    let (took_wait, work_group_str, locker) =
-        check_work_group(&req, trace_id, start, file_list_took).await?;
-    #[cfg(feature = "enterprise")]
-    let (took_wait, work_group_str, work_group) = check_work_group(
-        &req,
+    let _lock = crate::service::search::work_group::check_work_group(
         trace_id,
-        &nodes,
-        &file_id_list_vec,
-        start,
-        file_list_took,
-        "leader".to_string(),
+        &req.org_id,
+        req.timeout as u64,
+        &mut stop_watch,
+        "logs",
     )
     .await?;
+
+    #[cfg(feature = "enterprise")]
+    let _lock = {
+        // Predict workgroup first
+        let is_background_task = req
+            .search_event_type
+            .as_ref()
+            .and_then(|st| config::meta::search::SearchEventType::try_from(st.as_str()).ok())
+            .map(|st| st.is_background())
+            .unwrap_or(false);
+
+        let work_group = o2_enterprise::enterprise::search::work_group::predict(
+            &nodes,
+            &file_id_list_vec,
+            is_background_task,
+        );
+
+        SEARCH_SERVER
+            .add_work_group(trace_id, Some(work_group.clone()))
+            .await;
+
+        let user_id = req.user_id.as_deref();
+
+        crate::service::search::work_group::check_work_group(
+            trace_id,
+            &req.org_id,
+            user_id,
+            req.timeout as u64,
+            work_group,
+            &mut stop_watch,
+            "logs",
+        )
+        .await?
+    };
+
+    let took_wait = _lock.took_wait;
+    let work_group_str = _lock.work_group_str.clone();
+
     // add work_group
     req.add_work_group(Some(work_group_str));
 
@@ -225,49 +256,15 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
         .with_label_values(&[&sql.org_id])
         .inc();
 
-    // release lock when search done or get error
+    // Setup cleanup for metrics (workgroup cleanup is automatic via _lock drop)
     let trace_id_move = trace_id.to_string();
     let org_id_move = sql.org_id.clone();
-    #[cfg(not(feature = "enterprise"))]
     let _defer = AsyncDefer::new({
         async move {
             metrics::QUERY_RUNNING_NUMS
                 .with_label_values(&[&org_id_move])
                 .dec();
-            // search done, release lock
-            let _ = dist_lock::unlock_with_trace_id(&trace_id_move, &locker)
-                .await
-                .map_err(|e| {
-                    log::error!(
-                        "[trace_id {trace_id_move}] release lock in flight search error: {e}"
-                    );
-                    Error::Message(e.to_string())
-                });
-            log::info!("[trace_id {trace_id_move}] release lock in flight search");
-        }
-    });
-
-    #[cfg(feature = "enterprise")]
-    let user_id = req.user_id.clone();
-    #[cfg(feature = "enterprise")]
-    let _defer = AsyncDefer::new({
-        async move {
-            metrics::QUERY_RUNNING_NUMS
-                .with_label_values(&[&org_id_move])
-                .dec();
-            // search done, release lock
-            let _ = work_group
-                .as_ref()
-                .unwrap()
-                .done(&trace_id_move, user_id.as_deref())
-                .await
-                .map_err(|e| {
-                    log::error!(
-                        "[trace_id {trace_id_move}] release work group in flight search error: {e}",
-                    );
-                    e.to_string();
-                });
-            log::info!("[trace_id {trace_id_move}] release work group in flight search");
+            log::info!("[trace_id {trace_id_move}] search completed, metrics decremented");
         }
     });
 
@@ -374,6 +371,10 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     }?;
 
     log::info!("[trace_id {trace_id}] flight->search: search finished");
+    log::info!(
+        "[trace_id {trace_id}] flight->search timing breakdown:\n{}",
+        stop_watch.get_summary()
+    );
 
     scan_stats.format_to_mb();
     scan_stats.file_list_took += file_id_list_took as i64;
