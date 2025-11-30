@@ -15,9 +15,7 @@
 
 use std::time::Duration;
 
-#[cfg(feature = "enterprise")]
-use config::utils::stopwatch::StopWatch;
-use config::{get_config, metrics};
+use config::{get_config, metrics, utils::stopwatch::StopWatch};
 use infra::errors::{Error, Result};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::WorkGroup;

@@ -324,9 +324,9 @@ async fn get_ctx_and_physical_plan(
     req: &FlightSearchRequest,
 ) -> Result<PlanResult, infra::errors::Error> {
     if req.super_cluster_info.is_super_cluster {
-        let (ctx, physical_plan, defer, scan_stats) =
+        let (ctx, physical_plan, scan_stats) =
             crate::service::search::super_cluster::follower::search(trace_id, req).await?;
-        Ok((ctx, physical_plan, Some(defer), scan_stats))
+        Ok((ctx, physical_plan, None, scan_stats))
     } else {
         let (ctx, physical_plan, scan_stats) = grpcFlight::search(trace_id, req).await?;
         Ok((ctx, physical_plan, None, scan_stats))
