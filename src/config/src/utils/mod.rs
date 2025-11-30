@@ -35,6 +35,7 @@ pub mod schema_ext;
 pub mod size;
 pub mod sort;
 pub mod sql;
+pub mod stopwatch;
 pub mod str;
 pub mod sysinfo;
 pub mod tantivy;
