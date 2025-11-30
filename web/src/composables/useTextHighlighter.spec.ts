@@ -209,7 +209,12 @@ describe("useTextHighlighter", () => {
         "",
         mockColors,
       );
-      expect(result).toContain("Success message");
+      // New behavior: quotes are preserved as part of the data
+      expect(result).toContain("Success");
+      expect(result).toContain("message");
+      expect(result).toContain("completed");
+      // Quotes should be in the output (data quotes)
+      expect(result).toContain("&quot;");
     });
 
     it("should handle tokenization with highlighting", () => {
@@ -230,7 +235,12 @@ describe("useTextHighlighter", () => {
         "",
         mockColors,
       );
-      expect(result).toContain("[timestamp]");
+      // New behavior: brackets are styled separately but content is preserved
+      expect(result).toContain("timestamp");
+      expect(result).toContain("hello");
+      expect(result).toContain("world");
+      // Brackets should be styled with gray color
+      expect(result).toContain("#9ca3af");
     });
   });
 
@@ -407,7 +417,9 @@ describe("useTextHighlighter", () => {
         mockColors,
       );
       expect(result).toContain("color: #047857");
-      expect(result).toContain("normal text");
+      // New behavior: text is tokenized into separate spans
+      expect(result).toContain("normal");
+      expect(result).toContain("text");
     });
 
     it("should apply semantic coloring", () => {
@@ -454,7 +466,8 @@ describe("useTextHighlighter", () => {
         "",
         mockColors,
       );
-      expect(result).toContain("<span");
+      // Empty text returns empty string (no tokens to process)
+      expect(result).toBe("");
     });
 
     it("should handle complex text with multiple semantic types", () => {
@@ -512,7 +525,13 @@ describe("useTextHighlighter", () => {
       const result = textHighlighter.processTextWithHighlights(mixedText, "", {
         stringValue: "#000",
       });
-      expect(result).toContain("double single double again");
+      // New behavior: quotes are preserved as data
+      expect(result).toContain("double");
+      expect(result).toContain("single");
+      expect(result).toContain("double again");
+      // Both quote types should be preserved
+      expect(result).toContain("&quot;"); // double quotes
+      expect(result).toContain("'"); // single quotes (or &#39; if escaped)
     });
   });
 });
