@@ -673,6 +673,17 @@ pub fn merge_response(
 
         cache_response.hits.extend(res.hits.clone());
     }
+
+    // Deduplicate histogram buckets if this is an aggregate query with histogram intervals
+    // This handles the case where cached partial intervals overlap with new search results
+    if cache_response.histogram_interval.is_some()
+        && cache_response.histogram_interval.unwrap() > 0
+        && !cache_response.hits.is_empty()
+    {
+        cache_response.hits =
+            deduplicate_histogram_buckets(cache_response.hits, ts_column, &order_by);
+    }
+
     sort_response(is_descending, &mut cache_response, ts_column, &order_by);
 
     if cache_response.hits.len() > (limit as usize) {
@@ -712,6 +723,114 @@ pub fn merge_response(
         .map(|res| res.is_histogram_eligible)
         .unwrap_or_default();
     cache_response
+}
+
+/// Deduplicates histogram buckets by grouping records with the same timestamp
+/// and aggregating their values. For histogram queries, multiple records with
+/// the same timestamp (bucket) should be merged into a single record.
+///
+/// # Arguments
+/// * `hits` - The result hits potentially containing duplicate histogram buckets
+/// * `ts_column` - The timestamp column name
+/// * `order_by` - The ORDER BY clauses to identify aggregation columns
+///
+/// # Returns
+/// A deduplicated vector of hits where each timestamp appears at most once
+fn deduplicate_histogram_buckets(
+    hits: Vec<json::Value>,
+    ts_column: &str,
+    order_by: &Vec<(String, OrderBy)>,
+) -> Vec<json::Value> {
+    use std::collections::HashMap;
+
+    // Group hits by timestamp
+    let mut buckets: HashMap<i64, Vec<json::Value>> = HashMap::new();
+
+    for hit in hits {
+        let ts = get_ts_value(ts_column, &hit);
+        buckets.entry(ts).or_default().push(hit);
+    }
+
+    // Merge duplicate buckets
+    let mut result = Vec::new();
+    for (_ts, mut bucket_hits) in buckets {
+        if bucket_hits.len() == 1 {
+            // No duplicates for this timestamp
+            result.push(bucket_hits.pop().unwrap());
+        } else {
+            // Multiple hits for the same timestamp - merge them
+            // For histogram aggregations, we need to sum numeric values
+            let merged = merge_histogram_bucket(bucket_hits, ts_column, order_by);
+            result.push(merged);
+        }
+    }
+
+    result
+}
+
+/// Merges multiple histogram records with the same timestamp by summing their aggregated values.
+/// This handles cases where partial cache results overlap with new search results.
+///
+/// # Arguments
+/// * `bucket_hits` - All hits belonging to the same histogram bucket (same timestamp)
+/// * `ts_column` - The timestamp column name (preserved as-is)
+/// * `order_by` - The ORDER BY clauses (used to identify grouping keys)
+///
+/// # Returns
+/// A single merged hit representing the complete histogram bucket
+fn merge_histogram_bucket(
+    bucket_hits: Vec<json::Value>,
+    ts_column: &str,
+    _order_by: &Vec<(String, OrderBy)>,
+) -> json::Value {
+    use serde_json::Map;
+
+    if bucket_hits.is_empty() {
+        return json::Value::Object(Map::new());
+    }
+
+    let mut merged = Map::new();
+    let first_hit = &bucket_hits[0];
+
+    // Preserve the timestamp and any string fields from the first hit
+    if let Some(obj) = first_hit.as_object() {
+        for (key, value) in obj {
+            if key == ts_column || value.is_string() || value.as_bool().is_some() {
+                // Preserve timestamp and non-numeric fields as-is
+                merged.insert(key.clone(), value.clone());
+            }
+        }
+    }
+
+    // Sum all numeric fields across all bucket hits
+    // Normalize all numeric types to f64 for consistent aggregation
+    for hit in &bucket_hits {
+        if let Some(obj) = hit.as_object() {
+            for (key, value) in obj {
+                if key == ts_column {
+                    continue; // Already handled
+                }
+
+                // Try to extract numeric value, normalizing to f64
+                let num_value = if let Some(num) = value.as_f64() {
+                    Some(num)
+                } else if let Some(num) = value.as_i64() {
+                    Some(num as f64)
+                } else if let Some(num) = value.as_u64() {
+                    Some(num as f64)
+                } else {
+                    None
+                };
+
+                if let Some(num) = num_value {
+                    let current = merged.get(key).and_then(|v| v.as_f64()).unwrap_or(0.0);
+                    merged.insert(key.clone(), json::Value::from(current + num));
+                }
+            }
+        }
+    }
+
+    json::Value::Object(merged)
 }
 
 fn sort_response(
@@ -836,7 +955,7 @@ pub async fn write_results(
     // 1. alignment time range for incomplete records for histogram
     let mut accept_start_time = req_query_start_time;
     let mut accept_end_time = req_query_end_time;
-    if is_aggregate
+    let histogram_interval_micros = if is_aggregate
         && let Some(interval) = res.histogram_interval
         && interval > 0
     {
@@ -847,9 +966,12 @@ pub async fn write_results(
         }
         // previous interval of end_time
         if (accept_end_time % interval) != 0 {
-            accept_end_time = accept_end_time - (accept_end_time % interval) - interval;
+            accept_end_time = accept_end_time - (accept_end_time % interval);
         }
-    }
+        Some(interval)
+    } else {
+        None
+    };
 
     // 2. get the data time range, check if need to remove records with discard_duration
     // For histogram queries with non-timestamp ORDER BY, we need to scan all hits
@@ -860,17 +982,51 @@ pub async fn write_results(
     let delay_ts = second_micros(get_config().limit.cache_delay_secs);
     let accept_end_time = std::cmp::min(Utc::now().timestamp_micros() - delay_ts, accept_end_time);
 
+    // For histogram queries, align data boundaries to interval boundaries
+    // This prevents caching partial intervals
+    let (cache_start_boundary, cache_end_boundary) =
+        if let Some(interval) = histogram_interval_micros {
+            let start = if data_start_time % interval == 0 {
+                data_start_time
+            } else {
+                data_start_time - (data_start_time % interval) + interval
+            };
+            let end = data_end_time - (data_end_time % interval);
+            (start, end)
+        } else {
+            (data_start_time, data_end_time)
+        };
+
+    // For histogram queries, verify we have at least one complete interval to cache
+    if histogram_interval_micros.is_some() && cache_end_boundary <= cache_start_boundary {
+        log::info!(
+            "[trace_id {trace_id}] No complete histogram intervals to cache (data: {}-{}, boundaries: {}-{}), skipping caching",
+            data_start_time,
+            data_end_time,
+            cache_start_boundary,
+            cache_end_boundary
+        );
+        return;
+    }
+
     // Track if we need to recalculate timestamp range after filtering
-    let needs_filtering = data_start_time < accept_start_time || data_end_time > accept_end_time;
+    let needs_filtering = data_start_time < accept_start_time
+        || data_end_time > accept_end_time
+        || (histogram_interval_micros.is_some()
+            && (data_start_time < cache_start_boundary || data_end_time > cache_end_boundary));
 
     if needs_filtering {
+        // Determine the actual filter boundaries
+        let filter_start = std::cmp::max(accept_start_time, cache_start_boundary);
+        let filter_end = std::cmp::min(accept_end_time, cache_end_boundary);
+
         res.hits.retain(|hit| {
             if let Some(hit_ts) = hit.get(ts_column)
                 && let Some(hit_ts_datetime) = convert_ts_value_to_datetime(hit_ts)
             {
                 let item_ts = hit_ts_datetime.timestamp_micros();
-                // only keep the records within the accept time range
-                item_ts >= accept_start_time && item_ts <= accept_end_time
+                // only keep the records within the filter range
+                item_ts >= filter_start && item_ts < filter_end
             } else {
                 true
             }
@@ -881,7 +1037,9 @@ pub async fn write_results(
 
     // 3. check if the hits is empty
     if res.hits.is_empty() {
-        log::info!("[trace_id {trace_id}] No hits found for caching, skipping caching");
+        log::info!(
+            "[trace_id {trace_id}] No hits found for caching after filtering, skipping caching"
+        );
         return;
     }
 
@@ -895,8 +1053,57 @@ pub async fn write_results(
         (data_start_time, data_end_time)
     };
 
+    // For histogram queries, calculate cache boundaries based on actual bucket coverage.
+    // A histogram bucket with timestamp T covers data from [T, T+interval).
+    // The cache metadata should reflect this coverage, not just the bucket timestamps.
+    let (cache_start_time, cache_end_time) = if let Some(interval) = histogram_interval_micros {
+        // Get the first and last bucket timestamps from the filtered data
+        let first_bucket_ts = get_ts_value(ts_column, res.hits.first().unwrap());
+        let last_bucket_ts = get_ts_value(ts_column, res.hits.last().unwrap());
+
+        // Bucket timestamps should already be aligned since filtering uses cache_start_boundary
+        // If not aligned, this indicates a data consistency issue
+        if first_bucket_ts % interval != 0 {
+            log::warn!(
+                "[trace_id {trace_id}] First bucket timestamp {} is not aligned to interval {} (remainder: {}). This indicates unexpected data.",
+                first_bucket_ts,
+                interval,
+                first_bucket_ts % interval
+            );
+        }
+        if last_bucket_ts % interval != 0 {
+            log::warn!(
+                "[trace_id {trace_id}] Last bucket timestamp {} is not aligned to interval {} (remainder: {}). This indicates unexpected data.",
+                last_bucket_ts,
+                interval,
+                last_bucket_ts % interval
+            );
+        }
+
+        // Cache start is the first bucket timestamp
+        // Cache end is last_bucket_ts + interval because the bucket covers [last_bucket_ts,
+        // last_bucket_ts + interval)
+        let cache_start = first_bucket_ts;
+        let cache_end = last_bucket_ts + interval;
+
+        // Verify we have valid boundaries
+        if cache_end <= cache_start {
+            log::info!(
+                "[trace_id {trace_id}] No valid histogram intervals (first_bucket: {}, last_bucket: {}, cache: {}-{}), skipping caching",
+                first_bucket_ts,
+                last_bucket_ts,
+                cache_start,
+                cache_end
+            );
+            return;
+        }
+        (cache_start, cache_end)
+    } else {
+        (final_start_time, final_end_time)
+    };
+
     // 4. check if the time range is less than discard_duration
-    if (final_end_time - final_start_time) < delay_ts {
+    if (cache_end_time - cache_start_time) < delay_ts {
         log::info!("[trace_id {trace_id}] Time range is too short for caching, skipping caching");
         return;
     }
@@ -904,8 +1111,8 @@ pub async fn write_results(
     // 5. cache to disk
     let file_name = format!(
         "{}_{}_{}_{}.json",
-        final_start_time,
-        final_end_time,
+        cache_start_time,
+        cache_end_time,
         if is_aggregate { 1 } else { 0 },
         if is_descending { 1 } else { 0 }
     );
@@ -919,8 +1126,8 @@ pub async fn write_results(
             &file_name,
             res_cache,
             clear_cache,
-            Some(final_start_time),
-            Some(final_end_time),
+            Some(cache_start_time),
+            Some(cache_end_time),
         )
         .await
         {
@@ -934,8 +1141,8 @@ pub async fn write_results(
                         .entry(query_key)
                         .or_insert_with(Vec::new)
                         .push(ResultCacheMeta {
-                            start_time: final_start_time,
-                            end_time: final_end_time,
+                            start_time: cache_start_time,
+                            end_time: cache_end_time,
                             is_aggregate,
                             is_descending,
                         });
@@ -1127,5 +1334,50 @@ mod tests {
         }
         . = arr1_final"#;
         assert!(is_result_array_skip_vrl(query_fn));
+    }
+
+    #[test]
+    fn test_merge_histogram_bucket_mixed_numeric_types() {
+        use serde_json::json;
+
+        // Test merging buckets with mixed numeric types (i64, u64, f64)
+        let bucket_hits = vec![
+            json!({"_timestamp": 1000, "count": 5, "total": 100, "ratio": 0.5}),
+            json!({"_timestamp": 1000, "count": 3.0, "total": 50, "ratio": 0.3}),
+            json!({"_timestamp": 1000, "count": 2, "total": 25.5, "ratio": 0.2}),
+        ];
+
+        let result = merge_histogram_bucket(bucket_hits, "_timestamp", &vec![]);
+
+        // Verify timestamp is preserved
+        assert_eq!(result["_timestamp"], 1000);
+
+        // Verify numeric fields are summed correctly regardless of input type
+        // All should be normalized to f64
+        assert_eq!(result["count"].as_f64().unwrap(), 10.0); // 5 + 3.0 + 2
+        assert_eq!(result["total"].as_f64().unwrap(), 175.5); // 100 + 50 + 25.5
+        assert_eq!(result["ratio"].as_f64().unwrap(), 1.0); // 0.5 + 0.3 + 0.2
+    }
+
+    #[test]
+    fn test_merge_histogram_bucket_preserves_non_numeric() {
+        use serde_json::json;
+
+        let bucket_hits = vec![
+            json!({"_timestamp": 1000, "count": 5, "status": "success", "enabled": true}),
+            json!({"_timestamp": 1000, "count": 3, "status": "error", "enabled": false}),
+        ];
+
+        let result = merge_histogram_bucket(bucket_hits, "_timestamp", &vec![]);
+
+        // Verify timestamp is preserved from first hit
+        assert_eq!(result["_timestamp"], 1000);
+
+        // Verify numeric field is summed
+        assert_eq!(result["count"].as_f64().unwrap(), 8.0);
+
+        // Verify string and boolean fields are preserved from first hit
+        assert_eq!(result["status"], "success");
+        assert_eq!(result["enabled"], true);
     }
 }
