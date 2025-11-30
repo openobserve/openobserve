@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="spanMarkerRef"
           data-test="span-marker"
         >
+          {{ leftPosition }} {{ spanWidth }}
           <div
             :style="{
               width: 'calc(100% - 6px)',
@@ -171,15 +172,16 @@ export default defineComponent({
 
     const getLeftPosition = () => {
       const left =
-        props.span.startTimeMs - props.baseTracePosition["startTimeMs"];
+        props.span.startTimeUs - props.baseTracePosition["startTimeUs"];
 
-      return (left / props.baseTracePosition?.durationMs) * 100;
+      return (left / props.baseTracePosition?.durationUs) * 100;
     };
 
     const getSpanWidth = () => {
+      console.log(props.span?.durationUs, props.baseTracePosition?.durationUs);
       return Number(
         (
-          (props.span?.durationMs / props.baseTracePosition?.durationMs) *
+          (props.span?.durationUs / props.baseTracePosition?.durationUs) *
           100
         ).toFixed(2),
       );
@@ -205,7 +207,7 @@ export default defineComponent({
     });
 
     watch(
-      () => props.span.startTimeMs,
+      () => props.span.startTimeUs,
       () => {
         leftPosition.value = getLeftPosition();
       },
@@ -226,8 +228,9 @@ export default defineComponent({
     );
 
     watch(
-      () => props.span?.durationMs + props.baseTracePosition?.durationMs,
+      () => props.span?.durationUs + props.baseTracePosition?.durationUs,
       () => {
+        console.log("calculate width");
         spanWidth.value = getSpanWidth();
       },
       {
