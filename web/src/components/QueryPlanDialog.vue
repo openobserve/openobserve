@@ -425,8 +425,21 @@ export default defineComponent({
       showAnalyzeResults.value = false;
 
       try {
+        // Save the current histogram state before calling buildSearch()
+        // This is necessary because buildSearch() modifies the global searchObj.data.histogram
+        // when histogram is turned off, which would clear the title on the logs page
+        const savedHistogram = searchObj.meta.showHistogram === false
+          ? JSON.parse(JSON.stringify(searchObj.data.histogram))
+          : null;
+
         // Build the complete query using buildSearch()
         const queryReq = buildSearch();
+
+        // Restore the histogram state after buildSearch() only if histogram is still off
+        // This prevents QueryPlanDialog from clearing the histogram title on the logs page
+        if (savedHistogram !== null && searchObj.meta.showHistogram === false) {
+          searchObj.data.histogram = savedHistogram;
+        }
 
         if (!queryReq || !queryReq.query || !queryReq.query.sql) {
           error.value = t("search.errorFetchingPlan");
@@ -481,8 +494,21 @@ export default defineComponent({
       isAnalyzing.value = true;
 
       try {
+        // Save the current histogram state before calling buildSearch()
+        // This is necessary because buildSearch() modifies the global searchObj.data.histogram
+        // when histogram is turned off, which would clear the title on the logs page
+        const savedHistogram = searchObj.meta.showHistogram === false
+          ? JSON.parse(JSON.stringify(searchObj.data.histogram))
+          : null;
+
         // Build the complete query using buildSearch()
         const queryReq = buildSearch();
+
+        // Restore the histogram state after buildSearch() only if histogram is still off
+        // This prevents QueryPlanDialog from clearing the histogram title on the logs page
+        if (savedHistogram !== null && searchObj.meta.showHistogram === false) {
+          searchObj.data.histogram = savedHistogram;
+        }
 
         if (!queryReq || !queryReq.query || !queryReq.query.sql) {
           error.value = t("search.errorRunningAnalyze");
