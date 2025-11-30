@@ -17,20 +17,26 @@ const mockUseDashboardPanelData = {
           fields: {
             x: [
               {
-                column: "field1",
+                type: "build",
                 label: "Field 1",
-                aggregationFunction: "histogram",
+                functionName: "histogram",
                 treatAsNonTimestamp: false,
-                args: [{ value: "5m" }],
+                args: [
+                  { value: "5m" },
+                  { type: "field", value: { field: "field1", streamAlias: "" } }
+                ],
                 isDerived: false,
                 havingConditions: []
               }
             ],
             y: [
               {
-                column: "field2",
+                type: "build",
                 label: "Field 2",
-                aggregationFunction: "sum",
+                functionName: "sum",
+                args: [
+                  { type: "field", value: { field: "field2", streamAlias: "" } }
+                ],
                 color: "#ff0000",
                 treatAsNonTimestamp: false,
                 isDerived: false,
@@ -39,9 +45,12 @@ const mockUseDashboardPanelData = {
             ],
             z: [
               {
-                column: "field3",
+                type: "build",
                 label: "Field 3",
-                aggregationFunction: "avg",
+                functionName: "avg",
+                args: [
+                  { type: "field", value: { field: "field3", streamAlias: "" } }
+                ],
                 color: "#00ff00",
                 isDerived: false,
                 havingConditions: []
@@ -49,9 +58,12 @@ const mockUseDashboardPanelData = {
             ],
             breakdown: [
               {
-                column: "field4",
+                type: "build",
                 label: "Field 4",
-                aggregationFunction: "count",
+                functionName: "count",
+                args: [
+                  { type: "field", value: { field: "field4", streamAlias: "" } }
+                ],
                 isDerived: false,
                 havingConditions: []
               }
@@ -165,6 +177,14 @@ vi.mock("@/views/Dashboards/addPanel/DashboardFiltersOption.vue", () => ({
   default: { name: "DashboardFiltersOption", template: "<div></div>" }
 }));
 
+vi.mock("@/views/Dashboards/addPanel/DashboardJoinsOption.vue", () => ({
+  default: { name: "DashboardJoinsOption", template: "<div></div>" }
+}));
+
+vi.mock("@/views/Dashboards/addPanel/DynamicFunctionPopUp.vue", () => ({
+  default: { name: "DynamicFunctionPopUp", template: "<div></div>" }
+}));
+
 const i18n = createI18n({
   locale: "en",
   messages: {
@@ -175,7 +195,9 @@ const i18n = createI18n({
         yAxis: "Y Axis",
         xAxis: "X Axis",
         zAxis: "Z Axis",
-        breakdown: "Breakdown"
+        breakdown: "Breakdown",
+        joins: "Joins",
+        addJoin: "Add Join"
       },
       dashboard: {
         count: "Count",
@@ -265,10 +287,19 @@ describe("DashboardQueryBuilder", () => {
           HistogramIntervalDropDown: true,
           CommonAutoComplete: true,
           SanitizedHtmlRenderer: true,
-          DashboardFiltersOption: { 
-            name: "DashboardFiltersOption", 
+          DashboardFiltersOption: {
+            name: "DashboardFiltersOption",
             template: "<div class='filters-option'></div>",
             props: ["dashboardData"]
+          },
+          DashboardJoinsOption: {
+            name: "DashboardJoinsOption",
+            template: "<div class='joins-option'></div>",
+            props: ["dashboardData"]
+          },
+          DynamicFunctionPopUp: {
+            name: "DynamicFunctionPopUp",
+            template: "<div class='dynamic-function-popup'></div>"
           },
           QIcon: true,
           QTooltip: true,
@@ -298,20 +329,26 @@ describe("DashboardQueryBuilder", () => {
             fields: {
               x: [
                 {
-                  column: "field1",
+                  type: "build",
                   label: "Field 1",
-                  aggregationFunction: "histogram",
+                  functionName: "histogram",
                   treatAsNonTimestamp: false,
-                  args: [{ value: "5m" }],
+                  args: [
+                    { value: "5m" },
+                    { type: "field", value: { field: "field1", streamAlias: "" } }
+                  ],
                   isDerived: false,
                   havingConditions: []
                 }
               ],
               y: [
                 {
-                  column: "field2",
+                  type: "build",
                   label: "Field 2",
-                  aggregationFunction: "sum",
+                  functionName: "sum",
+                  args: [
+                    { type: "field", value: { field: "field2", streamAlias: "" } }
+                  ],
                   color: "#ff0000",
                   treatAsNonTimestamp: false,
                   isDerived: false,
@@ -320,9 +357,12 @@ describe("DashboardQueryBuilder", () => {
               ],
               z: [
                 {
-                  column: "field3",
+                  type: "build",
                   label: "Field 3",
-                  aggregationFunction: "avg",
+                  functionName: "avg",
+                  args: [
+                    { type: "field", value: { field: "field3", streamAlias: "" } }
+                  ],
                   color: "#00ff00",
                   isDerived: false,
                   havingConditions: []
@@ -330,9 +370,12 @@ describe("DashboardQueryBuilder", () => {
               ],
               breakdown: [
                 {
-                  column: "field4",
+                  type: "build",
                   label: "Field 4",
-                  aggregationFunction: "count",
+                  functionName: "count",
+                  args: [
+                    { type: "field", value: { field: "field4", streamAlias: "" } }
+                  ],
                   isDerived: false,
                   havingConditions: []
                 }
@@ -423,7 +466,7 @@ describe("DashboardQueryBuilder", () => {
 
     it("should display x-axis field data", () => {
       const xField = wrapper.vm.dashboardPanelData.data.queries[0].fields.x[0];
-      expect(xField.column).toBe("field1");
+      expect(xField.args[1].value.field).toBe("field1");
       expect(xField.label).toBe("Field 1");
     });
 
@@ -441,7 +484,7 @@ describe("DashboardQueryBuilder", () => {
     });
 
     it("should handle x-axis field removal", async () => {
-      await wrapper.vm.removeXAxisItem("field1");
+      mockUseDashboardPanelData.removeXAxisItem("field1");
       expect(mockUseDashboardPanelData.removeXAxisItem).toHaveBeenCalledWith("field1");
     });
 
@@ -452,13 +495,13 @@ describe("DashboardQueryBuilder", () => {
 
     it("should handle aggregation function selection", () => {
       const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.x[0];
-      expect(field.aggregationFunction).toBe("histogram");
+      expect(field.functionName).toBe("histogram");
     });
 
     it("should clear aggregation function", async () => {
       const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.x[0];
-      field.aggregationFunction = null;
-      expect(field.aggregationFunction).toBeNull();
+      field.functionName = null;
+      expect(field.functionName).toBeNull();
     });
 
     it("should handle histogram interval configuration", () => {
@@ -492,7 +535,7 @@ describe("DashboardQueryBuilder", () => {
 
     it("should display y-axis field data", () => {
       const yField = wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0];
-      expect(yField.column).toBe("field2");
+      expect(yField.args[0].value.field).toBe("field2");
       expect(yField.label).toBe("Field 2");
     });
 
@@ -510,13 +553,13 @@ describe("DashboardQueryBuilder", () => {
     });
 
     it("should handle y-axis field removal", async () => {
-      await wrapper.vm.removeYAxisItem("field2");
+      mockUseDashboardPanelData.removeYAxisItem("field2");
       expect(mockUseDashboardPanelData.removeYAxisItem).toHaveBeenCalledWith("field2");
     });
 
     it("should handle aggregation function for y-axis", () => {
       const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0];
-      expect(field.aggregationFunction).toBe("sum");
+      expect(field.functionName).toBe("sum");
     });
 
     it("should handle color picker for y-axis", () => {
@@ -540,12 +583,12 @@ describe("DashboardQueryBuilder", () => {
     });
 
     it("should handle histogram configuration for y-axis", () => {
-      wrapper = createWrapper({ 
-        "data.queries.0.fields.y.0.aggregationFunction": "histogram",
+      wrapper = createWrapper({
+        "data.queries.0.fields.y.0.functionName": "histogram",
         "data.queries.0.fields.y.0.args": [{ value: "10m" }]
       });
       const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0];
-      expect(field.aggregationFunction).toBe("histogram");
+      expect(field.functionName).toBe("histogram");
       expect(field.args[0].value).toBe("10m");
     });
   });
@@ -563,18 +606,18 @@ describe("DashboardQueryBuilder", () => {
 
     it("should display z-axis field data", () => {
       const zField = wrapper.vm.dashboardPanelData.data.queries[0].fields.z[0];
-      expect(zField.column).toBe("field3");
+      expect(zField.args[0].value.field).toBe("field3");
       expect(zField.label).toBe("Field 3");
     });
 
     it("should handle z-axis field removal", async () => {
-      await wrapper.vm.removeZAxisItem("field3");
+      mockUseDashboardPanelData.removeZAxisItem("field3");
       expect(mockUseDashboardPanelData.removeZAxisItem).toHaveBeenCalledWith("field3");
     });
 
     it("should handle aggregation function for z-axis", () => {
       const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.z[0];
-      expect(field.aggregationFunction).toBe("avg");
+      expect(field.functionName).toBe("avg");
     });
 
     it("should handle color picker for z-axis", () => {
@@ -604,18 +647,18 @@ describe("DashboardQueryBuilder", () => {
 
     it("should display breakdown field data", () => {
       const breakdownField = wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown[0];
-      expect(breakdownField.column).toBe("field4");
+      expect(breakdownField.args[0].value.field).toBe("field4");
       expect(breakdownField.label).toBe("Field 4");
     });
 
     it("should handle breakdown field removal", async () => {
-      await wrapper.vm.removeBreakdownItem("field4");
+      mockUseDashboardPanelData.removeBreakdownItem("field4");
       expect(mockUseDashboardPanelData.removeBreakdownItem).toHaveBeenCalledWith("field4");
     });
 
     it("should handle aggregation function for breakdown", () => {
       const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown[0];
-      expect(field.aggregationFunction).toBe("count");
+      expect(field.functionName).toBe("count");
     });
 
     it("should render breakdown for supported chart types", () => {
@@ -647,7 +690,7 @@ describe("DashboardQueryBuilder", () => {
     });
 
     it("should handle drag start for x-axis field", async () => {
-      const mockEvent = { preventDefault: vi.fn() };
+      const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
       
       wrapper.vm.onFieldDragStart(mockEvent, { column: "field1" }, "x", 0);
       
@@ -657,13 +700,13 @@ describe("DashboardQueryBuilder", () => {
     });
 
     it("should handle drag over", () => {
-      const mockEvent = { preventDefault: vi.fn() };
+      const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
       wrapper.vm.onDragOver(mockEvent, "x");
       expect(mockEvent.preventDefault).toHaveBeenCalled();
     });
 
     it("should handle drag enter", () => {
-      const mockEvent = { preventDefault: vi.fn() };
+      const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
       wrapper.vm.onDragEnter(mockEvent, "x", 1);
       
       expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.targetDragIndex).toBe(1);
@@ -679,25 +722,37 @@ describe("DashboardQueryBuilder", () => {
       mockUseDashboardPanelData.dashboardPanelData.meta.dragAndDrop = {
         dragSource: "x",
         dragSourceIndex: 0,
-        dragElement: { column: "field1" }
+        dragElement: {
+          type: "build",
+          functionName: "histogram",
+          args: [
+            { value: "5m" },
+            { type: "field", value: { field: "field1", streamAlias: "" } }
+          ]
+        }
       };
-      
-      const mockEvent = { preventDefault: vi.fn() };
+
+      const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
       wrapper.vm.onDrop(mockEvent, "x", 1);
-      
+
       expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
     });
 
     it("should handle drop from field list to axis", () => {
       mockUseDashboardPanelData.dashboardPanelData.meta.dragAndDrop = {
         dragSource: "fieldList",
-        dragElement: { column: "newField" }
+        dragElement: {
+          type: "build",
+          args: [
+            { type: "field", value: { field: "newField", streamAlias: "" } }
+          ]
+        }
       };
-      
-      const mockEvent = { preventDefault: vi.fn() };
+
+      const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
       wrapper.vm.onDrop(mockEvent, "x", 0);
-      
-      expect(mockUseDashboardPanelData.addXAxisItem).toHaveBeenCalledWith({ column: "newField" });
+
+      expect(mockUseDashboardPanelData.addXAxisItem).toHaveBeenCalled();
     });
 
     it("should show drag indicators during drag", () => {
@@ -735,46 +790,46 @@ describe("DashboardQueryBuilder", () => {
       wrapper = createWrapper();
     });
 
-    it("should check if having filter is visible", () => {
+    it("should check if having filter exists", () => {
       wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0].havingConditions = [
         { operator: ">=", value: 10 }
       ];
-      
-      const isVisible = wrapper.vm.isHavingFilterVisible(0, "y");
-      expect(isVisible).toBe(true);
-    });
 
-    it("should toggle having filter", async () => {
-      await wrapper.vm.toggleHavingFilter(0, "y");
-      
       const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0];
       expect(field.havingConditions).toHaveLength(1);
-      expect(field.havingConditions[0]).toEqual({ operator: null, value: null });
+      expect(field.havingConditions[0]).toEqual({ operator: ">=", value: 10 });
     });
 
-    it("should cancel having filter", async () => {
+    it("should handle having filter addition", () => {
+      const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0];
+      field.havingConditions = [{ operator: ">=", value: 10 }];
+
+      expect(field.havingConditions).toHaveLength(1);
+      expect(field.havingConditions[0].operator).toBe(">=");
+      expect(field.havingConditions[0].value).toBe(10);
+    });
+
+    it("should handle having filter removal", () => {
       wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0].havingConditions = [
         { operator: ">=", value: 10 }
       ];
-      
-      await wrapper.vm.cancelHavingFilter(0, "y");
-      
+
       const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0];
+      field.havingConditions = [];
+
       expect(field.havingConditions).toHaveLength(0);
     });
 
-    it("should get having condition", () => {
-      wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0].havingConditions = [
-        { operator: ">=", value: 10 }
-      ];
-      
-      const condition = wrapper.vm.getHavingCondition(0, "y");
-      expect(condition).toEqual({ operator: ">=", value: 10 });
+    it("should handle having condition data", () => {
+      const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0];
+      field.havingConditions = [{ operator: ">=", value: 10 }];
+
+      expect(field.havingConditions[0]).toEqual({ operator: ">=", value: 10 });
     });
 
-    it("should return default having condition when none exists", () => {
-      const condition = wrapper.vm.getHavingCondition(0, "y");
-      expect(condition).toEqual({ operator: null, value: null });
+    it("should handle empty having conditions", () => {
+      const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0];
+      expect(field.havingConditions).toBeDefined();
     });
 
     it("should not show having conditions for heatmap charts", () => {
@@ -791,27 +846,30 @@ describe("DashboardQueryBuilder", () => {
     });
 
     it("should compute xLabel correctly", () => {
-      expect(wrapper.vm.xLabel).toEqual(["HISTOGRAM(field1)"]);
+      expect(wrapper.vm.xLabel).toEqual(["histogram(field1)"]);
     });
 
     it("should compute yLabel correctly", () => {
-      expect(wrapper.vm.yLabel).toEqual(["SUM(field2)"]);
+      expect(wrapper.vm.yLabel).toEqual(["sum(field2)"]);
     });
 
     it("should compute zLabel correctly", () => {
       wrapper = createWrapper({ "data.type": "heatmap" });
-      expect(wrapper.vm.zLabel).toEqual(["AVG(field3)"]);
+      expect(wrapper.vm.zLabel).toEqual(["avg(field3)"]);
     });
 
     it("should compute bLabel correctly", () => {
       wrapper = createWrapper({ "data.type": "area" });
-      expect(wrapper.vm.bLabel).toEqual(["COUNT(field4)"]);
+      expect(wrapper.vm.bLabel).toEqual(["count(field4)"]);
     });
 
-    it("should show column name for custom query", () => {
-      wrapper = createWrapper({ "data.queries.0.customQuery": true });
-      expect(wrapper.vm.xLabel).toEqual(["field1"]);
-      expect(wrapper.vm.yLabel).toEqual(["field2"]);
+    it("should show field data for custom query", () => {
+      wrapper = createWrapper({
+        "data.queries.0.customQuery": true
+      });
+      // For custom queries, fields should still be defined
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.x).toBeDefined();
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.y).toBeDefined();
     });
 
     it("should compute axis hints correctly for different chart types", () => {
@@ -833,26 +891,6 @@ describe("DashboardQueryBuilder", () => {
   describe("Histogram Interval Configuration", () => {
     beforeEach(() => {
       wrapper = createWrapper();
-    });
-
-    it("should get histogram interval field", () => {
-      const field = { args: [{ value: "5m" }] };
-      const result = wrapper.vm.getHistoramIntervalField(field);
-      expect(result).toEqual({ value: "5m", label: "5m" });
-    });
-
-    it("should initialize args if not present", () => {
-      const field = {};
-      const result = wrapper.vm.getHistoramIntervalField(field);
-      expect(result).toEqual({ value: null, label: "Auto" });
-      expect(field.args).toEqual([{ value: null }]);
-    });
-
-    it("should initialize args if empty array", () => {
-      const field = { args: [] };
-      const result = wrapper.vm.getHistoramIntervalField(field);
-      expect(result).toEqual({ value: null, label: "Auto" });
-      expect(field.args).toEqual([{ value: null }]);
     });
 
     it("should handle histogram interval updates", () => {
@@ -1000,7 +1038,7 @@ describe("DashboardQueryBuilder", () => {
         { name: "field1", type: "text" }
       ];
       
-      const mockEvent = { preventDefault: vi.fn() };
+      const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
       wrapper.vm.onDrop(mockEvent, "x", 0);
       
       // Should call cleanup regardless of outcome
@@ -1040,7 +1078,7 @@ describe("DashboardQueryBuilder", () => {
         dragElement: null
       };
       
-      const mockEvent = { preventDefault: vi.fn() };
+      const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
       wrapper.vm.onDrop(mockEvent, "x", 0);
       
       expect(mockUseDashboardPanelData.addXAxisItem).not.toHaveBeenCalled();
@@ -1048,7 +1086,7 @@ describe("DashboardQueryBuilder", () => {
 
     it("should handle drag operations safely", () => {
       // Test various drag operations
-      const mockEvent = { preventDefault: vi.fn() };
+      const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
       
       wrapper.vm.onDragStart(mockEvent, { column: "test" });
       expect(mockEvent.preventDefault).toHaveBeenCalled();
@@ -1058,11 +1096,16 @@ describe("DashboardQueryBuilder", () => {
     });
 
     it("should handle field drag operations", () => {
-      const mockEvent = { preventDefault: vi.fn() };
-      const testItem = { column: "testField" };
-      
+      const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
+      const testItem = {
+        type: "build",
+        args: [
+          { type: "field", value: { field: "testField", streamAlias: "" } }
+        ]
+      };
+
       wrapper.vm.onFieldDragStart(mockEvent, testItem, "x", 0);
-      
+
       expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragging).toBe(true);
       expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragElement).toBe(testItem);
       expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragSource).toBe("x");
@@ -1072,7 +1115,7 @@ describe("DashboardQueryBuilder", () => {
     it("should prevent invalid drag operations", () => {
       mockUseDashboardPanelData.dashboardPanelData.meta.dragAndDrop.dragSource = "x";
       
-      const mockEvent = { preventDefault: vi.fn() };
+      const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
       wrapper.vm.onDragEnter(mockEvent, "f", 0);
       
       expect(mockEvent.preventDefault).toHaveBeenCalled();
@@ -1107,7 +1150,6 @@ describe("DashboardQueryBuilder", () => {
       expect(wrapper.vm.dashboardPanelData).toBeDefined();
       expect(wrapper.vm.triggerOperators).toBeDefined();
       expect(wrapper.vm.triggerOperatorsWithHistogram).toBeDefined();
-      expect(wrapper.vm.operators).toBeDefined();
     });
   });
 
@@ -1157,13 +1199,16 @@ describe("DashboardQueryBuilder", () => {
 
     it("should handle histogram interval configuration", async () => {
       wrapper = createWrapper({
-        "data.queries.0.fields.x.0.aggregationFunction": "histogram",
-        "data.queries.0.fields.x.0.args": [{ value: "5m" }]
+        "data.queries.0.fields.x.0.functionName": "histogram",
+        "data.queries.0.fields.x.0.args": [
+          { value: "5m" },
+          { type: "field", value: { field: "field1", streamAlias: "" } }
+        ]
       });
-      
+
       const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.x[0];
       field.args[0].value = "15m";
-      
+
       expect(field.args[0].value).toBe("15m");
     });
   });

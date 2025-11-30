@@ -15,7 +15,7 @@
 
 use chrono::{DateTime, FixedOffset, Utc};
 use config::meta::{
-    dashboards::{Dashboard as MetaDashboard, v1, v2, v3, v4, v5, v6, v7},
+    dashboards::{Dashboard as MetaDashboard, v1, v2, v3, v4, v5, v6, v7, v8},
     folder::Folder as MetaFolder,
 };
 use serde::{Deserialize, Deserializer, Serialize};
@@ -33,6 +33,7 @@ pub enum DashboardRequestBody {
     V5(v5::Dashboard),
     V6(v6::Dashboard),
     V7(v7::Dashboard),
+    V8(v8::Dashboard),
 }
 
 /// Tracks the max version of dashboard currently supported.
@@ -61,6 +62,7 @@ impl<'de> Deserialize<'de> for DashboardRequestBody {
             5 => Self::V5(v5::Dashboard::deserialize(value).map_err(serde::de::Error::custom)?),
             6 => Self::V6(v6::Dashboard::deserialize(value).map_err(serde::de::Error::custom)?),
             7 => Self::V7(v7::Dashboard::deserialize(value).map_err(serde::de::Error::custom)?),
+            8 => Self::V8(v8::Dashboard::deserialize(value).map_err(serde::de::Error::custom)?),
             _ => {
                 return Err(serde::de::Error::custom(format!(
                     "unsupported version: {version}"
@@ -125,6 +127,8 @@ pub struct ListDashboardsResponseBodyItem {
     pub v6: Option<v6::Dashboard>,
     #[deprecated(note = "use GetDashboard endpoint to get dashboard details")]
     pub v7: Option<v7::Dashboard>,
+    #[deprecated(note = "use GetDashboard endpoint to get dashboard details")]
+    pub v8: Option<v8::Dashboard>,
 
     pub version: i32,
     pub hash: String,
@@ -171,6 +175,7 @@ impl From<DashboardRequestBody> for MetaDashboard {
             DashboardRequestBody::V5(d) => d.into(),
             DashboardRequestBody::V6(d) => d.into(),
             DashboardRequestBody::V7(d) => d.into(),
+            DashboardRequestBody::V8(d) => d.into(),
         }
     }
 }
@@ -268,6 +273,7 @@ impl From<(MetaFolder, MetaDashboard)> for ListDashboardsResponseBodyItem {
             v5: dashboard.v5,
             v6: dashboard.v6,
             v7: dashboard.v7,
+            v8: dashboard.v8,
         }
     }
 }

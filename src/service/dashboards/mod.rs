@@ -300,8 +300,12 @@ pub fn get_query_variables(
             let dash = dashboard.v7.as_ref().unwrap();
             _get_variables!(map, dash);
         }
+        8 => {
+            let dash = dashboard.v8.as_ref().unwrap();
+            _get_variables!(map, dash);
+        }
         _ => {
-            unreachable!("we only have 7 dashboard versions")
+            unreachable!("we only have 8 dashboard versions")
         }
     }
     map
