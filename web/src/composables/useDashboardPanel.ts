@@ -490,6 +490,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         havingConditions: [],
         treatAsNonTimestamp:
           row.name === store.state.zoConfig.timestamp_column ? false : true,
+        showFieldAsJson: false,
       });
     }
 
@@ -607,6 +608,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         havingConditions: [],
         treatAsNonTimestamp:
           row.name === store.state.zoConfig.timestamp_column ? false : true,
+        showFieldAsJson: false,
       });
     }
     updateArrayAlias();
