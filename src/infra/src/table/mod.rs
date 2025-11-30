@@ -41,6 +41,7 @@ pub mod re_pattern_stream_map;
 pub mod reports;
 pub mod search_job;
 pub mod search_queue;
+pub mod sessions;
 pub mod short_urls;
 pub mod system_prompts;
 pub mod templates;
