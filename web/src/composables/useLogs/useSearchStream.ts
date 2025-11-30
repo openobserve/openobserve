@@ -45,6 +45,7 @@ import useSearchConnection from "@/composables/useLogs/useSearchConnection";
 import useSearchResponseHandler from "@/composables/useLogs/useSearchResponseHandler";
 import useSearchHistogramManager from "@/composables/useLogs/useSearchHistogramManager";
 import useSearchPagination from "@/composables/useLogs/useSearchPagination";
+import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 
 export const useSearchStream = () => {
   const { showErrorNotification } = useNotifications();

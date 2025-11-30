@@ -36,6 +36,7 @@ import useStreamFields from "@/composables/useLogs/useStreamFields";
 export const useSearchBar = () => {
   const { getStream, isStreamExists, isStreamFetched } = useStreams();
 
+
   let { searchObj, searchObjDebug, notificationMsg } = searchState();
 
   const store = useStore();
