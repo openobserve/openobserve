@@ -81,6 +81,10 @@ pub async fn get_semantic_groups(org_id: &str) -> Result<Vec<SemanticFieldGroup>
         Some(config) => Ok(config.semantic_field_groups),
         None => {
             // No config exists, initialize with defaults
+            #[cfg(feature = "enterprise")]
+            let defaults = o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file();
+
+            #[cfg(not(feature = "enterprise"))]
             let defaults = SemanticFieldGroup::load_defaults_from_file();
 
             // Auto-initialize for this org
@@ -121,6 +125,10 @@ pub async fn initialize_semantic_groups(org_id: &str) -> Result<(), anyhow::Erro
         return Ok(());
     }
 
+    #[cfg(feature = "enterprise")]
+    let defaults = o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file();
+
+    #[cfg(not(feature = "enterprise"))]
     let defaults = SemanticFieldGroup::load_defaults_from_file();
     let config = GlobalDeduplicationConfig {
         enabled: false,

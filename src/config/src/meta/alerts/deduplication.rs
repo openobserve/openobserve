@@ -44,6 +44,11 @@ pub struct SemanticFieldGroup {
     /// Human-readable display name (e.g., "Host", "K8s Cluster")
     pub display: String,
 
+    /// Category/group this semantic field belongs to (e.g., "Common", "Kubernetes", "AWS", "GCP", "Azure")
+    /// Used for UI organization and preset templates
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+
     /// List of field names that are equivalent (e.g., ["host", "hostname", "node"])
     ///
     /// Note: Field names can overlap with other groups. First-defined group wins.
@@ -66,6 +71,25 @@ impl SemanticFieldGroup {
         Self {
             id: id.into(),
             display: display.into(),
+            group: None,
+            fields,
+            normalize,
+        }
+    }
+
+    pub fn with_group(
+        id: impl Into<String>,
+        display: impl Into<String>,
+        group: impl Into<String>,
+        fields: &[&str],
+        normalize: bool,
+    ) -> Self {
+        let fields = fields.iter().map(|v| v.to_string()).collect_vec();
+
+        Self {
+            id: id.into(),
+            display: display.into(),
+            group: Some(group.into()),
             fields,
             normalize,
         }
