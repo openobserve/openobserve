@@ -353,7 +353,8 @@
     "roles": "Roles",
     "groups": "Groups",
     "customRole": "Custom Roles",
-    "description": "Description"
+    "description": "Description",
+    "revoke_invite":"Revoke Invite"
   },
   "invitation": {
     "pendingInvitations": "Pending Invitations",

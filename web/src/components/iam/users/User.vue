@@ -101,6 +101,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
               </q-btn>
               <q-btn
+                v-if="props.row.status == 'pending' && props.row.token"
+                :title="t('user.revoke_invite')"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                icon="cancel"
+                @click="confirmRevokeAction(props)"
+                style="cursor: pointer !important"
+                :data-test="`revoke-invite-${props.row.email}`"
+              >
+              </q-btn>
+              <q-btn
                 v-if="props.row.enableEdit && props.row.status != 'pending' && config.isCloud == 'false'"
                 :title="t('user.update')"
                 padding="sm"
@@ -189,6 +203,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-actions>
       </q-card>
     </q-dialog>
+
+    <q-dialog v-model="confirmRevoke">
+      <q-card style="width: 400px">
+        <q-card-section class="confirmBody">
+          <div class="head">Revoke Invitation</div>
+          <div class="para">Are you sure you want to revoke the invitation for {{ revokeInviteEmail }}?</div>
+        </q-card-section>
+
+        <q-card-actions class="confirmActions">
+          <q-btn v-close-popup="true" unelevated
+            no-caps class="q-mr-sm o2-secondary-button">
+            {{ t("user.cancel") }}
+          </q-btn>
+          <q-btn
+            v-close-popup="true"
+            unelevated
+            no-caps
+            class="o2-primary-button"
+            @click="revokeInvite"
+          >
+            {{ t("user.ok") }}
+          </q-btn>
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -244,6 +283,7 @@ export default defineComponent({
     const showUpdateUserDialog: any = ref(false);
     const showAddUserDialog: any = ref(false);
     const confirmDelete = ref<boolean>(false);
+    const confirmRevoke = ref<boolean>(false);
     const selectedUser: any = ref({});
     const orgData: any = ref(store.state.selectedOrganization);
     const isUpdated: any = ref(false);
@@ -353,6 +393,8 @@ export default defineComponent({
     const selectedRole = ref();
     const currentUserRole = ref("");
     let deleteUserEmail = "";
+    let revokeInviteToken = "";
+    const revokeInviteEmail = ref("");
 
     const getRoles = () => {
       return new Promise((resolve) => {
@@ -440,6 +482,7 @@ export default defineComponent({
                 enableChangeRole: false,
                 enableDelete: config.isCloud == "true" ? true : false,
                 status: data?.status,
+                token: data?.token || null,
               };
             });
 
@@ -798,6 +841,48 @@ export default defineComponent({
         });
     };
 
+    const confirmRevokeAction = (props: any) => {
+      confirmRevoke.value = true;
+      revokeInviteToken = props.row.token;
+      revokeInviteEmail.value = props.row.email;
+    };
+
+    const revokeInvite = async () => {
+      const dismiss = $q.notify({
+        spinner: true,
+        message: "Please wait...",
+        timeout: 2000,
+      });
+
+      organizationsService
+        .revoke_invite(store.state.selectedOrganization.identifier, revokeInviteToken)
+        .then(async (res: any) => {
+          dismiss();
+          $q.notify({
+            color: "positive",
+            message: "Invitation revoked successfully.",
+            timeout: 3000,
+          });
+          await getOrgMembers();
+          updateUserActions();
+
+          segment.track("Button Click", {
+            button: "Revoke Invite",
+            user_org: store.state.selectedOrganization.identifier,
+            user_id: store.state.userInfo.email,
+            page: "Users",
+          });
+        })
+        .catch((err: any) => {
+          dismiss();
+          $q.notify({
+            color: "negative",
+            message: err?.response?.data?.message || "Error while revoking invitation.",
+            timeout: 5000,
+          });
+        });
+    };
+
     const updateUserRole = (row: any) => {
       const dismiss = $q.notify({
         spinner: true,
@@ -885,6 +970,10 @@ export default defineComponent({
       confirmDelete,
       deleteUser,
       confirmDeleteAction,
+      confirmRevoke,
+      revokeInvite,
+      revokeInviteEmail,
+      confirmRevokeAction,
       getOrgMembers,
       updateUser,
       updateMember,
