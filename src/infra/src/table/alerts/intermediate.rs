@@ -596,6 +596,7 @@ impl From<MetaStreamType> for StreamType {
             MetaStreamType::Logs => Self::Logs,
             MetaStreamType::Metrics => Self::Metrics,
             MetaStreamType::Traces => Self::Traces,
+            MetaStreamType::ServiceGraph => Self::Metadata, // Map to Metadata for alerts
             MetaStreamType::EnrichmentTables => Self::EnrichmentTables,
             MetaStreamType::Filelist => Self::FileList,
             MetaStreamType::Metadata => Self::Metadata,
