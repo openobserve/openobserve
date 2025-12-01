@@ -199,7 +199,8 @@ pub fn create_wal_dir_datetime_filter(
         };
 
         let month_days = [31u32, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-        let days = month_days[(month-1) as usize] + if month == 2 && year % 4 == 0 { 1 } else { 0 };
+        let days =
+            month_days[(month - 1) as usize] + if month == 2 && year % 4 == 0 { 1 } else { 0 };
         let day = match components.next().map(|c| c.parse::<u32>()) {
             Some(Ok(day)) => {
                 if 1 <= day && day <= days {
