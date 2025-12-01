@@ -54,7 +54,7 @@ test.describe("dashboard folder testcases", () => {
     await pm.dashboardFolder.searchFolder(folderName);
     await pm.alertsPage.verifyFolderCreated(folderName);
     await pm.alertsPage.navigateToFolder(folderName);
-    await page.waitForTimeout(2000);
+    // await page.waitForTimeout(2000);
 
     // await pm.dashboardCreate.createDashboard(randomDashboardName);
     // await page.waitForTimeout(1000);
