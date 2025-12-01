@@ -1192,9 +1192,9 @@ async fn queue_services_from_parquet(
         return Ok(());
     }
 
-    // Get semantic field groups (use defaults for now)
+    // Get semantic field groups (use enterprise defaults for comprehensive field mapping)
     let semantic_groups =
-        ::config::meta::alerts::deduplication::SemanticFieldGroup::default_presets();
+        o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file();
 
     // Create processor (with org_id for cardinality tracking)
     let processor = o2_enterprise::enterprise::service_streams::processor::StreamProcessor::new(

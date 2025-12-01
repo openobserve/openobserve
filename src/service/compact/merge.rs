@@ -1368,9 +1368,9 @@ async fn process_single_parquet_buffer(
         return Ok(());
     }
 
-    // Create processor with default semantic groups
+    // Create processor with enterprise semantic groups for comprehensive field mapping
     let semantic_groups =
-        config::meta::alerts::deduplication::SemanticFieldGroup::default_presets();
+        o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file();
     let processor = o2_enterprise::enterprise::service_streams::processor::StreamProcessor::new(
         org_id.to_string(),
         semantic_groups,
