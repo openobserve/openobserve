@@ -145,41 +145,53 @@ pub async fn create_table() -> Result<(), errors::Error> {
 
 /// Add or update a service (upsert)
 pub async fn put(record: ServiceRecord) -> Result<(), errors::Error> {
-    // Generate KSUID for new record
-    let id = svix_ksuid::Ksuid::new(None, None).to_string();
-
-    let active_model = ActiveModel {
-        id: Set(id),
-        org_id: Set(record.org_id),
-        service_key: Set(record.service_key),
-        service_name: Set(record.service_name),
-        dimensions: Set(record.dimensions),
-        streams: Set(record.streams),
-        first_seen: Set(record.first_seen),
-        last_seen: Set(record.last_seen),
-        metadata: Set(record.metadata),
-    };
-
     let _lock = get_lock().await;
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
-    // Try insert first, if it fails due to unique violation, do update
-    match Entity::insert(active_model.clone()).exec(client).await {
-        Ok(_) => Ok(()),
-        Err(DbErr::Exec(RuntimeErr::SqlxError(SqlxError::Database(e)))) => {
-            if e.is_unique_violation() {
-                // Update existing record
-                Entity::update(active_model)
-                    .exec(client)
-                    .await
-                    .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-                Ok(())
-            } else {
-                Err(Error::DbError(DbError::SeaORMError(e.to_string())))
-            }
-        }
-        Err(e) => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
+    // Try to find existing record by unique constraint (org_id, service_key)
+    let existing = Entity::find()
+        .filter(Column::OrgId.eq(&record.org_id))
+        .filter(Column::ServiceKey.eq(&record.service_key))
+        .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    if let Some(existing_record) = existing {
+        // Update existing record
+        let mut active_model: ActiveModel = existing_record.into();
+        active_model.service_name = Set(record.service_name);
+        active_model.dimensions = Set(record.dimensions);
+        active_model.streams = Set(record.streams);
+        active_model.first_seen = Set(record.first_seen);
+        active_model.last_seen = Set(record.last_seen);
+        active_model.metadata = Set(record.metadata);
+
+        active_model
+            .update(client)
+            .await
+            .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    } else {
+        // Insert new record
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let active_model = ActiveModel {
+            id: Set(id),
+            org_id: Set(record.org_id),
+            service_key: Set(record.service_key),
+            service_name: Set(record.service_name),
+            dimensions: Set(record.dimensions),
+            streams: Set(record.streams),
+            first_seen: Set(record.first_seen),
+            last_seen: Set(record.last_seen),
+            metadata: Set(record.metadata),
+        };
+
+        Entity::insert(active_model)
+            .exec(client)
+            .await
+            .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
     }
+
+    Ok(())
 }
 
 /// Get a specific service
