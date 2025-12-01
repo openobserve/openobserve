@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <member-invitation
               :key="currentUserRole"
               v-model:currentrole="currentUserRole"
+              @invite-sent="handleInviteSent"
             />
           </div>
           <div class="col-6" v-else>
@@ -883,6 +884,11 @@ export default defineComponent({
         });
     };
 
+    const handleInviteSent = async () => {
+      await getOrgMembers();
+      updateUserActions();
+    };
+
     const updateUserRole = (row: any) => {
       const dismiss = $q.notify({
         spinner: true,
@@ -974,6 +980,7 @@ export default defineComponent({
       revokeInvite,
       revokeInviteEmail,
       confirmRevokeAction,
+      handleInviteSent,
       getOrgMembers,
       updateUser,
       updateMember,

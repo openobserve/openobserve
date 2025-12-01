@@ -94,7 +94,8 @@ export default defineComponent({
       required: true,
     },
   },
-  setup(props: any) {
+  emits: ["inviteSent"],
+  setup(props: any, { emit }) {
     const store = useStore();
     const { t } = useI18n();
     const $q = useQuasar();
@@ -152,6 +153,8 @@ export default defineComponent({
                 message: data.message,
                 timeout: 5000,
               });
+              // Emit event to parent to refresh the members list
+              emit("inviteSent");
             }
 
             dismiss();
