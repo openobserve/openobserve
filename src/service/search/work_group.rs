@@ -67,8 +67,7 @@ pub async fn check_work_group(
     let trace_id_owned = trace_id.to_string();
     let caller_owned = caller.to_string();
     let guard = AsyncDefer::new(async move {
-        if let Err(e) = infra::dist_lock::unlock_with_trace_id(&trace_id_owned, &locker).await
-        {
+        if let Err(e) = infra::dist_lock::unlock_with_trace_id(&trace_id_owned, &locker).await {
             log::error!(
                 "[trace_id {trace_id_owned}] {caller_owned}->search: failed to unlock: {e:?}"
             );
