@@ -44,8 +44,8 @@ pub struct SemanticFieldGroup {
     /// Human-readable display name (e.g., "Host", "K8s Cluster")
     pub display: String,
 
-    /// Category/group this semantic field belongs to (e.g., "Common", "Kubernetes", "AWS", "GCP", "Azure")
-    /// Used for UI organization and preset templates
+    /// Category/group this semantic field belongs to (e.g., "Common", "Kubernetes", "AWS", "GCP",
+    /// "Azure") Used for UI organization and preset templates
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub group: Option<String>,
 

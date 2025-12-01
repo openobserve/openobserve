@@ -53,20 +53,38 @@ pub async fn list_services(org_id: web::Path<String>) -> Result<HttpResponse, Er
 /// GET /api/{org_id}/service_streams/{service_name}
 ///
 /// List all instances of a service across dimension combinations
+///
+/// Query parameters:
+/// - Any key-value pair will be treated as a dimension filter
+/// - Example: ?cluster=us-west&environment=prod
+/// - Only services matching ALL specified dimensions will be returned
 #[get("/{org_id}/service_streams/{service_name}")]
 pub async fn list_service_instances(
     path: web::Path<(String, String)>,
+    query: web::Query<std::collections::HashMap<String, String>>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, service_name) = path.into_inner();
+    let dimension_filters = query.into_inner();
 
     #[cfg(feature = "enterprise")]
     {
-        match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::list_by_name(
-            &org_id,
-            &service_name,
-        )
-        .await
-        {
+        // If dimension filters are provided, use filtered query
+        let result = if dimension_filters.is_empty() {
+            o2_enterprise::enterprise::service_streams::storage::ServiceStorage::list_by_name(
+                &org_id,
+                &service_name,
+            )
+            .await
+        } else {
+            o2_enterprise::enterprise::service_streams::storage::ServiceStorage::list_by_dimensions(
+                &org_id,
+                Some(&service_name),
+                &dimension_filters,
+            )
+            .await
+        };
+
+        match result {
             Ok(services) => Ok(MetaHttpResponse::json(services)),
             Err(e) => Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::error(

@@ -82,7 +82,8 @@ pub async fn get_semantic_groups(org_id: &str) -> Result<Vec<SemanticFieldGroup>
         None => {
             // No config exists, initialize with defaults
             #[cfg(feature = "enterprise")]
-            let defaults = o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file();
+            let defaults =
+                o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file();
 
             #[cfg(not(feature = "enterprise"))]
             let defaults = SemanticFieldGroup::load_defaults_from_file();

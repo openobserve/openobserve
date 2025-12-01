@@ -1351,6 +1351,33 @@ pub static SELF_REPORTING_QUEUE_DEPTH: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// service streams cache stats
+pub static SERVICE_STREAMS_CACHE_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "service_streams_cache_bytes",
+            "Service streams cache memory usage in bytes by organization",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "cache_type"], // cache_type: "services" or "dimensions"
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_CACHE_ENTRIES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "service_streams_cache_entries",
+            "Number of entries in service streams cache by organization",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "cache_type"], // cache_type: "services" or "dimensions"
+    )
+    .expect("Metric created")
+});
+
 fn register_metrics(registry: &Registry) {
     // http latency
     registry
@@ -1702,6 +1729,14 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(SELF_REPORTING_QUEUE_DEPTH.clone()))
+        .expect("Metric registered");
+
+    // service streams cache
+    registry
+        .register(Box::new(SERVICE_STREAMS_CACHE_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_CACHE_ENTRIES.clone()))
         .expect("Metric registered");
 }
 
