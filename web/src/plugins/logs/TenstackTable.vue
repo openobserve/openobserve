@@ -361,7 +361,9 @@ name="warning" class="q-mr-xs" />
                       : cell.renderValue()
                   "
                   :show-braces="cell.column.columnDef.id === 'source'"
-                  :show-quotes="cell.column.columnDef.id === 'source'"
+                  :show-quotes="
+                    cell.column.columnDef.id === 'source'
+                  "
                   :query-string="highlightQuery"
                   :simple-mode="
                     !(

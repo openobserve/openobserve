@@ -15,14 +15,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw-flex-1 tw-overflow-hidden tw-py-[0.375rem]">
-    <!-- Patterns List with Virtual Scroll -->
-    <q-virtual-scroll
-      v-if="patterns?.length > 0"
-      :items="patterns"
+  <div class="tw-flex-1 tw-overflow-hidden">
+    <!-- Patterns Table -->
+    <div v-if="patterns?.length > 0" class="tw-flex tw-flex-col tw-h-full">
+      <!-- Table Header -->
+      <div
+        class="tw-flex tw-items-center tw-py-2 tw-px-3 tw-border-b tw-border-[var(--o2-border-color)] tw-sticky tw-top-0 tw-z-10"
+        :style="{
+          background: store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
+        }"
+      >
+        <!-- Pattern Column Header -->
+        <div class="tw-flex-1 tw-min-w-0 tw-pr-1">
+          <span
+            class="tw-text-xs text-weight-bold"
+            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+          >
+            {{ t("search.patternColumnHeader") }}
+          </span>
+        </div>
+
+        <!-- Occurrence Column Header -->
+        <div class="tw-w-16 tw-flex-shrink-0 tw-pr-1 tw-text-right">
+          <span
+            class="tw-text-xs text-weight-bold"
+            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+          >
+            {{ t("search.occurrenceColumnHeader") }}
+          </span>
+        </div>
+
+        <!-- Percentage Column Header -->
+        <div class="tw-w-14 tw-flex-shrink-0 tw-pr-1 tw-text-right">
+          <span
+            class="tw-text-xs text-weight-bold"
+            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+          >
+            {{ t("search.percentageColumnHeader") }}
+          </span>
+        </div>
+
+        <!-- Actions Column - No Header -->
+        <div class="tw-w-20 tw-flex-shrink-0">
+        </div>
+      </div>
+
+      <!-- Patterns List with Virtual Scroll -->
+      <q-virtual-scroll
+        :items="patterns"
         virtual-scroll-slice-size="5"
         v-slot="{ item: pattern, index }"
-        class="tw-h-full tw-pl-[0.375rem] tw-pr-[0.625rem]"
+        class="tw-flex-1"
       >
         <PatternCard
           :pattern="pattern"
@@ -32,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @exclude="$emit('add-to-search', pattern, 'exclude')"
         />
       </q-virtual-scroll>
+    </div>
 
     <!-- Loading State -->
     <div
@@ -78,6 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import PatternCard from "./PatternCard.vue";
 
 defineProps<{
@@ -92,4 +137,5 @@ defineEmits<{
 }>();
 
 const store = useStore();
+const { t} = useI18n();
 </script>
