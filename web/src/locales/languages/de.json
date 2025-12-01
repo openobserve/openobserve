@@ -353,7 +353,8 @@
     "roles": "Rollen",
     "groups": "Gruppen",
     "customRole": "Benutzerdefinierte Rollen",
-    "description": "Beschreibung"
+    "description": "Beschreibung",
+    "revoke_invite": "Einladung widerrufen"
   },
   "ticket": {
     "header": "Tickets für den Support",

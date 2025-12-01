@@ -353,7 +353,8 @@
     "roles": "Rollen",
     "groups": "Groepen",
     "customRole": "Rollen op maat",
-    "description": "Omschrijving"
+    "description": "Omschrijving",
+    "revoke_invite": "Uitnodiging intrekken"
   },
   "ticket": {
     "header": "Tickets voor ondersteuning",

@@ -353,7 +353,8 @@
     "roles": "ロール",
     "groups": "グループ",
     "customRole": "カスタムロール",
-    "description": "[説明]"
+    "description": "[説明]",
+    "revoke_invite": "招待を取り消す"
   },
   "serviceAccounts": {
     "header": "サービスアカウント",

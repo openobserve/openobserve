@@ -353,7 +353,8 @@
     "roles": "Rôles",
     "groups": "Groupes",
     "customRole": "Rôles personnalisés",
-    "description": "Descriptif"
+    "description": "Descriptif",
+    "revoke_invite": "Révoquer l'invitation"
   },
   "ticket": {
     "header": "Tickets d'assistance",

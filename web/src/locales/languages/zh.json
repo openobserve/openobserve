@@ -353,7 +353,8 @@
     "roles": "角色",
     "groups": "群组",
     "customRole": "自定义角色",
-    "description": "描述"
+    "description": "描述",
+    "revoke_invite": "撤销邀请"
   },
   "ticket": {
     "header": "工单",
