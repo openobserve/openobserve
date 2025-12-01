@@ -1080,7 +1080,10 @@
     "panelQueryMustHaveStream": "パネルクエリにはストリームが設定されている必要があります",
     "unsupportedPanelTypeAlert": "{type} パネルからアラートを作成すると、期待どおりに動作しない場合があります",
     "panelDuplicatedSuccessfully": "パネルは正常に複製されました",
-    "panelDuplicationFailed": "パネルを複製できませんでした"
+    "panelDuplicationFailed": "パネルを複製できませんでした",
+    "customChartTypeSelector": "カスタムチャートタイプセレクター",
+    "customChartTypeSelectorHint": "基本的なコード構造を始めるには、eCharts ライブラリからグラフの種類を選択します。",
+    "selectChartType": "チャートタイプを選択"
   },
   "home": {
     "streams": "ストリーム",

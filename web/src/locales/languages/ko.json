@@ -1064,7 +1064,10 @@
     "panelDuplicatedSuccessfully": "패널 복제 성공",
     "panelDuplicationFailed": "패널 복제 실패",
     "mapname": "이름",
-    "mapvalue": "가치"
+    "mapvalue": "가치",
+    "customChartTypeSelector": "사용자 지정 차트 유형 선택기",
+    "customChartTypeSelectorHint": "eCharts 라이브러리에서 차트 유형을 선택하여 기본 코드 구조를 시작하세요.",
+    "selectChartType": "차트 유형 선택"
   },
   "home": {
     "streams": "스트림",
