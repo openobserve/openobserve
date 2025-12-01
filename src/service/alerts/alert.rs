@@ -1205,7 +1205,7 @@ fn process_row_template(
             let value = if value.is_string() {
                 value.as_str().unwrap_or_default().to_string()
             } else if value.is_f64() {
-                format!("{:.2}", value.as_f64().unwrap_or_default())
+                value.as_f64().unwrap_or_default().to_string()
             } else {
                 value.to_string()
             };
@@ -1333,7 +1333,7 @@ async fn process_dest_template(
             let value = if value.is_string() {
                 value.as_str().unwrap_or_default().to_string()
             } else if value.is_f64() {
-                format!("{:.2}", value.as_f64().unwrap_or_default())
+                value.as_f64().unwrap_or_default().to_string()
             } else {
                 value.to_string()
             };
@@ -1627,7 +1627,7 @@ pub fn get_row_column_map(rows: &[Map<String, Value>]) -> HashMap<String, HashSe
             let value = if value.is_string() {
                 value.as_str().unwrap_or_default().to_string()
             } else if value.is_f64() {
-                format!("{:.2}", value.as_f64().unwrap_or_default())
+                value.as_f64().unwrap_or_default().to_string()
             } else {
                 value.to_string()
             };
