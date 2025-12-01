@@ -31,7 +31,9 @@ use config::{
     },
     metrics,
     utils::{
-        parquet::{get_recordbatch_reader_from_bytes, read_schema_from_bytes},
+        parquet::{
+            get_recordbatch_reader_from_bytes, read_recordbatch_from_bytes, read_schema_from_bytes,
+        },
         record_batch_ext::concat_batches,
         schema_ext::SchemaExt,
         time::{day_micros, hour_micros},
@@ -884,6 +886,29 @@ pub async fn merge_files(
         }
     };
 
+    // Process service streams if in compactor mode
+    #[cfg(feature = "enterprise")]
+    {
+        let o2_config = o2_enterprise::enterprise::common::config::get_config();
+        if o2_config.service_streams.enabled
+            && o2_config.service_streams.is_compactor_mode()
+            && (stream_type == StreamType::Logs
+                || stream_type == StreamType::Metrics
+                || stream_type == StreamType::Traces)
+        {
+            // Process the merged data for service discovery
+            // Works with all stream types (same as ingester mode)
+            if let Err(e) =
+                process_service_streams_from_parquet(org_id, stream_name, stream_type, &buf).await
+            {
+                log::warn!(
+                    "[COMPACTOR] Failed to process service streams for {org_id}/{stream_type}/{stream_name}: {}",
+                    e
+                );
+            }
+        }
+    }
+
     let latest_schema_fields = latest_schema
         .fields()
         .iter()
@@ -1292,6 +1317,150 @@ fn sort_by_time_range(mut file_list: Vec<FileKey>) -> Vec<FileKey> {
         files.extend(group);
     }
     files
+}
+
+/// Process service streams from merged parquet data (compactor mode)
+#[cfg(feature = "enterprise")]
+async fn process_service_streams_from_parquet(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    parquet_result: &exec::MergeParquetResult,
+) -> Result<(), anyhow::Error> {
+    let parquet_bytes = match parquet_result {
+        exec::MergeParquetResult::Single(buf) => buf,
+        exec::MergeParquetResult::Multiple { bufs, .. } => {
+            // For multiple files, process each one
+            for buf in bufs {
+                process_single_parquet_buffer(org_id, stream_name, stream_type, buf).await?;
+            }
+            return Ok(());
+        }
+    };
+
+    process_single_parquet_buffer(org_id, stream_name, stream_type, parquet_bytes).await
+}
+
+#[cfg(feature = "enterprise")]
+async fn process_single_parquet_buffer(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    parquet_bytes: &[u8],
+) -> Result<(), anyhow::Error> {
+    // Read record batches from parquet bytes
+    let bytes = Bytes::from(parquet_bytes.to_vec());
+    let (_schema, batches) = read_recordbatch_from_bytes(&bytes).await?;
+
+    // Convert all batches to HashMap records
+    let mut all_records: Vec<std::collections::HashMap<String, serde_json::Value>> = Vec::new();
+    for batch in batches {
+        let records = record_batch_to_hashmap(&batch)?;
+        // Convert hashbrown::HashMap to std::collections::HashMap
+        for record in records {
+            let std_map: std::collections::HashMap<String, serde_json::Value> =
+                record.into_iter().collect();
+            all_records.push(std_map);
+        }
+    }
+
+    if all_records.is_empty() {
+        return Ok(());
+    }
+
+    // Create processor with default semantic groups
+    let semantic_groups =
+        config::meta::alerts::deduplication::SemanticFieldGroup::default_presets();
+    let processor = o2_enterprise::enterprise::service_streams::processor::StreamProcessor::new(
+        org_id.to_string(),
+        semantic_groups,
+    );
+
+    // Process records and extract services
+    let services = processor
+        .process_records(stream_type, stream_name, &all_records)
+        .await;
+
+    if services.is_empty() {
+        return Ok(());
+    }
+
+    log::info!(
+        "[COMPACTOR] Discovered {} services from {}/{}/{}",
+        services.len(),
+        org_id,
+        stream_type,
+        stream_name
+    );
+
+    // Queue services for batched processing (same as ingester mode)
+    o2_enterprise::enterprise::service_streams::batch_processor::queue_services(
+        org_id.to_string(),
+        services,
+    )
+    .await;
+
+    Ok(())
+}
+
+/// Convert RecordBatch to Vec<HashMap<String, Value>> for service streams processing
+#[cfg(feature = "enterprise")]
+fn record_batch_to_hashmap(
+    batch: &RecordBatch,
+) -> Result<Vec<HashMap<String, serde_json::Value>>, anyhow::Error> {
+    use arrow::{array::*, datatypes::DataType};
+
+    let mut records = Vec::with_capacity(batch.num_rows());
+    let field_names: Vec<String> = batch
+        .schema()
+        .fields()
+        .iter()
+        .map(|f| f.name().clone())
+        .collect();
+
+    for row_idx in 0..batch.num_rows() {
+        let mut record = HashMap::new();
+
+        for (col_idx, field_name) in field_names.iter().enumerate() {
+            let column = batch.column(col_idx);
+
+            if column.is_null(row_idx) {
+                record.insert(field_name.clone(), serde_json::Value::Null);
+                continue;
+            }
+
+            // Convert arrow value to JSON based on type
+            let value = match column.data_type() {
+                DataType::Utf8 => {
+                    let array = column.as_any().downcast_ref::<StringArray>().unwrap();
+                    serde_json::Value::String(array.value(row_idx).to_string())
+                }
+                DataType::Int64 => {
+                    let array = column.as_any().downcast_ref::<Int64Array>().unwrap();
+                    serde_json::Value::Number(array.value(row_idx).into())
+                }
+                DataType::Float64 => {
+                    let array = column.as_any().downcast_ref::<Float64Array>().unwrap();
+                    serde_json::json!(array.value(row_idx))
+                }
+                DataType::Boolean => {
+                    let array = column.as_any().downcast_ref::<BooleanArray>().unwrap();
+                    serde_json::Value::Bool(array.value(row_idx))
+                }
+                // Add more types as needed
+                _ => {
+                    // Skip complex types for now
+                    continue;
+                }
+            };
+
+            record.insert(field_name.clone(), value);
+        }
+
+        records.push(record);
+    }
+
+    Ok(records)
 }
 
 #[cfg(test)]

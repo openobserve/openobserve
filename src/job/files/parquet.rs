@@ -896,11 +896,17 @@ async fn merge_files(
     #[cfg(feature = "enterprise")]
     {
         use config::cluster::LOCAL_NODE;
-        let service_streams_enabled = o2_enterprise::enterprise::common::config::get_config()
-            .service_streams
-            .enabled;
+        let service_streams_config =
+            &o2_enterprise::enterprise::common::config::get_config().service_streams;
 
-        if LOCAL_NODE.is_ingester() && service_streams_enabled {
+        // Only process in ingester mode (if mode is "compactor", this will be handled during merge)
+        if LOCAL_NODE.is_ingester()
+            && service_streams_config.enabled
+            && service_streams_config.is_ingester_mode()
+            && (stream_type == StreamType::Logs
+                || stream_type == StreamType::Metrics
+                || stream_type == StreamType::Traces)
+        {
             // Check if we should process this file (per-stream-type sampling)
             let should_process =
                 o2_enterprise::enterprise::service_streams::sampler::should_process_file(
