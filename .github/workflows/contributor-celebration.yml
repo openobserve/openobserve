@@ -1,0 +1,122 @@
+name: Celebrate Contributor Commits
+permissions:
+  contents: read
+on:
+  schedule:
+    - cron: "0 10 * * 1" # Every Monday at 10AM
+  workflow_dispatch:
+
+jobs:
+  celebrate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch full history for commit analysis
+
+      - name: Analyze contributor commits
+        uses: actions/github-script@v6
+        id: commit-stats
+        with:
+          script: |
+            const { execSync } = require('child_process');
+
+            // Get commits from last 7 days
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+            const since = sevenDaysAgo.toISOString().split('T')[0];
+
+            // Get commit count by author
+            const gitLog = execSync(
+              `git log --since="${since}" --format="%aN|%ae" --no-merges`,
+              { encoding: 'utf-8' }
+            );
+
+            // Count commits per contributor
+            const commitMap = {};
+            const lines = gitLog.trim().split('\n').filter(line => line);
+
+            lines.forEach(line => {
+              const [name, email] = line.split('|');
+              if (name && email) {
+                const key = `${name} <${email}>`;
+                commitMap[key] = (commitMap[key] || 0) + 1;
+              }
+            });
+
+            // Convert to array and sort by commit count
+            const contributors = Object.entries(commitMap)
+              .map(([contributor, commits]) => ({
+                name: contributor.split(' <')[0],
+                email: contributor.match(/<(.+)>/)?.[1] || '',
+                commits: commits
+              }))
+              .sort((a, b) => b.commits - a.commits);
+
+            // Get total commits and contributors
+            const totalCommits = lines.length;
+            const totalContributors = contributors.length;
+
+            core.setOutput("contributors", JSON.stringify(contributors));
+            core.setOutput("totalCommits", totalCommits);
+            core.setOutput("totalContributors", totalContributors);
+
+      - name: Build celebratory Slack message
+        id: slack-msg
+        run: |
+          CONTRIBUTORS='${{ steps.commit-stats.outputs.contributors }}'
+          TOTAL_COMMITS='${{ steps.commit-stats.outputs.totalCommits }}'
+          TOTAL_CONTRIBUTORS='${{ steps.commit-stats.outputs.totalContributors }}'
+
+          if [ "$TOTAL_COMMITS" -eq 0 ]; then
+            MESSAGE="💚 *Weekly Contributor Update for ${{ github.repository }}*\n\n🌟 Taking a breather this week! Rest is important too. 🌟"
+          else
+            # Build contributor list with positive emojis
+            CONTRIBUTOR_LIST=$(echo "$CONTRIBUTORS" | jq -r '
+              .[] |
+              if .commits >= 10 then
+                "🔥 *\(.name)* — \(.commits) commits (Incredible momentum!)"
+              elif .commits >= 5 then
+                "⚡ *\(.name)* — \(.commits) commits (Outstanding work!)"
+              elif .commits >= 3 then
+                "✨ *\(.name)* — \(.commits) commits (Great progress!)"
+              else
+                "💫 *\(.name)* — \(.commits) commit\(if .commits > 1 then "s" else "" end) (Every contribution matters!)"
+              end
+            ')
+
+            # Determine motivational message based on activity
+            if [ "$TOTAL_COMMITS" -ge 50 ]; then
+              MOTIVATION="🚀 *Amazing team effort!* The energy is incredible!"
+            elif [ "$TOTAL_COMMITS" -ge 25 ]; then
+              MOTIVATION="🎯 *Fantastic progress!* Keep up the great work!"
+            elif [ "$TOTAL_COMMITS" -ge 10 ]; then
+              MOTIVATION="💪 *Solid week!* Every commit brings us closer to our goals!"
+            else
+              MOTIVATION="🌱 *Quality over quantity!* Thoughtful contributions make the difference!"
+            fi
+
+            MESSAGE="💚 *Weekly Contributor Celebration for ${{ github.repository }}*\n\n"
+            MESSAGE="${MESSAGE}📊 *This Week's Highlights (Last 7 Days)*\n"
+            MESSAGE="${MESSAGE}• Total Commits: *${TOTAL_COMMITS}*\n"
+            MESSAGE="${MESSAGE}• Active Contributors: *${TOTAL_CONTRIBUTORS}*\n\n"
+            MESSAGE="${MESSAGE}🌟 *Our Amazing Contributors*\n${CONTRIBUTOR_LIST}\n\n"
+            MESSAGE="${MESSAGE}${MOTIVATION}\n\n"
+            MESSAGE="${MESSAGE}_Thank you all for making OpenObserve better every day! 🙌_"
+          fi
+
+          # Create JSON payload
+          PAYLOAD=$(jq -n --arg msg "$MESSAGE" '{text: $msg}')
+          echo "payload<<EOF" >> $GITHUB_OUTPUT
+          echo "$PAYLOAD" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Send Slack notification
+        if: steps.commit-stats.outputs.totalCommits > 0 || github.event_name == 'workflow_dispatch'
+        uses: slackapi/slack-github-action@v1.25.0
+        with:
+          payload: ${{ steps.slack-msg.outputs.payload }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.STALE_PR_SLACK_NOTIFICATION }}
