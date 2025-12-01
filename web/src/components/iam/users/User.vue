@@ -268,6 +268,7 @@ export default defineComponent({
     onBeforeMount(async () => {
       isEnterprise.value = config.isEnterprise == "true";
       await getOrgMembers();
+      updateUserActions();
       await getRoles();
 
       // if (config.isCloud == "true") {
