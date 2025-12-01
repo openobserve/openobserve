@@ -12,9 +12,6 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-use std::time::Duration;
-
 use config::{get_config, metrics, utils::stopwatch::StopWatch};
 use infra::errors::{Error, Result};
 #[cfg(feature = "enterprise")]
@@ -69,9 +66,8 @@ pub async fn check_work_group(
     // Create cleanup guard
     let trace_id_owned = trace_id.to_string();
     let caller_owned = caller.to_string();
-    let locker_clone = locker.clone();
     let guard = AsyncDefer::new(async move {
-        if let Err(e) = infra::dist_lock::unlock_with_trace_id(&trace_id_owned, &locker_clone).await
+        if let Err(e) = infra::dist_lock::unlock_with_trace_id(&trace_id_owned, &locker).await
         {
             log::error!(
                 "[trace_id {trace_id_owned}] {caller_owned}->search: failed to unlock: {e:?}"
@@ -243,7 +239,7 @@ async fn work_group_need_wait(
                     );
                     log_wait = true;
                 }
-                tokio::time::sleep(Duration::from_millis(100)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             }
             Ok((false, cur, max)) => {
                 // Got approval - slot available
