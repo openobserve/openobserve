@@ -160,7 +160,7 @@ export default defineComponent({
             dismiss();
             $q.notify({
               type: "negative",
-              message: error.message,
+              message: error?.response?.data?.message || error.message,
               timeout: 5000,
             });
           });
