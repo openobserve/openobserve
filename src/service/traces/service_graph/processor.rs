@@ -108,17 +108,83 @@ async fn process_stream(
         (end_time - start_time) / 1_000_000
     );
 
+    // Build service graph using span_kind and peer identification attributes
+    // Uses ONLY mandatory fields + COALESCE for optional peer attributes
+    //
+    // Mandatory fields: service_name, span_kind (always present)
+    // Optional peer attributes (priority order): peer_service, server_address, db_name, db_system
+    //
+    // Logic:
+    //   - CLIENT spans (span_kind='3'): client=service_name, server=COALESCE(peer attrs)
+    //   - SERVER spans (span_kind='2'): client=COALESCE(peer attrs), server=service_name
+    //   - INTERNAL/other spans: ignored (can't determine client/server relationship)
+
+    // Check schema for available peer identification attributes
+    let schema = match infra::schema::get_cache(org_id, stream_name, StreamType::Traces).await {
+        Ok(schema) => schema,
+        Err(e) => {
+            log::debug!(
+                "[ServiceGraph] Failed to get schema for {}/{}: {} - skipping",
+                org_id, stream_name, e
+            );
+            return Ok(());
+        }
+    };
+
+    let schema_arrow = schema.schema();
+
+    // Build COALESCE expression for peer identification
+    // Try multiple attributes in priority order (following OTel conventions)
+    let peer_attr_candidates = [
+        "peer_service",      // peer.service - explicit peer service name
+        "server_address",    // server.address - logical server name
+        "db_name",          // db.name - database name
+        "db_system",        // db.system - database type
+        "http_url",         // http.url - for HTTP calls (extract hostname)
+    ];
+
+    let mut available_peer_attrs = Vec::new();
+    for attr in peer_attr_candidates {
+        if schema_arrow.field_with_name(attr).is_ok() {
+            available_peer_attrs.push(attr);
+        }
+    }
+
+    if available_peer_attrs.is_empty() {
+        log::debug!(
+            "[ServiceGraph] Stream {}/{} has no peer identification attributes - skipping",
+            org_id, stream_name
+        );
+        return Ok(());
+    }
+
+    let peer_expr = if available_peer_attrs.len() > 1 {
+        format!("COALESCE({})", available_peer_attrs.join(", "))
+    } else {
+        available_peer_attrs[0].to_string()
+    };
+
+    log::debug!(
+        "[ServiceGraph] Stream {}/{} using peer expression: {}",
+        org_id, stream_name, peer_expr
+    );
+
     let sql = format!(
         "WITH edges AS (
            SELECT
-             CASE WHEN CAST(span_kind AS VARCHAR) = '3' THEN service_name ELSE peer_service END as client,
-             CASE WHEN CAST(span_kind AS VARCHAR) = '3' THEN peer_service ELSE service_name END as server,
+             CASE
+               WHEN CAST(span_kind AS VARCHAR) = '3' THEN service_name
+               WHEN CAST(span_kind AS VARCHAR) = '2' THEN {}
+             END as client,
+             CASE
+               WHEN CAST(span_kind AS VARCHAR) = '3' THEN {}
+               WHEN CAST(span_kind AS VARCHAR) = '2' THEN service_name
+             END as server,
              end_time - start_time as duration,
              span_status
            FROM \"{}\"
            WHERE _timestamp >= {} AND _timestamp < {}
              AND CAST(span_kind AS VARCHAR) IN ('2', '3')
-             AND peer_service IS NOT NULL
          )
          SELECT
            {} as start,
@@ -133,8 +199,9 @@ async fn process_stream(
            approx_percentile_cont(duration, 0.95) as p95,
            approx_percentile_cont(duration, 0.99) as p99
          FROM edges
+         WHERE client IS NOT NULL AND server IS NOT NULL
          GROUP BY client, server",
-        stream_name, start_time, end_time, start_time, end_time
+        peer_expr, peer_expr, stream_name, start_time, end_time, start_time, end_time
     );
 
     // Execute search
@@ -170,8 +237,7 @@ async fn process_stream(
     };
 
     let trace_id = config::ider::generate();
-    let resp =
-        crate::service::search::search(&trace_id, org_id, StreamType::Traces, None, &req).await?;
+    let resp = crate::service::search::search(&trace_id, org_id, StreamType::Traces, None, &req).await?;
 
     log::info!(
         "[ServiceGraph] Query returned {} pre-aggregated edges from {}/{}",
