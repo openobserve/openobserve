@@ -80,6 +80,7 @@ impl RemoteScanNodes {
             histogram_interval: self.req.histogram_interval,
             is_analyze: false, // set in distribute Analyze
             sampling_config: self.sampling_config.clone(),
+            clear_cache: self.req.overwrite_cache,
         };
 
         let index_info = IndexInfo {
@@ -178,6 +179,7 @@ pub struct SearchInfos {
     pub histogram_interval: i64,
     pub is_analyze: bool,
     pub sampling_config: Option<proto::cluster_rpc::SamplingConfig>,
+    pub clear_cache: bool,
 }
 
 impl SearchInfos {
@@ -197,6 +199,7 @@ impl SearchInfos {
             histogram_interval: self.histogram_interval,
             is_analyze: self.is_analyze,
             sampling_config: self.sampling_config.clone(),
+            clear_cache: self.clear_cache,
         }
     }
 }
