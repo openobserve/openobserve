@@ -1297,7 +1297,8 @@
     "serviceAccountsName": "サービスアカウント名",
     "basicUsers": "ユーザ",
     "externalUserWarningTitle": "外部ユーザー警告",
-    "externalUserWarningMessage": "外部ユーザーをロールに直接追加しても権限は付与されません。代わりにユーザーグループに追加してください。"
+    "externalUserWarningMessage": "外部ユーザーをロールに直接追加しても権限は付与されません。代わりにユーザーグループに追加してください。",
+    "invitations": "招待状"
   },
   "pipeline": {
     "header": "パイプライン",

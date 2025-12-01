@@ -1283,7 +1283,8 @@
     "basicUsers": "Kullanıcılar",
     "quota": "Kontenjanlar",
     "externalUserWarningTitle": "Harici kullanıcı uyarısı",
-    "externalUserWarningMessage": "Harici kullanıcıları doğrudan rollere eklemek izin vermez. Bunun yerine Kullanıcı Gruplarına ekleyin."
+    "externalUserWarningMessage": "Harici kullanıcıları doğrudan rollere eklemek izin vermez. Bunun yerine Kullanıcı Gruplarına ekleyin.",
+    "invitations": "Davetiyeler"
   },
   "pipeline": {
     "header": "Boru hatları",

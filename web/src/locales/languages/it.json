@@ -1283,7 +1283,8 @@
     "basicUsers": "Utenti",
     "quota": "Quote",
     "externalUserWarningTitle": "Avviso per l'utente esterno",
-    "externalUserWarningMessage": "L'aggiunta diretta di utenti esterni ai ruoli non concederà autorizzazioni. Aggiungili invece ai gruppi di utenti."
+    "externalUserWarningMessage": "L'aggiunta diretta di utenti esterni ai ruoli non concederà autorizzazioni. Aggiungili invece ai gruppi di utenti.",
+    "invitations": "Inviti"
   },
   "pipeline": {
     "header": "Oleodotti",

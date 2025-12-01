@@ -1283,7 +1283,8 @@
     "basicUsers": "Usuários",
     "quota": "Cotas",
     "externalUserWarningTitle": "Aviso de usuário externo",
-    "externalUserWarningMessage": "Adicionar usuários externos diretamente às funções não concederá permissões. Em vez disso, adicione-os aos grupos de usuários."
+    "externalUserWarningMessage": "Adicionar usuários externos diretamente às funções não concederá permissões. Em vez disso, adicione-os aos grupos de usuários.",
+    "invitations": "Convites"
   },
   "pipeline": {
     "header": "Oleodutos",
