@@ -1128,7 +1128,7 @@ describe('PerformanceSummary.vue', () => {
     await nextTick();
 
     const performanceDashboard = wrapper.find('.performance-dashboard');
-    expect(performanceDashboard.attributes('style')).toContain('visibility: hidden');
+    expect(performanceDashboard.classes()).toContain('tw-invisible');
   });
 
   // Test 38: Performance dashboard visibility when not loading
@@ -1151,7 +1151,7 @@ describe('PerformanceSummary.vue', () => {
     await nextTick();
 
     const performanceDashboard = wrapper.find('.performance-dashboard');
-    expect(performanceDashboard.attributes('style')).toContain('visibility: visible');
+    expect(performanceDashboard.classes()).toContain('tw-visible');
   });
 
   // Test 39: Store access
@@ -1344,14 +1344,14 @@ describe('PerformanceSummary.vue', () => {
     await nextTick();
 
     expect(wrapper.vm.isLoading.length).toBe(3);
-    expect(wrapper.find('.performance-dashboard').attributes('style')).toContain('visibility: hidden');
+    expect(wrapper.find('.performance-dashboard').classes()).toContain('tw-invisible');
 
     // Remove all loading states
     wrapper.vm.isLoading.splice(0);
     await nextTick();
 
     expect(wrapper.vm.isLoading.length).toBe(0);
-    expect(wrapper.find('.performance-dashboard').attributes('style')).toContain('visibility: visible');
+    expect(wrapper.find('.performance-dashboard').classes()).toContain('tw-visible');
   });
 
   // Test 47: Error handling in updateLayout

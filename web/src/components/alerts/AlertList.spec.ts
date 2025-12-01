@@ -26,6 +26,7 @@ vi.mock("@/services/alerts", () => ({
     toggle_state_by_alert_id: vi.fn(),
     delete_by_alert_id: vi.fn(),
     create_by_alert_id: vi.fn(),
+    getHistory: vi.fn(),
   },
 }));
 vi.mock("@/services/alert_templates", () => ({
@@ -127,6 +128,7 @@ async function mountAlertList() {
         ImportAlert: true,
         AddAlert: true,
         QTablePagination: true,
+        QDrawer: true,
         AppTabs: {
           props: ["tabs", "activeTab"],
           emits: ["update:active-tab"],
@@ -194,6 +196,10 @@ beforeEach(() => {
   (alertsSvc.delete_by_alert_id as any) = vi.fn().mockImplementation(async (_org: any, id: string) => {
     alertsDB = alertsDB.filter((a) => a.alert_id !== id);
     return Promise.resolve({ data: { code: 200, message: "deleted" } } as any);
+  });
+
+  (alertsSvc.getHistory as any) = vi.fn().mockImplementation(async () => {
+    return Promise.resolve({ data: { total: 0, hits: [] } } as any);
   });
 
   (alertsSvc.create_by_alert_id as any) = vi.fn().mockImplementation(async (_org: any, body: any, folder?: string) => {
@@ -543,8 +549,14 @@ describe("AlertList - row actions", () => {
 describe("AlertList - router query behaviors", () => {
   it("when action=import, opens ImportAlert dialog after fetch", async () => {
     const wrapper: any = await mountAlertList();
-    wrapper.vm.router.currentRoute.value.query = { action: "import" };
     await waitData(wrapper);
+    // Use router.push to trigger the watcher properly
+    await router.push({
+      name: "alertList",
+      query: { action: "import" }
+    });
+    await flushPromises();
+    await wrapper.vm.$nextTick();
     expect(wrapper.vm.showImportAlertDialog).toBe(true);
   });
 

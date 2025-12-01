@@ -91,6 +91,9 @@ export default class DashboardPanelConfigs {
       '[data-test="dashboard-addpanel-config-type-select-0"]'
     );
     this.sidebarScrollContainer = page.locator('.sidebar-content.scroll');
+    this.connectNullValuesToggle = page.locator(
+      '[data-test="dashboard-config-connect-null-values"]'
+    );
   }
   /// Open the config panel
   async openConfigPanel() {
@@ -341,11 +344,31 @@ export default class DashboardPanelConfigs {
         const el = document.querySelector(selector);
         if (el) el.scrollTop = el.scrollHeight;
       }, ".sidebar-content");
+
+      // Wait a bit for scroll to complete
+      await this.page.waitForTimeout(500);
     }
 
     // Ensure the button is actually visible before proceeding
-    await this.overrideConfig.scrollIntoViewIfNeeded();
-    await this.overrideConfig.waitFor({ state: "visible" });
+    // First wait for it to be attached
+    await this.overrideConfig.waitFor({ state: "attached", timeout: 20000 });
+
+    // Try to scroll it into view with timeout handling
+    try {
+      await this.overrideConfig.scrollIntoViewIfNeeded({ timeout: 10000 });
+    } catch (e) {
+      // If scrollIntoView fails, try programmatic scroll one more time
+      await this.page.evaluate(() => {
+        const button = document.querySelector('[data-test="dashboard-addpanel-config-override-config-add-btn"]');
+        if (button) {
+          button.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
+      await this.page.waitForTimeout(1000);
+    }
+
+    // Finally wait for it to be visible
+    await this.overrideConfig.waitFor({ state: "visible", timeout: 10000 });
   }
   //Metric Text
   //BG color
@@ -367,5 +390,31 @@ export default class DashboardPanelConfigs {
     await this.gaugeMax.click();
     await this.gaugeMax.fill(max);
   }
-  
+
+  // Get connect null values toggle state
+  async getConnectNullValuesState() {
+    await this.connectNullValuesToggle.waitFor({ state: "visible", timeout: 10000 });
+
+    // Check aria-checked attribute - this is the most reliable indicator
+    let ariaChecked = await this.connectNullValuesToggle.getAttribute("aria-checked");
+    if (ariaChecked === null) {
+      ariaChecked = await this.connectNullValuesToggle.getAttribute("aria-pressed");
+    }
+
+    return ariaChecked === "true";
+  }
+
+  // Verify connect null values toggle state
+  async verifyConnectNullValuesToggle(expectedState = true) {
+    const isChecked = await this.getConnectNullValuesState();
+
+    if (expectedState !== isChecked) {
+      throw new Error(
+        `Expected connect null values to be ${expectedState} but actual state is ${isChecked}`
+      );
+    }
+
+    return isChecked;
+  }
+
 }

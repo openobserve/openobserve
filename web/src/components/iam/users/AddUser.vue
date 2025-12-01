@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="add-user-dialog column full-height ">
+  <q-card class="o2-side-dialog column full-height ">
     <q-card-section class="q-py-md tw-w-full">
       <div class="row items-center no-wrap q-py-sm">
         <div class="col">
@@ -39,14 +39,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div>
         <q-form ref="updateUserForm" @submit.prevent="onSubmit">
           <!-- <p class="q-pt-sm tw-truncate">{{t('user.organization')}} : <strong>{{formData.organization}}</strong></p> -->
-          <p class="q-pt-sm tw-truncate" v-if="!existingUser">
+          <p class="tw-mt-2 tw-truncate" v-if="!existingUser">
             {{ t("user.email") }} : <strong>{{ formData.email }}</strong>
           </p>
-          <p class="q-pt-sm tw-truncate" v-if="!existingUser && !beingUpdated">
+          <p class="tw-mt-2 tw-truncate" v-if="!existingUser && !beingUpdated">
             {{ t("user.roles") }} : <strong>{{ formData.role }}</strong>
           </p>
           <p
-            class="q-pt-sm tw-truncate"
+            class="tw-mt-2 tw-truncate"
             v-if="
               !existingUser && !beingUpdated && formData?.custom_role?.length
             "
@@ -58,13 +58,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="existingUser && !beingUpdated"
             v-model="formData.email"
             :label="t('user.email') + ' *'"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-md showLabelOnTop"
+            class="showLabelOnTop tw-mt-2"
             stack-label
-            outlined
-            filled
+            hide-bottom-space
             dense
+            borderless
             :rules="[
               (val: any, rules: any) =>
                 rules.email(val) || 'Please enter a valid email address',
@@ -73,18 +71,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="user-email-field"
           />
 
-          <div v-if="!beingUpdated && !existingUser">
+          <div v-if="!beingUpdated && !existingUser" class="tw-mt-2">
             <q-input
               :type="isPwd ? 'password' : 'text'"
               v-model="formData.password"
               :label="t('user.password') + ' *'"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-md showLabelOnTop"
+              class="showLabelOnTop"
               stack-label
-              outlined
-              filled
               dense
+              borderless
+              hide-bottom-space
               :rules="[
                 (val: any) => !!val || 'Field is required',
                 (val: any) =>
@@ -107,13 +103,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!existingUser"
             v-model="formData.first_name"
             :label="t('user.firstName')"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-md showLabelOnTop q-mt-sm"
+            class="showLabelOnTop tw-mt-2"
             stack-label
-            outlined
-            filled
             dense
+            hide-bottom-space
+            borderless
             data-test="user-first-name-field"
           />
 
@@ -121,13 +115,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!existingUser"
             v-model="formData.last_name"
             :label="t('user.lastName')"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-md showLabelOnTop"
+            class="showLabelOnTop tw-mt-2"
             stack-label
-            outlined
-            filled
             dense
+            hide-bottom-space
+            borderless
             data-test="user-last-name-field"
           />
           <q-select
@@ -139,15 +131,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="formData.role"
             :label="t('user.role') + ' *'"
             :options="roles"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-pt-md q-pb-md showLabelOnTop"
+            class="showLabelOnTop tw-mt-2"
             emit-value
             map-options
             stack-label
-            outlined
-            filled
             dense
+            hide-bottom-space
+            borderless
             :rules="[(val: any) => !!val || 'Field is required']"
             data-test="user-role-field"
           />
@@ -160,32 +150,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="formData.custom_role"
             :label="t('user.customRole')"
             :options="filterdOption"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-pt-md q-pb-md showLabelOnTop"
+            class="showLabelOnTop tw-mt-2"
             multiple
             emit-value
             map-options
             stack-label
-            outlined
-            filled
             dense
+            borderless
+            hide-bottom-space
             use-input
             @filter="filterFn"
             data-test="user-custom-role-field"
             :disable="filterdOption.length === 0"
           />
-          <div v-if="beingUpdated">
+          <div v-if="beingUpdated" class="tw-mt-2">
             <q-toggle
               v-model="formData.change_password"
               :label="t('user.changePassword')"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-pt-md q-pb-sm showLabelOnTop"
               stack-label
               outlined
               filled
-              dense
+              hide-bottom-space
+              class="o2-toggle-button-lg -tw-ml-4"
+              size="lg"
+              :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
               data-test="user-change-password-field"
             />
 
@@ -198,13 +186,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :type="isOldPwd ? 'password' : 'text'"
               v-model="formData.old_password"
               :label="t('user.oldPassword') + ' *'"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-md showLabelOnTop"
+              class="showLabelOnTop tw-mt-2"
               stack-label
-              outlined
-              filled
               dense
+              borderless
+              hide-bottom-space
               :rules="[
                 (val: any) => !!val || 'Field is required',
                 (val: any) =>
@@ -227,13 +213,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :type="isNewPwd ? 'password' : 'text'"
               v-model="formData.new_password"
               :label="t('user.newPassword') + ' *'"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-md showLabelOnTop"
+              class="showLabelOnTop tw-mt-2"
               stack-label
-              outlined
-              filled
               dense
+              hide-bottom-space
+              borderless
               :rules="[
                 (val: any) => !!val || 'Field is required',
                 (val: any) =>
@@ -251,23 +235,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-input>
           </div>
-          <!-- <q-select
-            v-if="!beingUpdated && userRole != 'member'"
-            v-model="formData.organization"
-            :label="t('user.organization') + ' *'"
-            emit-value
-            :options="organizationOptions"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-pt-md q-pb-md showLabelOnTop q-mt-sm"
-            stack-label
-            outlined
-            :loading="loadingOrganizations"
-            filled
-            dense
-            :rules="[(val: any) => !!val || 'Field is required']"
-          /> -->
-
           <q-input
             v-if="
               !beingUpdated &&
@@ -276,13 +243,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             v-model="formData.other_organization"
             :label="t('user.otherOrganization')"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-md showLabelOnTop q-mt-sm"
+            class="showLabelOnTop tw-mt-2"
             stack-label
-            outlined
-            filled
             dense
+            borderless
+            hide-bottom-space
             :rules="[
               (val: any) =>
                 /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(val) ||
@@ -291,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             maxlength="100"
           />
 
-          <div class="flex justify-start ">
+          <div class="flex justify-start tw-mt-6">
             <q-btn
               v-close-popup
               class="q-mr-md o2-secondary-button tw-h-[36px]"
@@ -399,7 +364,7 @@ export default defineComponent({
     const router: any = useRouter();
     const { t } = useI18n();
     const { track } = useReo();
-    const $q = useQuasar();
+    const q = useQuasar();
     const formData: any = ref(defaultValue());
     const existingUser = ref(true);
     const beingUpdated: any = ref(false);
@@ -446,7 +411,7 @@ export default defineComponent({
 
     return {
       t,
-      $q,
+      q,
       store,
       router,
       formData,
@@ -511,7 +476,7 @@ export default defineComponent({
       this.$router.push("/logout");
     },
     onSubmit() {
-      const dismiss = this.$q.notify({
+      const dismiss = this.q.notify({
         spinner: true,
         message: "Please wait...",
         timeout: 2000,
@@ -544,7 +509,7 @@ export default defineComponent({
             }
           })
           .catch((err: any) => {
-            this.$q.notify({
+            this.q.notify({
               color: "negative",
               message: err.response.data.message,
               timeout: 2000,
@@ -578,7 +543,7 @@ export default defineComponent({
             })
             .catch((err: any) => {
               if (err.response.data.code === 422) {
-                // this.$q.notify({
+                // this.q.notify({
                 //   color: "positive",
                 //   type: 'positive',
                 //   message: "User added successfully.",
@@ -586,7 +551,7 @@ export default defineComponent({
                 dismiss();
                 this.existingUser = false;
               } else {
-                this.$q.notify({
+                this.q.notify({
                   color: "negative",
                   message: err.response.data.message,
                   timeout: 2000,
@@ -607,7 +572,7 @@ export default defineComponent({
               this.$emit("updated", res.data, this.formData, "created");
             })
             .catch((err: any) => {
-              this.$q.notify({
+              this.q.notify({
                 color: "negative",
                 message: err.response.data.message,
                 timeout: 2000,
@@ -639,8 +604,3 @@ export default defineComponent({
   },
 });
 </script>
-<style scoped lang="scss">
-.add-user-dialog {
-  width: 30vw;
-}
-</style>

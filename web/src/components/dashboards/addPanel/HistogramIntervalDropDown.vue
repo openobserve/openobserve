@@ -5,15 +5,15 @@
     label="Histogram interval"
     :options="histogramIntervalOptions"
     behavior="menu"
-    filled
     borderless
     data-test="histogram-interval-dropdown"
     dense
+    class="o2-custom-select-dashboard"
     @update:model-value="$emit('update:modelValue', $event)"
     :display-value="`${
         histogramIntervalModel.label ?? 'Auto'
     }`"
-  >
+   hide-bottom-space>
   </q-select>
 </template>
 

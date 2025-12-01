@@ -15,9 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-pa-none">
-    <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[71px] tw-border-b-[1px]"
-      :class="store.state.theme =='dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
+  <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
+    <div>
+    <div class="card-container tw-mb-[0.625rem]">
+    <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[68px]"
       >
     <div
       data-test="iam-groups-section-title"
@@ -33,30 +34,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               class="q-ml-auto no-border o2-search-input tw-h-[36px]"
               :placeholder="t('iam.searchGroup')"
-              :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
+                <q-icon class="o2-search-input-icon" name="search" />
               </template>
             </q-input>
         </div>
         <q-btn
           data-test="iam-groups-add-group-btn"
-          class="q-ml-md o2-primary-button tw-h-[36px]"
+          class="q-ml-sm o2-primary-button tw-h-[36px]"
           flat
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
           no-caps
           :label="t(`iam.addGroup`)"
           @click="addGroup"
         />
       </div>
     </div>
-    <div>
-      <app-table
+    </div>
+    <div class="tw-w-full tw-h-full">
+      <div class="card-container tw-h-[calc(100vh-127px)]">      
+        <app-table
         data-test="iam-groups-table-section"
         class="iam-table o2-quasar-app-table o2-quasar-table-header-sticky"
-        :class="store.state.theme == 'dark' ? 'o2-quasar-app-table-dark o2-quasar-table-header-sticky-dark' : 'o2-quasar-app-table-light o2-quasar-table-header-sticky-light'"
-        :tableStyle="hasVisibleRows ? 'height: calc(100vh - 114px); overflow-y: auto;' : ''"
+        :tableStyle="hasVisibleRows ? 'height: calc(100vh - 127px); overflow-y: auto;' : ''"
         :rows="visibleRows"
         :columns="columns"
         pagination
@@ -70,29 +70,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :hideTopPagination="true"
         :showBottomPaginationWithTitle="true"
       >
-        <template v-slot:actions="slotProps: any">
-          <div>
-            <q-icon
+        <template  v-slot:actions="slotProps: any">
+          <div class="tw-flex tw-items-center tw-gap-2 tw-justify-center">
+            <q-btn
               :data-test="`iam-groups-edit-${slotProps.column.row.group_name}-role-icon`"
-              size="14px"
-              name="edit"
-              class="cursor-pointer q-mr-md"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              icon="edit"
               :title="t('common.edit')"
               @click="editGroup(slotProps.column.row)"
-            />
-            <q-icon
+            >
+            </q-btn>
+            <q-btn
               :data-test="`iam-groups-delete-${slotProps.column.row.group_name}-role-icon`"
-              size="14px"
-              name="delete"
-              class="cursor-pointer"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              :icon="outlinedDelete"
               :title="t('common.delete')"
               @click="showConfirmDialog(slotProps.column.row)"
-            />
+            >
+            </q-btn>
           </div>
         </template>
       </app-table>
     </div>
-
+    </div>
+    </div>
     <q-dialog v-model="showAddGroup" position="right" full-height maximized>
       <AddGroup
         style="width: 30vw"
@@ -108,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="deleteConformDialog.show = false"
       v-model="deleteConformDialog.show"
     />
-  </div>
+  </q-page>
 </template>
 
 <script setup lang="ts">
@@ -124,6 +133,7 @@ import usePermissions from "@/composables/iam/usePermissions";
 import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
+import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 
 const showAddGroup = ref(false);
 

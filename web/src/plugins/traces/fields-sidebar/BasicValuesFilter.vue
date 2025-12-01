@@ -86,24 +86,24 @@
                   "
                 >
                   <q-btn
-                    class="q-mr-xs"
+                    class="o2-custom-button-hover tw-ml-[0.25rem] tw-mr-[0.25rem] !tw-border !tw-border-solid !tw-border-[var(--o2-border-color)]"
                     size="6px"
                     title="Include Term"
                     round
                     @click="addSearchTerm(`${row.name}='${value.key}'`)"
                   >
-                    <q-icon>
+                    <q-icon class="tw-h-[0.5rem] tw-w-[0.5rem]">
                       <EqualIcon></EqualIcon>
                     </q-icon>
                   </q-btn>
                   <q-btn
-                    class="q-mr-xs"
+                    class="o2-custom-button-hover !tw-border !tw-border-solid !tw-border-[var(--o2-border-color)]"
                     size="6px"
-                    title="Include Term"
+                    title="Exclude Term"
                     round
                     @click="addSearchTerm(`${row.name}!='${value.key}'`)"
                   >
-                    <q-icon>
+                    <q-icon class="tw-h-[0.5rem] tw-w-[0.5rem]">
                       <NotEqualIcon></NotEqualIcon>
                     </q-icon>
                   </q-btn>
@@ -221,7 +221,7 @@ const openFilterCreator = (event: any, { name, ftsKey }: any) => {
         start_time: searchObj.data.datetime.startTime,
         end_time: searchObj.data.datetime.endTime,
         fields: [name],
-        size: 10,
+        size: store.state.zoConfig?.query_values_default_num || 10,
         type: "traces",
         query_context,
       })

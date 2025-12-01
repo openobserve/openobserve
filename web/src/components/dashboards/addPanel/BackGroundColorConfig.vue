@@ -1,7 +1,7 @@
 <template>
   <div style="display: flex; align-items: center; width: 100%">
     <q-select
-      outlined
+    borderless hide-bottom-space
       v-model="backgroundType"
       :options="colorModeOptions"
       dense

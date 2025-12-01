@@ -5,7 +5,6 @@
     indicator-color="transparent"
     inline-label
     :vertical="direction === 'vertical'"
-    class="q-mx-xs o2-route-tabs"
     @update:model-value="handleTabChange"
   >
     <template v-for="tab in (tabs as any)" :key="tab.name">
@@ -61,33 +60,3 @@ defineExpose({
   setActiveTab,
 });
 </script>
-
-<style lang="scss">
-.o2-route-tabs {
-  &.q-tabs {
-    &--vertical {
-      padding: 16px 8px 0 8px;
-      .q-tab {
-        justify-content: flex-start;
-        padding: 0 1rem 0 1.25rem;
-        border-radius: 0.5rem;
-        margin-bottom: 0.5rem;
-        text-transform: capitalize;
-        min-height: 40px !important;
-        &__content.tab_content {
-          .q-tab {
-            &__icon + &__label {
-              padding-left: 0.875rem;
-              font-weight: 600;
-            }
-          }
-        }
-        &--active {
-          background-color: $accent;
-          color: black;
-        }
-      }
-    }
-  }
-}
-</style>

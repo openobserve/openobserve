@@ -4,7 +4,7 @@
     <div class="text-subtitle1 q-pl-xs q-mt-md">Install cert-manager</div>
     <ContentCopy
       class="q-mt-sm"
-      content="kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.16.1/cert-manager.yaml"
+      content="kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.19.0/cert-manager.yaml"
     />
 
     <div class="text-subtitle1 q-pl-xs q-mt-md">
@@ -25,7 +25,7 @@
     </div>
     <ContentCopy
       class="q-mt-sm"
-      content="kubectl apply -f https://github.com/open-telemetry/opentelemetry-operator/releases/latest/download/opentelemetry-operator.yaml"
+      content="kubectl apply -f https://raw.githubusercontent.com/openobserve/openobserve-helm-chart/refs/heads/main/opentelemetry-operator.yaml"
     />
 
     <div class="text-subtitle1 q-pl-xs q-mt-md">Create namespace</div>
@@ -184,22 +184,34 @@ const accessKey = computed(() => {
 
 const collectorCmd = computed(() => {
   return `helm --namespace openobserve-collector \\
-  install o2c openobserve/openobserve-collector \\
+  upgrade --install o2c openobserve/openobserve-collector \\
   --set k8sCluster=cluster1  \\
-  --set exporters."otlphttp/openobserve".endpoint=${endpoint.value.url}/api/${props.currOrgIdentifier}  \\
-  --set exporters."otlphttp/openobserve".headers.Authorization="Basic [BASIC_PASSCODE]"  \\
-  --set exporters."otlphttp/openobserve_k8s_events".endpoint=${endpoint.value.url}/api/${props.currOrgIdentifier}  \\
-  --set exporters."otlphttp/openobserve_k8s_events".headers.Authorization="Basic [BASIC_PASSCODE]"`;
+  --set exporters.'otlphttp/openobserve'.endpoint=${endpoint.value.url}/api/${props.currOrgIdentifier}  \\
+  --set exporters.'otlphttp/openobserve'.headers.Authorization='Basic [BASIC_PASSCODE]'  \\
+  --set exporters.'otlphttp/openobserve_k8s_events'.endpoint=${endpoint.value.url}/api/${props.currOrgIdentifier}  \\
+  --set exporters.'otlphttp/openobserve_k8s_events'.headers.Authorization='Basic [BASIC_PASSCODE]' \\
+  --set agent.service.pipelines.logs.exporters={otlphttp/openobserve} \\
+  --set agent.service.pipelines.metrics.exporters={otlphttp/openobserve} \\
+  --set gateway.service.pipelines.logs/k8s_events.exporters={otlphttp/openobserve_k8s_events} \\
+  --set gateway.service.pipelines.logs/k8s_pods.exporters={otlphttp/openobserve} \\
+  --set gateway.service.pipelines.metrics.exporters={otlphttp/openobserve} \\
+  --set gateway.service.pipelines.traces.exporters={servicegraph,otlphttp/openobserve}`;
 });
 
 const collectorCmdThisCluster = computed(() => {
   return `helm --namespace openobserve-collector \\
-  install o2c openobserve/openobserve-collector \\
+  upgrade --install o2c openobserve/openobserve-collector \\
   --set k8sCluster=cluster1  \\
-  --set exporters."otlphttp/openobserve".endpoint=http://o2-openobserve-router.openobserve.svc.cluster.local:5080/api/${props.currOrgIdentifier}  \\
-  --set exporters."otlphttp/openobserve".headers.Authorization="Basic [BASIC_PASSCODE]"  \\
-  --set exporters."otlphttp/openobserve_k8s_events".endpoint=http://o2-openobserve-router.openobserve.svc.cluster.local:5080/api/${props.currOrgIdentifier}  \\
-  --set exporters."otlphttp/openobserve_k8s_events".headers.Authorization="Basic [BASIC_PASSCODE]" \\
+  --set exporters.'otlphttp/openobserve'.endpoint=http://o2-openobserve-router.openobserve.svc.cluster.local:5080/api/${props.currOrgIdentifier}  \\
+  --set exporters.'otlphttp/openobserve'.headers.Authorization='Basic [BASIC_PASSCODE]'  \\
+  --set exporters.'otlphttp/openobserve_k8s_events'.endpoint=http://o2-openobserve-router.openobserve.svc.cluster.local:5080/api/${props.currOrgIdentifier}  \\
+  --set exporters.'otlphttp/openobserve_k8s_events'.headers.Authorization='Basic [BASIC_PASSCODE]' \\
+  --set agent.service.pipelines.logs.exporters={otlphttp/openobserve} \\
+  --set agent.service.pipelines.metrics.exporters={otlphttp/openobserve} \\
+  --set gateway.service.pipelines.logs/k8s_events.exporters={otlphttp/openobserve_k8s_events} \\
+  --set gateway.service.pipelines.logs/k8s_pods.exporters={otlphttp/openobserve} \\
+  --set gateway.service.pipelines.metrics.exporters={otlphttp/openobserve} \\
+  --set gateway.service.pipelines.traces.exporters={servicegraph,otlphttp/openobserve}
   --create-namespace`;
 });
 

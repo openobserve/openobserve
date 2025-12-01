@@ -47,7 +47,7 @@ use crate::{
         ("view_id" = String, Path, description = "The view_id which was stored"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = View, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = inline(View), example = json!({
             "org_id": "some-org-id",
             "view_id": "some-uuid-v4",
             "view_name": "view-name",
@@ -126,7 +126,7 @@ pub async fn get_views(path: web::Path<String>) -> Result<HttpResponse, Error> {
         ("view_id" = String, Path, description = "The view_id to delete"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = DeleteViewResponse, example = json!([{
+        (status = 200, description = "Success", content_type = "application/json", body = inline(DeleteViewResponse), example = json!([{
             "org_id": "some-org-id",
             "view_id": "view_id",
         }])),
@@ -166,9 +166,9 @@ pub async fn delete_view(path: web::Path<(String, String)>) -> Result<HttpRespon
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = CreateViewRequest, description = "Create view data", content_type = "application/json"),
+    request_body(content = inline(CreateViewRequest), description = "Create view data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = CreateViewResponse, example = json!([{
+        (status = 200, description = "Success", content_type = "application/json", body = inline(CreateViewResponse), example = json!([{
             "org_id": "some-org-id",
             "view_id": "view_id",
         }])),
@@ -214,9 +214,9 @@ pub async fn create_view(
         ("org_id" = String, Path, description = "Organization name"),
         ("view_id" = String, Path, description = "View id to be updated"),
     ),
-    request_body(content = UpdateViewRequest, description = "Update view data", content_type = "application/json"),
+    request_body(content = inline(UpdateViewRequest), description = "Update view data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = View, example = json!([{
+        (status = 200, description = "Success", content_type = "application/json", body = inline(View), example = json!([{
             "org_id": "some-org-id",
             "view_name": "view-name",
             "view_id": "view-id",

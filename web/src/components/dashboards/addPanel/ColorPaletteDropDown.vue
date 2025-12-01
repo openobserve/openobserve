@@ -18,7 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-select
         v-model="dashboardPanelData.data.config.color.mode"
         :options="colorOptions"
-        outlined
         dense
         label="Color palette"
         class="showLabelOnTop"
@@ -27,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onColorModeChange"
         style="width: 100%"
         :popup-content-style="{ height: '300px', width: '200px' }"
-      >
+       borderless hide-bottom-space>
         <template v-slot:option="props">
           <!-- label -->
           <!-- sublabel -->

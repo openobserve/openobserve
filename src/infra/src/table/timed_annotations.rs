@@ -378,7 +378,7 @@ pub async fn update(
     } else {
         update_query = update_query.col_expr(
             timed_annotations::Column::EndTime,
-            Expr::value(sea_orm::Value::Json(None)),
+            Expr::value(Option::<i64>::None),
         );
     }
 

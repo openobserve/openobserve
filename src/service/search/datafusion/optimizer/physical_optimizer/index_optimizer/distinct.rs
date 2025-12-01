@@ -34,8 +34,10 @@ use crate::service::search::datafusion::optimizer::physical_optimizer::{
 };
 
 #[rustfmt::skip]
-/// SimpleDistinct(String, usize, bool): select name from table where str_match(name, 'a') group by name order by name asc limit 10;
-/// condition：name is index field, group by name, order by name asc, have limit, and where only the str_match()(expect _timestamp)
+/// SimpleDistinct(String, usize, bool):
+/// the sql can like: select name from table where str_match(name, 'a') group by name order by name asc limit 10;
+///                   or select name as key from table where str_match(name, 'a') group by key order by key desc limit 10;
+/// condition：name is index field, group by name (or alias), order by name (or alias), have limit, and where only the str_match()(expect _timestamp)
 /// example plan:
 ///   SortPreservingMergeExec: [kubernetes_namespace_name@0 ASC NULLS LAST], fetch=10
 ///     SortExec: TopK(fetch=10), expr=[kubernetes_namespace_name@0 ASC NULLS LAST], preserve_partitioning=[true]
@@ -86,15 +88,12 @@ impl<'n> TreeNodeVisitor<'n> for SimpleDistinctVisitor {
                 && sort_merge.expr().iter().collect::<Vec<_>>().len() == 1
                 && is_column(&sort_merge.expr().first().expr)
             {
-                let column_name = get_column_name(&sort_merge.expr().first().expr);
-                if self.index_fields.contains(column_name) {
-                    self.simple_distinct = Some((
-                        column_name.to_string(),
-                        fetch,
-                        !sort_merge.expr().first().options.descending,
-                    ));
-                    return Ok(TreeNodeRecursion::Continue);
-                }
+                self.simple_distinct = Some((
+                    "".to_string(), // Will be set when we find the group by field
+                    fetch,
+                    !sort_merge.expr().first().options.descending,
+                ));
+                return Ok(TreeNodeRecursion::Continue);
             }
             // if not simple distinct, stop visiting
             self.simple_distinct = None;
@@ -107,11 +106,15 @@ impl<'n> TreeNodeVisitor<'n> for SimpleDistinctVisitor {
                 && let Some((group_expr, _)) = aggregate.group_expr().expr().first()
             {
                 let column_name = get_column_name(group_expr);
-                if is_column(group_expr)
-                    && self.index_fields.contains(column_name)
-                    && let Some(simple_distinct) = &self.simple_distinct
-                    && simple_distinct.0 == column_name
-                {
+                if is_column(group_expr) && self.index_fields.contains(column_name) {
+                    // Update the simple_distinct with the correct field name
+                    if let Some(simple_distinct) = &mut self.simple_distinct {
+                        self.simple_distinct = Some((
+                            column_name.to_string(),
+                            simple_distinct.1,
+                            simple_distinct.2,
+                        ));
+                    }
                     return Ok(TreeNodeRecursion::Continue);
                 }
             }
@@ -213,6 +216,14 @@ mod tests {
             ),
             (
                 "select name from t where str_match(name, 'a') and _timestamp >= 175256100000000 and _timestamp < 17525610000000000 group by name order by name desc limit 10",
+                Some(IndexOptimizeMode::SimpleDistinct(
+                    "name".to_string(),
+                    10,
+                    false,
+                )),
+            ),
+            (
+                "select name as key from t where str_match(name, 'a') and _timestamp >= 175256100000000 and _timestamp < 17525610000000000 group by key order by key desc limit 10",
                 Some(IndexOptimizeMode::SimpleDistinct(
                     "name".to_string(),
                     10,

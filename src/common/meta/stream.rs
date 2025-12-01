@@ -24,6 +24,8 @@ use config::{
     utils::json,
 };
 use datafusion::arrow::datatypes::Schema;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -44,6 +46,18 @@ pub struct Stream {
     pub pattern_associations: Vec<PatternAssociation>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_derived: Option<bool>,
+}
+
+#[cfg(feature = "enterprise")]
+impl From<Stream> for enterprise::recommendations::meta::Stream {
+    fn from(value: Stream) -> Self {
+        Self {
+            name: value.name,
+            stream_type: value.stream_type,
+            stats: value.stats,
+            settings: value.settings,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -86,6 +100,23 @@ pub struct SchemaRecords {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct StreamDeleteFields {
     pub fields: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct FieldUpdate {
+    /// Field name to update
+    pub name: String,
+    /// Target data type (e.g., Utf8, LargeUtf8, Int64, Float64)
+    pub data_type: String,
+    /// Optionally set nullability; defaults to existing field nullability if not provided
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nullable: Option<bool>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct StreamUpdateFields {
+    /// List of field updates, each with name, target data_type, and optional nullability
+    pub fields: Vec<FieldUpdate>,
 }
 
 #[cfg(test)]

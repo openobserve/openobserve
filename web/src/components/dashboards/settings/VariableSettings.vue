@@ -31,21 +31,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- show variables dependencies if variables exist -->
             <q-btn
               v-if="dashboardVariablesList.length > 0"
-              class="text-bold no-border q-ml-md"
+              class="text-bold no-border q-ml-md o2-secondary-button tw-h-[36px]"
               no-caps
               no-outline
-              rounded
-              color="primary"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-secondary-button-dark'
+                  : 'o2-secondary-button-light'
+              "
+              flat
               label="Show Dependencies"
               @click="showVariablesDependenciesGraphPopUp = true"
               data-test="dashboard-variable-dependencies-btn"
             />
             <q-btn
-              class="text-bold no-border q-ml-md"
-              no-caps
-              no-outline
-              rounded
-              color="secondary"
+              class="text-bold no-border q-ml-md o2-primary-button tw-h-[36px]"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-primary-button-dark'
+                  : 'o2-primary-button-light'
+              "
+              flat
               :label="t(`dashboard.newVariable`)"
               @click="addVariables"
               data-test="dashboard-variable-add-btn"
@@ -388,7 +394,8 @@ export default defineComponent({
   grid-template-columns: 48px 80px minmax(200px, 1fr) 150px 100px 120px;
   padding: 8px 0;
   font-weight: 900;
-  border-bottom: 1px solid #cccccc70;
+  border-bottom: 1px solid var(--o2-border-color);
+  background-color: var(--o2-table-header-bg);
 
   .header-item {
     &:first-child {
@@ -402,9 +409,9 @@ export default defineComponent({
   grid-template-columns: 48px minmax(0, 1fr);
   align-items: center;
   border-radius: 4px;
-  border-bottom: 1px solid #cccccc70;
+  border-bottom: 1px solid var(--o2-border-color);
   &:hover {
-    background-color: #cccccc10;
+    background-color: var(--o2-hover-accent);
   }
 }
 
@@ -430,6 +437,14 @@ export default defineComponent({
     display: flex;
     justify-content: flex-end;
     gap: 8px;
+
+    .q-btn {
+      transition: background-color 0.2s ease;
+
+      &:hover {
+        background-color: var(--o2-hover-accent) !important;
+      }
+    }
   }
 }
 

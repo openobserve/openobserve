@@ -22,11 +22,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <DashboardHeader :title="t('dashboard.tabSettingsTitle')">
       <template #right>
         <q-btn
-          class="text-bold no-border q-ml-md"
+          class="text-bold no-border q-ml-md o2-primary-button"
           no-caps
           no-outline
           rounded
-          color="secondary"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-primary-button-dark'
+              : 'o2-primary-button-light'
+          "
           :label="t(`dashboard.newTab`)"
           @click.stop="addNewItem"
           data-test="dashboard-tab-settings-add-tab"
@@ -398,7 +402,8 @@ export default defineComponent({
 <style lang="scss" scoped>
 .table-header {
   padding: 8px 16px;
-  border-bottom: 1px solid #cccccc70;
+  border-bottom: 1px solid var(--o2-border-color);
+  background-color: var(--o2-table-header-bg);
 }
 
 .header-content {
@@ -421,11 +426,11 @@ export default defineComponent({
     display: grid;
     grid-template-columns: 40px minmax(0, 1fr);
     align-items: center;
-    border-bottom: 1px solid #cccccc70;
+    border-bottom: 1px solid var(--o2-border-color);
     min-height: 40px;
 
     &:hover {
-      background-color: #cccccc10;
+      background-color: var(--o2-hover-accent);
     }
   }
 }
@@ -476,5 +481,12 @@ export default defineComponent({
   display: flex;
   justify-content: flex-end;
   gap: 4px;
+}
+.q-btn {
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: var(--o2-hover-accent) !important;
+  }
 }
 </style>

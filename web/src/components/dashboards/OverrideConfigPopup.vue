@@ -33,13 +33,12 @@
         style="width: 40%"
         :data-test="`dashboard-addpanel-config-unit-config-select-column-${index}`"
         input-debounce="0"
-        filled
         emit-value
         map-options
         borderless
         dense
-        class="tw-flex-1"
-      />
+        class="tw-flex-1 o2-custom-select-dashboard"
+       hide-bottom-space/>
       <div class="tw-flex items-center" style="width: 60%; gap: 10px">
         <q-select
           v-model="overrideConfig.config[0].type"
@@ -49,13 +48,13 @@
           style="width: 40%"
           :data-test="`dashboard-addpanel-config-type-select-${index}`"
           input-debounce="0"
-          filled
           emit-value
           map-options
           borderless
           dense
+          class="o2-custom-select-dashboard"
           @update:model-value="onConfigTypeChange(index)"
-        />
+         hide-bottom-space/>
 
         <div
           v-if="overrideConfig.config[0].type === 'unit'"
@@ -70,13 +69,12 @@
             style="flex-grow: 1; width: 50%"
             :data-test="`dashboard-addpanel-config-unit-config-select-unit-${index}`"
             input-debounce="0"
-            filled
             emit-value
             map-options
             borderless
             dense
-            class="tw-flex-1"
-          />
+            class="tw-flex-1 o2-custom-select-dashboard"
+           hide-bottom-space/>
           <q-input
             v-if="overrideConfig.config[0].value.unit === 'custom'"
             v-model="overrideConfig.config[0].value.customUnit"
@@ -84,12 +82,11 @@
             color="input-border"
             bg-color="input-bg"
             stack-label
-            filled
             dense
             label-slot
             data-test="dashboard-config-unit"
             style="width: 50%"
-          />
+           borderless hide-bottom-space/>
         </div>
 
         <div
@@ -120,7 +117,7 @@
       @click="addOverrideConfig"
       label="+ Add field override"
       no-caps
-      class="q-mt-md"
+      class="q-mt-md el-border"
     />
 
     <q-card-actions align="right">

@@ -21,7 +21,7 @@
       title="Include Term"
       round
     >
-      <q-icon color="currentColor">
+      <q-icon style="height: 8px; width: 8px;">
         <EqualIcon></EqualIcon>
       </q-icon>
     </q-btn>
@@ -32,7 +32,7 @@
       :data-test="`log-details-exclude-field-${row[column.id]}`"
       round
     >
-      <q-icon color="currentColor">
+    <q-icon style="height: 8px; width: 8px;">
         <NotEqualIcon></NotEqualIcon>
       </q-icon>
     </q-btn>

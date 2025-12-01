@@ -110,8 +110,8 @@ pub async fn ingest(
         &StreamType::Logs,
     )
     .await;
-    let mut pipeline_inputs = Vec::new();
-    let mut original_options = Vec::new();
+    let mut pipeline_inputs = Vec::with_capacity(stream_params.len());
+    let mut original_options = Vec::with_capacity(stream_params.len());
     // End pipeline params construction
 
     if let Some(exec_pl) = &executable_pipeline {
@@ -271,7 +271,7 @@ pub async fn ingest(
             };
 
             if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
-                local_val = crate::service::logs::refactor_map(local_val, fields);
+                local_val = crate::service::ingestion::refactor_map(local_val, fields);
             }
 
             // add `_original` and '_record_id` if required by StreamSettings
@@ -402,7 +402,7 @@ pub async fn ingest(
 
                         if let Some(Some(fields)) = user_defined_schema_map.get(&destination_stream)
                         {
-                            local_val = crate::service::logs::refactor_map(local_val, fields);
+                            local_val = crate::service::ingestion::refactor_map(local_val, fields);
                         }
 
                         // usize::MAX used as a flag when pipeline is applied with ResultArray vrl
@@ -666,7 +666,7 @@ impl<'a> IngestionData<'a> {
                 }
             }
             IngestionData::KinesisFH(request) => {
-                let mut events = Vec::new();
+                let mut events = Vec::with_capacity(request.records.len());
                 let request_id = &request.request_id;
                 let req_timestamp = request.timestamp.unwrap_or(Utc::now().timestamp_micros());
 

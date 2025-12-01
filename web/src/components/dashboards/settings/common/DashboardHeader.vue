@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="row items-center no-wrap q-mb-sm">
       <div v-if="backButton" class="col-auto">
         <q-btn
-          class="q-mr-md"
+          class="q-mr-md el-border"
           no-caps
           @click="onBackClicked"
           padding="xs"

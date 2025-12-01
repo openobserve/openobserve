@@ -379,9 +379,10 @@ describe('useAiChat', () => {
         expect.objectContaining({
           method: 'POST',
           credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json'
-          },
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+            'traceparent': expect.stringMatching(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/)
+          }),
           body: JSON.stringify({ model, messages: mockMessages })
         })
       );

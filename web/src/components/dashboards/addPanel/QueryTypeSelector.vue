@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="onUpdateButton('auto', $event)"
           :style="{
             backgroundColor:
-            store.state.theme == 'dark' ? '#bfbebef5' : '#f0eaea',
+            store.state.theme == 'dark' ? 'transparent' : '#f0eaea',
           }"
         >
           {{ t("panel.auto") }}
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="button"
           :style="{
             backgroundColor:
-            store.state.theme == 'dark' ? '#bfbebef5' : '#f0eaea',
+            store.state.theme == 'dark' ? 'transparent' : '#f0eaea',
           }"
           :class="selectedButtonType === 'promql' ? 'selected' : ''"
           v-show="
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="selectedButtonType === 'custom-sql' ? 'selected' : ''"
           :style="{
             backgroundColor:
-            store.state.theme == 'dark' ? '#bfbebef5' : '#f0eaea',
+            store.state.theme == 'dark' ? 'transparent' : '#f0eaea',
           }"
           class="button button-right"
           @click="onUpdateButton('custom-sql', $event)"
@@ -126,7 +126,12 @@ export default defineComponent({
 
       ignoreSelectedButtonTypeUpdate.value = true;
       if (dashboardPanelData.data.type == "custom_chart") {
-        selectedButtonType.value = "custom-sql";
+        // For custom_chart, check the actual query type instead of assuming custom-sql
+        if (dashboardPanelData.data.queryType == "promql") {
+          selectedButtonType.value = "promql";
+        } else {
+          selectedButtonType.value = "custom-sql";
+        }
         ignoreSelectedButtonTypeUpdate.value = false;
         return;
       } else if (
@@ -268,11 +273,14 @@ export default defineComponent({
           ].customQuery = true;
           dashboardPanelData.data.queryType = "promql";
 
-          // set some defaults for the promql query
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].query = "";
-          dashboardPanelData.data.type = "line";
+          // For custom charts, preserve the existing query
+          // Only clear the query for non-custom charts when switching to promql
+          if (dashboardPanelData.data.type !== "custom_chart") {
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].query = "";
+            dashboardPanelData.data.type = "line";
+          }
         } else {
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex

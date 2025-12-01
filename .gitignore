@@ -10,6 +10,8 @@ flamegraph.html
 /examples/
 /target/
 /bin/
+/docs/
+/.claude/*
 
 # data
 /tmp/
@@ -30,6 +32,14 @@ CLAUDE.md
 /tests/ui-testing/test-logs
 /tests/ui-testing/test-archives
 /test-logs
-test-results/.last-run.json
 tests/ui-testing/playwright-tests/utils/auth/user.json
 /tests/ui-testing/utils/test-mapping/archived-utils
+/tests/ui-testing/playwright-results
+/tests/ui-testing/testDinoPOC/MD Files
+/tests/ui-testing/playwright-tests/envRunsMDFiles
+/tests/ui-testing/testDinoPOC
+/tests/ui-testing/MD_Files
+*.bak
+/tests/ui-testing/MD_Files
+.github/workflows/bug-automation-helper.yml
+/tests/bug-automation

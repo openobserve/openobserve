@@ -1,0 +1,64 @@
+name: Notify Slack on stale PRs
+permissions:
+  contents: read
+on:
+  schedule:
+    - cron: "0 11 * * *" # everyday at 11AM
+  workflow_dispatch:
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get PRs older than 7 days
+        uses: actions/github-script@v6
+        id: stale-prs
+        with:
+          script: |
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+            const dateString = sevenDaysAgo.toISOString().split('T')[0];
+
+            const resp = await github.rest.search.issuesAndPullRequests({
+              q: `repo:${{ github.repository }} is:pr is:open created:<${dateString}`,
+              sort: 'created',
+              order: 'asc',
+              per_page: 100
+            });
+
+            const prs = resp.data.items.map(pr => {
+              const createdDate = new Date(pr.created_at);
+              const daysOld = Math.floor((new Date() - createdDate) / (1000 * 60 * 60 * 24));
+              return {
+                number: pr.number,
+                title: pr.title,
+                user: pr.user.login,
+                daysOld: daysOld
+              };
+            });
+
+            core.setOutput("prs", JSON.stringify(prs));
+
+      - name: Build Slack message
+        id: slack-msg
+        run: |
+          PRS=$(echo '${{ steps.stale-prs.outputs.prs }}' | jq -r '.[] | "- <https://github.com/${{ github.repository }}/pull/\(.number)|#\(.number) \(.title)> — @\(.user) (_\(.daysOld) days old_)"')
+          PR_COUNT=$(echo '${{ steps.stale-prs.outputs.prs }}' | jq '. | length')
+          if [ "$PR_COUNT" -eq 0 ]; then
+            MESSAGE="✅ *No stale PRs in ${{ github.repository }}*\n\nAll PRs are less than 7 days old!"
+          else
+            MESSAGE="🔔 *Pull Requests older than 7 days in ${{ github.repository }}*\n\n$PRS"
+          fi
+          # Escape for JSON and create the payload
+          PAYLOAD=$(jq -n --arg msg "$MESSAGE" '{text: $msg}')
+          echo "payload<<EOF" >> $GITHUB_OUTPUT
+          echo "$PAYLOAD" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Send Slack notification
+        uses: slackapi/slack-github-action@v1.25.0
+        with:
+          payload: ${{ steps.slack-msg.outputs.payload }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.STALE_PR_SLACK_NOTIFICATION }}

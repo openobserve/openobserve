@@ -104,12 +104,13 @@ mod tests {
         ));
 
         // encode
-        let proto = super::super::get_physical_extension_codec("test".to_string());
+        let proto = super::super::get_physical_extension_codec();
         let plan_bytes = physical_plan_to_bytes_with_extension_codec(plan.clone(), &proto).unwrap();
 
         // decode
         let ctx = datafusion::prelude::SessionContext::new();
-        let plan2 = physical_plan_from_bytes_with_extension_codec(&plan_bytes, &ctx, &proto)?;
+        let plan2 =
+            physical_plan_from_bytes_with_extension_codec(&plan_bytes, &ctx.task_ctx(), &proto)?;
         let plan2 = plan2.as_any().downcast_ref::<TmpExec>().unwrap();
         let plan = plan.as_any().downcast_ref::<TmpExec>().unwrap();
 

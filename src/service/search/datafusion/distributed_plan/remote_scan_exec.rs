@@ -73,7 +73,7 @@ impl RemoteScanExec {
         let cache = Self::compute_properties(Arc::clone(&input.schema()), output_partitions);
 
         // serialize the input plan and set it as the plan for the remote scan node
-        let proto = get_physical_extension_codec(remote_scan_node.query_identifier.org_id.clone());
+        let proto = get_physical_extension_codec();
         let physical_plan_bytes =
             physical_plan_to_bytes_with_extension_codec(input.clone(), &proto)?;
         remote_scan_node.set_plan(physical_plan_bytes.to_vec());
@@ -348,7 +348,15 @@ async fn get_remote_batch(
     let stream = match client.do_get(request).await {
         Ok(stream) => stream,
         Err(e) => {
-            if e.code() == tonic::Code::Cancelled || e.code() == tonic::Code::DeadlineExceeded {
+            let is_parquet_file_not_found = e.code() == tonic::Code::Internal && {
+                let msg = e.message();
+                msg.find('{')
+                    .and_then(|start| msg.rfind('}').map(|end| &msg[start..=end]))
+                    .and_then(|json_part| infra::errors::ErrorCodes::from_json(json_part).ok())
+                    .map(|err_code| err_code.get_code() == infra::errors::ErrorCodes::SearchParquetFileNotFound.get_code())
+                    .unwrap_or(false)
+            };
+            if e.code() == tonic::Code::Cancelled || e.code() == tonic::Code::DeadlineExceeded || is_parquet_file_not_found {
                 return Ok(get_empty_stream(empty_stream.with_error(e)));
             }
             log::error!(

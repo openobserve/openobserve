@@ -1,0 +1,183 @@
+name: Update Translations
+
+on:
+  push:
+    branches:
+      - '**'
+    # No path filter - always run to check for changes
+  workflow_dispatch:
+    inputs:
+      languages:
+        description: 'Languages to translate (space-separated, e.g., "fr es de"). Leave empty for all.'
+        required: false
+        default: ''
+      force:
+        description: 'Force translation even if en.json not detected as changed'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  update-translations:
+    name: Update translation files
+    runs-on: ubuntu-latest
+
+    # Only run on main repo, not forks
+    if: github.repository == 'openobserve/openobserve'
+
+    # Required for OIDC authentication with AWS
+    permissions:
+      id-token: write
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check if en.json was modified
+        id: check_en_json
+        run: |
+          echo "Checking for en.json changes..."
+          echo "Event: ${{ github.event_name }}"
+          echo "Force flag: ${{ github.event.inputs.force }}"
+          echo "Before: ${{ github.event.before }}"
+          echo "After: ${{ github.sha }}"
+
+          # Check if force flag is set (manual workflow dispatch)
+          if [ "${{ github.event.inputs.force }}" = "true" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "🔧 Force flag set - running translation regardless"
+            exit 0
+          fi
+
+          EN_JSON_CHANGED=false
+
+          # Method 1: Check using git diff with before/after SHAs
+          if [ "${{ github.event.before }}" != "" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            echo "Attempting to compare ${{ github.event.before }} with ${{ github.sha }}"
+
+            # Check if before commit exists (handles force push/rebase)
+            if git cat-file -e ${{ github.event.before }} 2>/dev/null; then
+              echo "Before commit exists, comparing..."
+              CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
+              echo "Changed files in this push:"
+              echo "$CHANGED_FILES"
+
+              if echo "$CHANGED_FILES" | grep -q "web/src/locales/languages/en.json"; then
+                EN_JSON_CHANGED=true
+              fi
+            else
+              echo "⚠️  Before commit doesn't exist (force push/rebase), checking last commit..."
+              CHANGED_FILES=$(git show --name-only --pretty="" HEAD)
+              echo "Changed files in last commit:"
+              echo "$CHANGED_FILES"
+
+              if echo "$CHANGED_FILES" | grep -q "web/src/locales/languages/en.json"; then
+                EN_JSON_CHANGED=true
+              fi
+            fi
+          else
+            # Method 2: For first push or workflow_dispatch, check last commit
+            echo "Checking last commit changes..."
+            CHANGED_FILES=$(git show --name-only --pretty="" HEAD)
+            echo "Changed files in last commit:"
+            echo "$CHANGED_FILES"
+
+            if echo "$CHANGED_FILES" | grep -q "web/src/locales/languages/en.json"; then
+              EN_JSON_CHANGED=true
+            fi
+          fi
+
+          if [ "$EN_JSON_CHANGED" = true ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "✅ en.json was modified, will update translations"
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "ℹ️  en.json not modified, skipping translation update"
+          fi
+
+      - name: Configure AWS Credentials with IAM Role
+        if: steps.check_en_json.outputs.changed == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::058694856476:role/GitHubActionsRole
+          role-session-name: GitHubActions-TranslationWorkflow
+          aws-region: us-east-1
+
+      - name: Set up Python
+        if: steps.check_en_json.outputs.changed == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        if: steps.check_en_json.outputs.changed == 'true'
+        run: |
+          pip install -q boto3 botocore
+
+      - name: Run translation script
+        if: steps.check_en_json.outputs.changed == 'true'
+        run: |
+          cd scripts/translations
+          if [ -n "${{ github.event.inputs.languages }}" ]; then
+            echo "Translating specific languages: ${{ github.event.inputs.languages }}"
+            python3 main.py ${{ github.event.inputs.languages }}
+          else
+            echo "Translating all supported languages..."
+            python3 main.py
+          fi
+
+      - name: Check for translation changes
+        id: check_changes
+        run: |
+          if git diff --quiet web/src/locales/languages/; then
+            echo "changes=false" >> $GITHUB_OUTPUT
+            echo "No translation changes detected"
+          else
+            echo "changes=true" >> $GITHUB_OUTPUT
+            echo "Translation changes detected:"
+            git diff --stat web/src/locales/languages/
+          fi
+
+      - name: Commit and push translation updates
+        if: steps.check_changes.outputs.changes == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add web/src/locales/languages/*.json
+
+          git commit -m "chore: update translations from en.json
+
+          Auto-generated translation updates from English source file.
+
+          🤖 Generated with automated translation workflow"
+
+          git push
+
+      - name: Summary
+        if: steps.check_changes.outputs.changes == 'true'
+        run: |
+          echo "✅ Translations updated and committed successfully!"
+          echo "📦 Subsequent build workflows will use the updated translation files."
+
+      - name: No changes summary
+        if: steps.check_changes.outputs.changes != 'true'
+        run: |
+          echo "ℹ️  No translation updates needed. All translations are up to date."
+
+      - name: Workflow complete
+        if: always()
+        run: |
+          echo "✅ Translation workflow completed successfully"
+          if [ "${{ steps.check_en_json.outputs.changed }}" != "true" ]; then
+            echo "ℹ️  No en.json changes detected - skipped translation"
+          elif [ "${{ steps.check_changes.outputs.changes }}" == "true" ]; then
+            echo "✅ Translations updated and committed"
+          else
+            echo "ℹ️  No new translation keys to update"
+          fi
+          echo "📦 Dependent workflows can now proceed"

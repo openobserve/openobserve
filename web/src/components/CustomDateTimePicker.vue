@@ -348,7 +348,7 @@ const computedClass = computed(() => {
 
 .rp-selector-selected {
   color: #ffffff;
-  background: $primary;
+  background: var(--o2-primary-btn-bg);
 }
 
 .tab-button {

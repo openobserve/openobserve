@@ -20,12 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="add-cipher-key-akeyless-baseurl-input"
       v-model="formData.key.store.akeyless.base_url"
       :label="t('cipherKey.baseURL') + ' *'"
-      color="input-border"
-      bg-color="input-bg"
-      class="showLabelOnTop q-w-lg q-pb-xs"
+      class="showLabelOnTop q-w-lg"
       stack-label
-      outlined
-      filled
+      borderless
+      hide-bottom-space
       dense
       :rules="[
         (val: any) => !!val || 'Base URL is required',
@@ -39,12 +37,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="add-cipher-key-akeyless-access-id-input"
         v-model="formData.key.store.akeyless.access_id"
         :label="t('cipherKey.accessId') + ' *'"
-        color="input-border"
-        bg-color="input-bg"
         class="showLabelOnTop q-w-lg"
         stack-label
-        outlined
-        filled
+        borderless
+        hide-bottom-space
         dense
         :rules="[
           (val: any) => !!val || 'Access ID is required',
@@ -65,12 +61,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="add-cipher-key-auth-method-input"
       v-model="formData.key.store.akeyless.auth.type"
       :label="t('cipherKey.authenticationType') + ' *'"
-      color="input-border q-w-lg"
-      bg-color="input-bg"
-      class="showLabelOnTop full-width"
+      class="showLabelOnTop q-w-lg"
       stack-label
-      outlined
-      filled
+      borderless
       dense
       :options="authenticationTypeOptions"
       option-value="value"
@@ -94,12 +87,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="add-cipher-key-akeyless-access-key-input"
             v-model="formData.key.store.akeyless.auth.access_key"
             :label="t('cipherKey.accessKey') + ' *'"
-            color="input-border"
-            bg-color="input-bg"
             class="showLabelOnTop q-w-lg"
             stack-label
-            outlined
-            filled
+            borderless
             dense
             :rules="[(val: any) => !!val || 'Access Key is required']"
           />
@@ -119,12 +109,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="add-cipher-key-akeyless-ldap-username-input"
             v-model="formData.key.store.akeyless.auth.ldap.username"
             :label="t('cipherKey.ldapUsername') + ' *'"
-            color="input-border"
-            bg-color="input-bg"
             class="showLabelOnTop q-w-lg"
             stack-label
-            outlined
-            filled
+            borderless
             dense
             :rules="[
               (val: any) => !!val || 'LDAP Username is required',
@@ -145,12 +132,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="add-cipher-key-akeyless-ldap-password-input"
             v-model="formData.key.store.akeyless.auth.ldap.password"
             :label="t('cipherKey.ldapPassword') + ' *'"
-            color="input-border"
-            bg-color="input-bg"
             class="showLabelOnTop q-w-lg"
             stack-label
-            outlined
-            filled
+            borderless
             dense
             type="password"
             autocomplete="new-password"
@@ -171,12 +155,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="add-cipher-key-secret-type-input"
       v-model="formData.key.store.akeyless.store.type"
       :label="t('cipherKey.secretType') + ' *'"
-      color="input-border q-w-lg"
-      bg-color="input-bg"
-      class="showLabelOnTop full-width"
+      class="showLabelOnTop q-w-lg"
       stack-label
-      outlined
-      filled
+      borderless
       dense
       :options="secretTypeOptions"
       option-value="value"
@@ -199,12 +180,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="add-cipher-key-akeyless-static-secret-name-input"
           v-model="formData.key.store.akeyless.store.static_secret"
           :label="t('cipherKey.staticSecretName') + ' *'"
-          color="input-border"
-          bg-color="input-bg"
           class="showLabelOnTop q-w-lg"
           stack-label
-          outlined
-          filled
+          borderless
           dense
           :rules="[(val: any) => !!val || 'Static Secret Name is required']"
         />
@@ -214,12 +192,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="add-cipher-key-akeyless-dfc-name-input"
           v-model="formData.key.store.akeyless.store.dfc.name"
           :label="t('cipherKey.dfcName') + ' *'"
-          color="input-border"
-          bg-color="input-bg"
           class="showLabelOnTop q-w-lg"
           stack-label
-          outlined
-          filled
+          borderless
           dense
           :rules="[(val: any) => !!val || 'DFC Name is required']"
         />
@@ -227,25 +202,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="add-cipher-key-akeyless-dfc-iv-input"
           v-model="formData.key.store.akeyless.store.dfc.iv"
           :label="t('cipherKey.dfcIV')"
-          color="input-border"
-          bg-color="input-bg"
           class="showLabelOnTop q-w-lg"
           stack-label
-          outlined
-          filled
+          borderless
           dense
         />
         <q-input
           data-test="add-cipher-key-akeyless-dfc-encrypted-data-input"
           v-model="formData.key.store.akeyless.store.dfc.encrypted_data"
           :label="t('cipherKey.dfcEncryptedData') + ' *'"
-          color="input-border"
-          bg-color="input-bg"
           class="showLabelOnTop q-w-lg"
           stack-label
           type="textarea"
-          outlined
-          filled
+          borderless
           dense
           :rules="[(val: any) => !!val || 'DFC Encrypted Data is required']"
         />

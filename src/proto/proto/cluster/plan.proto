@@ -9,6 +9,7 @@ package cluster;
 import "datafusion_common/datafusion_common.proto";
 import "datafusion/datafusion.proto";
 import "cluster/common.proto";
+import "cluster/search.proto";
 
 message PhysicalPlanNode {
   oneof plan {
@@ -59,6 +60,7 @@ message StreamingAggsExecNode {
   bool                 is_complete_cache_hit = 5;
   repeated string               cached_files = 6;
   datafusion.PhysicalPlanNode aggregate_plan = 7;
+  bool                        overwrite_cache = 8;
 }
 
 // Search request
@@ -74,7 +76,7 @@ message QueryIdentifier {
     string                         org_id = 2;
     string                    stream_type = 3;
     uint32                      partition = 4; // the partition number of the remote scan
-    string                         job_id = 5; // the unique id for each remote scan 
+    string                         job_id = 5; // the unique id for each remote scan
     bool                      enrich_mode = 6; // need special logic for loading enrich table
 }
 
@@ -87,6 +89,8 @@ message SearchInfo {
     bool                        use_cache = 7;
     int64              histogram_interval = 8;
     bool                       is_analyze = 9;
+    optional SamplingConfig sampling_config = 10;
+    bool                      clear_cache = 11;
 }
 
 message IndexInfo {

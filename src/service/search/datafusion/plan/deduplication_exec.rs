@@ -21,7 +21,7 @@ use std::{
 
 use arrow::array::{
     BooleanArray, Float64Array, Int64Array, LargeStringArray, RecordBatch, StringArray,
-    TimestampMicrosecondArray, UInt64Array,
+    StringViewArray, TimestampMicrosecondArray, UInt64Array,
 };
 use arrow_schema::{DataType, SortOptions, TimeUnit};
 use config::TIMESTAMP_COL_NAME;
@@ -287,6 +287,7 @@ impl DeduplicationArrays {
 #[derive(Debug, Clone)]
 enum Array {
     String(StringArray),
+    StringView(StringViewArray),
     LargeString(LargeStringArray),
     Int64(Int64Array),
     UInt64(UInt64Array),
@@ -299,6 +300,7 @@ impl Array {
     pub fn get_value(&self, i: usize) -> Value {
         match &self {
             Array::String(array) => Value::String(array.value(i).to_string()),
+            Array::StringView(array) => Value::String(array.value(i).to_string()),
             Array::LargeString(array) => Value::String(array.value(i).to_string()),
             Array::Int64(array) => Value::Int64(array.value(i)),
             Array::UInt64(array) => Value::UInt64(array.value(i)),
@@ -331,6 +333,13 @@ fn generate_deduplication_arrays(
                     array
                         .as_any()
                         .downcast_ref::<StringArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                DataType::Utf8View => Array::StringView(
+                    array
+                        .as_any()
+                        .downcast_ref::<StringViewArray>()
                         .unwrap()
                         .clone(),
                 ),

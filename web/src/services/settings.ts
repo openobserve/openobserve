@@ -16,15 +16,15 @@
 import http from "./http";
 
 const settings = {
-  createLogo: (org_identifier: string, formData: any) => {
-    const url: string = `/api/${org_identifier}/settings/logo`;
+  createLogo: (org_identifier: string, formData: any, theme: string = 'light') => {
+    const url: string = `/api/${org_identifier}/settings/logo?theme=${theme}`;
     const headers = {
       "Content-Type": "multipart/form-data",
     };
     return http(headers).post(url, formData);
   },
-  deleteLogo: (org_identifier: string) => {
-    return http().delete(`/api/${org_identifier}/settings/logo`);
+  deleteLogo: (org_identifier: string, theme: string = 'light') => {
+    return http().delete(`/api/${org_identifier}/settings/logo?theme=${theme}`);
   },
   updateCustomText: (org_identifier: string, key: string, value: string) => {
     return http().post(`/api/${org_identifier}/settings/logo/text`, value);

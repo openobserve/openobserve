@@ -23,7 +23,7 @@ use config::{
     get_config,
     meta::{
         search::{ScanStats, StorageType},
-        stream::{FileKey, StreamParams, StreamPartition},
+        stream::{FileKey, PartitionTimeLevel, StreamParams, StreamPartition},
     },
     utils::{
         async_file::{create_wal_dir_datetime_filter, scan_files_filtered},
@@ -31,7 +31,7 @@ use config::{
         parquet::{parse_time_range_from_filename, read_metadata_from_file},
         record_batch_ext::concat_batches,
         size::bytes_to_human_readable,
-        time::HOUR_MICRO_SECS,
+        time::{DAY_MICRO_SECS, HOUR_MICRO_SECS},
     },
 };
 use datafusion::{
@@ -40,18 +40,20 @@ use datafusion::{
 };
 use futures::StreamExt;
 use hashbrown::HashMap;
-use infra::errors::{Error, ErrorCodes};
+use infra::{
+    errors::{Error, ErrorCodes},
+    schema::unwrap_partition_time_level,
+};
 use ingester::WAL_PARQUET_METADATA;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::{
     common::infra::wal,
     service::{
-        db, file_list,
+        file_list,
         search::{
             datafusion::{exec::TableBuilder, table_provider::memtable::NewMemTable},
             generate_filter_from_equal_items, generate_search_schema_diff,
-            grpc::utils,
             index::IndexCondition,
             inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
             match_source,
@@ -73,22 +75,25 @@ pub async fn search_parquet(
     snapshot_time: Option<i64>,
 ) -> super::SearchTable {
     let load_start = std::time::Instant::now();
+    let trace_id = &query.trace_id;
     // get file list
     let stream_settings =
         infra::schema::get_settings(&query.org_id, &query.stream_name, query.stream_type)
             .await
             .unwrap_or_default();
+    let partition_time_level =
+        unwrap_partition_time_level(stream_settings.partition_time_level, query.stream_type);
     let files = get_file_list(
         query.clone(),
         &stream_settings.partition_keys,
         query.time_range,
         search_partition_keys,
+        partition_time_level,
         snapshot_time,
     )
     .await?;
     log::info!(
-        "[trace_id {}] wal->parquet->search: get file list files: {}, took {} ms",
-        query.trace_id,
+        "[trace_id {trace_id}] wal->parquet->search: get file list files: {}, took {} ms",
         files.len(),
         load_start.elapsed().as_millis()
     );
@@ -127,7 +132,7 @@ pub async fn search_parquet(
         .await;
     for file in files_metadata {
         if file.meta.is_empty() {
-            wal::release_files(std::slice::from_ref(&file.key));
+            wal::release_files(std::slice::from_ref(&file.key)).await;
             lock_files.retain(|f| f != &file.key);
             continue;
         }
@@ -135,13 +140,12 @@ pub async fn search_parquet(
             && (file.meta.min_ts > max_ts || file.meta.max_ts < min_ts)
         {
             log::debug!(
-                "[trace_id {}] skip wal parquet file: {} time_range: [{},{})",
-                query.trace_id,
+                "[trace_id {trace_id}] skip wal parquet file: {} time_range: [{},{})",
                 &file.key,
                 file.meta.min_ts,
                 file.meta.max_ts
             );
-            wal::release_files(std::slice::from_ref(&file.key));
+            wal::release_files(std::slice::from_ref(&file.key)).await;
             lock_files.retain(|f| f != &file.key);
             continue;
         }
@@ -152,96 +156,28 @@ pub async fn search_parquet(
     scan_stats.files = files.len() as i64;
     if scan_stats.files == 0 {
         // release all files
-        wal::release_files(&lock_files);
+        wal::release_files(&lock_files).await;
         return Ok((vec![], scan_stats));
     }
 
-    // fetch all schema versions, group files by version
-    let schema_versions = match infra::schema::get_versions(
-        &query.org_id,
-        &query.stream_name,
-        query.stream_type,
-        query.time_range,
-    )
-    .await
-    {
-        Ok(versions) => versions,
+    let scan_stats = match file_list::calculate_files_size(&files).await {
+        Ok(size) => size,
         Err(err) => {
-            log::error!("[trace_id {}] get schema error: {}", query.trace_id, err);
             // release all files
-            wal::release_files(&lock_files);
-            return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
-                query.stream_name.clone(),
+            wal::release_files(&lock_files).await;
+            log::error!("[trace_id {trace_id}] calculate files size error: {err}",);
+            return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                "calculate files size error".to_string(),
             )));
         }
     };
-    if schema_versions.is_empty() {
-        // release all files
-        wal::release_files(&lock_files);
-        return Ok((vec![], ScanStats::new()));
-    }
-    let latest_schema_id = schema_versions.len() - 1;
-
-    let mut files_group: HashMap<usize, Vec<FileKey>> =
-        HashMap::with_capacity(schema_versions.len());
-    let mut scan_stats = ScanStats::new();
-    if schema_versions.len() == 1 {
-        let files = files.to_vec();
-        scan_stats = match file_list::calculate_files_size(&files).await {
-            Ok(size) => size,
-            Err(err) => {
-                // release all files
-                wal::release_files(&lock_files);
-                log::error!(
-                    "[trace_id {}] calculate files size error: {}",
-                    query.trace_id,
-                    err
-                );
-                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                    "calculate files size error".to_string(),
-                )));
-            }
-        };
-        files_group.insert(latest_schema_id, files);
-    } else {
-        scan_stats.files = files.len() as i64;
-        for file in files.iter() {
-            // calculate scan size
-            scan_stats.records += file.meta.records;
-            scan_stats.original_size += file.meta.original_size;
-            scan_stats.compressed_size += file.meta.compressed_size;
-            // check schema version
-            let schema_ver_id = match db::schema::filter_schema_version_id(
-                &schema_versions,
-                file.meta.min_ts,
-                file.meta.max_ts,
-            ) {
-                Some(id) => id,
-                None => {
-                    log::error!(
-                        "[trace_id {}] wal->parquet->search: file {} schema version not found, will use the latest schema, min_ts: {}, max_ts: {}",
-                        query.trace_id,
-                        &file.key,
-                        file.meta.min_ts,
-                        file.meta.max_ts
-                    );
-                    // HACK: use the latest version if not found in schema versions
-                    latest_schema_id
-                }
-            };
-            let group = files_group.entry(schema_ver_id).or_default();
-            group.push(file.clone());
-        }
-    }
 
     log::info!(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {}] wal->parquet->search: load groups {}, files {}, scan_size {}, compressed_size {}",
-                query.trace_id,
-                files_group.len(),
-                scan_stats.files,
+                "[trace_id {trace_id}] wal->parquet->search: load files {}, scan_size {}, compressed_size {}",
+                files.len(),
                 scan_stats.original_size,
                 scan_stats.compressed_size
             ),
@@ -251,9 +187,8 @@ pub async fn search_parquet(
                 .search_role("follower".to_string())
                 .duration(load_start.elapsed().as_millis() as usize)
                 .desc(format!(
-                    "wal parquet search load groups {}, files {}, scan_size {}, compressed_size {}",
-                    files_group.len(),
-                    scan_stats.files,
+                    "wal parquet search load files {}, scan_size {}, compressed_size {}",
+                    files.len(),
                     bytes_to_human_readable(scan_stats.original_size as f64),
                     bytes_to_human_readable(scan_stats.compressed_size as f64)
                 ))
@@ -264,63 +199,47 @@ pub async fn search_parquet(
     // check memory circuit breaker
     if let Err(e) = ingester::check_memory_circuit_breaker() {
         // release all files
-        wal::release_files(&lock_files);
+        wal::release_files(&lock_files).await;
         return Err(Error::ResourceError(e.to_string()));
     }
 
-    // construct latest schema map
-    let latest_schema = Arc::new(schema.as_ref().clone().with_metadata(Default::default()));
-    let mut latest_schema_map = HashMap::with_capacity(latest_schema.fields().len());
-    for field in latest_schema.fields() {
-        latest_schema_map.insert(field.name(), field);
-    }
-
-    let mut tables = Vec::new();
     let start = std::time::Instant::now();
-    for (ver, files) in files_group {
-        if files.is_empty() {
-            continue;
-        }
-        let schema = schema_versions[ver]
-            .clone()
-            .with_metadata(Default::default());
-        let schema = utils::change_schema_to_utf8_view(schema);
-        let session = config::meta::search::Session {
-            id: format!("{}-wal-{ver}", query.trace_id),
-            storage_type: StorageType::Wal,
-            work_group: query.work_group.clone(),
-            target_partitions: cfg.limit.cpu_num,
-        };
 
-        let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map);
-        match TableBuilder::new()
-            .rules(diff_fields)
-            .sorted_by_time(sorted_by_time)
-            .file_stat_cache(file_stat_cache.clone())
-            .index_condition(index_condition.clone())
-            .fst_fields(fst_fields.clone())
-            .need_optimize_partition(true)
-            .build(session, &files, latest_schema.clone())
-            .await
-        {
-            Ok(v) => tables.push(v),
-            Err(e) => {
-                // release all files
-                wal::release_files(&lock_files);
-                return Err(e.into());
-            }
+    let session = config::meta::search::Session {
+        id: format!("{trace_id}-wal"),
+        storage_type: StorageType::Wal,
+        work_group: query.work_group.clone(),
+        target_partitions: cfg.limit.cpu_num,
+    };
+
+    let table = match TableBuilder::new()
+        .sorted_by_time(sorted_by_time)
+        .file_stat_cache(file_stat_cache.clone())
+        .index_condition(index_condition.clone())
+        .fst_fields(fst_fields.clone())
+        .build(
+            session,
+            files,
+            Arc::new(schema.as_ref().clone().with_metadata(Default::default())),
+        )
+        .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            // release all files
+            wal::release_files(&lock_files).await;
+            return Err(e.into());
         }
-    }
+    };
 
     // lock these files for this request
-    wal::lock_request(&query.trace_id, &lock_files);
+    wal::lock_request(&query.trace_id, &lock_files).await;
 
     log::info!(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {}] wal->parquet->search: create tables took {} ms",
-                query.trace_id,
+                "[trace_id {trace_id}] wal->parquet->search: create tables took {} ms",
                 start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
@@ -332,7 +251,7 @@ pub async fn search_parquet(
         )
     );
 
-    Ok((tables, scan_stats))
+    Ok((vec![table], scan_stats))
 }
 
 /// search in local WAL, which haven't been sync to object storage
@@ -558,15 +477,15 @@ async fn get_file_list(
     partition_keys: &[StreamPartition],
     time_range: Option<(i64, i64)>,
     search_partition_keys: &[(String, String)],
+    partition_time_level: PartitionTimeLevel,
     snapshot_time: Option<i64>,
 ) -> Result<Vec<FileKey>, Error> {
     let wal_dir = match Path::new(&get_config().common.data_wal_dir).canonicalize() {
         Ok(path) => {
             let mut path = path.to_str().unwrap().to_string();
             // Hack for windows
-            if path.starts_with("\\\\?\\") {
-                path = path[4..].to_string();
-                path = path.replace('\\', "/");
+            if let Some(stripped) = path.strip_prefix("\\\\?\\") {
+                path = stripped.to_string().replace('\\', "/");
             }
             path
         }
@@ -581,8 +500,15 @@ async fn get_file_list(
         wal_dir, query.org_id, query.stream_type, query.stream_name
     );
     let files = if let Some((start_time, end_time)) = query.time_range.and_then(|(s, e)| {
-        let s = s - s % HOUR_MICRO_SECS;
-        let e = e - e % HOUR_MICRO_SECS;
+        let (s, e) = if partition_time_level == PartitionTimeLevel::Daily {
+            let s = s - s % DAY_MICRO_SECS;
+            let e = e - e % DAY_MICRO_SECS;
+            (s, e)
+        } else {
+            let s = s - s % HOUR_MICRO_SECS;
+            let e = e - e % HOUR_MICRO_SECS;
+            (s, e)
+        };
         DateTime::from_timestamp_micros(s).zip(DateTime::from_timestamp_micros(e))
     }) {
         let skip_count = AsRef::<Path>::as_ref(&pattern).components().count();
@@ -652,7 +578,7 @@ async fn get_file_list(
     }
 
     // lock theses files
-    wal::lock_files(&files);
+    wal::lock_files(&files).await;
 
     let stream_params = Arc::new(StreamParams::new(
         &query.org_id,
@@ -686,7 +612,7 @@ async fn get_file_list(
                     file_min_ts,
                     file_max_ts
                 );
-                wal::release_files(std::slice::from_ref(file));
+                wal::release_files(std::slice::from_ref(file)).await;
                 continue;
             }
         }
@@ -694,7 +620,7 @@ async fn get_file_list(
         if match_source(stream_params.clone(), time_range, &filters, &file_key).await {
             result.push(file_key);
         } else {
-            wal::release_files(std::slice::from_ref(file));
+            wal::release_files(std::slice::from_ref(file)).await;
         }
     }
     Ok(result)

@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="column index-menu">
-    <div class="index-table q-mt-xs">
+  <div class="column index-menu default-index-menu">
+    <div class="index-table logs-index-menu">
       <q-table
         data-test="log-search-index-list-fields-table"
         :visible-columns="['name']"
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :pagination="{ rowsPerPage: 10000 }"
         hide-header
         hide-bottom
-        class="traces-field-table"
+        class="traces-field-table tw-h-full"
         id="tracesFieldList"
       >
         <template #body-cell-name="props">
@@ -65,11 +65,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 switch-toggle-side
                 :label="props.row.name"
-                expand-icon-class="field-expansion-icon"
+                expand-icon-class="field-expansion-icon !tw-text-[1rem] tw-text-[var(--o2-icon-color)]"
                 expand-icon="
                      expand_more
                   "
-                @before-show="(event: any) => openFilterCreator(event, props.row)"
+                @before-show="
+                  (event: any) => openFilterCreator(event, props.row)
+                "
+                class="hover:tw-bg-[var(--o2-hover-accent)] tw-rounded-[0.25rem]"
               >
                 <template v-slot:header>
                   <div
@@ -90,7 +93,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         round
                       />
                     </div>
-                    <div v-if="!hideCopyValue" style="background-color: #E8E8E8;"  class="field_overlay">
+                    <div
+                      v-if="!hideCopyValue"
+                      style="background-color: #e8e8e8"
+                      class="field_overlay"
+                    >
                       <q-btn
                         :data-test="`log-search-index-list-filter-${props.row.name}-copy-btn`"
                         icon="content_copy"
@@ -133,11 +140,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         []"
                         :key="value.key"
                       >
-                        <q-list  dense>
+                        <q-list dense>
                           <q-item tag="label" class="q-pr-none">
                             <div
                               class="flex row wrap justify-between"
-                              style="width: calc(100% - 46px)"
+                              style="width: calc(100% - 40px)"
                             >
                               <div
                                 :title="value.key"
@@ -155,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </div>
                             </div>
                             <div
-                            v-if="!hideIncludeExlcude"
+                              v-if="!hideIncludeExlcude"
                               class="flex row"
                               :class="
                                 store.state.theme === 'dark'
@@ -164,38 +171,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               "
                             >
                               <q-btn
-                                class="q-mr-xs"
-                                size="6px"
+                                class="q-mr-xs !tw-border !tw-border-solid !tw-border-[var(--o2-border-color)]"
+                                size="5px"
                                 title="Include Term"
                                 round
                                 @click="
                                   addSearchTerm(
-                                    `${props.row.name}='${value.key}'`
+                                    `${props.row.name}='${value.key}'`,
                                   )
                                 "
                               >
-                                <q-icon>
+                                <q-icon class="!tw-h-[0.5rem] !tw-w-[0.5rem]">
                                   <EqualIcon></EqualIcon>
                                 </q-icon>
                               </q-btn>
                               <q-btn
-                                class="q-mr-xs"
-                                size="6px"
+                                class="q-mr-xs !tw-border !tw-border-solid !tw-border-[var(--o2-border-color)]"
+                                size="5px"
                                 title="Include Term"
                                 round
                                 @click="
                                   addSearchTerm(
-                                    `${props.row.name}!='${value.key}'`
+                                    `${props.row.name}!='${value.key}'`,
                                   )
                                 "
                               >
-                                <q-icon>
+                                <q-icon class="!tw-h-[0.5rem] !tw-w-[0.5rem]">
                                   <NotEqualIcon></NotEqualIcon>
                                 </q-icon>
                               </q-btn>
                             </div>
                             <div
-                            v-if="!hideCopyValue"
+                              v-if="!hideCopyValue"
                               class="flex row"
                               :class="
                                 store.state.theme === 'dark'
@@ -208,14 +215,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 size="8px"
                                 title="Copy Value"
                                 round
-                                dense 
+                                dense
                                 flat
-                                @click="
-                                 copyContentValue(value.key)
-                                "
+                                @click="copyContentValue(value.key)"
                               >
-                                <q-icon  name="content_copy"></q-icon>
-   
+                                <q-icon name="content_copy"></q-icon>
                               </q-btn>
                             </div>
                           </q-item>
@@ -233,15 +237,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="log-search-index-list-field-search-input"
             v-model="filterFieldValue"
             data-cy="index-field-search-input"
-            filled
             borderless
             dense
             clearable
             debounce="1"
             :placeholder="t('search.searchField')"
+            class="o2-search-input tw-min-w-full "
           >
             <template #prepend>
-              <q-icon name="search" />
+              <q-icon name="search" class="o2-search-input-icon" />
             </template>
           </q-input>
         </template>
@@ -290,18 +294,18 @@ export default defineComponent({
       type: String,
       default: "logs",
     },
-    hideIncludeExlcude:{
+    hideIncludeExlcude: {
       type: Boolean,
       default: false,
     },
-    hideCopyValue:{
+    hideCopyValue: {
       type: Boolean,
       default: true,
     },
-    hideAddSearchTerm:{
+    hideAddSearchTerm: {
       type: Boolean,
       default: false,
-    }
+    },
   },
   emits: ["event-emitted"],
   setup(props, { emit }) {
@@ -332,7 +336,7 @@ export default defineComponent({
 
     const openFilterCreator = (
       event: any,
-      { name, ftsKey, stream_name }: any
+      { name, ftsKey, stream_name }: any,
     ) => {
       if (ftsKey) {
         event.stopPropagation();
@@ -351,7 +355,7 @@ export default defineComponent({
           start_time: props.timeStamp.startTime,
           end_time: props.timeStamp.endTime,
           fields: [name],
-          size: 10,
+          size: store.state.zoConfig?.query_values_default_num || 10,
           type: props.streamType,
         })
         .then((res: any) => {
@@ -408,7 +412,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .traces-field-table {
-  height: calc(100vh - 190px) !important;
+  height: calc(100vh - 212px) !important;
 }
 .q-menu {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
@@ -617,8 +621,8 @@ export default defineComponent({
       }
       .field-expansion-icon {
         img {
-          width: 12px;
-          height: 12px;
+          width: 10px;
+          height: 10px;
         }
       }
     }

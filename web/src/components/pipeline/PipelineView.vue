@@ -48,12 +48,14 @@
   import { getImageURL } from "@/utils/zincutils";
 import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
   import { defineComponent, computed, watch } from 'vue';
+  import { ControlButton, Controls } from '@vue-flow/controls'
   import { VueFlow } from "@vue-flow/core";
   import { ref, onMounted } from "vue";
 import CustomNode from '@/plugins/pipelines/CustomNode.vue';
 import CustomEdge from "@/plugins/pipelines/CustomEdge.vue";
 /* import the required styles */
 import "@vue-flow/core/dist/style.css";
+import '@vue-flow/controls/dist/style.css';
 import useDragAndDrop from '@/plugins/pipelines/useDnD';
 const functionImage = getImageURL("images/pipeline/transform_function.png");
 const streamImage = getImageURL("images/pipeline/input_stream.png");
@@ -67,7 +69,7 @@ const queryImage = getImageURL("images/pipeline/input_query.png");
     props: {
       pipeline: Object
     },
-    components: { VueFlow, CustomNode, DropzoneBackground, CustomEdge},
+    components: { VueFlow, CustomNode, DropzoneBackground, CustomEdge, ControlButton, Controls },
     setup(props) {
       const {
       pipelineObj,

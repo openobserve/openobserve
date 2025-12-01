@@ -48,6 +48,7 @@
       "
       no-caps
       data-test="dashboard-addpanel-config-drilldown-add-btn"
+      class="el-border"
     />
     <q-dialog v-model="showValueMappingPopUp">
       <ValueMappingPopUp

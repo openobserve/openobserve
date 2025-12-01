@@ -45,10 +45,16 @@ import { ChangeOrgPage } from "./generalPages/changeOrgPage.js";
 import { EnrichmentPage } from "./generalPages/enrichmentPage.js";
 const SchemaPage = require("./generalPages/schemaPage.js");
 const SchemaLoadPage = require("./generalPages/schemaLoadPage.js");
+const APICleanup = require("./apiCleanup.js");
 
 // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
 import { LogsQueryPage } from "./logsPages/logsQueryPage.js";
 import UnflattenedPage from "./logsPages/unflattened.js";
+
+// ===== SDR (SENSITIVE DATA REDACTION) PAGE OBJECTS =====
+import { SDRPatternsPage } from "./sdrPages/sdrPatternsPage.js";
+import { SDRVerificationPage } from "./sdrPages/sdrVerificationPage.js";
+import { StreamAssociationPage } from "./streamsPages/streamAssociationPage.js";
 
 class PageManager {
   /**
@@ -78,6 +84,9 @@ class PageManager {
 
     // ===== EXISTING ALERTS PAGE OBJECT =====
     this.alertsPage = new AlertsPage(page);
+
+    // ===== API CLEANUP =====
+    this.apiCleanup = new APICleanup();
 
     // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
     this.logsPage = new LogsPage(page);
@@ -110,6 +119,11 @@ class PageManager {
     // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
     this.logsQueryPage = new LogsQueryPage(page);
     this.unflattenedPage = new UnflattenedPage(page);
+
+    // ===== SDR (SENSITIVE DATA REDACTION) PAGE OBJECTS =====
+    this.sdrPatternsPage = new SDRPatternsPage(page);
+    this.sdrVerificationPage = new SDRVerificationPage(page);
+    this.streamAssociationPage = new StreamAssociationPage(page);
   }
 }
 

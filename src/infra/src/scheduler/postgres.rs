@@ -323,6 +323,236 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         Ok(())
     }
 
+    async fn bulk_update_triggers(&self, triggers: Vec<Trigger>) -> Result<()> {
+        if triggers.is_empty() {
+            return Ok(());
+        }
+
+        let pool = CLIENT.clone();
+
+        // Build bulk update query using UNNEST
+        let query_builder = String::from(
+            r#"UPDATE scheduled_jobs SET
+                    status = bulk_data.status,
+                    retries = bulk_data.retries,
+                    next_run_at = bulk_data.next_run_at,
+                    is_realtime = bulk_data.is_realtime,
+                    is_silenced = bulk_data.is_silenced,
+                    data = bulk_data.data
+                FROM (SELECT * FROM UNNEST($1::integer[], $2::text[], $3::text[], $4::integer[], $5::integer[], $6::bigint[], $7::boolean[], $8::boolean[], $9::text[])
+                    AS bulk_data(module, org, module_key, status, retries, next_run_at, is_realtime, is_silenced, data)) AS bulk_data
+                WHERE scheduled_jobs.module = bulk_data.module
+                    AND scheduled_jobs.org = bulk_data.org
+                    AND scheduled_jobs.module_key = bulk_data.module_key"#,
+        );
+
+        let mut modules = Vec::new();
+        let mut orgs = Vec::new();
+        let mut module_keys = Vec::new();
+        let mut statuses: Vec<TriggerStatus> = Vec::new();
+        let mut retries_vec = Vec::new();
+        let mut next_run_ats = Vec::new();
+        let mut is_realtimes = Vec::new();
+        let mut is_silenceds = Vec::new();
+        let mut datas = Vec::new();
+
+        for trigger in &triggers {
+            modules.push(trigger.module.clone());
+            orgs.push(trigger.org.clone());
+            module_keys.push(trigger.module_key.clone());
+            statuses.push(trigger.status.clone());
+            retries_vec.push(trigger.retries);
+            next_run_ats.push(trigger.next_run_at);
+            is_realtimes.push(trigger.is_realtime);
+            is_silenceds.push(trigger.is_silenced);
+            datas.push(trigger.data.clone());
+        }
+
+        let query = sqlx::query(&query_builder)
+            .bind(modules)
+            .bind(orgs)
+            .bind(module_keys)
+            .bind(statuses)
+            .bind(retries_vec)
+            .bind(next_run_ats)
+            .bind(is_realtimes)
+            .bind(is_silenceds)
+            .bind(datas);
+
+        match query.execute(&pool).await {
+            Ok(_) => {
+                // Report the metric only after the db op is successful
+                DB_QUERY_NUMS
+                    .with_label_values(&["bulk_update", "scheduled_jobs"])
+                    .inc();
+                // Handle cluster coordinator for realtime alerts
+                for trigger in &triggers {
+                    if trigger.module == TriggerModule::Alert && trigger.is_realtime {
+                        let key = format!(
+                            "{TRIGGERS_KEY}{}/{}/{}",
+                            trigger.module, &trigger.org, &trigger.module_key
+                        );
+                        let cluster_coordinator = db::get_coordinator().await;
+                        if let Err(e) = cluster_coordinator
+                            .put(&key, Bytes::from(""), true, None)
+                            .await
+                        {
+                            log::error!(
+                                "Error updating cluster coordinator for trigger {}: {}",
+                                key,
+                                e
+                            );
+                        }
+                    }
+                }
+                Ok(())
+            }
+            Err(e) => {
+                log::warn!(
+                    "Bulk update failed, falling back to individual updates: {}",
+                    e
+                );
+                // Fallback to individual updates
+                for trigger in triggers {
+                    self.update_trigger(trigger, false).await?;
+                }
+                Ok(())
+            }
+        }
+    }
+
+    async fn bulk_update_status(
+        &self,
+        updates: Vec<(
+            String,
+            TriggerModule,
+            String,
+            TriggerStatus,
+            i32,
+            Option<String>,
+        )>,
+    ) -> Result<()> {
+        if updates.is_empty() {
+            return Ok(());
+        }
+
+        let pool = CLIENT.clone();
+
+        // Separate updates with and without data
+        let mut updates_with_data = Vec::new();
+        let mut updates_without_data = Vec::new();
+
+        for update in updates {
+            if update.5.is_some() {
+                updates_with_data.push(update);
+            } else {
+                updates_without_data.push(update);
+            }
+        }
+
+        // Handle updates with data
+        if !updates_with_data.is_empty() {
+            let mut orgs = Vec::new();
+            let mut modules = Vec::new();
+            let mut module_keys = Vec::new();
+            let mut statuses = Vec::new();
+            let mut retries_vec = Vec::new();
+            let mut datas = Vec::new();
+
+            for (org, module, module_key, status, retries, data) in &updates_with_data {
+                orgs.push(org.clone());
+                modules.push(module.clone());
+                module_keys.push(module_key.clone());
+                statuses.push(status.clone());
+                retries_vec.push(*retries);
+                datas.push(data.as_ref().unwrap().clone());
+            }
+
+            let query = sqlx::query(
+                r#"UPDATE scheduled_jobs SET
+                    status = bulk_data.status,
+                    retries = bulk_data.retries,
+                    data = bulk_data.data
+                FROM (SELECT * FROM UNNEST($1::text[], $2::integer[], $3::text[], $4::integer[], $5::integer[], $6::text[])
+                    AS bulk_data(org, module, module_key, status, retries, data)) AS bulk_data
+                WHERE scheduled_jobs.org = bulk_data.org
+                    AND scheduled_jobs.module = bulk_data.module
+                    AND scheduled_jobs.module_key = bulk_data.module_key"#,
+            )
+            .bind(orgs)
+            .bind(modules)
+            .bind(module_keys)
+            .bind(statuses)
+            .bind(retries_vec)
+            .bind(datas);
+
+            if let Err(e) = query.execute(&pool).await {
+                log::warn!(
+                    "Bulk status update with data failed, falling back to individual updates: {}",
+                    e
+                );
+                for (org, module, module_key, status, retries, data) in updates_with_data {
+                    self.update_status(&org, module, &module_key, status, retries, data.as_deref())
+                        .await?;
+                }
+            } else {
+                DB_QUERY_NUMS
+                    .with_label_values(&["bulk_update_status", "scheduled_jobs"])
+                    .inc();
+            }
+        }
+
+        // Handle updates without data
+        if !updates_without_data.is_empty() {
+            let mut orgs = Vec::new();
+            let mut modules = Vec::new();
+            let mut module_keys = Vec::new();
+            let mut statuses: Vec<TriggerStatus> = Vec::new();
+            let mut retries_vec = Vec::new();
+
+            for (org, module, module_key, status, retries, _) in &updates_without_data {
+                orgs.push(org.clone());
+                modules.push(module.clone());
+                module_keys.push(module_key.clone());
+                statuses.push(status.clone());
+                retries_vec.push(*retries);
+            }
+
+            let query = sqlx::query(
+                r#"UPDATE scheduled_jobs SET
+                    status = bulk_data.status,
+                    retries = bulk_data.retries
+                FROM (SELECT * FROM UNNEST($1::text[], $2::integer[], $3::text[], $4::integer[], $5::integer[])
+                    AS bulk_data(org, module, module_key, status, retries)) AS bulk_data
+                WHERE scheduled_jobs.org = bulk_data.org
+                    AND scheduled_jobs.module = bulk_data.module
+                    AND scheduled_jobs.module_key = bulk_data.module_key"#,
+            )
+            .bind(orgs)
+            .bind(modules)
+            .bind(module_keys)
+            .bind(statuses)
+            .bind(retries_vec);
+
+            if let Err(e) = query.execute(&pool).await {
+                log::warn!(
+                    "Bulk status update without data failed, falling back to individual updates: {}",
+                    e
+                );
+                for (org, module, module_key, status, retries, data) in updates_without_data {
+                    self.update_status(&org, module, &module_key, status, retries, data.as_deref())
+                        .await?;
+                }
+            } else {
+                DB_QUERY_NUMS
+                    .with_label_values(&["bulk_update_status", "scheduled_jobs"])
+                    .inc();
+            }
+        }
+
+        Ok(())
+    }
+
     /// Keeps the trigger alive
     async fn keep_alive(&self, ids: &[i64], alert_timeout: i64, report_timeout: i64) -> Result<()> {
         let now = now_micros();
@@ -391,7 +621,7 @@ SET status = $1, start_time = $2,
 WHERE id IN (
     SELECT id
     FROM scheduled_jobs
-    WHERE status = $6 AND next_run_at <= $7 AND NOT (is_realtime = $8 AND is_silenced = $9) 
+    WHERE status = $6 AND next_run_at <= $7 AND NOT (is_realtime = $8 AND is_silenced = $9)
     ORDER BY next_run_at
     LIMIT $10
 )

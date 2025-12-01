@@ -17,15 +17,10 @@ use std::sync::Arc;
 
 use datafusion::{
     common::{
-        Result, internal_err,
+        Result,
         tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter},
     },
-    physical_plan::{
-        ExecutionPlan,
-        coalesce_partitions::CoalescePartitionsExec,
-        joins::{HashJoinExec, PartitionMode},
-        repartition::RepartitionExec,
-    },
+    physical_plan::{ExecutionPlan, joins::HashJoinExec},
     sql::TableReference,
 };
 
@@ -66,28 +61,7 @@ impl TreeNodeRewriter for EnrichBroadcastJoinRewriter {
             let org_id = self.remote_scan_nodes.req.org_id.clone();
             let trace_id = self.remote_scan_nodes.req.trace_id.clone();
             let mut rewriter = EnrichmentExecRewriter::new(trace_id.clone(), org_id);
-            let mut plan = node.rewrite(&mut rewriter)?.data;
-
-            // 2. change the HashJoinExec partition mode to CollectLeft
-            // Remove unused RepartitionExec(Hash) for collect left
-            let Some(hash_join) = plan.as_any().downcast_ref::<HashJoinExec>() else {
-                return internal_err!("Expected HashJoinExec but got different execution plan");
-            };
-            if *hash_join.partition_mode() != PartitionMode::CollectLeft {
-                let left_without_repartition =
-                    remove_repartition_from_left_table(hash_join.left().clone());
-                let left = Arc::new(CoalescePartitionsExec::new(left_without_repartition));
-                plan = Arc::new(HashJoinExec::try_new(
-                    left,
-                    hash_join.right().clone(),
-                    hash_join.on().to_vec(),
-                    hash_join.filter().cloned(),
-                    hash_join.join_type(),
-                    hash_join.projection.clone(),
-                    PartitionMode::CollectLeft,
-                    hash_join.null_equality(),
-                )?) as Arc<dyn ExecutionPlan>;
-            }
+            let plan = node.rewrite(&mut rewriter)?.data;
 
             // 3. replace the HashJoinExec to EnrichBroadcastJoinExec
             let hash_join = remote_scan_to_top_if_needed(plan, self.remote_scan_nodes.clone())?;
@@ -132,30 +106,6 @@ impl TreeNodeRewriter for EnrichmentExecRewriter {
                     TreeNodeRecursion::Stop,
                 ));
             }
-        }
-        Ok(Transformed::no(node))
-    }
-}
-
-/// Remove RepartitionExec from the left table execution plan
-fn remove_repartition_from_left_table(plan: Arc<dyn ExecutionPlan>) -> Arc<dyn ExecutionPlan> {
-    let mut rewriter = RepartitionRemover {};
-    match plan.clone().rewrite(&mut rewriter) {
-        Ok(transformed) => transformed.data,
-        Err(_) => plan,
-    }
-}
-
-struct RepartitionRemover {}
-
-impl TreeNodeRewriter for RepartitionRemover {
-    type Node = Arc<dyn ExecutionPlan>;
-
-    fn f_up(&mut self, node: Arc<dyn ExecutionPlan>) -> Result<Transformed<Self::Node>> {
-        if node.name() == "RepartitionExec"
-            && let Some(repartition) = node.as_any().downcast_ref::<RepartitionExec>()
-        {
-            return Ok(Transformed::yes(repartition.input().clone()));
         }
         Ok(Transformed::no(node))
     }

@@ -40,8 +40,12 @@ use infra::{
     db::{ORM_CLIENT, connect_to_orm},
     scheduler::get_scheduler_max_retries,
 };
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::recommendations::service::QueryRecommendationService;
 use proto::cluster_rpc;
 
+#[cfg(feature = "enterprise")]
+use crate::service::alerts::scheduler::query_optimization_recommendation::QueryOptimizerContext;
 #[cfg(feature = "cloud")]
 use crate::service::organization::is_org_in_free_trial_period;
 use crate::service::{
@@ -66,12 +70,16 @@ pub async fn handle_triggers(
         db::scheduler::TriggerModule::DerivedStream => {
             handle_derived_stream_triggers(trace_id, trigger).await
         }
+        config::meta::triggers::TriggerModule::QueryRecommendations => {
+            handle_query_recommendations_triggers(trace_id, trigger).await
+        }
     }
 }
 
 /// Returns the skipped timestamps and the final timestamp to evaluate the alert.
 /// `tz_offset` is in minutes
 /// Frequency is in seconds
+#[allow(clippy::too_many_arguments)]
 fn get_skipped_timestamps(
     supposed_to_run_at: i64,
     cron: &str,
@@ -80,6 +88,7 @@ fn get_skipped_timestamps(
     delay: i64,
     align_time: bool,
     now: i64,
+    timezone_str: Option<&str>,
 ) -> (Vec<i64>, i64) {
     let mut skipped_timestamps = Vec::new();
     let mut next_run_at;
@@ -110,6 +119,7 @@ fn get_skipped_timestamps(
                 supposed_to_run_at + second_micros(frequency),
                 tz_offset,
                 Some(frequency),
+                timezone_str,
             )
         } else {
             supposed_to_run_at + second_micros(frequency)
@@ -210,14 +220,8 @@ async fn handle_alert_triggers(
                     start_time: now,
                     end_time: now,
                     next_run_at: now,
-                    skipped_alerts_count: None,
-                    delay_in_secs: None,
-                    evaluation_took_in_secs: None,
-                    query_took: None,
-                    success_response: None,
-                    is_partial: None,
-                })
-                .await;
+                    ..Default::default()
+                });
                 return Err(anyhow::anyhow!("Alert not found"));
             }
             Err(e) => {
@@ -229,7 +233,7 @@ async fn handle_alert_triggers(
                     // next run at is after 5mins
                     let next_run_at = now + Duration::minutes(5).num_microseconds().unwrap();
                     new_trigger.next_run_at = next_run_at;
-                    db::scheduler::update_trigger(new_trigger).await?;
+                    db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
                 } else {
                     // Mark the trigger as failed
                     db::scheduler::update_status(
@@ -239,6 +243,8 @@ async fn handle_alert_triggers(
                         db::scheduler::TriggerStatus::Waiting,
                         trigger.retries + 1,
                         None,
+                        true,
+                        &query_trace_id,
                     )
                     .await?;
                 }
@@ -258,14 +264,8 @@ async fn handle_alert_triggers(
                     start_time: now,
                     end_time: now,
                     next_run_at: now,
-                    skipped_alerts_count: None,
-                    delay_in_secs: None,
-                    evaluation_took_in_secs: None,
-                    query_took: None,
-                    success_response: None,
-                    is_partial: None,
-                })
-                .await;
+                    ..Default::default()
+                });
                 return Err(anyhow::anyhow!("Error getting alert by id: {}", e));
             }
         }
@@ -294,24 +294,56 @@ async fn handle_alert_triggers(
     // Set the is_realtime field according to the alert
     new_trigger.is_realtime = alert.is_real_time;
 
+    // [ENTERPRISE] Initialize RCA batch tracking for this scheduler run
+    // #[cfg(feature = "enterprise")]
+    // let rca_enabled =
+    //     o2_enterprise::enterprise::ai::rca::integration::is_rca_enabled_for_org(&new_trigger.
+    // org); #[cfg(not(feature = "enterprise"))]
+    let _rca_enabled = false;
+
+    // Helper closure to mark alert completion and process batch if needed
+    // #[cfg(feature = "enterprise")]
+    // let mark_rca_completion = || async {
+    //     if rca_enabled {
+    //         let is_batch_complete =
+    //             o2_enterprise::enterprise::ai::rca::mark_alert_completed(trace_id);
+    //         if is_batch_complete {
+    //             log::info!(
+    //                 "[SCHEDULER trace_id {scheduler_trace_id}] Batch {} complete, processing
+    // incidents",                 trace_id
+    //             );
+    //             if let Err(e) =
+    // o2_enterprise::enterprise::ai::rca::integration::process_batch_and_create_incidents(
+    //                 trace_id
+    //             ).await {
+    //                 log::error!(
+    //                     "[SCHEDULER trace_id {scheduler_trace_id}] Error creating incidents from
+    // batch {}: {}",                     trace_id, e
+    //                 );
+    //             }
+    //         }
+    //     }
+    // };
+
     #[cfg(feature = "cloud")]
     {
         if !is_org_in_free_trial_period(&trigger.org).await? {
+            let mut alert = alert;
             log::info!(
-                "skipping alert {} id {} in org {} because free trial expiry",
+                "pausing alert {} id {} in org {} because free trial expiry",
                 alert.name,
                 trigger.module_key,
                 trigger.org
             );
+            alert.enabled = false;
             // Update the trigger job to the next expected trigger time to check again
-            let next_run_at = alert.trigger_condition.get_next_trigger_time(
-                true,
-                alert.tz_offset,
-                false,
-                None,
-            )?;
-            new_trigger.next_run_at = next_run_at;
-            db::scheduler::update_trigger(new_trigger).await?;
+            if let Err(e) = set_without_updating_trigger(&trigger.org, alert).await {
+                log::error!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Failed to pause alert due to trial expiry: {}/{} : {e}",
+                    &trigger.org,
+                    &trigger.module_key
+                );
+            }
             return Ok(());
         }
     }
@@ -327,7 +359,7 @@ async fn handle_alert_triggers(
             &trigger.module_key
         );
         // wakeup the trigger
-        db::scheduler::update_trigger(new_trigger).await?;
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
 
@@ -335,7 +367,7 @@ async fn handle_alert_triggers(
         // update trigger, check on next week
         new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
         new_trigger.is_silenced = true;
-        db::scheduler::update_trigger(new_trigger).await?;
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
 
@@ -367,7 +399,7 @@ async fn handle_alert_triggers(
         // Keep the last_satisfied_at field
         trigger_data.reset();
         new_trigger.data = json::to_string(&trigger_data).unwrap();
-        db::scheduler::update_trigger(new_trigger).await?;
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
 
@@ -393,6 +425,7 @@ async fn handle_alert_triggers(
             delay,
             alert.trigger_condition.align_time,
             now,
+            alert.trigger_condition.timezone.as_deref(),
         );
         final_end_time = skipped_timestamps_end_timestamp.1;
         let skipped_timestamps = skipped_timestamps_end_timestamp.0;
@@ -426,17 +459,12 @@ async fn handle_alert_triggers(
                 end_time: *skipped_last_timestamp,
                 retries: trigger.retries,
                 delay_in_secs: Some(Duration::microseconds(delay).num_seconds()),
-                error: None,
-                success_response: None,
-                is_partial: None,
-                evaluation_took_in_secs: None,
                 source_node: Some(source_node.clone()),
-                query_took: None,
                 scheduler_trace_id: Some(scheduler_trace_id.clone()),
                 time_in_queue_ms: Some(time_in_queue),
                 skipped_alerts_count: Some(skipped_alerts_count as i64),
-            })
-            .await;
+                ..Default::default()
+            });
         }
         log::info!(
             "[SCHEDULER trace_id {scheduler_trace_id}] alert {} skipped due to delay: {}",
@@ -479,7 +507,7 @@ async fn handle_alert_triggers(
         query_took: None,
         scheduler_trace_id: Some(scheduler_trace_id.clone()),
         time_in_queue_ms: Some(time_in_queue),
-        skipped_alerts_count: None,
+        ..Default::default()
     };
 
     let evaluation_took = Instant::now();
@@ -488,7 +516,7 @@ async fn handle_alert_triggers(
         .evaluate(
             None,
             (Some(start_time), final_end_time),
-            Some(query_trace_id),
+            Some(query_trace_id.clone()),
         )
         .await;
     let evaluation_took = evaluation_took.elapsed().as_secs_f64();
@@ -531,7 +559,7 @@ async fn handle_alert_triggers(
             trigger_data.reset();
             new_trigger.data = json::to_string(&trigger_data).unwrap();
             trigger_data_stream.next_run_at = new_trigger.next_run_at;
-            db::scheduler::update_trigger(new_trigger).await?;
+            db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         } else {
             // update its status and retries
             db::scheduler::update_status(
@@ -541,10 +569,17 @@ async fn handle_alert_triggers(
                 db::scheduler::TriggerStatus::Waiting,
                 trigger.retries + 1,
                 None,
+                true,
+                &query_trace_id,
             )
             .await?;
         }
-        publish_triggers_usage(trigger_data_stream).await;
+        publish_triggers_usage(trigger_data_stream);
+
+        // [ENTERPRISE] Mark completion even on failure
+        // #[cfg(feature = "enterprise")]
+        // mark_rca_completion().await;
+
         return Err(err);
     }
 
@@ -594,6 +629,195 @@ async fn handle_alert_triggers(
 
     // send notification
     if let Some(data) = trigger_results.data {
+        // Check if grouping is enabled BEFORE deduplication (enterprise-only feature)
+        #[cfg(feature = "enterprise")]
+        let grouping_enabled = alert
+            .deduplication
+            .as_ref()
+            .and_then(|d| d.grouping.as_ref())
+            .map(|g| g.enabled)
+            .unwrap_or(false);
+
+        #[cfg(not(feature = "enterprise"))]
+        let grouping_enabled = false;
+
+        if grouping_enabled {
+            #[cfg(feature = "enterprise")]
+            {
+                let grouping_config = alert
+                    .deduplication
+                    .as_ref()
+                    .and_then(|d| d.grouping.as_ref())
+                    .unwrap();
+
+                // Calculate fingerprint for grouping
+                let fingerprint = if let Some(dedup_config) = alert.deduplication.as_ref() {
+                    let org_config =
+                        match crate::service::alerts::org_config::get_deduplication_config(
+                            &new_trigger.org,
+                        )
+                        .await
+                        {
+                            Ok(Some(config)) => Some(config),
+                            _ => None,
+                        };
+
+                    if let Some(first_row) = data.first() {
+                        crate::service::alerts::deduplication::calculate_fingerprint(
+                            &alert,
+                            first_row,
+                            dedup_config,
+                            org_config.as_ref(),
+                        )
+                    } else {
+                        alert.get_unique_key()
+                    }
+                } else {
+                    alert.get_unique_key()
+                };
+
+                log::debug!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Adding alert to batch, org: {}, alert: {}, fingerprint: {}, rows: {}",
+                    &new_trigger.org,
+                    &alert.name,
+                    fingerprint,
+                    data.len()
+                );
+
+                // Add to batch
+                let batch_ready = crate::service::alerts::grouping::add_to_batch(
+                    fingerprint.clone(),
+                    new_trigger.org.clone(),
+                    alert.clone(),
+                    data.clone(),
+                    grouping_config.group_wait_seconds,
+                    grouping_config.max_group_size,
+                );
+
+                if batch_ready {
+                    log::info!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Batch {} reached max size, sending immediately",
+                        fingerprint
+                    );
+                    if let Some(batch) =
+                        crate::service::alerts::grouping::get_ready_batch(&fingerprint)
+                        && let Err(e) =
+                            crate::job::alert_grouping::send_grouped_notification_sync(batch).await
+                    {
+                        log::error!(
+                            "[SCHEDULER trace_id {scheduler_trace_id}] Failed to send grouped notification: {}",
+                            e
+                        );
+                    }
+                } else {
+                    log::debug!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Alert added to batch, waiting for more alerts or timeout, fingerprint: {}",
+                        fingerprint
+                    );
+                }
+
+                // Mark as grouped for history tracking
+                trigger_data_stream.dedup_enabled = Some(true);
+                trigger_data_stream.grouped = Some(true);
+                trigger_data_stream.group_size = Some(if batch_ready {
+                    grouping_config.max_group_size as i32
+                } else {
+                    1
+                });
+
+                // Alert added to batch, don't send individual notification
+                trigger_data.period_end_time = if should_store_last_end_time {
+                    Some(trigger_results.end_time)
+                } else {
+                    None
+                };
+                new_trigger.data = json::to_string(&trigger_data).unwrap();
+                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                publish_triggers_usage(trigger_data_stream);
+                return Ok(());
+            }
+        }
+
+        // Apply deduplication if enabled (enterprise-only feature)
+        #[cfg(feature = "enterprise")]
+        let data = if let Some(db) = ORM_CLIENT.get() {
+            match crate::service::alerts::deduplication::apply_deduplication(
+                db,
+                &alert,
+                data.clone(),
+            )
+            .await
+            {
+                Ok(deduplicated_data) => {
+                    if deduplicated_data.is_empty() {
+                        log::debug!(
+                            "[SCHEDULER trace_id {scheduler_trace_id}] All alert results deduplicated for org: {}, module_key: {}",
+                            &new_trigger.org,
+                            &new_trigger.module_key
+                        );
+
+                        // Mark as suppressed for history tracking
+                        trigger_data_stream.dedup_enabled = Some(true);
+                        trigger_data_stream.dedup_suppressed = Some(true);
+
+                        // All results were deduplicated, skip notification
+                        // Still update the trigger timing
+                        trigger_data.period_end_time = if should_store_last_end_time {
+                            Some(trigger_results.end_time)
+                        } else {
+                            None
+                        };
+                        new_trigger.data = json::to_string(&trigger_data).unwrap();
+                        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                        publish_triggers_usage(trigger_data_stream);
+                        return Ok(());
+                    }
+                    deduplicated_data
+                }
+                Err(e) => {
+                    log::error!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Error applying deduplication for org: {}, module_key: {}: {}",
+                        &new_trigger.org,
+                        &new_trigger.module_key,
+                        e
+                    );
+                    // On error, continue with original data to avoid missing alerts
+                    data
+                }
+            }
+        } else {
+            log::warn!(
+                "[SCHEDULER trace_id {scheduler_trace_id}] Could not connect to ORM for deduplication, continuing without it"
+            );
+            data
+        };
+
+        // [ENTERPRISE] Collect alert events for batched incident creation
+        // #[cfg(feature = "enterprise")]
+        // if rca_enabled && !data.is_empty() {
+        //     // Collect each deduplicated result row as an alert event
+        //     // Use parent trace_id for cross-alert correlation (not scheduler_trace_id)
+        //     for row in &data {
+        //         if let Err(e) =
+        // o2_enterprise::enterprise::ai::rca::integration::collect_alert_event(
+        // trace_id, // Use parent trace_id for cross-alert batch             &alert,
+        //             row,
+        //             triggered_at,
+        //         ) {
+        //             log::error!(
+        //                 "[SCHEDULER trace_id {scheduler_trace_id}] Error collecting alert event
+        // for RCA: {}",                 e
+        //             );
+        //             // Don't fail alert evaluation if RCA collection fails
+        //         }
+        //     }
+        //     log::debug!(
+        //         "[SCHEDULER trace_id {scheduler_trace_id}] Collected {} alert events for RCA
+        // batch {}",         data.len(),
+        //         trace_id
+        //     );
+        // }
+
         let vars = get_row_column_map(&data);
         // Multi-time range alerts can have multiple time ranges, hence only
         // use the main start_time (now - period) and end_time (now) for the alert evaluation.
@@ -613,12 +837,20 @@ async fn handle_alert_triggers(
         );
         trigger_data_stream.start_time = alert_start_time;
         trigger_data_stream.end_time = alert_end_time;
+
+        // Mark dedup status for history (if dedup was enabled, alert passed through)
+        if alert.deduplication.as_ref().is_some_and(|d| d.enabled) {
+            trigger_data_stream.dedup_enabled = Some(true);
+            trigger_data_stream.dedup_suppressed = Some(false);
+        }
+
+        // No grouping - send individual notification
         match alert
             .send_notification(
                 &data,
                 trigger_results.end_time,
                 Some(start_time),
-                final_end_time,
+                triggered_at,
             )
             .await
         {
@@ -649,7 +881,7 @@ async fn handle_alert_triggers(
                 new_trigger.data = json::to_string(&trigger_data).unwrap();
                 // Notification is already sent to some destinations,
                 // hence in case of partial errors, no need to retry
-                db::scheduler::update_trigger(new_trigger).await?;
+                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
             }
             Err(e) => {
                 log::error!(
@@ -677,7 +909,7 @@ async fn handle_alert_triggers(
                     trigger_data.period_end_time = None;
                     new_trigger.data = json::to_string(&trigger_data).unwrap();
                     trigger_data_stream.next_run_at = new_trigger.next_run_at;
-                    db::scheduler::update_trigger(new_trigger).await?;
+                    db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
                 } else {
                     let trigger_data = json::to_string(&trigger_data).unwrap();
                     // Otherwise update its status and data only
@@ -688,6 +920,8 @@ async fn handle_alert_triggers(
                         db::scheduler::TriggerStatus::Waiting,
                         trigger.retries + 1,
                         Some(&trigger_data),
+                        true,
+                        &query_trace_id,
                     )
                     .await?;
                     trigger_data_stream.next_run_at = now;
@@ -711,7 +945,7 @@ async fn handle_alert_triggers(
             None
         };
         new_trigger.data = json::to_string(&trigger_data).unwrap();
-        db::scheduler::update_trigger(new_trigger).await?;
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         trigger_data_stream.start_time = start_time;
         trigger_data_stream.end_time = trigger_results.end_time;
         trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
@@ -722,7 +956,91 @@ async fn handle_alert_triggers(
         &trigger_data_stream.key
     );
     // publish the triggers as stream
-    publish_triggers_usage(trigger_data_stream).await;
+    publish_triggers_usage(trigger_data_stream);
+
+    // [ENTERPRISE] Mark alert completed and process batch if this was the last alert
+    // #[cfg(feature = "enterprise")]
+    // mark_rca_completion().await;
+
+    Ok(())
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn handle_query_recommendations_triggers(
+    _trace_id: &str,
+    _trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    Ok(())
+}
+
+#[cfg(feature = "enterprise")]
+async fn handle_query_recommendations_triggers(
+    trace_id: &str,
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    use std::{
+        sync::Arc,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    use config::meta::triggers::TriggerStatus;
+
+    let cfg = get_config();
+    let query_recommendation_analysis_interval = cfg.limit.query_recommendation_analysis_interval;
+    let next_run_at = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Basic relative time")
+        .as_micros() as i64
+        + query_recommendation_analysis_interval * 1_000_000;
+
+    log::info!("[QUERY_RECOMMENDATIONS] Generating Query Recommendations. trace_id={trace_id}");
+
+    let query_recommendation_service = QueryRecommendationService {
+        ctx: Arc::new(QueryOptimizerContext),
+        query_recommendation_analysis_interval: cfg.limit.query_recommendation_analysis_interval,
+        query_recommendation_duration: cfg.limit.query_recommendation_duration,
+        query_recommendation_top_k: cfg.limit.query_recommendation_top_k,
+    };
+
+    let result = query_recommendation_service
+        .run()
+        .await
+        .inspect_err(|e| {
+            log::error!(
+                "[QUERY_RECOMMENDATIONS] Recommendation service stopped with an error: Error={:?}",
+                e
+            );
+        })
+        .inspect(|_| {
+            log::info!("[QUERY_RECOMMENDATIONS] Recommendation job completed successfully. trace_id={trace_id}");
+        });
+
+    // Always queue the next run, regardless of success or failure
+    let new_trigger = db::scheduler::Trigger {
+        status: TriggerStatus::Waiting,
+        retries: 3,
+        next_run_at,
+        ..trigger
+    };
+
+    db::scheduler::update_trigger(new_trigger, false, trace_id)
+        .await
+        .inspect_err(|e| {
+            log::error!(
+                "[QUERY_RECOMMENDATIONS] Failed to update QueryRecommendations trigger. e={:?}",
+                e
+            )
+        })?;
+
+    // If there was an error during generation, log it but don't prevent the next run from being
+    // queued
+    if let Err(e) = result {
+        log::error!(
+            "[QUERY_RECOMMENDATIONS] Query Recommendations Job operation encountered an error: e={:?}",
+            e
+        );
+        // Return Ok since the next run has been successfully queued
+    }
 
     Ok(())
 }
@@ -732,7 +1050,8 @@ async fn handle_report_triggers(
     trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let scheduler_trace_id = format!("{}/{}", trace_id, ider::generate_trace_id());
+    let query_trace_id = ider::generate_trace_id();
+    let scheduler_trace_id = format!("{trace_id}/{query_trace_id}");
     let (_, max_retries) = get_scheduler_max_retries();
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] Inside handle_report_trigger,org: {}, module_key: {}",
@@ -767,7 +1086,7 @@ async fn handle_report_triggers(
                 // next run at is after 5mins
                 let next_run_at = now + Duration::minutes(5).num_microseconds().unwrap();
                 new_trigger.next_run_at = next_run_at;
-                db::scheduler::update_trigger(new_trigger).await?;
+                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
             } else {
                 // Mark the trigger as failed
                 db::scheduler::update_status(
@@ -777,6 +1096,8 @@ async fn handle_report_triggers(
                     db::scheduler::TriggerStatus::Waiting,
                     trigger.retries + 1,
                     None,
+                    true,
+                    &query_trace_id,
                 )
                 .await?;
             }
@@ -801,9 +1122,8 @@ async fn handle_report_triggers(
                 query_took: None,
                 scheduler_trace_id: Some(scheduler_trace_id.clone()),
                 time_in_queue_ms: Some(Duration::microseconds(time_in_queue).num_milliseconds()),
-                skipped_alerts_count: None,
-            })
-            .await;
+                ..Default::default()
+            });
             return Err(anyhow::anyhow!(
                 "Error getting report: {report_id}, error: {e}"
             ));
@@ -815,12 +1135,21 @@ async fn handle_report_triggers(
     {
         if !is_org_in_free_trial_period(&trigger.org).await? {
             log::info!(
-                "skipping report {}  in org {} because free trial expiry",
+                "pausing report {}  in org {} because free trial expiry",
                 report_name,
                 trigger.org
             );
-            new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
-            db::scheduler::update_trigger(new_trigger).await?;
+            report.enabled = false;
+            if let Err(e) =
+                crate::service::dashboards::reports::enable(&report.org_id, &report.name, false)
+                    .await
+            {
+                log::error!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Failed to pause report due to trial expiry: {}/{} : {e}",
+                    &trigger.org,
+                    report_name
+                );
+            }
             return Ok(());
         }
     }
@@ -831,7 +1160,7 @@ async fn handle_report_triggers(
         );
         // update trigger, check on next week
         new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
-        db::scheduler::update_trigger(new_trigger).await?;
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
     let mut run_once = false;
@@ -894,6 +1223,11 @@ async fn handle_report_triggers(
             new_trigger.next_run_at,
             report.tz_offset,
             Some(frequency_seconds),
+            if report.timezone.is_empty() {
+                None
+            } else {
+                Some(&report.timezone)
+            },
         );
     }
 
@@ -922,7 +1256,7 @@ async fn handle_report_triggers(
         query_took: None,
         scheduler_trace_id: Some(scheduler_trace_id.clone()),
         time_in_queue_ms: Some(Duration::microseconds(time_in_queue).num_milliseconds()),
-        skipped_alerts_count: None,
+        ..Default::default()
     };
 
     if trigger.retries >= max_retries {
@@ -933,7 +1267,7 @@ async fn handle_report_triggers(
             org_id = &new_trigger.org,
             report_name = report_name
         );
-        db::scheduler::update_trigger(new_trigger).await?;
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
     match report.send_subscribers().await {
@@ -945,7 +1279,7 @@ async fn handle_report_triggers(
             if run_once {
                 new_trigger.status = db::scheduler::TriggerStatus::Completed;
             }
-            db::scheduler::update_trigger(new_trigger).await?;
+            db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
             log::debug!(
                 "[SCHEDULER trace_id {scheduler_trace_id}] Update trigger for report name: {report_name} id: {report_id}"
             );
@@ -962,7 +1296,7 @@ async fn handle_report_triggers(
                     "[SCHEDULER trace_id {scheduler_trace_id}] This report trigger: {org_id}/{report_name} has reached maximum possible retries"
                 );
                 trigger_data_stream.next_run_at = new_trigger.next_run_at;
-                db::scheduler::update_trigger(new_trigger).await?;
+                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
             } else {
                 if run_once {
                     report.enabled = true;
@@ -975,6 +1309,8 @@ async fn handle_report_triggers(
                     db::scheduler::TriggerStatus::Waiting,
                     trigger.retries + 1,
                     None,
+                    true,
+                    &query_trace_id,
                 )
                 .await?;
             }
@@ -987,7 +1323,7 @@ async fn handle_report_triggers(
         "[SCHEDULER trace_id {scheduler_trace_id}] publish_triggers_usage for report: {}",
         &trigger_data_stream.key
     );
-    publish_triggers_usage(trigger_data_stream).await;
+    publish_triggers_usage(trigger_data_stream);
 
     Ok(())
 }
@@ -1031,61 +1367,94 @@ async fn handle_derived_stream_triggers(
     } else {
         ScheduledTriggerData::from_json_string(&trigger.data).unwrap()
     };
-    let Ok(pipeline) = db::pipeline::get_by_id(&pipeline_id).await else {
-        let err_msg = format!(
-            "Pipeline associated with trigger not found: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after 5 mins."
+    // Try to get pipeline from cache first, fallback to database if not found
+    let pipeline = if let Some(cached_pipeline) =
+        db::pipeline::get_scheduled_pipeline_from_cache(&pipeline_id).await
+    {
+        log::debug!(
+            "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline {pipeline_id} found in cache"
         );
-        // Check after 5 mins if the pipeline is created
-        new_trigger.next_run_at += Duration::try_minutes(5)
-            .unwrap()
-            .num_microseconds()
-            .unwrap();
-        let trigger_data_stream = TriggerData {
-            _timestamp: now_micros(),
-            org: new_trigger.org.clone(),
-            module: TriggerDataType::DerivedStream,
-            key: new_trigger.module_key.clone(),
-            next_run_at: new_trigger.next_run_at,
-            is_realtime: new_trigger.is_realtime,
-            is_silenced: new_trigger.is_silenced,
-            status: TriggerDataStatus::Failed,
-            start_time: 0,
-            end_time: 0,
-            retries: new_trigger.retries,
-            error: Some(err_msg.clone()),
-            success_response: None,
-            is_partial: None,
-            delay_in_secs: None,
-            evaluation_took_in_secs: None,
-            source_node: Some(LOCAL_NODE.name.clone()),
-            query_took: None,
-            scheduler_trace_id: Some(scheduler_trace_id.clone()),
-            time_in_queue_ms: Some(time_in_queue),
-            skipped_alerts_count: None,
-        };
+        cached_pipeline
+    } else {
+        // Cache miss, try to fetch from database and cache it
+        log::debug!(
+            "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline {pipeline_id} not in cache, fetching from database"
+        );
+        match db::pipeline::get_by_id(&pipeline_id).await {
+            Ok(pipeline) => {
+                // Cache the pipeline for future use
+                db::pipeline::cache_scheduled_pipeline(&pipeline).await;
+                log::debug!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline {pipeline_id} fetched from database and cached"
+                );
+                pipeline
+            }
+            Err(_) => {
+                let err_msg = format!(
+                    "Pipeline associated with trigger not found: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after 5 mins."
+                );
+                // Check after 5 mins if the pipeline is created
+                new_trigger.next_run_at += Duration::try_minutes(5)
+                    .unwrap()
+                    .num_microseconds()
+                    .unwrap();
+                let trigger_data_stream = TriggerData {
+                    _timestamp: now_micros(),
+                    org: new_trigger.org.clone(),
+                    module: TriggerDataType::DerivedStream,
+                    key: new_trigger.module_key.clone(),
+                    next_run_at: new_trigger.next_run_at,
+                    is_realtime: new_trigger.is_realtime,
+                    is_silenced: new_trigger.is_silenced,
+                    status: TriggerDataStatus::Failed,
+                    start_time: 0,
+                    end_time: 0,
+                    retries: new_trigger.retries,
+                    error: Some(err_msg.clone()),
+                    success_response: None,
+                    is_partial: None,
+                    delay_in_secs: None,
+                    evaluation_took_in_secs: None,
+                    source_node: Some(LOCAL_NODE.name.clone()),
+                    query_took: None,
+                    scheduler_trace_id: Some(scheduler_trace_id.clone()),
+                    time_in_queue_ms: Some(time_in_queue),
+                    ..Default::default()
+                };
 
-        log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {err_msg}");
-        new_trigger_data.reset();
-        new_trigger.data = new_trigger_data.to_json_string();
-        db::scheduler::update_trigger(new_trigger).await?;
-        publish_triggers_usage(trigger_data_stream).await;
-        return Err(anyhow::anyhow!(
-            "[SCHEDULER trace_id {scheduler_trace_id}] {}",
-            err_msg
-        ));
+                log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {err_msg}");
+                new_trigger_data.reset();
+                new_trigger.data = new_trigger_data.to_json_string();
+                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                publish_triggers_usage(trigger_data_stream);
+                return Err(anyhow::anyhow!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] {}",
+                    err_msg
+                ));
+            }
+        }
     };
 
     #[cfg(feature = "cloud")]
     {
         if !is_org_in_free_trial_period(&trigger.org).await? {
             log::info!(
-                "[Scheduler trace_id {scheduler_trace_id}] Skipping pipeline {} id {} in org {} because free trial expiry",
+                "[Scheduler trace_id {scheduler_trace_id}] pausing pipeline {} id {} in org {} because free trial expiry",
                 pipeline.name,
                 pipeline_id,
                 trigger.org
             );
-            new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
-            db::scheduler::update_trigger(new_trigger).await?;
+
+            if let Err(e) =
+                crate::service::pipeline::enable_pipeline(&pipeline.org, &pipeline.id, false, false)
+                    .await
+            {
+                log::error!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Failed to pause pipeline due to trial expiry: {}/{} : {e}",
+                    &trigger.org,
+                    pipeline.name
+                );
+            }
             return Ok(());
         }
     }
@@ -1120,13 +1489,13 @@ async fn handle_derived_stream_triggers(
             query_took: None,
             scheduler_trace_id: Some(scheduler_trace_id.clone()),
             time_in_queue_ms: Some(time_in_queue),
-            skipped_alerts_count: None,
+            ..Default::default()
         };
         log::info!("[SCHEDULER trace_id {scheduler_trace_id}] {msg}");
         new_trigger_data.reset();
         new_trigger.data = new_trigger_data.to_json_string();
-        db::scheduler::update_trigger(new_trigger).await?;
-        publish_triggers_usage(trigger_data_stream).await;
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+        publish_triggers_usage(trigger_data_stream);
         return Ok(());
     }
 
@@ -1159,13 +1528,13 @@ async fn handle_derived_stream_triggers(
             query_took: None,
             scheduler_trace_id: Some(scheduler_trace_id.clone()),
             time_in_queue_ms: Some(time_in_queue),
-            skipped_alerts_count: None,
+            ..Default::default()
         };
         log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {err_msg}");
         new_trigger_data.reset();
         new_trigger.data = new_trigger_data.to_json_string();
-        db::scheduler::update_trigger(new_trigger).await?;
-        publish_triggers_usage(trigger_data_stream).await;
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+        publish_triggers_usage(trigger_data_stream);
         return Err(anyhow::anyhow!(
             "[SCHEDULER trace_id {scheduler_trace_id}] {}",
             err_msg
@@ -1197,11 +1566,18 @@ async fn handle_derived_stream_triggers(
             supposed_to_be_run_at,
             derived_stream.tz_offset,
             Some(derived_stream.trigger_condition.period * 60),
+            derived_stream.trigger_condition.timezone.as_deref(), /* Derived streams don't have
+                                                                   * timezone string yet */
         )
     } else {
         // For cron frequency, we don't need to align the end time as it is already aligned (the
         // cron crate takes care of it)
-        TriggerCondition::align_time(supposed_to_be_run_at, derived_stream.tz_offset, None)
+        TriggerCondition::align_time(
+            supposed_to_be_run_at,
+            derived_stream.tz_offset,
+            None,
+            derived_stream.trigger_condition.timezone.as_deref(),
+        )
     };
 
     let (mut start, mut end) = if derived_stream.start_at.is_some() && trigger.data.is_empty() {
@@ -1262,11 +1638,18 @@ async fn handle_derived_stream_triggers(
             end,
             derived_stream.tz_offset,
             Some(derived_stream.trigger_condition.period * 60),
+            derived_stream.trigger_condition.timezone.as_deref(), /* Derived streams don't have
+                                                                   * timezone string yet */
         )
     } else {
         // For cron frequency, we don't need to align the end time as it is already aligned (the
         // cron crate takes care of it)
-        TriggerCondition::align_time(end, derived_stream.tz_offset, None)
+        TriggerCondition::align_time(
+            end,
+            derived_stream.tz_offset,
+            None,
+            derived_stream.trigger_condition.timezone.as_deref(),
+        )
     };
 
     let mut trigger_data_stream = TriggerData {
@@ -1294,7 +1677,7 @@ async fn handle_derived_stream_triggers(
         query_took: None,
         scheduler_trace_id: Some(scheduler_trace_id.clone()),
         time_in_queue_ms: Some(time_in_queue),
-        skipped_alerts_count: None,
+        ..Default::default()
     };
 
     // conditionally modify supposed_to_be_run_at
@@ -1326,8 +1709,8 @@ async fn handle_derived_stream_triggers(
         trigger_data_stream.error = Some(format!(
             "Invalid timerange - start: {start_time}, end: {end}, should be fixed in the next run"
         ));
-        db::scheduler::update_trigger(new_trigger).await?;
-        publish_triggers_usage(trigger_data_stream).await;
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+        publish_triggers_usage(trigger_data_stream);
         return Ok(());
     }
 
@@ -1350,7 +1733,7 @@ async fn handle_derived_stream_triggers(
         )?;
         // Start over next time
         new_trigger.retries = 0;
-        db::scheduler::update_trigger(new_trigger).await?;
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
 
@@ -1624,7 +2007,7 @@ async fn handle_derived_stream_triggers(
     trigger_data_stream.next_run_at = new_trigger.next_run_at;
 
     // publish the triggers as stream
-    publish_triggers_usage(trigger_data_stream).await;
+    publish_triggers_usage(trigger_data_stream);
 
     // If it reaches max retries, go to the next nun at, but use the same trigger start time
     if new_trigger.retries >= max_retries {
@@ -1652,7 +2035,7 @@ async fn handle_derived_stream_triggers(
         new_trigger.retries = 0; // start over
     }
 
-    if let Err(e) = db::scheduler::update_trigger(new_trigger).await {
+    if let Err(e) = db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await {
         log::warn!(
             "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline({}/{})]: DerivedStream's new trigger failed to be updated, caused by {}",
             &pipeline.org,
@@ -1789,6 +2172,7 @@ mod tests {
             delay,
             align_time,
             now,
+            None,
         );
 
         // Should have skipped timestamps for 5:00, 5:05, 5:10
@@ -1818,6 +2202,7 @@ mod tests {
             delay,
             align_time,
             now,
+            None,
         );
 
         // Should have skipped timestamps for 5:00, 5:05, 5:10
@@ -1847,6 +2232,7 @@ mod tests {
             delay,
             align_time,
             now,
+            None,
         );
 
         // When align_time is true and there are skipped timestamps,
@@ -1876,6 +2262,7 @@ mod tests {
             delay,
             align_time,
             now,
+            None,
         );
 
         // Should still work with timezone offset
@@ -1902,6 +2289,7 @@ mod tests {
             delay,
             align_time,
             now,
+            None,
         );
 
         // Should have no skipped timestamps when delay is 0
@@ -1928,6 +2316,7 @@ mod tests {
             delay,
             align_time,
             now,
+            None,
         );
 
         // Should have many skipped timestamps (60 minutes worth)
@@ -1956,6 +2345,7 @@ mod tests {
                 delay,
                 align_time,
                 now,
+                None,
             )
         });
 
@@ -1981,6 +2371,7 @@ mod tests {
             delay,
             align_time,
             now,
+            None,
         );
 
         assert!(skipped_timestamps.is_empty());
@@ -2006,6 +2397,7 @@ mod tests {
             delay,
             align_time,
             now,
+            None,
         );
 
         // Should have some skipped timestamps

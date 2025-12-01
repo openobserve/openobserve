@@ -31,7 +31,7 @@ use config::{
     utils::{
         inverted_index::convert_parquet_file_name_to_tantivy_file,
         size::bytes_to_human_readable,
-        tantivy::tokenizer::{O2_TOKENIZER, o2_tokenizer_build},
+        tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
         time::BASE_TIME,
     },
 };
@@ -50,14 +50,12 @@ use tokio_stream::StreamExt as _;
 use tracing::Instrument;
 
 use crate::service::{
-    db, file_list,
+    file_list,
     search::{
         datafusion::exec::TableBuilder,
-        generate_search_schema_diff,
         grpc::{
             tantivy_result::{TantivyMultiResult, TantivyMultiResultBuilder, TantivyResult},
             tantivy_result_cache::{self, CacheEntry},
-            utils,
         },
         index::IndexCondition,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
@@ -82,39 +80,9 @@ pub async fn search(
     mut fst_fields: Vec<String>,
     idx_optimize_rule: Option<IndexOptimizeMode>,
 ) -> super::SearchTable {
+    let trace_id = &query.trace_id;
     let enter_span = tracing::span::Span::current();
-    log::info!("[trace_id {}] search->storage: enter", query.trace_id);
-    // fetch all schema versions, group files by version
-    let schema_versions = match infra::schema::get_versions(
-        &query.org_id,
-        &query.stream_name,
-        query.stream_type,
-        query.time_range,
-    )
-    .instrument(enter_span.clone())
-    .await
-    {
-        Ok(versions) => versions,
-        Err(err) => {
-            log::error!("[trace_id {}] get schema error: {}", query.trace_id, err);
-            return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
-                query.stream_name.clone(),
-            )));
-        }
-    };
-    log::info!(
-        "[trace_id {}] search->storage: stream {}/{}/{}, get schema versions num {}",
-        query.trace_id,
-        query.org_id,
-        query.stream_type,
-        query.stream_name,
-        schema_versions.len()
-    );
-    if schema_versions.is_empty() {
-        return Ok((vec![], ScanStats::new()));
-    }
-    let latest_schema_id = schema_versions.len() - 1;
-
+    log::info!("[trace_id {trace_id}] search->storage: enter");
     // get file list
     let mut files = file_list.to_vec();
     if files.is_empty() {
@@ -122,8 +90,7 @@ pub async fn search(
     }
     let original_files_len = files.len();
     log::info!(
-        "[trace_id {}] search->storage: stream {}/{}/{}, load file_list num {}",
-        query.trace_id,
+        "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load file_list num {}",
         query.org_id,
         query.stream_type,
         query.stream_name,
@@ -145,13 +112,11 @@ pub async fn search(
             "{}",
             search_inspector_fields(
                 format!(
-                    "[trace_id {}] search->storage: stream {}/{}/{}, inverted index reduced file_list num to {} in {} ms",
-                    query.trace_id,
+                    "[trace_id {trace_id}] search->storage: stream {}/{}/{}, inverted index reduced file_list num to {} in {idx_took} ms",
                     query.org_id,
                     query.stream_type,
                     query.stream_name,
                     files.len(),
-                    idx_took
                 ),
                 SearchInspectorFieldsBuilder::new()
                     .node_name(LOCAL_NODE.name.clone())
@@ -174,59 +139,18 @@ pub async fn search(
     }
 
     let cfg = get_config();
-    let mut files_group: HashMap<usize, Vec<FileKey>> =
-        HashMap::with_capacity(schema_versions.len());
-    let mut scan_stats = ScanStats::new();
-    if schema_versions.len() == 1 {
-        let files = files.to_vec();
-        scan_stats = match file_list::calculate_files_size(&files).await {
-            Ok(size) => size,
-            Err(err) => {
-                log::error!(
-                    "[trace_id {}] calculate files size error: {err}",
-                    query.trace_id
-                );
-                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                    "calculate files size error".to_string(),
-                )));
-            }
-        };
-        files_group.insert(latest_schema_id, files);
-    } else {
-        scan_stats.files = files.len() as i64;
-        for file in files.iter() {
-            // calculate scan size
-            scan_stats.records += file.meta.records;
-            scan_stats.original_size += file.meta.original_size;
-            scan_stats.compressed_size += file.meta.compressed_size;
-            scan_stats.idx_scan_size += file.meta.index_size;
-            // check schema version
-            let schema_ver_id = match db::schema::filter_schema_version_id(
-                &schema_versions,
-                file.meta.min_ts,
-                file.meta.max_ts,
-            ) {
-                Some(id) => id,
-                None => {
-                    log::error!(
-                        "[trace_id {}] search->storage: file {} schema version not found, will use the latest schema, min_ts: {}, max_ts: {}",
-                        query.trace_id,
-                        &file.key,
-                        file.meta.min_ts,
-                        file.meta.max_ts
-                    );
-                    // HACK: use the latest version if not found in schema versions
-                    latest_schema_id
-                }
-            };
-            let group = files_group.entry(schema_ver_id).or_default();
-            group.push(file.clone());
+    let mut scan_stats = match file_list::calculate_files_size(&files).await {
+        Ok(size) => size,
+        Err(err) => {
+            log::error!("[trace_id {trace_id}] calculate files size error: {err}",);
+            return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                "calculate files size error".to_string(),
+            )));
         }
-    }
+    };
 
     log::info!(
-        "[trace_id {}] search->storage: stream {}/{}/{}, load files {}, scan_size {}, compressed_size {}",
-        query.trace_id,
+        "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load files {}, scan_size {}, compressed_size {}",
         query.org_id,
         query.stream_type,
         query.stream_name,
@@ -283,8 +207,7 @@ pub async fn search(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {}] search->storage: stream {}/{}/{}, load files {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
-                query.trace_id,
+                "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load files {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
                 query.org_id,
                 query.stream_type,
                 query.stream_name,
@@ -324,52 +247,34 @@ pub async fn search(
         cfg.limit.cpu_num
     };
 
-    // construct latest schema map
-    let latest_schema = Arc::new(schema.as_ref().clone().with_metadata(Default::default()));
-    let mut latest_schema_map = HashMap::with_capacity(latest_schema.fields().len());
-    for field in latest_schema.fields() {
-        latest_schema_map.insert(field.name(), field);
-    }
-
-    let mut tables = Vec::new();
     let start = std::time::Instant::now();
-    for (ver, files) in files_group {
-        if files.is_empty() {
-            continue;
-        }
-        let schema = schema_versions[ver]
-            .clone()
-            .with_metadata(Default::default());
-        let schema = utils::change_schema_to_utf8_view(schema);
 
-        let session = config::meta::search::Session {
-            id: format!("{}-storage-{ver}", query.trace_id),
-            storage_type: StorageType::Memory,
-            work_group: query.work_group.clone(),
-            target_partitions,
-        };
+    let session = config::meta::search::Session {
+        id: format!("{trace_id}-storage"),
+        storage_type: StorageType::Memory,
+        work_group: query.work_group.clone(),
+        target_partitions,
+    };
 
-        log::debug!("search->storage: session target_partitions: {target_partitions}");
+    log::debug!("search->storage: session target_partitions: {target_partitions}");
 
-        let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map);
-        let table = TableBuilder::new()
-            .rules(diff_fields)
-            .sorted_by_time(sorted_by_time)
-            .file_stat_cache(file_stat_cache.clone())
-            .index_condition(index_condition.clone())
-            .fst_fields(fst_fields.clone())
-            .need_optimize_partition(true)
-            .build(session, &files, latest_schema.clone())
-            .await?;
-        tables.push(table);
-    }
+    let table = TableBuilder::new()
+        .sorted_by_time(sorted_by_time)
+        .file_stat_cache(file_stat_cache.clone())
+        .index_condition(index_condition.clone())
+        .fst_fields(fst_fields.clone())
+        .build(
+            session,
+            files,
+            Arc::new(schema.as_ref().clone().with_metadata(Default::default())),
+        )
+        .await?;
 
     log::info!(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {}] search->storage: create tables took: {} ms",
-                query.trace_id,
+                "[trace_id {trace_id}] search->storage: create tables took: {} ms",
                 start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
@@ -380,7 +285,7 @@ pub async fn search(
                 .build()
         )
     );
-    Ok((tables, scan_stats))
+    Ok((vec![table], scan_stats))
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]
@@ -784,7 +689,7 @@ pub async fn tantivy_search(
                 .search_role("follower".to_string())
                 .duration(search_start.elapsed().as_millis() as usize)
                 .desc(format!(
-                    "found {} , is_add_filter_back: {}, file_num: {}",
+                    "found {}, is_add_filter_back: {}, file_num: {}",
                     tantivy_result,
                     is_add_filter_back,
                     file_list_map.len(),
@@ -867,7 +772,7 @@ async fn search_tantivy_index(
     let index = tantivy::Index::open(reader_directory)?;
     index
         .tokenizers()
-        .register(O2_TOKENIZER, o2_tokenizer_build());
+        .register(O2_TOKENIZER, o2_tokenizer_build(CollectType::Search));
     let reader = index
         .reader_builder()
         .reload_policy(tantivy::ReloadPolicy::Manual)

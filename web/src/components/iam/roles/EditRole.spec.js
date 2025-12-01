@@ -160,7 +160,8 @@ describe('EditRole - basic rendering', () => {
   it('renders page and title with role name', async () => {
     const wrapper = await mountEditRole();
     expect(wrapper.find('[data-test="edit-role-page"]').exists()).toBe(true);
-    expect(wrapper.get('[data-test="edit-role-title"]').text()).toBe('Admin');
+    // The title div contains both the role name and tabs, so we check if it includes the role name
+    expect(wrapper.get('[data-test="edit-role-title"]').text()).toContain('Admin');
   });
 
   it('renders tabs component', async () => {

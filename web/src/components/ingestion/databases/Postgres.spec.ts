@@ -123,18 +123,6 @@ describe('Postgres.vue Comprehensive Coverage', () => {
   };
 
   describe('Component Rendering Tests', () => {
-    it('should render the component correctly', () => {
-      wrapper = createWrapper();
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('.q-ma-md').exists()).toBe(true);
-    });
-
-    it('should render with correct CSS classes', () => {
-      wrapper = createWrapper();
-      expect(wrapper.find('.q-ma-md').exists()).toBe(true);
-      expect(wrapper.find('.tw-text-\\[16px\\]').exists()).toBe(true);
-      expect(wrapper.find('.tw-font-bold').exists()).toBe(true);
-    });
 
     it('should render CopyContent component', () => {
       wrapper = createWrapper();
@@ -165,11 +153,6 @@ describe('Postgres.vue Comprehensive Coverage', () => {
       expect(docText.text()).toContain('to check further documentation.');
     });
 
-    it('should render with proper component structure', () => {
-      wrapper = createWrapper();
-      expect(wrapper.find('.q-ma-md > .tw-text-\\[16px\\]').exists()).toBe(true);
-      expect(wrapper.find('.tw-font-bold.tw-pt-6.tw-pb-2').exists()).toBe(true);
-    });
   });
 
   describe('Props Validation Tests', () => {
@@ -451,21 +434,6 @@ describe('Postgres.vue Comprehensive Coverage', () => {
   });
 
   describe('Template Integration Tests', () => {
-    it('should render all template elements correctly', () => {
-      wrapper = createWrapper();
-      
-      expect(wrapper.find('.q-ma-md').exists()).toBe(true);
-      expect(wrapper.find('.tw-text-\\[16px\\]').exists()).toBe(true);
-      expect(wrapper.find('.q-mt-sm').exists()).toBe(true);
-      expect(wrapper.find('.tw-font-bold.tw-pt-6.tw-pb-2').exists()).toBe(true);
-    });
-
-    it('should pass correct CSS classes', () => {
-      wrapper = createWrapper();
-      const copyContent = wrapper.findComponent(CopyContent);
-      
-      expect(copyContent.classes()).toContain('q-mt-sm');
-    });
 
     it('should render documentation link with correct attributes', () => {
       wrapper = createWrapper();

@@ -81,6 +81,16 @@ Object.defineProperty(Element.prototype, 'removeChild', {
   value: vi.fn(),
 });
 
+Object.defineProperty(Element.prototype, 'addEventListener', {
+  writable: true,
+  value: vi.fn(),
+});
+
+Object.defineProperty(Element.prototype, 'removeEventListener', {
+  writable: true,
+  value: vi.fn(),
+});
+
 Object.defineProperty(Node.prototype, 'insertBefore', {
   writable: true,
   value: vi.fn(),
@@ -192,6 +202,8 @@ describe("Dashboards.vue", () => {
       insertBefore: vi.fn(),
       appendChild: vi.fn(),
       removeChild: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
       click: vi.fn(),
       style: {},
       classList: {

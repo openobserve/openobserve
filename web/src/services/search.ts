@@ -223,7 +223,10 @@ const search = {
     tab_id?: string;
     tab_name?: string;
   }) => {
-    let url = `/api/${org_identifier}/prometheus/api/v1/query_range?start=${start_time}&end=${end_time}&step=${step}&query=${encodeURIComponent(
+    const use_cache = (window as any).use_cache !== undefined
+      ? (window as any).use_cache
+      : true;
+    let url = `/api/${org_identifier}/prometheus/api/v1/query_range?use_cache=${use_cache}&start=${start_time}&end=${end_time}&step=${step}&query=${encodeURIComponent(
       query,
     )}`;
     if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;

@@ -107,8 +107,7 @@ describe("Curl", () => {
 
     it("should have correct component structure", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('.q-ma-md').exists()).toBe(true);
-      expect(wrapper.find('.q-mt-sm').exists()).toBe(true);
+      expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
     });
   });
 
@@ -224,8 +223,8 @@ describe("Curl", () => {
     it("should include JSON data structure", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.content).toContain('_json');
-      expect(wrapper.vm.content).toContain('level":"info"');
-      expect(wrapper.vm.content).toContain('job":"test"');
+      expect(wrapper.vm.content).toContain('\\"level\\":\\"info\\"');
+      expect(wrapper.vm.content).toContain('\\"job\\":\\"test\\"');
     });
 
     it("should include proper curl flags", () => {
@@ -237,10 +236,12 @@ describe("Curl", () => {
 
     it("should generate valid JSON payload", () => {
       wrapper = createWrapper();
-      const jsonMatch = wrapper.vm.content.match(/-d '(\[.*\])'/);
+      const jsonMatch = wrapper.vm.content.match(/-d "(\[.*\])"/);
       expect(jsonMatch).toBeTruthy();
       if (jsonMatch) {
-        expect(() => JSON.parse(jsonMatch[1])).not.toThrow();
+        // Unescape the JSON string before parsing
+        const unescapedJson = jsonMatch[1].replace(/\\"/g, '"');
+        expect(() => JSON.parse(unescapedJson)).not.toThrow();
       }
     });
   });
@@ -292,7 +293,7 @@ describe("Curl", () => {
 
     it("should render CopyContent with correct classes", () => {
       wrapper = createWrapper();
-      const copyContentContainer = wrapper.find('.q-mt-sm');
+      const copyContentContainer = wrapper.find('.copy-content-container-cls');
       expect(copyContentContainer.exists()).toBe(true);
     });
   });
@@ -343,7 +344,7 @@ describe("Curl", () => {
   describe("Template Rendering", () => {
     it("should render main container with correct classes", () => {
       wrapper = createWrapper();
-      const container = wrapper.find('.q-ma-md');
+      const container = wrapper.find('.q-pa-sm');
       expect(container.exists()).toBe(true);
     });
 
@@ -360,7 +361,7 @@ describe("Curl", () => {
       const content = wrapper.vm.content;
       expect(content).toMatch(/curl\s+-u\s+\[EMAIL\]:\[PASSCODE\]/);
       expect(content).toMatch(/-k\s+http/);
-      expect(content).toMatch(/-d\s+'\[.*\]'/);
+      expect(content).toMatch(/-d\s+"\[.*\]"/);
     });
 
     it("should include proper API endpoint path", () => {
@@ -371,11 +372,13 @@ describe("Curl", () => {
     it("should have valid JSON structure in curl data", () => {
       wrapper = createWrapper();
       const content = wrapper.vm.content;
-      const jsonMatch = content.match(/-d '(\[.*\])'/);
+      const jsonMatch = content.match(/-d "(\[.*\])"/);
       expect(jsonMatch).toBeTruthy();
-      
+
       if (jsonMatch) {
-        const jsonData = JSON.parse(jsonMatch[1]);
+        // Unescape the JSON string before parsing
+        const unescapedJson = jsonMatch[1].replace(/\\"/g, '"');
+        const jsonData = JSON.parse(unescapedJson);
         expect(Array.isArray(jsonData)).toBe(true);
         expect(jsonData[0]).toHaveProperty('level');
         expect(jsonData[0]).toHaveProperty('job');

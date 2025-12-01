@@ -71,7 +71,7 @@ impl TableProvider for NewUnionTable {
             table_plans.push(plan);
         }
 
-        Ok(Arc::new(UnionExec::new(table_plans)))
+        Ok(UnionExec::try_new(table_plans)?)
     }
 
     fn supports_filters_pushdown(

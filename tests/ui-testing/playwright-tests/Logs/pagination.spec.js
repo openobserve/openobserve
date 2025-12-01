@@ -100,10 +100,10 @@ test.describe("Pagination for logs", () => {
 
     test("Enable Streaming for running query to validate WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl')", async ({ page }) => {
 
-        await pageManager.managementPage.goToManagement();
+        // await pageManager.managementPage.goToManagement();
         // Strategic 2000ms wait for complex operation - this is functionally necessary
         await page.waitForTimeout(2000);
-        await pageManager.managementPage.checkStreaming();
+        // await pageManager.managementPage.checkStreaming();
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
         testLogger.debug('Stream name generated', { streamName });
@@ -121,10 +121,10 @@ test.describe("Pagination for logs", () => {
 
     test("Enable Streaming for running query to validate WHERE match_all('zin*')", async ({ page }) => {
 
-        await pageManager.managementPage.goToManagement();
+        // await pageManager.managementPage.goToManagement();
         // Strategic 2000ms wait for complex operation - this is functionally necessary
         await page.waitForTimeout(2000);
-        await pageManager.managementPage.checkStreaming();
+        // await pageManager.managementPage.checkStreaming();
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
         testLogger.debug('Stream name generated', { streamName });
@@ -142,10 +142,10 @@ test.describe("Pagination for logs", () => {
 
     test("Enable Streaming for running query to validate WHERE match_all('2022-12-27T1*')", async ({ page }) => {
 
-        await pageManager.managementPage.goToManagement();
+        // await pageManager.managementPage.goToManagement();
         // Strategic 2000ms wait for complex operation - this is functionally necessary
         await page.waitForTimeout(2000);
-        await pageManager.managementPage.checkStreaming();
+        // await pageManager.managementPage.checkStreaming();
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
         testLogger.debug('Stream name generated', { streamName });
@@ -163,10 +163,10 @@ test.describe("Pagination for logs", () => {
 
     test("Enable Streaming for running query to validate WHERE match_all('2022-12-27T14:11:2*')", async ({ page }) => {
 
-        await pageManager.managementPage.goToManagement();
+        // await pageManager.managementPage.goToManagement();
         // Strategic 2000ms wait for complex operation - this is functionally necessary
         await page.waitForTimeout(2000);
-        await pageManager.managementPage.checkStreaming();
+        // await pageManager.managementPage.checkStreaming();
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
         testLogger.debug('Stream name generated', { streamName });
@@ -184,10 +184,10 @@ test.describe("Pagination for logs", () => {
 
     test("Enable Streaming for running query to validate pagination is not visible WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl') limit`", async ({ page }) => {
 
-        await pageManager.managementPage.goToManagement();
+        // await pageManager.managementPage.goToManagement();
         // Strategic 2000ms wait for complex operation - this is functionally necessary
         await page.waitForTimeout(2000);
-        await pageManager.managementPage.checkStreaming();
+        // await pageManager.managementPage.checkStreaming();
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
         testLogger.debug('Stream name generated', { streamName });
@@ -201,6 +201,6 @@ test.describe("Pagination for logs", () => {
     });
     
     test.afterEach(async ({ page }) => {
-        await pageManager.commonActions.flipStreaming();
+        // await pageManager.commonActions.flipStreaming();
     });
 });

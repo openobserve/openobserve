@@ -45,7 +45,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="alert-variables-add-btn"
           size="sm"
           class="text-bold no-border o2-secondary-button tw-h-[36px]"
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           flat
           no-caps
           @click="addVariable"
@@ -66,12 +65,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-input
             data-test="alert-variables-key-input"
             v-model="variable.key"
-            color="input-border"
-            :class="store.state.theme === 'dark' ? 'input-bg-dark' : 'input-bg-light'"
             stack-label
-          
-            outlined
-            filled
+            borderless
             :placeholder="t('common.name')"
             dense
             tabindex="0"
@@ -82,11 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-variables-value-input"
             v-model="variable.value"
             :placeholder="t('common.value')"
-            color="input-border"
-            :class="store.state.theme === 'dark' ? 'input-bg-dark' : 'input-bg-light'"
             stack-label
-            outlined
-            filled
+            borderless
             dense
             isUpdatingDestination
             tabindex="0"

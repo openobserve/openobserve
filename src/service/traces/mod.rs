@@ -13,7 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::Error, sync::Arc, time::Instant};
+use std::{
+    collections::{HashMap, HashSet},
+    io::Error,
+    sync::Arc,
+    time::Instant,
+};
 
 use actix_web::{HttpResponse, http, web};
 use bytes::BytesMut;
@@ -29,7 +34,6 @@ use config::{
     metrics,
     utils::{flatten, json, schema_ext::SchemaExt, time::now_micros},
 };
-use hashbrown::HashSet;
 use infra::schema::{SchemaCache, unwrap_partition_time_level};
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
@@ -40,6 +44,8 @@ use opentelemetry_proto::tonic::{
 };
 use prost::Message;
 use serde_json::Map;
+
+pub mod service_graph;
 
 #[cfg(feature = "cloud")]
 use crate::service::stream::get_stream;
@@ -84,6 +90,7 @@ pub async fn otlp_proto(
     org_id: &str,
     body: web::Bytes,
     in_stream_name: Option<&str>,
+    user_email: &str,
 ) -> Result<HttpResponse, Error> {
     let request = match ExportTraceServiceRequest::decode(body) {
         Ok(v) => v,
@@ -100,6 +107,7 @@ pub async fn otlp_proto(
         request,
         OtlpRequestType::HttpProtobuf,
         in_stream_name,
+        user_email,
     )
     .await
     {
@@ -117,6 +125,7 @@ pub async fn otlp_json(
     org_id: &str,
     body: web::Bytes,
     in_stream_name: Option<&str>,
+    user_email: &str,
 ) -> Result<HttpResponse, Error> {
     let request = match serde_json::from_slice::<ExportTraceServiceRequest>(body.as_ref()) {
         Ok(req) => req,
@@ -128,7 +137,15 @@ pub async fn otlp_json(
             )));
         }
     };
-    match handle_otlp_request(org_id, request, OtlpRequestType::HttpJson, in_stream_name).await {
+    match handle_otlp_request(
+        org_id,
+        request,
+        OtlpRequestType::HttpJson,
+        in_stream_name,
+        user_email,
+    )
+    .await
+    {
         Ok(v) => Ok(v),
         Err(e) => {
             log::error!("[TRACES:OTLP] Error while handling http trace request: {e}");
@@ -142,6 +159,7 @@ pub async fn handle_otlp_request(
     request: ExportTraceServiceRequest,
     req_type: OtlpRequestType,
     in_stream_name: Option<&str>,
+    user_email: &str,
 ) -> Result<HttpResponse, Error> {
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None).await {
@@ -205,6 +223,24 @@ pub async fn handle_otlp_request(
     .await;
     let mut stream_pipeline_inputs = Vec::new();
     // End pipeline params construction
+
+    // Start get user defined schema
+    let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
+    let mut streams_need_original_map: HashMap<String, bool> = HashMap::new();
+    let mut streams_need_all_values_map: HashMap<String, bool> = HashMap::new();
+    let streams = vec![StreamParams {
+        org_id: org_id.to_owned().into(),
+        stream_type: StreamType::Traces,
+        stream_name: traces_stream_name.to_owned().into(),
+    }];
+    crate::service::ingestion::get_uds_and_original_data_streams(
+        &streams,
+        &mut user_defined_schema_map,
+        &mut streams_need_original_map,
+        &mut streams_need_all_values_map,
+    )
+    .await;
+    // End get user defined schema
 
     let mut service_name: String = traces_stream_name.to_string();
     let res_spans = request.resource_spans;
@@ -343,21 +379,68 @@ pub async fn handle_otlp_request(
                 }
                 let local_val = Span {
                     trace_id: trace_id.clone(),
-                    span_id,
+                    span_id: span_id.clone(),
                     span_kind: span.kind.to_string(),
-                    span_status: get_span_status(span.status),
+                    span_status: get_span_status(span.status.clone()),
                     operation_name: span.name.clone(),
                     start_time,
                     end_time,
                     duration: (end_time - start_time) / 1000, // microseconds
-                    reference: span_ref,
+                    reference: span_ref.clone(),
                     service_name: service_name.clone(),
-                    attributes: span_att_map,
+                    attributes: span_att_map.clone(),
                     service: service_att_map.clone(),
                     flags: 1, // TODO add appropriate value
                     events: json::to_string(&events).unwrap(),
                     links: json::to_string(&links).unwrap(),
                 };
+
+                // Process span for service graph if enabled
+                #[cfg(feature = "enterprise")]
+                if o2_enterprise::enterprise::common::config::get_config()
+                    .service_graph
+                    .enabled
+                {
+                    // Wrap in catch_unwind to prevent panics from crashing trace ingestion
+                    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        log::trace!(
+                            "[ServiceGraph] Processing span: trace_id={}, span_id={}",
+                            trace_id,
+                            span_id
+                        );
+                        let parent_span_id_opt =
+                            span_ref.get(PARENT_SPAN_ID).map(|s| Arc::from(s.as_str()));
+                        // Convert HashMap to json::Map
+                        let mut attrs_map = json::Map::new();
+                        for (k, v) in &span_att_map {
+                            attrs_map.insert(k.clone(), v.clone());
+                        }
+                        let graph_span = service_graph::span_to_graph_span(
+                            Arc::from(trace_id.as_str()),
+                            Arc::from(span_id.as_str()),
+                            parent_span_id_opt,
+                            Arc::from(service_name.as_str()),
+                            Arc::from(traces_stream_name.as_str()),
+                            &local_val.span_kind,
+                            start_time,
+                            end_time,
+                            &local_val.span_status,
+                            &attrs_map,
+                        );
+                        service_graph::process_span(org_id, graph_span);
+                    }));
+
+                    if let Err(e) = result {
+                        log::error!(
+                            "[ServiceGraph] Panic caught during span processing: {:?}",
+                            e
+                        );
+                        // Increment error metric
+                        service_graph::SERVICE_GRAPH_DROPPED_SPANS
+                            .with_label_values(&[org_id])
+                            .inc();
+                    }
+                }
 
                 let mut value: json::Value = json::to_value(local_val).unwrap();
                 // add timestamp
@@ -375,7 +458,7 @@ pub async fn handle_otlp_request(
                     })?;
 
                     // get json object
-                    let record_val = match value.take() {
+                    let mut record_val = match value.take() {
                         json::Value::Object(v) => v,
                         _ => {
                             log::error!(
@@ -391,6 +474,10 @@ pub async fn handle_otlp_request(
                             ));
                         }
                     };
+
+                    if let Some(Some(fields)) = user_defined_schema_map.get(&traces_stream_name) {
+                        record_val = crate::service::ingestion::refactor_map(record_val, fields);
+                    }
 
                     let (ts_data, _) = json_data_by_stream
                         .entry(traces_stream_name.to_string())
@@ -432,7 +519,7 @@ pub async fn handle_otlp_request(
 
                     for (_idx, mut res) in stream_pl_results {
                         // get json object
-                        let record_val = match res.take() {
+                        let mut record_val = match res.take() {
                             json::Value::Object(v) => v,
                             _ => {
                                 log::error!(
@@ -449,6 +536,13 @@ pub async fn handle_otlp_request(
                                     )));
                             }
                         };
+
+                        if let Some(Some(fields)) =
+                            user_defined_schema_map.get(&stream_params.stream_name.to_string())
+                        {
+                            record_val =
+                                crate::service::ingestion::refactor_map(record_val, fields);
+                        }
 
                         log::debug!(
                             "[TRACES:OTLP] pipeline result for stream: {} got {} records",
@@ -481,13 +575,28 @@ pub async fn handle_otlp_request(
         return format_response(partial_success, req_type);
     }
 
-    if let Err(e) = write_traces_by_stream(org_id, (started_at, &start), json_data_by_stream).await
+    if let Err(e) = write_traces_by_stream(
+        org_id,
+        (started_at, &start),
+        json_data_by_stream,
+        user_email,
+    )
+    .await
     {
         log::error!("Error while writing traces: {e}");
-        return Ok(HttpResponse::InternalServerError()
+        // Check if this is a schema validation error (InvalidData)
+        let (status_code, mut http_status) = if e.kind() == std::io::ErrorKind::InvalidData {
+            (http::StatusCode::BAD_REQUEST, HttpResponse::BadRequest())
+        } else {
+            (
+                http::StatusCode::INTERNAL_SERVER_ERROR,
+                HttpResponse::InternalServerError(),
+            )
+        };
+        return Ok(http_status
             .append_header((ERROR_HEADER, format!("error while writing trace data: {e}")))
             .json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR,
+                status_code,
                 format!("error while writing trace data: {e}"),
             )));
     }
@@ -511,11 +620,13 @@ pub async fn handle_otlp_request(
 /// This ingestion handler is designated to ScheduledPipeline's gPRC ingestion service.
 /// Only accepts data that has already been validated against the otlp protocol.
 /// Please use other ingestion handlers when ingesting raw trace data.
+/// For internal service only, so don't need to check UDS
 pub async fn ingest_json(
     org_id: &str,
     body: web::Bytes,
     req_type: OtlpRequestType,
     traces_stream_name: &str,
+    user_email: &str,
 ) -> Result<HttpResponse, Error> {
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None).await {
@@ -617,13 +728,28 @@ pub async fn ingest_json(
         return format_response(partial_success, req_type);
     }
 
-    if let Err(e) = write_traces_by_stream(org_id, (started_at, &start), json_data_by_stream).await
+    if let Err(e) = write_traces_by_stream(
+        org_id,
+        (started_at, &start),
+        json_data_by_stream,
+        user_email,
+    )
+    .await
     {
         log::error!("Error while writing traces: {e}");
-        return Ok(HttpResponse::InternalServerError()
+        // Check if this is a schema validation error (InvalidData)
+        let (status_code, mut http_status) = if e.kind() == std::io::ErrorKind::InvalidData {
+            (http::StatusCode::BAD_REQUEST, HttpResponse::BadRequest())
+        } else {
+            (
+                http::StatusCode::INTERNAL_SERVER_ERROR,
+                HttpResponse::InternalServerError(),
+            )
+        };
+        return Ok(http_status
             .append_header((ERROR_HEADER, format!("error while writing trace data: {e}")))
             .json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR,
+                status_code,
                 format!("error while writing trace data: {e}"),
             )));
     }
@@ -693,6 +819,7 @@ async fn write_traces_by_stream(
     org_id: &str,
     time_stats: (i64, &Instant),
     json_data_by_stream: HashMap<String, O2IngestJsonData>,
+    user_email: &str,
 ) -> Result<(), Error> {
     for (traces_stream_name, (json_data, fn_num)) in json_data_by_stream {
         // for cloud, we want to sent event when user creates a new stream
@@ -725,6 +852,11 @@ async fn write_traces_by_stream(
         };
         let time = time_stats.1.elapsed().as_secs_f64();
         req_stats.response_time = time;
+        req_stats.user_email = if user_email.is_empty() {
+            None
+        } else {
+            Some(user_email.to_string())
+        };
         // metric + data usage
         report_request_usage_stats(
             req_stats,
@@ -799,7 +931,7 @@ async fn write_traces(
 
     // Start check for schema
     let min_timestamp = json_data.iter().map(|(ts, _)| ts).min().unwrap();
-    let _ = check_for_schema(
+    let (_schema_evolution, _infer_schema) = check_for_schema(
         org_id,
         stream_name,
         StreamType::Traces,
@@ -808,7 +940,8 @@ async fn write_traces(
         *min_timestamp,
         false, // is_derived is false for traces
     )
-    .await;
+    .await
+    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
     let record_schema = traces_schema_map
         .get(stream_name)
         .unwrap()
@@ -918,6 +1051,7 @@ async fn write_traces(
     let writer = ingester::get_writer(0, org_id, StreamType::Traces.as_str(), stream_name).await;
     let req_stats = write_file(
         &writer,
+        org_id,
         stream_name,
         data_buf,
         !cfg.common.wal_fsync_disabled,
@@ -938,7 +1072,8 @@ async fn write_traces(
     }
 
     // send trace metadata
-    if !trace_index_values.is_empty()
+    if cfg.common.traces_list_index_enabled
+        && !trace_index_values.is_empty()
         && let Err(e) = write(org_id, MetadataType::TraceListIndexer, trace_index_values).await
     {
         log::error!("Error while writing trace_index values: {e}");

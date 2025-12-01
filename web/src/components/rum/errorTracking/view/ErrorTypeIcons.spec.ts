@@ -87,8 +87,8 @@ describe("ErrorTypeIcons Component", () => {
 
     it("should have correct image dimensions", () => {
       const image = wrapper.find("img");
-      expect(image.attributes("style")).toContain("width: 22px");
-      expect(image.attributes("style")).toContain("height: 22px");
+      expect(image.classes()).toContain("tw-w-[1.375rem]");
+      expect(image.classes()).toContain("tw-h-[1.375rem]");
     });
   });
 
@@ -271,9 +271,8 @@ describe("ErrorTypeIcons Component", () => {
 
     it("should have proper dimensions styling", () => {
       const image = wrapper.find("img");
-      const style = image.attributes("style");
-      expect(style).toContain("width: 22px");
-      expect(style).toContain("height: 22px");
+      expect(image.classes()).toContain("tw-w-[1.375rem]");
+      expect(image.classes()).toContain("tw-h-[1.375rem]");
     });
   });
 

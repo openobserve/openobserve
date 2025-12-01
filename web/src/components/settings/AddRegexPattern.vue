@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
-
+<!-- TODO: Remove store.state.theme based styling as we moved towards having at central place that is app.scss so we plan this whole to that place -->
 <template>
     <div
       class="q-pt-md"
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="closeAddRegexPatternDialog"
             round
             flat
-            icon="close"
+            icon="cancel"
         />
         </div>
 
@@ -89,14 +89,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-bind:disable="isEdit"
                         v-model="regexPatternInputs.name"
                         :label="t('regex_patterns.name') + ' *'"
-                        color="input-border"
-                        bg-color="input-bg"
                         class="showLabelOnTop"
                         data-test="add-regex-pattern-name-input"
                         stack-label
-                        outlined
-                        filled
                         dense
+                        borderless
                         :lazy-rules="true"
                         :hide-bottom-space="true"
                         :rules="[val => val !== '' || '* Name is required']"
@@ -107,12 +104,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-bind:disable="isEdit"
                         v-model="regexPatternInputs.description"
                         :label="t('regex_patterns.description')"
-                        color="input-border"
-                        bg-color="input-bg"
                         class="q-pb-md showLabelOnTop"
                         stack-label
-                        outlined
-                        filled
+                        borderless
+                        :hide-bottom-space="true"
                         dense
                         data-test="add-regex-pattern-description-input"
                         placeholder="Describe your pattern to help users understand"
@@ -149,24 +144,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 Write Pattern
                                 </div>    
                         </div>
-                        <q-input
-                        data-test="add-regex-pattern-input"
-                        v-model="regexPatternInputs.pattern"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="regex-pattern-input"
-                        :class="store.state.theme === 'dark' ? 'dark-mode-regex-pattern-input' : 'light-mode-regex-pattern-input'"
-                        stack-label
-                        outlined
-                        filled
-                        dense
-                        tabindex="0"
-                        style="width: 100%; resize: none;"
-                        type="textarea"
-                        placeholder="Eg. \d....\d "
-                        rows="5"
-                        :rules="[val => val !== '' || '* Pattern is required']"
-                        :hide-bottom-space="true"
+                            <q-input
+                            data-test="add-regex-pattern-input"
+                            v-model="regexPatternInputs.pattern"
+                            class="regex-pattern-input"
+                            :class="store.state.theme === 'dark' ? 'dark-mode-regex-pattern-input' : 'light-mode-regex-pattern-input'"
+                            stack-label
+                            borderless
+                            dense
+                            tabindex="0"
+                            style="width: 100%; resize: none;"
+                            type="textarea"
+                            placeholder="Eg. \d....\d "
+                            rows="5"
+                            :rules="[val => val !== '' || '* Pattern is required']"
+                            :hide-bottom-space="true"
                         />
                     </div>
                 </div>
@@ -207,8 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="regex-test-string-input"
                         :class="store.state.theme === 'dark' ? 'dark-mode-regex-test-string-input' : 'light-mode-regex-test-string-input'"
                         stack-label
-                        outlined
-                        filled
+                        borderless
                         dense
                         tabindex="0"
                         style="width: 100%; resize: none;"
@@ -565,11 +556,7 @@ setup(props, {emit}) {
     .regex-pattern-test-string-container {
         border: 0px 1px 1px 1px solid #E6E6E6  ;
     }
-    .add-regex-pattern-pattern-input .q-field__control {
-    display: flex;
-    align-items: center;
-    height: 200px;
-    }
+
 
     .dark-mode-regex-pattern-input .q-field__control  { 
         background-color:#181A1B !important;
@@ -583,9 +570,10 @@ setup(props, {emit}) {
     border-right: 1px solid #E6E6E6 !important;
     border-bottom: 1px solid #E6E6E6 !important;
     }
-.regex-pattern-input > div > div > div > textarea{
-    height: 200px !important;
-    resize: none !important;
+    .regex-pattern-input > div > div > div > textarea{
+        height: 200px !important;
+        resize: none !important;
+        padding-left: 0.5rem !important;
     }
 
     .dark-mode-regex-test-string-input .q-field__control  { 
@@ -603,6 +591,7 @@ setup(props, {emit}) {
     }
 .regex-test-string-input > div > div > div > textarea{
     resize: none !important;
+    padding-left: 0.5rem !important;
     }
     .is-pattern-valid > div > div  { 
         .q-field__native {

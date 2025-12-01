@@ -15,7 +15,10 @@
 
 use std::io::Error;
 
-use actix_web::{HttpRequest, HttpResponse, delete, get, http, post, put, web};
+use actix_web::{
+    HttpResponse, delete, get, http, post, put,
+    web::{self, Json},
+};
 use infra::table::re_pattern::PatternEntry;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -25,6 +28,7 @@ use crate::common::{
     meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
     utils::auth::{remove_ownership, set_ownership},
 };
+use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 struct PatternCreateRequest {
@@ -88,10 +92,27 @@ struct PatternListResponse {
 struct PatternTestRequest {
     pattern: String,
     test_records: Vec<String>,
+    #[serde(default)]
+    policy: Option<String>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 struct PatternTestResponse {
     results: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+struct BuiltInPatternsResponse {
+    pub patterns: Vec<crate::service::github::adapters::BuiltInPatternResponse>,
+    pub last_updated: i64,
+    pub source_url: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+struct BuiltInPatternsQuery {
+    #[serde(default)]
+    search: String,
+    #[serde(default)]
+    tags: Vec<String>,
 }
 
 /// Store a re_pattern in db
@@ -101,7 +122,7 @@ struct PatternTestResponse {
     summary = "Create a new regex pattern",
     description = "Stores a new regular expression pattern for log processing and data extraction",
     request_body(
-        content = PatternCreateRequest,
+        content = inline(PatternCreateRequest),
         description = "re_pattern to add",
         content_type = "application/json",
     ),
@@ -119,18 +140,13 @@ struct PatternTestResponse {
 #[post("/{org_id}/re_patterns")]
 pub async fn save(
     org_id: web::Path<String>,
-    body: web::Bytes,
-    in_req: HttpRequest,
+    Headers(user_email): Headers<UserEmail>,
+    Json(req): Json<PatternCreateRequest>,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
         use infra::table::{re_pattern::PatternEntry, re_pattern_stream_map::PatternPolicy};
         use o2_enterprise::enterprise::re_patterns::PatternManager;
-
-        let req: PatternCreateRequest = match serde_json::from_slice(&body) {
-            Ok(v) => v,
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-        };
 
         if req.name.contains(":") {
             return Ok(MetaHttpResponse::bad_request(
@@ -138,22 +154,12 @@ pub async fn save(
             ));
         }
 
-        let user_id = match in_req
-            .headers()
-            .get("user_id")
-            .and_then(|v| v.to_str().ok())
-        {
-            Some(id) => id,
-            None => return Ok(MetaHttpResponse::bad_request("Invalid user_id in request")),
-        };
+        let user_id = &user_email.user_id;
 
-        match PatternManager::test_pattern(
-            req.pattern.clone(),
-            "".to_string(),
-            PatternPolicy::Redact,
-        ) {
-            Ok(_) => {}
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        if let Err(e) =
+            PatternManager::test_pattern(req.pattern.clone(), "".to_string(), PatternPolicy::Redact)
+        {
+            return Ok(MetaHttpResponse::bad_request(e));
         }
 
         match crate::service::db::re_pattern::add(PatternEntry::new(
@@ -197,7 +203,7 @@ pub async fn save(
         (
             status = 200,
             description = "Pattern info",
-            body = PatternGetResponse,
+            body = inline(PatternGetResponse),
             content_type = "application/json",
         ),
         (status = 404, description = "Pattern not found", content_type = "text/plain")
@@ -240,7 +246,7 @@ pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Erro
         (
             status = 200,
             description = "list all patterns in the org",
-            body = PatternListResponse,
+            body = inline(PatternListResponse),
             content_type = "application/json",
         ),
     ),
@@ -349,7 +355,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         ("id" = String, Path, description = "id of the pattern to update", example = "12345")
     ),
     request_body(
-        content = PatternCreateRequest,
+        content = inline(PatternCreateRequest),
         description = "updated pattern data",
         content_type = "application/json",
     ),
@@ -367,7 +373,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
 #[put("/{org_id}/re_patterns/{id}")]
 pub async fn update(
     path: web::Path<(String, String)>,
-    body: web::Bytes,
+    web::Json(req): web::Json<PatternCreateRequest>,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
@@ -375,10 +381,6 @@ pub async fn update(
         use o2_enterprise::enterprise::re_patterns::PatternManager;
 
         let (_org_id, id) = path.into_inner();
-        let req: PatternCreateRequest = match serde_json::from_slice(&body) {
-            Ok(v) => v,
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-        };
 
         match infra::table::re_pattern::get(&id).await {
             Ok(Some(k)) => k,
@@ -412,7 +414,7 @@ pub async fn update(
     #[cfg(not(feature = "enterprise"))]
     {
         drop(path);
-        drop(body);
+        drop(req);
         Ok(MetaHttpResponse::forbidden("not supported"))
     }
 }
@@ -424,7 +426,7 @@ pub async fn update(
     summary = "Test regex pattern against sample data",
     description = "Tests a regex pattern against sample input strings to validate pattern matching",
     request_body(
-        content = PatternTestRequest,
+        content = inline(PatternTestRequest),
         description = "re_pattern to test and strings to test against",
         content_type = "application/json",
     ),
@@ -432,7 +434,7 @@ pub async fn update(
         (
             status = 200,
             description = "array of strings",
-            body = PatternTestResponse,
+            body = inline(PatternTestResponse),
             content_type = "application/json",
         ),
         (status = 400, description = "Invalid request", content_type = "application/json")
@@ -440,22 +442,21 @@ pub async fn update(
     tag = "RePattern"
 )]
 #[post("/{org_id}/re_patterns/test")]
-pub async fn test(body: web::Bytes) -> Result<HttpResponse, Error> {
+pub async fn test(web::Json(req): web::Json<PatternTestRequest>) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
         use infra::table::re_pattern_stream_map::PatternPolicy;
         use o2_enterprise::enterprise::re_patterns::PatternManager;
 
-        let req: PatternTestRequest = match serde_json::from_slice(&body) {
-            Ok(v) => v,
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-        };
-
         let pattern = req.pattern;
         let inputs = req.test_records;
+        // Default to Redact if policy not specified for backward compatibility
+        let policy = req.policy.as_deref().unwrap_or("Redact");
+        let policy = PatternPolicy::from(policy);
+
         let mut ret = Vec::with_capacity(inputs.len());
         for i in inputs {
-            match PatternManager::test_pattern(pattern.clone(), i, PatternPolicy::Redact) {
+            match PatternManager::test_pattern(pattern.clone(), i, policy) {
                 Ok(v) => {
                     ret.push(v);
                 }
@@ -471,7 +472,70 @@ pub async fn test(body: web::Bytes) -> Result<HttpResponse, Error> {
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        drop(body);
+        drop(req);
         Ok(MetaHttpResponse::forbidden("not supported"))
     }
+}
+
+/// Get built-in patterns from GitHub (pyWhat)
+#[utoipa::path(
+    get,
+    context_path = "/api",
+    summary = "Get built-in regex patterns from GitHub",
+    description = "Fetches curated regex patterns from the pyWhat project on GitHub. Supports search and tag filtering. Uses frontend caching only.",
+    params(
+        ("search" = Option<String>, Query, description = "Search query to filter patterns by name, description, or tags"),
+        ("tags" = Option<Vec<String>>, Query, description = "Filter patterns by specific tags")
+    ),
+    responses(
+        (
+            status = 200,
+            description = "Built-in patterns list",
+            body = BuiltInPatternsResponse,
+            content_type = "application/json",
+        ),
+        (status = 500, description = "Failed to fetch patterns", content_type = "application/json")
+    ),
+    tag = "RePattern"
+)]
+#[get("/{org_id}/re_patterns/built-in")]
+pub async fn get_built_in_patterns(
+    _org_id: web::Path<String>,
+    query: web::Query<BuiltInPatternsQuery>,
+) -> Result<HttpResponse, Error> {
+    use crate::service::github::{GitHubDataService, adapters::PyWhatAdapter};
+
+    // Create GitHub service
+    let github_service = GitHubDataService::new();
+
+    // Fetch patterns without backend caching
+    let mut patterns = match PyWhatAdapter::fetch_built_in_patterns(&github_service).await {
+        Ok(patterns) => patterns,
+        Err(e) => {
+            log::error!("Failed to fetch built-in patterns: {}", e);
+            return Ok(HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to fetch built-in patterns",
+                "message": e.to_string()
+            })));
+        }
+    };
+
+    // Apply search filter
+    if !query.search.is_empty() {
+        patterns = PyWhatAdapter::filter_by_search(patterns, &query.search);
+    }
+
+    // Apply tag filter
+    if !query.tags.is_empty() {
+        patterns = PyWhatAdapter::filter_by_tags(patterns, &query.tags);
+    }
+
+    let config = config::get_config();
+    let response = BuiltInPatternsResponse {
+        patterns,
+        last_updated: chrono::Utc::now().timestamp(),
+        source_url: config.common.regex_patterns_source_url.clone(),
+    };
+
+    Ok(HttpResponse::Ok().json(response))
 }

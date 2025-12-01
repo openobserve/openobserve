@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-close-popup
           unelevated
           no-caps
-          class=""
+          class="o2-secondary-button"
           dense
           @click="onCancel"
           data-test="cancel-button"
@@ -58,14 +58,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-close-popup
           unelevated
           no-caps
-          class="no-border"
-          color="secondary"
           @click="onConfirm"
           dense
           data-test="confirm-button"
-          style="padding: 0px 10px;"
+          class="o2-primary-button"
         >
-         Run Pipeline
+        {{ t('pipeline_list.run_pipeline') }}
         </q-btn>
       </q-card-actions>
     </q-card>
@@ -229,6 +227,6 @@ font-size: 12px;
   }
 }
 .resume-radio-align {
-  align-items: flex-start; /* aligns radio button with top of the label */
+  align-items: flex-center; /* aligns radio button with top of the label */
 }
 </style>

@@ -22,15 +22,40 @@ test.describe("Enrichment data testcases", () => {
         // Navigate to logs page and select stream
         const logsUrl = `${process.env["ZO_BASE_URL"]}/web/logs?org_identifier=${process.env["ORGNAME"]}`;
         testLogger.navigation('Navigating to logs page', { url: logsUrl });
-        
-        await page.goto(logsUrl);
-        const allsearch = page.waitForResponse("**/api/default/_search**");
-        await pm.logsPage.selectStream("e2e_automate");
-        
-        // Apply query to load data
-        await pm.enrichmentPage.applyQuery();
-        
-        testLogger.info('Enrichment test setup completed');
+
+        try {
+            testLogger.debug('Before page.goto', { url: logsUrl, isClosed: page.isClosed() });
+            await page.goto(logsUrl);
+            testLogger.debug('After page.goto', { url: page.url(), isClosed: page.isClosed() });
+
+            testLogger.debug('Setting up waitForResponse');
+            const searchPattern = `**/api/${process.env["ORGNAME"]}/_search**`;
+            testLogger.debug('Waiting for search response', { pattern: searchPattern });
+            const allsearch = page.waitForResponse(searchPattern, { timeout: 30000 });
+
+            testLogger.debug('Before selectStream', { isClosed: page.isClosed() });
+            await pm.logsPage.selectStream("e2e_automate");
+            testLogger.debug('After selectStream', { isClosed: page.isClosed() });
+
+            // Apply query to load data
+            testLogger.debug('Before applyQuery', { isClosed: page.isClosed() });
+            await pm.enrichmentPage.applyQuery();
+            testLogger.debug('After applyQuery', { isClosed: page.isClosed() });
+
+            testLogger.debug('Waiting for search response');
+            await allsearch;
+            testLogger.debug('Search response received');
+
+            testLogger.info('Enrichment test setup completed');
+        } catch (error) {
+            testLogger.error('Enrichment test setup failed', {
+                error: error.message,
+                stack: error.stack,
+                pageUrl: page.url(),
+                isClosed: page.isClosed()
+            });
+            throw error;
+        }
     });
 
     test("should upload an enrichment table under functions", async ({ page }) => {

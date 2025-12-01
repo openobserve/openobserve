@@ -28,7 +28,7 @@ export default class DashboardImport {
   async deleteImportedDashboard(prefix, dashboardName) {
     const fullRowName = `${prefix} ${dashboardName}`;
     await this.page
-      .getByRole("row", { name: fullRowName })
+      .locator(`//tr[.//td[text()="${prefix}"] and .//div[@title="${dashboardName}"]]`)
       .locator('[data-test="dashboard-delete"]')
       .click();
 

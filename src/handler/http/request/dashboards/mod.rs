@@ -19,13 +19,16 @@ use hashbrown::HashMap;
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
-    handler::http::models::dashboards::{
-        DashboardRequestBody,
-        DashboardResponseBody,
-        ListDashboardsQuery,
-        ListDashboardsResponseBody,
-        MoveDashboardRequestBody,
-        MoveDashboardsRequestBody, // UpdateDashboardRequestBody, UpdateDashboardResponseBody,
+    handler::http::{
+        extractors::Headers,
+        models::dashboards::{
+            DashboardRequestBody,
+            DashboardResponseBody,
+            ListDashboardsQuery,
+            ListDashboardsResponseBody,
+            MoveDashboardRequestBody,
+            MoveDashboardsRequestBody, // UpdateDashboardRequestBody, UpdateDashboardResponseBody,
+        },
     },
     service::dashboards::{self, DashboardError},
 };
@@ -86,7 +89,7 @@ impl From<DashboardError> for HttpResponse {
         ("org_id" = String, Path, description = "Organization name"),
     ),
     request_body(
-        content = DashboardRequestBody,
+        content = inline(DashboardRequestBody),
         description = "Dashboard details",
         example = json!({
             "title": "Network Traffic Overview",
@@ -94,7 +97,7 @@ impl From<DashboardError> for HttpResponse {
         }),
     ),
     responses(
-        (status = StatusCode::CREATED, description = "Dashboard created", body = DashboardResponseBody),
+        (status = StatusCode::CREATED, description = "Dashboard created", body = inline(DashboardResponseBody)),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
     extensions(
@@ -106,7 +109,7 @@ pub async fn create_dashboard(
     path: web::Path<String>,
     req_body: web::Json<DashboardRequestBody>,
     req: HttpRequest,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
 ) -> impl Responder {
     let org_id = path.into_inner();
     let folder = get_folder(req.query_string());
@@ -137,9 +140,9 @@ pub async fn create_dashboard(
         ("org_id" = String, Path, description = "Organization name"),
         ("dashboard_id" = String, Path, description = "Dashboard ID"),
     ),
-    request_body(content = DashboardRequestBody, description = "Dashboard details"),
+    request_body(content = inline(DashboardRequestBody), description = "Dashboard details"),
     responses(
-        (status = StatusCode::OK, description = "Dashboard updated", body = DashboardResponseBody),
+        (status = StatusCode::OK, description = "Dashboard updated", body = inline(DashboardResponseBody)),
         (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to update the dashboard", body = ()),
     ),
@@ -152,7 +155,7 @@ async fn update_dashboard(
     path: web::Path<(String, String)>,
     req_body: web::Json<DashboardRequestBody>,
     req: HttpRequest,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
 ) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
@@ -188,7 +191,7 @@ async fn update_dashboard(
         ListDashboardsQuery
     ),
     responses(
-        (status = StatusCode::OK, body = ListDashboardsResponseBody),
+        (status = StatusCode::OK, body = inline(ListDashboardsResponseBody)),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "list"}))
@@ -227,7 +230,7 @@ async fn list_dashboards(
         ("dashboard_id" = String, Path, description = "Dashboard ID"),
     ),
     responses(
-        (status = StatusCode::OK, body = DashboardResponseBody),
+        (status = StatusCode::OK, body = inline(DashboardResponseBody)),
         (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
     ),
     extensions(
@@ -260,7 +263,7 @@ async fn get_dashboard(path: web::Path<(String, String)>) -> impl Responder {
         ("dashboard_id" = String, Path, description = "Dashboard ID"),
     ),
     responses(
-        (status = StatusCode::OK, body = DashboardResponseBody),
+        (status = StatusCode::OK, body = inline(DashboardResponseBody)),
         (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
     ),
     extensions(
@@ -328,7 +331,7 @@ async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
         ("dashboard_id" = String, Path, description = "Dashboard ID"),
     ),
      request_body(
-        content = MoveDashboardRequestBody,
+        content = inline(MoveDashboardRequestBody),
         description = "MoveDashboard details",
         example = json!({
             "from": "Source folder id",
@@ -347,7 +350,7 @@ async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
 async fn move_dashboard(
     path: web::Path<(String, String)>,
     req_body: web::Json<MoveDashboardRequestBody>,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
 ) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
     // For this endpoint, openfga check is already done in the middleware
@@ -381,7 +384,7 @@ async fn move_dashboard(
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = MoveDashboardsRequestBody, description = "Identifies dashboards and the destination folder", content_type = "application/json"),    
+    request_body(content = inline(MoveDashboardsRequestBody), description = "Identifies dashboards and the destination folder", content_type = "application/json"),    
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
@@ -395,7 +398,7 @@ async fn move_dashboard(
 async fn move_dashboards(
     path: web::Path<String>,
     req_body: web::Json<MoveDashboardsRequestBody>,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
 ) -> HttpResponse {
     let org_id = path.into_inner();
     // For this endpoint, openfga check is needed here, as we don't do openfga check in the

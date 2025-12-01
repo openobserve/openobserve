@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-    <div class="flex justify-center items-baseline">
+    <div class="flex justify-center items-start">
       <!-- select new folder -->
       <q-select
         v-model="selectedFolder"
@@ -24,12 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`${type}-index-dropdown-stream_type`"
         input-debounce="0"
         behavior="menu"
-        filled
         borderless
         dense
-        class="q-mb-xs showLabelOnTop no-case "
-        :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
-        style="width: calc(100% - 40px)"
+        class="showLabelOnTop no-case tw-mr-1"
+        style="width: calc(100% - 44px)"
         :disable="disableDropdown"
       >
         <template #no-option>
@@ -40,22 +38,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-select>
 
       <q-btn
-        class="q-mb-md text-bold add-folder-btn "
-        :class="store.state.theme === 'dark' ? 'add-folder-btn-dark' : 'add-folder-btn-light'"
+        class="q-mb-md add-folder-btn"
         :data-test="`${type}-folder-move-new-add`"
-        label="+"
-        text-color="light-text"
-        style="width: 40px;"
+        style="width: 40px;position: relative; top: 32px;"
         :style="computedStyle"
-
         no-caps
+        dense
         @click="
           () => {
             showAddFolderDialog = true;
           }
         "
+        title="Add Folder"
         :disable="disableDropdown"
-      />
+      >
+        <q-icon name="add" size="xs" />
+      </q-btn>
     </div>
     <!-- add folder -->
     <q-dialog
@@ -141,7 +139,8 @@ import { getFoldersListByType } from "@/utils/commons";
       };
 
       const computedStyle = computed (() => {
-        return props.style ? props.style : 'height: 42px';
+        const baseStyle = props.style ? props.style : 'height: 35px';
+        return `${baseStyle}; margin-top: 23px`;
       });
 
       onActivated(async () => {

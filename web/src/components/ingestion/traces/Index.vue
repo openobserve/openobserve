@@ -22,47 +22,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="min-height: calc(100vh - 130px)"
   >
     <template v-slot:before>
-      <q-tabs
-        v-model="ingestiontabs"
-        indicator-color="transparent"
-        inline-label
-        vertical
-      >
-        <q-route-tab
-          name="openTelemetry"
-          :to="{
-            name: 'tracesOTLP',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
-          label="OpenTelemetry"
-          content-class="tab_content"
-        />
-        <q-route-tab
-          name="ingestTracesFromOtel"
-          :to="{
-            name: 'ingestTracesFromOtel',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
-          label="OTEL Collector"
-          content-class="tab_content"
-        />
-      </q-tabs>
+      <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
+        <div class="card-container tw-h-[calc(100vh-140px)]">
+          <q-tabs
+            v-model="ingestiontabs"
+            indicator-color="transparent"
+            inline-label
+            vertical
+          >
+            <q-route-tab
+              name="openTelemetry"
+              :to="{
+                name: 'tracesOTLP',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
+              label="OpenTelemetry"
+              content-class="tab_content"
+            />
+            <q-route-tab
+              name="ingestTracesFromOtel"
+              :to="{
+                name: 'ingestTracesFromOtel',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
+              label="OTEL Collector"
+              content-class="tab_content"
+            />
+          </q-tabs>
+        </div>
+      </div>
     </template>
 
     <template v-slot:after>
-      <router-view
-        title="Metrics"
-        :currOrgIdentifier="currOrgIdentifier"
-        :currUserEmail="currentUserEmail"
-        @copy-to-clipboard-fn="copyToClipboardFn"
-      >
-      </router-view>
+      <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
+        <div class="card-container tw-h-[calc(100vh-140px)]">
+          <router-view
+            title="Metrics"
+            :currOrgIdentifier="currOrgIdentifier"
+            :currUserEmail="currentUserEmail"
+            @copy-to-clipboard-fn="copyToClipboardFn"
+          >
+          </router-view>
+        </div>
+      </div>
     </template>
   </q-splitter>
 </template>
@@ -188,31 +196,6 @@ export default defineComponent({
   padding: 1.5rem 0 0;
   .head {
     padding-bottom: 1rem;
-  }
-  .q-tabs {
-    &--vertical {
-      margin: 1.5rem 1rem 0 1rem;
-      .q-tab {
-        justify-content: flex-start;
-        padding: 0 0.6rem 0 0.6rem;
-        border-radius: 0.5rem;
-        margin-bottom: 0.5rem;
-        text-transform: capitalize;
-
-        &__content.tab_content {
-          .q-tab {
-            &__icon + &__label {
-              padding-left: 0.875rem;
-              font-weight: 600;
-            }
-          }
-        }
-        &--active {
-          color: black;
-          background-color: $accent;
-        }
-      }
-    }
   }
 }
 </style>

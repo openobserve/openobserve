@@ -28,9 +28,9 @@ const docURLFastAPI = languagesDocURLs["fastapi"];
 </script>
 
 <template>
-  <div class="q-ma-md">
+  <div class="q-pa-sm">
     <div class="tw-text-[16px]">
-      <CopyContent class="q-mt-sm" :content="content" />
+      <CopyContent :content="content" />
       <div class="tw-font-bold tw-pt-6 tw-pb-2">Check further documentation at:</div>
       <ol class="tw-list-decimal q-pl-md">
         <li class="tw-py-1">

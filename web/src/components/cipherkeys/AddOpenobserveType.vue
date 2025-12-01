@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         type="textarea"
         stack-label
         outlined
+        borderless
         filled
         dense
         :rules="[(val: any) => !!val || 'Secret is required']"

@@ -15,11 +15,13 @@
 
 use std::io::Error;
 
-use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
+use actix_web::{HttpResponse, delete, get, post, put, web};
 use config::meta::function::{FunctionList, TestVRLRequest, Transform};
 
-/// CreateFunction
+#[cfg(feature = "enterprise")]
+use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
 
+/// CreateFunction
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
@@ -35,7 +37,7 @@ use config::meta::function::{FunctionList, TestVRLRequest, Transform};
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = Transform, description = "Function data", content_type = "application/json"),
+    request_body(content = inline(Transform), description = "Function data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
@@ -74,7 +76,7 @@ pub async fn save_function(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = FunctionList),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(FunctionList)),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "list"}))
@@ -83,16 +85,15 @@ pub async fn save_function(
 #[get("/{org_id}/functions")]
 async fn list_functions(
     org_id: web::Path<String>,
-    _req: HttpRequest,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let mut _permitted = None;
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
     {
-        let user_id = _req.headers().get("user_id").unwrap();
         match crate::handler::http::auth::validator::list_objects_for_user(
             &org_id,
-            user_id.to_str().unwrap(),
+            &user_email.user_id,
             "GET",
             "function",
         )
@@ -164,7 +165,7 @@ async fn delete_function(path: web::Path<(String, String)>) -> Result<HttpRespon
         ("org_id" = String, Path, description = "Organization name"),
         ("name" = String, Path, description = "Function name"),
     ),
-    request_body(content = Transform, description = "Function data", content_type = "application/json"),
+    request_body(content = inline(Transform), description = "Function data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
@@ -205,7 +206,7 @@ pub async fn update_function(
         ("name" = String, Path, description = "Function name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = FunctionList),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(FunctionList)),
         (status = 404, description = "Function not found", content_type = "application/json", body = ()),
         (status = 500, description = "Internal server error", content_type = "application/json", body = ()),
     ),
@@ -237,7 +238,7 @@ pub async fn list_pipeline_dependencies(
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = TestVRLRequest, description = "Test run function", content_type = "application/json"),
+    request_body(content = inline(TestVRLRequest), description = "Test run function", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),

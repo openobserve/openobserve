@@ -661,25 +661,6 @@ SELECT date
             .collect())
     }
 
-    async fn get_min_ts(
-        &self,
-        org_id: &str,
-        stream_type: StreamType,
-        stream_name: &str,
-    ) -> Result<i64> {
-        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
-        let min_ts = config::utils::time::BASE_TIME.timestamp_micros();
-        let pool = CLIENT_RO.clone();
-        let ret: Option<i64> = sqlx::query_scalar(
-            r#"SELECT MIN(min_ts) AS num FROM file_list WHERE stream = $1 AND min_ts > $2;"#,
-        )
-        .bind(stream_key)
-        .bind(min_ts)
-        .fetch_one(&pool)
-        .await?;
-        Ok(ret.unwrap_or_default())
-    }
-
     async fn get_min_date(
         &self,
         org_id: &str,
@@ -790,11 +771,12 @@ GROUP BY stream
         stream_type: Option<StreamType>,
         stream_name: Option<&str>,
     ) -> Result<Vec<(String, StreamStats)>> {
-        let sql = if stream_type.is_some() && stream_name.is_some() {
+        let sql = if let Some(stream_type) = stream_type
+            && let Some(stream_name) = stream_name
+        {
             format!(
                 "SELECT * FROM stream_stats WHERE stream = '{org_id}/{}/{}';",
-                stream_type.unwrap(),
-                stream_name.unwrap()
+                stream_type, stream_name
             )
         } else {
             format!("SELECT * FROM stream_stats WHERE org = '{org_id}';")
@@ -1277,7 +1259,7 @@ SELECT stream, max(id) as id, COUNT(*) AS num
                     .entry(org)
                     .or_default()
                     .entry(stream_type)
-                    .and_modify(|e| *e = counts)
+                    .and_modify(|e| *e += counts)
                     .or_insert(counts);
             }
         }
@@ -1492,9 +1474,15 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
             }
         }
 
-        let del_items = files.iter().filter(|f| f.deleted).collect::<Vec<_>>();
+        // sort by file id and key to reduce locked table range
+        let mut del_items = files.iter().filter(|v| v.deleted).collect::<Vec<_>>();
+        del_items.sort_by(|v1, v2| match v1.id.cmp(&v2.id) {
+            std::cmp::Ordering::Equal => v1.key.cmp(&v2.key),
+            other => other,
+        });
+        let deleted_batch_size = get_config().compact.file_list_deleted_batch_size;
         if !del_items.is_empty() {
-            let chunks = del_items.chunks(1000);
+            let chunks = del_items.chunks(deleted_batch_size);
             for files in chunks {
                 // get ids of the files
                 let mut ids = Vec::with_capacity(files.len());

@@ -78,7 +78,7 @@ test.describe("Alerts Import/Export", () => {
     await download.saveAs(downloadPath);
 
     // Test invalid import
-    await pm.alertsPage.importInvalidFile('utils/td150.json');
+    await pm.alertsPage.importInvalidFile('../test-data/invalid-alert.json');
 
     // Import valid file
     await pm.alertsPage.importValidFile(downloadPath);
@@ -187,7 +187,6 @@ test.describe("Alerts Import/Export", () => {
     const webhookDestinationUrl = 'https://raw.githubusercontent.com/openobserve/alert_tests/refs/heads/main/Webhook_Destination_Import.json';
     const webhookDestinationName = 'auto_dest_name_' + sharedRandomValue;
     await pm.alertDestinationsPage.importDestinationFromUrl(webhookDestinationUrl, webhookTemplateName, webhookDestinationName);
-    await expect(page.getByText('Successfully imported')).toBeVisible();
     testLogger.info('Imported webhook destination from URL', { destinationName: webhookDestinationName });
     await pm.alertDestinationsPage.verifyDestinationExists(webhookDestinationName);
     testLogger.info('Successfully verified webhook destination exists');

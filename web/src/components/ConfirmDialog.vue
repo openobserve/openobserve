@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-close-popup
           unelevated
           no-caps
-          class="q-mr-sm"
+          class="q-mr-sm o2-secondary-button"
           @click="onCancel"
           data-test="cancel-button"
         >
@@ -62,8 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-close-popup
           unelevated
           no-caps
-          class="no-border"
-          color="primary"
+          class="o2-primary-button"
           @click="onConfirm"
           data-test="confirm-button"
         >

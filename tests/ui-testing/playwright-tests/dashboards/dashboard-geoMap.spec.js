@@ -3,6 +3,7 @@ import { login } from "./utils/dashLogin.js";
 import { ingestionForMaps } from "./utils/dashIngestion.js";
 
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
+import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/dashboard-time";
 import PageManager from "../../pages/page-manager";
 const testLogger = require('../utils/test-logger.js');
 
@@ -74,7 +75,9 @@ test.describe("dashboard maps testcases", () => {
       "$variablename"
     );
 
-    await pm.dashboardPanelActions.applyDashboardBtn();
+    await waitForDateTimeButtonToBeEnabled(page);
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    // await pm.dashboardPanelActions.applyDashboardBtn();
 
     await pm.dashboardPanelActions.waitForChartToRender();
 

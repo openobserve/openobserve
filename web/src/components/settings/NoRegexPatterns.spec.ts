@@ -146,116 +146,8 @@ describe("NoRegexPatterns", () => {
     });
   });
 
-  describe("Theme support", () => {
-    it("should apply light mode classes by default", () => {
-      mockStore.state.theme = "light";
-      const wrapper = createWrapper();
-      
-      const container = wrapper.find(".full-width");
-      expect(container.classes()).toContain("light-mode");
-      expect(container.classes()).not.toContain("dark-mode");
-    });
-
-    it("should apply dark mode classes when theme is dark", () => {
-      mockStore.state.theme = "dark";
-      const wrapper = createWrapper();
-      
-      const container = wrapper.find(".full-width");
-      expect(container.classes()).toContain("dark-mode");
-      expect(container.classes()).not.toContain("light-mode");
-    });
-
-    it("should apply correct text colors in dark mode", () => {
-      mockStore.state.theme = "dark";
-      const wrapper = createWrapper();
-      
-      const container = wrapper.find(".full-width");
-      expect(container.classes()).toContain("dark-mode");
-      
-      // Check that title and subtitle text have dark mode styling
-      const titleText = wrapper.find(".title-text");
-      const subtitleText = wrapper.find(".subtitle-text");
-      
-      expect(titleText.exists()).toBe(true);
-      expect(subtitleText.exists()).toBe(true);
-    });
-  });
-
-  describe("Text styling", () => {
-    it("should apply correct styling to title text", () => {
-      const wrapper = createWrapper();
-      const titleText = wrapper.find(".title-text");
-      
-      expect(titleText.classes()).toContain("title-text");
-      
-      // CSS styles are applied via the class and tested through visual/integration tests
-    });
-
-    it("should apply correct styling to subtitle text", () => {
-      const wrapper = createWrapper();
-      const subtitleText = wrapper.find(".subtitle-text");
-      
-      expect(subtitleText.classes()).toContain("subtitle-text");
-    });
-
-    it("should apply correct styling to create new text", () => {
-      const wrapper = createWrapper();
-      const createNewText = wrapper.find(".create-new-text");
-      
-      expect(createNewText.classes()).toContain("create-new-text");
-    });
-
-    it("should apply correct styling to import button text", () => {
-      const wrapper = createWrapper();
-      const importButtonText = wrapper.find(".import-button-text");
-      
-      expect(importButtonText.classes()).toContain("import-button-text");
-    });
-  });
-
-  describe("Layout and structure", () => {
-    it("should have correct container classes", () => {
-      const wrapper = createWrapper();
-      const container = wrapper.find(".full-width");
-      
-      expect(container.classes()).toContain("full-width");
-      expect(container.classes()).toContain("column");
-      expect(container.classes()).toContain("flex-center");
-      expect(container.classes()).toContain("q-gutter-sm");
-      expect(container.classes()).toContain("q-mt-xs");
-    });
-
-    it("should have correct font size styling", () => {
-      const wrapper = createWrapper();
-      const container = wrapper.find(".full-width");
-      
-      expect(container.attributes("style")).toContain("font-size: 1.5rem");
-    });
-
-    it("should render import button container with correct classes", () => {
-      const wrapper = createWrapper();
-      const buttonContainer = wrapper.find(".import-button-container");
-      
-      expect(buttonContainer.exists()).toBe(true);
-      expect(buttonContainer.classes()).toContain("import-button-container");
-    });
-
-    it("should apply q-mt-sm class to import button", () => {
-      const wrapper = createWrapper();
-      const importButton = wrapper.find('[data-test-stub="q-btn"]');
-      
-      expect(importButton.classes()).toContain("q-mt-sm");
-    });
-  });
 
   describe("Accessibility", () => {
-    it("should have clickable create new text with cursor pointer", () => {
-      const wrapper = createWrapper();
-      const createNewText = wrapper.find(".create-new-text");
-      
-      expect(createNewText.classes()).toContain("create-new-text");
-      // CSS cursor: pointer should be applied via the class
-    });
 
     it("should provide meaningful text content", () => {
       const wrapper = createWrapper();
@@ -282,16 +174,6 @@ describe("NoRegexPatterns", () => {
   });
 
   describe("Edge cases", () => {
-    it("should handle missing theme gracefully", () => {
-      mockStore.state.theme = undefined;
-      const wrapper = createWrapper();
-      
-      expect(wrapper.exists()).toBe(true);
-      const container = wrapper.find(".full-width");
-      // When theme is undefined, component defaults to light-mode
-      expect(container.classes()).toContain("light-mode");
-      expect(container.classes()).not.toContain("dark-mode");
-    });
 
     it("should handle multiple rapid clicks on create new", async () => {
       const wrapper = createWrapper();

@@ -26,6 +26,8 @@ test.describe("dashboard variables settings", () => {
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
+    await pm.dashboardCreate.waitForDashboardUIStable();
+
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(dashboardName);
 
@@ -66,6 +68,8 @@ test.describe("dashboard variables settings", () => {
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
+    await pm.dashboardCreate.waitForDashboardUIStable();
+
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(dashboardName);
     await page
@@ -105,6 +109,7 @@ test.describe("dashboard variables settings", () => {
     // Navigate to dashboards page
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
+    await pm.dashboardCreate.waitForDashboardUIStable();
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(dashboardName);
@@ -148,6 +153,8 @@ test.describe("dashboard variables settings", () => {
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
+    await pm.dashboardCreate.waitForDashboardUIStable();
+
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(dashboardName);
     await page
@@ -190,6 +197,8 @@ test.describe("dashboard variables settings", () => {
     // Navigate to the dashboard page
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
+
+    await pm.dashboardCreate.waitForDashboardUIStable();
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(dashboardName);
@@ -241,6 +250,8 @@ test.describe("dashboard variables settings", () => {
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
+    await pm.dashboardCreate.waitForDashboardUIStable();
+
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(dashboardName);
 
@@ -280,6 +291,7 @@ test.describe("dashboard variables settings", () => {
     // Navigate to dashboards page
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
+    await pm.dashboardCreate.waitForDashboardUIStable();
 
     await pm.dashboardCreate.createDashboard(dashboardName);
     await page
@@ -318,6 +330,7 @@ test.describe("dashboard variables settings", () => {
     // Navigate to the dashboards page
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
+    await pm.dashboardCreate.waitForDashboardUIStable();
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(dashboardName);
@@ -358,6 +371,7 @@ test.describe("dashboard variables settings", () => {
     // Navigate to the dashboards page
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
+    await pm.dashboardCreate.waitForDashboardUIStable();
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(dashboardName);
@@ -398,6 +412,7 @@ test.describe("dashboard variables settings", () => {
     // Navigate to the dashboards page
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
+    await pm.dashboardCreate.waitForDashboardUIStable();
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(dashboardName);
@@ -441,6 +456,7 @@ test.describe("dashboard variables settings", () => {
     // Navigate to the dashboards page
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
+    await pm.dashboardCreate.waitForDashboardUIStable();
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(dashboardName);
@@ -484,6 +500,7 @@ test.describe("dashboard variables settings", () => {
     // Navigate to the dashboards page
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
+    await pm.dashboardCreate.waitForDashboardUIStable();
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(dashboardName);

@@ -13,42 +13,61 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::utils::sort::sort_float;
+use std::time::Duration;
+
+use config::{
+    meta::promql::value::{EvalContext, Sample, Value},
+    utils::sort::sort_float,
+};
 use datafusion::error::Result;
 
-use crate::service::promql::value::{RangeValue, Value};
+use crate::service::promql::functions::RangeFunc;
 
-pub(crate) fn max_over_time(data: Value) -> Result<Value> {
-    super::eval_idelta(data, "max_over_time", exec, false)
+pub(crate) fn max_over_time(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+    super::eval_range(data, MaxOverTimeFunc::new(), eval_ctx)
 }
 
-fn exec(data: RangeValue) -> Option<f64> {
-    if data.samples.is_empty() {
-        return None;
+pub struct MaxOverTimeFunc;
+
+impl MaxOverTimeFunc {
+    pub fn new() -> Self {
+        MaxOverTimeFunc {}
     }
-    Some(
-        data.samples
-            .iter()
-            .map(|s| s.value)
-            .max_by(sort_float)
-            .unwrap(),
-    )
+}
+
+impl RangeFunc for MaxOverTimeFunc {
+    fn name(&self) -> &'static str {
+        "max_over_time"
+    }
+
+    fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
+        if samples.is_empty() {
+            return None;
+        }
+        Some(samples.iter().map(|s| s.value).max_by(sort_float).unwrap())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
 
+    use config::meta::promql::value::{Labels, RangeValue, TimeWindow};
+
     use super::*;
-    use crate::service::promql::value::{Labels, RangeValue, TimeWindow};
+    // Test helper
+    fn max_over_time_test_helper(data: Value) -> Result<Value> {
+        let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
+        max_over_time(data, &eval_ctx)
+    }
 
     #[test]
     fn test_max_over_time_function() {
         // Create a range value with sample data
         let samples = vec![
-            crate::service::promql::value::Sample::new(1000, 10.0),
-            crate::service::promql::value::Sample::new(2000, 30.0),
-            crate::service::promql::value::Sample::new(3000, 20.0),
+            Sample::new(1000, 10.0),
+            Sample::new(2000, 30.0),
+            Sample::new(3000, 20.0),
         ];
 
         let range_value = RangeValue {
@@ -56,24 +75,24 @@ mod tests {
             samples,
             exemplars: None,
             time_window: Some(TimeWindow {
-                eval_ts: 3000,
                 range: Duration::from_secs(2),
                 offset: Duration::ZERO,
             }),
         };
 
         let matrix = Value::Matrix(vec![range_value]);
-        let result = max_over_time(matrix).unwrap();
+        let result = max_over_time_test_helper(matrix).unwrap();
 
-        // Should return a vector with max value
+        // Should return a matrix with max value
         match result {
-            Value::Vector(v) => {
-                assert_eq!(v.len(), 1);
+            Value::Matrix(m) => {
+                assert_eq!(m.len(), 1);
+                assert_eq!(m[0].samples.len(), 1);
                 // Should return the max value: 30.0
-                assert!((v[0].sample.value - 30.0).abs() < 0.001);
-                assert_eq!(v[0].sample.timestamp, 3000);
+                assert!((m[0].samples[0].value - 30.0).abs() < 0.001);
+                assert_eq!(m[0].samples[0].timestamp, 3000);
             }
-            _ => panic!("Expected Vector result"),
+            _ => panic!("Expected Matrix result"),
         }
     }
 }

@@ -1,0 +1,78 @@
+.guide-list {
+  padding: 0 10px;
+  margin: 10px 0 0 0;
+}
+
+.guide-list li {
+  font-size: 14px;
+  line-height: 23px;
+}
+
+.q-btn:before {
+  border: 0px solid #d5d5d5;
+}
+
+.syntax-guide-button {
+  cursor: pointer;
+  text-transform: capitalize;
+  min-width: 1.875rem; // 30px
+  min-height: 1.875rem; // 30px
+  padding: 0.25rem 0.375rem; // 4px 6px
+  font-weight: normal;
+  border: 0.0625rem solid rgba(0, 0, 0, 0.12) !important; // 1px
+  border-radius: 0.375rem; // 6px
+  transition: all 0.2s ease;
+
+  .q-btn__content .q-icon {
+    font-size: 1.125rem; // 18px
+  }
+
+  &:hover {
+    background-color: var(--o2-hover-accent);
+  }
+}
+
+.syntax-guide-button-dark {
+  border: 0.0625rem solid var(--o2-border-color) !important; // 1px
+}
+
+.dark-theme .syntax-guide-in-toolbar {
+  border: 0.0625rem solid var(--o2-border-color) !important; // 1px
+}
+
+.syntax-guide-title {
+  width: 420px;
+
+  .label {
+    font-size: 15px;
+    font-weight: bold;
+  }
+}
+
+.syntax-guide-sub-title {
+  color: $primary;
+  font-size: 15px;
+  margin-left: 5px;
+}
+
+.syntax-guide-text {
+  font-size: 12px;
+  margin-left: 5px;
+}
+
+.syntax-section {
+  margin-bottom: 5px;
+}
+
+.bg-highlight {
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+.theme-dark .bg-highlight {
+  background-color: #747474;
+}
+
+.theme-light .bg-highlight {
+  background-color: #e7e6e6;
+}

@@ -155,7 +155,7 @@ describe("Cookie Utilities", () => {
       expect(Cookies.set).toHaveBeenCalledWith(
         Keys.languageKey,
         language,
-        { path: "/" }
+        { path: "/", expires: 400 }
       );
     });
 
@@ -167,7 +167,7 @@ describe("Cookie Utilities", () => {
         expect(Cookies.set).toHaveBeenCalledWith(
           Keys.languageKey,
           lang,
-          { path: "/" }
+          { path: "/", expires: 400 }
         );
       });
 
@@ -182,7 +182,7 @@ describe("Cookie Utilities", () => {
       expect(Cookies.set).toHaveBeenCalledWith(
         Keys.languageKey,
         language,
-        { path: "/" }
+        { path: "/", expires: 400 }
       );
     });
   });
@@ -386,7 +386,7 @@ describe("Cookie Utilities", () => {
       setLanguage(language);
       const result = getLanguage();
 
-      expect(Cookies.set).toHaveBeenCalledWith(Keys.languageKey, language, { path: "/" });
+      expect(Cookies.set).toHaveBeenCalledWith(Keys.languageKey, language, { path: "/", expires: 400 });
       expect(Cookies.get).toHaveBeenCalledWith(Keys.languageKey);
       expect(result).toBe(language);
     });

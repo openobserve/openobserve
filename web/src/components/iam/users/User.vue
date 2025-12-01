@@ -17,20 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page
-    class="q-pa-none"
-    style="min-height: inherit; height: calc(100vh - 57px)"
-  >
+  <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
     <div>
+    <div class="card-container tw-mb-[0.625rem]">
+      <div class="tw-flex tw-flex-row tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[68px] tw-border-b-[1px]"
+    >
       <div
-        class="tw-flex tw-flex-row tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[71px] tw-border-b-[1px]"
-        :class="
-          store.state.theme == 'dark'
-            ? 'o2-table-header-dark tw-border-gray-500'
-            : 'o2-table-header-light tw-border-gray-200'
-        "
-      >
-        <div
           class="q-table__title full-width tw-font-[600]"
           data-test="user-title-text"
         >
@@ -38,29 +30,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="full-width tw-flex tw-justify-end">
           <q-input
-            v-model="filterQuery"
-            borderless
-            dense
-            class="q-ml-auto no-border o2-search-input tw-h-[36px] tw-w-[150px]"
-            :placeholder="t('user.search')"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-search-input-dark'
-                : 'o2-search-input-light'
-            "
-          >
-            <template #prepend>
-              <q-icon
-                class="o2-search-input-icon"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-search-input-icon-dark'
-                    : 'o2-search-input-icon-light'
-                "
-                name="search"
-              />
-            </template>
-          </q-input>
+              v-model="filterQuery"
+              borderless
+              dense
+              class="q-ml-auto no-border o2-search-input tw-h-[36px]"
+              :placeholder="t('user.search')"
+            >
+              <template #prepend>
+                <q-icon class="o2-search-input-icon" name="search" />
+              </template>
+            </q-input>
           <div class="col-6" v-if="config.isCloud == 'true'">
             <member-invitation
               :key="currentUserRole"
@@ -69,13 +48,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="col-6" v-else>
             <q-btn
-              class="q-ml-md o2-primary-button tw-h-[36px]"
+              class="q-ml-sm o2-primary-button tw-h-[36px]"
               flat
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-primary-button-dark'
-                  : 'o2-primary-button-light'
-              "
               no-caps
               :label="t(`user.add`)"
               @click="addRoutePush({})"
@@ -83,95 +57,84 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </div>
-      </div>
-    </div>
-    <q-table
-      ref="qTable"
-      :rows="visibleRows"
-      :columns="columns"
-      row-key="id"
-      :pagination="pagination"
-      :filter="filterQuery"
-      :style="
-        hasVisibleRows ? 'height: calc(100vh - 114px); overflow-y: auto;' : ''
-      "
-      class="o2-quasar-table o2-quasar-table-header-sticky"
-      :class="
-        store.state.theme == 'dark'
-          ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark'
-          : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'
-      "
-    >
-      <template #no-data>
-        <NoData></NoData>
-      </template>
-      <template v-slot:header="props">
-        <q-tr :props="props">
-          <q-th
-            v-for="col in props.cols"
-            :class="col.classes"
-            :key="col.name"
-            :props="props"
-          >
-            <span>{{ col.label }}</span>
-          </q-th>
-        </q-tr>
-      </template>
-      <template #body-cell-actions="props">
-        <q-td :props="props" side>
-          <q-btn
-            v-if="props.row.enableDelete && props.row.status != 'pending'"
-            :icon="outlinedDelete"
-            :title="t('user.delete')"
-            class="q-ml-xs"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            @click="confirmDeleteAction(props)"
-            style="cursor: pointer !important"
-            :data-test="`delete-basic-user-${props.row.email}`"
-          />
-          <q-btn
-            v-if="
-              props.row.enableEdit &&
-              props.row.status != 'pending' &&
-              config.isCloud == 'false'
-            "
-            icon="edit"
-            :title="t('user.update')"
-            class="q-ml-xs"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            @click="addRoutePush(props)"
-            style="cursor: pointer !important"
-            :data-test="`edit-basic-user-${props.row.email}`"
-          />
-        </q-td>
-      </template>
-      <template #bottom="scope">
-        <div
-          class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]"
-        >
-          <div
-            class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md"
-          >
-            {{ resultTotal }} {{ t("user.header") }}
-          </div>
-          <QTablePagination
-            :scope="scope"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            position="bottom"
-            @update:changeRecordPerPage="changePagination"
-          />
         </div>
-      </template>
-    </q-table>
+    </div>
+    <div class="tw-w-full tw-h-full">
+      <div class="card-container tw-h-[calc(100vh-127px)]">
+        <q-table
+          ref="qTable"
+          :rows="visibleRows"
+          :columns="columns"
+          row-key="id"
+          :pagination="pagination"
+          :filter="filterQuery"
+          :style="hasVisibleRows ? 'height: calc(100vh - 127px); overflow-y: auto;' : ''"
+          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+        >
+          <template #no-data>
+            <NoData></NoData>
+          </template>
+          <template v-slot:header="props">
+            <q-tr :props="props">
+              <q-th v-for="col in props.cols"
+              :class="col.classes"
+              :style="col.style"
+              :key="col.name" :props="props">
+                <span>{{ col.label }}</span>
+              </q-th>
+            </q-tr>
+          </template>
+          <template #body-cell-actions="props">
+            <q-td :props="props" side>
+              <q-btn
+                v-if="props.row.enableDelete && props.row.status != 'pending'"
+                :title="t('user.delete')"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                :icon="outlinedDelete"
+                @click="confirmDeleteAction(props)"
+                style="cursor: pointer !important"
+                :data-test="`delete-basic-user-${props.row.email}`"
+              >
+              </q-btn>
+              <q-btn
+                v-if="props.row.enableEdit && props.row.status != 'pending' && config.isCloud == 'false'"
+                :title="t('user.update')"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                icon="edit"
+                @click="addRoutePush(props)"
+                style="cursor: pointer !important"
+                :data-test="`edit-basic-user-${props.row.email}`"
+              >
+            </q-btn>
+            </q-td>
+          </template>
+          <template #bottom="scope">
+            <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
+              <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
+                {{ resultTotal }} {{ t('user.header') }}
+              </div>
+              <QTablePagination
+              :scope="scope"
+              :resultTotal="resultTotal"
+              :perPageOptions="perPageOptions"
+              position="bottom"
+              @update:changeRecordPerPage="changePagination"
+            />
+            </div>
+            
+          </template>
+        </q-table>
+        </div>
+    </div>
+    </div>
 
     <q-dialog
       v-if="config.isCloud == 'false'"
@@ -191,7 +154,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <add-user
         v-if="config.isCloud == 'false'"
-        style="width: 35vw"
         v-model="selectedUser"
         :isUpdated="isUpdated"
         :userRole="currentUserRole"
@@ -211,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-card-actions class="confirmActions">
           <q-btn v-close-popup="true" unelevated
-no-caps class="q-mr-sm">
+            no-caps class="q-mr-sm">
             {{ t("user.cancel") }}
           </q-btn>
           <q-btn
@@ -231,7 +193,7 @@ no-caps class="q-mr-sm">
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onActivated, onBeforeMount } from "vue";
+import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps, date } from "quasar";
@@ -306,16 +268,15 @@ export default defineComponent({
     onBeforeMount(async () => {
       isEnterprise.value = config.isEnterprise == "true";
       await getOrgMembers();
-      updateUserActions();
       await getRoles();
 
       // if (config.isCloud == "true") {
-      // columns.value.push({
-      //   name: "status",
-      //   field: "status",
-      //   label: t("user.status"),
-      //   align: "left",
-      // });
+        // columns.value.push({
+        //   name: "status",
+        //   field: "status",
+        //   label: t("user.status"),
+        //   align: "left",
+        // });
       // }
 
       // if (
@@ -329,6 +290,8 @@ export default defineComponent({
       //     align: "left",
       //   });
       // }
+
+      updateUserActions();
     });
 
     const columns: any = ref<QTableProps["columns"]>([
@@ -374,8 +337,9 @@ export default defineComponent({
         name: "actions",
         field: "actions",
         label: t("user.actions"),
-        align: "left",
-        classes: "actions-column",
+        align: "center",
+        classes: 'actions-column',
+        style: "width: 100px"
       },
     ]);
     const userEmail: any = ref("");
@@ -415,7 +379,7 @@ export default defineComponent({
         usersService
           .invitedUsers(store.state.selectedOrganization.identifier)
           .then((res) => {
-            if (res.status == 200) {
+            if(res.status == 200) {
               dismiss();
               resolve(res.data);
             } else {
@@ -428,7 +392,7 @@ export default defineComponent({
             reject([]);
           });
       });
-    };
+    }
 
     const getOrgMembers = () => {
       const dismiss = $q.notify({
@@ -448,7 +412,7 @@ export default defineComponent({
               resultTotal.value += invitedMembers.length;
               users = [...res.data.data, ...invitedMembers];
             }
-
+            
             let counter = 1;
             currentUserRole.value = "";
             usersState.users = users.map((data: any) => {
@@ -466,12 +430,8 @@ export default defineComponent({
                 email: maskText(data.email),
                 first_name: data.first_name,
                 last_name: data.last_name,
-                role:
-                  data?.status == "pending"
-                    ? data.role + " (Invited)"
-                    : data.role,
-                enableEdit:
-                  store.state.userInfo.email == data.email ? true : false,
+                role: data?.status == "pending" ? data.role + " (Invited)": data.role,
+                enableEdit: store.state.userInfo.email == data.email ? true : false,
                 enableChangeRole: false,
                 enableDelete: config.isCloud == "true" ? true : false,
                 status: data?.status,
@@ -578,16 +538,18 @@ export default defineComponent({
     };
 
     const shouldAllowDelete = (user: any) => {
+
       if (isEnterprise.value) {
-        //for cloud
-        //should allow delete for all users when it is root and also when the row user is not root
-        //should allow delete for all users when it is admin and also when the row user is not logged in user / not root
-        if (config.isCloud == "true") {
+      //for cloud
+      //should allow delete for all users when it is root and also when the row user is not root 
+      //should allow delete for all users when it is admin and also when the row user is not logged in user / not root
+        if(config.isCloud == 'true'){
           return (
             user.role !== "root" &&
             (currentUserRole.value == "root" ||
               currentUserRole.value == "admin") &&
-            store.state.userInfo.email !== user.email
+              store.state.userInfo.email !== user.email
+
           );
         }
         return (
@@ -880,26 +842,31 @@ export default defineComponent({
     };
 
     const filterData = (rows: any, terms: any) => {
-      var filtered = [];
-      terms = terms.toLowerCase();
-      for (var i = 0; i < rows.length; i++) {
-        if (
-          rows[i]["first_name"]?.toLowerCase().includes(terms) ||
-          rows[i]["last_name"]?.toLowerCase().includes(terms) ||
-          rows[i]["email"]?.toLowerCase().includes(terms) ||
-          rows[i]["role"].toLowerCase().includes(terms)
-        ) {
-          filtered.push(rows[i]);
+        var filtered = [];
+        terms = terms.toLowerCase();
+        for (var i = 0; i < rows.length; i++) {
+          if (
+            rows[i]["first_name"]?.toLowerCase().includes(terms) ||
+            rows[i]["last_name"]?.toLowerCase().includes(terms) ||
+            rows[i]["email"]?.toLowerCase().includes(terms) ||
+            rows[i]["role"].toLowerCase().includes(terms)
+          ) {
+            filtered.push(rows[i]);
+          }
         }
-      }
-      return filtered;
-    };
+        return filtered;
+      };
 
-    const visibleRows = computed(() => {
-      if (!filterQuery.value) return usersState.users || [];
-      return filterData(usersState.users || [], filterQuery.value);
+      const visibleRows = computed(() => {
+      if (!filterQuery.value) return usersState.users || []
+      return filterData(usersState.users || [], filterQuery.value)
     });
     const hasVisibleRows = computed(() => visibleRows.value.length > 0);
+
+    // Watch visibleRows to sync resultTotal with search filter
+    watch(visibleRows, (newVisibleRows) => {
+      resultTotal.value = newVisibleRows.length;
+    }, { immediate: true });
 
     return {
       t,
@@ -964,6 +931,7 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+
 .iconHoverBtn {
   cursor: pointer !important;
 }

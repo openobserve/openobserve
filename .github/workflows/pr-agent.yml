@@ -5,6 +5,10 @@ on:
     types: [opened, reopened, ready_for_review]
   issue_comment:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   pr_agent_job:
     if: ${{ github.event.sender.type != 'Bot' }}

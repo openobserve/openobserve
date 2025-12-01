@@ -196,6 +196,7 @@ const store = useStore();
 
 .chart-container-light {
   border: 1px solid #E7EAEE;
+  background: #ffffff;
 }
 
 .chart-container-dark {

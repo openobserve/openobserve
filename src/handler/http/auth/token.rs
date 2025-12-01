@@ -50,12 +50,25 @@ pub async fn token_validator(
     };
     let path_columns = path.split('/').collect::<Vec<&str>>();
 
+    // Check if this is an MCP endpoint request or has the MCP header
+    let is_mcp_endpoint = path_columns.get(1).map(|s| *s == "mcp").unwrap_or(false);
+    let has_mcp_header = req
+        .headers()
+        .get("x-o2-mcp")
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v == "true")
+        .unwrap_or_default();
+    let is_mcp_request = is_mcp_endpoint || has_mcp_header;
+
+    // For MCP requests with dynamic clients, skip audience validation
+    let login_flow = !is_mcp_request;
+
     match jwt::verify_decode_token(
         auth_info.auth.strip_prefix("Bearer").unwrap().trim(),
         &keys,
         &get_dex_config().client_id,
         false,
-        true,
+        login_flow,
     ) {
         Ok(res) => {
             let user_id = &res.0.user_email;
@@ -75,6 +88,9 @@ pub async fn token_validator(
                 let is_list_invite_call = path_columns.len() <= 2
                     && path_columns.first().is_some_and(|p| p.eq(&"invites"))
                     && (auth_info.method.eq("GET") || auth_info.method.eq("DELETE"));
+
+                // For MCP endpoints, allow any authenticated user from Dex
+                let allow_nonexistent_user = is_mcp_request;
                 let path_suffix = path_columns.last().unwrap_or(&"");
                 if path_suffix.eq(&"organizations")
                     || path_suffix.eq(&"clusters")
@@ -107,7 +123,13 @@ pub async fn token_validator(
                                 };
                             users::get_user(Some(org_id), user_id).await
                         }
-                        None => users::get_user(None, user_id).await,
+                        None => {
+                            if path_columns.len() == 1 && path_columns[0] == "license" {
+                                users::get_user(Some("_meta"), user_id).await
+                            } else {
+                                users::get_user(None, user_id).await
+                            }
+                        }
                     }
                 };
                 match user {
@@ -119,7 +141,10 @@ pub async fn token_validator(
                     // nothing else. Similarly for accepting invite, we will not have the
                     // user in db anymore, and the fn checks based on email and token, so ok to
                     // bypass
-                    None if (is_list_invite_call || is_member_subscription) => {
+                    None if (is_list_invite_call
+                        || is_member_subscription
+                        || allow_nonexistent_user) =>
+                    {
                         let mut req = req;
 
                         if req.method().eq(&Method::POST)

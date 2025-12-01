@@ -91,11 +91,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="dashboardPanelData.layout.vrlFunctionToggle"
           :icon="'img:' + getImageURL('images/common/function.svg')"
           title="Toggle Function Editor"
-          class="float-left"
-          size="28px"
           @update:model-value="onFunctionToggle"
           :disable="promqlMode"
-        />
+          class="float-left tw-h-[36px] o2-toggle-button-xs tw-mt-2 "
+        size="xs"
+        :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"        />
         <QueryTypeSelector></QueryTypeSelector>
       </div>
     </q-bar>
@@ -208,7 +208,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       input-debounce="0"
                       behavior="menu"
                       use-input
-                      filled
                       borderless
                       dense
                       hide-selected
@@ -219,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       option-value="function"
                       @update:modelValue="onFunctionSelect"
                       style="width: 100%"
-                    >
+                     hide-bottom-space>
                       <template #no-option>
                         <q-item>
                           <q-item-section>
@@ -582,6 +581,7 @@ export default defineComponent({
       filterFunctionOptions,
       onFunctionSelect,
       selectedStreamFieldsBasedOnUserDefinedSchema,
+      store,
     };
   },
 });

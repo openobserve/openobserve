@@ -16,6 +16,8 @@
 use config::get_config;
 
 pub mod handlers;
+#[cfg(feature = "enterprise")]
+pub mod query_optimization_recommendation;
 pub mod worker;
 
 // The main function that creates and runs the scheduler

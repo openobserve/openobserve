@@ -110,12 +110,6 @@ pub trait FileList: Sync + Send + 'static {
         limit: i64,
     ) -> Result<Vec<FileListDeleted>>;
     async fn list_deleted(&self) -> Result<Vec<FileListDeleted>>;
-    async fn get_min_ts(
-        &self,
-        org_id: &str,
-        stream_type: StreamType,
-        stream_name: &str,
-    ) -> Result<i64>;
     async fn get_min_date(
         &self,
         org_id: &str,
@@ -353,11 +347,6 @@ pub async fn query_deleted(
 #[inline]
 pub async fn list_deleted() -> Result<Vec<FileListDeleted>> {
     CLIENT.list_deleted().await
-}
-
-#[inline]
-pub async fn get_min_ts(org_id: &str, stream_type: StreamType, stream_name: &str) -> Result<i64> {
-    CLIENT.get_min_ts(org_id, stream_type, stream_name).await
 }
 
 #[inline]

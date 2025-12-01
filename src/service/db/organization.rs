@@ -94,9 +94,17 @@ pub async fn get_org_setting(org_id: &str) -> Result<OrganizationSetting, Error>
         ret.free_trial_expiry = trial_period_expiry;
         return Ok(ret);
     }
-    let _settings = db::get(&key).await?;
-    let mut settings: OrganizationSetting = json::from_slice(&_settings)?;
-    // cache the org setting
+
+    // Try to get settings from DB, but use default if not found
+    let mut settings: OrganizationSetting = match db::get(&key).await {
+        Ok(settings) => json::from_slice(&settings)?,
+        Err(Error::DbError(infra::errors::DbError::KeyNotExists(_))) => {
+            OrganizationSetting::default()
+        }
+        Err(e) => return Err(e),
+    };
+
+    // Cache the org setting (even if it's default)
     ORGANIZATION_SETTING
         .write()
         .await

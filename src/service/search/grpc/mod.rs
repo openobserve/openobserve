@@ -23,7 +23,6 @@ pub mod flight;
 pub mod storage;
 pub(crate) mod tantivy_result;
 pub(crate) mod tantivy_result_cache;
-pub(crate) mod utils;
 pub mod wal;
 
 pub type SearchTable = Result<(Vec<Arc<dyn TableProvider>>, ScanStats)>;

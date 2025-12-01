@@ -10,11 +10,11 @@
         </div>
       </div>
       <div class="col-auto">
-        <q-btn
+        <q-icon
           v-close-popup
-          round
-          flat
-          :icon="'img:' + getImageURL('images/common/close_icon.svg')"
+          name="cancel"
+          class="cursor-pointer tw-mr-3"
+          size="20px"
           data-test="json-editor-close"
         />
       </div>
@@ -54,13 +54,13 @@
         flat
         :label="t('common.cancel')"
         color="primary"
+        class="q-ml-sm o2-secondary-button tw-h-[36px]"
         v-close-popup
         data-test="json-editor-cancel"
       />
       <q-btn
-        class="text-bold no-border"
+        class="q-ml-sm o2-primary-button tw-h-[36px]"
         padding="sm lg"
-        color="secondary"
         no-caps
         :label="t('common.save')"
         :loading="saveJsonLoading"

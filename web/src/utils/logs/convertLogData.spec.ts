@@ -19,6 +19,20 @@ import { convertLogData, formatDate } from "./convertLogData";
 describe("convertLogData.ts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Mock getComputedStyle to return the expected theme color
+    Object.defineProperty(window, 'getComputedStyle', {
+      value: () => ({
+        getPropertyValue: (prop: string) => {
+          if (prop === '--o2-theme-color') {
+            return '#7A80C2';
+          }
+          return '';
+        }
+      }),
+      writable: true,
+      configurable: true
+    });
   });
 
   afterEach(() => {

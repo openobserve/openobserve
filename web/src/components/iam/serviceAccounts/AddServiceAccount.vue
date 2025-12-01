@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="add-service-account-dialog column full-height">
+  <q-card class="o2-side-dialog column full-height">
     <q-card-section class=" q-py-md tw-w-full">
       <div class="row items-center no-wrap q-py-sm">
         <div class="col ">
@@ -42,13 +42,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!beingUpdated"
             v-model="formData.email"
             :label="t('user.email') + ' *'"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-md showLabelOnTop"
+            class="showLabelOnTop tw-mt-2"
             ref="email"
             stack-label
-            outlined
-            filled
+            hide-bottom-space
+            borderless
             dense
             :rules="[
               (val: any, rules: any) =>
@@ -59,16 +57,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-input
             v-model="firstName"
             :label="t('user.description')"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-md showLabelOnTop q-mt-sm"
+            class="showLabelOnTop tw-mt-2"
             ref="description"
             stack-label
-            outlined
-            filled
+            hide-bottom-space
+            borderless
             dense
           />
-          <div class="flex justify-start">
+          <div class="flex justify-start tw-mt-6">
             <q-btn
               v-close-popup="true"
               class="q-mr-md o2-secondary-button tw-h-[36px]"
@@ -248,9 +244,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.add-service-account-dialog {
-  width: 30vw;
-}
-</style>

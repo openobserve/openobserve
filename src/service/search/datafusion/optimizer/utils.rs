@@ -72,6 +72,7 @@ impl TreeNodeRewriter for AddSortAndLimit {
             // skip projection,subqueryalias, analyze, that we can add limit/sort after them
             LogicalPlan::Projection(_)
             | LogicalPlan::SubqueryAlias(_)
+            | LogicalPlan::DescribeTable(_)
             | LogicalPlan::Analyze(_) => {
                 is_stop = false;
                 (Transformed::no(node), None)
@@ -318,6 +319,10 @@ pub fn is_empty_relation(plan: &LogicalPlan) -> bool {
 }
 
 pub fn is_place_holder_or_empty(plan: &Arc<dyn ExecutionPlan>) -> bool {
-    plan.exists(|plan| Ok(plan.name() == "PlaceholderRowExec" || plan.name() == "EmptyExec"))
-        .unwrap_or(true)
+    plan.exists(|plan| {
+        Ok(plan.name() == "PlaceholderRowExec"
+            || plan.name() == "EmptyExec"
+            || plan.name() == "DataSourceExec")
+    })
+    .unwrap_or(true)
 }

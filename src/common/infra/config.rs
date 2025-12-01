@@ -22,6 +22,7 @@ use config::{
         destinations::{Destination, Template},
         folder::Folder,
         function::Transform,
+        pipeline::Pipeline,
         promql::ClusterLeader,
         ratelimit::CachedUserRoles,
         stream::StreamParams,
@@ -93,6 +94,8 @@ pub static STREAM_EXECUTABLE_PIPELINES: Lazy<RwAHashMap<StreamParams, Executable
     Lazy::new(Default::default);
 pub static PIPELINE_STREAM_MAPPING: Lazy<RwAHashMap<String, StreamParams>> =
     Lazy::new(Default::default);
+
+pub static SCHEDULED_PIPELINES: Lazy<RwAHashMap<String, Pipeline>> = Lazy::new(Default::default);
 pub static USER_SESSIONS: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 pub static SHORT_URLS: Lazy<RwHashMap<String, ShortUrlRecord>> = Lazy::new(DashMap::default);
 pub static USER_ROLES_CACHE: Lazy<RwAHashMap<String, CachedUserRoles>> =

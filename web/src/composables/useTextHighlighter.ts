@@ -263,48 +263,22 @@ export function useTextHighlighter() {
       });
     }
     
-    // SECOND PASS: Merge consecutive quoted strings
-    // Example: "Success" "message" → "Success message"
+    // SECOND PASS: Preserve all tokens as-is
+    // IMPORTANT: We do NOT remove or modify quotes in the raw data
+    // Quotes like "POST /api/endpoint HTTP/1.1" are part of the actual log content
+    // Display quotes (when showQuotes=true) are added separately during rendering
     const mergedTokens: Array<{ content: string; type: string }> = [];
     let i = 0;
-    
+
     while (i < tokens.length) {
       const token = tokens[i];
-      
-      if (token.type === "quoted") {
-        // Start with first quoted string (remove quotes)
-        let mergedContent = token.content.slice(1, -1); // Remove outer quotes
-        let j = i + 1;
-        
-        // Look for pattern: whitespace + quoted string
-        while (j < tokens.length) {
-          if (tokens[j].type === "whitespace" && 
-              j + 1 < tokens.length && 
-              tokens[j + 1].type === "quoted") {
-            // Merge: add space + next quoted content (without quotes)
-            mergedContent += " " + tokens[j + 1].content.slice(1, -1);
-            j += 2; // Skip whitespace and quoted token
-          } else {
-            break; // No more consecutive quoted strings
-          }
-        }
-        
-        // If we merged multiple strings, create single token
-        if (j > i + 1) {
-          mergedTokens.push({ content: mergedContent, type: "token" });
-          i = j;
-        } else {
-          // Single quoted string, keep as-is
-          mergedTokens.push(token);
-          i++;
-        }
-      } else {
-        // Non-quoted token, keep as-is
-        mergedTokens.push(token);
-        i++;
-      }
+
+      // Keep all tokens exactly as they are in the raw data
+      // No quote removal, no merging - preserve original content
+      mergedTokens.push(token);
+      i++;
     }
-    
+
     return mergedTokens;
   }
 
@@ -450,8 +424,8 @@ export function useTextHighlighter() {
 
   /**
    * Processes text segments with both semantic coloring and keyword highlighting
-   * Quotes are always shown when requested, but background highlighting only applies to content
-   * 
+   * Each segment is processed individually to maintain semantic colorization
+   *
    * @param segments - Array of text segments to process
    * @param keywords - Keywords to highlight
    * @param colors - Color theme object
@@ -459,21 +433,73 @@ export function useTextHighlighter() {
    * @returns HTML string with applied styling
    */
   function processTextSegments(segments: Array<{ content: string; type: string }>, keywords: string[], colors: any, showQuotes: boolean = false): string {
-    // Always reconstruct the full text to handle merged consecutive quotes properly
-    const fullText = segments.map(s => s.content).join('');
-    const fullTextParts = splitTextByKeywords(fullText, keywords);
-    
-    // Process the full text as a single unit
-    return fullTextParts.map(part => {
-      const content = escapeHtml(part.text);
-      if (part.isHighlighted) {
-        return `<span style="background-color: rgb(255, 213, 0); color: black;">${content}</span>`;
-      } else {
-        const semanticType = detectSemanticType(part.text);
-        const semanticColor = getColorForType(semanticType, colors) || colors.stringValue;
-        return `<span style="color: ${semanticColor};">${content}</span>`;
+    let result = '';
+
+    // Add opening quote if requested
+    if (showQuotes) {
+      result += `<span style="color: ${colors.stringValue};">&quot;</span>`;
+    }
+
+    // Process each segment individually to preserve semantic colorization
+    result += segments.map(segment => {
+      // For whitespace, just return as-is with no special styling
+      if (segment.type === "whitespace") {
+        return segment.content;
       }
+
+      // For bracketed content, preserve brackets with semantic color for content
+      if (segment.type === "bracketed") {
+        const innerContent = segment.content.slice(1, -1); // Remove brackets temporarily for colorization
+        const semanticType = detectSemanticType(innerContent);
+        const semanticColor = getColorForType(semanticType, colors) || colors.stringValue;
+        return `<span style="color: #9ca3af;">[</span><span style="color: ${semanticColor};">${escapeHtml(innerContent)}</span><span style="color: #9ca3af;">]</span>`;
+      }
+
+      // For quoted content (quotes are part of the raw data), preserve quotes and treat as string
+      // Content inside quotes is kept as a simple string color - no individual semantic colorization
+      if (segment.type === "quoted") {
+        const innerContent = segment.content.slice(1, -1); // Extract content between quotes
+        const quoteChar = segment.content[0]; // Get the quote character (" or ')
+
+        // Split inner content by keywords for highlighting only
+        const parts = splitTextByKeywords(innerContent, keywords);
+        let processedContent = parts.map(part => {
+          const content = escapeHtml(part.text);
+          if (part.isHighlighted) {
+            // Highlighted keywords get yellow background
+            return `<span style="background-color: rgb(255, 213, 0); color: black;">${content}</span>`;
+          } else {
+            // Everything else inside quotes stays as string color
+            return `<span style="color: ${colors.stringValue};">${content}</span>`;
+          }
+        }).join('');
+
+        // Wrap with quotes (these are the data quotes, not display quotes)
+        return `<span style="color: ${colors.stringValue};">${escapeHtml(quoteChar)}</span>${processedContent}<span style="color: ${colors.stringValue};">${escapeHtml(quoteChar)}</span>`;
+      }
+
+      // For regular tokens, split by keywords and apply semantic colors
+      const parts = splitTextByKeywords(segment.content, keywords);
+      return parts.map(part => {
+        const content = escapeHtml(part.text);
+        if (part.isHighlighted) {
+          // Highlighted keywords get yellow background
+          return `<span style="background-color: rgb(255, 213, 0); color: black;">${content}</span>`;
+        } else {
+          // Apply semantic colorization based on content type
+          const semanticType = detectSemanticType(part.text);
+          const semanticColor = getColorForType(semanticType, colors) || colors.stringValue;
+          return `<span style="color: ${semanticColor};">${content}</span>`;
+        }
+      }).join('');
     }).join('');
+
+    // Add closing quote if requested
+    if (showQuotes) {
+      result += `<span style="color: ${colors.stringValue};">&quot;</span>`;
+    }
+
+    return result;
   }
 
   /**

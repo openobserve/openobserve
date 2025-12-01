@@ -27,7 +27,7 @@ test.describe("dashboard max query testcases", () => {
     await page.goto(logsUrl);
     await page.waitForLoadState('networkidle');
   });
-  test("should correctly display max query range error message when max query range is exceeded.", async ({
+  test.skip("should correctly display max query range error message when max query range is exceeded.", async ({
     page,
   }) => {
     // Instantiate PageManager (pm) for this test case

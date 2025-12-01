@@ -38,12 +38,20 @@ use tracing::Instrument;
 
 use super::promql;
 use crate::service::{
-    search as SearchService, self_reporting::http_report_metrics, setup_tracing_with_trace_id,
+    search::{self as SearchService, utils::is_permissable_function_error},
+    self_reporting::http_report_metrics,
+    setup_tracing_with_trace_id,
 };
 
 pub mod alert;
+#[cfg(feature = "enterprise")]
+pub mod deduplication;
 pub mod derived_streams;
 pub mod destinations;
+#[cfg(feature = "enterprise")]
+pub mod grouping;
+#[cfg(feature = "enterprise")]
+pub mod org_config;
 pub mod scheduler;
 pub mod templates;
 
@@ -174,15 +182,28 @@ impl QueryConditionExt for QueryCondition {
                         (end - start) / promql::MAX_DATA_POINTS,
                     ),
                     query_exemplars: false,
-                    no_cache: None,
+                    use_cache: None,
+                    search_type: Some(SearchEventType::Alerts),
+                    regions: vec![],
+                    clusters: vec![],
                 };
-                let resp = match promql::search::search(&trace_id, org_id, &req, "", 0).await {
-                    Ok(v) => v,
-                    Err(_) => {
-                        return Ok(eval_results);
-                    }
-                };
-                let promql::value::Value::Matrix(value) = resp else {
+                // check super cluster
+                #[cfg(not(feature = "enterprise"))]
+                let is_super_cluster = false;
+                #[cfg(feature = "enterprise")]
+                let is_super_cluster = o2_enterprise::enterprise::common::config::get_config()
+                    .super_cluster
+                    .enabled;
+                let resp =
+                    match promql::search::search(&trace_id, org_id, &req, "", 0, is_super_cluster)
+                        .await
+                    {
+                        Ok(v) => v,
+                        Err(_) => {
+                            return Ok(eval_results);
+                        }
+                    };
+                let config::meta::promql::value::Value::Matrix(value) = resp else {
                     log::warn!(
                         "Alert evaluate: trace_id: {trace_id}, PromQL query {v} returned unexpected response: {resp:?}"
                     );
@@ -387,6 +408,8 @@ impl QueryConditionExt for QueryCondition {
                         None
                     },
                     skip_wal: false,
+                    sampling_config: None,
+                    sampling_ratio: None,
                     streaming_output: false,
                     streaming_id: None,
                     histogram_interval: 0,
@@ -398,6 +421,7 @@ impl QueryConditionExt for QueryCondition {
                 search_type,
                 search_event_context,
                 use_cache: false,
+                clear_cache: false,
                 local_mode: None,
             };
             log::debug!(
@@ -420,7 +444,13 @@ impl QueryConditionExt for QueryCondition {
         // 1. Vec<Map<String, Value>> - for normal alert
         // 2. Vec<Vec<Map<String, Value>>> - for multi_time_range alert
         let resp = match resp {
-            Ok(v) => {
+            Ok(mut v) => {
+                // Check if function error is only query limit default error
+                if is_permissable_function_error(&v.function_error) {
+                    v.function_error.clear();
+                    v.is_partial = false;
+                }
+
                 // the search request doesn't via cache layer, so need report usage separately
                 http_report_metrics(
                     req_start,

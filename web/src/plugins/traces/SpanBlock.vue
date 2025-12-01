@@ -254,7 +254,7 @@ export default defineComponent({
         spanBlockWidth.value
       ) {
         style.right = 0;
-        style.top = "-5px";
+        style.top = "-0.3125rem";
       } else if (leftPosition.value > 50) {
         style.left = leftPosition.value * onePercent - labelWidth + "px";
       } else {

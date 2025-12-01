@@ -81,7 +81,7 @@ describe("Usage Component", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     // Mock successful API response for mounted hook
     const mockResponse = {
       data: {
@@ -93,10 +93,10 @@ describe("Usage Component", () => {
       }
     };
     mockBillingService.get_data_usage.mockResolvedValue(mockResponse);
-    
+
     // Mock quasar notify
     mockNotify = vi.fn(() => vi.fn()); // Returns dismiss function
-    
+
     wrapper = mount(Usage, {
       attachTo: "#app",
       global: {
@@ -117,7 +117,7 @@ describe("Usage Component", () => {
             template: "<div class='chart-renderer'></div>",
           },
           CustomChartRenderer: {
-            name: "CustomChartRenderer", 
+            name: "CustomChartRenderer",
             template: "<div class='custom-chart-renderer'></div>",
           },
         },
@@ -160,6 +160,7 @@ describe("Usage Component", () => {
     expect(wrapper.vm.usageData).toEqual({
       ingestion: "10.50",
       search: "5.25",
+      dataretention: "0.00",
       functions: "2.75",
       pipeline: "0.00",
       remotepipeline: "0.00"
@@ -239,7 +240,7 @@ describe("Usage Component", () => {
     };
     wrapper.vm.dataLoading = false;
     await nextTick();
-    
+
     expect(wrapper.text()).toContain("Ingestion");
     expect(wrapper.text()).toContain("Search");
     expect(wrapper.text()).toContain("Functions");
@@ -254,37 +255,12 @@ describe("Usage Component", () => {
     };
     wrapper.vm.dataLoading = false;
     await nextTick();
-    
+
     expect(wrapper.text()).toContain("10.50 GB");
     expect(wrapper.text()).toContain("5.25 GB");
     expect(wrapper.text()).toContain("2.75 GB");
   });
 
-  // Test 17: Theme-based styling classes
-  it("should apply correct theme-based CSS classes", async () => {
-    wrapper.vm.store.state.theme = "dark";
-    wrapper.vm.usageData = { ingestion: "1.00", search: "1.00", functions: "1.00" };
-    wrapper.vm.dataLoading = false;
-    await nextTick();
-    
-    const tileContents = wrapper.findAll(".tile-content");
-    tileContents.forEach(tile => {
-      expect(tile.classes()).toContain("dark-usage-tile-content");
-    });
-  });
-
-  // Test 18: Light theme styling
-  it("should apply light theme styling when theme is light", async () => {
-    wrapper.vm.store.state.theme = "light";
-    wrapper.vm.usageData = { ingestion: "1.00", search: "1.00", functions: "1.00" };
-    wrapper.vm.dataLoading = false;
-    await nextTick();
-    
-    const tileContents = wrapper.findAll(".tile-content");
-    tileContents.forEach(tile => {
-      expect(tile.classes()).toContain("light-usage-tile-content");
-    });
-  });
 
   // Test 19: GetUsage function call with notification
   it("should call getUsage and show notification", async () => {
@@ -297,14 +273,14 @@ describe("Usage Component", () => {
         ]
       }
     };
-    
+
     // The notification should have been called during component mounting
     // Let's test that the function completes successfully instead
     mockBillingService.get_data_usage.mockResolvedValue(mockResponse);
-    
+
     await wrapper.vm.getUsage();
     await flushPromises();
-    
+
     // Verify that the function ran successfully
     expect(wrapper.vm.dataLoading).toBe(false);
     expect(mockBillingService.get_data_usage).toHaveBeenCalled();
@@ -321,35 +297,36 @@ describe("Usage Component", () => {
         ]
       }
     };
-    
+
     mockBillingService.get_data_usage.mockResolvedValue(mockResponse);
-    
+
     await wrapper.vm.getUsage();
     await flushPromises();
-    
+
     expect(wrapper.vm.usageData).toEqual({
       ingestion: "10.50",
       search: "5.25",
       functions: "2.75",
       pipeline: "0.00",
-      remotepipeline: "0.00"
+      remotepipeline: "0.00",
+      dataretention: "0.00"
     });
   });
 
   // Test 21: GetUsage function handles API errors
   it("should handle API errors gracefully", async () => {
     const errorMessage = "API Error";
-    
+
     // Test that error handling works correctly
     mockBillingService.get_data_usage.mockRejectedValue(new Error(errorMessage));
-    
+
     try {
       await wrapper.vm.getUsage();
       await flushPromises();
     } catch (error) {
       // Error should be handled gracefully by the component
     }
-    
+
     // Verify that loading state is reset after error
     expect(wrapper.vm.dataLoading).toBe(false);
     expect(mockBillingService.get_data_usage).toHaveBeenCalled();
@@ -366,11 +343,11 @@ describe("Usage Component", () => {
       }
     };
     mockBillingService.get_data_usage.mockResolvedValue(mockResponse);
-    
+
     wrapper.vm.chartData = { some: "data" };
     wrapper.vm.selectUsageDate();
     expect(wrapper.vm.chartData).toEqual({});
-    
+
     await flushPromises();
   });
 
@@ -453,7 +430,7 @@ describe("Usage Component", () => {
     const series = wrapper.vm.dataModel.options.series;
     expect(Array.isArray(series)).toBe(true);
     expect(series.length).toBe(2);
-    
+
     const barSeries = series[0];
     expect(barSeries.type).toBe("bar");
     expect(barSeries.name).toBe("K8s Container Name");
@@ -484,12 +461,12 @@ describe("Usage Component", () => {
         ]
       }
     };
-    
+
     mockBillingService.get_data_usage.mockResolvedValue(mockResponse);
-    
+
     await wrapper.vm.getUsage();
     await flushPromises();
-    
+
     expect(wrapper.vm.usageData.ingestion).toBe("10.57");
     expect(wrapper.vm.usageData.search).toBe("5.23");
   });
@@ -505,12 +482,12 @@ describe("Usage Component", () => {
         ]
       }
     };
-    
+
     mockBillingService.get_data_usage.mockResolvedValue(mockResponse);
-    
+
     await wrapper.vm.getUsage();
     await flushPromises();
-    
+
     expect(wrapper.vm.usageData.ingestion).toBe("10.50");
     expect(wrapper.vm.usageData.search).toBe("5.25");
     expect(wrapper.vm.usageData.functions).toBe("2.75");
@@ -527,13 +504,13 @@ describe("Usage Component", () => {
       }
     };
     mockBillingService.get_data_usage.mockResolvedValue(mockResponse);
-    
+
     const orgIdentifier = "test-org";
     wrapper.vm.store.state.selectedOrganization.identifier = orgIdentifier;
-    
+
     await wrapper.vm.getUsage();
     await flushPromises();
-    
+
     expect(mockBillingService.get_data_usage).toHaveBeenCalledWith(
       orgIdentifier,
       "30days",
@@ -543,11 +520,11 @@ describe("Usage Component", () => {
 
   // Test 37: Loading state during API call
   it("should set loading state during API call", async () => {
-    const mockPromise = new Promise(() => {}); // Never resolves
+    const mockPromise = new Promise(() => { }); // Never resolves
     mockBillingService.get_data_usage.mockReturnValue(mockPromise);
-    
+
     wrapper.vm.getUsage();
-    
+
     expect(wrapper.vm.dataLoading).toBe(true);
   });
 
@@ -586,10 +563,10 @@ describe("Usage Component", () => {
     wrapper.vm.usageData = { ingestion: "1.00", search: "1.00", functions: "1.00" };
     wrapper.vm.dataLoading = false;
     await nextTick();
-    
+
     const usageTiles = wrapper.findAll('.usage-tile-title');
     const tileTexts = usageTiles.map((tile: any) => tile.text());
-    
+
     expect(tileTexts).toContain('Ingestion');
     expect(tileTexts).toContain('Search');
     expect(tileTexts).toContain('Functions');
@@ -600,7 +577,7 @@ describe("Usage Component", () => {
     wrapper.vm.dataLoading = true;
     wrapper.vm.usageData = {};
     await nextTick();
-    
+
     const tiles = wrapper.findAll('.usage-tile-title');
     const ingestionExists = tiles.some((tile: any) => tile.text().includes('Ingestion'));
     expect(ingestionExists).toBe(false);
@@ -611,7 +588,7 @@ describe("Usage Component", () => {
     wrapper.vm.usageData = {};
     wrapper.vm.dataLoading = false;
     await nextTick();
-    
+
     const tiles = wrapper.findAll('.usage-tile-title');
     const ingestionExists = tiles.some((tile: any) => tile.text().includes('Ingestion'));
     expect(ingestionExists).toBe(false);
@@ -630,17 +607,12 @@ describe("Usage Component", () => {
     expect(container.attributes('style')).toContain('width: 100%');
   });
 
-  // Test 47: Title row styling
-  it("should have correct title row styling", () => {
-    const titleRow = wrapper.find('.row.text-body1.tw-font-bold');
-    expect(titleRow.exists()).toBe(true);
-  });
 
   // Test 48: No data section visibility
   it("should show no data section when usage data is empty", async () => {
     wrapper.vm.usageData = {};
     await nextTick();
-    
+
     expect(wrapper.text()).toContain(wrapper.vm.t("billing.messageDataNotFound"));
   });
 
@@ -649,7 +621,7 @@ describe("Usage Component", () => {
     wrapper.vm.usageData = { ingestion: "1.00", search: "1.00", functions: "1.00" };
     wrapper.vm.dataLoading = false;
     await nextTick();
-    
+
     expect(wrapper.text()).toContain("GB"); // usageDataType.toUpperCase()
   });
 
@@ -692,12 +664,12 @@ describe("Usage Component", () => {
         ]
       }
     };
-    
+
     mockBillingService.get_data_usage.mockResolvedValue(mockResponse);
-    
+
     await wrapper.vm.getUsage();
     await flushPromises();
-    
+
     expect(wrapper.vm.usageData.ingestion).toBe("NaN"); // parseFloat of "invalid" is NaN
     expect(wrapper.vm.usageData.search).toBe("5.25");
   });

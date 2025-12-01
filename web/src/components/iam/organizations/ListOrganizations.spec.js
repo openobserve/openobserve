@@ -376,51 +376,6 @@ describe("ListOrganizations", () => {
     });
   });
 
-  describe("Theme Handling", () => {
-    it("should apply correct theme class to table header", () => {
-      const headerDiv = wrapper.find("[data-test='organizations-title-text']").element.parentElement;
-      expect(headerDiv.classList.contains("o2-table-header-light")).toBe(true);
-    });
-
-    it("should apply correct theme class to table", () => {
-      const table = wrapper.find(".o2-quasar-table");
-      expect(table.classes()).toContain("o2-quasar-table-light");
-    });
-
-    it("should handle dark theme", async () => {
-      const darkWrapper = mount(ListOrganizations, {
-        global: {
-          plugins: [i18n, router],
-          provide: {
-            store: {
-              ...mockStore,
-              state: {
-                ...mockStore.state,
-                theme: "dark"
-              }
-            },
-          },
-          stubs: {
-            QTable: {
-              template: '<div class="o2-quasar-table" :class="$attrs.class"><slot></slot></div>',
-              props: ['rows', 'columns']
-            },
-            QInput: true,
-            QIcon: true,
-            QBtn: true,
-            QDialog: true,
-            QTablePagination: true,
-            NoData: true,
-          },
-        },
-      });
-      
-      await darkWrapper.vm.$nextTick();
-      const table = darkWrapper.find(".o2-quasar-table");
-      expect(table.classes()).toContain("o2-quasar-table-dark");
-      darkWrapper.unmount();
-    });
-  });
 
   describe("Error Handling", () => {
 

@@ -31,6 +31,7 @@ class SchemaPage {
             logsSearchBarQueryEditor: '[data-test="logs-search-bar-query-editor"]',
             logsSearchBarRefreshBtn: '[data-test="logs-search-bar-refresh-btn"]',
             logsSearchErrorMessage: '[data-test="logs-search-error-message"]',
+            showQueryToggleBtn: '[data-test="logs-search-bar-show-query-toggle-btn"] div',
             // Stream creation locators
             logStreamAddStreamBtn: '[data-test="log-stream-add-stream-btn"]',
             nameLabel: 'Name *',
@@ -267,8 +268,6 @@ class SchemaPage {
             const fnEditorCountAfterReload = await this.page.locator(this.schemaLocators.fnEditor).count();
             
             if (fnEditorCountAfterReload === 0) {
-                // Take a screenshot for debugging
-                
                 // Skip the VRL editor click and try alternative approach
                 await this.page.locator(this.schemaLocators.logSearchIndexSelectStream).click();
                 await this.page.locator(this.schemaLocators.logSearchIndexSelectStream).fill(fromStream);
@@ -282,8 +281,20 @@ class SchemaPage {
                 return; // Exit early, skipping VRL editor interaction
             }
         }
-        
-        await this.page.locator(this.schemaLocators.fnEditor).locator('.monaco-editor').click();
+
+        // Try clicking the monaco editor, with toggle fallback if click fails
+        try {
+            await this.page.locator(this.schemaLocators.fnEditor).locator('.monaco-editor').click({ timeout: 3000 });
+        } catch (error) {
+            testLogger.warn('Failed to click monaco editor, trying toggle button');
+
+            // Click toggle button to reveal/enable VRL editor
+            await this.page.locator(this.schemaLocators.showQueryToggleBtn).nth(1).click({ force: true });
+            await this.page.waitForTimeout(1000);
+
+            // Retry clicking monaco editor
+            await this.page.locator(this.schemaLocators.fnEditor).locator('.monaco-editor').click();
+        }
         await this.page.locator(this.schemaLocators.logSearchIndexSelectStream).click();
         await this.page.locator(this.schemaLocators.logSearchIndexSelectStream).fill(fromStream);
         await this.page.getByText(fromStream).click();
@@ -293,6 +304,11 @@ class SchemaPage {
         await this.page.getByText(toStream).click();
         await this.page.waitForLoadState('networkidle');
         await this.page.waitForSelector('text=Loading...', { state: 'hidden' });
+
+        // Close the dropdown by pressing Escape or clicking outside
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(500);
+
         await this.page.locator(this.schemaLocators.logSearchIndexFieldsTable).getByTitle('_timestamp').click();
     }
 
@@ -305,7 +321,11 @@ class SchemaPage {
         await this.page.locator(this.schemaLocators.logStreamRefreshStatsBtn).click();
         await this.page.getByPlaceholder(this.schemaLocators.streamSearchPlaceholder).click();
         await this.page.getByPlaceholder(this.schemaLocators.streamSearchPlaceholder).click();
-        await this.page.getByRole('button', { name: this.schemaLocators.deleteButton }).click();
+
+        // Wait for the specific stream row and click its delete button
+        const streamRow = this.page.getByRole('row', { name: streamName });
+        await streamRow.waitFor({ state: 'visible', timeout: 10000 });
+        await streamRow.getByRole('button', { name: this.schemaLocators.deleteButton }).click();
         await this.page.getByRole('button', { name: this.schemaLocators.okButton }).click();
     }
 

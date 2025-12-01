@@ -1,6 +1,7 @@
 import { date } from "quasar";
 import { CURRENT_DASHBOARD_SCHEMA_VERSION } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import { getColorPalette } from "./colorPalette";
+import { fromZonedTime } from "date-fns-tz";
 
 const units: any = {
   bytes: [
@@ -1033,6 +1034,8 @@ export const validatePanel = (
   isFieldsValidationRequired: boolean = true,
   allStreamFields: any[] = [],
   pageKey: string = "dashboard",
+  store: any,
+  checkTimestampAlias: any,
 ) => {
   // Get current query index
   const currentQueryIndex = panelData?.layout?.currentQueryIndex || 0;
@@ -1042,6 +1045,22 @@ export const validatePanel = (
 
   // Validate panel content based on type
   validatePanelContentByType(panelData?.data, errors);
+
+  // Validate timestamp alias for SQL queries with custom query mode
+  if (panelData?.data?.queryType === "sql") {
+    const timestampColumn =
+      store.state.zoConfig.timestamp_column || "_timestamp";
+
+    panelData?.data?.queries?.forEach((queryObj: any, index: number) => {
+      if (queryObj?.query && queryObj?.customQuery) {
+        if (!checkTimestampAlias(queryObj.query)) {
+          errors.push(
+            `Alias '${timestampColumn}' is not allowed.`,
+          );
+        }
+      }
+    });
+  }
 
   if (isPromQLMode) {
     // 1. Chart type: only specific chart types are supported for PromQL
@@ -1055,6 +1074,7 @@ export const validatePanel = (
       "gauge",
       "html",
       "markdown",
+      "custom_chart",
     ];
     if (!allowedChartTypes.includes(panelData?.data?.type)) {
       errors.push(
@@ -1421,4 +1441,19 @@ export const getContrastColor = (
     // In light theme, prefer black text unless background is very dark
     return luminance > 0.5 ? "#000000" : "#FFFFFF";
   }
+};
+
+// Function to convert chart timestamp (timezone-adjusted) back to UTC
+export const getUTCTimestampFromZonedTimestamp = (
+  timestampMs: number,
+  currentTimeZone: string,
+) => {
+  if (!timestampMs) return null;
+
+  // Use fromZonedTime to convert from currentTimeZone back to UTC
+  const zonedDate = new Date(timestampMs);
+  const utcDate = fromZonedTime(zonedDate, currentTimeZone);
+  const utcMs = utcDate.getTime();
+
+  return Math.trunc(utcMs * 1000); // milliseconds to microseconds
 };

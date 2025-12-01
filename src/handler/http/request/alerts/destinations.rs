@@ -22,6 +22,8 @@ use crate::{
     handler::http::models::destinations::Destination,
     service::{alerts::destinations, db::alerts::destinations::DestinationError},
 };
+#[cfg(feature = "enterprise")]
+use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
 
 impl From<DestinationError> for HttpResponse {
     fn from(value: DestinationError) -> Self {
@@ -51,7 +53,7 @@ impl From<DestinationError> for HttpResponse {
     params(
         ("org_id" = String, Path, description = "Organization name"),
       ),
-    request_body(content = Destination, description = "Destination data", content_type = "application/json"),  
+    request_body(content = inline(Destination), description = "Destination data", content_type = "application/json"),  
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
@@ -97,7 +99,7 @@ pub async fn save_destination(
         ("org_id" = String, Path, description = "Organization name"),
         ("destination_name" = String, Path, description = "Destination name"),
       ),
-    request_body(content = Destination, description = "Destination data", content_type = "application/json"),  
+    request_body(content = inline(Destination), description = "Destination data", content_type = "application/json"),  
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
@@ -139,7 +141,7 @@ pub async fn update_destination(
         ("destination_name" = String, Path, description = "Destination name"),
       ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = Destination),
+        (status = 200, description = "Success",  content_type = "application/json", body = inline(Destination)),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()), 
     ),
     extensions(
@@ -173,7 +175,7 @@ async fn get_destination(path: web::Path<(String, String)>) -> Result<HttpRespon
         ("module" = Option<String>, Query, description = "Destination module filter, none, alert, or pipeline"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<Destination>),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Destination>)),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
@@ -184,6 +186,7 @@ async fn get_destination(path: web::Path<(String, String)>) -> Result<HttpRespon
 async fn list_destinations(
     path: web::Path<String>,
     req: HttpRequest,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
@@ -193,10 +196,10 @@ async fn list_destinations(
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
     {
-        let user_id = req.headers().get("user_id").unwrap();
+        let user_id = &user_email.user_id;
         match crate::handler::http::auth::validator::list_objects_for_user(
             &org_id,
-            user_id.to_str().unwrap(),
+            user_id,
             "GET",
             "destination",
         )

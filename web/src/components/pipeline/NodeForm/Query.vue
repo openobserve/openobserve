@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="add-stream-query-routing-section "
-    class="full-width stream-routing-section"
+    class="full-width stream-routing-section tw-h-full"
     :class="[
       store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
       { 'fullscreen-mode': isFullscreenMode },

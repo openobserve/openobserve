@@ -1,0 +1,29 @@
+// Project-local debug tasks
+//
+// For more documentation on how to configure debug tasks,
+// see: https://zed.dev/docs/debugger
+[
+  {
+    "label": "DBG OpenObserve",
+    "build": {
+      "command": "cargo",
+      "args": ["build"]
+    },
+    "program": "$ZED_WORKTREE_ROOT/target/debug/openobserve",
+    "env": {
+      "RUST_LOG": "debug",
+      "ZO_ROOT_USER_EMAIL": "root@example.com",
+      "ZO_ROOT_USER_PASSWORD": "Complexpass#123",
+      "ZO_QUERY_RECOMMENDATION_DURATION": "3600000000",
+      "ZO_QUERY_RECOMMENDATION_INTERVAL": "5",
+      "ZO_QUERY_RECOMMENDATION_TOP_K": "128",
+      "VITE_OPENOBSERVE_ENTERPRISE": "true",
+      "ZO_USAGE_BATCH_SIZE": "200",
+      "ZO_USAGE_PUBLISH_INTERVAL": "2",
+      "ZO_USAGE_REPORTING_ENABLED": "true"
+    },
+    "request": "launch",
+    "sourceLanguages": ["rust"],
+    "adapter": "CodeLLDB"
+  }
+]

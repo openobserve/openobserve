@@ -33,7 +33,7 @@
         unelevated
         size="sm"
         round
-        outline
+        borderless
         :title="t('dashboard.cancel')"
         @click.stop="cancelEdit"
         data-test="dashboard-color-by-series-cancel"
@@ -70,7 +70,7 @@
                   color="input-border"
                   bg-color="input-bg"
                   stack-label
-                  outlined
+                  borderless
                   label-slot
                   style="
                     top: none !important;
@@ -96,11 +96,10 @@
                 >
                   <q-input
                     v-model="series.color"
-                    filled
                     style="width: 90%"
                     class="input-spacing"
                     dense
-                  >
+                   borderless hide-bottom-space>
                     <template v-slot:append>
                       <q-icon
                         name="colorize"
@@ -159,6 +158,7 @@
         outline
         dense
         data-test="dashboard-addpanel-config-color-by-series-add-btn"
+        class="el-border"
       />
       <q-btn
         @click="applycolorBySeries"

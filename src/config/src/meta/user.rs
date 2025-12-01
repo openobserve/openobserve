@@ -121,6 +121,15 @@ impl UserRole {
             UserRole::ServiceAccount => "Service Account".to_string(),
         }
     }
+
+    /// Check if a string is a valid standard role name
+    /// Returns true if the string matches one of the UserRole enum variants
+    pub fn is_valid_role(role: &str) -> bool {
+        matches!(
+            role,
+            "admin" | "root" | "viewer" | "editor" | "user" | "service_account"
+        )
+    }
 }
 
 // Implementing FromStr for UserRole

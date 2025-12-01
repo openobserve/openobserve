@@ -93,7 +93,7 @@ describe("ErrorDetail Component", () => {
 
     it("should have correct container width", () => {
       const container = wrapper.find(".error_details");
-      expect(container.attributes("style")).toContain("width: 40vw");
+      expect(container.classes()).toContain("tw-w-[40vw]");
     });
   });
 
@@ -359,7 +359,7 @@ describe("ErrorDetail Component", () => {
 
     it("should maintain fixed width container", () => {
       const container = wrapper.find(".error_details");
-      expect(container.attributes("style")).toContain("width: 40vw");
+      expect(container.classes()).toContain("tw-w-[40vw]");
     });
   });
 

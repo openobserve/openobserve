@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-ma-md">
-    <CopyContent class="q-mt-sm" :content="content" />
+  <div class="q-pa-sm">
+    <CopyContent :content="content" />
   </div>
 </template>
 

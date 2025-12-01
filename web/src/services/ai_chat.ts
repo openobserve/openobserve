@@ -14,8 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import { generateTraceContext } from "@/utils/zincutils";
 
 export const getAiChat = (messages: any) => {
-  return http().post("/api/default/ai/chat_stream", { messages });
+  const { traceparent } = generateTraceContext();
+  return http({ headers: { traceparent } }).post("/api/default/ai/chat_stream", { messages });
 };
 

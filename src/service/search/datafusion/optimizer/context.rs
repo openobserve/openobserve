@@ -45,6 +45,7 @@ pub struct StreamingAggregationContext {
     pub start_time: i64,
     pub end_time: i64,
     pub is_complete_cache_hit: Arc<Mutex<bool>>,
+    pub overwrite_cache: bool,
 }
 
 #[cfg(feature = "enterprise")]
@@ -76,6 +77,7 @@ impl StreamingAggregationContext {
             start_time: request.time_range.unwrap_or((0, 0)).0,
             end_time: request.time_range.unwrap_or((0, 0)).1,
             is_complete_cache_hit,
+            overwrite_cache: request.overwrite_cache,
         }))
     }
 }
@@ -89,6 +91,7 @@ pub fn generate_streaming_agg_rules(
         context.start_time,
         context.end_time,
         context.is_complete_cache_hit,
+        context.overwrite_cache,
     )) as _
 }
 

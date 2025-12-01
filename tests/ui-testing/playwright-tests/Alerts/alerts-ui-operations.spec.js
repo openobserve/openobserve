@@ -63,20 +63,23 @@ test.describe("Alerts UI Operations", () => {
   /**
    * Test: Delete alert template functionality
    * Verifies template deletion and in-use scenarios
+   * Uses isolated template to avoid conflicts with other tests
    */
   test('Verify Delete alert template functionality', {
     tag: ['@deleteTemplate', '@all', '@alerts']
   }, async ({ page }) => {
-    // Ensure template exists
-    createdTemplateName = 'auto_playwright_template_' + sharedRandomValue;
-    await pm.alertTemplatesPage.ensureTemplateExists(createdTemplateName);
+    // Create isolated template specifically for deletion test
+    const deleteTemplateName = 'auto_playwright_delete_template_' + sharedRandomValue;
+    await pm.alertTemplatesPage.createTemplate(deleteTemplateName);
+    testLogger.info('Created isolated template for deletion test', { templateName: deleteTemplateName });
 
     // Navigate to templates page
     await pm.alertTemplatesPage.navigateToTemplates();
     await page.waitForTimeout(2000);
 
     // Test template deletion
-    await pm.alertTemplatesPage.deleteTemplateAndVerify(createdTemplateName);
+    await pm.alertTemplatesPage.deleteTemplateAndVerify(deleteTemplateName);
+    testLogger.info('Successfully deleted isolated template', { templateName: deleteTemplateName });
   });
 
   /**
@@ -128,10 +131,10 @@ test.describe("Alerts UI Operations", () => {
   test('Alert Module UI Validations and Filters Check', {
     tag: ['@all', '@alerts', '@alertsUIValidations']
   }, async ({ page }) => {
-    // Create template
+    // Ensure template exists
     const templateName = 'auto_playwright_template_' + sharedRandomValue;
-    await pm.alertTemplatesPage.createTemplate(templateName);
-    testLogger.info('Created template', { templateName });
+    await pm.alertTemplatesPage.ensureTemplateExists(templateName);
+    testLogger.info('Template ready for use', { templateName });
 
     // Create destination
     const destinationName = 'auto_playwright_destination_' + sharedRandomValue;

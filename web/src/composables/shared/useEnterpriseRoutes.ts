@@ -33,8 +33,8 @@ const Quota = () => import("@/components/iam/quota/Quota.vue");
 const Organizations = () =>
   import("@/components/iam/organizations/AppOrganizations.vue");
 
-const ActionScipts = () =>
-  import("@/components/actionScripts/ActionScipts.vue");
+const ActionScripts = () =>
+  import("@/components/actionScripts/ActionScripts.vue");
 
 const Invitations = () => import("@/views/Invitations.vue");
 
@@ -93,10 +93,7 @@ const useEnterpriseRoutes = () => {
     routes.push({
       path: "actions",
       name: "actionScripts",
-      meta:{
-        title: "Action Scripts",
-      },
-      component: ActionScipts,
+      component: ActionScripts,
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -117,7 +114,7 @@ const useEnterpriseRoutes = () => {
         {
           path: "groups/edit/:group_name",
           name: "editGroup",
-          meta:{
+          meta: {
             title: "Edit Group",
           },
           component: EditGroup,
@@ -128,7 +125,7 @@ const useEnterpriseRoutes = () => {
         {
           path: "roles",
           name: "roles",
-          meta:{
+          meta: {
             title: "Roles",
           },
           component: AppRoles,
@@ -139,7 +136,7 @@ const useEnterpriseRoutes = () => {
         {
           path: "roles/edit/:role_name",
           name: "editRole",
-          meta:{
+          meta: {
             title: "Edit Role",
           },
           component: EditRole,
@@ -150,9 +147,6 @@ const useEnterpriseRoutes = () => {
         {
           path: "quota",
           name: "quota",
-          meta: {
-            title: "Quota",
-          },
           component: Quota,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);

@@ -5,7 +5,11 @@
   >
     <div
       class="flex justify-between q-px-sm q-py-xs"
-      :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-indigo-1'"
+      :class="
+        store.state.theme === 'dark'
+          ? 'bg-grey-9'
+          : 'tw-bg-[var(--o2-table-header-bg)]'
+      "
     >
       <div class="trace-name text-body2 text-bold">
         <span class="q-mr-xs"> {{ item?.service_name }}:</span>

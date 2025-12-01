@@ -29,14 +29,14 @@ installQuasar({
 // Create i18n instance
 const i18n = createI18n({
   legacy: false,
-  locale: 'en',
+  locale: "en",
   messages: {
     en: {
       search: {
-        queryRangeRestrictionMsg: 'Query range restricted to {range}'
-      }
-    }
-  }
+        queryRangeRestrictionMsg: "Query range restricted to {range}",
+      },
+    },
+  },
 });
 
 // Create test wrapper component
@@ -44,13 +44,13 @@ const TestComponent = defineComponent({
   setup() {
     const histogram = useHistogram();
     return {
-      ...histogram
+      ...histogram,
     };
   },
-  template: '<div></div>'
+  template: "<div></div>",
 });
 
-describe('useHistogram Composable', () => {
+describe("useHistogram Composable", () => {
   let wrapper: any;
 
   beforeEach(() => {
@@ -65,44 +65,40 @@ describe('useHistogram Composable', () => {
     vi.clearAllMocks();
   });
 
-  describe('Histogram Functions', () => {
-    it('should have generateHistogramSkeleton function', () => {
-      expect(typeof wrapper.vm.generateHistogramSkeleton).toBe('function');
+  describe("Histogram Functions", () => {
+    it("should have generateHistogramSkeleton function", () => {
+      expect(typeof wrapper.vm.generateHistogramSkeleton).toBe("function");
     });
 
-    it('should have generateHistogramData function', () => {
-      expect(typeof wrapper.vm.generateHistogramData).toBe('function');
+    it("should have generateHistogramData function", () => {
+      expect(typeof wrapper.vm.generateHistogramData).toBe("function");
     });
 
-    it('should have getHistogramTitle function', () => {
-      expect(typeof wrapper.vm.getHistogramTitle).toBe('function');
+    it("should have getHistogramTitle function", () => {
+      expect(typeof wrapper.vm.getHistogramTitle).toBe("function");
     });
 
-    it('should have getHistogramQueryData function', () => {
-      expect(typeof wrapper.vm.getHistogramQueryData).toBe('function');
+    it("should have resetHistogramWithError function", () => {
+      expect(typeof wrapper.vm.resetHistogramWithError).toBe("function");
     });
 
-    it('should have resetHistogramWithError function', () => {
-      expect(typeof wrapper.vm.resetHistogramWithError).toBe('function');
+    it("should have setMultiStreamHistogramQuery function", () => {
+      expect(typeof wrapper.vm.setMultiStreamHistogramQuery).toBe("function");
     });
 
-    it('should have setMultiStreamHistogramQuery function', () => {
-      expect(typeof wrapper.vm.setMultiStreamHistogramQuery).toBe('function');
-    });
-
-    it('should have isHistogramEnabled function', () => {
-      expect(typeof wrapper.vm.isHistogramEnabled).toBe('function');
+    it("should have isHistogramEnabled function", () => {
+      expect(typeof wrapper.vm.isHistogramEnabled).toBe("function");
     });
   });
 
-  describe('generateHistogramSkeleton', () => {
-    it('should generate histogram skeleton data', async () => {
+  describe("generateHistogramSkeleton", () => {
+    it("should generate histogram skeleton data", async () => {
       const { generateHistogramSkeleton } = wrapper.vm;
       await generateHistogramSkeleton();
       expect(generateHistogramSkeleton).toHaveBeenCalled;
     });
 
-    it('should handle custom time ranges', async () => {
+    it("should handle custom time ranges", async () => {
       const { generateHistogramSkeleton } = wrapper.vm;
       await generateHistogramSkeleton();
       expect(generateHistogramSkeleton).toHaveBeenCalled;

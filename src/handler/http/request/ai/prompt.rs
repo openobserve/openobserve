@@ -17,7 +17,9 @@ use std::io::Error;
 
 use actix_web::{HttpResponse, Result, delete, get, http::StatusCode, put, web};
 use config::meta::ai::PromptType;
-use o2_enterprise::enterprise::ai::prompt::{meta::UpdatePromptRequest, service as prompt_service};
+use o2_enterprise::enterprise::ai::agent::prompt::{
+    meta::UpdatePromptRequest, service as prompt_service,
+};
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse, handler::http::models::ai::PromptResponse,
@@ -37,7 +39,7 @@ use crate::{
         ("org_id" = String, Path, description = "Organization name")
     ),
     responses(
-        (status = StatusCode::OK, description = "Chat response", body = PromptResponse),
+        (status = StatusCode::OK, description = "Chat response", body = inline(PromptResponse)),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
         (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
     ),
@@ -76,7 +78,7 @@ pub async fn list_prompts(org_id: web::Path<String>) -> Result<HttpResponse, Err
         ("id" = String, Path, description = "Prompt ID")
     ),
     responses(
-        (status = StatusCode::OK, description = "Prompt retrieved", body = PromptResponse),
+        (status = StatusCode::OK, description = "Prompt retrieved", body = inline(PromptResponse)),
         (status = StatusCode::NOT_FOUND, description = "Prompt not found", body = Object),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
         (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
@@ -116,14 +118,14 @@ pub async fn get_prompt(path: web::Path<(String, PromptType)>) -> Result<HttpRes
         ("org_id" = String, Path, description = "Organization name")
     ),
     request_body(
-        content = UpdatePromptRequest,
+        content = inline(UpdatePromptRequest),
         description = "Prompt details", 
         example = json!({
             "content": "Write a SQL query to get the top 10 users by response time in the default stream"
         }),
     ),
     responses(
-        (status = StatusCode::OK, description = "Prompt updated", body = PromptResponse), 
+        (status = StatusCode::OK, description = "Prompt updated", body = inline(PromptResponse)), 
         (status = StatusCode::NOT_FOUND, description = "Prompt not found", body = Object),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
         (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
@@ -193,7 +195,7 @@ pub async fn update_prompt(
         ("org_id" = String, Path, description = "Organization name")
     ),
     responses(
-        (status = StatusCode::OK, description = "Prompt rolled back to default", body = PromptResponse),
+        (status = StatusCode::OK, description = "Prompt rolled back to default", body = inline(PromptResponse)),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
         (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
     ),

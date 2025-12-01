@@ -22,14 +22,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ErrorTag :tag="{ key: tag, value }" />
       </template>
     </div>
-    <div
-      class="play-button bg-primary cursor-pointer q-mt-md text-white row items-center"
-      style="width: fit-content; border-radius: 3px; padding: 6px 8px"
+    <q-btn
+      class="bg-primary rounded text-white tw-mt-[0.625rem]"
+      no-caps
+      title="View Session Replay"
       @click="playSessionReplay"
     >
-      <q-icon name="play_circle" size="18px" class="q-mr-xs" /> Play Session
-      Replay
-    </div>
+      <q-icon name="play_circle" size="1.125rem" class="q-mr-xs" /> 
+      Play Session Replay
+    </q-btn>
   </div>
 </template>
 

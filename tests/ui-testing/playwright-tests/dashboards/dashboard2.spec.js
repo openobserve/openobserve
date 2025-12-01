@@ -309,11 +309,11 @@ test.describe("dashboard UI testcases", () => {
     await waitForDateTimeButtonToBeEnabled(page);
     await pm.dashboardTimeRefresh.setRelative("6", "w");
 
-    await pm.dashboardPanelActions.applyDashboardBtn();
+    // await pm.dashboardPanelActions.applyDashboardBtn();
 
     // Set absolute date-time and timezone
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.selectAbsolutetime("8", "16");
+    await pm.dashboardTimeRefresh.selectAbsolutetime("1", "1");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
 

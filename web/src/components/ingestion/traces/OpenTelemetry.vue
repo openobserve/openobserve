@@ -15,28 +15,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
-    <div class="title q-pl-md q-pt-md" data-test="vector-title-text">
+  <div class="q-pa-sm">
+    <div class="title" data-test="vector-title-text">
       <b>OTLP HTTP</b>
-    </div>
-    <div class="q-ma-md">
+    
       <CopyContent
-        class="q-mt-sm"
         :content="copyHTTPTracesContentURL"
         :displayContent="'HTTP Endpoint: ' + copyHTTPTracesContentURL"
       />
       <CopyContent
-        class="q-mt-sm"
         :content="copyHTTPTracesContentPasscode"
         :displayContent="'Authorization: ' + copyHTTPTracesContentPasscode"
       />
     </div>
 
-    <div class="title q-pl-md q-pt-md" data-test="vector-title-text">
+    <div class="title q-pt-md" data-test="vector-title-text">
       <b>OTLP gRPC</b>
-    </div>
-    <div class="q-ma-md">
-      <CopyContent class="q-mt-sm" :content="copyGRPCTracesContent" />
+      <CopyContent :content="copyGRPCTracesContent" />
     </div>
   </div>
 </template>

@@ -176,19 +176,6 @@ describe("PanelContainer", () => {
       expect(wrapper.find('[data-test="dashboard-panel-drag"]').exists()).toBe(false);
     });
 
-    it("should apply dark theme class", () => {
-      store.state.theme = "dark";
-      wrapper = createWrapper();
-
-      expect(wrapper.find('.dark-mode').exists()).toBe(true);
-    });
-
-    it("should apply light theme class", () => {
-      store.state.theme = "light";
-      wrapper = createWrapper();
-
-      expect(wrapper.find('.bg-white').exists()).toBe(true);
-    });
   });
 
   describe("Panel Header", () => {

@@ -110,7 +110,7 @@ describe("Billing Component", () => {
     it("should initialize with correct data", () => {
       expect(wrapper.vm.billingtab).toBe("plans"); // Should be set to "plans" in onMounted
       expect(wrapper.vm.usageDataType).toBe("gb");
-      expect(wrapper.vm.splitterModel).toBe(200);
+      expect(wrapper.vm.splitterModel).toBe(220);
       expect(wrapper.vm.usageDate).toBe("30days");
     });
 

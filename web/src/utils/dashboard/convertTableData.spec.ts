@@ -592,8 +592,143 @@ describe("convertTableData", () => {
     ]];
 
     const result = convertTableData(schemaWithDynamicColumns, mixedData, mockStore);
-    
     expect(result.columns.length).toBeGreaterThan(2);
     expect(result.rows).toHaveLength(3);
+  });
+
+  it("should apply unit configuration from override_config for numeric columns", () => {
+    const schemaWithUnitOverride = {
+      ...mockPanelSchema,
+      config: {
+        ...mockPanelSchema.config,
+        decimals: 3,
+        unit: "bytes",
+        unit_custom: "KB",
+        override_config: [
+          {
+            field: {
+              match_by: "exact",
+              value: "value"
+            },
+            config: [
+              {
+                type: "unit",
+                value: {
+                  unit: "percent",
+                  custom_unit: "%"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      queries: [{
+        fields: {
+          x: [],
+          y: [{ alias: "value", column: "value" }]
+        },
+        customQuery: false
+      }]
+    };
+
+    const numericData = [[
+      { timestamp: "2023-01-01T00:00:00", value: 45.678 },
+      { timestamp: "2023-01-01T01:00:00", value: 78.912 },
+      { timestamp: "2023-01-01T02:00:00", value: 123.456 }
+    ]];
+
+    const result = convertTableData(schemaWithUnitOverride, numericData, mockStore);
+
+    expect(result.columns).toBeDefined();
+    expect(result.columns.length).toBeGreaterThan(0);
+    expect(result.rows).toHaveLength(3);
+
+    // Find the value column
+    const valueColumn = result.columns.find((col: any) => col.field === "value");
+    expect(valueColumn).toBeDefined();
+    expect(valueColumn.format).toBeDefined();
+  });
+
+  it("should correctly sort numeric columns with custom sort function", () => {
+    const schemaWithNumericColumn = {
+      ...mockPanelSchema,
+      config: {
+        ...mockPanelSchema.config,
+        decimals: 2
+      },
+      queries: [{
+        fields: {
+          x: [],
+          y: [{ alias: "score", column: "score" }]
+        },
+        customQuery: false
+      }]
+    };
+
+    const unsortedData = [[
+      { timestamp: "2023-01-01T00:00:00", score: 45.5 },
+      { timestamp: "2023-01-01T01:00:00", score: 12.3 },
+      { timestamp: "2023-01-01T02:00:00", score: 89.7 },
+      { timestamp: "2023-01-01T03:00:00", score: 3.14 }
+    ]];
+
+    const result = convertTableData(schemaWithNumericColumn, unsortedData, mockStore);
+
+    // Find the score column
+    const scoreColumn = result.columns.find((col: any) => col.field === "score");
+    expect(scoreColumn).toBeDefined();
+    expect(scoreColumn.sort).toBeDefined();
+    expect(scoreColumn.sortable).toBe(true);
+    expect(scoreColumn.align).toBe("right"); // Numbers should be right-aligned
+
+    // Test the sort function
+    if (scoreColumn.sort) {
+      expect(scoreColumn.sort(12.3, 45.5)).toBeLessThan(0);
+      expect(scoreColumn.sort(89.7, 45.5)).toBeGreaterThan(0);
+      expect(scoreColumn.sort(45.5, 45.5)).toBe(0);
+    }
+  });
+
+  it("should set colorMode to auto when autoColor is enabled in override_config", () => {
+    const schemaWithAutoColor = {
+      ...mockPanelSchema,
+      config: {
+        ...mockPanelSchema.config,
+        override_config: [
+          {
+            field: {
+              match_by: "exact",
+              value: "status"
+            },
+            config: [
+              {
+                type: "unique_value_color",
+                autoColor: true
+              }
+            ]
+          }
+        ]
+      },
+      queries: [{
+        fields: {
+          x: [],
+          y: [{ alias: "status", column: "status" }]
+        },
+        customQuery: false
+      }]
+    };
+
+    const colorData = [[
+      { timestamp: "2023-01-01T00:00:00", status: "active" },
+      { timestamp: "2023-01-01T01:00:00", status: "inactive" },
+      { timestamp: "2023-01-01T02:00:00", status: "pending" }
+    ]];
+
+    const result = convertTableData(schemaWithAutoColor, colorData, mockStore);
+
+    // Find the status column
+    const statusColumn = result.columns.find((col: any) => col.field === "status");
+    expect(statusColumn).toBeDefined();
+    expect(statusColumn.colorMode).toBe("auto");
   });
 });

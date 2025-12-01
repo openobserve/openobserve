@@ -26,18 +26,23 @@ use crate::{
 pub const USER_SESSION_KEY: &str = "/user_sessions/";
 
 pub async fn get(session_id: &str) -> Result<String, anyhow::Error> {
-    match USER_SESSIONS.get(session_id) {
-        Some(val) => Ok(val.to_string()),
-        None => {
-            let val = db::get(&format!("{USER_SESSION_KEY}{session_id}")).await?;
-            // base64 format: convert bytes to string and trim any quotes
-            let val = String::from_utf8(val.to_vec())
-                .unwrap()
-                .trim_matches('"')
-                .to_string();
-            Ok(val)
-        }
+    if let Some(val) = USER_SESSIONS.get(session_id) {
+        return Ok(val.to_string());
     }
+
+    // get from db
+    log::warn!("Cache miss for user session, read from db: {}", session_id);
+    let val = db::get(&format!("{USER_SESSION_KEY}{session_id}")).await?;
+    // json format: convert bytes to string and trim any quotes
+    let val = String::from_utf8(val.to_vec())
+        .unwrap()
+        .trim_matches('"')
+        .to_string();
+    // cache it in memory
+    if !val.is_empty() {
+        USER_SESSIONS.insert(session_id.to_string(), val.to_string());
+    }
+    Ok(val)
 }
 
 pub async fn set(session_id: &str, val: &str) -> Result<(), anyhow::Error> {

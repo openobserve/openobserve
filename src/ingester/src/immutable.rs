@@ -16,13 +16,10 @@
 use std::{path::PathBuf, sync::Arc};
 
 use config::metrics;
-use hashbrown::HashSet;
 use once_cell::sync::Lazy;
+use scc::HashSet;
 use snafu::ResultExt;
-use tokio::{
-    fs,
-    sync::{RwLock, mpsc},
-};
+use tokio::{fs, sync::mpsc};
 
 use crate::{
     ReadRecordBatchEntry,
@@ -36,8 +33,7 @@ use crate::{
 pub(crate) static IMMUTABLES: Lazy<RwIndexMap<PathBuf, Arc<Immutable>>> =
     Lazy::new(RwIndexMap::default);
 
-static PROCESSING_TABLES: Lazy<RwLock<HashSet<PathBuf>>> =
-    Lazy::new(|| RwLock::new(HashSet::new()));
+static PROCESSING_TABLES: Lazy<HashSet<PathBuf>> = Lazy::new(HashSet::new);
 
 pub(crate) struct Immutable {
     idx: usize,
@@ -52,13 +48,16 @@ pub async fn read_from_immutable(
     time_range: Option<(i64, i64)>,
     partition_filters: &[(String, Vec<String>)],
 ) -> Result<Vec<ReadRecordBatchEntry>> {
+    let shared_memtable = config::get_config().common.feature_shared_memtable_enabled;
     let r = IMMUTABLES.read().await;
     let mut batches = Vec::with_capacity(r.len());
     for (_, i) in r.iter() {
-        if org_id == i.key.org_id.as_ref() && stream_type == i.key.stream_type.as_ref() {
+        if stream_type == i.key.stream_type.as_ref()
+            && (shared_memtable || org_id == i.key.org_id.as_ref())
+        {
             batches.extend(
                 i.memtable
-                    .read(stream_name, time_range, partition_filters)?,
+                    .read(org_id, stream_name, time_range, partition_filters)?,
             );
         }
     }
@@ -121,15 +120,14 @@ pub(crate) async fn persist(tx: mpsc::Sender<PathBuf>) -> Result<()> {
     drop(r);
     for path in paths {
         // check if the file is processing
-        if PROCESSING_TABLES.read().await.contains(&path) {
+        if PROCESSING_TABLES.contains_async(&path).await {
             continue;
         }
         tx.send(path.clone()).await.context(TokioMpscSendSnafu)?;
-        PROCESSING_TABLES.write().await.insert(path);
+        let _ = PROCESSING_TABLES.insert_async(path).await;
     }
 
     IMMUTABLES.write().await.shrink_to_fit();
-    PROCESSING_TABLES.write().await.shrink_to_fit();
 
     Ok(())
 }
@@ -156,7 +154,7 @@ pub(crate) async fn persist_table(idx: usize, path: PathBuf) -> Result<()> {
         Ok(v) => v,
         Err(e) => {
             // remove from processing tables
-            PROCESSING_TABLES.write().await.remove(&path);
+            PROCESSING_TABLES.remove_async(&path).await;
             return Err(e);
         }
     };
@@ -177,7 +175,7 @@ pub(crate) async fn persist_table(idx: usize, path: PathBuf) -> Result<()> {
     drop(rw);
 
     // remove from processing tables
-    PROCESSING_TABLES.write().await.remove(&path);
+    PROCESSING_TABLES.remove_async(&path).await;
 
     // update metrics
     metrics::INGEST_MEMTABLE_BYTES

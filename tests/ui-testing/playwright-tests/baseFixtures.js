@@ -10,6 +10,7 @@ export function generateUUID() {
   return crypto.randomBytes(16).toString('hex');
 }
 
+
 export const test = baseTest.extend({
   context: async ({ context }, use) => {
     await context.addInitScript(() =>
@@ -39,6 +40,10 @@ export const test = baseTest.extend({
         testLogger.error('Failed to collect final coverage for page', { error });
       }
     }));
+  },
+
+  page: async ({ page }, use) => {
+    await use(page);
   }
 });
 

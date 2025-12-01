@@ -15,15 +15,19 @@
 
 use std::io::Error;
 
-use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
+#[cfg(not(feature = "enterprise"))]
+use actix_web::HttpRequest;
+use actix_web::{HttpResponse, delete, get, post, put, web};
 #[cfg(feature = "enterprise")]
 use {
     crate::cipher::{KeyAddRequest, KeyGetResponse, KeyInfo, KeyListResponse},
     crate::common::{
         meta::authz::Authz,
-        utils::auth::{remove_ownership, set_ownership},
+        utils::auth::{UserEmail, remove_ownership, set_ownership},
     },
+    crate::handler::http::extractors::Headers,
     actix_web::http,
+    actix_web::web::Json,
     config::utils::time::now_micros,
     infra::table::cipher::CipherEntry,
     o2_enterprise::enterprise::cipher::{Cipher, CipherData, http_repr::merge_updates},
@@ -42,7 +46,7 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
                    and validated before being made available for use. Key names cannot contain ':' characters. Only \
                    available in enterprise deployments for enhanced data security and compliance requirements.",
     request_body(
-        content = KeyAddRequest,
+        content = inline(KeyAddRequest),
         description = "Key data to add",
         content_type = "application/json",
     ),
@@ -60,19 +64,12 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 #[post("/{org_id}/cipher_keys")]
 pub async fn save(
     org_id: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
     body: web::Json<KeyAddRequest>,
-    in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let req = body.into_inner();
 
-    let user_id = match in_req
-        .headers()
-        .get("user_id")
-        .and_then(|v| v.to_str().ok())
-    {
-        Some(id) => id,
-        None => return Ok(MetaHttpResponse::bad_request("Invalid user_id in request")),
-    };
+    let user_id = user_email.user_id;
 
     if req.name.contains(":") {
         return Ok(MetaHttpResponse::bad_request(
@@ -133,7 +130,7 @@ pub async fn save(
 #[post("/{org_id}/cipher_keys")]
 pub async fn save(
     _org_id: web::Path<String>,
-    mut _body: web::Payload,
+    _body: web::Payload,
     _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     Ok(MetaHttpResponse::forbidden("not supported"))
@@ -326,7 +323,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         ("key_name" = String, Path, description = "name of the key to update", example = "test_key")
     ),
     request_body(
-        content = KeyAddRequest,
+        content = inline(KeyAddRequest),
         description = "updated key data",
         content_type = "application/json",
     ),
@@ -344,25 +341,18 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
 #[put("/{org_id}/cipher_keys/{key_name}")]
 pub async fn update(
     path: web::Path<(String, String)>,
-    body: web::Json<KeyAddRequest>,
-    in_req: HttpRequest,
+    Headers(user_email): Headers<UserEmail>,
+    Json(req): Json<KeyAddRequest>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, key_name) = path.into_inner();
-    let req = body.into_inner();
+
     if key_name != req.name {
         return Ok(MetaHttpResponse::bad_request(
             "Key name from request does not match path",
         ));
     }
 
-    let user_id = match in_req
-        .headers()
-        .get("user_id")
-        .and_then(|v| v.to_str().ok())
-    {
-        Some(id) => id,
-        None => return Ok(MetaHttpResponse::bad_request("Invalid user_id in request")),
-    };
+    let user_id = user_email.user_id;
 
     if req.name.contains(":") {
         return Ok(MetaHttpResponse::bad_request(

@@ -142,10 +142,14 @@ describe("FunctionSelector", () => {
 
   // Computed Properties Tests
   it("should compute functionToggleIcon based on showTransformEditor state", async () => {
-    // Initially false, should show regular function icon
-    expect(wrapper.vm.functionToggleIcon).toContain("function.svg");
-    expect(wrapper.vm.functionToggleIcon).not.toContain("function_dark.svg");
-    
+    // The store theme is set to "dark" by default, so it should show function_dark.svg
+    const currentTheme = store.state.theme;
+    if (currentTheme === "dark") {
+      expect(wrapper.vm.functionToggleIcon).toContain("function_dark.svg");
+    } else {
+      expect(wrapper.vm.functionToggleIcon).toContain("function.svg");
+    }
+
     // The computed property depends on reactive searchObj from composable
     // In a real scenario, changing the searchObj would trigger reactivity
     expect(wrapper.vm.searchObj.meta.showTransformEditor).toBe(false);

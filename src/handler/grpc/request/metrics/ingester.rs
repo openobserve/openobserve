@@ -47,10 +47,16 @@ impl MetricsService for MetricsIngester {
             return Err(Status::invalid_argument(msg));
         }
 
+        let user_email = metadata
+            .get("user_id")
+            .and_then(|id| id.to_str().ok())
+            .unwrap_or_default();
+
         let resp = crate::service::metrics::otlp::handle_otlp_request(
             org_id.unwrap().to_str().unwrap(),
             in_req,
             OtlpRequestType::Grpc,
+            user_email,
         )
         .await;
         if resp.is_ok() {

@@ -1,0 +1,874 @@
+{
+  "version": 5,
+  "dashboardId": "",
+  "title": "Alert Insights",
+  "description": "Interactive alert analysis for deduplication and grouping decisions",
+  "role": "",
+  "owner": "",
+  "created": "2025-01-30T00:00:00.000Z",
+  "tabs": [
+    {
+      "tabId": "overview",
+      "name": "Overview",
+      "panels": [
+        {
+          "id": "Panel_Total_Alerts",
+          "type": "metric",
+          "title": "Unique Alerts",
+          "description": "Number of unique alerts that were triggered",
+          "config": {
+            "show_legends": false,
+            "unit": "custom",
+            "decimals": 0,
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "enable_annotations": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT COUNT(DISTINCT SPLIT_PART(key, '/', 1)) as \"y_axis_1\" FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL]",
+              "customQuery": true,
+              "fields": {
+                "stream": "triggers",
+                "stream_type": "logs",
+                "x": [],
+                "y": [
+                  {
+                    "label": "Unique Alerts",
+                    "alias": "y_axis_1",
+                    "column": "y_axis_1",
+                    "color": "#5960b2"
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 6,
+            "h": 4,
+            "i": 1
+          }
+        },
+        {
+          "id": "Panel_Success_Rate_Metric",
+          "type": "metric",
+          "title": "Firing Rate",
+          "description": "Percentage of triggers that resulted in alert firing",
+          "config": {
+            "show_legends": false,
+            "unit": "percent",
+            "decimals": 1,
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "enable_annotations": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT (COUNT(CASE WHEN status='completed' THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0)) as \"y_axis_1\" FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL]",
+              "customQuery": true,
+              "fields": {
+                "stream": "triggers",
+                "stream_type": "logs",
+                "x": [],
+                "y": [
+                  {
+                    "label": "Firing %",
+                    "alias": "y_axis_1",
+                    "column": "y_axis_1",
+                    "color": "#53ca53"
+                  }
+                ],
+                "z": []
+              }
+            }
+          ],
+          "layout": {
+            "x": 6,
+            "y": 0,
+            "w": 6,
+            "h": 4,
+            "i": 2
+          }
+        },
+        {
+          "id": "Panel_Avg_Duration_Metric",
+          "type": "metric",
+          "title": "Avg Execution Time",
+          "description": "Average alert execution duration",
+          "config": {
+            "show_legends": false,
+            "unit": "minutes",
+            "decimals": 2,
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "enable_annotations": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT AVG(end_time - start_time) / 60000000.0 as \"y_axis_1\" FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL]",
+              "customQuery": true,
+              "fields": {
+                "stream": "triggers",
+                "stream_type": "logs",
+                "x": [],
+                "y": [
+                  {
+                    "label": "Avg Duration",
+                    "alias": "y_axis_1",
+                    "column": "y_axis_1",
+                    "color": "#5960b2"
+                  }
+                ],
+                "z": []
+              }
+            }
+          ],
+          "layout": {
+            "x": 12,
+            "y": 0,
+            "w": 6,
+            "h": 4,
+            "i": 3
+          }
+        },
+        {
+          "id": "Panel_Failed_Count",
+          "type": "metric",
+          "title": "Errored Evaluations",
+          "description": "Number of alert evaluations that encountered errors",
+          "config": {
+            "show_legends": false,
+            "unit": "custom",
+            "decimals": 0,
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "enable_annotations": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT COUNT(*) as \"y_axis_1\" FROM \"triggers\" WHERE module = 'alert' AND status='failed' [WHERE_CLAUSE_ADDITIONAL]",
+              "customQuery": true,
+              "fields": {
+                "stream": "triggers",
+                "stream_type": "logs",
+                "x": [],
+                "y": [
+                  {
+                    "label": "Errored",
+                    "alias": "y_axis_1",
+                    "column": "y_axis_1",
+                    "color": "#ff0000"
+                  }
+                ],
+                "z": []
+              }
+            }
+          ],
+          "layout": {
+            "x": 18,
+            "y": 0,
+            "w": 6,
+            "h": 4,
+            "i": 4
+          }
+        },
+        {
+          "id": "Panel_Alert_Volume",
+          "type": "bar",
+          "title": "Total Evaluations Over Time",
+          "description": "Total alert evaluations over time - Click and drag to zoom",
+          "config": {
+            "show_legends": false,
+            "unit": "custom",
+            "decimals": 0,
+            "line_thickness": 2,
+            "show_symbol": false,
+            "line_interpolation": "smooth",
+            "color": {
+              "mode": "palette-classic-by-series",
+              "fixedColor": [
+                "#5960b2"
+              ],
+              "seriesBy": "last"
+            },
+            "dataZoom": {
+              "yAxisIndex": 0
+            },
+            "enable_annotations": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "WITH trigger_metrics AS ( SELECT _timestamp, key, status, (end_time - start_time) as duration, retries, CASE WHEN is_silenced THEN 1 ELSE 0 END as silenced_count, CASE WHEN status='completed' THEN 1 ELSE 0 END as firing_count, CASE WHEN status='failed' THEN 1 ELSE 0 END as errored_count FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] ) SELECT histogram(_timestamp) as time_bucket, COUNT(*) as total_evaluations, SUM(firing_count) as firing_triggers, SUM(errored_count) as errored_triggers, AVG(duration) as avg_duration, SUM(retries) as total_retries FROM trigger_metrics GROUP BY time_bucket ORDER BY time_bucket ASC",
+              "customQuery": true,
+              "fields": {
+                "stream": "triggers",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "",
+                    "alias": "time_bucket",
+                    "column": "time_bucket",
+                    "isDerived": true,
+                    "treatAsNonTimestamp": true
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Total Evaluations",
+                    "alias": "total_evaluations",
+                    "column": "total_evaluations",
+                    "color": "#5960b2",
+                    "isDerived": true
+                  }
+                ],
+                "z": [],
+                "breakdown": []
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 4,
+            "w": 192,
+            "h": 6,
+            "i": 5
+          }
+        },
+        {
+          "id": "Panel_Success_Rate_Timeline",
+          "type": "line",
+          "title": "Firing Rate Over Time",
+          "description": "Trend of alert firing rate (triggers that resulted in alerts)",
+          "config": {
+            "show_legends": false,
+            "unit": "percent",
+            "decimals": 1,
+            "line_thickness": 2,
+            "show_symbol": false,
+            "line_interpolation": "smooth",
+            "color": {
+              "fixedColor": [
+                "#53ca53"
+              ]
+            },
+            "dataZoom": {
+              "yAxisIndex": "none"
+            },
+            "enable_annotations": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "WITH trigger_metrics AS ( SELECT _timestamp, CASE WHEN status='completed' THEN 1 ELSE 0 END as firing_count FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] ) SELECT histogram(_timestamp) as time_bucket, (SUM(firing_count) * 100.0 / NULLIF(COUNT(*), 0)) as firing_rate FROM trigger_metrics GROUP BY time_bucket ORDER BY time_bucket ASC",
+              "customQuery": true,
+              "fields": {
+                "stream": "triggers",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "",
+                    "alias": "time_bucket",
+                    "column": "time_bucket",
+                    "isDerived": true,
+                    "treatAsNonTimestamp": true
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "",
+                    "alias": "firing_rate",
+                    "column": "firing_rate",
+                    "color": "#53ca53",
+                    "isDerived": true
+                  }
+                ],
+                "z": []
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 12,
+            "w": 24,
+            "h": 6,
+            "i": 6
+          }
+        },
+        {
+          "id": "Panel_Status_Distribution",
+          "type": "pie",
+          "title": "Evaluation Status Distribution",
+          "description": "Breakdown of alert evaluation statuses",
+          "config": {
+            "show_legends": true,
+            "legends_position": "right",
+            "enable_annotations": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT CASE WHEN status = 'completed' THEN 'Firing' WHEN status = 'failed' THEN 'Errored' WHEN status = 'condition_not_satisfied' THEN 'Resolved' WHEN status = 'skipped' THEN 'Skipped' ELSE status END as \"x_axis_1\", COUNT(*) as \"y_axis_1\" FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] GROUP BY status ORDER BY y_axis_1 DESC",
+              "customQuery": true,
+              "fields": {
+                "stream": "triggers",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Status",
+                    "alias": "x_axis_1",
+                    "column": "x_axis_1"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Count",
+                    "alias": "y_axis_1",
+                    "column": "y_axis_1"
+                  }
+                ],
+                "z": []
+              }
+            }
+          ],
+          "layout": {
+            "x": 24,
+            "y": 12,
+            "w": 24,
+            "h": 6,
+            "i": 7
+          }
+        }
+      ]
+    },
+    {
+      "tabId": "frequency",
+      "name": "Frequency & Dedup",
+      "panels": [
+        {
+          "id": "Panel_Alert_Frequency",
+          "type": "bar",
+          "title": "Alert Firing Frequency (Dedup Candidates)",
+          "description": "Number of times each alert fired - candidates for deduplication",
+          "config": {
+            "show_legends": false,
+            "unit": "custom",
+            "decimals": 0,
+            "color": {
+              "fixedColor": [
+                "#ff6b6b"
+              ]
+            },
+            "dataZoom": {
+              "yAxisIndex": 0
+            },
+            "enable_annotations": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT SPLIT_PART(key, '/', 1) as \"x_axis_1\", COUNT(*) as firing_count FROM \"triggers\" WHERE module = 'alert' AND status='completed' [WHERE_CLAUSE_ADDITIONAL] GROUP BY SPLIT_PART(key, '/', 1) ORDER BY firing_count DESC LIMIT 30",
+              "customQuery": true,
+              "fields": {
+                "stream": "triggers",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Alert Name",
+                    "alias": "x_axis_1",
+                    "column": "key"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Firing Count",
+                    "alias": "firing_count",
+                    "column": "firing_count",
+                    "color": "#ff6b6b"
+                  }
+                ],
+                "z": []
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 10,
+            "i": 1
+          }
+        },
+        {
+          "id": "Panel_Dedup_Impact",
+          "type": "table",
+          "title": "Dedup Impact Analysis",
+          "description": "Potential noise reduction with deduplication",
+          "config": {
+            "wrap_table_cells": false,
+            "table_dynamic_columns": true,
+            "enable_annotations": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT SPLIT_PART(key, '/', 1) as key, COUNT(*) as total_firings, COUNT(*) / 24.0 as firings_per_hour, ROUND(COUNT(*) * 0.95) as potential_dedup_savings, ROUND((COUNT(*) * 0.95) * 100.0 / NULLIF(COUNT(*), 0), 1) as savings_percent FROM \"triggers\" WHERE module = 'alert' AND status='completed' [WHERE_CLAUSE_ADDITIONAL] GROUP BY SPLIT_PART(key, '/', 1) HAVING firings_per_hour >= 5 ORDER BY total_firings DESC LIMIT 20",
+              "customQuery": true,
+              "fields": {
+                "stream": "triggers",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Alert Key",
+                    "alias": "key",
+                    "column": "key",
+                    "color": null,
+                    "isDerived": false
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Total Firings",
+                    "alias": "total_firings",
+                    "column": "total_firings",
+                    "color": null,
+                    "isDerived": true
+                  },
+                  {
+                    "label": "Firings Per Hour",
+                    "alias": "firings_per_hour",
+                    "column": "firings_per_hour",
+                    "color": null,
+                    "isDerived": true
+                  },
+                  {
+                    "label": "Potential Savings",
+                    "alias": "potential_dedup_savings",
+                    "column": "potential_dedup_savings",
+                    "color": null,
+                    "isDerived": true
+                  },
+                  {
+                    "label": "Savings %",
+                    "alias": "savings_percent",
+                    "column": "savings_percent",
+                    "color": null,
+                    "isDerived": true
+                  }
+                ],
+                "z": []
+              }
+            }
+          ],
+          "layout": {
+            "x": 24,
+            "y": 10,
+            "w": 24,
+            "h": 10,
+            "i": 2
+          }
+        },
+        {
+          "id": "Panel_Hourly_Distribution",
+          "type": "heatmap",
+          "title": "Alert Firing Pattern (Hourly)",
+          "description": "Heatmap showing when alerts fire most frequently",
+          "config": {
+            "show_legends": true,
+            "enable_annotations": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT SPLIT_PART(key, '/', 1) as \"x_axis_1\", DATE_PART('hour', to_timestamp(_timestamp/1000000)) as \"y_axis_1\", COUNT(*) as \"z_axis_1\" FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] GROUP BY SPLIT_PART(key, '/', 1), DATE_PART('hour', to_timestamp(_timestamp/1000000)) ORDER BY x_axis_1, y_axis_1",
+              "customQuery": true,
+              "fields": {
+                "stream": "triggers",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Alert",
+                    "alias": "x_axis_1",
+                    "column": "key"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Hour",
+                    "alias": "y_axis_1",
+                    "column": "y_axis_1"
+                  }
+                ],
+                "z": [
+                  {
+                    "label": "Count",
+                    "alias": "z_axis_1",
+                    "column": "z_axis_1"
+                  }
+                ]
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 20,
+            "w": 24,
+            "h": 10,
+            "i": 3
+          }
+        }
+      ]
+    },
+    {
+      "tabId": "correlation",
+      "name": "Errors & Storms Detection",
+      "panels": [
+        {
+          "id": "Panel_Alert_Storms",
+          "type": "table",
+          "title": "Alert Storms Detection",
+          "description": "Time periods with abnormally high alert volume (>10 alerts in 5 min)",
+          "config": {
+            "wrap_table_cells": false,
+            "table_dynamic_columns": true,
+            "enable_annotations": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "WITH minute_buckets AS ( SELECT DATE_TRUNC('minute', to_timestamp(_timestamp/1000000)) as storm_time, COUNT(*) as alert_count, COUNT(DISTINCT SPLIT_PART(key, '/', 1)) as unique_alerts, array_agg(DISTINCT SPLIT_PART(key, '/', 1)) as alerts_involved FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] GROUP BY storm_time ) SELECT storm_time, alert_count, unique_alerts, alerts_involved FROM minute_buckets WHERE alert_count > 10 ORDER BY alert_count DESC LIMIT 50",
+              "customQuery": true,
+              "fields": {
+                "stream": "triggers",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Storm Time",
+                    "alias": "storm_time",
+                    "column": "storm_time",
+                    "color": null,
+                    "isDerived": true
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Alert Count",
+                    "alias": "alert_count",
+                    "column": "alert_count",
+                    "color": null,
+                    "isDerived": true
+                  },
+                  {
+                    "label": "Unique Alerts",
+                    "alias": "unique_alerts",
+                    "column": "unique_alerts",
+                    "color": null,
+                    "isDerived": true
+                  },
+                  {
+                    "label": "Alerts Involved",
+                    "alias": "alerts_involved",
+                    "column": "alerts_involved",
+                    "color": null,
+                    "isDerived": true
+                  }
+                ],
+                "z": []
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 12,
+            "w": 24,
+            "h": 10,
+            "i": 2
+          }
+        },
+        {
+          "id": "Panel_Common_Errors",
+          "type": "table",
+          "title": "Common Error Patterns",
+          "description": "Most frequent error messages - potential grouping by error type",
+          "config": {
+            "wrap_table_cells": true,
+            "table_dynamic_columns": true,
+            "enable_annotations": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT SUBSTR(error, 1, 100) as error_message, COUNT(*) as occurrence_count, COUNT(DISTINCT SPLIT_PART(key, '/', 1)) as affected_alerts FROM \"triggers\" WHERE module = 'alert' AND status='failed' AND error IS NOT NULL [WHERE_CLAUSE_ADDITIONAL] GROUP BY SUBSTR(error, 1, 100) ORDER BY occurrence_count DESC LIMIT 20",
+              "customQuery": true,
+              "fields": {
+                "stream": "triggers",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Error Message",
+                    "alias": "error_message",
+                    "column": "error_message",
+                    "color": null,
+                    "isDerived": true
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Occurrence Count",
+                    "alias": "occurrence_count",
+                    "column": "occurrence_count",
+                    "color": null,
+                    "isDerived": true
+                  },
+                  {
+                    "label": "Affected Alerts",
+                    "alias": "affected_alerts",
+                    "column": "affected_alerts",
+                    "color": null,
+                    "isDerived": true
+                  }
+                ],
+                "z": []
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 22,
+            "w": 24,
+            "h": 10,
+            "i": 3
+          }
+        }
+      ]
+    },
+    {
+      "tabId": "quality",
+      "name": "Alert Quality",
+      "panels": [
+        {
+          "id": "Panel_Alert_Effectiveness",
+          "type": "table",
+          "title": "Alert Effectiveness Score",
+          "description": "Quality metrics for each alert",
+          "config": {
+            "wrap_table_cells": false,
+            "table_dynamic_columns": true,
+            "enable_annotations": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT SPLIT_PART(key, '/', 1) as key, COUNT(*) as total_evaluations, COUNT(CASE WHEN status='completed' THEN 1 END) as firing, COUNT(CASE WHEN status='condition_not_satisfied' THEN 1 END) as resolved, COUNT(CASE WHEN status='failed' THEN 1 END) as errored, COUNT(CASE WHEN is_silenced=true THEN 1 END) as silenced, ROUND((COUNT(CASE WHEN status='completed' THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0)), 1) as firing_rate, ROUND(AVG(end_time - start_time) / 60000000.0, 3) as avg_duration_min FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] GROUP BY SPLIT_PART(key, '/', 1) ORDER BY total_evaluations DESC LIMIT 30",
+              "customQuery": true,
+              "fields": {
+                "stream": "triggers",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Alert Key",
+                    "alias": "key",
+                    "column": "key",
+                    "color": null,
+                    "isDerived": false
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Total Evaluations",
+                    "alias": "total_evaluations",
+                    "column": "total_evaluations",
+                    "color": null,
+                    "isDerived": true
+                  },
+                  {
+                    "label": "Firing",
+                    "alias": "firing",
+                    "column": "firing",
+                    "color": null,
+                    "isDerived": true
+                  },
+                  {
+                    "label": "Resolved",
+                    "alias": "resolved",
+                    "column": "resolved",
+                    "color": null,
+                    "isDerived": true
+                  },
+                  {
+                    "label": "Errored",
+                    "alias": "errored",
+                    "column": "errored",
+                    "color": null,
+                    "isDerived": true
+                  },
+                  {
+                    "label": "Silenced",
+                    "alias": "silenced",
+                    "column": "silenced",
+                    "color": null,
+                    "isDerived": true
+                  },
+                  {
+                    "label": "Firing Rate %",
+                    "alias": "firing_rate",
+                    "column": "firing_rate",
+                    "color": null,
+                    "isDerived": true
+                  },
+                  {
+                    "label": "Avg Duration (min)",
+                    "alias": "avg_duration_min",
+                    "column": "avg_duration_min",
+                    "color": null,
+                    "isDerived": true
+                  }
+                ],
+                "z": []
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 192,
+            "h": 12,
+            "i": 1
+          }
+        },
+        {
+          "id": "Panel_Retry_Analysis",
+          "type": "bar",
+          "title": "Alerts Requiring Retries",
+          "description": "Alerts with execution issues requiring retries",
+          "config": {
+            "show_legends": false,
+            "unit": "custom",
+            "decimals": 1,
+            "enable_annotations": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT SPLIT_PART(key, '/', 1) as \"x_axis_1\", AVG(retries) as \"y_axis_1\" FROM \"triggers\" WHERE module = 'alert' AND retries > 0 [WHERE_CLAUSE_ADDITIONAL] GROUP BY SPLIT_PART(key, '/', 1) ORDER BY y_axis_1 DESC LIMIT 20",
+              "customQuery": true,
+              "fields": {
+                "stream": "triggers",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Alert",
+                    "alias": "x_axis_1",
+                    "column": "key"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Avg Retries",
+                    "alias": "y_axis_1",
+                    "column": "y_axis_1",
+                    "color": "#ff9800"
+                  }
+                ],
+                "z": []
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 12,
+            "w": 24,
+            "h": 8,
+            "i": 2
+          }
+        },
+        {
+          "id": "Panel_Execution_Duration",
+          "type": "bar",
+          "title": "Slowest Alert Executions",
+          "description": "Alerts with highest execution time",
+          "config": {
+            "show_legends": false,
+            "unit": "minutes",
+            "decimals": 3,
+            "enable_annotations": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT SPLIT_PART(key, '/', 1) as \"x_axis_1\", AVG(end_time - start_time) / 60000000.0 as \"y_axis_1\" FROM \"triggers\" WHERE module = 'alert' [WHERE_CLAUSE_ADDITIONAL] GROUP BY SPLIT_PART(key, '/', 1) ORDER BY y_axis_1 DESC LIMIT 20",
+              "customQuery": true,
+              "fields": {
+                "stream": "triggers",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Alert",
+                    "alias": "x_axis_1",
+                    "column": "key"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Avg Duration",
+                    "alias": "y_axis_1",
+                    "column": "y_axis_1",
+                    "color": "#9c27b0"
+                  }
+                ],
+                "z": []
+              }
+            }
+          ],
+          "layout": {
+            "x": 24,
+            "y": 12,
+            "w": 24,
+            "h": 8,
+            "i": 3
+          }
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "list": []
+  }
+}

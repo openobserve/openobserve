@@ -37,6 +37,7 @@ pub trait NodeInfo: Debug + Send + Sync {
     fn get_cluster(&self) -> String {
         crate::config::get_cluster_name()
     }
+    fn is_local(&self) -> bool;
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -161,6 +162,10 @@ impl NodeInfo for Node {
 
     fn get_grpc_addr(&self) -> String {
         self.grpc_addr.clone()
+    }
+
+    fn is_local(&self) -> bool {
+        self.grpc_addr == crate::cluster::get_local_grpc_addr()
     }
 }
 
@@ -300,4 +305,15 @@ pub fn get_internal_grpc_token() -> String {
 pub enum CompactionJobType {
     Current,
     Historical,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_node_is_local() {
+        let local_node = &*crate::cluster::LOCAL_NODE;
+        assert!(local_node.is_local());
+    }
 }

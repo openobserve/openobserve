@@ -185,7 +185,7 @@ describe("PrometheusConfig.vue", () => {
 
   describe("Template Rendering", () => {
     it("should render main container with correct class", () => {
-      const container = wrapper.find(".q-ma-md");
+      const container = wrapper.find(".q-pa-sm");
       expect(container.exists()).toBe(true);
     });
 

@@ -22,6 +22,7 @@ import logs from "../mockData/logs";
 import organizations from "../mockData/organizations";
 import home from "../mockData/home";
 import regexPatterns from "../mockData/regexPatterns";
+import actionScripts from "../mockData/actionScripts";
 import store from "./store";
 
 // TODO OK: Move below rest handlers to separate file
@@ -296,7 +297,6 @@ export const restHandlers = [
   // Config Service handler
   http.get(`${store.state.API_ENDPOINT}/config`, () => {
     return HttpResponse.json({
-      websocket_enabled: true,
       streaming_enabled: true,
       custom_logo_text: "Test Logo Text",
       custom_logo_img: "base64imagedata",
@@ -305,4 +305,59 @@ export const restHandlers = [
       default_fts_keys: ["log", "message", "msg", "content", "data"],
     }, { status: 200 });
   }),
+
+  // Action Scripts handlers
+  http.get(
+    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions`,
+    () => {
+      return HttpResponse.json(actionScripts.list);
+    },
+  ),
+
+  http.get(
+    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions/:id`,
+    () => {
+      return HttpResponse.json(actionScripts.single);
+    },
+  ),
+
+  http.post(
+    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions`,
+    () => {
+      return HttpResponse.json({
+        code: 200,
+        message: "Action script created successfully",
+      });
+    },
+  ),
+
+  http.put(
+    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions/:id`,
+    () => {
+      return HttpResponse.json({
+        code: 200,
+        message: "Action script updated successfully",
+      });
+    },
+  ),
+
+  http.delete(
+    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions/:id`,
+    () => {
+      return HttpResponse.json({
+        code: 200,
+        message: "Action script deleted successfully",
+      });
+    },
+  ),
+
+  // Service Accounts handlers
+  http.get(
+    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/service_accounts`,
+    () => {
+      return HttpResponse.json({
+        data: actionScripts.serviceAccounts,
+      });
+    },
+  ),
 ];

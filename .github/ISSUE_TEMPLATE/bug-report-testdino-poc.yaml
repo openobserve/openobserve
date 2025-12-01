@@ -1,0 +1,118 @@
+name: Bug Report
+description: Report a bug in OpenObserve
+labels: ["☢️ Bug"]
+ 
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please provide detailed information to help us understand and reproduce the bug.
+
+        **Reminder:** If you can, please assign this issue to the appropriate team member and set a milestone after creating it.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: Detailed description of what the bug is. You can also attach screenshots or videos by dragging and dropping them here.
+      placeholder: "Example: When clicking the login button on mobile devices (iOS Safari), nothing happens. The button appears to be clickable but no navigation or action occurs."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: "How urgently should this bug be fixed based on business impact?"
+      options:
+        - P0 - Critical
+        - P1 - High
+        - P2 - Medium
+        - P3 - Low
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: "How much impact does this bug have on the system's functionality?"
+      options:
+        - Blocker
+        - Major
+        - Minor
+        - Trivial
+    validations:
+      required: true
+
+  - type: input
+    id: related-story
+    attributes:
+      label: Related Story/Issue
+      description: Link to the GitHub issue/story where this feature was developed
+      placeholder: "#1234 or https://github.com/openobserve/openobserve/issues/1234 or 'Not Available'"
+
+  - type: dropdown
+    id: is-regression
+    attributes:
+      label: Is this a regression?
+      description: Did this work in a previous version?
+      options:
+        - 'Yes'
+        - 'No'
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps_to_reproduce
+    attributes:
+      label: Steps to Reproduce (Optional)
+      description: Provide step-by-step instructions to reproduce the bug
+      placeholder: |
+        1. Open OpenObserve application on iOS Safari
+        2. Navigate to home page
+        3. Click on login button in top-right corner
+        4. Observe no response
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment Details
+      description: Version information and environment details (check About page)
+      render: yaml
+      placeholder: |
+        Version: v0.0.1
+        Commit Hash: 9d65f4640b55a952149df8daad5a01d5ff219497
+        Build Date: 2023-02-13T11:29:53Z
+        OS: linux x64
+        Browser: Safari 16.5 (iOS)
+        Device: iPhone 14 Pro
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: affected-functionalities
+    attributes:
+      label: Which OpenObserve Functionalities Are Affected?
+      description: Select all that apply
+      options:
+        - label: Login
+        - label: Landing Page
+        - label: Logs
+        - label: Dashboards
+        - label: Streams
+        - label: Functions
+        - label: Ingestion
+        - label: Alerts
+        - label: Pipelines
+        - label: Metrics
+        - label: Traces
+        - label: Real User Monitoring (RUM)
+        - label: Reports
+        - label: Data Sources
+        - label: IAM
+        - label: Management
+        - label: Cosmetic
+        - label: Not Known / Other
+    validations:
+      required: true

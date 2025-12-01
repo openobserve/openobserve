@@ -1,0 +1,139 @@
+/**
+ * Index List (Field List) Styles
+ * Phase 2: CSS Architecture - Extract Inline Styles Only
+ * NO SIZE CHANGES - Keep all original measurements
+ * Using rem units (1rem = 16px)
+ */
+
+/* ============================================================================
+   FIELD GROUP HEADER
+   ============================================================================ */
+
+.field-group-header {
+  line-height: 1.75rem; // 28px
+  padding-left: 0.625rem; // 10px
+  border-radius: 0.5rem;
+}
+
+/* ============================================================================
+   FIELD NAME & VALUE STYLES
+   ============================================================================ */
+
+.field-name {
+  max-width: 90% !important;
+  display: inline-block;
+}
+
+.field-icon-spacing {
+  margin-right: 0.375rem; // 6px (already in rem)
+}
+
+/* ============================================================================
+   FIELD VALUE CONTAINER - DYNAMIC WIDTH
+   ============================================================================ */
+
+.field-value-container {
+  border-radius: 0.5rem;
+
+  &--multi-stream {
+    width: calc(100% - 3.125rem); // 50px
+  }
+
+  &--single-stream {
+    width: 100%;
+  }
+}
+
+.field-value-key {
+  width: calc(100% - 3.125rem); // 50px
+  border-radius: 0.5rem;
+}
+
+.field-value-count {
+  display: contents;
+
+  &--with-actions {
+    width: 3.125rem; // 50px
+  }
+}
+
+/* ============================================================================
+   LOADING STATE
+   ============================================================================ */
+
+.field-loading {
+  height: 3.75rem; // 60px
+  border-radius: 0.5rem;
+}
+
+.field-loading-label {
+  font-size: 1.1em; // Keep em-based relative sizing
+}
+
+/* ============================================================================
+   EXPANDED FIELD DETAILS
+   ============================================================================ */
+
+.expanded-field-row {
+  opacity: 0.7;
+}
+
+/* ============================================================================
+   STREAM OPTION ITEM
+   ============================================================================ */
+
+.stream-option-item {
+  cursor: pointer;
+  border-radius: 0.5rem;
+}
+
+/* ============================================================================
+   FIELD VALUE WIDTH CALCULATIONS (UPDATED)
+   ============================================================================ */
+
+.field-value-container {
+  border-radius: 0.5rem;
+
+  &--multi-stream {
+    width: calc(100% - 2.625rem); // 42px
+  }
+
+  &--single-stream {
+    width: calc(100% - 0rem); // 0px
+  }
+}
+
+.field-value-key {
+  width: calc(100% - 3.125rem); // 50px
+  border-radius: 0.5rem;
+}
+
+.field-value-count {
+  display: contents;
+
+  &--with-actions {
+    width: 3.125rem; // 50px
+  }
+}
+
+/* ============================================================================
+   SMOOTH LOADING TRANSITIONS
+   ============================================================================ */
+
+.field-table {
+  transition: opacity 0.2s ease-in-out;
+
+  &.loading-fields {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  // Ensure consistent scrollbar styling
+  .q-table__middle {
+    overflow-y: auto !important;
+    position: relative;
+    // Add padding to prevent content from covering the scrollbar
+    padding-right: 0.5rem; // 8px for scrollbar
+    box-sizing: border-box;
+  }
+}

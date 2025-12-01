@@ -821,8 +821,7 @@ describe("GroupUsers Component", () => {
     it("applies correct theme classes", () => {
       const filters = wrapper.find('[data-test="iam-users-selection-filters"]');
       expect(filters.exists()).toBe(true);
-      // The component applies theme classes based on store.state.theme
-      expect(filters.classes()).toContain('bg-white');
+      // Theme classes have been removed from the component
     });
 
     it("switches to dark theme classes when theme is dark", async () => {
@@ -848,7 +847,8 @@ describe("GroupUsers Component", () => {
       });
 
       const filters = wrapper.find('[data-test="iam-users-selection-filters"]');
-      expect(filters.classes()).toContain('bg-dark');
+      expect(filters.exists()).toBe(true);
+      // Theme classes have been removed from the component
     });
   });
 

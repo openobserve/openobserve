@@ -45,6 +45,7 @@ use tokio::{
 use crate::{
     common::infra::config::QUERY_FUNCTIONS,
     service::{
+        alerts::ConditionExt,
         ingestion::{apply_vrl_fn, compile_vrl_function},
         self_reporting::publish_error,
     },
@@ -653,8 +654,8 @@ async fn process_node(
                 // only send to children when passing all condition evaluations
                 if condition_params
                     .conditions
-                    .iter()
-                    .all(|cond| cond.evaluate(record.as_object().unwrap()))
+                    .evaluate(record.as_object().unwrap())
+                    .await
                 {
                     send_to_children(
                         &mut child_senders,
@@ -1188,7 +1189,12 @@ async fn get_transforms(org_id: &str, fn_name: &str) -> Result<Transform> {
 
 fn resolve_stream_name(haystack: &str, record: &Value) -> Result<String> {
     // Fast path: if it's a complete pattern like "{field}", avoid regex
-    if haystack.starts_with("{") && haystack.ends_with("}") {
+    // Check for no inner braces to avoid matching composite patterns like "{level}_{job}"
+    if haystack.starts_with("{")
+        && haystack.ends_with("}")
+        && !haystack[1..haystack.len() - 1].contains('{')
+        && !haystack[1..haystack.len() - 1].contains('}')
+    {
         let field_name = &haystack[1..haystack.len() - 1];
         return match record.get(field_name) {
             Some(stream_name) => Ok(get_string_value(stream_name)),
@@ -1240,6 +1246,9 @@ mod tests {
             ("abc-{container_name}-xyz", "abc-compactor-xyz"),
             ("abc-{value}-xyz", "abc-123-xyz"),
             ("{value}", "123"),
+            // Test composite patterns with multiple field references
+            ("{app_name}_{container_name}", "o2_compactor"),
+            ("{app_name}-{value}-{container_name}", "o2-123-compactor"),
         ];
         for (test, expected) in ok_cases {
             let result = resolve_stream_name(test, &record);

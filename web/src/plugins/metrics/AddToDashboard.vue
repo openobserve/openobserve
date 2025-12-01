@@ -20,8 +20,8 @@
         </div>
       </q-card-section>
       <q-separator />
-      <q-card-section>
-        <q-form ref="addToDashboardForm" @submit="onSubmit.execute">
+      <q-card-section class="q-px-md q-py-sm add-dashboard-form-card-section">
+        <q-form ref="addToDashboardForm" @submit.stop="onSubmit.execute">
           <!-- select folder or create new folder and select -->
           <select-folder-dropdown @folder-selected="updateActiveFolderId" />
 
@@ -30,6 +30,7 @@
             v-if="activeFolderId"
             :folder-id="activeFolderId"
             @dashboard-selected="updateSelectedDashboard"
+            class="showLabelOnTop"
           />
 
           <!-- select tab or create new tab and select -->
@@ -38,41 +39,52 @@
             :folder-id="activeFolderId"
             :dashboard-id="selectedDashboard"
             @tab-selected="updateActiveTabId"
+            class="showLabelOnTop"
           />
+          <span>&nbsp;</span>
           <q-input
             v-model.trim="panelTitle"
             :label="t('dashboard.panelTitle') + '*'"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-mb-xs showLabelOnTop"
+            class="showLabelOnTop"
             stack-label
-            outlined
-            filled
+            hide-bottom-space
+            borderless
             dense
             :rules="[(val: any) => !!val.trim() || 'Panel Title required']"
             :lazy-rules="true"
             data-test="metrics-new-dashboard-panel-title"
           />
-          <span>&nbsp;</span>
-          <div class="q-mt-lg text-center">
+
+          <div class="flex justify-start q-mt-sm">
             <q-btn
               v-close-popup="true"
               data-test="metrics-schema-cancel-button"
-              class="q-mb-md text-bold"
+              class="o2-secondary-button tw-h-[36px]"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-secondary-button-dark'
+                  : 'o2-secondary-button-light'
+              "
               :label="t('metrics.cancel')"
-              text-color="light-text"
-              padding="sm md"
+              flat
+              dense
               no-caps
             />
             <q-btn
               data-test="metrics-schema-update-settings-button"
               :label="t('metrics.add')"
-              class="q-mb-md text-bold no-border q-ml-md"
-              color="secondary"
-              padding="sm xl"
+              class="o2-primary-button tw-h-[36px] q-ml-md"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-primary-button-dark'
+                  : 'o2-primary-button-light'
+              "
+              flat
+              dense
               type="submit"
               no-caps
               :loading="onSubmit.isLoading.value"
+              :disable="!panelTitle.trim()"
             />
           </div>
         </q-form>
@@ -240,4 +252,10 @@ export default defineComponent({
 });
 </script>
 
-<style scoped></style>
+<style lang="scss">
+.add-dashboard-form-card-section {
+  .add-folder-btn {
+    margin-top: 36px !important;
+  }
+}
+</style>

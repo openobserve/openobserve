@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use o2_enterprise::enterprise::ai::meta::{AiMessage, Role};
+use o2_enterprise::enterprise::ai::agent::meta::{AiMessage, Role};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use utoipa::ToSchema;

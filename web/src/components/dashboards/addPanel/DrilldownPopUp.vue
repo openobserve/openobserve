@@ -43,8 +43,7 @@
       bg-color="input-bg"
       class="q-py-md showLabelOnTop"
       stack-label
-      outlined
-      filled
+      borderless
       data-test="dashboard-config-panel-drilldown-name"
       dense
       :rules="[(val: any) => !!val.trim() || t('dashboard.nameRequired')]"
@@ -163,14 +162,13 @@
             bg-color="input-bg"
             class="q-py-sm showLabelOnTop no-case"
             stack-label
-            outlined
-            filled
+            borderless
             dense
             style="width: 100%"
             :loading="getFoldersListLoading.isLoading.value"
             :disable="getFoldersListLoading.isLoading.value"
             data-test="dashboard-drilldown-folder-select"
-          >
+           hide-bottom-space>
             <!-- template when on options -->
             <template v-slot:no-option>
               <q-item>
@@ -191,14 +189,13 @@
             bg-color="input-bg"
             class="q-py-sm showLabelOnTop no-case"
             stack-label
-            outlined
-            filled
+            borderless
             dense
             style="width: 100%"
             :loading="getDashboardListLoading.isLoading.value"
             :disable="getDashboardListLoading.isLoading.value"
             data-test="dashboard-drilldown-dashboard-select"
-          >
+           hide-bottom-space>
             <!-- template when on options -->
             <template v-slot:no-option>
               <q-item
@@ -221,14 +218,13 @@
             bg-color="input-bg"
             class="q-py-sm showLabelOnTop no-case"
             stack-label
-            outlined
-            filled
+            borderless
             dense
             style="width: 100%"
             :loading="getTabListLoading.isLoading.value"
             :disable="getTabListLoading.isLoading.value"
             data-test="dashboard-drilldown-tab-select"
-          >
+           hide-bottom-space>
             <!-- template when on options -->
             <template v-slot:no-option>
               <q-item data-test="dashboard-drilldown-no-tab-available-option">
@@ -309,6 +305,9 @@
           left-label
           v-model="drilldownData.data.passAllVariables"
           data-test="dashboard-drilldown-pass-all-variables"
+          class="tw-h-[36px] tw-ml-1 o2-toggle-button-lg"
+          size="lg"
+          :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
         />
       </div>
     </div>
@@ -320,6 +319,9 @@
         left-label
         v-model="drilldownData.targetBlank"
         data-test="dashboard-drilldown-open-in-new-tab"
+        class="tw-h-[36px] tw-ml-1 o2-toggle-button-lg"
+        size="lg"
+        :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
       />
     </div>
 
@@ -327,7 +329,9 @@
       <q-btn
         unelevated
         no-caps
-        class="q-mr-sm"
+        class="o2-secondary-button tw-h-[36px] el-border"
+        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+        flat
         @click="$emit('close')"
         data-test="cancel-button"
       >
@@ -336,8 +340,9 @@
       <q-btn
         unelevated
         no-caps
-        class="no-border"
-        color="primary"
+        class="o2-primary-button tw-h-[36px] q-ml-md el-border"
+        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+        flat
         @click="saveDrilldown"
         style="min-width: 60px"
         data-test="confirm-button"

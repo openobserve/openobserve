@@ -30,9 +30,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-avatar
           color="primary"
           text-color="white"
-          size="20px"
+          size="1.25rem"
           icon="drag_indicator"
-          style="top: 10px"
+          class="tw-top-[0.625rem]"
         />
       </template>
       <template #after>
@@ -123,7 +123,7 @@ const rows = ref<Session[]>([]);
   .q-field__native,
   .q-field__input,
   .q-table tbody td {
-    font-size: 12px !important;
+    font-size: 0.75rem !important;
   }
 
   .q-splitter__after {
@@ -136,24 +136,24 @@ const rows = ref<Session[]>([]);
 
   .index-table :hover::-webkit-scrollbar,
   #tracesSearchGridComponent:hover::-webkit-scrollbar {
-    height: 13px;
-    width: 13px;
+    height: 0.8125rem;
+    width: 0.8125rem;
   }
 
   .index-table ::-webkit-scrollbar-track,
   #tracesSearchGridComponent::-webkit-scrollbar-track {
     -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
-    border-radius: 10px;
+    border-radius: 0.625rem;
   }
 
   .index-table ::-webkit-scrollbar-thumb,
   #tracesSearchGridComponent::-webkit-scrollbar-thumb {
-    border-radius: 10px;
+    border-radius: 0.625rem;
     -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
   }
 
   .q-table__top {
-    padding: 0px !important;
+    padding: 0 !important;
   }
 
   .q-table__control {
@@ -161,7 +161,7 @@ const rows = ref<Session[]>([]);
   }
 
   .q-field__control-container {
-    padding-top: 0px !important;
+    padding-top: 0 !important;
   }
 }
 </style>

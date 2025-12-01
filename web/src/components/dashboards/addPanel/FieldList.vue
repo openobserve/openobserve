@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="column index-menu"
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
-    <div class="col-auto">
+    <div class="col-auto tw-mx-[0.625rem]">
       <!-- stream type selection will be hidden for metrics page -->
       <q-select
         v-if="dashboardPanelDataPageKey !== 'metrics'"
@@ -33,12 +33,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="index-dropdown-stream_type"
         input-debounce="0"
         behavior="menu"
-        filled
         borderless
         dense
-        class="q-mb-xs"
+        class="q-mb-xs o2-custom-select-dashboard"
         :readonly="dashboardPanelDataPageKey === 'logs'"
-      ></q-select>
+       hide-bottom-space></q-select>
       <q-select
         v-model="
           dashboardPanelData.data.queries[
@@ -51,7 +50,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         input-debounce="0"
         behavior="menu"
         use-input
-        filled
         borderless
         dense
         hide-selected
@@ -61,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         option-label="name"
         option-value="name"
         emit-value
+        class="o2-custom-select-dashboard"
         :class="
           selectedMetricTypeIcon &&
           dashboardPanelData.data.queries[
@@ -70,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : ''
         "
         :readonly="dashboardPanelDataPageKey === 'logs'"
-      >
+       hide-bottom-space>
         <template
           v-if="
             dashboardPanelData.data.queries[
@@ -518,14 +517,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-input
             v-model="dashboardPanelData.meta.stream.filterField"
             data-test="index-field-search-input"
-            filled
             borderless
             dense
             clearable
             debounce="1"
             :loading="getStreamFields.isLoading.value"
             :placeholder="t('search.searchField')"
-          >
+            class="tw-mx-[0.625rem]"
+           hide-bottom-space>
             <template #prepend>
               <q-icon name="search" />
             </template>
@@ -1343,7 +1342,7 @@ export default defineComponent({
       height: 25px;
 
       .field_icons {
-        padding: 0 0 0 0.25rem;
+        padding: 0 0 0 0.15rem;
         transition: all 0.3s ease;
         // background-color: white;
         position: absolute;
@@ -1353,6 +1352,10 @@ export default defineComponent({
 
         .q-icon {
           cursor: pointer;
+        }
+
+        .q-btn {
+          border-left: 2px solid #d0d0d0;
         }
       }
 
@@ -1513,6 +1516,6 @@ export default defineComponent({
 .fieldList-pagination {
   // min-height: 80px;
   display: flex;
-  padding-bottom: 2rem;
+  // padding-bottom: 2rem; //why we added this not sure but need to check and for now removing it because it is showing too much space at the bottom
 }
 </style>

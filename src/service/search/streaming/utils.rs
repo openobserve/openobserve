@@ -69,7 +69,7 @@ pub fn get_top_k_values(
             .unwrap_or_default();
         let num = hit
             .get("zo_sql_num")
-            .and_then(|v| v.as_i64())
+            .and_then(Value::as_i64)
             .unwrap_or_default();
         search_result_hits.push((key, num));
     }

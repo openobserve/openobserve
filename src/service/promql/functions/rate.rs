@@ -13,24 +13,39 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::time::Duration;
+
+use config::meta::promql::value::{
+    EvalContext, ExtrapolationKind, Sample, Value, extrapolated_rate,
+};
 use datafusion::error::Result;
 
-use crate::service::promql::value::{ExtrapolationKind, RangeValue, Value, extrapolated_rate};
+use crate::service::promql::functions::RangeFunc;
 
-pub(crate) fn rate(data: Value) -> Result<Value> {
-    super::eval_idelta(data, "rate", exec, false)
+pub(crate) fn rate(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+    super::eval_range(data, RateFunc::new(), eval_ctx)
 }
 
-fn exec(series: RangeValue) -> Option<f64> {
-    let tw = series
-        .time_window
-        .as_ref()
-        .expect("BUG: `rate` function requires time window");
-    extrapolated_rate(
-        &series.samples,
-        tw.eval_ts,
-        tw.range,
-        tw.offset,
-        ExtrapolationKind::Rate,
-    )
+pub struct RateFunc;
+
+impl RateFunc {
+    pub fn new() -> Self {
+        RateFunc {}
+    }
+}
+
+impl RangeFunc for RateFunc {
+    fn name(&self) -> &'static str {
+        "rate"
+    }
+
+    fn exec(&self, samples: &[Sample], eval_ts: i64, range: &Duration) -> Option<f64> {
+        extrapolated_rate(
+            samples,
+            eval_ts,
+            *range,
+            Duration::ZERO,
+            ExtrapolationKind::Rate,
+        )
+    }
 }

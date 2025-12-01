@@ -31,12 +31,9 @@
           <q-input
             v-model="field.name"
             :placeholder="'Field Name' + ' *'"
-            color="input-border"
-            bg-color="input-bg"
             class="q-py-sm"
             stack-label
-            outlined
-            filled
+            borderless
             dense
             :rules="[(val: any) => !!val.trim() || 'Field is required!']"
             tabindex="0"
@@ -73,19 +70,15 @@
             v-model="field.index_type"
             :options="streamIndexType"
             :popup-content-style="{ textTransform: 'lowercase' }"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm stream-schema-index-select"
+            class="q-py-sm"
             multiple
             :max-values="2"
             map-options
             :option-disable="(_option: any) => disableOptions(field, _option)"
             emit-value
             clearable
-            outlined
             stack-label
             borderless
-            filled
             dense
             use-input
             fill-input
@@ -105,15 +98,11 @@
             v-model="field.type"
             :options="dataTypes"
             :popup-content-style="{ textTransform: 'lowercase' }"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm stream-schema-index-select"
+            class="q-py-sm"
             option-label="label"
             option-value="value"
             clearable
-            outlined
             borderless
-            filled
             dense
             use-input
             fill-input

@@ -210,13 +210,28 @@ impl SchedulerJobPuller {
                 }
 
                 // Print counts for each module
-                for (module, triggers) in grouped_triggers {
+                for (module, module_triggers) in &grouped_triggers {
                     log::debug!(
                         "[SCHEDULER] [JobPuller-{}] Pulled {:?}: {} jobs",
                         trace_id,
                         module,
-                        triggers.len()
+                        module_triggers.len()
                     );
+
+                    // [ENTERPRISE] Register batch for RCA cross-alert correlation
+                    // Only for Alert module
+                    // #[cfg(feature = "enterprise")]
+                    // if matches!(module, TriggerModule::Alert) && !module_triggers.is_empty() {
+                    //     log::debug!(
+                    //         "[SCHEDULER][JobPuller-{}] Registering RCA batch with {} alerts",
+                    //         trace_id,
+                    //         module_triggers.len()
+                    //     );
+                    //     o2_enterprise::enterprise::ai::rca::register_batch(
+                    //         &trace_id,
+                    //         module_triggers.len(),
+                    //     );
+                    // }
                 }
             }
 
@@ -238,7 +253,12 @@ impl SchedulerJobPuller {
                 let ttl = self.config.keep_alive_interval_secs;
                 let alert_timeout = self.config.alert_schedule_timeout;
                 let report_timeout = self.config.report_schedule_timeout;
+                // Maximum lifetime for keep-alive: use the larger timeout * 3
+                let max_lifetime_secs = std::cmp::max(alert_timeout, report_timeout) * 3;
                 tokio::task::spawn(async move {
+                    let start_time = tokio::time::Instant::now();
+                    let max_lifetime = tokio::time::Duration::from_secs(max_lifetime_secs as u64);
+
                     loop {
                         tokio::select! {
                             _ = tokio::time::sleep(tokio::time::Duration::from_secs(ttl)) => {}
@@ -249,6 +269,15 @@ impl SchedulerJobPuller {
                                 return;
                             }
                         }
+
+                        // Check if we've exceeded the maximum lifetime
+                        if start_time.elapsed() >= max_lifetime {
+                            log::warn!(
+                                "[SCHEDULER][JobPuller-{trace_id_keep_alive}] keep_alive for job[{job_id}] trigger[{job_key}] exceeded maximum lifetime of {max_lifetime_secs}s, stopping"
+                            );
+                            return;
+                        }
+
                         if let Err(e) =
                             infra::scheduler::keep_alive(&[job_id], alert_timeout, report_timeout)
                                 .await

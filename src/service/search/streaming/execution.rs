@@ -33,6 +33,8 @@ use super::{
     sorting::order_search_results,
     utils::{calculate_progress_percentage, get_top_k_values},
 };
+#[cfg(feature = "enterprise")]
+use crate::service::search::cache::cacher::delete_cache;
 use crate::{
     common::meta::search::{QueryDelta, SearchResultType},
     service::search::{self as SearchService},
@@ -174,13 +176,15 @@ pub async fn do_partitioned_search(
             );
         }
 
-        curr_res_size += total_hits;
-        if req_size > 0 && curr_res_size >= req_size {
-            log::info!(
-                "[HTTP2_STREAM trace_id {trace_id}] Reached requested result size ({req_size}), truncating results",
-            );
-            search_res.hits.truncate(req_size as usize);
-            search_res.total = search_res.hits.len();
+        if !is_streaming_aggs {
+            curr_res_size += total_hits;
+            if req_size > 0 && curr_res_size >= req_size {
+                log::info!(
+                    "[HTTP2_STREAM trace_id {trace_id}] Reached requested result size ({req_size}), truncating results",
+                );
+                search_res.hits.truncate(req_size as usize);
+                search_res.total = search_res.hits.len();
+            }
         }
 
         search_res = order_search_results(search_res, fallback_order_by_col.clone());
@@ -310,8 +314,61 @@ pub async fn do_partitioned_search(
     // Remove the streaming_aggs cache
     if is_streaming_aggs && partition_resp.streaming_id.is_some() {
         #[cfg(feature = "enterprise")]
-        streaming_aggs_exec::remove_cache(&partition_resp.streaming_id.unwrap())
+        {
+            let streaming_id = partition_resp.streaming_id.as_ref().unwrap();
+
+            // Delete mismatched-interval cache files BEFORE removing cache
+            // This ensures cache consistency - only files with the target interval are kept
+            // We do this before remove_cache() because we need GLOBAL_CACHE data
+            // Only runs when clear_cache is true (when overwrite_cache was requested)
+            //
+            // NOTE: There's a potential race condition if:
+            // - User1 refreshes cache with interval A (clear_cache=true)
+            // - User2 queries with interval B simultaneously
+            // - User2 might see partial results if deletion happens during cache discovery
+            if req.clear_cache {
+                // Get the cache file path and interval from GLOBAL_CACHE
+                if let Some(cache_file_path) = streaming_aggs_exec::GLOBAL_CACHE
+                    .id_cache
+                    .get_cache_file_path(streaming_id)
+                {
+                    let target_interval_mins =
+                        streaming_aggs_exec::GLOBAL_CACHE.get_cache_interval(streaming_id);
+
+                    if target_interval_mins > 0 {
+                        use o2_enterprise::enterprise::search::cache::streaming_agg::delete_mismatched_interval_cache_files;
+
+                        match delete_mismatched_interval_cache_files(
+                            streaming_id,
+                            &cache_file_path,
+                            modified_start_time,
+                            modified_end_time,
+                            target_interval_mins,
+                        )
+                        .await
+                        {
+                            Ok(deleted_count) => {
+                                if deleted_count > 0 {
+                                    log::info!(
+                                        "[trace_id: {trace_id}] [streaming_id: {streaming_id}] Successfully deleted {deleted_count} mismatched-interval cache files (target_interval: {target_interval_mins}min)"
+                                    );
+                                }
+                            }
+                            Err(e) => {
+                                log::warn!(
+                                    "[trace_id: {trace_id}] [streaming_id: {streaming_id}] Failed to delete mismatched-interval cache files: {e:?}"
+                                );
+                                // Don't fail the query if cleanup fails
+                            }
+                        }
+                    }
+                }
+            }
+
+            streaming_aggs_exec::remove_cache(streaming_id)
+        }
     }
+
     Ok(())
 }
 
@@ -334,6 +391,7 @@ pub async fn get_partitions(
         query_fn: Default::default(),
         streaming_output: true,
         histogram_interval: req.query.histogram_interval,
+        sampling_ratio: req.query.sampling_ratio,
     };
 
     let res = SearchService::search_partition(
@@ -345,6 +403,7 @@ pub async fn get_partitions(
         false,
         false,
         false,
+        req.use_cache,
     )
     .instrument(tracing::info_span!(
         "src::service::search::stream_execution::get_partitions"
@@ -390,8 +449,6 @@ pub fn handle_partial_response(mut res: Response) -> Response {
         res.function_error = if res.function_error.is_empty() {
             vec![PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()]
         } else {
-            res.function_error
-                .push(PARTIAL_ERROR_RESPONSE_MESSAGE.to_string());
             res.function_error
         };
     }
@@ -758,6 +815,61 @@ async fn send_partial_search_resp(
     Ok(())
 }
 
+/// Clear streaming aggregation cache files for the given streaming_id
+/// This should be called once before processing partitions when clear_cache is true
+#[deprecated]
+#[allow(dead_code)]
+#[cfg(feature = "enterprise")]
+async fn clear_streaming_agg_cache(
+    trace_id: &str,
+    streaming_id: &str,
+    start_time: i64,
+    end_time: i64,
+) -> Result<(), infra::errors::Error> {
+    use o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec::GLOBAL_CACHE;
+
+    log::info!(
+        "[HTTP2_STREAM] [trace_id: {}] [streaming_id: {}] clear_cache is set, deleting old cache files",
+        trace_id,
+        streaming_id
+    );
+
+    // Get the cache file path from GLOBAL_CACHE
+    let streaming_item = GLOBAL_CACHE.id_cache.get(streaming_id);
+    if let Some(item) = streaming_item {
+        let cache_file_path = item.get_cache_file_path();
+
+        // Delete cache files in the time range using DeletionCriteria::TimeRange
+        if let Err(e) = delete_cache(&cache_file_path, 0, Some(start_time), Some(end_time)).await {
+            log::error!(
+                "[HTTP2_STREAM] [trace_id: {}] [streaming_id: {}] Error deleting cache files: {}",
+                trace_id,
+                streaming_id,
+                e
+            );
+            return Err(infra::errors::Error::Message(format!(
+                "Failed to delete cache: {e}",
+            )));
+        }
+
+        log::info!(
+            "[HTTP2_STREAM] [trace_id: {}] [streaming_id: {}] Successfully deleted cache files for time range: {} - {}",
+            trace_id,
+            streaming_id,
+            start_time,
+            end_time
+        );
+    } else {
+        log::warn!(
+            "[HTTP2_STREAM] [trace_id: {}] [streaming_id: {}] No cache file path found in GLOBAL_CACHE",
+            trace_id,
+            streaming_id
+        );
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use config::meta::sql::OrderBy;
@@ -814,27 +926,6 @@ mod tests {
         let result = calc_queried_range(start_time, end_time, 50);
         let expected = 0.5; // 1 hour * 0.5
         assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn test_handle_partial_response() {
-        let response = Response {
-            is_partial: true,
-            function_error: vec!["Custom error".to_string()],
-            trace_id: "test-123".to_string(),
-            ..Default::default()
-        };
-
-        let result = handle_partial_response(response.clone());
-
-        // Should add the partial error message
-        assert!(
-            result
-                .function_error
-                .contains(&PARTIAL_ERROR_RESPONSE_MESSAGE.to_string())
-        );
-        assert!(result.function_error.contains(&"Custom error".to_string()));
-        assert_eq!(result.function_error.len(), 2);
     }
 
     #[test]

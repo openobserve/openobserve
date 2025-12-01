@@ -186,7 +186,7 @@ test.describe("CTE Logs Queries testcases", () => {
 
   test.afterEach(async ({ page }) => {
     try {
-      await pageManager.commonActions.flipStreaming();
+      // await pageManager.commonActions.flipStreaming();
       testLogger.info('Streaming flipped after test');
     } catch (error) {
       testLogger.warn('Streaming flip failed', { error: error.message });

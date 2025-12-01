@@ -24,13 +24,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("dashboard.description") }}
       </div>
       <q-input
-        outlined
+        borderless
         v-model="dashboardPanelData.data.description"
-        filled
         autogrow
-        class="showLabelOnTop"
+        class="showLabelOnTop el-border"
         data-test="dashboard-config-description"
-      />
+       hide-bottom-space/>
     </div>
   </div>
   <div v-else style="padding-bottom: 30px">
@@ -39,13 +38,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("dashboard.description") }}
       </div>
       <q-input
-        outlined
+        borderless
         v-model="dashboardPanelData.data.description"
-        filled
         autogrow
-        class="showLabelOnTop"
+        class="showLabelOnTop el-border"
         data-test="dashboard-config-description"
-      />
+       hide-bottom-space/>
     </div>
 
     <div class="space"></div>
@@ -59,13 +57,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       bg-color="input-bg"
       class="q-py-sm showLabelOnTop"
       stack-label
-      outlined
-      filled
+      borderless
       dense
       label-slot
       placeholder="Default: 0"
       data-test="dashboard-config-step-value"
-    >
+     hide-bottom-space>
       <template v-slot:label>
         <div class="row items-center all-pointer-events">
           Step Value
@@ -99,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-select
         :label="t('dashboard.trellisLayout')"
         data-test="dashboard-trellis-chart"
-        outlined
+        borderless
         v-model="dashboardPanelData.data.config.trellis.layout"
         :options="trellisOptions"
         dense
@@ -110,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.config.trellis?.layout ?? 'None'
         }`"
         :disable="isBreakdownFieldEmpty || hasTimeShifts"
-      >
+       hide-bottom-space>
         <template v-slot:label>
           <div class="row items-center all-pointer-events">
             {{ t("dashboard.trellisLayout") }}
@@ -144,14 +141,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="dashboardPanelData.data.config.trellis?.layout === 'custom'"
       >
         <q-input
-          outlined
+          borderless
           v-model.number="dashboardPanelData.data.config.trellis.num_of_columns"
-          color="input-border"
           :label="t('dashboard.numOfColumns')"
-          bg-color="input-bg"
           class="q-mr-sm showLabelOnTop"
           stack-label
-          filled
           dense
           :type="'number'"
           placeholder="Auto"
@@ -159,6 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disable="isBreakdownFieldEmpty || hasTimeShifts"
           :min="1"
           :max="16"
+          hide-bottom-space
           @update:model-value="
             (value: any) =>
               dashboardPanelData.data.config.trellis.num_of_columns > 16
@@ -209,6 +204,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="dashboardPanelData.data.config.trellis.group_by_y_axis"
           label="Group multi Y-axis for trellis"
           data-test="dashboard-config-trellis-group-by-y-axis"
+          class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
+          size="lg"
+          :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
         />
         <div>
           <q-icon
@@ -244,18 +242,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <q-toggle
-      v-if="
-        dashboardPanelData.data.type != 'table' &&
-        dashboardPanelData.data.type != 'heatmap' &&
-        dashboardPanelData.data.type != 'metric' &&
-        dashboardPanelData.data.type != 'gauge' &&
-        dashboardPanelData.data.type != 'geomap' &&
-        dashboardPanelData.data.type != 'sankey' &&
-        dashboardPanelData.data.type != 'maps'
-      "
+      v-if="shouldShowLegendsToggle(dashboardPanelData)"
       v-model="dashboardPanelData.data.config.show_legends"
       :label="t('dashboard.showLegendsLabel')"
       data-test="dashboard-config-show-legend"
+      class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
+      size="lg"
+      :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
     />
 
     <div class="space"></div>
@@ -265,6 +258,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="dashboardPanelData.data.config.wrap_table_cells"
       :label="t('dashboard.wraptext')"
       data-test="dashboard-config-wrap-table-cells"
+      class="tw-h-[36px] -tw-ml-2 o2-toggle-button-lg"
+      size="lg"
+      :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
     />
 
     <div class="space"></div>
@@ -274,6 +270,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="dashboardPanelData.data.config.table_transpose"
       :label="t('dashboard.tableTranspose')"
       data-test="dashboard-config-table_transpose"
+      class="tw-h-[36px] -tw-ml-2 o2-toggle-button-lg"
+      size="lg"
+      :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
     />
 
     <div class="space"></div>
@@ -283,23 +282,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="dashboardPanelData.data.config.table_dynamic_columns"
       :label="t('dashboard.tableDynamicColumns')"
       data-test="dashboard-config-table_dynamic_columns"
+      class="tw-h-[36px] -tw-ml-2 o2-toggle-button-lg"
+      size="lg"
+      :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
     />
 
     <div class="space"></div>
 
     <div class="o2-input">
       <q-select
-        v-if="
-          dashboardPanelData.data.type != 'table' &&
-          dashboardPanelData.data.type != 'heatmap' &&
-          dashboardPanelData.data.type != 'metric' &&
-          dashboardPanelData.data.type != 'gauge' &&
-          dashboardPanelData.data.type != 'geomap' &&
-          dashboardPanelData.data.config.show_legends &&
-          dashboardPanelData.data.type != 'sankey' &&
-          dashboardPanelData.data.type != 'maps'
-        "
-        outlined
+        v-if="shouldShowLegendPosition(dashboardPanelData)"
+        borderless
         v-model="dashboardPanelData.data.config.legends_position"
         :options="legendsPositionOptions"
         dense
@@ -311,49 +304,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.config.legends_position ?? 'Auto'
         }`"
         data-test="dashboard-config-legend-position"
-      >
+       hide-bottom-space>
+      </q-select>
+
+      <div class="space"></div>
+
+      <q-select
+        v-if="shouldShowLegendType(dashboardPanelData)"
+        borderless
+        v-model="dashboardPanelData.data.config.legends_type"
+        :options="legendTypeOptions"
+        dense
+        label="Legends Type"
+        class="showLabelOnTop"
+        stack-label
+        emit-value
+        :display-value="`${
+          dashboardPanelData.data.config.legends_type ?? 'Auto'
+        }`"
+        data-test="dashboard-config-legends-scrollable"
+       hide-bottom-space>
       </q-select>
 
       <div class="space"></div>
 
       <div class="input-container">
+        <!-- Legend Width Configuration (for right position) -->
         <q-input
-          v-if="
-            dashboardPanelData.data.type != 'table' &&
-            dashboardPanelData.data.type != 'heatmap' &&
-            dashboardPanelData.data.type != 'metric' &&
-            dashboardPanelData.data.type != 'gauge' &&
-            dashboardPanelData.data.type != 'geomap' &&
-            dashboardPanelData.data.config.show_legends &&
-            dashboardPanelData.data.config.legends_position == 'right' &&
-            dashboardPanelData.data.type != 'sankey'
-          "
+          v-if="shouldShowLegendWidth(dashboardPanelData)"
           v-model.number="legendWidthValue"
           :label="t('common.legendWidth')"
           color="input-border"
           bg-color="input-bg"
           class="q-py-md showLabelOnTop q-mr-sm"
           stack-label
-          outlined
-          filled
+          borderless
           dense
           label-slot
           :type="'number'"
           placeholder="Auto"
           data-test="dashboard-config-legend-width"
-        ></q-input>
+         hide-bottom-space></q-input>
+
+        <!-- Legend Height Configuration (for auto/bottom position) -->
+        <q-input
+          v-if="shouldShowLegendHeight(dashboardPanelData)"
+          v-model.number="legendHeightValue"
+          label="Legend Height"
+          color="input-border"
+          bg-color="input-bg"
+          class="q-py-md showLabelOnTop q-mr-sm"
+          stack-label
+          borderless
+          dense
+          label-slot
+          :type="'number'"
+          placeholder="Auto"
+          data-test="dashboard-config-legend-height"
+         hide-bottom-space></q-input>
+        <!-- dashboardPanelData.data.config.legends_type != 'scroll' -->
+        <!-- Unit container for Legend Width (right position) -->
         <div
           class="unit-container"
-          v-if="
-            dashboardPanelData.data.type != 'table' &&
-            dashboardPanelData.data.type != 'heatmap' &&
-            dashboardPanelData.data.type != 'metric' &&
-            dashboardPanelData.data.type != 'gauge' &&
-            dashboardPanelData.data.type != 'geomap' &&
-            dashboardPanelData.data.config.show_legends &&
-            dashboardPanelData.data.config.legends_position == 'right' &&
-            dashboardPanelData.data.type != 'sankey'
-          "
+          v-if="shouldShowLegendWidthUnitContainer(dashboardPanelData)"
         >
           <button
             @click="setUnit('px')"
@@ -387,12 +400,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             %
           </button>
         </div>
+
+        <!-- Unit container for Legend Height (auto/bottom position) -->
+        <div
+          class="unit-container"
+          v-if="shouldShowLegendHeightUnitContainer(dashboardPanelData)"
+        >
+          <button
+            @click="setHeightUnit('px')"
+            :class="{
+              active:
+                dashboardPanelData?.data?.config.legend_height?.unit === null ||
+                dashboardPanelData?.data?.config?.legend_height?.unit === 'px',
+            }"
+            style="height: 100%; width: 100%; font-size: 14px"
+            :data-test="`dashboard-config-legend-height-unit-${
+              dashboardPanelData?.data?.config?.legend_height?.unit === 'px'
+                ? 'active'
+                : 'inactive'
+            }`"
+          >
+            px
+          </button>
+          <button
+            @click="setHeightUnit('%')"
+            :class="{
+              active:
+                dashboardPanelData?.data?.config?.legend_height?.unit === '%',
+            }"
+            style="height: 100%; width: 100%; font-size: 14px"
+            :data-test="`dashboard-config-legend-height-unit-${
+              dashboardPanelData?.data?.config?.legend_height?.unit === '%'
+                ? 'active'
+                : 'inactive'
+            }`"
+          >
+            %
+          </button>
+        </div>
       </div>
 
       <div class="space"></div>
 
       <q-select
-        outlined
+        v-if="shouldApplyChartAlign(dashboardPanelData)"
+        borderless
+        v-model="dashboardPanelData.data.config.chart_align"
+        :options="chartAlignOptions"
+        dense
+        label="Chart Align"
+        class="showLabelOnTop"
+        stack-label
+        emit-value
+        :display-value="`${
+          dashboardPanelData.data.config.chart_align ?? 'Auto'
+        }`"
+        data-test="dashboard-config-chart-align"
+       hide-bottom-space>
+      </q-select>
+
+      <div class="space"></div>
+
+      <q-select
+        borderless
         v-model="dashboardPanelData.data.config.unit"
         :options="unitOptions"
         dense
@@ -419,11 +489,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         bg-color="input-bg"
         class="q-py-md showLabelOnTop"
         stack-label
-        filled
         dense
         label-slot
         data-test="dashboard-config-custom-unit"
-      />
+       borderless hide-bottom-space/>
       <div class="space"></div>
       <q-input
         type="number"
@@ -431,6 +500,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         value="2"
         min="0"
         max="100"
+        borderless
         @update:model-value="
           (value: any) =>
             (dashboardPanelData.data.config.decimals =
@@ -445,7 +515,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         bg-color="input-bg"
         class="q-py-md showLabelOnTop"
         stack-label
-        filled
+        hide-bottom-space
         dense
         label-slot
         data-test="dashboard-config-decimals"
@@ -455,7 +525,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-select
         v-if="dashboardPanelData.data.type == 'maps'"
-        outlined
+        borderless
         v-model="dashboardPanelData.data.config.map_type.type"
         :options="mapTypeOptions"
         dense
@@ -464,14 +534,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         stack-label
         emit-value
         data-test="dashboard-config-map-type"
-      >
+       hide-bottom-space>
       </q-select>
 
       <div class="space"></div>
 
       <q-select
         v-if="dashboardPanelData.data.type == 'geomap'"
-        outlined
+        borderless
         v-model="dashboardPanelData.data.config.base_map.type"
         :options="basemapTypeOptions"
         dense
@@ -481,7 +551,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         emit-value
         :display-value="'OpenStreetMap'"
         data-test="dashboard-config-basemap"
-      >
+       hide-bottom-space>
       </q-select>
 
       <div class="space"></div>
@@ -500,13 +570,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             bg-color="input-bg"
             class="col-6 q-py-md showLabelOnTop"
             stack-label
-            outlined
-            filled
+            borderless
             dense
             label-slot
             :type="'number'"
             data-test="dashboard-config-latitude"
-          >
+           hide-bottom-space>
           </q-input>
           <q-input
             v-model.number="dashboardPanelData.data.config.map_view.lng"
@@ -519,13 +588,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             bg-color="input-bg"
             class="col-6 q-py-md showLabelOnTop"
             stack-label
-            outlined
-            filled
+            borderless
             dense
             label-slot
             :type="'number'"
             data-test="dashboard-config-longitude"
-          >
+           hide-bottom-space>
           </q-input>
         </div>
         <q-input
@@ -537,20 +605,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           bg-color="input-bg"
           class="q-py-md showLabelOnTop"
           stack-label
-          outlined
-          filled
+          borderless
           dense
           label-slot
           :type="'number'"
           data-test="dashboard-config-zoom"
-        >
+         hide-bottom-space>
         </q-input>
 
         <!-- symbol size -->
         <q-select
           v-model="dashboardPanelData.data.config.map_symbol_style.size"
           :label="t('dashboard.symbolsize')"
-          outlined
+          borderless
           :options="symbolOptions"
           dense
           class="showLabelOnTop"
@@ -558,7 +625,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           emit-value
           :display-value="`${dashboardPanelData.data.config.map_symbol_style.size}`"
           data-test="dashboard-config-symbol"
-        >
+         hide-bottom-space>
         </q-select>
 
         <div class="space"></div>
@@ -585,14 +652,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             bg-color="input-bg"
             class="col-6 q-py-md showLabelOnTop"
             stack-label
-            outlined
-            filled
+            borderless
             dense
             label-slot
             :type="'number'"
             data-test="dashboard-config-map-symbol-min"
             :min="0"
-          >
+           hide-bottom-space>
           </q-input>
 
           <q-input
@@ -616,14 +682,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             bg-color="input-bg"
             class="col-6 q-py-md showLabelOnTop"
             stack-label
-            outlined
-            filled
+            borderless
             dense
             label-slot
             :type="'number'"
             data-test="dashboard-config-map-symbol-max"
             :min="0"
-          >
+           hide-bottom-space>
           </q-input>
         </div>
         <q-input
@@ -646,20 +711,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           bg-color="input-bg"
           class="col-6 q-py-md showLabelOnTop"
           stack-label
-          outlined
-          filled
+          borderless
           dense
           label-slot
           :type="'number'"
           data-test="dashboard-config-map-symbol-fixed"
-        >
+         hide-bottom-space>
         </q-input>
       </div>
 
       <div class="space"></div>
 
       <!-- <q-input v-if="promqlMode" v-model="dashboardPanelData.data.config.promql_legend" label="Legend" color="input-border"
-      bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot> -->
+      bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label dense label-slot borderless hide-bottom-space> -->
       <div
         v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
         class="q-py-md showLabelOnTop"
@@ -716,8 +780,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         bg-color="input-bg"
         class="q-py-sm showLabelOnTop"
         stack-label
-        outlined
-        filled
+        borderless
+        
         dense
         label-slot
         placeholder="0"
@@ -771,8 +835,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         bg-color="input-bg"
         class="q-py-sm showLabelOnTop"
         stack-label
-        outlined
-        filled
+        borderless
+        
         dense
         label-slot
         placeholder="ALL"
@@ -834,6 +898,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.layout.currentQueryIndex
             ].fields?.breakdown?.length == 0
           "
+          class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
+          size="lg"
+          :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
         />
 
         <q-icon
@@ -870,7 +937,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         bg-color="input-bg"
         class="showLabelOnTop"
         stack-label
-        outlined
+        borderless
         label-slot
         style="
           top: none !important;
@@ -913,6 +980,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="dashboardPanelData.data.config.connect_nulls"
         label="Connect null values"
         data-test="dashboard-config-connect-null-values"
+        class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
+      size="lg"
+      :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
       />
 
       <div class="space"></div>
@@ -929,12 +999,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         bg-color="input-bg"
         class="q-py-md showLabelOnTop"
         stack-label
-        filled
         dense
         label-slot
         placeholder="-"
         data-test="dashboard-config-no-value-replacement"
-        ><template v-slot:label>
+         borderless hide-bottom-space><template v-slot:label>
           <div class="row items-center all-pointer-events">
             No Value Replacement
             <div>
@@ -959,7 +1028,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="space"></div>
       <q-select
         v-if="dashboardPanelData.data.type == 'geomap'"
-        outlined
+        borderless
         v-model="
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
@@ -977,7 +1046,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ].config.layer_type
         }`"
         data-test="dashboard-config-layer-type"
-      >
+       hide-bottom-space>
       </q-select>
 
       <div class="space"></div>
@@ -1004,13 +1073,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         bg-color="input-bg"
         class="q-py-md showLabelOnTop"
         stack-label
-        outlined
-        filled
+        borderless
         dense
         label-slot
         :type="'number'"
         data-test="dashboard-config-weight"
-      >
+       hide-bottom-space>
       </q-input>
 
       <q-input
@@ -1032,8 +1100,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         bg-color="input-bg"
         class="q-py-md showLabelOnTop"
         stack-label
-        outlined
-        filled
+        borderless
+        
         dense
         label-slot
         :type="'number'"
@@ -1062,8 +1130,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         bg-color="input-bg"
         class="q-py-md showLabelOnTop"
         stack-label
-        outlined
-        filled
+        borderless
+        
         dense
         label-slot
         placeholder="100"
@@ -1092,8 +1160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         bg-color="input-bg"
         class="q-py-md showLabelOnTop"
         stack-label
-        outlined
-        filled
+        borderless
         dense
         label-slot
         :type="'number'"
@@ -1123,6 +1190,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="dashboardPanelData.data.config.axis_border_show"
         :label="t('dashboard.showBorder')"
         data-test="dashboard-config-axis-border"
+        class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
+      size="lg"
+      :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
       />
 
       <div class="space"></div>
@@ -1149,8 +1219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: 50%"
           class="q-py-md showLabelOnTop"
           stack-label
-          outlined
-          filled
+          borderless
           dense
           label-slot
           :type="'number'"
@@ -1194,8 +1263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: 50%"
           class="q-py-md showLabelOnTop"
           stack-label
-          outlined
-          filled
+          borderless
           dense
           label-slot
           :type="'number'"
@@ -1248,7 +1316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             'h-stacked',
           ].includes(dashboardPanelData.data.type)
         "
-        outlined
+        borderless
         v-model="dashboardPanelData.data.config.label_option.position"
         :options="labelPositionOptions"
         dense
@@ -1271,6 +1339,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="space"></div>
 
+      <div class="space"></div>
+
+      <q-toggle
+        v-if="shouldShowGridlines(dashboardPanelData)"
+        v-model="dashboardPanelData.data.config.show_gridlines"
+        label="Show Gridlines"
+        data-test="dashboard-config-show-gridlines"
+        class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
+        size="lg"
+        :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
+      />
+
+      <div class="space"></div>
+
       <q-input
         v-if="
           [
@@ -1290,8 +1372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         bg-color="input-bg"
         class="q-py-md showLabelOnTop"
         stack-label
-        outlined
-        filled
+        borderless
         dense
         label-slot
         :type="'number'"
@@ -1313,7 +1394,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.type,
           )
         "
-        outlined
+        borderless
         v-model="dashboardPanelData.data.config.show_symbol"
         :options="showSymbol"
         dense
@@ -1353,7 +1434,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.type,
           )
         "
-        outlined
+        borderless
         v-model="dashboardPanelData.data.config.line_interpolation"
         :options="lineInterpolationOptions"
         dense
@@ -1409,8 +1490,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         bg-color="input-bg"
         class="q-py-sm showLabelOnTop"
         stack-label
-        outlined
-        filled
+        borderless
+        
         dense
         label-slot
         placeholder="Default: 1.5"
@@ -1532,6 +1613,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="addTimeShift"
         style="cursor: pointer; padding: 0px 5px"
         label="+ Add"
+        class="el-border"
         no-caps
         data-test="dashboard-addpanel-config-time-shift-add-btn"
       />
@@ -1554,7 +1636,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import useDashboardPanelData from "@/composables/useDashboardPanel";
-import { computed, defineComponent, inject, onBeforeMount, onMounted, ref } from "vue";
+import { computed, defineComponent, inject, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
@@ -1573,7 +1655,18 @@ import StepAfter from "@/components/icons/dashboards/StepAfter.vue";
 import StepMiddle from "@/components/icons/dashboards/StepMiddle.vue";
 import { useStore } from "vuex";
 
-import { markRaw } from "vue";
+import { markRaw, watchEffect } from "vue";
+import {
+  shouldShowLegendsToggle,
+  shouldShowLegendPosition,
+  shouldShowLegendType,
+  shouldShowLegendWidth,
+  shouldShowLegendHeight,
+  shouldShowLegendWidthUnitContainer,
+  shouldShowLegendHeightUnitContainer,
+  shouldApplyChartAlign,
+  shouldShowGridlines,
+} from "@/utils/dashboard/configUtils";
 
 export default defineComponent({
   components: {
@@ -1602,6 +1695,7 @@ export default defineComponent({
     const { dashboardPanelData, promqlMode } = useDashboardPanelData(
       dashboardPanelDataPageKey,
     );
+
     const { t } = useI18n();
     const store = useStore();
 
@@ -1622,6 +1716,14 @@ export default defineComponent({
       // Ensure that the nested structure is initialized
       if (!dashboardPanelData.data.config.legend_width) {
         dashboardPanelData.data.config.legend_width = {
+          value: null,
+          unit: "px",
+        };
+      }
+
+      // Initialize legend height configuration
+      if (!dashboardPanelData.data.config.legend_height) {
+        dashboardPanelData.data.config.legend_height = {
           value: null,
           unit: "px",
         };
@@ -1689,12 +1791,19 @@ export default defineComponent({
         };
       }
 
+      // by default, use chart_align as null (auto)
+      if (dashboardPanelData.data.config.chart_align === undefined) {
+        dashboardPanelData.data.config.chart_align = null;
+      }
+
       // by default, set show_symbol as false
       if (dashboardPanelData.data.config.show_symbol === undefined) {
         const isNewPanel = !dashboardPanelData.data.id;
         // if new panel, use config env
         // else always false
-        dashboardPanelData.data.config.show_symbol = isNewPanel ? store?.state?.zoConfig?.dashboard_show_symbol_enabled ?? false : false;
+        dashboardPanelData.data.config.show_symbol = isNewPanel
+          ? (store?.state?.zoConfig?.dashboard_show_symbol_enabled ?? false)
+          : false;
       }
 
       // by default, set line interpolation as smooth
@@ -1714,6 +1823,13 @@ export default defineComponent({
 
       if (!dashboardPanelData?.data?.config?.trellis?.group_by_y_axis) {
         dashboardPanelData.data.config.trellis.group_by_y_axis = false;
+      }
+
+      if (
+        dashboardPanelData.data.config.show_gridlines === null ||
+        dashboardPanelData.data.config.show_gridlines === undefined
+      ) {
+        dashboardPanelData.data.config.show_gridlines = true;
       }
     });
 
@@ -1747,6 +1863,38 @@ export default defineComponent({
 
       // Set the unit
       dashboardPanelData.data.config.legend_width.unit = unit;
+    };
+
+    const legendHeightValue = computed({
+      get() {
+        return dashboardPanelData.data.config?.legend_height?.value;
+      },
+      set(value) {
+        // Ensure that the nested structure is initialized
+        if (!dashboardPanelData.data.config.legend_height) {
+          dashboardPanelData.data.config.legend_height = {
+            value: null,
+            unit: "px",
+          };
+        }
+
+        // Set the value
+        dashboardPanelData.data.config.legend_height.value =
+          value !== "" ? value : null;
+      },
+    });
+
+    const setHeightUnit = (unit: any) => {
+      // Ensure that the nested structure is initialized
+      if (!dashboardPanelData.data.config.legend_height) {
+        dashboardPanelData.data.config.legend_height = {
+          value: null,
+          unit: null,
+        };
+      }
+
+      // Set the unit
+      dashboardPanelData.data.config.legend_height.unit = unit;
     };
 
     const layerTypeOptions = [
@@ -1804,6 +1952,36 @@ export default defineComponent({
       {
         label: t("dashboard.bottom"),
         value: "bottom",
+      },
+    ];
+
+    const legendTypeOptions = [
+      {
+        label: "Auto",
+        value: null,
+      },
+      {
+        label: "Plain",
+        value: "plain",
+      },
+      {
+        label: "Scroll",
+        value: "scroll",
+      },
+    ];
+
+    const chartAlignOptions = [
+      {
+        label: "Auto",
+        value: null,
+      },
+      {
+        label: "Left",
+        value: "left",
+      },
+      {
+        label: "Center",
+        value: "center",
       },
     ];
     const unitOptions = [
@@ -2112,6 +2290,33 @@ export default defineComponent({
       );
     });
 
+    // Clear legend width when switching away from plain type or when position is not right
+    watchEffect(() => {
+      if (
+        dashboardPanelData.data.config.legends_type !== "plain" ||
+        dashboardPanelData.data.config.legends_position !== "right"
+      ) {
+        // Clear the legend width value when conditions no longer allow width customization
+        if (dashboardPanelData.data.config.legend_width) {
+          dashboardPanelData.data.config.legend_width.value = null;
+        }
+      }
+    });
+
+    // Clear legend height when switching away from plain type or when position is not bottom/auto
+    watchEffect(() => {
+      if (
+        dashboardPanelData.data.config.legends_type !== "plain" ||
+        (dashboardPanelData.data.config.legends_position !== null &&
+          dashboardPanelData.data.config.legends_position !== "bottom")
+      ) {
+        // Clear the legend height value when conditions no longer allow height customization
+        if (dashboardPanelData.data.config.legend_height) {
+          dashboardPanelData.data.config.legend_height.value = null;
+        }
+      }
+    });
+
     return {
       t,
       dashboardPanelData,
@@ -2121,14 +2326,18 @@ export default defineComponent({
       layerTypeOptions,
       symbolOptions,
       legendsPositionOptions,
+      legendTypeOptions,
+      chartAlignOptions,
       unitOptions,
       labelPositionOptions,
       showSymbol,
       lineInterpolationOptions,
       isWeightFieldPresent,
       setUnit,
+      setHeightUnit,
       handleBlur,
       legendWidthValue,
+      legendHeightValue,
       dashboardSelectfieldPromQlList,
       selectPromQlNameOption,
       addTimeShift,
@@ -2139,6 +2348,16 @@ export default defineComponent({
       isBreakdownFieldEmpty,
       hasTimeShifts,
       dashboardPanelDataPageKey,
+      store,
+      shouldShowLegendsToggle,
+      shouldShowLegendPosition,
+      shouldShowLegendType,
+      shouldShowLegendWidth,
+      shouldShowLegendHeight,
+      shouldShowLegendWidthUnitContainer,
+      shouldShowLegendHeightUnitContainer,
+      shouldApplyChartAlign,
+      shouldShowGridlines,
     };
   },
 });

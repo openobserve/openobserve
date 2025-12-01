@@ -53,6 +53,18 @@ pub trait Scheduler: Sync + Send + 'static {
         data: Option<&str>,
     ) -> Result<()>;
     async fn update_trigger(&self, trigger: Trigger, clone: bool) -> Result<()>;
+    async fn bulk_update_triggers(&self, triggers: Vec<Trigger>) -> Result<()>;
+    async fn bulk_update_status(
+        &self,
+        updates: Vec<(
+            String,
+            TriggerModule,
+            String,
+            TriggerStatus,
+            i32,
+            Option<String>,
+        )>,
+    ) -> Result<()>;
     async fn keep_alive(&self, ids: &[i64], alert_timeout: i64, report_timeout: i64) -> Result<()>;
     async fn pull(
         &self,
@@ -113,6 +125,27 @@ pub async fn update_status(
 #[inline]
 pub async fn update_trigger(trigger: Trigger, clone: bool) -> Result<()> {
     CLIENT.update_trigger(trigger, clone).await
+}
+
+/// Bulk updates multiple triggers at once for better performance
+#[inline]
+pub async fn bulk_update_triggers(triggers: Vec<Trigger>) -> Result<()> {
+    CLIENT.bulk_update_triggers(triggers).await
+}
+
+/// Bulk updates status of multiple triggers at once for better performance
+#[inline]
+pub async fn bulk_update_status(
+    updates: Vec<(
+        String,
+        TriggerModule,
+        String,
+        TriggerStatus,
+        i32,
+        Option<String>,
+    )>,
+) -> Result<()> {
+    CLIENT.bulk_update_status(updates).await
 }
 
 /// Keeps the trigger alive

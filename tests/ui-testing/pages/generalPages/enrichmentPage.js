@@ -27,6 +27,7 @@ class EnrichmentPage {
         // VRL editor locator
         this.vrlEditor = '#fnEditor';
         this.refreshButton = "[data-test='logs-search-bar-refresh-btn']";
+        this.showQueryToggleBtn = '[data-test="logs-search-bar-show-query-toggle-btn"] div';
         
         // Table and validation locators
         this.tableRows = 'tbody tr';
@@ -198,15 +199,17 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     async expandFirstLogRow() {
-        await this.page.waitForLoadState('networkidle');
-        
+        await this.page.waitForLoadState('networkidle', { timeout: 60000 });
+        await this.page.waitForTimeout(1000);
+
         // Additional run query clicks to ensure VRL enrichment is fully processed
         const refreshButton = this.page.locator(this.refreshButton);
         if (await refreshButton.isVisible()) {
             for (let i = 0; i < 3; i++) {
                 await refreshButton.click({ force: true });
                 await this.page.waitForLoadState('domcontentloaded');
-                await this.page.waitForLoadState('networkidle', { timeout: 2000 });
+                await this.page.waitForTimeout(2000);
+                await this.page.waitForLoadState('networkidle', { timeout: 10000 });
             }
         }
         
@@ -396,14 +399,33 @@ abc, err = get_enrichment_table_record("${fileName}", {
         }
         
         // Wait for VRL editor to appear after potential URL modification
-        await this.page.waitForSelector(this.vrlEditor, { 
-            state: 'visible',
-            timeout: 15000 
-        });
+        try {
+            await this.page.waitForSelector(this.vrlEditor, {
+                state: 'visible',
+                timeout: 3000
+            });
+        } catch (error) {
+            testLogger.warn('VRL editor not visible, clicking show query toggle button');
+
+            // Click the show query toggle button to reveal the VRL editor
+            await this.page.locator(this.showQueryToggleBtn).nth(1).click({ force: true });
+            await this.page.waitForTimeout(1000);
+
+            // Retry waiting for VRL editor
+            await this.page.waitForSelector(this.vrlEditor, {
+                state: 'visible',
+                timeout: 10000
+            });
+            testLogger.debug('VRL editor visible after clicking toggle button');
+        }
         
         const vrlEditorExists = await this.page.locator('#fnEditor').count();
         testLogger.debug('VRL Editor count after URL logic', { vrlEditorExists });
-        
+
+        // Wait for enrichment table to be fully indexed and available for querying
+        testLogger.debug('Waiting for enrichment table to be ready for VRL queries');
+        await this.page.waitForTimeout(5000);
+
         // Now proceed with VRL processing
         await this.fillVRLQuery(fileName);
 
@@ -412,6 +434,36 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
         // Apply query with multiple clicks for VRL test reliability
         await this.applyQueryMultipleClicks();
+
+        // Wait for query results to load
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+        await this.page.waitForTimeout(2000);
+
+        // Check if error occurred and retry with additional wait
+        const errorDetailsBtn = this.page.locator('[data-test="logs-page-result-error-details-btn"]');
+        if (await errorDetailsBtn.isVisible()) {
+            testLogger.warn('Error detected after first VRL query attempt, waiting 5s and retrying');
+
+            // Wait additional 5 seconds for enrichment table to be fully ready
+            await this.page.waitForTimeout(5000);
+
+            // Retry the query
+            await this.applyQueryMultipleClicks();
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+            await this.page.waitForTimeout(2000);
+
+            // Check again if error persists
+            if (await errorDetailsBtn.isVisible()) {
+                testLogger.error('Error persists after retry, capturing details');
+                await errorDetailsBtn.click();
+                await this.page.waitForTimeout(1000);
+                await this.page.screenshot({ path: 'test-results/error-details-vrl-enrichment.png', fullPage: true });
+                testLogger.error('Error details screenshot saved to test-results/error-details-vrl-enrichment.png');
+                throw new Error('VRL query execution failed after retry - check test-results/error-details-vrl-enrichment.png for details');
+            } else {
+                testLogger.info('VRL query succeeded after retry');
+            }
+        }
 
         // Verify that no warning is shown for query execution
         await this.verifyNoQueryWarning();

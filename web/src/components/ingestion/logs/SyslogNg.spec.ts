@@ -404,7 +404,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
       });
 
       expect(wrapper.find('div').exists()).toBe(true);
-      expect(wrapper.find('.q-ma-md').exists()).toBe(true);
+      expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
     });
 
     it('should render CopyContent component with correct content prop', () => {
@@ -459,8 +459,7 @@ describe('SyslogNg.vue Comprehensive Coverage', () => {
         },
       });
 
-      expect(wrapper.find('.q-ma-md').exists()).toBe(true);
-      expect(wrapper.find('.q-mt-sm').exists()).toBe(true);
+      expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
     });
   });
 

@@ -160,7 +160,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         ("prefix" = Option<String>, Query, description = "Key prefix"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<String>),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Key Values", "operation": "list"}))

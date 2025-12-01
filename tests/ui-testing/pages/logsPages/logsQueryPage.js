@@ -30,7 +30,8 @@ export class LogsQueryPage {
   }
 
   async clickErrorMessage() {
-    await expect(this.page.locator(this.errorMessage).getByText('No events found')).toBeVisible();
+    // Wait longer for error message to appear in deployed environments
+    await expect(this.page.locator(this.errorMessage).getByText('No events found')).toBeVisible({ timeout: 30000 });
     await this.page.locator(this.errorMessage).click();
   }
 

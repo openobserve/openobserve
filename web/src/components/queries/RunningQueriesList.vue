@@ -83,10 +83,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #bottom="scope">
         <q-btn
           data-test="qm-multiple-cancel-query-btn"
-          class="text-bold"
+          class="o2-secondary-button no-border tw-h-[36px]"
           outline
+          flat
           padding="sm lg"
-          color="red"
           :disable="selectedRowsModel?.length === 0"
           @click="handleMultiQueryCancel"
           no-caps

@@ -19,22 +19,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- TODO OK : Add button to delete role in toolbar -->
     <div
       data-test="edit-role-title"
-      style="font-size: 18px"
-      class="q-py-sm q-px-md"
+      class="tw-pb-[0.625rem]"
     >
-      {{ editingRole }}
+    <div class="card-container q-py-sm">
+          <span style="font-size: 18px;" class="q-px-md ">{{ editingRole }}</span> 
+           <AppTabs
+              data-test="edit-role-tabs"
+              :tabs="tabs"
+              :active-tab="activeTab"
+              @update:active-tab="updateActiveTab"
+            />
     </div>
+</div>
 
-    <div class="full-width bg-grey-4" style="height: 1px" />
-
-    <AppTabs
-      data-test="edit-role-tabs"
-      :tabs="tabs"
-      :active-tab="activeTab"
-      @update:active-tab="updateActiveTab"
-    />
-
-    <q-separator />
 
     <template v-if="isFetchingInitialRoles">
       <div data-test="edit-role-page-loading-spinner" style="margin-top: 64px">
@@ -49,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-else>
-      <div style="min-height: calc(100% - (39px + 55px + 46px))">
+      <div style="min-height: calc(100% - (39px + 55px + 49px))">
         <GroupUsers
           data-test="edit-role-users-section"
           v-show="activeTab === 'users'"
@@ -72,6 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-show="activeTab === 'permissions'"
           data-test="edit-role-permissions-section"
+          class="card-container tw-h-[calc(100vh-200px)]"
         >
           <div
             class="flex justify-between items-center"
@@ -80,12 +78,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-show="permissionsUiType === 'table'"
               data-test="edit-role-permissions-filters"
-              class="o2-input flex items-start q-px-md q-py-sm justify-start"
+              class=" flex items-start q-px-md q-py-sm justify-start"
               style="position: sticky; top: 0px; z-index: 2"
             >
               <div
                 data-test="edit-role-permissions-show-toggle"
-                class="flex items-center q-pt-xs q-mr-md"
+                class="flex items-center q-mr-md"
               >
                 <span
                   data-test="edit-role-permissions-show-text"
@@ -95,11 +93,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <div
                   class="q-ml-xs"
-                  style="
-                    border: 1px solid #d7d7d7;
-                    width: fit-content;
-                    border-radius: 2px;
-                  "
+                   style="
+                  border: 1px solid var(--o2-border-color);
+                  width: fit-content;
+                  border-radius: 0.3rem;
+                  padding: 2px;
+                "
                 >
                   <template
                     v-for="visual in permissionDisplayOptions"
@@ -116,6 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="11px"
                       class="q-px-md visual-selection-btn"
                       @click="updateTableData(visual.value)"
+                      style="height: 30px;"
                     >
                       {{ visual.label }}</q-btn
                     >
@@ -151,8 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   emit-value
                   fill-input
                   hide-selected
-                  outlined
-                  filled
+                  borderless
                   dense
                   clearable
                   style="width: 200px"
@@ -164,12 +163,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div></div>
             <div
               data-test="edit-role-permissions-ui-type-toggle"
-              class="q-mr-md"
+              class="q-mr-md q-my-xs"
               style="
-                border: 1px solid #d7d7d7;
-                width: fit-content;
-                border-radius: 2px;
-              "
+              border: 1px solid #d7d7d7;
+              width: fit-content;
+              border-radius: 0.3rem;
+              padding: 2px;
+            "
             >
               <template
                 v-for="visual in permissionUiOptions"
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div data-test="edit-role-permissions-table-section">
+          <div data-test="edit-role-permissions-table-section" class="el-border-radius q-px-md">
             <div v-show="permissionsUiType === 'table'">
               <permissions-table
                 ref="permissionTableRef"
@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     language="json"
                     ref="permissionJsonEditorRef"
                     v-model:query="permissionsJsonValue"
-                    style="height: calc(100vh - 328px)"
+                    style="height: calc(100vh - 295px)"
                   />
                 </div>
                 <div v-if="isHelpOpen" style="width: 350px" class="q-pa-sm">
@@ -273,28 +273,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="flex justify-end q-px-md q-py-sm full-width"
-        style="position: sticky; bottom: 0px; z-index: 2"
-        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+        class="flex justify-end tw-w-full"
+        style="position: sticky; bottom: 0.45rem; z-index: 2"
       >
+      <div class="card-container tw-w-full tw-py-2 tw-px-3 tw-justify-end tw-flex">
         <q-btn
           data-test="edit-role-cancel-btn"
-          class="text-bold"
+          class="o2-secondary-button"
           :label="t('alerts.cancel')"
-          text-color="light-text"
-          padding="sm md"
           no-caps
           @click="cancelPermissionsUpdate"
         />
         <q-btn
           data-test="edit-role-save-btn"
           :label="t('alerts.save')"
-          class="text-bold no-border q-ml-md"
-          color="secondary"
-          padding="sm xl"
+          class="o2-primary-button q-ml-md"
           no-caps
           @click="saveRole"
         />
+      </div>
+        
       </div>
     </template>
   </div>

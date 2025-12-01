@@ -18,193 +18,198 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <q-page class="ingestionPage">
-    <div class="q-px-md full-width">
-      <span class="text-h6 q-mr-auto"> {{ t("ingestion.header") }}</span>
-      <q-btn
-        v-if="
-          rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
-          store.state.organizationData.rumToken.rum_token != ''
-        "
-        class="o2-primary-button tw-h-[36px] q-ml-md q-mb-xs text-bold no-border right float-right"
-        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-        flat
-        no-caps
-        :label="t(`ingestion.resetRUMTokenLabel`)"
-        @click="showRUMUpdateDialogFn"
-      />
-      <q-btn
-        v-else-if="
-          rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
-          store.state.organizationData.rumToken.rum_token == ''
-        "
-        class="o2-primary-button tw-h-[36px] q-ml-md q-mb-xs text-bold no-border right float-right"
-        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-        flat
-        no-caps
-        :label="t(`ingestion.generateRUMTokenLabel`)"
-        @click="generateRUMToken"
-      />
-      <q-btn
-        v-else
-        class="o2-primary-button tw-h-[36px] q-ml-md q-mb-xs text-bold no-border right float-right"
-        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-        flat
-        no-caps
-        :label="t(`ingestion.resetTokenBtnLabel`)"
-        @click="showUpdateDialogFn"
-      />
-      <span
-        class="text-subtitle bg-warning float-right q-mt-xs q-pa-sm text-bold"
-        style="margin-right: 14%"
-        v-if="
-          store.state.zoConfig.hasOwnProperty(
-            'restricted_routes_on_empty_data'
-          ) &&
-          store.state.zoConfig.restricted_routes_on_empty_data == true &&
-          store.state.organizationData.isDataIngested == false
-        "
-      >
-        {{ t("ingestion.redirectionIngestionMsg") }}
-      </span>
-      <ConfirmDialog
-        title="Reset Token"
-        message="Are you sure you want to update token for this organization?"
-        @update:ok="updatePasscode"
-        @update:cancel="confirmUpdate = false"
-        v-model="confirmUpdate"
-      />
-      <ConfirmDialog
-        title="Reset RUM Token"
-        message="Are you sure you want to update rum token for this organization?"
-        @update:ok="updateRUMToken"
-        @update:cancel="confirmRUMUpdate = false"
-        v-model="confirmRUMUpdate"
-      />
+    <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem] q-pt-xs">
+      <div class=" card-container">
+        <div class="q-px-md q-pt-md full-width">
+          <span class="text-h6 q-mr-auto"> {{ t("ingestion.header") }}</span>
+          <q-btn
+            v-if="
+              rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
+              store.state.organizationData.rumToken.rum_token != ''
+            "
+            class="o2-primary-button tw-h-[36px] q-ml-md q-mb-xs text-bold no-border right float-right"
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            flat
+            no-caps
+            :label="t(`ingestion.resetRUMTokenLabel`)"
+            @click="showRUMUpdateDialogFn"
+          />
+          <q-btn
+            v-else-if="
+              rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
+              store.state.organizationData.rumToken.rum_token == ''
+            "
+            class="o2-primary-button tw-h-[36px] q-ml-md q-mb-xs text-bold no-border right float-right"
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            flat
+            no-caps
+            :label="t(`ingestion.generateRUMTokenLabel`)"
+            @click="generateRUMToken"
+          />
+          <q-btn
+            v-else
+            class="o2-primary-button tw-h-[36px] q-ml-md q-mb-xs text-bold no-border right float-right"
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            flat
+            no-caps
+            :label="t(`ingestion.resetTokenBtnLabel`)"
+            @click="showUpdateDialogFn"
+          />
+          <span
+            class="text-subtitle bg-warning float-right q-pa-sm text-bold"
+            v-if="
+              store.state.zoConfig.hasOwnProperty(
+                'restricted_routes_on_empty_data'
+              ) &&
+              store.state.zoConfig.restricted_routes_on_empty_data == true &&
+              store.state.organizationData.isDataIngested == false
+            "
+          >
+            {{ t("ingestion.redirectionIngestionMsg") }}
+          </span>
+          <div style="clear: both;"></div>
+          <ConfirmDialog
+            title="Reset Token"
+            message="Are you sure you want to update token for this organization?"
+            @update:ok="updatePasscode"
+            @update:cancel="confirmUpdate = false"
+            v-model="confirmUpdate"
+          />
+          <ConfirmDialog
+            title="Reset RUM Token"
+            message="Are you sure you want to update rum token for this organization?"
+            @update:ok="updateRUMToken"
+            @update:cancel="confirmRUMUpdate = false"
+            v-model="confirmRUMUpdate"
+          />
+        </div>
+        <q-tabs v-model="ingestTabType" horizontal align="left" class="q-ml-md">
+          <q-route-tab
+            default
+            name="recommended"
+            :to="{
+              name: 'recommended',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
+            :label="t('ingestion.recommendedLabel')"
+            content-class="tab_content"
+          />
+          <q-route-tab
+            name="custom"
+            :to="{
+              name: 'custom',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
+            :label="t('ingestion.customLabel')"
+            content-class="tab_content"
+          />
+          <q-route-tab
+            name="server"
+            :to="{
+              name: 'servers',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
+            :label="t('ingestion.serverLabel')"
+            content-class="tab_content"
+          />
+          <q-route-tab
+            name="database"
+            :to="{
+              name: 'databases',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
+            :label="t('ingestion.databaseLabel')"
+            content-class="tab_content"
+          />
+
+          <q-route-tab
+            name="security"
+            :to="{
+              name: 'security',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
+            :label="t('ingestion.securityLabel')"
+            content-class="tab_content"
+          />
+
+          <q-route-tab
+            name="devops"
+            :to="{
+              name: 'devops',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
+            :label="t('ingestion.devopsLabel')"
+            content-class="tab_content"
+          />
+
+          <q-route-tab
+            name="networking"
+            :to="{
+              name: 'networking',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
+            :label="t('ingestion.networkingLabel')"
+            content-class="tab_content"
+          />
+          <q-route-tab
+            name="message-queues"
+            :to="{
+              name: 'message-queues',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
+            :label="t('ingestion.messageQueuesLabel')"
+            content-class="tab_content"
+          />
+          <q-route-tab
+            name="languages"
+            :to="{
+              name: 'languages',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
+            :label="t('ingestion.languagesLabel')"
+            content-class="tab_content"
+          />
+          <q-route-tab
+            name="others"
+            :to="{
+              name: 'others',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
+            :label="t('ingestion.otherLabel')"
+            content-class="tab_content"
+          />
+        </q-tabs>
+      </div>
     </div>
-    <q-tabs v-model="ingestTabType" horizontal align="left">
-      <q-route-tab
-        default
-        name="recommended"
-        :to="{
-          name: 'recommended',
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        }"
-        :label="t('ingestion.recommendedLabel')"
-        content-class="tab_content"
-      />
-      <q-route-tab
-        name="custom"
-        :to="{
-          name: 'custom',
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        }"
-        :label="t('ingestion.customLabel')"
-        content-class="tab_content"
-      />
-      <q-route-tab
-        name="server"
-        :to="{
-          name: 'servers',
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        }"
-        :label="t('ingestion.serverLabel')"
-        content-class="tab_content"
-      />
-      <q-route-tab
-        name="database"
-        :to="{
-          name: 'databases',
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        }"
-        :label="t('ingestion.databaseLabel')"
-        content-class="tab_content"
-      />
-
-      <q-route-tab
-        name="security"
-        :to="{
-          name: 'security',
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        }"
-        :label="t('ingestion.securityLabel')"
-        content-class="tab_content"
-      />
-
-      <q-route-tab
-        name="devops"
-        :to="{
-          name: 'devops',
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        }"
-        :label="t('ingestion.devopsLabel')"
-        content-class="tab_content"
-      />
-
-      <q-route-tab
-        name="networking"
-        :to="{
-          name: 'networking',
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        }"
-        :label="t('ingestion.networkingLabel')"
-        content-class="tab_content"
-      />
-      <q-route-tab
-        name="message-queues"
-        :to="{
-          name: 'message-queues',
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        }"
-        :label="t('ingestion.messageQueuesLabel')"
-        content-class="tab_content"
-      />
-      <q-route-tab
-        name="languages"
-        :to="{
-          name: 'languages',
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        }"
-        :label="t('ingestion.languagesLabel')"
-        content-class="tab_content"
-      />
-      <q-route-tab
-        name="others"
-        :to="{
-          name: 'others',
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        }"
-        :label="t('ingestion.otherLabel')"
-        content-class="tab_content"
-      />
-    </q-tabs>
-    <q-separator class="separator" />
-    <router-view
-      :title="ingestTabType"
-      :currOrgIdentifier="currentOrgIdentifier"
-      :currUserEmail="currentUserEmail"
-      @copy-to-clipboard-fn="copyToClipboardFn"
-    >
-    </router-view>
+    <div class="tw-h-[calc(100vh-140px)] tw-overflow-hidden">
+      <router-view
+        :title="ingestTabType"
+        :currOrgIdentifier="currentOrgIdentifier"
+        :currUserEmail="currentUserEmail"
+        @copy-to-clipboard-fn="copyToClipboardFn"
+      >
+      </router-view>
+    </div>
   </q-page>
 </template>
 
@@ -496,34 +501,8 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .ingestionPage {
-  padding: 0.25rem 0 1.5rem 0;
   .head {
     padding-bottom: 1rem;
-  }
-  .q-tabs {
-    &--horizontal {
-      margin: 1.5rem 1rem 0 1rem;
-      .q-tab {
-        justify-content: flex-start;
-        padding: 0 0.6rem 0 0.6rem;
-        border-radius: 0.5rem;
-        margin-bottom: 0.5rem;
-        text-transform: capitalize;
-
-        &__content.tab_content {
-          .q-tab {
-            &__icon + &__label {
-              padding-left: 0.875rem;
-              font-weight: 600;
-            }
-          }
-        }
-        &--active {
-          color: black;
-          background-color: $accent;
-        }
-      }
-    }
   }
 }
 </style>

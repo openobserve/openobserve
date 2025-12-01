@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @edge-click="onEdgeClick"
       @connect="onConnect"
       @dragover="onDragOver"
-      :default-viewport="{ zoom: 1.5 }"
+      :default-viewport="{ zoom: 0.8 }"
       :min-zoom="0.2"
       :max-zoom="4"
       @dragleave="onDragLeave"

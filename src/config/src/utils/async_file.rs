@@ -199,7 +199,8 @@ pub fn create_wal_dir_datetime_filter(
         };
 
         let month_days = [31u32, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-        let days = month_days[month as usize] + if month == 2 && year % 4 == 0 { 1 } else { 0 };
+        let days =
+            month_days[(month - 1) as usize] + if month == 2 && year % 4 == 0 { 1 } else { 0 };
         let day = match components.next().map(|c| c.parse::<u32>()) {
             Some(Ok(day)) => {
                 if 1 <= day && day <= days {
@@ -313,7 +314,18 @@ where
     .await
     .into_iter()
     .map(Result::ok)
-    .filter_map(|path| path.and_then(|pbuf| pbuf.to_str().map(String::from)))
+    .filter_map(|path| {
+        path.and_then(|pbuf| {
+            pbuf.to_str().map(|path| {
+                // Hack for windows
+                if let Some(stripped) = path.strip_prefix("\\\\?\\") {
+                    stripped.to_string().replace('\\', "/")
+                } else {
+                    path.to_string()
+                }
+            })
+        })
+    })
     .collect();
 
     Ok(files)

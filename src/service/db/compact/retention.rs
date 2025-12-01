@@ -60,7 +60,13 @@ pub async fn delete_stream(
     }
 
     CACHE.insert(key.clone(), now_micros());
-    db::put(&db_key, "OK".into(), db::NEED_WATCH, None).await?;
+    // only watch if deleting all data
+    let need_watch = if date_range.is_none() {
+        db::NEED_WATCH
+    } else {
+        false
+    };
+    db::put(&db_key, "OK".into(), need_watch, None).await?;
     Ok((key, true)) // return the key and true
 }
 
@@ -74,7 +80,13 @@ pub async fn process_stream(
 ) -> Result<(), anyhow::Error> {
     let key = mk_key(org_id, stream_type, stream_name, date_range);
     let db_key = format!("/compact/delete/{key}");
-    Ok(db::put(&db_key, node.to_string().into(), db::NEED_WATCH, None).await?)
+    // only watch if deleting all data
+    let need_watch = if date_range.is_none() {
+        db::NEED_WATCH
+    } else {
+        false
+    };
+    Ok(db::put(&db_key, node.to_string().into(), need_watch, None).await?)
 }
 
 // get the stream processing information
@@ -109,7 +121,13 @@ pub async fn delete_stream_done(
     date_range: Option<(&str, &str)>,
 ) -> Result<(), anyhow::Error> {
     let key = mk_key(org_id, stream_type, stream_name, date_range);
-    db::delete_if_exists(&format!("/compact/delete/{key}"), false, db::NEED_WATCH).await?;
+    // only watch if deleting all data
+    let need_watch = if date_range.is_none() {
+        db::NEED_WATCH
+    } else {
+        false
+    };
+    db::delete_if_exists(&format!("/compact/delete/{key}"), false, need_watch).await?;
 
     // remove in cache
     CACHE.remove(&key);

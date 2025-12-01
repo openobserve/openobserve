@@ -18,34 +18,24 @@ use std::sync::Arc;
 use datafusion::{
     common::{Result, internal_err},
     error::DataFusionError,
-    execution::{FunctionRegistry, runtime_env::RuntimeEnvBuilder},
+    execution::TaskContext,
     physical_plan::{ExecutionPlan, aggregates::AggregateExec},
-    prelude::SessionContext,
 };
 use datafusion_proto::{physical_plan::AsExecutionPlan, protobuf::PhysicalPlanNode};
 use o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec::StreamingAggsExec;
 use prost::Message;
 use proto::cluster_rpc;
 
-use crate::service::search::datafusion::exec::register_udf;
-
 pub(crate) fn try_decode(
     node: cluster_rpc::StreamingAggsExecNode,
     inputs: &[Arc<dyn ExecutionPlan>],
-    _registry: &dyn FunctionRegistry,
-    org_id: &str,
+    ctx: &TaskContext,
 ) -> Result<Arc<dyn ExecutionPlan>> {
     let Some(aggregate_plan) = node.aggregate_plan else {
         return internal_err!("aggregate_plan is required");
     };
-    let extension_codec = super::get_physical_extension_codec("test".to_string());
-    // TODO: after https://github.com/apache/datafusion/issues/17596 release
-    // we can remove the org_id
-    let mut ctx = SessionContext::new();
-    register_udf(&ctx, org_id)?;
-    datafusion_functions_json::register_all(&mut ctx)?;
-    let runtime = RuntimeEnvBuilder::default().build()?;
-    let aggregate_plan = aggregate_plan.try_into_physical_plan(&ctx, &runtime, &extension_codec)?;
+    let extension_codec = super::get_physical_extension_codec();
+    let aggregate_plan = aggregate_plan.try_into_physical_plan(ctx, &extension_codec)?;
     let Some(aggregate_plan) = aggregate_plan.as_any().downcast_ref::<AggregateExec>() else {
         return internal_err!("aggregate_plan is not an AggregateExec");
     };
@@ -66,6 +56,7 @@ pub(crate) fn try_decode(
         node.target_partitions as usize,
         node.is_complete_cache_hit,
         aggregate_plan,
+        node.overwrite_cache,
     )))
 }
 
@@ -75,7 +66,7 @@ pub(crate) fn try_encode(node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Res
     };
 
     // serialize execution plan to proto
-    let extension_codec = super::get_physical_extension_codec("test".to_string());
+    let extension_codec = super::get_physical_extension_codec();
     let aggregate_plan =
         PhysicalPlanNode::try_from_physical_plan(node.aggregate_plan().clone(), &extension_codec)?;
     let plan_node = cluster_rpc::StreamingAggsExecNode {
@@ -90,6 +81,7 @@ pub(crate) fn try_encode(node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Res
             .map(|v| v.as_ref().to_string())
             .collect(),
         aggregate_plan: Some(aggregate_plan),
+        overwrite_cache: node.overwrite_cache(),
     };
     let proto = cluster_rpc::PhysicalPlanNode {
         plan: Some(cluster_rpc::physical_plan_node::Plan::StreamingAggs(
@@ -165,15 +157,17 @@ mod tests {
             1,
             false,
             Arc::new(agg_plan),
+            false,
         ));
 
         // encode
-        let proto = super::super::get_physical_extension_codec("test".to_string());
+        let proto = super::super::get_physical_extension_codec();
         let plan_bytes = physical_plan_to_bytes_with_extension_codec(plan.clone(), &proto).unwrap();
 
         // decode
         let ctx = datafusion::prelude::SessionContext::new();
-        let plan2 = physical_plan_from_bytes_with_extension_codec(&plan_bytes, &ctx, &proto)?;
+        let plan2 =
+            physical_plan_from_bytes_with_extension_codec(&plan_bytes, &ctx.task_ctx(), &proto)?;
         let plan2 = plan2.as_any().downcast_ref::<StreamingAggsExec>().unwrap();
         let plan = plan.as_any().downcast_ref::<StreamingAggsExec>().unwrap();
 
@@ -246,17 +240,19 @@ mod tests {
             1,
             false,
             Arc::new(agg_plan),
+            false,
         ));
 
         // encode
-        let proto = super::super::get_physical_extension_codec("test".to_string());
+        let proto = super::super::get_physical_extension_codec();
         let plan_bytes = physical_plan_to_bytes_with_extension_codec(plan.clone(), &proto).unwrap();
 
         // decode
         let ctx = datafusion::prelude::SessionContext::new();
         // Register UDFs in the context
         ctx.register_udf(STR_MATCH_UDF.clone());
-        let plan2 = physical_plan_from_bytes_with_extension_codec(&plan_bytes, &ctx, &proto)?;
+        let plan2 =
+            physical_plan_from_bytes_with_extension_codec(&plan_bytes, &ctx.task_ctx(), &proto)?;
         let plan2 = plan2.as_any().downcast_ref::<StreamingAggsExec>().unwrap();
         let plan = plan.as_any().downcast_ref::<StreamingAggsExec>().unwrap();
 

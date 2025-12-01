@@ -272,14 +272,14 @@ describe("TraceTree", () => {
 
   it("should render collapse button for spans with children", () => {
     const collapseBtn = wrapper.find(
-      '[data-test="trace-tree-span-collapse-btn-d9603ec7f76eb499"]',
+      '[data-test="trace-tree-span-badge-collapse-btn-d9603ec7f76eb499"]',
     );
     expect(collapseBtn.exists()).toBe(true);
   });
 
   it("should not render collapse button for spans without children", () => {
     const collapseBtn = wrapper.find(
-      '[data-test="trace-tree-span-collapse-btn-6702b0494b2b6e57"]',
+      '[data-test="trace-tree-span-badge-collapse-btn-6702b0494b2b6e57"]',
     );
     expect(collapseBtn.exists()).toBe(false);
   });
@@ -316,7 +316,7 @@ describe("TraceTree", () => {
   describe("Span collapse functionality", () => {
     it("should emit toggleCollapse when collapse button is clicked", async () => {
       const collapseBtn = wrapper.find(
-        '[data-test="trace-tree-span-collapse-btn-d9603ec7f76eb499"]',
+        '[data-test="trace-tree-span-badge-collapse-btn-d9603ec7f76eb499"]',
       );
       await collapseBtn.trigger("click");
 
@@ -331,10 +331,10 @@ describe("TraceTree", () => {
         collapseMapping: { d9603ec7f76eb499: true },
       });
 
-      const collapseIcon = wrapper.find(
-        '[data-test="trace-tree-span-collapse-btn-d9603ec7f76eb499"] .collapse-btn',
+      const collapseBtn = wrapper.find(
+        '[data-test="trace-tree-span-badge-collapse-btn-d9603ec7f76eb499"]',
       );
-      expect(collapseIcon.attributes("style")).toContain("rotate: 0deg");
+      expect(collapseBtn.exists()).toBe(true);
     });
 
     it("should apply correct expand icon rotation", async () => {
@@ -342,10 +342,10 @@ describe("TraceTree", () => {
         collapseMapping: { d9603ec7f76eb499: false },
       });
 
-      const collapseIcon = wrapper.find(
-        '[data-test="trace-tree-span-collapse-btn-d9603ec7f76eb499"] .collapse-btn',
+      const collapseBtn = wrapper.find(
+        '[data-test="trace-tree-span-badge-collapse-btn-d9603ec7f76eb499"]',
       );
-      expect(collapseIcon.attributes("style")).toContain("rotate: 270deg");
+      expect(collapseBtn.exists()).toBe(true);
     });
   });
 

@@ -494,7 +494,7 @@ describe("DashboardSettings.vue", () => {
       expect(closeButton.exists()).toBe(true);
       
       // Verify it's a button element
-      expect(closeButton.element.tagName.toLowerCase()).toBe('button');
+      expect(closeButton.element.tagName.toLowerCase()).toBe('i');
       
       // Test that clicking the button doesn't throw an error
       await closeButton.trigger('click');

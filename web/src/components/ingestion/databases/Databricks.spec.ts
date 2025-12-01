@@ -105,7 +105,7 @@ describe('Databricks.vue', () => {
       plugins: [store, i18n, [Quasar, {}]],
       stubs: {
         CopyContent: {
-          template: '<div class="copy-content-stub q-mt-sm"><slot /></div>',
+          template: '<div class="copy-content-stub copy-content-container-cls"><slot /></div>',
           props: ['content']
         }
       }
@@ -141,7 +141,7 @@ describe('Databricks.vue', () => {
   // Test 5: Template renders main container
   it('should render main container with correct class', () => {
     wrapper = mount(Databricks, getGlobalConfig());
-    const container = wrapper.find('.q-ma-md');
+    const container = wrapper.find('.q-pa-sm');
     expect(container.exists()).toBe(true);
   });
 
@@ -250,7 +250,7 @@ describe('Databricks.vue', () => {
   // Test 19: Component structure matches expected layout
   it('should have correct component structure', () => {
     wrapper = mount(Databricks, getGlobalConfig());
-    const container = wrapper.find('.q-ma-md');
+    const container = wrapper.find('.q-pa-sm');
     const textDiv = container.find('div[class*="tw-text-"]');
     const boldDiv = wrapper.find('div[class*="tw-font-bold"]');
     
@@ -263,7 +263,7 @@ describe('Databricks.vue', () => {
   it('should apply correct classes to CopyContent', () => {
     wrapper = mount(Databricks, getGlobalConfig());
     const copyContent = wrapper.find('.copy-content-stub');
-    expect(copyContent.classes()).toContain('q-mt-sm');
+    expect(copyContent.classes()).toContain('copy-content-container-cls');
   });
 
   // Test 21: Documentation section styling

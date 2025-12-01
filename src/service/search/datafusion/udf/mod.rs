@@ -28,6 +28,7 @@ pub(crate) mod cipher_udf;
 pub(crate) mod date_format_udf;
 pub(crate) mod fuzzy_match_udf;
 pub(crate) mod histogram_udf;
+pub(crate) mod match_all_hash_udf;
 pub(crate) mod match_all_udf;
 pub(crate) mod regexp_matches_udf;
 pub(crate) mod regexp_udf;

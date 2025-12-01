@@ -54,11 +54,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-if="action === 'move'" class="select-container">
               <q-select
                 dense
-                filled
                 v-model="selectedTabToMovePanels"
                 :options="moveTabOptions"
                 data-test="dashboard-tab-delete-tab-panels-move-select"
-              />
+               borderless hide-bottom-space/>
             </div>
           </div>
           <q-radio

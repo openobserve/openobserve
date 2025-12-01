@@ -9,7 +9,7 @@
         <div class="row items-center no-wrap">
           <div class="col">
             <div class="text-body1 text-bold" data-test="queryList-title-text">
-              {{ t("queries.queryList") }}
+              {{ t("queries.queryList") }}123
             </div>
           </div>
           <div class="col-auto">
