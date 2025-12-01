@@ -253,6 +253,10 @@ export default defineComponent({
     const isCurrentUserInternal = ref(false);
     const filterQuery = ref("");
 
+    const toCamelCase = (str: string) => {
+      return str.charAt(0).toUpperCase() + str.slice(1);
+    };
+
     onActivated(() => {
       if (router.currentRoute.value.query.action == "add") {
         addUser({}, false);
@@ -431,7 +435,7 @@ export default defineComponent({
                 email: maskText(data.email),
                 first_name: data.first_name,
                 last_name: data.last_name,
-                role: data?.status == "pending" ? data.role + " (Invited)": data.role,
+                role: data?.status == "pending" ? toCamelCase(data.role) + " (Invited)": toCamelCase(data.role),
                 enableEdit: store.state.userInfo.email == data.email ? true : false,
                 enableChangeRole: false,
                 enableDelete: config.isCloud == "true" ? true : false,
