@@ -503,6 +503,7 @@ pub async fn get_invitations_for_org(
             expires_at: invite.expires_at,
             is_external: true,
             role: invite.role,
+            token: invite.token,
         })
         .collect())
 }
