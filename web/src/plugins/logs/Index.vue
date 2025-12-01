@@ -652,6 +652,7 @@ export default defineComponent({
       isLimitQuery,
       updateUrlQueryParams,
       addTraceId,
+      checkTimestampAlias,
     } = logsUtils();
     const {
       getHistogramData,
@@ -924,8 +925,9 @@ export default defineComponent({
           return;
         }
 
-        // Override the size with the pattern scan size from UI
-        queryReq.query.size = patternsState.value.scanSize;
+        // Set size to -1 to let backend determine sampling size based on config
+        console.log("[Patterns] Using default sampling from backend configuration");
+        queryReq.query.size = -1;
 
         const streamName = searchObj.data.stream.selectedStream[0];
         if (!streamName) {
@@ -1313,6 +1315,16 @@ export default defineComponent({
     const collapseFieldList = () => {
       if (searchObj.meta.showFields) searchObj.meta.showFields = false;
       else searchObj.meta.showFields = true;
+
+      // Redraw chart after field list collapse/expand
+      nextTick(() => {
+        if (
+          searchObj.meta.showHistogram &&
+          searchResultRef.value?.reDrawChart
+        ) {
+          searchResultRef.value.reDrawChart();
+        }
+      });
     };
 
     const areStreamsPresent = computed(() => {

@@ -51,6 +51,12 @@ export class SDRPatternsPage {
     await expect(this.importButton).toBeVisible();
   }
 
+  async emptySearchInput() {
+    testLogger.info('Emptying search input');
+    await this.searchPatternInput.clear();
+    await this.page.waitForTimeout(500);
+  }
+
   async verifyNoPatternsMessage() {
     testLogger.info('Verifying no patterns message is displayed');
     await expect(this.noPatternsMessage).toBeVisible();
@@ -196,11 +202,20 @@ export class SDRPatternsPage {
     // Click the Import JSON File tab to ensure it's selected
     await this.page.locator('[data-test="tab-import_json_file"]').click();
 
-    // Upload file
-    const fileInput = this.page.locator('[data-test="regex-pattern-import-json-file-input"]');
-    await expect(fileInput).toBeVisible();
-    await fileInput.setInputFiles(filePath);
-    testLogger.info('File selected for import');
+    // Upload file - try original locator first, fallback to new locator
+    let fileInput;
+    try {
+      fileInput = this.page.locator('[data-test="regex-pattern-import-json-file-input"]');
+      await expect(fileInput).toBeVisible({ timeout: 5000 });
+      await fileInput.setInputFiles(filePath);
+      testLogger.info('File selected for import (using original locator)');
+    } catch (error) {
+      // Fallback to new locator pattern
+      fileInput = this.page.locator('[data-test="regex-pattern-import-file-input"]');
+      await expect(fileInput).toBeVisible();
+      await fileInput.setInputFiles(filePath);
+      testLogger.info('File selected for import (using fallback locator)');
+    }
 
     // Click import button
     const importJsonBtn = this.page.locator('[data-test="regex-pattern-import-json-btn"]');
@@ -393,6 +408,26 @@ export class SDRPatternsPage {
     }
   }
 
+  async ensurePatternDeleted(patternName) {
+    testLogger.info(`Ensuring pattern "${patternName}" is deleted before continuing`);
+    const exists = await this.checkPatternExists(patternName);
+
+    if (!exists) {
+      testLogger.info(`Pattern ${patternName} already absent`);
+      await this.searchPatternInput.clear();
+      await this.page.waitForTimeout(500);
+      return;
+    }
+
+    const deleteResult = await this.deletePatternByName(patternName);
+    if (!deleteResult.success) {
+      throw new Error(`Unable to delete existing pattern ${patternName}. Reason: ${deleteResult.reason}`);
+    }
+
+    await this.page.waitForTimeout(500);
+    testLogger.info(`Pattern ${patternName} removed successfully`);
+  }
+
   // ===== Import Dialog Methods =====
 
   async verifyImportDialogOpen() {
@@ -488,6 +523,7 @@ export class SDRPatternsPage {
 
     await this.selectPatternCheckboxes(checkboxIndices);
     await this.clickImportJsonButton();
+    await this.page.waitForTimeout(10000);
 
     return await this.verifyImportSuccess();
   }
@@ -508,7 +544,10 @@ export class SDRPatternsPage {
 
   async verifyPatternVisibleInList(patternName, exact = true) {
     testLogger.info(`Verifying pattern visible in list: ${patternName}`);
+    await this.searchPattern(patternName);
+    await this.page.waitForTimeout(1000);
     const isVisible = await this.page.getByText(patternName, { exact }).isVisible({ timeout: 3000 }).catch(() => false);
+    await this.emptySearchInput();
 
     if (isVisible) {
       testLogger.info(`✓ Pattern '${patternName}' is visible`);
@@ -521,7 +560,11 @@ export class SDRPatternsPage {
 
   async verifyPatternNotVisibleInList(patternName, exact = true) {
     testLogger.info(`Verifying pattern NOT visible in list: ${patternName}`);
-    const isVisible = await this.page.getByText(patternName, { exact }).isVisible({ timeout: 2000 }).catch(() => false);
+    await this.page.waitForLoadState('networkidle');
+    await this.searchPattern(patternName);
+    await this.page.waitForTimeout(2000);
+    const isVisible = await this.page.getByText(patternName, { exact }).isVisible({ timeout: 3000 }).catch(() => false);
+    await this.emptySearchInput();
 
     if (!isVisible) {
       testLogger.info(`✓ Pattern '${patternName}' is not visible (as expected)`);

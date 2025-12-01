@@ -239,6 +239,13 @@ async fn main() -> Result<(), anyhow::Error> {
         bytes_to_human_readable(cfg.memory_cache.datafusion_max_size as f64),
     );
 
+    // install ring as the default crypto provider if TLS is enabled
+    if cfg.http.tls_enabled || cfg.grpc.tls_enabled {
+        rustls::crypto::ring::default_provider()
+            .install_default()
+            .expect("Failed to install rustls crypto provider");
+    }
+
     // init script server
     #[cfg(feature = "enterprise")]
     if config::cluster::LOCAL_NODE.is_script_server() && config::cluster::LOCAL_NODE.is_standalone()
@@ -314,7 +321,10 @@ async fn main() -> Result<(), anyhow::Error> {
 
             // init service graph workers
             #[cfg(feature = "enterprise")]
-            if cfg.service_graph.enabled {
+            if o2_enterprise::enterprise::common::config::get_config()
+                .service_graph
+                .enabled
+            {
                 log::info!("Initializing service graph background workers");
                 openobserve::service::traces::service_graph::init_background_workers();
             }

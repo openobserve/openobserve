@@ -38,18 +38,8 @@ pub fn load_local_node() -> Node {
         role: load_local_node_role(),
         role_group: load_role_group(),
         name: cfg.common.instance_name.clone(),
-        http_addr: format!(
-            "{}://{}:{}",
-            get_http_schema(),
-            get_local_http_ip(),
-            cfg.http.port
-        ),
-        grpc_addr: format!(
-            "{}://{}:{}",
-            get_grpc_schema(),
-            get_local_grpc_ip(),
-            cfg.grpc.port
-        ),
+        http_addr: get_local_http_addr(),
+        grpc_addr: get_local_grpc_addr(),
         cpu_num: cfg.limit.cpu_num as u64,
         scheduled: false,
         broadcasted: false,
@@ -75,6 +65,24 @@ fn load_local_node_role() -> Vec<Role> {
 
 pub fn load_role_group() -> RoleGroup {
     RoleGroup::from(get_config().common.node_role_group.as_str())
+}
+
+pub fn get_local_http_addr() -> String {
+    format!(
+        "{}://{}:{}",
+        get_http_schema(),
+        get_local_http_ip(),
+        get_config().http.port
+    )
+}
+
+pub fn get_local_grpc_addr() -> String {
+    format!(
+        "{}://{}:{}",
+        get_grpc_schema(),
+        get_local_grpc_ip(),
+        get_config().grpc.port
+    )
 }
 
 pub fn get_local_http_ip() -> String {

@@ -23,7 +23,6 @@ export const patternsState = ref({
   loading: false,
   error: null as string | null,
   lastQuery: null as SearchRequestPayload | null,
-  scanSize: 2000 as number,
 });
 
 /**

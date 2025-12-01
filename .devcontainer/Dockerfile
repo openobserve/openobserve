@@ -1,5 +1,4 @@
-# FROM mcr.microsoft.com/devcontainers/base:bookworm
-FROM public.ecr.aws/docker/library/rust:buster
+FROM public.ecr.aws/docker/library/rust:trixie
 
 # Install all dependencies and setup rust in one layer
 RUN apt-get update && \

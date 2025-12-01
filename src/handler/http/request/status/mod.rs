@@ -154,6 +154,11 @@ struct ConfigResponse<'a> {
     ingestion_quota_used: f64,
     log_page_default_field_list: String,
     query_values_default_num: i64,
+    mysql_deprecated_warning: bool,
+    #[cfg(feature = "enterprise")]
+    service_graph_enabled: bool,
+    #[cfg(not(feature = "enterprise"))]
+    service_graph_enabled: bool,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -306,6 +311,11 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(not(feature = "enterprise"))]
     let ai_enabled = false;
 
+    #[cfg(feature = "enterprise")]
+    let service_graph_enabled = o2cfg.service_graph.enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let service_graph_enabled = false;
+
     #[cfg(all(feature = "cloud", not(feature = "enterprise")))]
     let build_type = "cloud";
     #[cfg(feature = "enterprise")]
@@ -408,6 +418,8 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         #[cfg(feature = "enterprise")]
         ingestion_quota_used,
         query_values_default_num: cfg.limit.query_values_default_num,
+        mysql_deprecated_warning: cfg.common.meta_store.starts_with("mysql"),
+        service_graph_enabled,
     }))
 }
 
@@ -529,22 +541,24 @@ fn hide_sensitive_fields(mut value: serde_json::Value) -> serde_json::Value {
             let key_lower = key.to_lowercase();
 
             // Simple rule: contains any of these sensitive keywords
+            // Also hide header values that might contain credentials
             let is_sensitive = key_lower.contains("password")
                 || key_lower.contains("secret")
                 || key_lower.contains("key")
                 || key_lower.contains("auth")
                 || key_lower.contains("token")
-                || key_lower.contains("credential");
+                || key_lower.contains("credential")
+                || (key_lower.contains("header") && key_lower.contains("value"));
 
-            if is_sensitive {
-                if let Some(s) = val.as_str() {
-                    *val = if s.is_empty() {
-                        serde_json::Value::String("[not set]".to_string())
-                    } else {
-                        serde_json::Value::String("[hidden]".to_string())
-                    };
-                }
-            } else if val.is_object() {
+            if is_sensitive && let Some(s) = val.as_str() {
+                *val = if s.is_empty() {
+                    serde_json::Value::String("[not set]".to_string())
+                } else {
+                    serde_json::Value::String("[hidden]".to_string())
+                };
+            }
+
+            if val.is_object() {
                 *val = hide_sensitive_fields(val.clone());
             }
         }

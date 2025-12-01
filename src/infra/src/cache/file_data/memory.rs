@@ -21,8 +21,13 @@ use std::{
 use bytes::Bytes;
 use config::{
     RwHashMap, get_config, is_local_disk_storage, metrics, spawn_pausable_job,
-    utils::hash::{Sum64, gxhash},
+    utils::{
+        hash::{Sum64, gxhash},
+        time::BASE_TIME,
+    },
 };
+use futures::StreamExt;
+use object_store::{GetOptions, GetResult, GetResultPayload, ObjectMeta};
 use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
 
@@ -229,6 +234,49 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
     });
     Ok(())
+}
+
+pub async fn get_opts(file: &str, options: GetOptions) -> object_store::Result<GetResult> {
+    let Some(data) = get(file, None).await else {
+        return Err(object_store::Error::NotFound {
+            path: file.to_string(),
+            source: Box::new(std::io::Error::other("file not found")),
+        });
+    };
+
+    let meta = ObjectMeta {
+        location: file.into(),
+        last_modified: *BASE_TIME,
+        size: data.len() as u64,
+        e_tag: Some(format!(
+            "{:x}-{:x}",
+            BASE_TIME.timestamp_micros(),
+            data.len()
+        )),
+        version: None,
+    };
+    options.check_preconditions(&meta)?;
+
+    let (range, data) = match options.range {
+        Some(range) => {
+            let r = range.as_range(data.len() as u64).map_err(|e| {
+                object_store::Error::Precondition {
+                    path: file.to_string(),
+                    source: Box::new(e),
+                }
+            })?;
+            (r.clone(), data.slice(r.start as usize..r.end as usize))
+        }
+        None => (0..data.len() as u64, data),
+    };
+    let stream = futures::stream::once(futures::future::ready(Ok(data)));
+
+    Ok(GetResult {
+        payload: GetResultPayload::Stream(stream.boxed()),
+        attributes: Default::default(),
+        meta,
+        range,
+    })
 }
 
 #[inline]

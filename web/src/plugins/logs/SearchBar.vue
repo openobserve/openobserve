@@ -1257,7 +1257,7 @@ class="q-pr-sm q-pt-xs" />
         round
         color="primary"
         @click="isFocused = !isFocused"
-        class="tw-absolute tw-top-[3.1rem] tw-right-[1.2rem] tw-z-50"
+        class="tw-absolute tw-top-[3.3rem] tw-right-[1.2rem] tw-z-50"
       >
       <Maximize size='0.8rem' v-if="!isFocused" />
       <Minimize size="0.8rem" v-else />
@@ -1907,6 +1907,7 @@ export default defineComponent({
       updateUrlQueryParams,
       generateURLQuery,
       isActionsEnabled,
+      checkTimestampAlias,
     } = logsUtils();
     const {
       getSavedViews,
@@ -3099,7 +3100,13 @@ export default defineComponent({
                 clearInterval(store.state.refreshIntervalID);
               }
               searchObj.data.stream.selectedStream.push(...selectedStreams);
-              await updatedLocalLogFilterField();
+              // we dont need to update local log filter field because 
+              // if visualize is there for any saved views we will get right any previous local filter fields 
+              // they will get applied to the current visualize selected stream 
+              // so we need to make sure we dont update that local filter fields when it is visualize
+              if(extractedObj.meta.logsVisualizeToggle ==  "logs"){
+                await updatedLocalLogFilterField();
+              }
               await getStreams("logs", true);
             } else {
               // ----- Here we are explicitly handling stream change -----
@@ -3209,7 +3216,13 @@ export default defineComponent({
               } else {
                 clearInterval(store.state.refreshIntervalID);
               }
-              await updatedLocalLogFilterField();
+              // we dont need to update local log filter field because 
+              // if visualize is there for any saved views we will get right any previous local filter fields 
+              // they will get applied to the current visualize selected stream 
+              // so we need to make sure we dont update that local filter fields when it is visualize
+              if(extractedObj.meta.logsVisualizeToggle ==  "logs" ){
+                await updatedLocalLogFilterField();
+              }
             }
 
             if (searchObj.meta.toggleFunction == false) {
@@ -3965,6 +3978,14 @@ export default defineComponent({
         ) {
           showErrorNotification(
             "Multiple SQL queries are not allowed to visualize",
+          );
+          return;
+        }
+
+        // validate that timestamp column is not used as an alias
+        if (!checkTimestampAlias(logsPageQuery)) {
+          showErrorNotification(
+            `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`,
           );
           return;
         }

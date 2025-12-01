@@ -27,6 +27,7 @@ import { extractFields, getStreamNameFromQuery } from "@/utils/query/sqlUtils";
 import { validatePanel } from "@/utils/dashboard/convertDataIntoUnitValue";
 import useValuesWebSocket from "./dashboard/useValuesWebSocket";
 import queryService from "@/services/search";
+import logsUtils from "./useLogs/logsUtils";
 
 const colors = [
   "#5960b2",
@@ -1107,7 +1108,24 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ].config.time_shift = [];
         break;
       case "html":
+        // Preserve current stream and stream_type before resetting
+        const htmlCurrentStream = dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream;
+        const htmlCurrentStreamType = dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream_type;
+        
         dashboardPanelData.data.queries = getDefaultQueries();
+        
+        // Restore the preserved stream and stream_type
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream = htmlCurrentStream;
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream_type = htmlCurrentStreamType;
+        
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.customChartContent =
           getDefaultCustomChartText();
@@ -1117,7 +1135,24 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ].config.time_shift = [];
         break;
       case "markdown":
+        // Preserve current stream and stream_type before resetting
+        const markdownCurrentStream = dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream;
+        const markdownCurrentStreamType = dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream_type;
+        
         dashboardPanelData.data.queries = getDefaultQueries();
+        
+        // Restore the preserved stream and stream_type
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream = markdownCurrentStream;
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream_type = markdownCurrentStreamType;
+        
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.customChartContent =
           getDefaultCustomChartText();
@@ -1128,7 +1163,24 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ].config.time_shift = [];
         break;
       case "custom_chart":
+        // Preserve current stream and stream_type before resetting
+        const customChartCurrentStream = dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream;
+        const customChartCurrentStreamType = dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream_type;
+        
         dashboardPanelData.data.queries = getDefaultQueries();
+        
+        // Restore the preserved stream and stream_type
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream = customChartCurrentStream;
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream_type = customChartCurrentStreamType;
+        
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.queryType = "";
@@ -2946,7 +2998,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     },
     { deep: true },
   );
-
+const { checkTimestampAlias } = logsUtils();
   // Replace the existing validatePanel function with a wrapper that calls the generic function
   const validatePanelWrapper = (
     errors: string[],
@@ -2956,7 +3008,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ...selectedStreamFieldsBasedOnUserDefinedSchema.value,
       ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
       ...dashboardPanelData.meta.stream.customQueryFields,
-    ], pageKey);
+    ], pageKey, store, checkTimestampAlias);
   };
 
   const VARIABLE_PLACEHOLDER = "substituteValue";

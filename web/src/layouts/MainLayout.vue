@@ -42,9 +42,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:is-hovered="isHovered = $event"
         @update-organization="updateOrganization"
         @go-to-home="goToHome"
-        @toggle-ai-chat="toggleAIChat"
+        @toggleAIChat="toggleAIChat"
         @open-slack="openSlack"
-        @navigate-to-open-api="navigateToOpenAPI"
+        @navigateToOpenAPI="navigateToOpenAPI"
         @navigate-to-docs="navigateToDocs"
         @change-language="changeLanguage"
         @open-predefined-themes="openPredefinedThemes"
@@ -1106,6 +1106,10 @@ export default defineComponent({
       this.resetStreams();
       this.store.dispatch("setOrganizationPasscode", "");
       this.store.dispatch("resetOrganizationData", {});
+
+      // Clear temporary theme colors when switching organizations
+      // This ensures each org shows its own theme colors without preview colors from another org
+      this.store.commit("clearTempThemeColors");
 
       await this.getOrganizationSettings();
 

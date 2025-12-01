@@ -1087,6 +1087,9 @@ const closeErrorDialog = () => {
 const goToPipelineHistory = () => {
   router.push({
     name: "pipelineHistory",
+    query: {
+      org_identifier: store.state.selectedOrganization.identifier,
+    },
   });
 };
 

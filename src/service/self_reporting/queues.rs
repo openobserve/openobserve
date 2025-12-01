@@ -26,11 +26,15 @@ use config::{
     },
     utils::json,
 };
+use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use tokio::{
     sync::{Mutex, mpsc},
     time,
 };
+
+#[cfg(feature = "cloud")]
+use crate::service::organization;
 
 pub(super) static USAGE_QUEUE: Lazy<Arc<ReportingQueue>> =
     Lazy::new(|| Arc::new(initialize_usage_queue()));
@@ -38,29 +42,24 @@ pub(super) static USAGE_QUEUE: Lazy<Arc<ReportingQueue>> =
 pub(super) static ERROR_QUEUE: Lazy<Arc<ReportingQueue>> =
     Lazy::new(|| Arc::new(initialize_error_queue()));
 
-fn initialize_usage_queue() -> ReportingQueue {
-    let cfg = get_config();
+/// Creates a reporting queue with specified configuration parameters.
+///
+/// # Arguments
+/// * `publish_interval` - Interval in seconds for publishing batches
+/// * `batch_size` - Maximum number of items per batch
+/// * `thread_num` - Number of worker threads to spawn
+fn create_reporting_queue(
+    publish_interval: u64,
+    batch_size: usize,
+    thread_num: usize,
+) -> ReportingQueue {
+    let timeout = time::Duration::from_secs(publish_interval);
 
-    // max usage reporting interval can be 10 mins, because we
-    // need relatively recent data for usage calculations
-    #[cfg(feature = "enterprise")]
-    let usage_publish_interval = (10 * 60).min(cfg.common.usage_publish_interval);
-    #[cfg(not(feature = "enterprise"))]
-    let usage_publish_interval = cfg.common.usage_publish_interval;
-
-    let timeout = time::Duration::from_secs(
-        usage_publish_interval
-            .try_into()
-            .expect("Env ZO_USAGE_PUBLISH_INTERVAL invalid format. Should be set as integer"),
-    );
-    let batch_size = cfg.common.usage_batch_size;
-
-    let (msg_sender, msg_receiver) = mpsc::channel::<ReportingMessage>(
-        batch_size * std::cmp::max(2, cfg.limit.usage_reporting_thread_num),
-    );
+    let (msg_sender, msg_receiver) =
+        mpsc::channel::<ReportingMessage>(batch_size * std::cmp::max(2, thread_num));
     let msg_receiver = Arc::new(Mutex::new(msg_receiver));
 
-    for thread_id in 0..cfg.limit.usage_reporting_thread_num {
+    for thread_id in 0..thread_num {
         let msg_receiver = msg_receiver.clone();
         tokio::task::spawn(self_reporting_ingest_job(
             thread_id,
@@ -73,6 +72,25 @@ fn initialize_usage_queue() -> ReportingQueue {
     ReportingQueue::new(msg_sender)
 }
 
+fn initialize_usage_queue() -> ReportingQueue {
+    let cfg = get_config();
+
+    // max usage reporting interval can be 10 mins, because we
+    // need relatively recent data for usage calculations
+    #[cfg(feature = "enterprise")]
+    let usage_publish_interval = (10 * 60).min(cfg.common.usage_publish_interval);
+    #[cfg(not(feature = "enterprise"))]
+    let usage_publish_interval = cfg.common.usage_publish_interval;
+
+    create_reporting_queue(
+        usage_publish_interval
+            .try_into()
+            .expect("Env ZO_USAGE_PUBLISH_INTERVAL invalid format. Should be set as integer"),
+        cfg.common.usage_batch_size,
+        cfg.limit.usage_reporting_thread_num,
+    )
+}
+
 fn initialize_error_queue() -> ReportingQueue {
     let cfg = get_config();
 
@@ -83,29 +101,13 @@ fn initialize_error_queue() -> ReportingQueue {
     #[cfg(not(feature = "enterprise"))]
     let usage_publish_interval = cfg.common.usage_publish_interval;
 
-    let timeout = time::Duration::from_secs(
+    create_reporting_queue(
         usage_publish_interval
             .try_into()
             .expect("Env ZO_USAGE_PUBLISH_INTERVAL invalid format. Should be set as integer"),
-    );
-    let batch_size = cfg.common.usage_batch_size;
-
-    let (msg_sender, msg_receiver) = mpsc::channel::<ReportingMessage>(
-        batch_size * std::cmp::max(2, cfg.limit.usage_reporting_thread_num),
-    );
-    let msg_receiver = Arc::new(Mutex::new(msg_receiver));
-
-    for thread_id in 0..cfg.limit.usage_reporting_thread_num {
-        let msg_receiver = msg_receiver.clone();
-        tokio::task::spawn(self_reporting_ingest_job(
-            thread_id,
-            msg_receiver,
-            batch_size,
-            timeout,
-        ));
-    }
-
-    ReportingQueue::new(msg_sender)
+        cfg.common.usage_batch_size,
+        cfg.limit.usage_reporting_thread_num,
+    )
 }
 
 async fn self_reporting_ingest_job(
@@ -132,6 +134,7 @@ async fn self_reporting_ingest_job(
                         // process any remaining data before shutting down
                         if !reporting_runner.pending.is_empty() {
                             let buffered = reporting_runner.take_batch();
+                            update_queue_depth_metrics(&buffered);
                             ingest_buffered_data(thread_id, buffered).await;
                         }
                         res_sender.send(()).ok();
@@ -139,8 +142,12 @@ async fn self_reporting_ingest_job(
                     }
                     Some(ReportingMessage::Data(reporting_data)) => {
                         reporting_runner.push(reporting_data);
+                        // Update queue depth metric after adding data
+                        update_queue_depth_metric_for_runner(&reporting_runner);
+
                         if reporting_runner.should_process() {
                             let buffered = reporting_runner.take_batch();
+                            update_queue_depth_metrics(&buffered);
                             ingest_buffered_data(thread_id, buffered).await;
                         }
                     }
@@ -150,11 +157,53 @@ async fn self_reporting_ingest_job(
             _ = interval.tick() => {
                 if reporting_runner.should_process() {
                     let buffered = reporting_runner.take_batch();
+                    update_queue_depth_metrics(&buffered);
                     ingest_buffered_data(thread_id, buffered).await;
                 }
             }
         }
     }
+}
+
+/// Update queue depth metrics based on pending data in the runner
+fn update_queue_depth_metric_for_runner(runner: &ReportingRunner) {
+    let mut usage_count = 0;
+    let mut error_count = 0;
+
+    for data in &runner.pending {
+        match data {
+            ReportingData::Usage(_) | ReportingData::Trigger(_) => usage_count += 1,
+            ReportingData::Error(_) => error_count += 1,
+        }
+    }
+
+    config::metrics::SELF_REPORTING_QUEUE_DEPTH
+        .with_label_values(&["usage"])
+        .set(usage_count);
+    config::metrics::SELF_REPORTING_QUEUE_DEPTH
+        .with_label_values(&["error"])
+        .set(error_count);
+}
+
+/// Update queue depth metrics after taking a batch (decrement)
+fn update_queue_depth_metrics(batch: &[ReportingData]) {
+    let mut usage_count = 0;
+    let mut error_count = 0;
+
+    for data in batch {
+        match data {
+            ReportingData::Usage(_) | ReportingData::Trigger(_) => usage_count += 1,
+            ReportingData::Error(_) => error_count += 1,
+        }
+    }
+
+    // Decrement the gauge by the batch size
+    config::metrics::SELF_REPORTING_QUEUE_DEPTH
+        .with_label_values(&["usage"])
+        .sub(usage_count);
+    config::metrics::SELF_REPORTING_QUEUE_DEPTH
+        .with_label_values(&["error"])
+        .sub(error_count);
 }
 
 async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
@@ -182,6 +231,17 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
 
     let cfg = get_config();
 
+    #[cfg(not(feature = "enterprise"))]
+    let usage_reporting_mode = &cfg.common.usage_reporting_mode;
+    #[cfg(feature = "enterprise")]
+    let usage_reporting_mode = {
+        if cfg.common.usage_reporting_mode == "local" {
+            "local"
+        } else {
+            "both"
+        }
+    };
+
     if !usages.is_empty() {
         super::ingestion::ingest_usages(usages).await;
     }
@@ -198,15 +258,6 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
                 Vec::new()
             };
         additional_reporting_orgs.push(META_ORG_ID.to_string());
-
-        // If configured, automatically add each trigger's own org
-        if cfg.common.usage_report_to_own_org {
-            for trigger_json in &triggers {
-                if let Ok(trigger) = json::from_value::<TriggerData>(trigger_json.clone()) {
-                    additional_reporting_orgs.push(trigger.org.clone());
-                }
-            }
-        }
 
         additional_reporting_orgs.sort();
         additional_reporting_orgs.dedup();
@@ -228,7 +279,7 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
             if super::ingestion::ingest_reporting_data(triggers.clone(), trigger_stream)
                 .await
                 .is_err()
-                && &cfg.common.usage_reporting_mode != "dual"
+                && usage_reporting_mode != "both"
                 && !enqueued_on_failure
             {
                 // Only enqueue once on first failure , this brings risk that it may be duplicated
@@ -245,6 +296,39 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
                         );
                     }
                 }
+            }
+        }
+    }
+
+    let mut per_org_map = HashMap::new();
+    // If configured, automatically add each trigger's own org
+    if cfg.common.usage_report_to_own_org && usage_reporting_mode != "remote" {
+        for trigger_json in triggers {
+            if let Ok(trigger) = json::from_value::<TriggerData>(trigger_json.clone()) {
+                let org_id = &trigger.org;
+                #[cfg(feature = "cloud")]
+                match organization::is_org_in_free_trial_period(&org_id).await {
+                    Ok(ongoing) => {
+                        if !ongoing {
+                            continue;
+                        }
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "error checking for trial period for trigger ingestion for {org_id} : {e}"
+                        );
+                        continue;
+                    }
+                }
+                let entry = per_org_map.entry(org_id.clone()).or_insert(vec![]);
+                entry.push(trigger_json);
+            }
+        }
+        for (org, values) in per_org_map.into_iter() {
+            let trigger_stream = StreamParams::new(&org, TRIGGERS_STREAM, StreamType::Logs);
+
+            if let Err(e) = super::ingestion::ingest_reporting_data(values, trigger_stream).await {
+                log::error!("error in ingesting trigger data for {org} : {e}");
             }
         }
     }
@@ -369,6 +453,11 @@ mod tests {
             query_took: None,
             scheduler_trace_id: None,
             time_in_queue_ms: None,
+            dedup_enabled: None,
+            dedup_suppressed: None,
+            dedup_count: None,
+            grouped: None,
+            group_size: None,
         }
     }
 

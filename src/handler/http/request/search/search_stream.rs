@@ -42,7 +42,7 @@ use crate::common::utils::http::get_extract_patterns_from_request;
 #[cfg(feature = "enterprise")]
 use crate::{
     common::meta::search::AuditContext,
-    handler::http::request::search::utils::check_stream_permissions,
+    handler::http::request::search::utils::{check_resource_permissions, check_stream_permissions},
     service::self_reporting::audit,
 };
 use crate::{
@@ -203,6 +203,16 @@ pub async fn search_http2_stream(
         return http_response;
     }
 
+    // Sampling is not available for /_search_stream endpoint
+    if req.query.sampling_config.is_some() || req.query.sampling_ratio.is_some() {
+        log::warn!(
+            "[trace_id {}] Sampling is not available for /_search_stream endpoint. Ignoring sampling parameters.",
+            trace_id
+        );
+        req.query.sampling_config = None;
+        req.query.sampling_ratio = None;
+    }
+
     // get stream name
     let stream_names = match resolve_stream_names(&req.query.sql) {
         Ok(v) => v.clone(),
@@ -327,6 +337,38 @@ pub async fn search_http2_stream(
             }
             Err(e) => {
                 return map_error_to_http_response(&(e), Some(trace_id));
+            }
+        }
+    }
+
+    // Check if user has edit permissions when clear_cache is requested
+    #[cfg(feature = "enterprise")]
+    if get_clear_cache_from_request(&query) {
+        for stream_name in stream_names.iter() {
+            if let Some(res) = check_resource_permissions(
+                &org_id,
+                &user_id,
+                stream_type.as_str(),
+                stream_name,
+                "PUT",
+                "",
+            )
+            .await
+            {
+                // Add audit before closing
+                report_to_audit(
+                    user_id,
+                    org_id,
+                    trace_id,
+                    res.status().into(),
+                    Some(
+                        "Unauthorized to clear cache - requires stream edit permission".to_string(),
+                    ),
+                    &in_req,
+                    body_bytes,
+                )
+                .await;
+                return res;
             }
         }
     }
