@@ -29,7 +29,7 @@ use tracing::{Instrument, Span};
 #[cfg(feature = "cloud")]
 use crate::service::ingestion::check_ingestion_allowed;
 // Re-export service graph API handlers
-pub use crate::service::traces::service_graph::{self, get_service_graph_metrics, get_store_stats};
+pub use crate::service::traces::service_graph::{self, get_current_topology};
 use crate::{
     common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},

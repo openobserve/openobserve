@@ -106,10 +106,11 @@ impl PartialEq for DataField {
     }
 }
 
-pub const ALL_STREAM_TYPES: [StreamType; 7] = [
+pub const ALL_STREAM_TYPES: [StreamType; 8] = [
     StreamType::Logs,
     StreamType::Metrics,
     StreamType::Traces,
+    StreamType::ServiceGraph,
     StreamType::EnrichmentTables,
     StreamType::Filelist,
     StreamType::Metadata,
@@ -123,6 +124,8 @@ pub enum StreamType {
     Logs,
     Metrics,
     Traces,
+    #[serde(rename = "service_graph")]
+    ServiceGraph,
     #[serde(rename = "enrichment_tables")]
     EnrichmentTables,
     #[serde(rename = "file_list")]
@@ -151,6 +154,7 @@ impl StreamType {
             StreamType::Logs => "logs",
             StreamType::Metrics => "metrics",
             StreamType::Traces => "traces",
+            StreamType::ServiceGraph => "service_graph",
             StreamType::EnrichmentTables => "enrichment_tables",
             StreamType::Filelist => "file_list",
             StreamType::Metadata => "metadata",
@@ -165,6 +169,7 @@ impl From<&str> for StreamType {
             "logs" => StreamType::Logs,
             "metrics" => StreamType::Metrics,
             "traces" => StreamType::Traces,
+            "service_graph" => StreamType::ServiceGraph,
             "enrichment_tables" | "enrich" => StreamType::EnrichmentTables,
             "file_list" => StreamType::Filelist,
             "metadata" => StreamType::Metadata,
@@ -186,6 +191,7 @@ impl std::fmt::Display for StreamType {
             StreamType::Logs => write!(f, "logs"),
             StreamType::Metrics => write!(f, "metrics"),
             StreamType::Traces => write!(f, "traces"),
+            StreamType::ServiceGraph => write!(f, "service_graph"),
             StreamType::EnrichmentTables => write!(f, "enrichment_tables"),
             StreamType::Filelist => write!(f, "file_list"),
             StreamType::Metadata => write!(f, "metadata"),
