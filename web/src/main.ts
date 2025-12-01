@@ -106,7 +106,7 @@ const getConfig = async () => {
         apiVersion: options.apiVersion,
       });
 
-      openobserveRum.startSessionReplayRecording();
+      openobserveRum.startSessionReplayRecording({ force: true });
     }
   });
 };
