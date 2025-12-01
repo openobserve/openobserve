@@ -92,6 +92,7 @@ const getConfig = async () => {
         trackUserInteractions: true,
         apiVersion: options.apiVersion,
         insecureHTTP: options.insecureHTTP,
+        defaultPrivacyLevel: "mask-user-input",
       });
 
       openobserveLogs.init({
