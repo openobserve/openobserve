@@ -15,94 +15,282 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="custom-chart-type-selector q-pa-md">
-    <div class="text-subtitle2 q-mb-sm">
-      {{ t("panel.customChartTypeSelector") }}
-      <q-icon name="info_outline" class="q-ml-xs">
-        <q-tooltip>
-          {{ t("panel.customChartTypeSelectorHint") }}
-        </q-tooltip>
-      </q-icon>
-    </div>
-    <q-select
-      v-model="selectedChartType"
-      :options="chartTypeOptions"
-      :label="t('panel.selectChartType')"
-      dense
-      outlined
-      emit-value
-      map-options
-      @update:model-value="onChartTypeSelected"
-      data-test="custom-chart-type-selector"
-      class="custom-chart-selector"
+  <div
+    class="custom-chart-type-selector-popup"
+    data-test="custom-chart-type-selector-popup"
+    style="padding: 0; width: 900px; height: 600px"
+  >
+    <!-- Header -->
+    <div
+      class="flex justify-between items-center q-pa-md header"
+      style="border-bottom: 2px solid #e0e0e0; background-color: #f5f5f5"
     >
-      <template v-slot:prepend>
-        <q-icon name="bar_chart" />
-      </template>
-    </q-select>
+      <div class="flex items-center q-table__title">
+        <q-icon name="bar_chart" size="sm" class="q-mr-sm" />
+        <span class="text-h6">{{ t("panel.selectChartType") }}</span>
+      </div>
+      <q-btn
+        icon="close"
+        class="q-ml-xs"
+        unelevated
+        size="sm"
+        round
+        flat
+        :title="t('dashboard.cancel')"
+        @click.stop="closeDialog"
+        data-test="custom-chart-type-selector-close"
+      />
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex" style="height: calc(100% - 60px); overflow: hidden">
+      <!-- Left Sidebar -->
+      <div
+        class="sidebar q-pa-md scroll"
+        style="
+          width: 160px;
+          height: 100%;
+          border-right: 1px solid #e0e0e0;
+          overflow-y: auto;
+          background-color: #fafafa;
+          flex-shrink: 0;
+        "
+      >
+        <div class="text-subtitle2 q-mb-md text-weight-bold">Chart Types</div>
+        <q-list dense>
+          <q-item
+            v-for="(category, index) in chartCategories"
+            :key="index"
+            clickable
+            v-ripple
+            :active="selectedCategory === category.chartLabel"
+            @click="scrollToCategory(category.chartLabel)"
+            class="sidebar-item"
+            :class="{ 'active-category': selectedCategory === category.chartLabel }"
+            data-test="chart-category-item"
+          >
+            <q-item-section>
+              <q-item-label>{{ category.chartLabel }}</q-item-label>
+            </q-item-section>
+          </q-item>
+        </q-list>
+      </div>
+
+      <!-- Right Content Area -->
+      <div
+        ref="contentArea"
+        class="content-area q-pa-md scroll"
+        style="flex: 1; height: 100%; overflow-y: auto; overflow-x: hidden"
+        @scroll="handleScroll"
+      >
+        <div
+          v-for="(category, categoryIndex) in chartCategories"
+          :key="categoryIndex"
+          class="chart-category-section q-mb-xl"
+          :data-category="category.chartLabel"
+        >
+          <div class="text-h6 q-mb-md text-weight-medium">
+            {{ category.chartLabel }}
+          </div>
+          <div class="row q-col-gutter-md">
+            <div
+              v-for="(chart, chartIndex) in category.type"
+              :key="chartIndex"
+              class="col-xs-12 col-sm-6 col-md-4 col-lg-3"
+            >
+              <q-card
+                flat
+                bordered
+                class="chart-card cursor-pointer"
+                :class="{ 'selected-chart': selectedChart?.value === chart.value }"
+                @click="selectChart(chart)"
+                data-test="chart-type-card"
+              >
+                <q-card-section class="q-pa-sm">
+                  <div class="chart-image-container">
+                    <img
+                      :src="chart.asset"
+                      :alt="chart.label"
+                      class="chart-image"
+                      loading="lazy"
+                    />
+                  </div>
+                </q-card-section>
+                <q-card-section class="q-pt-none q-px-sm q-pb-sm">
+                  <div class="text-caption text-center text-weight-medium">
+                    {{ chart.label }}
+                  </div>
+                </q-card-section>
+              </q-card>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, onMounted, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
-import { customChartTemplates } from "./customChartTemplates";
+import type { ChartType, ChartCategory } from "./chartTypes";
+import { chartTypesData } from "./chartTypes";
 
 export default defineComponent({
   name: "CustomChartTypeSelector",
-  emits: ["template-selected"],
+  emits: ["close", "select"],
   setup(props, { emit }) {
     const { t } = useI18n();
-    const selectedChartType = ref(null);
+    const chartCategories = ref<ChartCategory[]>(chartTypesData.data);
+    const selectedCategory = ref<string>(chartCategories.value[0]?.chartLabel || "");
+    const selectedChart = ref<ChartType | null>(null);
+    const contentArea = ref<HTMLElement | null>(null);
 
-    const chartTypeOptions = [
-      { label: "Basic Line Chart", value: "line-simple" },
-      { label: "Basic Bar Chart", value: "bar-simple" },
-      { label: "Basic Pie Chart", value: "pie-simple" },
-      { label: "Basic Scatter Chart", value: "scatter-simple" },
-      { label: "Radar Chart", value: "radar-simple" },
-      { label: "Gauge Chart", value: "gauge-simple" },
-      { label: "Funnel Chart", value: "funnel-simple" },
-      { label: "Heatmap", value: "heatmap-simple" },
-      { label: "Candlestick Chart", value: "candlestick-simple" },
-      { label: "Graph/Network", value: "graph-simple" },
-      { label: "Tree Chart", value: "tree-simple" },
-      { label: "Treemap", value: "treemap-simple" },
-      { label: "Sunburst", value: "sunburst-simple" },
-      { label: "Sankey Diagram", value: "sankey-simple" },
-      { label: "Boxplot", value: "boxplot-simple" },
-      { label: "Parallel Coordinates", value: "parallel-simple" },
-      { label: "Calendar Heatmap", value: "calendar-simple" },
-      { label: "Pictorial Bar", value: "pictorialBar-simple" },
-      { label: "ThemeRiver", value: "themeRiver-simple" },
-      { label: "Custom Series", value: "custom-simple" },
-    ];
-
-    const onChartTypeSelected = (value: string) => {
-      const template = customChartTemplates[value];
-      if (template) {
-        emit("template-selected", template);
+    const scrollToCategory = (category: string) => {
+      selectedCategory.value = category;
+      if (!contentArea.value) return;
+      
+      const element = contentArea.value.querySelector(`[data-category="${category}"]`) as HTMLElement;
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "start" });
       }
     };
 
+    const handleScroll = () => {
+      if (!contentArea.value) return;
+
+      const scrollTop = contentArea.value.scrollTop;
+      const sections = contentArea.value.querySelectorAll('.chart-category-section');
+      
+      // Find which category is currently in view
+      for (const section of Array.from(sections)) {
+        const element = section as HTMLElement;
+        const category = element.getAttribute('data-category');
+        if (!category) continue;
+
+        const elementTop = element.offsetTop - contentArea.value.offsetTop;
+        const elementBottom = elementTop + element.offsetHeight;
+
+        if (scrollTop >= elementTop - 100 && scrollTop < elementBottom) {
+          selectedCategory.value = category;
+          break;
+        }
+      }
+    };
+
+    const selectChart = (chart: ChartType) => {
+      selectedChart.value = chart;
+      // Emit selection and close dialog immediately
+      emit("select", chart);
+      closeDialog();
+    };
+
+    const closeDialog = () => {
+      emit("close");
+    };
+
+    onMounted(() => {
+      nextTick(() => {
+        // Set first category as selected by default
+        if (chartCategories.value.length > 0) {
+          selectedCategory.value = chartCategories.value[0].chartLabel;
+        }
+      });
+    });
+
     return {
       t,
-      selectedChartType,
-      chartTypeOptions,
-      onChartTypeSelected,
+      chartCategories,
+      selectedCategory,
+      selectedChart,
+      contentArea,
+      scrollToCategory,
+      handleScroll,
+      selectChart,
+      closeDialog,
     };
   },
 });
 </script>
 
 <style lang="scss" scoped>
-.custom-chart-type-selector {
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 4px;
-  background-color: rgba(0, 0, 0, 0.02);
+.custom-chart-type-selector-popup {
+  background-color: white;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
-.custom-chart-selector {
-  max-width: 400px;
+.sidebar {
+  .sidebar-item {
+    border-radius: 4px;
+    margin-bottom: 4px;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background-color: rgba(0, 0, 0, 0.04);
+    }
+
+    &.active-category {
+      background-color: var(--q-primary);
+      color: white;
+      font-weight: 600;
+    }
+  }
+}
+
+.content-area {
+  .chart-category-section {
+    scroll-margin-top: 20px;
+  }
+
+  .chart-card {
+    transition: all 0.2s ease;
+    height: 100%;
+
+    &:hover {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      transform: translateY(-2px);
+    }
+
+    &.selected-chart {
+      border: 2px solid var(--q-primary);
+      box-shadow: 0 4px 12px rgba(var(--q-primary-rgb), 0.3);
+    }
+
+    .chart-image-container {
+      width: 100%;
+      height: 150px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #f8f8f8;
+      border-radius: 4px;
+      overflow: hidden;
+
+      .chart-image {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+    }
+  }
+}
+
+// Custom scrollbar styling
+.scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scroll::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.scroll::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.scroll::-webkit-scrollbar-thumb:hover {
+  background: #555;
 }
 </style>
