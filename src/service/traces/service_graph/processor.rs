@@ -125,7 +125,9 @@ async fn process_stream(
         Err(e) => {
             log::debug!(
                 "[ServiceGraph] Failed to get schema for {}/{}: {} - skipping",
-                org_id, stream_name, e
+                org_id,
+                stream_name,
+                e
             );
             return Ok(());
         }
@@ -136,11 +138,11 @@ async fn process_stream(
     // Build COALESCE expression for peer identification
     // Try multiple attributes in priority order (following OTel conventions)
     let peer_attr_candidates = [
-        "peer_service",      // peer.service - explicit peer service name
-        "server_address",    // server.address - logical server name
-        "db_name",          // db.name - database name
-        "db_system",        // db.system - database type
-        "http_url",         // http.url - for HTTP calls (extract hostname)
+        "peer_service",   // peer.service - explicit peer service name
+        "server_address", // server.address - logical server name
+        "db_name",        // db.name - database name
+        "db_system",      // db.system - database type
+        "http_url",       // http.url - for HTTP calls (extract hostname)
     ];
 
     let mut available_peer_attrs = Vec::new();
@@ -150,15 +152,16 @@ async fn process_stream(
         }
     }
 
-    if available_peer_attrs.is_empty() {
+    // If no peer attributes are available, we can still process INTERNAL spans
+    // by using a fallback value for the peer/server side
+    let peer_expr = if available_peer_attrs.is_empty() {
         log::debug!(
-            "[ServiceGraph] Stream {}/{} has no peer identification attributes - skipping",
-            org_id, stream_name
+            "[ServiceGraph] Stream {}/{} has no peer identification attributes - will use 'internal' fallback for INTERNAL spans",
+            org_id,
+            stream_name
         );
-        return Ok(());
-    }
-
-    let peer_expr = if available_peer_attrs.len() > 1 {
+        "'internal'".to_string() // Literal string fallback
+    } else if available_peer_attrs.len() > 1 {
         format!("COALESCE({})", available_peer_attrs.join(", "))
     } else {
         available_peer_attrs[0].to_string()
@@ -166,11 +169,33 @@ async fn process_stream(
 
     log::debug!(
         "[ServiceGraph] Stream {}/{} using peer expression: {}",
-        org_id, stream_name, peer_expr
+        org_id,
+        stream_name,
+        peer_expr
     );
 
-    let sql = format!(
-        "WITH edges AS (
+    // Check if INTERNAL spans should be excluded (default: include them)
+    let exclude_internal = get_o2_config().service_graph.exclude_internal_spans;
+
+    if exclude_internal {
+        log::debug!(
+            "[ServiceGraph] INTERNAL spans (span_kind='1') will be excluded from {}/{}",
+            org_id,
+            stream_name
+        );
+    }
+
+    let span_kinds = if exclude_internal {
+        // Exclude INTERNAL spans (span_kind='1')
+        "('2', '3')"
+    } else {
+        // Include INTERNAL spans (span_kind='1') - default behavior
+        "('1', '2', '3')"
+    };
+
+    let sql = if exclude_internal {
+        format!(
+            "WITH edges AS (
            SELECT
              CASE
                WHEN CAST(span_kind AS VARCHAR) = '3' THEN service_name
@@ -184,7 +209,7 @@ async fn process_stream(
              span_status
            FROM \"{}\"
            WHERE _timestamp >= {} AND _timestamp < {}
-             AND CAST(span_kind AS VARCHAR) IN ('2', '3')
+             AND CAST(span_kind AS VARCHAR) IN {}
          )
          SELECT
            {} as start,
@@ -201,8 +226,46 @@ async fn process_stream(
          FROM edges
          WHERE client IS NOT NULL AND server IS NOT NULL
          GROUP BY client, server",
-        peer_expr, peer_expr, stream_name, start_time, end_time, start_time, end_time
-    );
+            peer_expr, peer_expr, stream_name, start_time, end_time, span_kinds, start_time, end_time
+        )
+    } else {
+        format!(
+            "WITH edges AS (
+           SELECT
+             CASE
+               WHEN CAST(span_kind AS VARCHAR) = '3' THEN service_name
+               WHEN CAST(span_kind AS VARCHAR) = '2' THEN {}
+               WHEN CAST(span_kind AS VARCHAR) = '1' THEN service_name
+             END as client,
+             CASE
+               WHEN CAST(span_kind AS VARCHAR) = '3' THEN {}
+               WHEN CAST(span_kind AS VARCHAR) = '2' THEN service_name
+               WHEN CAST(span_kind AS VARCHAR) = '1' THEN COALESCE({}, 'internal')
+             END as server,
+             end_time - start_time as duration,
+             span_status
+           FROM \"{}\"
+           WHERE _timestamp >= {} AND _timestamp < {}
+             AND CAST(span_kind AS VARCHAR) IN {}
+         )
+         SELECT
+           {} as start,
+           {} as end,
+           client,
+           server,
+           'standard' as connection_type,
+           COUNT(*) as total_requests,
+           COUNT(*) FILTER (WHERE span_status = 'ERROR') as errors,
+           CAST(COUNT(*) FILTER (WHERE span_status = 'ERROR') * 100.0 / COUNT(*) AS DOUBLE) as error_rate,
+           approx_median(duration) as p50,
+           approx_percentile_cont(duration, 0.95) as p95,
+           approx_percentile_cont(duration, 0.99) as p99
+         FROM edges
+         WHERE client IS NOT NULL AND server IS NOT NULL
+         GROUP BY client, server",
+            peer_expr, peer_expr, peer_expr, stream_name, start_time, end_time, span_kinds, start_time, end_time
+        )
+    };
 
     // Execute search
     let req = config::meta::search::Request {
@@ -237,7 +300,8 @@ async fn process_stream(
     };
 
     let trace_id = config::ider::generate();
-    let resp = crate::service::search::search(&trace_id, org_id, StreamType::Traces, None, &req).await?;
+    let resp =
+        crate::service::search::search(&trace_id, org_id, StreamType::Traces, None, &req).await?;
 
     log::info!(
         "[ServiceGraph] Query returned {} pre-aggregated edges from {}/{}",

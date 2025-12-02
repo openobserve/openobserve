@@ -48,6 +48,8 @@ pub(crate) mod pipeline;
 mod pipeline_error_cleanup;
 mod promql;
 mod promql_self_consume;
+#[cfg(feature = "enterprise")]
+mod service_graph;
 mod stats;
 
 pub use file_downloader::{download_from_node, queue_download};
@@ -307,6 +309,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { stats::run().await });
     tokio::task::spawn(async move { compactor::run().await });
     tokio::task::spawn(async move { flatten_compactor::run().await });
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(async move { service_graph::run().await });
     tokio::task::spawn(async move { metrics::run().await });
     let _ = promql::run();
     tokio::task::spawn(async move { alert_manager::run().await });
