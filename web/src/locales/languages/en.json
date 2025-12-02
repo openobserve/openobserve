@@ -1155,6 +1155,7 @@
     "cloneTitle": "Clone alert",
     "start": "start",
     "pause": "Pause",
+    "historyNotAvailableRealtime": "Alert history is not available for real-time alerts",
     "groupBy": "Group by",
     "row": "Row Template",
     "preview": "Preview",
@@ -1177,7 +1178,7 @@
     "email": "Email",
     "action": "Action",
     "all": "All",
-    "history": "Alert History",
+    "history": "History",
     "searcHistory": "Enter Alert Name",
     "results":"Results",
     "deduplication": {

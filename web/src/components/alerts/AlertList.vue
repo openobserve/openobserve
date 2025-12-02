@@ -194,8 +194,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-tr
                     :data-test="`stream-association-table-${props.row.trace_id}-row`"
                     :props="props"
-                    style="cursor: pointer"
-                    @click="triggerExpand(props)"
                   >
                     <q-td>
                       <q-checkbox
@@ -381,6 +379,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                      <q-icon size="16px" name="download" />
                                   </q-item-section>
                                   <q-item-section>Export</q-item-section>
+                                </q-item>
+                                <q-separator />
+                                <q-item
+                                  class="flex items-center"
+                                  clickable
+                                  v-close-popup
+                                  @click="showAlertHistory(props)"
+                                  :disable="props.row.is_real_time"
+                                >
+                                  <q-item-section dense avatar>
+                                     <q-icon size="16px" name="history" />
+                                  </q-item-section>
+                                  <q-item-section>{{ t("alerts.history") }}</q-item-section>
+                                  <q-tooltip v-if="props.row.is_real_time" class="bg-grey-8">
+                                    {{ t("alerts.historyNotAvailableRealtime") }}
+                                  </q-tooltip>
                                 </q-item>
                               </q-list>
                             </q-menu>
@@ -867,8 +881,8 @@ export default defineComponent({
     const showAlertDetailsDrawer = ref(false);
     const selectedAlertDetails: Ref<any> = ref(null);
 
-    const triggerExpand = (props: any) => {
-      // Open drawer instead of inline expansion
+    const showAlertHistory = (props: any) => {
+      // Open alert history drawer
       selectedAlertDetails.value = props.row;
       showAlertDetailsDrawer.value = true;
     };
@@ -2350,7 +2364,7 @@ export default defineComponent({
       searchQuery,
       clearSearchHistory,
       filteredResults,
-      triggerExpand,
+      showAlertHistory,
       showAlertDetailsDrawer,
       selectedAlertDetails,
       allSelectedAlerts,
