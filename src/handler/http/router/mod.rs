@@ -646,7 +646,10 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(alerts::deduplication::save_semantic_groups)
         .service(service_streams::list_services)
         .service(service_streams::list_service_instances)
-        .service(service_streams::get_dimension_stats);
+        .service(service_streams::get_dimension_stats)
+        .service(service_streams::get_dimension_analytics)
+        .service(service_streams::lookup_by_stream)
+        .service(service_streams::correlate_streams);
 
     #[cfg(not(feature = "enterprise"))]
     let service = service
