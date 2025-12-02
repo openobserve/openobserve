@@ -570,7 +570,7 @@
     "delete": "Delete",
     "view": "View",
     "delay": "Delay",
-    "history": "Pipeline History",
+    "history": "History",
     "historyNotAvailableRealtime": "Pipeline history is not available for real-time pipelines",
     "searchHistory": "Enter Pipeline Name",
     "destination_type": "Destination Type",

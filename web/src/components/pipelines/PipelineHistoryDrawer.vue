@@ -196,7 +196,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :rows="historyItems"
         :columns="historyTableColumns"
         row-key="timestamp"
-        :pagination="pagination"
+        v-model:pagination="pagination"
+        @request="onRequest"
         :style="historyItems.length > 0
           ? 'width: 100%; height: calc(100vh - 190px)'
           : 'width: 100%'"
@@ -238,14 +239,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #bottom="scope">
           <div class="bottom-btn tw-h-[48px] tw-flex tw-w-full">
             <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[220px] tw-mr-md">
-              {{ historyItems.length }} {{ t('pipeline_list.results') }}
+              {{ resultTotal }} {{ t('pipeline_list.results') }}
             </div>
             <QTablePagination
               :scope="scope"
               :position="'bottom'"
-              :resultTotal="historyItems.length"
+              :resultTotal="resultTotal"
               :perPageOptions="perPageOptions"
               @update:changeRecordPerPage="changePagination"
+              @update:changePagination="onPageChange"
             />
           </div>
         </template>
@@ -308,11 +310,14 @@ const historyItems: Ref<PipelineHistoryItem[]> = ref([]);
 const stats: Ref<PipelineHistoryStats | null> = ref(null);
 const qTableRef: Ref<any> = ref(null);
 
-// Pagination (offline pagination - fetch 100 records by default)
-const selectedPerPage = ref<number>(100);
+// Pagination (server-side pagination)
+const selectedPerPage = ref<number>(50);
+const currentPage = ref<number>(1);
+const resultTotal = ref(0);
 const pagination: any = ref({
   page: 1,
-  rowsPerPage: 100,
+  rowsPerPage: 50,
+  rowsNumber: 0,
 });
 
 const perPageOptions = [
@@ -322,11 +327,35 @@ const perPageOptions = [
   { label: "100", value: 100 },
 ];
 
+const onRequest = async (requestProps: any) => {
+  const { page, rowsPerPage } = requestProps.pagination;
+  currentPage.value = page;
+  selectedPerPage.value = rowsPerPage;
+
+  loading.value = true;
+  await fetchHistory();
+
+  // Update local pagination object after fetching
+  pagination.value.page = page;
+  pagination.value.rowsPerPage = rowsPerPage;
+
+  loading.value = false;
+};
+
 const changePagination = (val: { label: string; value: any }) => {
   selectedPerPage.value = val.value;
   pagination.value.rowsPerPage = val.value;
-  pagination.value.page = 1; // Reset to first page when changing rows per page
-  qTableRef.value?.setPagination(pagination.value);
+  pagination.value.page = 1;
+  qTableRef.value?.requestServerInteraction({
+    pagination: pagination.value
+  });
+};
+
+const onPageChange = (page: number) => {
+  pagination.value.page = page;
+  qTableRef.value?.requestServerInteraction({
+    pagination: pagination.value
+  });
 };
 
 // Table Columns
@@ -382,30 +411,11 @@ const formatStatus = (status: string) => {
 };
 
 const formatTimestamp = (timestamp: number) => {
-  if (!timestamp) return "N/A";
-  const now = Date.now() * 1000; // microseconds
-  const diff = now - timestamp;
-
-  // Less than 1 hour
-  if (diff < 3600000000) {
-    const minutes = Math.floor(diff / 60000000);
-    return `${minutes} min ago`;
-  }
-
-  // Less than 24 hours
-  if (diff < 86400000000) {
-    const hours = Math.floor(diff / 3600000000);
-    return `${hours} hour${hours > 1 ? "s" : ""} ago`;
-  }
-
-  // Less than 7 days
-  if (diff < 604800000000) {
-    const days = Math.floor(diff / 86400000000);
-    return `${days} day${days > 1 ? "s" : ""} ago`;
-  }
-
-  // Format as date
-  return date.formatDate(timestamp / 1000, "MMM DD, YYYY HH:mm");
+  if (!timestamp) return "";
+  const unixSeconds = timestamp / 1e6;
+  const dateToFormat = new Date(unixSeconds * 1000);
+  const formattedDate = dateToFormat.toISOString();
+  return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
 };
 
 const formatDuration = (seconds: number) => {
@@ -421,18 +431,20 @@ const formatDuration = (seconds: number) => {
 const fetchHistory = async () => {
   if (!props.pipelineId) return;
 
-  loading.value = true; 
   try {
     const orgIdentifier = store.state.selectedOrganization.identifier;
     const endTime = Date.now() * 1000; // microseconds
     const startTime = endTime - 30 * 24 * 60 * 60 * 1000000; // 30 days ago
 
+    // Calculate offset for server-side pagination
+    const from = (currentPage.value - 1) * selectedPerPage.value;
+
     const params = {
       pipeline_id: props.pipelineId,
       start_time: startTime.toString(),
       end_time: endTime.toString(),
-      from: "0",
-      size: "100", // Fetch 100 records for offline pagination
+      from: from.toString(),
+      size: selectedPerPage.value.toString(),
     };
 
     const url = `/api/${orgIdentifier}/pipelines/history`;
@@ -455,12 +467,19 @@ const fetchHistory = async () => {
       }));
 
       historyItems.value = items;
+      resultTotal.value = response.data.total || 0;
+
+      // Update pagination rowsNumber for table
+      pagination.value.rowsNumber = response.data.total || 0;
 
       // Calculate stats
       calculateStats();
     }
   } catch (error: any) {
     console.error("Failed to fetch pipeline history:", error);
+    historyItems.value = [];
+    resultTotal.value = 0;
+    pagination.value.rowsNumber = 0;
     $q.notify({
       type: "negative",
       message:
@@ -468,13 +487,20 @@ const fetchHistory = async () => {
         error.message ||
         t("pipeline.failedToFetchHistory"),
     });
-  } finally {
-    loading.value = false;
   }
 };
 
-const refreshHistory = () => {
-  fetchHistory();
+const refreshHistory = async () => {
+  // Reset pagination to defaults
+  pagination.value.page = 1;
+  pagination.value.rowsPerPage = 50;
+  currentPage.value = 1;
+  selectedPerPage.value = 50;
+
+  // Fetch with reset pagination
+  loading.value = true;
+  await fetchHistory();
+  loading.value = false;
 };
 
 const calculateStats = () => {
@@ -510,11 +536,26 @@ const calculateStats = () => {
 // Watchers
 watch(
   () => props.pipelineId,
-  (newVal) => {
+  async (newVal) => {
     if (newVal) {
       historyItems.value = [];
       stats.value = null;
-      fetchHistory();
+
+      // Reset to first page when pipeline changes
+      pagination.value.page = 1;
+      currentPage.value = 1;
+
+      // For initial load or when qTableRef is not ready, fetch directly
+      if (!qTableRef.value) {
+        loading.value = true;
+        await fetchHistory();
+        loading.value = false;
+      } else {
+        // Trigger table to fetch data
+        qTableRef.value?.requestServerInteraction({
+          pagination: pagination.value
+        });
+      }
     }
   },
   { immediate: true }
