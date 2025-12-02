@@ -103,7 +103,7 @@ test.describe("HTML chart dashboard", () => {
     await deleteDashboard(page, randomDashboardName);
   });
 
-  //skip beacuse value is not set in the variable on other environments its is working
+  //skip because value is not set in the variable on other environments its is working
   test.skip("Should correctly replace the dashboard variable value on the HTML chart.", async ({
     page,
   }) => {
