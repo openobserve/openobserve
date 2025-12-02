@@ -2,6 +2,48 @@ export default class DashboardFilter {
   constructor(page) {
     this.page = page;
   }
+
+  /**
+   * Helper method to select a field from the StreamFieldSelect dropdown
+   * @param {string} fieldName - The field name to select
+   * @param {object} dropdownLocator - The locator for the field dropdown
+   */
+  async selectFieldFromDropdown(fieldName, dropdownLocator) {
+    await dropdownLocator.click();
+
+    // Find the input element within the StreamFieldSelect component
+    const inputField = dropdownLocator.locator('input[aria-label="Select Field"]');
+    await inputField.waitFor({ state: "visible" });
+    await inputField.fill(fieldName);
+
+    // Wait for the dropdown menu to appear - use .last() to get the most recent menu
+    const dropdownMenu = this.page.locator('.q-menu[role="listbox"]').last();
+    await dropdownMenu.waitFor({ state: "visible", timeout: 5000 });
+
+    // Wait for options to be filtered
+    await this.page.waitForTimeout(500);
+
+    // First, ensure expansion items are expanded
+    const expansionItems = dropdownMenu.locator('.q-expansion-item');
+    const expansionCount = await expansionItems.count();
+
+    for (let i = 0; i < expansionCount; i++) {
+      const expansion = expansionItems.nth(i);
+      const isExpanded = await expansion.evaluate(el => el.classList.contains('q-expansion-item--expanded'));
+
+      if (!isExpanded) {
+        await expansion.click();
+        await this.page.waitForTimeout(500);
+      }
+    }
+
+    // Wait a bit more for expansion animation to complete
+    await this.page.waitForTimeout(500);
+
+    // Now find and click the field item - use getByText which is more reliable
+    await dropdownMenu.getByText(fieldName, { exact: true }).click();
+  }
+
   // Add filter condition
 
   async addFilterCondition(
@@ -44,26 +86,7 @@ export default class DashboardFilter {
       const fieldDropdown = this.page.locator(
         `[data-test="dashboard-add-condition-column-${idx}}"]`
       );
-      await fieldDropdown.click();
-
-      // Find the input element within the StreamFieldSelect component
-      const inputField = fieldDropdown.locator('input[aria-label="Select Field"]');
-      await inputField.waitFor({ state: "visible" });
-      await inputField.fill(newFieldName);
-
-      // Wait for the dropdown menu to appear - use .last() to get the most recent menu
-      await this.page.locator('.q-menu[role="listbox"]').last().waitFor({ state: "visible", timeout: 5000 });
-
-      // The new StreamFieldSelect uses q-item elements within expansion items
-      // After filtering, we just need to find and click the matching q-item
-      // Use getByText to find the item-label with exact text match
-      const fieldItem = this.page
-        .locator('.q-item')
-        .filter({ hasText: newFieldName })
-        .first();
-
-      await fieldItem.waitFor({ state: "visible", timeout: 10000 });
-      await fieldItem.click();
+      await this.selectFieldFromDropdown(newFieldName, fieldDropdown);
     }
 
     // Step 3: Open the condition selector
@@ -297,19 +320,7 @@ export default class DashboardFilter {
         ? allColumnLocators.first()
         : allColumnLocators.last();
 
-    await columnLocator.click();
-
-    // Find the input element within the StreamFieldSelect component
-    const inputField = columnLocator.locator('input[aria-label="Select Field"]');
-    await inputField.waitFor({ state: "visible" });
-    await inputField.fill(newFieldName);
-
-    // Wait for dropdown to appear after filling the value
-    // await this.page
-    //   .locator('div.q-menu[role="listbox"]')
-    //   .waitFor({ state: "visible", timeout: 5000 });
-    await inputField.press("ArrowDown");
-    await inputField.press("Enter");
+    await this.selectFieldFromDropdown(newFieldName, columnLocator);
   }
 
   // New robust function for nested group filter conditions
@@ -382,16 +393,6 @@ export default class DashboardFilter {
     const columnLocator = count === 1 ? allColumnLocators.first() : allColumnLocators.last();
 
     await columnLocator.waitFor({ state: "visible", timeout: 5000 });
-    await columnLocator.click();
-
-    // Find the input element within the StreamFieldSelect component
-    const inputField = columnLocator.locator('input[aria-label="Select Field"]');
-    await inputField.waitFor({ state: "visible" });
-    await inputField.fill(fieldName);
-
-    // Wait for dropdown options to be available
-    await this.page.locator('.q-menu[role="listbox"]').last().waitFor({ state: "visible", timeout: 3000 }).catch(() => {});
-    await inputField.press("ArrowDown");
-    await inputField.press("Enter");
+    await this.selectFieldFromDropdown(fieldName, columnLocator);
   }
 }
