@@ -15,6 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <div>
   <q-page v-if="currentRouteName === 'pipelines'">
     <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
       <div class="card-container tw-mb-[0.625rem]">
@@ -46,20 +47,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-icon class="o2-search-input-icon" name="search" />
                   </template>
                 </q-input>
-                <q-btn
-                    data-test="pipeline-list-history-btn"
-                    class="q-ml-sm o2-secondary-button tw-h-[36px]"
-                    :class="
-                        store.state.theme === 'dark'
-                        ? 'o2-secondary-button-dark'
-                        : 'o2-secondary-button-light'
-                    "
-                    no-caps
-                    flat
-                    :label="t(`pipeline.history`)"
-                    @click="goToPipelineHistory"
-                    icon="history"
-                />
                 <q-btn
                   data-test="pipeline-list-import-pipeline-btn"
                   class="q-ml-sm o2-secondary-button tw-h-[36px]"
@@ -103,8 +90,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-tr
                 :data-test="`pipeline-list-table-${props.row.pipeline_id}-row`"
                 :props="props"
-                style="cursor: pointer"
-                @click="triggerExpand(props)"
               >
                 <q-td auto-width>
                   <q-checkbox
@@ -112,18 +97,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="o2-table-checkbox"
                     size="sm"
                     @click.stop
-                  />
-                </q-td>
-                <q-td v-if="activeTab == 'scheduled'" auto-width>
-                  <q-btn
-                    dense
-                    flat
-                    size="xs"
-                    :icon="
-                      expandedRow != props.row.pipeline_id
-                        ? 'expand_more'
-                        : 'expand_less'
-                    "
                   />
                 </q-td>
                 <q-td v-for="col in filterColumns()" :key="col.name" :props="props">
@@ -160,30 +133,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                   </q-btn>
                     <q-btn
-                      :data-test="`pipeline-list-${props.row.name}-export-pipeline`"
-                      padding="sm"
-                      unelevated
-                      size="sm"
-                      round
-                      flat
-                      icon="download"
-                      :title="t('pipeline.export')"
-                      @click.stop="exportPipeline(props.row)"
-                    >
-                  </q-btn>
-                    <q-btn
-                      :data-test="`pipeline-list-${props.row.name}-delete-pipeline`"
-                      padding="sm"
-                      unelevated
-                      size="sm"
-                      round
-                      flat
-                      :icon="outlinedDelete"
-                      :title="t('pipeline.delete')"
-                      @click.stop="openDeleteDialog(props.row)"
-                    >
-                  </q-btn>
-                    <q-btn
                       :data-test="`pipeline-list-${props.row.name}-view-pipeline`"
                       padding="sm"
                       unelevated
@@ -192,6 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       flat
                       :icon="outlinedVisibility"
                       :title="t('pipeline.view')"
+                      @click.stop
                     >
                       <q-tooltip position="bottom">
                         <PipelineView :pipeline="props.row" />
@@ -217,33 +167,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </q-tooltip>
                       </q-btn>
                     </div>
+                    <q-btn
+                      :icon="outlinedMoreVert"
+                      unelevated
+                      size="sm"
+                      round
+                      flat
+                      @click.stop
+                      :data-test="`pipeline-list-${props.row.name}-more-options`"
+                    >
+                      <q-menu>
+                        <q-list style="min-width: 100px">
+                          <q-item
+                            class="flex items-center"
+                            clickable
+                            v-close-popup
+                            @click="exportPipeline(props.row)"
+                          >
+                            <q-item-section dense avatar>
+                              <q-icon size="16px" name="download" />
+                            </q-item-section>
+                            <q-item-section>{{ t("pipeline.export") }}</q-item-section>
+                          </q-item>
+                          <q-separator />
+                          <q-item
+                            class="flex items-center"
+                            clickable
+                            v-close-popup
+                            @click="openDeleteDialog(props.row)"
+                          >
+                            <q-item-section dense avatar>
+                              <q-icon size="16px" :name="outlinedDelete" />
+                            </q-item-section>
+                            <q-item-section>{{ t("pipeline.delete") }}</q-item-section>
+                          </q-item>
+                          <q-separator />
+                          <q-item
+                            class="flex items-center"
+                            clickable
+                            v-close-popup
+                            @click="showPipelineHistory(props.row)"
+                            :disable="props.row.source?.source_type === 'realtime'"
+                          >
+                            <q-item-section dense avatar>
+                              <q-icon size="16px" name="history" />
+                            </q-item-section>
+                            <q-item-section>{{ t("pipeline.history") }}</q-item-section>
+                            <q-tooltip v-if="props.row.source?.source_type === 'realtime'" class="bg-grey-8">
+                              {{ t('pipeline.historyNotAvailableRealtime') }}
+                            </q-tooltip>
+                          </q-item>
+                        </q-list>
+                      </q-menu>
+                    </q-btn>
                   </template>
-                </q-td>
-              </q-tr>
-              <q-tr
-                data-test="scheduled-pipeline-row-expand"
-                v-show="expandedRow === props.row.pipeline_id"
-                :props="props"
-              >
-                <q-td v-if="props.row?.sql_query" colspan="100%">
-                  <div
-                    data-test="scheduled-pipeline-expanded-content"
-                    class="text-left tw-px-2 q-mb-sm expanded-content"
-                  >
-                    <div class="tw-flex tw-items-center q-py-sm">
-                      <strong>{{ t('pipeline_list.sql_query') }} : <span></span></strong>
-                    </div>
-                    <div class="tw-flex tw-items-start tw-justify-center">
-                      <div
-                        data-test="scheduled-pipeline-expanded-sql"
-                        class="scrollable-content expanded-sql"
-                      >
-                        <pre style="text-wrap: wrap"
-                          >{{ props.row?.sql_query }} </pre
-                        >
-                      </div>
-                    </div>
-                  </div>
                 </q-td>
               </q-tr>
             </template>
@@ -454,6 +431,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-actions>
     </q-card>
   </q-dialog>
+
+  <!-- Pipeline History Dialog -->
+  <q-dialog
+    v-model="showHistoryDrawer"
+    position="right"
+    full-height
+    maximized
+    data-test="pipeline-history-dialog"
+  >
+    <PipelineHistoryDrawer
+      :pipeline-id="selectedHistoryPipelineId"
+      :pipeline-name="selectedHistoryPipelineName"
+      :pipeline-type="selectedHistoryPipelineType"
+      @close="showHistoryDrawer = false"
+    />
+  </q-dialog>
+  </div>
 </template>
 <script setup lang="ts">
 import {
@@ -480,6 +474,7 @@ import {
   outlinedPause,
   outlinedPlayArrow,
   outlinedVisibility,
+  outlinedMoreVert,
 } from "@quasar/extras/material-icons-outlined";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -487,6 +482,7 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import AppTabs from "@/components/common/AppTabs.vue";
 import PipelineView from "./PipelineView.vue";
 import ResumePipelineDialog from "../ResumePipelineDialog.vue";
+import PipelineHistoryDrawer from "@/components/pipelines/PipelineHistoryDrawer.vue";
 
 import { filter, update } from "lodash-es";
 
@@ -545,6 +541,12 @@ const confirmDialogMeta: any = ref({
 const activeTab = ref("all");
 const filteredPipelines: any = ref([]);
 const columns: any = ref([]);
+
+// Pipeline History Drawer state
+const showHistoryDrawer = ref(false);
+const selectedHistoryPipelineId = ref("");
+const selectedHistoryPipelineName = ref("");
+const selectedHistoryPipelineType = ref("");
 
 const tabs = reactive([
   {
@@ -673,16 +675,18 @@ const togglePipelineState = (row: any, from_now: boolean) => {
     });
 };
 
-const triggerExpand = (props: any) => {
-  if (
-    expandedRow.value === props.row.pipeline_id ||
-    props.row.source.source_type === "realtime"
-  ) {
-    expandedRow.value = null;
-  } else {
-    // Otherwise, expand the clicked row and collapse any other row
-    expandedRow.value = props.row.pipeline_id;
+const showPipelineHistory = (row: any) => {
+  // Only show history for scheduled pipelines, not realtime
+  const pipelineType = row.source?.source_type || 'realtime';
+
+  if (pipelineType === 'realtime') {
+    return;
   }
+
+  selectedHistoryPipelineId.value = row.pipeline_id;
+  selectedHistoryPipelineName.value = row.name;
+  selectedHistoryPipelineType.value = pipelineType;
+  showHistoryDrawer.value = true;
 };
 
 const getColumnsForActiveTab = (tab: any) => {
@@ -1070,15 +1074,6 @@ const showErrorDialog = (pipeline: any) => {
 const closeErrorDialog = () => {
   errorDialog.value.show = false;
   errorDialog.value.data = null;
-};
-
-const goToPipelineHistory = () => {
-  router.push({
-    name: "pipelineHistory",
-    query: {
-      org_identifier: store.state.selectedOrganization.identifier,
-    },
-  });
 };
 
 const bulkTogglePipelines = async (action: "pause" | "resume") => {

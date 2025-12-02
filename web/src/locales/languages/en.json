@@ -86,7 +86,8 @@
     "showMore": "Show More",
     "contactUs": "Contact Us",
     "addFolder": "Add Folder",
-    "status": "Status"
+    "status": "Status",
+    "loadMore":"Load More"
   },
   "search": {
     "resetFields": "Reset selected table fields",
@@ -569,9 +570,16 @@
     "delete": "Delete",
     "view": "View",
     "delay": "Delay",
-    "history": "Pipeline History",
+    "history": "History",
+    "historyNotAvailableRealtime": "Pipeline history is not available for real-time pipelines",
     "searchHistory": "Enter Pipeline Name",
-    "destination_type": "Destination Type"
+    "destination_type": "Destination Type",
+    "totalExecutions": "Total Executions",
+    "errorCount": "Errors",
+    "avgExecutionTime": "Avg. Execution Time",
+    "successRate": "Success Rate",
+    "noHistoryData": "No history data available",
+    "failedToFetchHistory": "Failed to fetch pipeline history"
   },
   "function": {
     "header": "Functions",
@@ -1119,8 +1127,8 @@
     "alertType": "Alert Type",
     "streamType": "Stream Type",
     "state": "State",
-    "realTime": "Real-Time Alert",
-    "scheduled": "Scheduled Alert",
+    "realTime": "Real-Time",
+    "scheduled": "Scheduled",
     "minutes": "Minutes",
     "hours": "Hours",
     "seconds": "Seconds",
@@ -1148,6 +1156,7 @@
     "cloneTitle": "Clone alert",
     "start": "start",
     "pause": "Pause",
+    "historyNotAvailableRealtime": "Alert history is not available for real-time alerts",
     "groupBy": "Group by",
     "row": "Row Template",
     "preview": "Preview",
@@ -1170,8 +1179,9 @@
     "email": "Email",
     "action": "Action",
     "all": "All",
-    "history": "Alert History",
+    "history": "History",
     "searcHistory": "Enter Alert Name",
+    "results":"Results",
     "deduplication": {
       "title": "Alert Deduplication",
       "subtitle": "Prevent duplicate alerts by configuring fingerprint-based deduplication.",
@@ -1205,6 +1215,24 @@
     "successRate": "Success Rate",
     "loadMore": "Load More",
     "failedToFetchHistory": "Failed to fetch alert history",
+    "historyTable": {
+      "timestamp": "Timestamp",
+      "status": "Status",
+      "evaluationTime": "Evaluation (s)",
+      "queryTime": "Query (ms)",
+      "error":"Error"
+    },
+    "alertDetails": {
+      "alertName": "Alert Name",
+      "sqlQuery": "SQL Query",
+      "conditions": "Conditions",
+      "copy": "Copy",
+      "noCondition": "No condition",
+      "noDescription": "No description",
+      "evaluationHistory": "Evaluation History",
+      "loadingHistory": "Loading history...",
+      "noHistoryAvailable": "No evaluation history available for this alert"
+    },
     "insights": {
       "title": "Alert Insights",
       "badge": "Interactive Analysis",
@@ -1568,7 +1596,7 @@
     "get_history": "Get History",
     "executed_at":"Executed At",
     "sql_query":"SQL Query",
-    "resuls":"Results"
+    "results":"Results"
   },
   "search_scheduler_job": {
     "title": "Search Job Scheduler",
@@ -1628,10 +1656,12 @@
     "period": "Period",
     "cron": "Cron",
     "type": "Type",
-    "run_pipeline":"Run Pipeline"
+    "run_pipeline":"Run Pipeline",
+    "results":"Results"
   },
   "alert_list":{
-    "alert_details":"Alert Details"
+    "alert_details":"Alert Details",
+    "alert_history":"Alert History"
   }
 
 }
