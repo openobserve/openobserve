@@ -957,7 +957,9 @@ export default defineComponent({
       selectedAlertDetails.value = props.row;
       showAlertDetailsDrawer.value = true;
       // Fetch history for this alert
-      fetchAlertHistory(props.row.alert_id);
+      if(config.isCloud == "false"){
+        fetchAlertHistory(props.row.alert_id);
+      }
     };
 
     // Handle ESC key and click outside to close drawer
@@ -1182,9 +1184,9 @@ export default defineComponent({
 
           // Fetch alert history data and aggregate by alert name
           try {
-            // Get history for last 30 days
+            // Get history for last 12 hours
             const endTime = Date.now() * 1000; // Convert to microseconds
-            const startTime = endTime - (30 * 24 * 60 * 60 * 1000000); // 30 days ago in microseconds
+            const startTime = endTime - (12 * 60 * 60 * 1000000); // 12 hours ago in microseconds
 
             const historyRes = await alertsService.getHistory(
               store?.state?.selectedOrganization?.identifier,
