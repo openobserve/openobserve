@@ -54,10 +54,7 @@ const convertPanelSchemaVersion = (data: any) => {
   };
 };
 
-const migrateV7FieldsToV8 = (
-  fieldItem: any,
-  isCustomQuery: boolean
-) => {
+const migrateV7FieldsToV8 = (fieldItem: any, isCustomQuery: boolean) => {
   // if fieldItem is undefined, do nothing
   if (!fieldItem) return;
 
@@ -110,9 +107,7 @@ function migrateFields(
   migrateFunction: (field: any, isCustomQuery: boolean) => void,
 ) {
   if (Array.isArray(fields)) {
-    fields.forEach((field: any) =>
-      migrateFunction(field, isCustomQuery),
-    );
+    fields.forEach((field: any) => migrateFunction(field, isCustomQuery));
   } else {
     migrateFunction(fields, isCustomQuery);
   }
@@ -319,6 +314,8 @@ export function convertDashboardSchemaVersion(data: any) {
               source,
               target,
               value,
+              name,
+              value_for_maps,
             } = queryItem.fields;
 
             // Migrate all fields
@@ -333,6 +330,8 @@ export function convertDashboardSchemaVersion(data: any) {
               source,
               target,
               value,
+              name,
+              value_for_maps,
             ].forEach((field: any) => {
               migrateFields(field, queryItem.customQuery, migrateV7FieldsToV8);
             });
