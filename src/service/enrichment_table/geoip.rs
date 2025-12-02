@@ -282,20 +282,21 @@ impl Geoip {
                     self.take_translation_from_names(&data.represented_country.names)
                 );
 
-                if let Some(traits) = data.traits {
-                    add_field!("autonomous_system_number", traits.autonomous_system_number);
-                    add_field!(
-                        "autonomous_system_organization",
-                        traits.autonomous_system_organization
-                    );
-                    add_field!("isp", traits.isp);
-                    add_field!("organization", traits.organization);
-                    add_field!("connection_type", traits.connection_type);
-                    add_field!("user_type", traits.user_type);
-                    add_field!("mobile_country_code", traits.mobile_country_code);
-                    add_field!("mobile_network_code", traits.mobile_network_code);
-                    add_field!("domain", traits.domain);
-                };
+                add_field!(
+                    "autonomous_system_number",
+                    data.traits.autonomous_system_number
+                );
+                add_field!(
+                    "autonomous_system_organization",
+                    data.traits.autonomous_system_organization
+                );
+                add_field!("isp", data.traits.isp);
+                add_field!("organization", data.traits.organization);
+                add_field!("connection_type", data.traits.connection_type);
+                add_field!("user_type", data.traits.user_type);
+                add_field!("mobile_country_code", data.traits.mobile_country_code);
+                add_field!("mobile_network_code", data.traits.mobile_network_code);
+                add_field!("domain", data.traits.domain);
             }
         }
 
