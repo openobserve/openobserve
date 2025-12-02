@@ -1338,7 +1338,8 @@
     "avgExecutionTime": "평균.실행 시간",
     "successRate": "성공률",
     "noHistoryData": "사용 가능한 기록 데이터 없음",
-    "failedToFetchHistory": "파이프라인 기록을 가져오지 못했습니다."
+    "failedToFetchHistory": "파이프라인 기록을 가져오지 못했습니다.",
+    "historyNotAvailableRealtime": "실시간 파이프라인에는 파이프라인 기록을 사용할 수 없습니다."
   },
   "reports": {
     "header": "보고서",

@@ -1338,7 +1338,8 @@
     "avgExecutionTime": "Promedio. Tiempo de ejecución",
     "successRate": "Tasa de éxito",
     "noHistoryData": "No hay datos de historial disponibles",
-    "failedToFetchHistory": "No se pudo obtener el historial del oleoducto"
+    "failedToFetchHistory": "No se pudo obtener el historial del oleoducto",
+    "historyNotAvailableRealtime": "El historial de oleoductos no está disponible para los oleoductos en tiempo real"
   },
   "reports": {
     "header": "Informes",

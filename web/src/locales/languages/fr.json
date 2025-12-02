@@ -1338,7 +1338,8 @@
     "avgExecutionTime": "Moyenne. Délai d'exécution",
     "successRate": "Taux de réussite",
     "noHistoryData": "Aucune donnée d'historique disponible",
-    "failedToFetchHistory": "Impossible de récupérer l'historique du pipeline"
+    "failedToFetchHistory": "Impossible de récupérer l'historique du pipeline",
+    "historyNotAvailableRealtime": "L'historique des pipelines n'est pas disponible pour les pipelines en temps réel"
   },
   "reports": {
     "header": "Rapports",

@@ -1334,7 +1334,8 @@
     "avgExecutionTime": "平均值。执行时间",
     "successRate": "成功率",
     "noHistoryData": "没有可用的历史数据",
-    "failedToFetchHistory": "无法获取管道历史记录"
+    "failedToFetchHistory": "无法获取管道历史记录",
+    "historyNotAvailableRealtime": "管道历史记录不适用于实时管道"
   },
   "reports": {
     "header": "报表",

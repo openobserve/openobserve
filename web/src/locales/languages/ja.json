@@ -1352,7 +1352,8 @@
     "avgExecutionTime": "平均。実行時間",
     "successRate": "成功率",
     "noHistoryData": "履歴データはありません",
-    "failedToFetchHistory": "パイプライン履歴を取得できませんでした"
+    "failedToFetchHistory": "パイプライン履歴を取得できませんでした",
+    "historyNotAvailableRealtime": "パイプライン履歴はリアルタイムパイプラインでは使用できません"
   },
   "reports": {
     "header": "レポート",

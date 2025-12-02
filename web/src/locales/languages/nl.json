@@ -1338,7 +1338,8 @@
     "avgExecutionTime": "Gemiddeld. Uitvoeringstijd",
     "successRate": "Succespercentage",
     "noHistoryData": "Geen historische gegevens beschikbaar",
-    "failedToFetchHistory": "Kon de geschiedenis van de pijplijn niet ophalen"
+    "failedToFetchHistory": "Kon de geschiedenis van de pijplijn niet ophalen",
+    "historyNotAvailableRealtime": "De geschiedenis van de pijplijn is niet beschikbaar voor realtime pijplijnen"
   },
   "reports": {
     "header": "Rapporten",

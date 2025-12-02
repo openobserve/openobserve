@@ -1338,7 +1338,8 @@
     "avgExecutionTime": "Durchschn. Ausführungszeit",
     "successRate": "Erfolgsquote",
     "noHistoryData": "Keine Verlaufsdaten verfügbar",
-    "failedToFetchHistory": "Fehler beim Abrufen des Pipeline-Verlaufs"
+    "failedToFetchHistory": "Fehler beim Abrufen des Pipeline-Verlaufs",
+    "historyNotAvailableRealtime": "Der Pipeline-Verlauf ist für Echtzeit-Pipelines nicht verfügbar"
   },
   "reports": {
     "header": "Berichte",

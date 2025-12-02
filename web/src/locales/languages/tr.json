@@ -1338,7 +1338,8 @@
     "avgExecutionTime": "Ort. Yürütme Süresi",
     "successRate": "Başarı Oranı",
     "noHistoryData": "Geçmiş verisi yok",
-    "failedToFetchHistory": "Boru hattı geçmişi alınamadı"
+    "failedToFetchHistory": "Boru hattı geçmişi alınamadı",
+    "historyNotAvailableRealtime": "Boru hattı geçmişi gerçek zamanlı boru hatları için kullanılamıyor"
   },
   "reports": {
     "header": "Raporlar",
