@@ -1021,7 +1021,9 @@ export default defineComponent({
       selectedAlertDetails.value = props.row;
       showAlertDetailsDrawer.value = true;
       // Fetch history for this alert
-      fetchAlertHistory(props.row.alert_id);
+      if(config.isCloud == "false"){
+        fetchAlertHistory(props.row.alert_id);
+      }
     };
 
     // Handle ESC key and click outside to close drawer
