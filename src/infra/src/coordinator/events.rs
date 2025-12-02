@@ -239,7 +239,9 @@ pub async fn put_event(key: &str, start_dt: Option<i64>, value: Option<Bytes>) -
 }
 
 pub async fn delete_event(key: &str, start_dt: Option<i64>) -> Result<()> {
-    log::debug!("[COORDINATOR::EVENTS] publishing delete event for key: {key}, start_dt: {start_dt:?}");
+    log::debug!(
+        "[COORDINATOR::EVENTS] publishing delete event for key: {key}, start_dt: {start_dt:?}"
+    );
     if let Err(e) = publish(CoordinatorEvent::Meta(MetaEvent {
         action: MetaAction::Delete,
         key: key.to_string(),
