@@ -75,7 +75,10 @@ impl SchedulerWorker {
 
     pub async fn run(&self) -> Result<()> {
         loop {
-            log::debug!("[SCHEDULER][Worker-{}] Waiting for next job", self.id);
+            let cfg = config::get_config();
+            if cfg.common.print_key_event {
+                log::info!("[SCHEDULER][Worker-{}] Waiting for next job", self.id);
+            }
             // Try to get next trigger with permit
             let job = {
                 let mut rx = self.rx.lock().await;
@@ -86,16 +89,59 @@ impl SchedulerWorker {
                 Some(job) => {
                     let job_id = job.trigger.id;
                     let job_key = job.trigger.module_key.to_string();
-                    log::debug!(
-                        "[SCHEDULER][Worker-{}] trace_id: {} Processing job[{}], trigger: {}",
-                        self.id,
-                        job.trace_id,
-                        job_id,
-                        job_key
-                    );
+                    if cfg.common.print_key_event {
+                        log::info!(
+                            "[SCHEDULER][Worker-{}] trace_id: {} Processing job[{}], trigger: {}",
+                            self.id,
+                            job.trace_id,
+                            job_id,
+                            job_key
+                        );
+                    }
+
+                    // start a self print task to print the job id and job key every 10 seconds
+                    // until the job is done
+                    let watch_start = std::time::Instant::now();
+                    let (watch_tx, mut watch_rx) = mpsc::channel::<()>(1);
+                    if cfg.common.print_key_event {
+                        let worker_id = self.id;
+                        let job_id = job.trigger.id;
+                        let trace_id = job.trace_id.clone();
+                        let job_key = job_key.clone();
+                        tokio::spawn(async move {
+                            loop {
+                                tokio::select! {
+                                    _ = tokio::time::sleep(tokio::time::Duration::from_secs(10)) => {
+                                        log::info!(
+                                            "[SCHEDULER][Worker-{}] trace_id: {} Processing job[{}], trigger: {}, keep alive",
+                                            worker_id,
+                                            trace_id,
+                                            job_id,
+                                            job_key
+                                        );
+                                    }
+                                    _ = watch_rx.recv() => {
+                                        break;
+                                    }
+                                }
+                            }
+                        });
+                    }
 
                     // Process the trigger
                     let ret = self.handle_trigger(&job.trace_id, job.trigger).await;
+                    // stop the watch task
+                    drop(watch_tx);
+                    if cfg.common.print_key_event {
+                        log::info!(
+                            "[SCHEDULER][Worker-{}] trace_id: {} Processing job[{}], trigger: {}, took: {} ms",
+                            self.id,
+                            job.trace_id,
+                            job_id,
+                            job_key,
+                            watch_start.elapsed().as_millis() as f64
+                        );
+                    }
                     // Stop the keep alive for the job
                     if let Err(e) = job.stop_keep_alive_tx.send(()).await {
                         log::error!(
@@ -173,10 +219,12 @@ impl SchedulerJobPuller {
         interval.tick().await; // The first tick
 
         loop {
+            let cfg = config::get_config();
             // Check how many workers are available
-            let trace_id = config::ider::uuid();
-
-            log::debug!("[SCHEDULER][JobPuller-{}] Pulling jobs", trace_id);
+            let trace_id = config::ider::generate_trace_id();
+            if cfg.common.print_key_event {
+                log::info!("[SCHEDULER][JobPuller-{}] Pulling jobs", trace_id);
+            }
 
             // Pull only as many jobs as we have workers
             let triggers = match self.pull().await {
@@ -191,11 +239,13 @@ impl SchedulerJobPuller {
                 }
             };
 
-            log::debug!(
-                "[SCHEDULER][JobPuller-{}] Pulled {} jobs from scheduler",
-                trace_id,
-                triggers.len()
-            );
+            if cfg.common.print_key_event {
+                log::info!(
+                    "[SCHEDULER][JobPuller-{}] Pulled {} jobs from scheduler",
+                    trace_id,
+                    triggers.len()
+                );
+            }
 
             // Print counts for each module
             if !triggers.is_empty() {
@@ -270,13 +320,31 @@ impl SchedulerJobPuller {
             }
 
             // Send all jobs to be processed
+            let mut retry_ttl = 1;
             for job in jobs {
-                if self.tx.send(job).await.is_err() {
-                    log::error!(
-                        "[SCHEDULER][JobPuller-{}] Channel closed, exiting job puller",
-                        trace_id
-                    );
-                    return Ok(());
+                loop {
+                    match self.tx.try_send(job.clone()) {
+                        Ok(()) => {
+                            break;
+                        }
+                        Err(mpsc::error::TrySendError::Closed(_)) => {
+                            log::error!(
+                                "[SCHEDULER][JobPuller-{}] Channel closed, exiting job puller",
+                                trace_id
+                            );
+                            return Ok(());
+                        }
+                        Err(mpsc::error::TrySendError::Full(_)) => {
+                            log::warn!(
+                                "[SCHEDULER][JobPuller-{}] Error sending job[{}] trigger[{}] to channel, all the workers are busy, retrying...",
+                                trace_id,
+                                job.trigger.id,
+                                job.trigger.module_key
+                            );
+                            tokio::time::sleep(tokio::time::Duration::from_secs(retry_ttl)).await;
+                            retry_ttl = std::cmp::min(retry_ttl * 2, 60);
+                        }
+                    }
                 }
             }
 
