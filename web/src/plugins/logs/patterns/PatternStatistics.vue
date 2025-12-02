@@ -17,12 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw-py-[0.375rem] tw-shrink-0 tw-bg-[var(--o2-bg-gray)]" data-test="pattern-statistics">
     <div class="row q-col-gutter-md !tw-mx-[0.375rem]">
-      <!-- Logs Analyzed Card -->
+      <!-- Total Logs Scanned Card -->
       <div class="col-3 !tw-pl-0">
         <q-card
           flat
           class="tw-bg-[var(--o2-card-bg)]"
-          data-test="pattern-stats-logs-analyzed-card"
+          data-test="pattern-stats-logs-scanned-card"
         >
           <q-card-section class="tw-py-[0.375rem] tw-px-[0.625rem]">
             <div
@@ -31,57 +31,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
               "
             >
-              Logs Analyzed
+              Total Logs Scanned
             </div>
-            <div class="row items-center q-mt-xs q-gutter-xs">
-              <!-- View Mode -->
-              <div
-                v-if="!isEditingScanSize"
-                class="row items-center no-wrap tw-m-0 tw-pl-1"
-                data-test="pattern-stats-scan-size-display"
-              >
-                <div
-                  class="tw-text-[1.5rem] tw-leading-[2rem] text-weight-bold text-primary tw-h-fit tw-pr-1"
-                  data-test="pattern-stats-scan-size-value"
-                >
-                  {{ scanSize.toLocaleString() }}
-                </div>
-                <q-btn
-                  flat
-                  round
-                  dense
-                  size="xs"
-                  icon="edit"
-                  @click="toggleEditScanSize"
-                  :class="
-                    store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
-                  "
-                  data-test="pattern-stats-edit-scan-size-btn"
-                >
-                  <q-tooltip>Edit scan size</q-tooltip>
-                </q-btn>
-              </div>
-
-              <!-- Edit Mode -->
-              <div
-                v-else
-                class="row items-center no-wrap logs-analyzed-input tw-gap-[0.25rem]"
-                data-test="pattern-stats-scan-size-edit"
-              >
-                <q-input
-                  v-model.number="localScanSize"
-                  type="number"
-                  dense
-                  outlined
-                  :min="100"
-                  :max="20000"
-                  class="!tw-text-[1.2rem] text-weight-bold tw-max-w-[7.5rem]"
-                  autofocus
-                  @keyup.escape="cancelEditScanSize"
-                  @blur="updateScanSize"
-                  data-test="pattern-stats-scan-size-input"
-                />
-              </div>
+            <div class="text-h5 text-weight-bold q-mt-xs text-primary" data-test="pattern-stats-logs-scanned-value">
+              {{ (statistics?.total_logs_analyzed || 0).toLocaleString() }}
             </div>
           </q-card-section>
         </q-card>
@@ -160,45 +113,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from "vue";
 import { useStore } from "vuex";
 
-const props = defineProps<{
+defineProps<{
   statistics: any;
-  scanSize: number;
-}>();
-
-const emit = defineEmits<{
-  (e: "update:scanSize", value: number): void;
 }>();
 
 const store = useStore();
-const isEditingScanSize = ref(false);
-const localScanSize = ref(props.scanSize);
-
-const toggleEditScanSize = () => {
-  isEditingScanSize.value = true;
-  localScanSize.value = props.scanSize;
-};
-
-const cancelEditScanSize = () => {
-  isEditingScanSize.value = false;
-  localScanSize.value = props.scanSize;
-};
-
-const updateScanSize = () => {
-  isEditingScanSize.value = false;
-  if (localScanSize.value !== props.scanSize) {
-    emit("update:scanSize", localScanSize.value);
-  }
-};
-
-watch(
-  () => props.scanSize,
-  (newValue) => {
-    localScanSize.value = newValue;
-  },
-);
 </script>
 
 <style scoped lang="scss">

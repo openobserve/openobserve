@@ -1033,7 +1033,7 @@ pub struct GetResultResponse {
     pub response: ::prost::alloc::vec::Vec<u8>,
 }
 /// Search request query
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SearchQuery {
     #[prost(string, tag = "1")]
     pub sql: ::prost::alloc::string::String,
@@ -1061,6 +1061,27 @@ pub struct SearchQuery {
     pub action_id: ::prost::alloc::string::String,
     #[prost(int64, tag = "16")]
     pub histogram_interval: i64,
+    /// Simplified sampling: just specify ratio (0.0-1.0), backend uses optimal defaults
+    /// Backend converts this to SamplingConfig for internal node communication
+    #[prost(double, optional, tag = "18")]
+    pub sampling_ratio: ::core::option::Option<f64>,
+}
+/// Sampling configuration for query performance optimization
+#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SamplingConfig {
+    /// Sampling ratio (0.0 to 1.0, e.g., 0.1 = 10% sample)
+    #[prost(double, tag = "1")]
+    pub sampling_ratio: f64,
+    /// Sampling mode: "system" (row group level) or "bernoulli" (row level)
+    #[prost(string, tag = "2")]
+    pub sampling_mode: ::prost::alloc::string::String,
+    /// Temporal strategy: "random" or "stratified"
+    #[prost(string, tag = "3")]
+    pub temporal_strategy: ::prost::alloc::string::String,
+    /// Number of time buckets for stratified sampling (e.g., 24 for hourly over a day)
+    #[prost(int32, optional, tag = "4")]
+    pub num_time_strata: ::core::option::Option<i32>,
 }
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct SearchEventContext {
@@ -2800,6 +2821,8 @@ pub struct StreamingAggsExecNode {
     pub aggregate_plan: ::core::option::Option<
         ::datafusion_proto::protobuf::PhysicalPlanNode,
     >,
+    #[prost(bool, tag = "8")]
+    pub overwrite_cache: bool,
 }
 /// Search request
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -2831,7 +2854,7 @@ pub struct QueryIdentifier {
     #[prost(bool, tag = "6")]
     pub enrich_mode: bool,
 }
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SearchInfo {
     #[prost(bytes = "vec", tag = "1")]
     pub plan: ::prost::alloc::vec::Vec<u8>,
@@ -2849,6 +2872,10 @@ pub struct SearchInfo {
     pub histogram_interval: i64,
     #[prost(bool, tag = "9")]
     pub is_analyze: bool,
+    #[prost(message, optional, tag = "10")]
+    pub sampling_config: ::core::option::Option<SamplingConfig>,
+    #[prost(bool, tag = "11")]
+    pub clear_cache: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IndexInfo {

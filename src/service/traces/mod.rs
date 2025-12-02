@@ -395,49 +395,8 @@ pub async fn handle_otlp_request(
                     links: json::to_string(&links).unwrap(),
                 };
 
-                // Process span for service graph if enabled
-                #[cfg(feature = "enterprise")]
-                if cfg.service_graph.enabled {
-                    // Wrap in catch_unwind to prevent panics from crashing trace ingestion
-                    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                        log::trace!(
-                            "[ServiceGraph] Processing span: trace_id={}, span_id={}",
-                            trace_id,
-                            span_id
-                        );
-                        let parent_span_id_opt =
-                            span_ref.get(PARENT_SPAN_ID).map(|s| Arc::from(s.as_str()));
-                        // Convert HashMap to json::Map
-                        let mut attrs_map = json::Map::new();
-                        for (k, v) in &span_att_map {
-                            attrs_map.insert(k.clone(), v.clone());
-                        }
-                        let graph_span = service_graph::span_to_graph_span(
-                            Arc::from(trace_id.as_str()),
-                            Arc::from(span_id.as_str()),
-                            parent_span_id_opt,
-                            Arc::from(service_name.as_str()),
-                            Arc::from(traces_stream_name.as_str()),
-                            &local_val.span_kind,
-                            start_time,
-                            end_time,
-                            &local_val.span_status,
-                            &attrs_map,
-                        );
-                        service_graph::process_span(org_id, graph_span);
-                    }));
-
-                    if let Err(e) = result {
-                        log::error!(
-                            "[ServiceGraph] Panic caught during span processing: {:?}",
-                            e
-                        );
-                        // Increment error metric
-                        service_graph::SERVICE_GRAPH_DROPPED_SPANS
-                            .with_label_values(&[org_id])
-                            .inc();
-                    }
-                }
+                // Service graph processing is handled by periodic daemon
+                // No inline processing during trace ingestion
 
                 let mut value: json::Value = json::to_value(local_val).unwrap();
                 // add timestamp
