@@ -1127,7 +1127,8 @@
       "evaluationHistory": "Historial de evaluación",
       "loadingHistory": "Cargando historial...",
       "noHistoryAvailable": "No hay ningún historial de evaluación disponible para esta alerta"
-    }
+    },
+    "results": "Resultados"
   },
   "alert_templates": {
     "header": "Plantillas",

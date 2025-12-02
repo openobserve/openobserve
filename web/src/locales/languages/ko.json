@@ -1127,7 +1127,8 @@
       "evaluationHistory": "평가 기록",
       "loadingHistory": "기록 로드 중...",
       "noHistoryAvailable": "이 알림에 대한 평가 기록이 없습니다."
-    }
+    },
+    "results": "결과"
   },
   "alert_templates": {
     "header": "템플릿",

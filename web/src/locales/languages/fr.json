@@ -1127,7 +1127,8 @@
       "evaluationHistory": "Historique de l'évaluation",
       "loadingHistory": "Historique de chargement...",
       "noHistoryAvailable": "Aucun historique d'évaluation disponible pour cette alerte"
-    }
+    },
+    "results": "Résultats"
   },
   "alert_templates": {
     "header": "Modèles",

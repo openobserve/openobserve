@@ -1123,7 +1123,8 @@
       "evaluationHistory": "评估历史",
       "loadingHistory": "正在加载历史记录...",
       "noHistoryAvailable": "此警报没有评估历史记录"
-    }
+    },
+    "results": "结果"
   },
   "alert_templates": {
     "header": "模板",

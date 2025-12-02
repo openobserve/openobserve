@@ -1127,7 +1127,8 @@
       "evaluationHistory": "Cronologia delle valutazioni",
       "loadingHistory": "Caricamento della cronologia...",
       "noHistoryAvailable": "Nessuna cronologia delle valutazioni disponibile per questo avviso"
-    }
+    },
+    "results": "Risultati"
   },
   "alert_templates": {
     "header": "Modelli",

@@ -1137,7 +1137,8 @@
       "evaluationHistory": "評価履歴",
       "loadingHistory": "履歴をロード中...",
       "noHistoryAvailable": "このアラートの評価履歴はありません"
-    }
+    },
+    "results": "結果"
   },
   "alert_templates": {
     "header": "テンプレート",

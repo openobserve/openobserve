@@ -1127,7 +1127,8 @@
       "evaluationHistory": "Verlauf der Evaluierung",
       "loadingHistory": "Verlauf wird geladen...",
       "noHistoryAvailable": "Für diese Warnung ist kein Bewertungsverlauf verfügbar"
-    }
+    },
+    "results": "Ergebnisse"
   },
   "alert_templates": {
     "header": "Vorlagen",
