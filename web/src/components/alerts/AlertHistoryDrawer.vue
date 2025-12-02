@@ -37,16 +37,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ alertDetails.name }}
               </q-tooltip>
             </span>
-            <!-- Alert Type Icon -->
-            <div class="tw-flex tw-items-center tw-gap-2">
-              <q-icon
-                :name="alertDetails?.is_real_time ? 'bolt' : 'schedule'"
-                size="20px"
-                color="grey"
-              >
-                <q-tooltip>{{ alertDetails?.is_real_time ? 'Real-time' : 'Scheduled' }}</q-tooltip>
-              </q-icon>
-            </div>
           </div>
         </div>
         <div class="col-auto tw-flex tw-items-center">
@@ -119,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </template>
                 <template v-else-if="col.name === 'timestamp'">
-                  {{ formatTimestamp(props.row.timestamp) }}
+                  {{ convertUnixToQuasarFormat(props.row.timestamp) }}
                 </template>
                 <template v-else-if="col.name === 'evaluation_time'">
                   {{ props.row.evaluation_took_in_secs ? props.row.evaluation_took_in_secs.toFixed(3) : '-' }}
@@ -270,31 +260,12 @@ const formatStatus = (status: string) => {
   return status.charAt(0).toUpperCase() + status.slice(1);
 };
 
-const formatTimestamp = (timestamp: number) => {
-  if (!timestamp) return "N/A";
-  const now = Date.now() * 1000; // microseconds
-  const diff = now - timestamp;
-
-  // Less than 1 hour
-  if (diff < 3600000000) {
-    const minutes = Math.floor(diff / 60000000);
-    return `${minutes} min ago`;
-  }
-
-  // Less than 24 hours
-  if (diff < 86400000000) {
-    const hours = Math.floor(diff / 3600000000);
-    return `${hours} hour${hours > 1 ? "s" : ""} ago`;
-  }
-
-  // Less than 7 days
-  if (diff < 604800000000) {
-    const days = Math.floor(diff / 86400000000);
-    return `${days} day${days > 1 ? "s" : ""} ago`;
-  }
-
-  // Format as date
-  return date.formatDate(timestamp / 1000, "MMM DD, YYYY HH:mm");
+const convertUnixToQuasarFormat = (unixMicroseconds: number) => {
+  if (!unixMicroseconds) return "";
+  const unixSeconds = unixMicroseconds / 1e6;
+  const dateToFormat = new Date(unixSeconds * 1000);
+  const formattedDate = dateToFormat.toISOString();
+  return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
 };
 
 // Main Functions
