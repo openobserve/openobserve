@@ -140,7 +140,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             // If draining and no more files to process, we can exit
             if is_draining {
                 // Check if there are any remaining files to process
-                let processing_count = PROCESSING_FILES.len();
+                let processing_count = PROCESSING_FILES.read().await.len();
                 let has_pending_files =
                     o2_enterprise::enterprise::drain::parquet::check_has_pending_files(
                         processing_count,
