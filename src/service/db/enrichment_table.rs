@@ -90,6 +90,7 @@ pub async fn get_enrichment_table_data(
         Some((search_query.start_time, search_query.end_time)),
         None, // search_type
         query.histogram_interval,
+        false, // overwrite_cache
     );
 
     log::info!("get enrichment table {org_id}/{name} data req start time: {start_time}");

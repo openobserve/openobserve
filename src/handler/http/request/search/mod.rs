@@ -1494,6 +1494,7 @@ pub async fn search_partition(
         false,
         true,
         enable_align_histogram,
+        true, // allow streamings aggs cache for http search partition handler
     )
     .instrument(http_span)
     .await;
