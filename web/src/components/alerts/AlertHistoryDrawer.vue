@@ -94,7 +94,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rows="alertHistory"
           :columns="historyTableColumns"
           row-key="timestamp"
-          :pagination="pagination"
+          v-model:pagination="pagination"
+          @request="onRequest"
           style="width: 100%; height: calc(100vh - 90px)"
           class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
           data-test="alert-details-history-table"
@@ -134,14 +135,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #bottom="scope">
             <div class="bottom-btn tw-h-[48px] tw-flex tw-w-full">
               <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[220px] tw-mr-md">
-                {{ alertHistory.length }} {{ t('alerts.results') }}
+                {{ resultTotal }} {{ t('alerts.results') }}
               </div>
               <QTablePagination
                 :scope="scope"
                 :position="'bottom'"
-                :resultTotal="alertHistory.length"
+                :resultTotal="resultTotal"
                 :perPageOptions="perPageOptions"
                 @update:changeRecordPerPage="changePagination"
+                @update:changePagination="onPageChange"
               />
             </div>
           </template>
@@ -180,12 +182,15 @@ const props = defineProps<Props>();
 const alertHistory: Ref<any[]> = ref([]);
 const isLoadingHistory = ref(false);
 const qTableRef: Ref<any> = ref(null);
+const resultTotal = ref(0);
 
-// Pagination (offline pagination - fetch 100 records by default)
-const selectedPerPage = ref<number>(100);
+// Pagination (server-side pagination)
+const selectedPerPage = ref<number>(50);
+const currentPage = ref<number>(1);
 const pagination: any = ref({
   page: 1,
-  rowsPerPage: 100,
+  rowsPerPage: 50,
+  rowsNumber: 0,
 });
 
 const perPageOptions = [
@@ -195,11 +200,35 @@ const perPageOptions = [
   { label: "100", value: 100 }
 ];
 
+const onRequest = async (requestProps: any) => {
+  const { page, rowsPerPage } = requestProps.pagination;
+  currentPage.value = page;
+  selectedPerPage.value = rowsPerPage;
+
+  isLoadingHistory.value = true;
+  await fetchAlertHistory(props.alertId);
+
+  // Update local pagination object after fetching
+  pagination.value.page = page;
+  pagination.value.rowsPerPage = rowsPerPage;
+
+  isLoadingHistory.value = false;
+};
+
 const changePagination = (val: { label: string; value: any }) => {
   selectedPerPage.value = val.value;
   pagination.value.rowsPerPage = val.value;
-  pagination.value.page = 1; // Reset to first page when changing rows per page
-  qTableRef.value?.setPagination(pagination.value);
+  pagination.value.page = 1;
+  qTableRef.value?.requestServerInteraction({
+    pagination: pagination.value
+  });
+};
+
+const onPageChange = (page: number) => {
+  pagination.value.page = page;
+  qTableRef.value?.requestServerInteraction({
+    pagination: pagination.value
+  });
 };
 
 // Constants
@@ -272,37 +301,53 @@ const convertUnixToQuasarFormat = (unixMicroseconds: number) => {
 const fetchAlertHistory = async (alertId: string) => {
   if (!alertId) return;
 
-  isLoadingHistory.value = true;
   try {
     // Get history for last 30 days
     const endTime = Date.now() * 1000; // Convert to microseconds
     const startTime = endTime - (30 * 24 * 60 * 60 * 1000000); // 30 days ago in microseconds
 
+    // Calculate offset for server-side pagination
+    const from = (currentPage.value - 1) * selectedPerPage.value;
+
     const response = await alertsService.getHistory(
       store?.state?.selectedOrganization?.identifier,
       {
         alert_id: alertId,
-        size: 100, // Get last 100 evaluations for offline pagination
+        size: selectedPerPage.value,
+        from: from,
         start_time: startTime,
         end_time: endTime
       }
     );
     alertHistory.value = response.data?.hits || [];
+    resultTotal.value = response.data?.total || 0;
+
+    // Update pagination rowsNumber for table
+    pagination.value.rowsNumber = response.data?.total || 0;
   } catch (error: any) {
     alertHistory.value = [];
+    resultTotal.value = 0;
+    pagination.value.rowsNumber = 0;
     $q.notify({
       type: "negative",
       message: error.response?.data?.message || error.message || t("alerts.failedToFetchHistory"),
       timeout: 5000,
     });
-  } finally {
-    isLoadingHistory.value = false;
   }
 };
 
-const refreshHistory = () => {
+const refreshHistory = async () => {
   if (props.alertId) {
-    fetchAlertHistory(props.alertId);
+    // Reset pagination to defaults
+    pagination.value.page = 1;
+    pagination.value.rowsPerPage = 50;
+    currentPage.value = 1;
+    selectedPerPage.value = 50;
+
+    // Fetch with reset pagination
+    isLoadingHistory.value = true;
+    await fetchAlertHistory(props.alertId);
+    isLoadingHistory.value = false;
   }
 };
 
@@ -328,9 +373,23 @@ const copyToClipboard = (text: string, type: string) => {
 // Watchers
 watch(
   () => props.alertId,
-  (newVal) => {
+  async (newVal) => {
     if (newVal) {
-      fetchAlertHistory(newVal);
+      // Reset to first page when alert changes
+      pagination.value.page = 1;
+      currentPage.value = 1;
+
+      // For initial load or when qTableRef is not ready, fetch directly
+      if (!qTableRef.value) {
+        isLoadingHistory.value = true;
+        await fetchAlertHistory(newVal);
+        isLoadingHistory.value = false;
+      } else {
+        // Trigger table to fetch data
+        qTableRef.value?.requestServerInteraction({
+          pagination: pagination.value
+        });
+      }
     }
   },
   { immediate: true }
