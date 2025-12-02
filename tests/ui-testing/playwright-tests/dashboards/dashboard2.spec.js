@@ -51,7 +51,8 @@ test.describe("dashboard UI testcases", () => {
     );
 
     // Simulate user removing a field (cancel-like behavior)
-    await pm.chartTypeSelector.removeField("kubernetes_container_image", "b");
+    // Field "kubernetes_container_image" gets alias "breakdown_1"
+    await pm.chartTypeSelector.removeField("breakdown_1", "b");
 
     // Apply configuration
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -105,7 +106,8 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardPanelActions.applyDashboardBtn();
 
     // Cancel adding the breakdown field
-    await pm.chartTypeSelector.removeField("kubernetes_container_name", "b");
+    // Field "kubernetes_container_name" gets alias "breakdown_1"
+    await pm.chartTypeSelector.removeField("breakdown_1", "b");
     await pm.dashboardPanelActions.applyDashboardBtn();
 
     // Save and verify panel

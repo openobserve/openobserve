@@ -100,7 +100,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardCreate.createDashboard(randomDashboardName);
 
     // Wait for dashboard tab to be visible
-    await page.locator('[data-test="dashboard-folder-tab-default"]').waitFor({
+    await page.locator('[data-test="dashboard-tab-default"]').waitFor({
       state: "visible",
     });
 

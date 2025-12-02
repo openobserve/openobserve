@@ -93,7 +93,9 @@ export default class ChartTypeSelector {
 
   //remove fields from the dashboard
   // Remove field by type (x, y, breakdown, etc.)
-  async removeField(fieldName, target) {
+  // @param alias - The field alias (e.g., "x_axis_1", "y_axis_1", "breakdown_1")
+  // @param target - The target type (x, y, b, filter, etc.)
+  async removeField(alias, target) {
     const removeSelectors = {
       x: "dashboard-x-item",
       y: "dashboard-y-item",
@@ -115,10 +117,10 @@ export default class ChartTypeSelector {
     }
 
     const removeButton = this.page.locator(
-      `[data-test="${baseTestId}-${fieldName}-remove"]`
+      `[data-test="${baseTestId}-${alias}-remove"]`
     );
 
-    await removeButton.waitFor({ state: "visible", timeout: 5000 });
+    await removeButton.waitFor({ state: "visible", timeout: 10000 });
     await removeButton.click();
   }
 
