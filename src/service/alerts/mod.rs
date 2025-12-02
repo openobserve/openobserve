@@ -644,7 +644,7 @@ impl ConditionExt for Condition {
         match val {
             Value::String(v) => {
                 let val = v.as_str();
-                let con_val = self.value.as_str().unwrap_or_default();
+                let con_val = self.value.as_str().unwrap_or_default().trim_matches('"');
                 match self.operator {
                     Operator::EqualTo => val == con_val,
                     Operator::NotEqualTo => val != con_val,
@@ -693,6 +693,10 @@ impl ConditionExt for Condition {
                     Operator::NotEqualTo => val != con_val,
                     _ => false,
                 }
+            }
+            Value::Null => {
+                matches!(self.operator, Operator::EqualTo)
+                    && matches!(&self.value, Value::String(v) if v == "null")
             }
             _ => false,
         }
