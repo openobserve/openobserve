@@ -1,7 +1,7 @@
 const ORG = "openobserve";
 const REPO = process.env.REPO || "openobserve";
 
-const ver_regexp = new RegExp("[a-zA-Z]*([0-9]+\.[0-9]+\.[0-9]+)");
+const ver_regexp = new RegExp("[a-zA-Z]*([0-9]+\\.[0-9]+\\.[0-9]+)");
 
 function get_lowest_milestone(ms1, ms2) {
   // the first index will be the first captured group
