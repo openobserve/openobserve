@@ -604,7 +604,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="col scroll" style="height: 100%; display: flex; flex-direction: column;">
                   <!-- Custom Chart Type Selector -->
                   <div class="q-pa-md layout-panel-container tw-h-[calc(100vh-200px)] col" style="border: 1px solid rgba(0, 0, 0, 0.12); border-radius: 4px; background-color: rgba(0, 0, 0, 0.02); margin-bottom: 12px; flex-shrink: 0;">
-                    <div class="text-subtitle2 q-mb-sm" style="font-weight: 600;">
+                    <div class="text-subtitle2 q-mb-md" style="font-weight: 600;">
                       {{ t("panel.customChartTypeSelector") }}
                       <q-icon name="info_outline" class="q-ml-xs" size="xs">
                         <q-tooltip>
@@ -612,22 +612,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </q-tooltip>
                       </q-icon>
                     </div>
-                    <q-select
-                      v-model="selectedCustomChartType"
-                      :options="customChartTypeOptions"
+                    <q-btn
+                      unelevated
+                      color="primary"
+                      icon="bar_chart"
                       :label="t('panel.selectChartType')"
-                      dense
-                      outlined
-                      emit-value
-                      map-options
-                      @update:model-value="onCustomChartTypeSelected"
-                      data-test="custom-chart-type-selector"
-                      style="max-width: 400px;"
-                    >
-                      <template v-slot:prepend>
-                        <q-icon name="bar_chart" />
-                      </template>
-                    </q-select>
+                      @click="openCustomChartTypeSelector"
+                      data-test="custom-chart-type-selector-btn"
+                      class="q-mb-sm"
+                      no-caps
+                    />
+                    <div v-if="selectedCustomChartType" class="q-mt-md">
+                      <div class="text-caption text-grey-7">Selected Chart Type:</div>
+                      <div class="text-body2 text-weight-medium">{{ selectedCustomChartType.label }}</div>
+                    </div>
+
+                    <!-- Custom Chart Type Selector Dialog -->
+                    <q-dialog v-model="showCustomChartTypeSelector">
+                      <CustomChartTypeSelector
+                        @select="handleChartTypeSelection"
+                        @close="showCustomChartTypeSelector = false"
+                      />
+                    </q-dialog>
                   </div>
                   <div style="height: 500px; flex-shrink: 0;">
                     <q-splitter
@@ -732,6 +738,7 @@ import {
 import PanelSidebar from "../../../components/dashboards/addPanel/PanelSidebar.vue";
 import ChartSelection from "../../../components/dashboards/addPanel/ChartSelection.vue";
 import FieldList from "../../../components/dashboards/addPanel/FieldList.vue";
+import CustomChartTypeSelector from "../../../components/dashboards/addPanel/CustomChartTypeSelector.vue";
 
 import { useI18n } from "vue-i18n";
 import {
@@ -805,6 +812,7 @@ export default defineComponent({
     VariablesValueSelector,
     PanelSchemaRenderer,
     RelativeTime,
+    CustomChartTypeSelector,
     DashboardQueryEditor: defineAsyncComponent(
       () => import("@/components/dashboards/addPanel/DashboardQueryEditor.vue"),
     ),
@@ -850,28 +858,26 @@ export default defineComponent({
 
     // Custom Chart Type Selector
     const selectedCustomChartType = ref(null);
-    const customChartTypeOptions = [
-      { label: "Basic Line Chart", value: "line-simple" },
-      { label: "Basic Bar Chart", value: "bar-simple" },
-      { label: "Basic Pie Chart", value: "pie-simple" },
-      { label: "Basic Scatter Chart", value: "scatter-simple" },
-      { label: "Radar Chart", value: "radar-simple" },
-      { label: "Gauge Chart", value: "gauge-simple" },
-      { label: "Funnel Chart", value: "funnel-simple" },
-      { label: "Heatmap", value: "heatmap-simple" },
-      { label: "Candlestick Chart", value: "candlestick-simple" },
-      { label: "Graph/Network", value: "graph-simple" },
-      { label: "Tree Chart", value: "tree-simple" },
-      { label: "Treemap", value: "treemap-simple" },
-      { label: "Sunburst", value: "sunburst-simple" },
-      { label: "Sankey Diagram", value: "sankey-simple" },
-      { label: "Boxplot", value: "boxplot-simple" },
-      { label: "Parallel Coordinates", value: "parallel-simple" },
-      { label: "Calendar Heatmap", value: "calendar-simple" },
-      { label: "Pictorial Bar", value: "pictorialBar-simple" },
-      { label: "ThemeRiver", value: "themeRiver-simple" },
-      { label: "Custom Series", value: "custom-simple" },
-    ];
+    const showCustomChartTypeSelector = ref(false);
+
+    const openCustomChartTypeSelector = () => {
+      showCustomChartTypeSelector.value = true;
+    };
+
+    const handleChartTypeSelection = (chart: any) => {
+      selectedCustomChartType.value = chart;
+      const template = customChartTemplates[chart.value];
+      if (template) {
+        // Keep the default commented instructions and only replace the option code
+        const defaultComments = `// To know more about ECharts , 
+// visit: https://echarts.apache.org/examples/en/index.html 
+// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple 
+// Define your ECharts 'option' here. 
+// 'data' variable is available for use and contains the response data from the search result and it is an array.
+`;
+        dashboardPanelData.data.customChartContent = defaultComments + template;
+      }
+    };
 
     const seriesDataUpdate = (data: any) => {
       seriesData.value = data;
@@ -1556,14 +1562,7 @@ export default defineComponent({
       dashboardPanelData.data.customChartContent = templateCode;
     };
 
-    // Handler for custom chart type selection from dropdown
-    const onCustomChartTypeSelected = (value: string) => {
-      if (!value) return;
-      const template = customChartTemplates[value];
-      if (template) {
-        dashboardPanelData.data.customChartContent = template;
-      }
-    };
+
 
     watch(
       () => dashboardPanelData.layout.splitter,
@@ -2011,9 +2010,10 @@ export default defineComponent({
       runQuery,
       layoutSplitterUpdated,
       handleCustomChartTemplateSelected,
-      onCustomChartTypeSelected,
       selectedCustomChartType,
-      customChartTypeOptions,
+      showCustomChartTypeSelector,
+      openCustomChartTypeSelector,
+      handleChartTypeSelection,
       expandedSplitterHeight,
       querySplitterUpdated,
       currentDashboard,
