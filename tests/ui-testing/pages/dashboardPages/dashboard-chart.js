@@ -78,9 +78,10 @@ export default class ChartTypeSelector {
     }
 
     // Locate the specific field item container that contains the field name
-    const fieldItem = this.page.locator(`[data-test^="field-list-item-"]`, {
-      hasText: fieldName,
-    });
+    const fieldItem = this.page
+      .locator(`[data-test^="field-list-item-"]`)
+      .filter({ hasText: fieldName })
+      .first();
 
     // Now locate the button within that field item
     const button = fieldItem.locator(`[data-test="${buttonTestId}"]`);
