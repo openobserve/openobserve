@@ -80,44 +80,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Content -->
     <div class="tw-mx-2 q-py-md alert-details-content" v-if="alertDetails">
-      <!-- SQL Query / Conditions -->
-      <div class="tw-mb-3">
-        <div class="tw-flex tw-items-center tw-justify-between tw-mb-1">
-          <div class="section-label">
-            {{ alertDetails.type == "sql" ? t('alerts.alertDetails.sqlQuery') : t('alerts.alertDetails.conditions') }}
-          </div>
-          <q-btn
-            v-if="alertDetails.conditions != '' && alertDetails.conditions != '--'"
-            @click="copyToClipboard(alertDetails.conditions, t('alerts.alertDetails.conditions'))"
-            size="sm"
-            flat
-            dense
-            icon="content_copy"
-            class="tw-ml-2"
-            data-test="alert-details-copy-conditions-btn"
-          >
-            <q-tooltip>{{ t('alerts.alertDetails.copy') }}</q-tooltip>
-          </q-btn>
-        </div>
-        <pre
-          class="el-border el-border-radius tw-p-2 tw-text-sm tw-overflow-x-auto"
-          style="white-space: pre-wrap"
-        >{{
-          alertDetails.conditions != "" && alertDetails.conditions != "--"
-            ? (alertDetails.type == 'sql' ? alertDetails.conditions : alertDetails.conditions.length != 2 ? `if ${alertDetails.conditions}` : t('alerts.alertDetails.noCondition'))
-            : t('alerts.alertDetails.noCondition')
-        }}</pre>
-      </div>
-
-      <!-- Description (only show if exists) -->
-      <div v-if="alertDetails.description" class="tw-mb-3">
-        <div class="section-label tw-mb-1">{{ t('common.description') }}</div>
-        <pre
-          class="el-border el-border-radius tw-p-2 tw-text-sm"
-          style="white-space: pre-wrap"
-        >{{ alertDetails.description }}</pre>
-      </div>
-
       <!-- Alert History Table -->
       <div class="tw-mb-6 tw-flex tw-flex-col" style="min-height: 300px;">
         <div v-if="isLoadingHistory" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1">
@@ -143,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="historyTableColumns"
           row-key="timestamp"
           :pagination="pagination"
-          :style="tableHeight"
+          style="width: 100%; height: calc(100vh - 90px)"
           class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
           data-test="alert-details-history-table"
         >
@@ -200,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useQuasar, date } from "quasar";
@@ -249,20 +211,6 @@ const changePagination = (val: { label: string; value: any }) => {
   pagination.value.page = 1; // Reset to first page when changing rows per page
   qTableRef.value?.setPagination(pagination.value);
 };
-
-// Computed property for dynamic table height
-const tableHeight = computed(() => {
-  // Base height calculation: 100vh - header - padding - conditions section
-  // If description exists, reduce more height; otherwise give more space to table
-  if (alertHistory.value.length === 0) {
-    return 'width: 100%';
-  }
-
-  const hasDescription = props.alertDetails?.description;
-  // With description: ~242px offset, Without description: ~190px offset (give ~52px more)
-  const heightOffset = hasDescription ? '242px' : '166px';
-  return `width: 100%; height: calc(100vh - ${heightOffset})`;
-});
 
 // Constants
 const historyTableColumns = [
