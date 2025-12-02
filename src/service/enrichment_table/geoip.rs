@@ -15,7 +15,7 @@
 //
 // The file re-use code snippets from https://github.com/vectordotdev/vector/blob/master/src/enrichment_tables/geoip.rs ,modified to suit openobserve needs
 
-use std::{collections::BTreeMap, fs, net::IpAddr, sync::Arc, time::SystemTime};
+use std::{fs, net::IpAddr, sync::Arc, time::SystemTime};
 
 use config::{MMDB_CITY_FILE_NAME, get_config};
 #[cfg(feature = "enterprise")]
