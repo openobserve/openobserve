@@ -1,7 +1,6 @@
 import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 
-
 export function buildSQLQueryFromInput(
   fields: any,
   defaultStream: any,
@@ -128,10 +127,7 @@ export function buildSQLQueryFromInput(
       : "";
 }
 
-function buildSQLJoinsFromInput(
-  joins: any[],
-  defaultStream: any,
-): string {
+function buildSQLJoinsFromInput(joins: any[], defaultStream: any): string {
   if (!joins || joins.length === 0) {
     return ""; // No joins, return empty string
   }
@@ -227,9 +223,8 @@ function buildChartQuery(config: {
   havingFields?: any[];
   requiredFields?: string[];
   queryData: any;
-  dashboardPanelData: any,
-},
-): string {
+  dashboardPanelData: any;
+}): string {
   const { queryData, dashboardPanelData } = config;
   const stream = queryData.fields.stream;
 
@@ -356,7 +351,7 @@ function buildChartQuery(config: {
 export function buildSQLChartQuery(config: {
   queryData: any;
   chartType: string;
-  dashboardPanelData: any,
+  dashboardPanelData: any;
 }): string {
   const { queryData, chartType, dashboardPanelData } = config;
 
@@ -408,7 +403,10 @@ export function buildSQLChartQuery(config: {
   )}`;
 
   // WHERE clause
-  const whereClause = buildWhereClause(queryData.fields.filter.conditions, dashboardPanelData);
+  const whereClause = buildWhereClause(
+    queryData.fields.filter.conditions,
+    dashboardPanelData,
+  );
   query += whereClause;
 
   // GROUP BY clause - chart-type-specific logic
@@ -693,7 +691,10 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
       selectFilter += `${fieldRef} NOT IN (${formatINValue(condition.value)})`;
     } else if (condition.operator === "match_all") {
       selectFilter += `match_all(${formatValue(condition.value, condition.column, dashboardPanelData)})`;
-    } else if (condition.operator === "str_match") {
+    } else if (
+      condition.operator === "str_match" ||
+      condition.operator === "Contains"
+    ) {
       const fieldRef = streamAlias
         ? `${streamAlias}.${condition.column.field}`
         : condition.column.field;
@@ -758,12 +759,6 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
             dashboardPanelData,
           )}`;
           break;
-        case "Contains":
-          selectFilter +=
-            columnType === "Utf8"
-              ? `LIKE '%${condition.value}%'`
-              : `LIKE %${condition.value}%`;
-          break;
         case "Not Contains":
           selectFilter +=
             columnType === "Utf8"
@@ -803,7 +798,9 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
  * @returns {string} - the WHERE clause as a string.
  */
 const buildWhereClause = (filterData: any, dashboardPanelData: any) => {
-  const whereConditions = filterData?.map((condition) => buildCondition(condition, dashboardPanelData))?.filter(Boolean);
+  const whereConditions = filterData
+    ?.map((condition) => buildCondition(condition, dashboardPanelData))
+    ?.filter(Boolean);
 
   const logicalOperators = filterData.map((it: any) => it.logicalOperator);
   if (whereConditions.length > 0) {
