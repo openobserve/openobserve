@@ -29,7 +29,7 @@ use tracing::{Instrument, Span};
 #[cfg(feature = "cloud")]
 use crate::service::ingestion::check_ingestion_allowed;
 // Re-export service graph API handlers
-pub use crate::service::traces::service_graph::{self, get_service_graph_metrics, get_store_stats};
+pub use crate::service::traces::service_graph::{self, get_current_topology};
 use crate::{
     common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
@@ -66,23 +66,26 @@ use crate::{
 #[post("/{org_id}/traces")]
 pub async fn traces_write(
     org_id: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
     req: HttpRequest,
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
-    handle_req(org_id, req, body).await
+    handle_req(org_id, user_email, req, body).await
 }
 
 #[post("/{org_id}/v1/traces")]
 pub async fn otlp_traces_write(
     org_id: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
     req: HttpRequest,
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
-    handle_req(org_id, req, body).await
+    handle_req(org_id, user_email, req, body).await
 }
 
 async fn handle_req(
     org_id: web::Path<String>,
+    user_email: UserEmail,
     req: HttpRequest,
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
@@ -94,6 +97,7 @@ async fn handle_req(
     };
 
     let org_id = org_id.into_inner();
+    let user_email = &user_email.user_id;
 
     #[cfg(feature = "cloud")]
     match check_ingestion_allowed(&org_id, StreamType::Traces, None).await {
@@ -118,9 +122,9 @@ async fn handle_req(
         .get(&get_config().grpc.stream_header_key)
         .and_then(|header| header.to_str().ok());
     let mut resp = if content_type.eq(CONTENT_TYPE_PROTO) {
-        traces::otlp_proto(&org_id, body, in_stream_name).await?
+        traces::otlp_proto(&org_id, body, in_stream_name, user_email).await?
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
-        traces::otlp_json(&org_id, body, in_stream_name).await?
+        traces::otlp_json(&org_id, body, in_stream_name, user_email).await?
     } else {
         HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
             http::StatusCode::BAD_REQUEST,
@@ -358,6 +362,8 @@ pub async fn get_latest_traces(
             query_fn: None,
             action_id: None,
             skip_wal: false,
+            sampling_config: None,
+            sampling_ratio: None,
             streaming_output: false,
             streaming_id: None,
             histogram_interval: 0,

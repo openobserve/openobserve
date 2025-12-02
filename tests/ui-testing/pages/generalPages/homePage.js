@@ -104,7 +104,7 @@ export class HomePage {
     
     async clickDefaultOrg() {
         // Click the dropdown to open the list of organizations
-        await this.page.getByText('arrow_drop_down').click();
+        await this.page.getByText('arrow_drop_down').first().click();
     
         // Wait for the dropdown options to be present using the correct selector
         const optionsSelector = '[data-test="organization-menu-item-label-item-label"]';
@@ -133,7 +133,7 @@ export class HomePage {
         }
     
         // Optionally, close the dropdown again if needed
-        await this.page.getByText('arrow_drop_down').click();
+        await this.page.getByText('arrow_drop_down').first().click();
     }
     
 }

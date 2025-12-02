@@ -21,8 +21,8 @@ use config::{RwAHashMap, meta::organization::OrganizationType};
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, Order, PaginatorTrait, QueryFilter,
-    QueryOrder, QuerySelect, Schema, Set, entity::prelude::Expr,
+    ColumnTrait, EntityTrait, FromQueryResult, Order, PaginatorTrait, QueryFilter, QueryOrder,
+    QuerySelect, Schema, Set, entity::prelude::*,
 };
 
 use super::{
@@ -148,16 +148,17 @@ pub async fn add(
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Entity::insert(record)
-        .exec(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-    {
-        let mut cache = CACHE.write().await;
-        cache.insert(org_id.to_string(), org);
+    match Entity::insert(record).exec(client).await {
+        Ok(_) => {
+            let mut cache = CACHE.write().await;
+            cache.insert(org_id.to_string(), org);
+            Ok(())
+        }
+        Err(e) => match e.sql_err() {
+            Some(SqlErr::UniqueConstraintViolation(_)) => Ok(()),
+            _ => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
+        },
     }
-
-    Ok(())
 }
 
 #[cfg(feature = "cloud")]

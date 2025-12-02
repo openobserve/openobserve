@@ -183,7 +183,7 @@ mod tests {
 
         let expected = vec![
             "CoalesceBatchesExec: target_batch_size=8192",
-            "  HashJoinExec: mode=Partitioned, join_type=LeftSemi, on=[(name@0, name@0)]",
+            "  HashJoinExec: mode=Partitioned, join_type=LeftSemi, on=[(name@0, name@0)], NullsEqual: true",
             "    AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[]",
             "      CoalesceBatchesExec: target_batch_size=8192",
             "        RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
@@ -228,7 +228,7 @@ mod tests {
 
         let expected = vec![
             "CoalesceBatchesExec: target_batch_size=8192",
-            "  HashJoinExec: mode=Partitioned, join_type=LeftAnti, on=[(name@0, name@0)]",
+            "  HashJoinExec: mode=Partitioned, join_type=LeftAnti, on=[(name@0, name@0)], NullsEqual: true",
             "    AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[]",
             "      CoalesceBatchesExec: target_batch_size=8192",
             "        RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
@@ -323,7 +323,7 @@ mod tests {
 
         let expected = vec![
             "CoalesceBatchesExec: target_batch_size=8192",
-            "  HashJoinExec: mode=CollectLeft, join_type=RightSemi, on=[(name@0, name@0)]",
+            "  HashJoinExec: mode=CollectLeft, join_type=RightSemi, on=[(name@0, name@0)], NullsEqual: true",
             "    ProjectionExec: expr=[name@1 as name]",
             "      DeduplicationExec: columns: [name@1]",
             "        SortExec: expr=[name@1 DESC NULLS LAST, _timestamp@0 DESC NULLS LAST], preserve_partitioning=[false]",
@@ -372,7 +372,7 @@ mod tests {
 
         let expected = vec![
             "CoalesceBatchesExec: target_batch_size=8192",
-            "  HashJoinExec: mode=CollectLeft, join_type=RightAnti, on=[(name@0, name@0)]",
+            "  HashJoinExec: mode=CollectLeft, join_type=RightAnti, on=[(name@0, name@0)], NullsEqual: true",
             "    ProjectionExec: expr=[name@1 as name]",
             "      DeduplicationExec: columns: [name@1]",
             "        SortExec: expr=[name@1 DESC NULLS LAST, _timestamp@0 DESC NULLS LAST], preserve_partitioning=[false]",

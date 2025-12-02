@@ -10,23 +10,32 @@ import "cluster/common.proto";
 
 service Metrics {
     rpc Query (MetricsQueryRequest) returns (MetricsQueryResponse) {}
+    // Server-streaming RPC: Data will stream multiple MetricsQueryResponse messages
+    rpc Data (MetricsQueryRequest) returns (stream MetricsQueryResponse) {}
 }
 
 message MetricsQueryRequest {
-    Job                 job = 1;
-    string           org_id = 2;
-    bool           need_wal = 4;
-    MetricsQueryStmt  query = 5;
-    int64           timeout = 8;
-    bool          use_cache = 9;
+    Job                   job = 1;
+    string             org_id = 2;
+    bool             need_wal = 4;
+    MetricsQueryStmt    query = 5;
+    int64             timeout = 8;
+    bool            use_cache = 9;
+    string search_event_type = 10;
+    repeated string  regions = 11;
+    repeated string clusters = 12;
+    bool    is_super_cluster = 13;
+
 }
 
 message MetricsQueryStmt {
-    string            query = 1;
-    int64             start = 2;
-    int64               end = 3;
-    int64              step = 4;
-    bool    query_exemplars = 5;
+    string                    query = 1;
+    int64                     start = 2;
+    int64                       end = 3;
+    int64                      step = 4;
+    bool            query_exemplars = 5;
+    bool                 query_data = 6;
+    repeated string  label_selector = 7;
 }
 
 message MetricsQueryResponse {

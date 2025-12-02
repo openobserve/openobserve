@@ -83,7 +83,7 @@ impl Ingest for Ingester {
                     )))
                 } else {
                     let data = bytes::Bytes::from(in_data.data);
-                    crate::service::metrics::json::ingest(&org_id, data)
+                    crate::service::metrics::json::ingest(&org_id, data, "")
                         .await
                         .map(|_| ()) // we don't care about success response
                         .map_err(|e| Error::IngestionError(format!("error in ingesting metrics {e}")))
@@ -101,7 +101,8 @@ impl Ingest for Ingester {
                     )))
                 } else {
                     let data = bytes::Bytes::from(in_data.data);
-                    crate::service::traces::ingest_json(&org_id, data, OtlpRequestType::Grpc, &stream_name)
+                    // internal ingestion does not require email id
+                    crate::service::traces::ingest_json(&org_id, data, OtlpRequestType::Grpc, &stream_name, "")
                         .await
                         .map(|_| ()) // we don't care about success response
                         .map_err(|e| Error::IngestionError(format!("error in ingesting traces {e}")))
@@ -154,8 +155,27 @@ impl Ingest for Ingester {
                     }
                 }
             }
+            StreamType::ServiceGraph => {
+                // Service graph edges - use same pattern as Logs
+                let log_ingestion_type = req.ingestion_type.unwrap_or_default();
+                let data = bytes::Bytes::from(in_data.data);
+                match create_log_ingestion_req(log_ingestion_type, &data) {
+                    Err(e) => Err(e),
+                    Ok(ingestion_req) => crate::service::logs::ingest::ingest(
+                        0,
+                        &org_id,
+                        &stream_name,
+                        ingestion_req,
+                        "",
+                        None,
+                        is_derived,
+                    )
+                    .await
+                    .map_or_else(Err, |_| Ok(())),
+                }
+            }
             _ => Err(Error::IngestionError(
-                "Internal gPRC ingestion service currently only supports Logs and EnrichmentTables"
+                "Internal gRPC ingestion service currently only supports Logs, EnrichmentTables, and ServiceGraph"
                     .to_string(),
             )),
         };

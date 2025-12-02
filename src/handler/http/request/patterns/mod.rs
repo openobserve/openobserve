@@ -14,6 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::{HttpResponse, post, web};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 
 #[cfg(feature = "enterprise")]
 use crate::handler::http::request::search::utils::check_stream_permissions;
@@ -154,10 +156,39 @@ pub async fn extract_patterns(
             }
         }
 
-        // Set a reasonable size limit for pattern extraction
-        if req.query.size == 0 {
-            req.query.size = config::get_config().limit.query_default_limit;
+        // Set size limit for pattern extraction using O2 config
+        // This determines the maximum number of logs to analyze for pattern detection
+        // Default is 10K which aligns with industry standards for pattern quality
+        if req.query.size == 0 || req.query.size == -1 {
+            let o2_config = get_o2_config();
+            req.query.size = if o2_config.log_patterns.max_logs_for_extraction > 0 {
+                o2_config.log_patterns.max_logs_for_extraction as i64
+            } else {
+                config::get_config().limit.query_default_limit
+            };
         }
+
+        // Set default sampling ratio for pattern extraction if not explicitly provided
+        // Pattern extraction benefits from sampling to improve performance on large datasets
+        if req.query.sampling_ratio.is_none() {
+            let o2_config = get_o2_config();
+            let default_ratio = o2_config.search_group.query_default_sampling_ratio / 100.0;
+            if default_ratio > 0.0 && default_ratio <= 1.0 {
+                req.query.sampling_ratio = Some(default_ratio);
+                log::info!(
+                    "[PATTERNS trace_id {}] Applied default sampling_ratio for pattern extraction: {}%",
+                    trace_id,
+                    o2_config.search_group.query_default_sampling_ratio
+                );
+            }
+        }
+
+        log::info!(
+            "[PATTERNS trace_id {}] Query configuration - size: {}, sampling_ratio: {:?}",
+            trace_id,
+            req.query.size,
+            req.query.sampling_ratio
+        );
 
         // Set search_type if not already set (required by search execution)
         if req.search_type.is_none() {

@@ -13,13 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+//! Service Graph API - HTTP Handlers
+//!
+//! HTTP handlers for service graph topology queries.
+//! Business logic is in enterprise crate.
+
 use actix_web::{HttpResponse, web};
 use serde::Deserialize;
-#[cfg(feature = "enterprise")]
-use {
-    config::utils::json,
-    prometheus::{Encoder, TextEncoder},
-};
 
 /// Query parameters for service graph API
 #[derive(Debug, Deserialize)]
@@ -30,216 +30,186 @@ pub struct ServiceGraphQuery {
     pub stream_name: Option<String>,
 }
 
-/// GetServiceGraphMetrics
+/// GetCurrentTopology
 #[utoipa::path(
     get,
-    path = "/{org_id}/traces/service_graph/metrics",
+    path = "/{org_id}/traces/service_graph/topology/current",
     context_path = "/api",
     tag = "Traces",
-    operation_id = "GetServiceGraphMetrics",
-    summary = "Get service graph metrics",
-    description = "Retrieves Prometheus-formatted metrics for the service graph. Returns metrics filtered by organization and optionally by stream name to ensure multi-tenant isolation. Service graph metrics provide insights into service-to-service communication patterns, request rates, and latencies.",
+    operation_id = "GetCurrentServiceGraphTopology",
+    summary = "Get current service graph topology",
+    description = "Returns service graph topology from stream storage (last 60 minutes). Stream-only - NO in-memory metrics.",
     security(
         ("Authorization" = [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("stream_name" = Option<String>, Query, description = "Optional stream name to filter service graph metrics"),
+        ("stream_name" = Option<String>, Query, description = "Optional stream name to filter service graph topology"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "text/plain; version=0.0.4", body = String, example = json!("# HELP traces_service_graph_request_total Total number of requests between services\n# TYPE traces_service_graph_request_total counter\ntraces_service_graph_request_total{client=\"service-a\",org_id=\"default\",server=\"service-b\",stream_name=\"default\"} 42\n")),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden - Enterprise feature", content_type = "application/json", body = String),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "service_graph_metrics"}))
+        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "service_graph_topology"}))
     )
 )]
-#[actix_web::get("/{org_id}/traces/service_graph/metrics")]
+#[actix_web::get("/{org_id}/traces/service_graph/topology/current")]
 #[cfg(feature = "enterprise")]
-pub async fn get_service_graph_metrics(
+pub async fn get_current_topology(
     org_id: web::Path<String>,
     query: web::Query<ServiceGraphQuery>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let metric_families = prometheus::gather();
-    let encoder = TextEncoder::new();
-    let mut buffer = vec![];
+    use config::meta::service_graph::ServiceGraphData;
 
-    // Filter metrics to only include those matching the requested org_id and optional stream_name
-    let filtered_families: Vec<_> = metric_families
-        .into_iter()
-        .filter_map(|mut family| {
-            // Filter out metrics that don't belong to this org/stream
-            let filtered_metrics: Vec<_> = family
-                .take_metric()
-                .into_iter()
-                .filter(|metric| {
-                    let labels = metric.get_label();
-
-                    // Check if metric has org_id label matching the requested org
-                    let org_matches = labels
-                        .iter()
-                        .any(|label| label.name() == "org_id" && label.value() == org_id.as_str());
-
-                    if !org_matches {
-                        return false;
-                    }
-
-                    // If stream_name filter is provided, also check stream_name label
-                    if let Some(ref stream_name) = query.stream_name {
-                        labels.iter().any(|label| {
-                            label.name() == "stream_name" && label.value() == stream_name.as_str()
-                        })
-                    } else {
-                        true
-                    }
-                })
-                .collect();
-
-            if filtered_metrics.is_empty() {
-                None
-            } else {
-                family.set_metric(filtered_metrics);
-                Some(family)
-            }
-        })
-        .collect();
-
-    encoder.encode(&filtered_families, &mut buffer).unwrap();
-
-    Ok(HttpResponse::Ok()
-        .content_type("text/plain; version=0.0.4")
-        .body(buffer))
-}
-
-/// GetServiceGraphMetrics
-#[utoipa::path(
-    get,
-    path = "/{org_id}/traces/service_graph/metrics",
-    context_path = "/api",
-    tag = "Traces",
-    operation_id = "GetServiceGraphMetrics",
-    summary = "Get service graph metrics",
-    description = "Retrieves Prometheus-formatted metrics for the service graph. Returns metrics filtered by organization to ensure multi-tenant isolation. Service graph metrics provide insights into service-to-service communication patterns, request rates, and latencies.",
-    security(
-        ("Authorization" = [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-    ),
-    responses(
-        (status = 200, description = "Success", content_type = "text/plain; version=0.0.4", body = String, example = json!("# HELP traces_service_graph_request_total Total number of requests between services\n# TYPE traces_service_graph_request_total counter\ntraces_service_graph_request_total{client=\"service-a\",org_id=\"default\",server=\"service-b\"} 42\n")),
-        (status = 403, description = "Forbidden - Enterprise feature", content_type = "application/json", body = String),
-        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
-    ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "service_graph_metrics"}))
-    )
-)]
-#[actix_web::get("/{org_id}/traces/service_graph/metrics")]
-#[cfg(not(feature = "enterprise"))]
-pub async fn get_service_graph_metrics(
-    _org_id: web::Path<String>,
-) -> Result<HttpResponse, actix_web::Error> {
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
-}
-
-/// GetServiceGraphStats
-#[utoipa::path(
-    get,
-    path = "/{org_id}/traces/service_graph/stats",
-    context_path = "/api",
-    tag = "Traces",
-    operation_id = "GetServiceGraphStats",
-    summary = "Get service graph store statistics",
-    description = "Retrieves internal statistics about the service graph store for an organization. Returns information about store size, capacity utilization, shard count, and configuration. Useful for monitoring and capacity planning of the service graph storage.",
-    security(
-        ("Authorization" = [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-    ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
-            "enabled": true,
-            "store_size": 1234,
-            "capacity_utilization_percent": 12.5,
-            "shard_count": 16,
-            "config": {
-                "max_items_per_shard": 10000,
-                "total_capacity": 160000,
-                "wait_duration_ms": 1000
-            }
-        })),
-        (status = 403, description = "Forbidden - Enterprise feature", content_type = "application/json", body = String),
-        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
-    ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "service_graph_stats"}))
-    )
-)]
-#[actix_web::get("/{org_id}/traces/service_graph/stats")]
-#[cfg(feature = "enterprise")]
-pub async fn get_store_stats(org_id: web::Path<String>) -> Result<HttpResponse, actix_web::Error> {
-    let store = o2_enterprise::enterprise::service_graph::get_store();
-    let org_sizes = store.get_org_sizes();
-    let org_capacities = store.get_org_capacity_utilization();
-
-    // Get stats for the requested org only
-    let org_store_size = org_sizes.get(org_id.as_str()).copied().unwrap_or(0);
-    let org_capacity_util = org_capacities.get(org_id.as_str()).copied().unwrap_or(0.0);
-
-    let stats = json::json!({
-        "enabled": config::get_config().service_graph.enabled,
-        "store_size": org_store_size,
-        "capacity_utilization_percent": org_capacity_util,
-        "shard_count": store.shard_count(),
-        "config": {
-            "max_items_per_shard": store.config().max_items_per_shard,
-            "total_capacity": store.config().max_items_per_shard * store.shard_count(),
-            "wait_duration_ms": store.config().wait_duration.as_millis(),
+    // Query edges from stream (last 60 minutes by default)
+    let edges = match query_edges_from_stream(&org_id, query.stream_name.as_deref()).await {
+        Ok(edges) => edges,
+        Err(e) => {
+            // Stream doesn't exist yet or query failed - return empty topology gracefully
+            log::debug!(
+                "[ServiceGraph] Stream query failed (likely stream doesn't exist yet): {}",
+                e
+            );
+            return Ok(HttpResponse::Ok().json(serde_json::json!({
+                "nodes": vec![] as Vec<()>,
+                "edges": vec![] as Vec<()>,
+                "availableStreams": vec![] as Vec<String>,
+            })));
         }
-    });
+    };
 
-    Ok(HttpResponse::Ok().json(stats))
+    if edges.is_empty() {
+        log::debug!(
+            "[ServiceGraph] No edges found for org '{}'",
+            org_id.as_str()
+        );
+        return Ok(HttpResponse::Ok().json(ServiceGraphData {
+            nodes: vec![],
+            edges: vec![],
+        }));
+    }
+
+    log::debug!(
+        "[ServiceGraph] Processing {} edge records for org '{}'",
+        edges.len(),
+        org_id.as_str()
+    );
+
+    // Use enterprise business logic to build topology
+    let (nodes, edges, available_streams) =
+        o2_enterprise::enterprise::service_graph::build_topology(edges);
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "nodes": nodes,
+        "edges": edges,
+        "availableStreams": available_streams,
+    })))
 }
 
-/// GetServiceGraphStats
-#[utoipa::path(
-    get,
-    path = "/{org_id}/traces/service_graph/stats",
-    context_path = "/api",
-    tag = "Traces",
-    operation_id = "GetServiceGraphStats",
-    summary = "Get service graph store statistics",
-    description = "Retrieves internal statistics about the service graph store for an organization. Returns information about store size, capacity utilization, shard count, and configuration. Useful for monitoring and capacity planning of the service graph storage.",
-    security(
-        ("Authorization" = [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-    ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
-            "enabled": true,
-            "store_size": 1234,
-            "capacity_utilization_percent": 12.5,
-            "shard_count": 16,
-            "config": {
-                "max_items_per_shard": 10000,
-                "total_capacity": 160000,
-                "wait_duration_ms": 1000
-            }
-        })),
-        (status = 403, description = "Forbidden - Enterprise feature", content_type = "application/json", body = String),
-        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
-    ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "service_graph_stats"}))
-    )
-)]
-#[actix_web::get("/{org_id}/traces/service_graph/stats")]
+#[cfg(feature = "enterprise")]
+/// Query edge records from the _o2_service_graph stream
+async fn query_edges_from_stream(
+    org_id: &str,
+    stream_filter: Option<&str>,
+) -> Result<Vec<serde_json::Value>, infra::errors::Error> {
+    use config::meta::stream::StreamType;
+
+    let stream_name = "_o2_service_graph";
+
+    // Query last 60 minutes by default
+    let now = chrono::Utc::now().timestamp_micros();
+    let sixty_minutes_ago = now - (60 * 60 * 1_000_000);
+
+    // Query pre-aggregated edge state (already summarized per minute)
+    let sql = if let Some(stream) = stream_filter {
+        format!(
+            "SELECT * FROM \"{}\"
+             WHERE _timestamp >= {}
+             AND org_id = '{}'
+             AND trace_stream_name = '{}'
+             LIMIT 10000",
+            stream_name, sixty_minutes_ago, org_id, stream
+        )
+    } else {
+        format!(
+            "SELECT * FROM \"{}\"
+             WHERE _timestamp >= {}
+             AND org_id = '{}'
+             LIMIT 10000",
+            stream_name, sixty_minutes_ago, org_id
+        )
+    };
+
+    // Build search request
+    let req = config::meta::search::Request {
+        query: config::meta::search::Query {
+            sql: sql.clone(),
+            from: 0,
+            size: 100000,
+            start_time: sixty_minutes_ago,
+            end_time: now,
+            quick_mode: false,
+            query_type: "".to_string(),
+            track_total_hits: false,
+            uses_zo_fn: false,
+            query_fn: None,
+            skip_wal: false,
+            action_id: None,
+            histogram_interval: 0,
+            streaming_id: None,
+            streaming_output: false,
+            sampling_config: None,
+            sampling_ratio: None,
+        },
+        encoding: config::meta::search::RequestEncoding::Empty,
+        regions: vec![],
+        clusters: vec![],
+        timeout: 30,
+        search_type: None,
+        search_event_context: None,
+        use_cache: false,
+        clear_cache: false,
+        local_mode: Some(false),
+    };
+
+    // Check if stream exists (using Logs type since we write as logs stream)
+    let schema = infra::schema::get(org_id, stream_name, StreamType::Logs).await;
+    if schema.is_err() {
+        log::debug!(
+            "[ServiceGraph] Stream '{}' does not exist yet for org '{}'",
+            stream_name,
+            org_id
+        );
+        return Ok(Vec::new());
+    }
+
+    // Execute search
+    let trace_id = config::ider::generate();
+    let resp = crate::service::search::search(&trace_id, org_id, StreamType::Logs, None, &req)
+        .await
+        .map_err(|e| {
+            log::error!("[ServiceGraph] Stream query failed: {}", e);
+            infra::errors::Error::ErrorCode(infra::errors::ErrorCodes::SearchStreamNotFound(
+                stream_name.to_string(),
+            ))
+        })?;
+
+    log::debug!(
+        "[ServiceGraph] Retrieved {} edge records from stream for org '{}'",
+        resp.hits.len(),
+        org_id
+    );
+
+    Ok(resp.hits)
+}
+
+#[actix_web::get("/{org_id}/traces/service_graph/topology/current")]
 #[cfg(not(feature = "enterprise"))]
-pub async fn get_store_stats(_org_id: web::Path<String>) -> Result<HttpResponse, actix_web::Error> {
+pub async fn get_current_topology(
+    _org_id: web::Path<String>,
+    _query: web::Query<ServiceGraphQuery>,
+) -> Result<HttpResponse, actix_web::Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }

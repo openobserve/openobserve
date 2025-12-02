@@ -11,6 +11,7 @@ flamegraph.html
 /target/
 /bin/
 /docs/
+/.claude/*
 
 # data
 /tmp/
@@ -40,3 +41,5 @@ tests/ui-testing/playwright-tests/utils/auth/user.json
 /tests/ui-testing/MD_Files
 *.bak
 /tests/ui-testing/MD_Files
+.github/workflows/bug-automation-helper.yml
+/tests/bug-automation

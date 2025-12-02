@@ -26,6 +26,7 @@ use bytes::Bytes;
 use config::utils::time::get_ymdh_from_micros;
 use hashbrown::HashSet;
 use hashlink::lru_cache::LruCache;
+use object_store::{GetOptions, GetResult};
 
 const DOWNLOAD_RETRY_TIMES: usize = 3;
 const INITIAL_CACHE_SIZE: usize = 128;
@@ -340,35 +341,36 @@ pub async fn get(
     file: &str,
     range: Option<Range<u64>>,
 ) -> object_store::Result<bytes::Bytes> {
-    get_opts(account, file, range, true).await
+    let options = GetOptions {
+        range: range.map(|r| r.into()),
+        ..Default::default()
+    };
+    get_opts(account, file, options, true).await?.bytes().await
 }
 
 pub async fn get_opts(
     account: &str,
     file: &str,
-    range: Option<Range<u64>>,
+    options: GetOptions,
     remote: bool,
-) -> object_store::Result<bytes::Bytes> {
+) -> object_store::Result<GetResult> {
     let cfg = config::get_config();
     // get from memory cache
     if cfg.memory_cache.enabled
-        && let Some(v) = memory::get(file, range.clone()).await
+        && let Ok(ret) = memory::get_opts(file, options.clone()).await
     {
-        return Ok(v);
+        return Ok(ret);
     }
     // get from disk cache
     if cfg.disk_cache.enabled
-        && let Some(v) = disk::get(file, range.clone()).await
+        && let Ok(ret) = disk::get_opts(file, options.clone()).await
     {
-        return Ok(v);
+        return Ok(ret);
     }
 
     // get from storage
     if remote {
-        return match range {
-            Some(r) => crate::storage::get_range(account, file, r).await,
-            None => crate::storage::get_bytes(account, file).await,
-        };
+        return crate::storage::get_opts(account, file, options).await;
     }
 
     Err(object_store::Error::NotFound {

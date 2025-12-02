@@ -213,6 +213,9 @@ jobs:
                 "streaming.spec.js",
                 "stream-settings.spec.js",
               ]
+          - testfolder: "RegressionSet"
+            browser: "chrome"
+            run_files: ["logs-regression.spec.js"]
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
@@ -322,13 +325,19 @@ jobs:
               echo "::group::Fetching last failed tests from TestDino"
               # Use custom cache ID that includes run_id to distinguish separate workflow runs
               # Format: gh_openobserve_main_12345678 (for main) or gh_openobserve_feature-branch_12345678 (for PRs)
-              CACHE_ID="gh_openobserve_${{ github.ref_name }}_${{ github.run_id }}"
+              # Sanitize branch name by replacing slashes with underscores
+              BRANCH_NAME=$(echo "${{ github.ref_name }}" | sed 's/\//_/g')
+              CACHE_ID="gh_openobserve_${BRANCH_NAME}_${{ github.run_id }}"
               echo "::notice::Using cache ID: $CACHE_ID"
               # Try to get last failed tests from TestDino
-              # Redirect stderr to /dev/null to avoid capturing npm warnings
-              if LAST_FAILED_FLAGS="$(npx tdpw last-failed --cache-id "$CACHE_ID" 2>/dev/null)"; then
-                # Trim whitespace (original working logic - no filtering)
-                LAST_FAILED_FLAGS="$(echo "$LAST_FAILED_FLAGS" | xargs)"
+              # Use a temp file to avoid shell variable truncation for large output
+              TEMP_OUTPUT="/tmp/testdino_output_$$.txt"
+              if npx tdpw last-failed --cache-id "$CACHE_ID" > "$TEMP_OUTPUT" 2>&1; then
+                # Filter out ALL lines that don't match test file pattern
+                # Valid format: "FolderName/testfile.spec.js" or "FolderName/testfile.spec.js -g test name"
+                # This filters out debug lines, empty lines, and anything that's not a test path
+                LAST_FAILED_FLAGS="$(grep -E '^[A-Za-z_-]+/[a-zA-Z0-9_-]+\.spec\.js' "$TEMP_OUTPUT" | tail -1)"
+                rm -f "$TEMP_OUTPUT"
 
                 if [ -n "$LAST_FAILED_FLAGS" ] && [ "$LAST_FAILED_FLAGS" != "No failed tests found" ]; then
                   echo "::notice::✅ Found failed tests from previous run."
@@ -419,11 +428,11 @@ jobs:
 
                     # Check if there's a -g flag
                     if echo "$EXTRA_PW_FLAGS" | grep -q " -g "; then
-                      # Extract test name (after -g)
-                      TEST_NAME=$(echo "$EXTRA_PW_FLAGS" | sed 's/.*-g //')
+                      # Extract test name (after -g) and strip any surrounding quotes
+                      TEST_NAME=$(echo "$EXTRA_PW_FLAGS" | sed 's/.*-g //' | sed 's/^"\(.*\)"$/\1/')
 
                       echo "DEBUG: File path: $TEST_FILE_PATH"
-                      echo "DEBUG: Test name: $TEST_NAME"
+                      echo "DEBUG: Test name (unquoted): $TEST_NAME"
                       echo "::notice::🎯 OPTIMIZED RERUN: Running failed test from this shard"
                       echo "DEBUG: Final command: npx playwright test \"$TEST_FILE_PATH\" -g \"$TEST_NAME\""
 
@@ -635,12 +644,18 @@ jobs:
           if [ -f "playwright-results/report.json" ]; then
             echo "::notice::JSON report found at playwright-results/report.json"
             ls -lh playwright-results/report.json
-            # tdpw cache expects to be run from the directory containing report.json
-            # Change to playwright-results directory where report.json lives
-            cd playwright-results
+
+            # Copy report.json to repo root to ensure correct git metadata
+            mkdir -p ../../playwright-results
+            cp playwright-results/report.json ../../playwright-results/
+
+            # Run tdpw cache from repo root directory (for correct git metadata)
+            cd ../../playwright-results
             # Use custom cache ID that includes run_id to distinguish separate workflow runs
             # Format: gh_openobserve_main_12345678 (for main) or gh_openobserve_feature-branch_12345678 (for PRs)
-            CACHE_ID="gh_openobserve_${{ github.ref_name }}_${{ github.run_id }}"
+            # Sanitize branch name by replacing slashes with underscores
+            BRANCH_NAME=$(echo "${{ github.ref_name }}" | sed 's/\//_/g')
+            CACHE_ID="gh_openobserve_${BRANCH_NAME}_${{ github.run_id }}"
             echo "::notice::Using cache ID: $CACHE_ID"
 
             # Suppress verbose debug output from TestDino, only show result

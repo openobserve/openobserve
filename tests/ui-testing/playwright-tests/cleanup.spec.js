@@ -33,6 +33,9 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up all pipelines for e2e_automate streams
     await pm.apiCleanup.cleanupPipelines();
 
+    // Clean up all pipeline destinations matching pattern "destination" + 2-3 digits
+    await pm.apiCleanup.cleanupPipelineDestinations();
+
     // Clean up all functions matching pattern "Pipeline" + 3 digits
     await pm.apiCleanup.cleanupFunctions();
 
@@ -47,6 +50,12 @@ test.describe("Pre-Test Cleanup", () => {
 
     // Clean up all users matching patterns "email*@gmail.com" and "duplicate*@gmail.com"
     await pm.apiCleanup.cleanupUsers();
+
+    // Clean up regex patterns matching test data
+    await pm.apiCleanup.cleanupRegexPatterns();
+
+    // Clean up custom logo from _meta organization
+    await pm.apiCleanup.cleanupLogo();
 
     testLogger.info('Pre-test cleanup completed successfully');
   });

@@ -88,6 +88,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-ml-sm o2-secondary-button tw-h-[36px]"
             no-caps
             flat
+            :label="t('settings.header')"
+            @click="showCorrelationDrawer = true"
+            data-test="correlation-settings-btn"
+            icon="settings"
+          />
+          <q-btn
+            class="q-ml-sm o2-secondary-button tw-h-[36px]"
+            no-caps
+            flat
             :label="t(`dashboard.import`)"
             @click="importAlert"
             data-test="alert-import"
@@ -236,6 +245,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           "
                         >
                           {{ props.row[col.field].name }}
+                        </div>
+                      </template>
+                      <template v-else-if="col.name === 'dedup_status'">
+                        <div class="tw-flex tw-items-center tw-justify-center">
+                          <q-icon
+                            v-if="props.row.deduplication?.enabled"
+                            name="check_circle"
+                            size="sm"
+                            color="positive"
+                          >
+                            <q-tooltip class="bg-grey-8">
+                              Deduplication: Enabled
+                              <div v-if="props.row.deduplication.fingerprint_fields?.length">
+                                Fields: {{ props.row.deduplication.fingerprint_fields.join(', ') }}
+                              </div>
+                              <div v-if="props.row.deduplication.grouping?.enabled">
+                                Grouping: {{ props.row.deduplication.grouping.group_wait_seconds }}s wait
+                              </div>
+                            </q-tooltip>
+                          </q-icon>
+                          <span v-else class="text-grey-5">-</span>
                         </div>
                       </template>
                       <template v-else-if="col.name == 'actions'">
@@ -525,6 +555,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:templates="getTemplates"
       />
     </template>
+
+    <!-- Correlation Settings Drawer -->
+    <q-drawer
+      v-model="showCorrelationDrawer"
+      side="right"
+      :width="800"
+      bordered
+      overlay
+      behavior="mobile"
+      data-test="correlation-settings-drawer"
+    >
+      <div class="tw-h-full tw-flex tw-flex-col">
+        <!-- Drawer Header -->
+        <div class="tw-px-6 tw-py-4 tw-border-b tw-flex tw-items-center tw-justify-between">
+          <div class="tw-flex tw-items-center">
+            <q-icon name="group_work" size="24px" class="tw-mr-2" />
+            <h6 class="tw-text-lg tw-font-semibold tw-m-0">
+              {{ t('settings.alertCorrelation') }}
+            </h6>
+          </div>
+          <q-btn
+            flat
+            round
+            dense
+            icon="close"
+            @click="showCorrelationDrawer = false"
+            data-test="close-correlation-drawer"
+          />
+        </div>
+
+        <!-- Drawer Content -->
+        <div class="tw-flex-1 tw-overflow-y-auto">
+          <OrganizationDeduplicationSettings
+            :org-id="store.state.selectedOrganization.identifier"
+            :config="store.state.organizationSettings?.deduplication_config"
+            @saved="onCorrelationSettingsSaved"
+            @cancel="showCorrelationDrawer = false"
+          />
+        </div>
+      </div>
+    </q-drawer>
+
     <ConfirmDialog
       title="Delete Alert"
       message="Are you sure you want to delete this alert?"
@@ -533,6 +605,108 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmDelete"
     />
 
+    <!-- Alert Details Drawer -->
+    <q-drawer
+      v-model="showAlertDetailsDrawer"
+      side="right"
+      :width="600"
+      bordered
+      overlay
+      behavior="mobile"
+      class="alert-details-drawer"
+    >
+      <div class="tw-h-full tw-flex tw-flex-col">
+        <!-- Drawer Header -->
+        <div class="tw-px-6 tw-py-4 tw-border-b tw-flex tw-items-center tw-justify-between">
+          <div class="tw-flex tw-items-center">
+            <q-icon name="info" size="24px" class="tw-mr-2" />
+            <h6 class="tw-text-lg tw-font-semibold tw-m-0">{{ t('alert_list.alert_details') }}</h6>
+          </div>
+          <q-btn
+            flat
+            round
+            dense
+            icon="close"
+            @click="showAlertDetailsDrawer = false"
+          />
+        </div>
+
+        <!-- Drawer Content -->
+        <div class="tw-flex-1 tw-overflow-y-auto tw-px-6 tw-py-4" v-if="selectedAlertDetails">
+          <!-- Alert Name -->
+          <div class="tw-mb-6">
+            <div class="tw-text-sm tw-font-semibold tw-mb-1" :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'">Alert Name</div>
+            <div class="tw-text-base">{{ selectedAlertDetails.name }}</div>
+          </div>
+
+          <!-- SQL Query / Conditions -->
+          <div class="tw-mb-6">
+            <div class="tw-flex tw-items-center tw-justify-between tw-mb-2">
+              <div class="tw-text-sm tw-font-semibold" :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'">
+                {{ selectedAlertDetails.type == "sql" ? "SQL Query" : "Conditions" }}
+              </div>
+              <q-btn
+                v-if="selectedAlertDetails.conditions != '' && selectedAlertDetails.conditions != '--'"
+                @click="copyToClipboard(selectedAlertDetails.conditions, 'Conditions')"
+                size="sm"
+                flat
+                dense
+                icon="content_copy"
+                class="tw-ml-2"
+              >
+                <q-tooltip>Copy</q-tooltip>
+              </q-btn>
+            </div>
+            <pre :class="store.state.theme === 'dark' ? 'tw-bg-gray-800 tw-text-gray-200' : 'tw-bg-gray-100 tw-text-gray-900'" class="tw-p-3 tw-rounded tw-text-sm tw-overflow-x-auto" style="white-space: pre-wrap">{{
+              selectedAlertDetails.conditions != "" && selectedAlertDetails.conditions != "--"
+                ? (selectedAlertDetails.type == 'sql' ? selectedAlertDetails.conditions : selectedAlertDetails.conditions.length != 2 ? `if ${selectedAlertDetails.conditions}` : 'No condition')
+                : "No condition"
+            }}</pre>
+          </div>
+
+          <!-- Description -->
+          <div class="tw-mb-6">
+            <div class="tw-text-sm tw-font-semibold tw-mb-2" :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'">Description</div>
+            <pre :class="store.state.theme === 'dark' ? 'tw-bg-gray-800 tw-text-gray-200' : 'tw-bg-gray-100 tw-text-gray-900'" class="tw-p-3 tw-rounded tw-text-sm" style="white-space: pre-wrap">{{ selectedAlertDetails.description || "No description" }}</pre>
+          </div>
+
+          <!-- Alert History Table -->
+          <div class="tw-mb-6">
+            <div class="tw-text-sm tw-font-semibold tw-mb-3" :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'">Evaluation History</div>
+
+            <div v-if="isLoadingHistory" class="tw-text-center tw-py-8">
+              <q-spinner size="32px" color="primary" />
+              <div class="tw-text-sm tw-mt-3" :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'">Loading history...</div>
+            </div>
+
+            <div v-else-if="expandedAlertHistory.length === 0" class="tw-text-center tw-py-8" :class="store.state.theme === 'dark' ? 'tw-text-gray-500' : 'tw-text-gray-500'">
+              <q-icon name="history" size="48px" class="tw-mb-2 tw-opacity-30" />
+              <div class="tw-text-sm">No evaluation history available for this alert</div>
+            </div>
+
+            <q-table
+              v-else
+              :rows="expandedAlertHistory"
+              :columns="historyTableColumns"
+              row-key="timestamp"
+              flat
+              dense
+              :pagination="{ rowsPerPage: 10 }"
+              class="tw-shadow-sm"
+            >
+              <template v-slot:body-cell-status="props">
+                <q-td :props="props">
+                  <q-badge
+                    :color="props.row.status?.toLowerCase() === 'firing' || props.row.status?.toLowerCase() === 'error' ? 'negative' : 'positive'"
+                    :label="props.row.status || 'Unknown'"
+                  />
+                </q-td>
+              </template>
+            </q-table>
+          </div>
+        </div>
+      </div>
+    </q-drawer>
 
     <template>
       <q-dialog class="q-pa-md" v-model="showForm" persistent>
@@ -642,20 +816,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @updated="updateAcrossFolders"
         />
       </q-dialog>
-            <!-- Alert Details Dialog -->
-      <q-dialog
-        v-model="showAlertDetailsDrawer"
-        position="right"
-        full-height
-        maximized
-        data-test="alert-details-dialog"
-      >
-        <AlertHistoryDrawer
-          :alert-details="selectedAlertDetails"
-          :alert-id="selectedAlertDetails?.alert_id || ''"
-          @close="showAlertDetailsDrawer = false"
-        />
-      </q-dialog>
+
+      <!-- Alert History Drawer -->
+      <AlertHistoryDrawer
+        v-model="showHistoryDrawer"
+        :alert-id="selectedHistoryAlertId"
+        :alert-name="selectedHistoryAlertName"
+      />
     </template>
   </div>
 </template>
@@ -689,6 +856,8 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import ImportAlert from "@/components/alerts/ImportAlert.vue";
+import OrganizationDeduplicationSettings from "@/components/alerts/OrganizationDeduplicationSettings.vue";
+import DedupSummaryCards from "@/components/alerts/DedupSummaryCards.vue";
 import {
   getImageURL,
   getUUID,
@@ -724,6 +893,8 @@ export default defineComponent({
     NoData,
     ConfirmDialog,
     ImportAlert,
+    OrganizationDeduplicationSettings,
+    DedupSummaryCards,
     FolderList,
     MoveAcrossFolders,
     AppTabs,
@@ -757,6 +928,10 @@ export default defineComponent({
     const isSubmitting = ref(false);
 
     const showImportAlertDialog = ref(false);
+    const showHistoryDrawer = ref(false);
+    const selectedHistoryAlertId = ref("");
+    const selectedHistoryAlertName = ref("");
+    const showCorrelationDrawer = ref(false);
 
     const { getStreams } = useStreams();
 
@@ -779,13 +954,113 @@ export default defineComponent({
     const showMoveAlertDialog = ref(false);
     const showAlertDetailsDrawer = ref(false);
     const selectedAlertDetails: Ref<any> = ref(null);
+    const expandedAlertHistory: Ref<any[]> = ref([]);
+    const isLoadingHistory = ref(false);
+
+    const historyTableColumns = [
+      {
+        name: 'timestamp',
+        label: 'Timestamp',
+        field: 'timestamp',
+        align: 'left',
+        sortable: true,
+        format: (val: any) => convertUnixToQuasarFormat(val)
+      },
+      {
+        name: 'status',
+        label: 'Status',
+        field: 'status',
+        align: 'center',
+        sortable: true
+      },
+      {
+        name: 'evaluation_time',
+        label: 'Evaluation (s)',
+        field: 'evaluation_took_in_secs',
+        align: 'center',
+        sortable: true,
+        format: (val: any) => val ? val.toFixed(3) : '-'
+      },
+      {
+        name: 'query_time',
+        label: 'Query (ms)',
+        field: 'query_took',
+        align: 'center',
+        sortable: true,
+        format: (val: any) => val || '-'
+      },
+    ];
+
+    const fetchAlertHistory = async (alertId: string) => {
+      isLoadingHistory.value = true;
+      try {
+        // Get history for last 30 days
+        const endTime = Date.now() * 1000; // Convert to microseconds
+        const startTime = endTime - (30 * 24 * 60 * 60 * 1000000); // 30 days ago in microseconds
+
+        const response = await alertsService.getHistory(
+          store?.state?.selectedOrganization?.identifier,
+          {
+            alert_id: alertId,
+            size: 50, // Get last 50 evaluations
+            start_time: startTime,
+            end_time: endTime
+          }
+        );
+        expandedAlertHistory.value = response.data?.hits || [];
+      } catch (error) {
+        console.error("Failed to fetch alert history:", error);
+        expandedAlertHistory.value = [];
+      } finally {
+        isLoadingHistory.value = false;
+      }
+    };
 
     const triggerExpand = (props: any) => {
       // Open drawer instead of inline expansion
       selectedAlertDetails.value = props.row;
       showAlertDetailsDrawer.value = true;
+      // Fetch history for this alert
+      fetchAlertHistory(props.row.alert_id);
     };
 
+    // Handle ESC key and click outside to close drawer
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && showAlertDetailsDrawer.value) {
+        showAlertDetailsDrawer.value = false;
+      }
+    };
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!showAlertDetailsDrawer.value) return;
+
+      const target = event.target as HTMLElement;
+
+      // Check if clicked element is the backdrop or outside drawer content
+      if (
+        target.classList.contains('q-drawer__backdrop') ||
+        target.classList.contains('q-layout__shadow')
+      ) {
+        showAlertDetailsDrawer.value = false;
+        return;
+      }
+
+      // Check if the click is outside the drawer content
+      const drawerElement = document.querySelector('.alert-details-drawer .q-drawer__content');
+      if (drawerElement && !drawerElement.contains(target)) {
+        showAlertDetailsDrawer.value = false;
+      }
+    };
+
+    onMounted(() => {
+      document.addEventListener('keydown', handleKeyDown);
+      document.addEventListener('click', handleClickOutside, true);
+    });
+
+    onBeforeUnmount(() => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('click', handleClickOutside, true);
+    });
 
     const activeFolderToMove = ref("default");
 
@@ -879,6 +1154,14 @@ export default defineComponent({
           align: "center",
           sortable: true,
           style: "width: 150px",
+        },
+        {
+          name: "dedup_status",
+          field: "dedup_status",
+          label: "Dedup",
+          align: "center",
+          sortable: false,
+          style: "width: 80px",
         },
         {
           name: "actions",
@@ -1769,6 +2052,21 @@ export default defineComponent({
       });
     };
 
+    const goToAlertHistory = () => {
+      router.push({
+        name: "alertHistory",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    };
+
+    const onCorrelationSettingsSaved = async () => {
+      // Reload organization settings to get updated dedup config
+      await store.dispatch("getDefaultOrganizationSettings");
+      showCorrelationDrawer.value = false;
+    };
+
     const exportAlert = async (row: any) => {
       // Find the alert based on uuid
       const alertToBeExported = await getAlertById(row.alert_id);
@@ -2220,6 +2518,7 @@ export default defineComponent({
       showImportAlertDialog,
       importAlert,
       goToAlertInsights,
+      goToAlertHistory,
       getTemplates,
       exportAlert,
       updateActiveFolderId,
@@ -2243,7 +2542,11 @@ export default defineComponent({
       triggerExpand,
       showAlertDetailsDrawer,
       selectedAlertDetails,
+      expandedAlertHistory,
+      isLoadingHistory,
+      historyTableColumns,
       allSelectedAlerts,
+      copyToClipboard,
       openMenu,
       outlinedMoreVert,
       getAlertsFn,
@@ -2252,6 +2555,11 @@ export default defineComponent({
       computedOwner,
       tabs,
       filterAlertsByTab,
+      showHistoryDrawer,
+      selectedHistoryAlertId,
+      selectedHistoryAlertName,
+      showCorrelationDrawer,
+      onCorrelationSettingsSaved,
       refreshImportedAlerts,
       folderIdToBeCloned,
       updateFolderIdToBeCloned,
