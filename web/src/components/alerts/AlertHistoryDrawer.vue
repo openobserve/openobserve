@@ -49,19 +49,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-        <div class="col-auto tw-flex tw-items-center tw-gap-2">
+        <div class="col-auto tw-flex tw-items-center">
           <q-btn
             data-test="alert-details-refresh-btn"
-            class="text-bold no-border o2-secondary-button tw-h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            class=""
             flat
+            dense
             no-caps
             @click="refreshHistory"
             :loading="isLoadingHistory"
             :disable="isLoadingHistory"
           >
             <q-icon name="refresh" size="18px" />
-            <span class="tw-ml-2">{{ t("common.refresh") }}</span>
+            <q-tooltip>
+              Refresh History
+            </q-tooltip>
           </q-btn>
           <q-btn
             data-test="alert-details-close-btn"
