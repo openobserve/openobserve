@@ -203,14 +203,8 @@ impl Geoip {
 
                 add_field!("timezone", data.location.time_zone);
                 add_field!("latitude", data.location.latitude);
-                add_field!(
-                    "longitude",
-                    data.location.longitude
-                );
-                add_field!(
-                    "metro_code",
-                    data.location.metro_code
-                );
+                add_field!("longitude", data.location.longitude);
+                add_field!("metro_code", data.location.metro_code);
 
                 // last subdivision is most specific per https://github.com/maxmind/GeoIP2-java/blob/39385c6ce645374039450f57208b886cf87ade47/src/main/java/com/maxmind/geoip2/model/AbstractCityResponse.java#L96-L107
                 let subdivision = data.subdivisions.last();
@@ -225,13 +219,23 @@ impl Geoip {
                 add_field!("postal_code", data.postal.code);
             }
             DatabaseKind::ConnectionType => {
-                let data = self.dbreader.lookup(ip).ok()?.decode::<ConnectionType>().ok()??;
+                let data = self
+                    .dbreader
+                    .lookup(ip)
+                    .ok()?
+                    .decode::<ConnectionType>()
+                    .ok()??;
 
                 add_field!("connection_type", data.connection_type);
             }
             #[cfg(feature = "enterprise")]
             DatabaseKind::Enterprise => {
-                let data = self.dbreader.lookup(ip).ok()?.decode::<Enterprise>().ok()??;
+                let data = self
+                    .dbreader
+                    .lookup(ip)
+                    .ok()?
+                    .decode::<Enterprise>()
+                    .ok()??;
 
                 add_field!(
                     "city_name",
@@ -248,14 +252,8 @@ impl Geoip {
 
                 add_field!("timezone", data.location.time_zone);
                 add_field!("latitude", data.location.latitude);
-                add_field!(
-                    "longitude",
-                    data.location.longitude
-                );
-                add_field!(
-                    "metro_code",
-                    data.location.metro_code
-                );
+                add_field!("longitude", data.location.longitude);
+                add_field!("metro_code", data.location.metro_code);
 
                 // last subdivision is most specific per https://github.com/maxmind/GeoIP2-java/blob/39385c6ce645374039450f57208b886cf87ade47/src/main/java/com/maxmind/geoip2/model/AbstractCityResponse.java#L96-L107
                 let subdivision = data.subdivisions.last();
@@ -269,10 +267,7 @@ impl Geoip {
                 );
                 add_field!("postal_code", data.postal.code);
 
-                add_field!(
-                    "registered_country_code",
-                    data.registered_country.iso_code
-                );
+                add_field!("registered_country_code", data.registered_country.iso_code);
                 add_field!(
                     "registered_country_name",
                     self.take_translation_from_names(&data.registered_country.names)
@@ -305,15 +300,6 @@ impl Geoip {
         }
 
         Some(map)
-    }
-
-    fn take_translation<'a>(
-        &self,
-        translations: Option<&BTreeMap<&str, &'a str>>,
-    ) -> Option<&'a str> {
-        translations
-            .and_then(|translations| translations.get(&*self.config.locale))
-            .copied()
     }
 
     fn take_translation_from_names<'a>(
