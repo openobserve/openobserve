@@ -87,9 +87,15 @@ export function extractStatusFromLog(logEntry: any): StatusInfo {
     // Example: logEntry["level"] = "WARNING" → parseStatusValue("WARNING")
     // Also handles numeric strings: "200", "404", "500"
     if (statusValue !== undefined && statusValue !== null) {
+      // Skip empty or whitespace-only strings to avoid incorrect conversion to 0
+      // Example: "" → skip (would become 0/emergency), "   " → skip
+      if (typeof statusValue === 'string' && statusValue.trim() === '') {
+        continue;
+      }
+
       // Convert numeric strings to numbers before parsing
       // Example: "0" → 0, "1" → 1, "error" → "error"
-        statusValue = isNaN(Number(statusValue)) ? statusValue : Number(statusValue);
+      statusValue = isNaN(Number(statusValue)) ? statusValue : Number(statusValue);
       return parseStatusValue(statusValue);
     }
   }
