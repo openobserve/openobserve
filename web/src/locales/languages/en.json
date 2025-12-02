@@ -1179,6 +1179,7 @@
     "all": "All",
     "history": "Alert History",
     "searcHistory": "Enter Alert Name",
+    "results":"Results",
     "deduplication": {
       "title": "Alert Deduplication",
       "subtitle": "Prevent duplicate alerts by configuring fingerprint-based deduplication.",
@@ -1216,7 +1217,8 @@
       "timestamp": "Timestamp",
       "status": "Status",
       "evaluationTime": "Evaluation (s)",
-      "queryTime": "Query (ms)"
+      "queryTime": "Query (ms)",
+      "error":"Error"
     },
     "alertDetails": {
       "alertName": "Alert Name",

@@ -67,10 +67,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator />
 
     <!-- Content -->
-    <div class="q-px-md q-py-md alert-details-content" v-if="alertDetails">
+    <div class="tw-mx-2 q-py-md alert-details-content" v-if="alertDetails">
       <!-- SQL Query / Conditions -->
-      <div class="tw-mb-6">
-        <div class="tw-flex tw-items-center tw-justify-between tw-mb-2">
+      <div class="tw-mb-3">
+        <div class="tw-flex tw-items-center tw-justify-between tw-mb-1">
           <div class="section-label">
             {{ alertDetails.type == "sql" ? t('alerts.alertDetails.sqlQuery') : t('alerts.alertDetails.conditions') }}
           </div>
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-btn>
         </div>
         <pre
-          class="el-border el-border-radius tw-p-3 tw-text-sm tw-overflow-x-auto"
+          class="el-border el-border-radius tw-p-2 tw-text-sm tw-overflow-x-auto"
           style="white-space: pre-wrap"
         >{{
           alertDetails.conditions != "" && alertDetails.conditions != "--"
@@ -98,18 +98,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Description (only show if exists) -->
-      <div v-if="alertDetails.description" class="tw-mb-6">
-        <div class="section-label tw-mb-2">{{ t('common.description') }}</div>
+      <div v-if="alertDetails.description" class="tw-mb-3">
+        <div class="section-label tw-mb-1">{{ t('common.description') }}</div>
         <pre
-          class="el-border el-border-radius tw-p-3 tw-text-sm"
+          class="el-border el-border-radius tw-p-2 tw-text-sm"
           style="white-space: pre-wrap"
         >{{ alertDetails.description }}</pre>
       </div>
 
       <!-- Alert History Table -->
       <div class="tw-mb-6 tw-flex tw-flex-col" style="min-height: 300px;">
-        <div class="section-label tw-mb-3">{{ t('alerts.alertDetails.evaluationHistory') }}</div>
-
         <div v-if="isLoadingHistory" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1">
           <q-spinner-hourglass size="32px" color="primary" />
           <div class="tw-text-sm tw-mt-3" :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'">
@@ -132,25 +130,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rows="alertHistory"
           :columns="historyTableColumns"
           row-key="timestamp"
-          flat
-          dense
           :pagination="pagination"
-          class="tw-shadow-sm"
+          :style="tableHeight"
+          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
           data-test="alert-details-history-table"
         >
-          <template v-slot:body-cell-status="props">
-            <q-td :props="props">
-              <q-badge
-                :color="props.row.status?.toLowerCase() === 'firing' || props.row.status?.toLowerCase() === 'error' ? 'negative' : 'positive'"
-                :label="props.row.status || 'Unknown'"
-              />
-            </q-td>
+          <template v-slot:body="props">
+            <q-tr :props="props">
+              <q-td v-for="col in historyTableColumns" :key="col.name" :props="props">
+                <template v-if="col.name === 'status'">
+                  <q-badge
+                    :color="getStatusColor(props.row.status)"
+                    :label="formatStatus(props.row.status)"
+                  />
+                </template>
+                <template v-else-if="col.name === 'timestamp'">
+                  {{ formatTimestamp(props.row.timestamp) }}
+                </template>
+                <template v-else-if="col.name === 'evaluation_time'">
+                  {{ props.row.evaluation_took_in_secs ? props.row.evaluation_took_in_secs.toFixed(3) : '-' }}
+                </template>
+                <template v-else-if="col.name === 'query_time'">
+                  {{ props.row.query_took || '-' }}
+                </template>
+                <template v-else-if="col.name === 'error'">
+                  <div v-if="props.row.error" class="tw-flex tw-items-center">
+                    <q-icon name="error" size="20px" class="tw-text-red-500 tw-cursor-pointer">
+                      <q-tooltip class="tw-text-xs tw-max-w-md">
+                        {{ props.row.error }}
+                      </q-tooltip>
+                    </q-icon>
+                  </div>
+                  <span v-else>--</span>
+                </template>
+              </q-td>
+            </q-tr>
           </template>
 
           <template #bottom="scope">
-            <div class="bottom-btn tw-h-[48px]">
-              <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[120px] tw-mr-md">
-                {{ alertHistory.length }} {{ t('alerts.alertDetails.evaluationHistory') }}
+            <div class="bottom-btn tw-h-[48px] tw-flex tw-w-full">
+              <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[220px] tw-mr-md">
+                {{ alertHistory.length }} {{ t('alerts.results') }}
               </div>
               <QTablePagination
                 :scope="scope"
@@ -168,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useQuasar, date } from "quasar";
@@ -218,6 +238,20 @@ const changePagination = (val: { label: string; value: any }) => {
   qTableRef.value?.setPagination(pagination.value);
 };
 
+// Computed property for dynamic table height
+const tableHeight = computed(() => {
+  // Base height calculation: 100vh - header - padding - conditions section
+  // If description exists, reduce more height; otherwise give more space to table
+  if (alertHistory.value.length === 0) {
+    return 'width: 100%';
+  }
+
+  const hasDescription = props.alertDetails?.description;
+  // With description: ~242px offset, Without description: ~190px offset (give ~52px more)
+  const heightOffset = hasDescription ? '242px' : '166px';
+  return `width: 100%; height: calc(100vh - ${heightOffset})`;
+});
+
 // Constants
 const historyTableColumns = [
   {
@@ -225,8 +259,7 @@ const historyTableColumns = [
     label: t('alerts.historyTable.timestamp'),
     field: 'timestamp',
     align: 'left' as const,
-    sortable: true,
-    format: (val: any) => convertUnixToQuasarFormat(val)
+    sortable: true
   },
   {
     name: 'status',
@@ -240,27 +273,69 @@ const historyTableColumns = [
     label: t('alerts.historyTable.evaluationTime'),
     field: 'evaluation_took_in_secs',
     align: 'center' as const,
-    sortable: true,
-    format: (val: any) => val ? val.toFixed(3) : '-'
+    sortable: true
   },
   {
     name: 'query_time',
     label: t('alerts.historyTable.queryTime'),
     field: 'query_took',
     align: 'center' as const,
-    sortable: true,
-    format: (val: any) => val || '-'
+    sortable: true
+  },
+  {
+    name: 'error',
+    label: t('alerts.historyTable.error'),
+    field: 'error',
+    align: 'center' as const,
+    sortable: false
   },
 ];
 
 // Helper Functions
-function convertUnixToQuasarFormat(unixMicroseconds: any) {
-  if (!unixMicroseconds) return "";
-  const unixSeconds = unixMicroseconds / 1e6;
-  const dateToFormat = new Date(unixSeconds * 1000);
-  const formattedDate = dateToFormat.toISOString();
-  return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
-}
+const getStatusColor = (status: string) => {
+  switch (status?.toLowerCase()) {
+    case "firing":
+    case "error":
+      return "negative";
+    case "ok":
+    case "success":
+      return "positive";
+    default:
+      return "grey";
+  }
+};
+
+const formatStatus = (status: string) => {
+  if (!status) return "Unknown";
+  return status.charAt(0).toUpperCase() + status.slice(1);
+};
+
+const formatTimestamp = (timestamp: number) => {
+  if (!timestamp) return "N/A";
+  const now = Date.now() * 1000; // microseconds
+  const diff = now - timestamp;
+
+  // Less than 1 hour
+  if (diff < 3600000000) {
+    const minutes = Math.floor(diff / 60000000);
+    return `${minutes} min ago`;
+  }
+
+  // Less than 24 hours
+  if (diff < 86400000000) {
+    const hours = Math.floor(diff / 3600000000);
+    return `${hours} hour${hours > 1 ? "s" : ""} ago`;
+  }
+
+  // Less than 7 days
+  if (diff < 604800000000) {
+    const days = Math.floor(diff / 86400000000);
+    return `${days} day${days > 1 ? "s" : ""} ago`;
+  }
+
+  // Format as date
+  return date.formatDate(timestamp / 1000, "MMM DD, YYYY HH:mm");
+};
 
 // Main Functions
 const fetchAlertHistory = async (alertId: string) => {
@@ -334,7 +409,6 @@ watch(
 <style lang="scss" scoped>
 .alert-details-content {
   max-height: calc(100vh - 80px);
-  overflow-y: auto;
 }
 
 .section-label {
