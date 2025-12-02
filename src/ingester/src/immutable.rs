@@ -16,10 +16,13 @@
 use std::{path::PathBuf, sync::Arc};
 
 use config::metrics;
+use hashbrown::HashSet;
 use once_cell::sync::Lazy;
-use scc::HashSet;
 use snafu::ResultExt;
-use tokio::{fs, sync::mpsc};
+use tokio::{
+    fs,
+    sync::{RwLock, mpsc},
+};
 
 use crate::{
     ReadRecordBatchEntry,
@@ -33,7 +36,8 @@ use crate::{
 pub(crate) static IMMUTABLES: Lazy<RwIndexMap<PathBuf, Arc<Immutable>>> =
     Lazy::new(RwIndexMap::default);
 
-static PROCESSING_TABLES: Lazy<HashSet<PathBuf>> = Lazy::new(HashSet::new);
+static PROCESSING_TABLES: Lazy<RwLock<HashSet<PathBuf>>> =
+    Lazy::new(|| RwLock::new(HashSet::new()));
 
 pub(crate) struct Immutable {
     idx: usize,
@@ -120,14 +124,15 @@ pub(crate) async fn persist(tx: mpsc::Sender<PathBuf>) -> Result<()> {
     drop(r);
     for path in paths {
         // check if the file is processing
-        if PROCESSING_TABLES.contains_async(&path).await {
+        if PROCESSING_TABLES.read().await.contains(&path) {
             continue;
         }
         tx.send(path.clone()).await.context(TokioMpscSendSnafu)?;
-        let _ = PROCESSING_TABLES.insert_async(path).await;
+        PROCESSING_TABLES.write().await.insert(path);
     }
 
     IMMUTABLES.write().await.shrink_to_fit();
+    PROCESSING_TABLES.write().await.shrink_to_fit();
 
     Ok(())
 }
@@ -154,7 +159,7 @@ pub(crate) async fn persist_table(idx: usize, path: PathBuf) -> Result<()> {
         Ok(v) => v,
         Err(e) => {
             // remove from processing tables
-            PROCESSING_TABLES.remove_async(&path).await;
+            PROCESSING_TABLES.write().await.remove(&path);
             return Err(e);
         }
     };
@@ -175,7 +180,7 @@ pub(crate) async fn persist_table(idx: usize, path: PathBuf) -> Result<()> {
     drop(rw);
 
     // remove from processing tables
-    PROCESSING_TABLES.remove_async(&path).await;
+    PROCESSING_TABLES.write().await.remove(&path);
 
     // update metrics
     metrics::INGEST_MEMTABLE_BYTES
