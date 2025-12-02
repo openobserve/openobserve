@@ -1128,7 +1128,8 @@
       "loadingHistory": "Geçmiş yükleniyor...",
       "noHistoryAvailable": "Bu uyarı için değerlendirme geçmişi mevcut değil"
     },
-    "results": "Sonuçlar"
+    "results": "Sonuçlar",
+    "historyNotAvailableRealtime": "Uyarı geçmişi gerçek zamanlı uyarılar için kullanılamıyor"
   },
   "alert_templates": {
     "header": "Şablonlar",

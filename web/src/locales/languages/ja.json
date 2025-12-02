@@ -1138,7 +1138,8 @@
       "loadingHistory": "履歴をロード中...",
       "noHistoryAvailable": "このアラートの評価履歴はありません"
     },
-    "results": "結果"
+    "results": "結果",
+    "historyNotAvailableRealtime": "アラート履歴はリアルタイムアラートには使用できません"
   },
   "alert_templates": {
     "header": "テンプレート",

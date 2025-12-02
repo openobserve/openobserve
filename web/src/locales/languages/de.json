@@ -1128,7 +1128,8 @@
       "loadingHistory": "Verlauf wird geladen...",
       "noHistoryAvailable": "Für diese Warnung ist kein Bewertungsverlauf verfügbar"
     },
-    "results": "Ergebnisse"
+    "results": "Ergebnisse",
+    "historyNotAvailableRealtime": "Der Warnungsverlauf ist für Echtzeitwarnungen nicht verfügbar"
   },
   "alert_templates": {
     "header": "Vorlagen",

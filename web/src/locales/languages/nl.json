@@ -1128,7 +1128,8 @@
       "loadingHistory": "Geschiedenis wordt geladen...",
       "noHistoryAvailable": "Geen evaluatiegeschiedenis beschikbaar voor deze waarschuwing"
     },
-    "results": "Resultaten"
+    "results": "Resultaten",
+    "historyNotAvailableRealtime": "Waarschuwingsgeschiedenis is niet beschikbaar voor realtime meldingen"
   },
   "alert_templates": {
     "header": "Sjablonen",

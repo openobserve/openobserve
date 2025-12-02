@@ -1128,7 +1128,8 @@
       "loadingHistory": "Historique de chargement...",
       "noHistoryAvailable": "Aucun historique d'évaluation disponible pour cette alerte"
     },
-    "results": "Résultats"
+    "results": "Résultats",
+    "historyNotAvailableRealtime": "L'historique des alertes n'est pas disponible pour les alertes en temps réel"
   },
   "alert_templates": {
     "header": "Modèles",

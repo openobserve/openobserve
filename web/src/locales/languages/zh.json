@@ -1124,7 +1124,8 @@
       "loadingHistory": "正在加载历史记录...",
       "noHistoryAvailable": "此警报没有评估历史记录"
     },
-    "results": "结果"
+    "results": "结果",
+    "historyNotAvailableRealtime": "警报历史记录不适用于实时警报"
   },
   "alert_templates": {
     "header": "模板",

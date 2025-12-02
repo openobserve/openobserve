@@ -1128,7 +1128,8 @@
       "loadingHistory": "기록 로드 중...",
       "noHistoryAvailable": "이 알림에 대한 평가 기록이 없습니다."
     },
-    "results": "결과"
+    "results": "결과",
+    "historyNotAvailableRealtime": "실시간 알림에는 경고 기록을 사용할 수 없습니다."
   },
   "alert_templates": {
     "header": "템플릿",

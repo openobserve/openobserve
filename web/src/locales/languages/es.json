@@ -1128,7 +1128,8 @@
       "loadingHistory": "Cargando historial...",
       "noHistoryAvailable": "No hay ningún historial de evaluación disponible para esta alerta"
     },
-    "results": "Resultados"
+    "results": "Resultados",
+    "historyNotAvailableRealtime": "El historial de alertas no está disponible para las alertas en tiempo real"
   },
   "alert_templates": {
     "header": "Plantillas",
