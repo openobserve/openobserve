@@ -454,6 +454,9 @@ impl From<meta_stream::StreamType> for StreamType {
             meta_stream::StreamType::Logs => Self::Logs,
             meta_stream::StreamType::Metrics => Self::Metrics,
             meta_stream::StreamType::Traces => Self::Traces,
+            meta_stream::StreamType::ServiceGraph => Self::Metadata, // ServiceGraph not
+            // alertable, map to
+            // Metadata
             meta_stream::StreamType::EnrichmentTables => Self::EnrichmentTables,
             meta_stream::StreamType::Filelist => Self::Filelist,
             meta_stream::StreamType::Metadata => Self::Metadata,
