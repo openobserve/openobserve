@@ -46,6 +46,9 @@ const organizations = {
   add_members: (data: any, orgIdentifier: string) => {
     return http().post(`api/${orgIdentifier}/invites`, data);
   },
+  revoke_invite: (orgIdentifier: string, token: string) => {
+    return http().delete(`api/${orgIdentifier}/invites/${token}`);
+  },
   process_subscription: (s: string, action: string, orgIdentifier: string) => {
     return http().put(
       `api/${orgIdentifier}/member_subscription/${s}?action=${action}`,

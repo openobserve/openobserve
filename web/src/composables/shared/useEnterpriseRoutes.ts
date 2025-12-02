@@ -36,6 +36,8 @@ const Organizations = () =>
 const ActionScripts = () =>
   import("@/components/actionScripts/ActionScripts.vue");
 
+const Invitations = () => import("@/views/Invitations.vue");
+
 import Users from "@/views/User.vue";
 
 const useEnterpriseRoutes = () => {
@@ -152,6 +154,17 @@ const useEnterpriseRoutes = () => {
         },
       ],
     );
+
+    if (config.isCloud == "true") {
+      routes[0].children.push({
+        path: "invitations",
+        name: "invitations",
+        component: Invitations,
+        beforeEnter(to: any, from: any, next: any) {
+          routeGuard(to, from, next);
+        },
+      });
+    }
   }
 
   return routes;

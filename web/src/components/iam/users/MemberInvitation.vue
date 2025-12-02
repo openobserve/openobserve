@@ -17,10 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="q-pa-none" style="min-height: inherit">
     <div
-      class="col-12 flex"
+      class="col-12 flex tw-ml-2"
       v-if="currentUserRole == 'admin' || currentUserRole == 'root'"
     >
-      <q-separator vertical class="separator q-mr-sm" />
+
 
       <div
         class="row invite-user"
@@ -94,7 +94,8 @@ export default defineComponent({
       required: true,
     },
   },
-  setup(props: any) {
+  emits: ["inviteSent"],
+  setup(props: any, { emit }) {
     const store = useStore();
     const { t } = useI18n();
     const $q = useQuasar();
@@ -110,11 +111,15 @@ export default defineComponent({
     });
 
     const inviteUser = () => {
-      const emailArray = userEmail.value
-        .split(";")
-        .flatMap((email: any) => email.split(","))
-        .filter((email: any) => email.trim().length > 0)
-        .map((email: any) => email.trim().toLowerCase());
+      const emailArray = Array.from(
+        new Set(
+          userEmail.value
+            .split(";")
+            .flatMap((email: any) => email.split(","))
+            .filter((email: any) => email.trim().length > 0)
+            .map((email: any) => email.trim().toLowerCase())
+        )
+      );
       const validationArray = emailArray.map((email: any) =>
         validateEmail(email),
       );
@@ -148,6 +153,8 @@ export default defineComponent({
                 message: data.message,
                 timeout: 5000,
               });
+              // Emit event to parent to refresh the members list
+              emit("inviteSent");
             }
 
             dismiss();
@@ -156,7 +163,7 @@ export default defineComponent({
             dismiss();
             $q.notify({
               type: "negative",
-              message: error.message,
+              message: error?.response?.data?.message || error.message,
               timeout: 5000,
             });
           });

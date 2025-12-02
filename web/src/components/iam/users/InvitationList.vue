@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw-m-4 tw-border">
+  <div>
     <div
       class="tw-flex tw-flex-row tw-justify-between tw-items-center tw-px-4 tw-py-3"
       :class="
@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="q-table__title full-width" data-test="invitation-title-text">
         {{ t("invitation.pendingInvitations") }}
       </div>
+      <div class="tw-h-[40px]" />
     </div>
     <!-- <div class="tw-text-sm tw-text-grey-500 tw-px-4">
       Info: If you decline all invitations and are not part of any organization,
@@ -84,6 +85,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`reject-invitation-${props.row.token}`"
           />
         </q-td>
+      </template>
+
+      <template #top="scope">
+        <QTablePagination
+          :scope="scope"
+          :pageTitle="t('invitation.pendingInvitations')"
+          :resultTotal="resultTotal"
+          :perPageOptions="perPageOptions"
+          position="top"
+          @update:changeRecordPerPage="changePagination"
+        />
+      </template>
+
+      <template #bottom="scope">
+        <QTablePagination
+          :scope="scope"
+          :resultTotal="resultTotal"
+          :perPageOptions="perPageOptions"
+          position="bottom"
+          @update:changeRecordPerPage="changePagination"
+        />
+        <!-- :maxRecordToReturn="maxRecordToReturn" -->
+        <!-- @update:maxRecordToReturn="changeMaxRecordToReturn" -->
       </template>
     </q-table>
 
@@ -159,11 +183,13 @@ import { useI18n } from "vue-i18n";
 import NoData from "@/components/shared/grid/NoData.vue";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
+import QTablePagination from "@/components/shared/grid/Pagination.vue";
 
 export default defineComponent({
   name: "InvitationList",
   components: {
     NoData,
+    QTablePagination,
   },
   props: {
     userEmail: {
@@ -183,6 +209,13 @@ export default defineComponent({
     const selectedInvitation = ref(null);
 
     const columns: any = ref<QTableProps["columns"]>([
+      {
+        name: "#",
+        label: "#",
+        field: "#",
+        align: "left",
+        style: "width: 67px;",
+      },
       {
         name: "org_name",
         field: "org_name",
@@ -224,6 +257,22 @@ export default defineComponent({
       rowsPerPage: 25,
     });
 
+    const perPageOptions = [
+      { label: "25", value: 25 },
+      { label: "50", value: 50 },
+      { label: "100", value: 100 },
+      { label: "250", value: 250 },
+      { label: "500", value: 500 },
+    ];
+    const resultTotal = ref<number>(0);
+    const selectedPerPage = ref<number>(25);
+
+    const changePagination = (val: { label: string; value: any }) => {
+      selectedPerPage.value = val.value;
+      pagination.value.rowsPerPage = val.value;
+      qTable.value.setPagination(pagination.value);
+    };
+
     onMounted(() => {
       fetchPendingInvitations();
     });
@@ -233,20 +282,25 @@ export default defineComponent({
         spinner: true,
         message: "Loading pending invitations...",
       });
-      // {"data":[{"org_id":"31b5oGxybSzf61gTGhHhEtsP0K5","token":"7364275578188333056","role":"admin","status":"pending","expires_at":1756384919464570}]}
 
       try {
         const response = await usersService.getPendingInvites();
+        let counter = 1;
         invitations.value = response.data.data.map((invitation: any) => ({
+          "#": counter <= 9 ? `0${counter++}` : counter++,
           ...invitation,
           expiry: formatExpiry(invitation.expires_at),
         }));
+        resultTotal.value = response.data.data.length;
         dismiss();
-      } catch {
+      } catch (error) {
         dismiss();
         $q.notify({
           color: "negative",
-          message: "Failed to load pending invitations",
+          message:
+            error.response?.data?.message ||
+            "Failed to load pending invitations",
+          timeout: 4000,
         });
       }
     };
@@ -313,11 +367,13 @@ export default defineComponent({
           accepted: true,
           organization: orgData,
         });
-      } catch {
+      } catch (error) {
         dismiss();
         $q.notify({
           color: "negative",
-          message: "Failed to accept invitation",
+          message:
+            error.response?.data?.message || "Failed to accept invitation",
+          timeout: 4000,
         });
       }
     };
@@ -349,11 +405,13 @@ export default defineComponent({
         if (invitations.value.length === 0) {
           emit("invitations-processed", { accepted: false, hasMore: false });
         }
-      } catch {
+      } catch (error) {
         dismiss();
         $q.notify({
           color: "negative",
-          message: "Failed to reject invitation",
+          message:
+            error.response?.data?.message || "Failed to reject invitation",
+          timeout: 4000,
         });
       }
     };
@@ -365,6 +423,10 @@ export default defineComponent({
       invitations,
       columns,
       pagination,
+      perPageOptions,
+      resultTotal,
+      selectedPerPage,
+      changePagination,
       confirmAccept,
       confirmReject,
       selectedInvitation,

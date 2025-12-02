@@ -78,6 +78,7 @@ pub struct OrganizationInviteUserRecord {
     pub status: InviteStatus,
     pub expires_at: i64,
     pub is_external: bool,
+    pub token: String,
 }
 
 #[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
@@ -589,6 +590,7 @@ mod tests {
             status: InviteStatus::Pending,
             expires_at: 999999,
             is_external: true,
+            token: "12345".to_string(),
         };
 
         assert_eq!(record.status, InviteStatus::Pending);
