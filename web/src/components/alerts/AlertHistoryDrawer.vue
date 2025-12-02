@@ -37,6 +37,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ alertDetails.name }}
               </q-tooltip>
             </span>
+            <!-- Alert Type Icon -->
+            <div class="tw-flex tw-items-center tw-gap-2">
+              <q-icon
+                :name="alertDetails?.is_real_time ? 'bolt' : 'schedule'"
+                size="20px"
+                color="grey"
+              >
+                <q-tooltip>{{ alertDetails?.is_real_time ? 'Real-time' : 'Scheduled' }}</q-tooltip>
+              </q-icon>
+            </div>
           </div>
         </div>
         <div class="col-auto tw-flex tw-items-center tw-gap-2">
