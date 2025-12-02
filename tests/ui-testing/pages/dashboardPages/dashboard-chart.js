@@ -77,10 +77,10 @@ export default class ChartTypeSelector {
       throw new Error(`Invalid target type: ${target}`);
     }
 
-    // Locate the specific field item container that contains the field name
-    const fieldItem = this.page.locator(`[data-test^="field-list-item-"]`, {
-      hasText: fieldName,
-    });
+    // Locate the specific field item container using the exact field name in the data-test attribute
+    // The format is: field-list-item-{streamType}-{streamName}-{fieldName}
+    // We combine ^= (starts with) and $= (ends with) to ensure exact match
+    const fieldItem = this.page.locator(`[data-test^="field-list-item-"][data-test$="-${fieldName}"]`);
 
     // Now locate the button within that field item
     const button = fieldItem.locator(`[data-test="${buttonTestId}"]`);

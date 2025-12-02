@@ -330,7 +330,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.selectChartType("table");
     
     // Now we can access the field removal buttons
-    await pm.chartTypeSelector.removeField("_timestamp", "x");
+    await pm.chartTypeSelector.removeField("x_axis_1", "x");
 
     // Open Custom SQL editor
     await page.locator('[data-test="dashboard-customSql"]').click();

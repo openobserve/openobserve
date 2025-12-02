@@ -770,7 +770,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardPanelActions.addPanelName(panelName);
 
     // Configure table chart with custom SQL using camelCase aliases
-    await pm.chartTypeSelector.removeField("_timestamp", "x");
+    await pm.chartTypeSelector.removeField("x_axis_1", "x");
     await pm.chartTypeSelector.selectChartType("table");
 
     await page.locator('[data-test="dashboard-customSql"]').click();
@@ -823,7 +823,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardPanelActions.addPanelName(panelName);
 
     // Configure line chart with custom SQL using camelCase aliases
-    await pm.chartTypeSelector.removeField("_timestamp", "x");
+    await pm.chartTypeSelector.removeField("x_axis_1", "x");
     await pm.chartTypeSelector.selectChartType("line");
 
     await page.locator('[data-test="dashboard-customSql"]').click();
@@ -920,7 +920,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardPanelActions.addPanelName(panelName);
 
     // Configure line chart with custom SQL using complex CASE WHEN statements
-    await pm.chartTypeSelector.removeField("_timestamp", "x");
+    await pm.chartTypeSelector.removeField("x_axis_1", "x");
     await pm.chartTypeSelector.selectChartType("line");
 
     await page.locator('[data-test="dashboard-customSql"]').click();
