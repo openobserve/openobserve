@@ -52,7 +52,6 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
     })
     .await
     .unwrap_or_default();
-    let mut events = EVENTS.write().await;
     for node in nodes {
         if node.uuid.eq(&LOCAL_NODE.uuid) {
             continue;
@@ -108,23 +107,30 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
         let mut ok = false;
         for _i in 0..5 {
             let node = node.clone();
-            let channel = events.entry(node_uuid.clone()).or_insert_with(|| {
-                let (tx, mut rx) = mpsc::unbounded_channel();
-                tokio::task::spawn(async move {
-                    let node_addr = node.grpc_addr.clone();
-                    if let Err(e) = send_to_node(node, &mut rx).await {
-                        log::error!(
-                            "[broadcast] send event to node[{}] channel failed, channel closed: {}",
-                            &node_addr,
-                            e
-                        );
-                    }
-                });
-                Arc::new(tx)
-            });
+            // Acquire lock only when accessing the HashMap
+            let channel = {
+                let mut events = EVENTS.write().await;
+                events.entry(node_uuid.clone()).or_insert_with(|| {
+                    let (tx, mut rx) = mpsc::unbounded_channel();
+                    tokio::task::spawn(async move {
+                        let node_addr = node.grpc_addr.clone();
+                        if let Err(e) = send_to_node(node, &mut rx).await {
+                            log::error!(
+                                "[broadcast] send event to node[{}] channel failed, channel closed: {}",
+                                &node_addr,
+                                e
+                            );
+                        }
+                    });
+                    Arc::new(tx)
+                }).clone()
+            };
             tokio::task::yield_now().await;
             if let Err(e) = channel.clone().send(node_items.clone()) {
-                events.remove(&node_uuid);
+                // Acquire lock only when removing from the HashMap
+                {
+                    EVENTS.write().await.remove(&node_uuid);
+                }
                 log::error!(
                     "[broadcast] send event to node[{}] channel failed, {}, retrying...",
                     &node_addr,
