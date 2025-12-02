@@ -85,7 +85,11 @@ export function extractStatusFromLog(logEntry: any): StatusInfo {
     
     // Found a valid status value - parse and return it
     // Example: logEntry["level"] = "WARNING" → parseStatusValue("WARNING")
+    // Also handles numeric strings: "200", "404", "500"
     if (statusValue !== undefined && statusValue !== null) {
+      // Convert numeric strings to numbers before parsing
+      // Example: "0" → 0, "1" → 1, "error" → "error"
+        statusValue = isNaN(Number(statusValue)) ? statusValue : Number(statusValue);
       return parseStatusValue(statusValue);
     }
   }
@@ -178,8 +182,8 @@ function mapNumericStatus(value: number): StatusInfo {
 
 /**
  * Maps string status levels to status information
- * Uses case-insensitive prefix matching for flexibility
- * 
+ * Uses exact full name matching for precise status identification
+ *
  * @param value - String status level (case-insensitive)
  * @returns StatusInfo object
  */
@@ -187,56 +191,56 @@ function mapStringStatus(value: string): StatusInfo {
   const lowerValue = value.toLowerCase().trim();
 
   // Emergency/Fatal levels - system unusable
-  // Examples: "emergency", "emerg", "fatal", "f" → emergency
-  if (lowerValue.startsWith('emerg') || lowerValue.startsWith('f')) {
+  // Examples: "emergency", "emerg", "fatal" → emergency
+  if (lowerValue === 'emergency' || lowerValue === 'emerg' || lowerValue === 'fatal') {
     return { level: 'emergency', color: STATUS_COLORS.emergency, priority: 0 };
   }
 
   // Alert levels - immediate action required
-  // Examples: "alert", "a" → alert
-  if (lowerValue.startsWith('a')) {
+  // Examples: "alert" → alert
+  if (lowerValue === 'alert') {
     return { level: 'alert', color: STATUS_COLORS.alert, priority: 1 };
   }
 
   // Critical levels - critical conditions
-  // Examples: "critical", "crit", "c" → critical
-  if (lowerValue.startsWith('c')) {
+  // Examples: "critical", "crit" → critical
+  if (lowerValue === 'critical' || lowerValue === 'crit') {
     return { level: 'critical', color: STATUS_COLORS.critical, priority: 2 };
   }
 
-  // Error levels - error conditions (exclude emergency)
-  // Examples: "error", "err", "e" → error (but not "emergency")
-  if (lowerValue.startsWith('e') && !lowerValue.startsWith('emerg')) {
+  // Error levels - error conditions
+  // Examples: "error", "err" → error
+  if (lowerValue === 'error' || lowerValue === 'err') {
     return { level: 'error', color: STATUS_COLORS.error, priority: 3 };
   }
 
   // Warning levels - warning conditions
-  // Examples: "warning", "warn", "w" → warning
-  if (lowerValue.startsWith('w')) {
+  // Examples: "warning", "warn" → warning
+  if (lowerValue === 'warning' || lowerValue === 'warn') {
     return { level: 'warning', color: STATUS_COLORS.warning, priority: 4 };
   }
 
   // Notice levels - significant but normal condition
-  // Examples: "notice", "n" → notice
-  if (lowerValue.startsWith('n')) {
+  // Examples: "notice" → notice
+  if (lowerValue === 'notice') {
     return { level: 'notice', color: STATUS_COLORS.notice, priority: 5 };
   }
 
   // Info levels - informational messages
-  // Examples: "info", "information", "i" → info
-  if (lowerValue.startsWith('i')) {
+  // Examples: "info", "information" → info
+  if (lowerValue === 'info' || lowerValue === 'information') {
     return { level: 'info', color: STATUS_COLORS.info, priority: 6 };
   }
 
   // Debug levels - debug messages and detailed logging
-  // Examples: "debug", "d", "trace", "verbose" → debug
-  if (lowerValue.startsWith('d') || lowerValue.startsWith('trace') || lowerValue.startsWith('verbose')) {
+  // Examples: "debug", "trace", "verbose" → debug
+  if (lowerValue === 'debug' || lowerValue === 'trace' || lowerValue === 'verbose') {
     return { level: 'debug', color: STATUS_COLORS.debug, priority: 7 };
   }
 
   // Success/OK levels - positive status indicators
-  // Examples: "ok", "success", "o", "s" → ok
-  if (lowerValue.startsWith('o') || lowerValue.startsWith('s') || lowerValue === 'ok' || lowerValue === 'success') {
+  // Examples: "ok", "success" → ok
+  if (lowerValue === 'ok' || lowerValue === 'success') {
     return { level: 'ok', color: STATUS_COLORS.ok, priority: 8 };
   }
 
