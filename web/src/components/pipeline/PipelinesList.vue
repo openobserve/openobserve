@@ -404,14 +404,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-card>
   </q-dialog>
 
-  <!-- Pipeline History Drawer - Outside q-page for full overlay -->
-  <PipelineHistoryDrawer
+  <!-- Pipeline History Dialog -->
+  <q-dialog
     v-model="showHistoryDrawer"
-    :pipeline-id="selectedHistoryPipelineId"
-    :pipeline-name="selectedHistoryPipelineName"
-    :pipeline-type="selectedHistoryPipelineType"
-    :is-silenced="selectedHistoryIsSilenced"
-  />
+    position="right"
+    full-height
+    maximized
+    data-test="pipeline-history-dialog"
+  >
+    <PipelineHistoryDrawer
+      :pipeline-id="selectedHistoryPipelineId"
+      :pipeline-name="selectedHistoryPipelineName"
+      :pipeline-type="selectedHistoryPipelineType"
+      @close="showHistoryDrawer = false"
+    />
+  </q-dialog>
   </div>
 </template>
 <script setup lang="ts">
@@ -511,7 +518,6 @@ const showHistoryDrawer = ref(false);
 const selectedHistoryPipelineId = ref("");
 const selectedHistoryPipelineName = ref("");
 const selectedHistoryPipelineType = ref("");
-const selectedHistoryIsSilenced = ref(false);
 
 const tabs = reactive([
   {
@@ -645,7 +651,6 @@ const triggerExpand = (props: any) => {
   selectedHistoryPipelineId.value = props.row.pipeline_id;
   selectedHistoryPipelineName.value = props.row.name;
   selectedHistoryPipelineType.value = props.row.source?.source_type || 'realtime';
-  selectedHistoryIsSilenced.value = props.row.is_silenced || false;
   showHistoryDrawer.value = true;
 };
 

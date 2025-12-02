@@ -86,7 +86,8 @@
     "showMore": "Show More",
     "contactUs": "Contact Us",
     "addFolder": "Add Folder",
-    "status": "Status"
+    "status": "Status",
+    "loadMore":"Load More"
   },
   "search": {
     "resetFields": "Reset selected table fields",
@@ -1160,6 +1161,23 @@
     "successRate": "Success Rate",
     "loadMore": "Load More",
     "failedToFetchHistory": "Failed to fetch alert history",
+    "historyTable": {
+      "timestamp": "Timestamp",
+      "status": "Status",
+      "evaluationTime": "Evaluation (s)",
+      "queryTime": "Query (ms)"
+    },
+    "alertDetails": {
+      "alertName": "Alert Name",
+      "sqlQuery": "SQL Query",
+      "conditions": "Conditions",
+      "copy": "Copy",
+      "noCondition": "No condition",
+      "noDescription": "No description",
+      "evaluationHistory": "Evaluation History",
+      "loadingHistory": "Loading history...",
+      "noHistoryAvailable": "No evaluation history available for this alert"
+    },
     "insights": {
       "title": "Alert Insights",
       "badge": "Interactive Analysis",
@@ -1522,7 +1540,7 @@
     "get_history": "Get History",
     "executed_at":"Executed At",
     "sql_query":"SQL Query",
-    "resuls":"Results"
+    "results":"Results"
   },
   "search_scheduler_job": {
     "title": "Search Job Scheduler",
@@ -1582,10 +1600,12 @@
     "period": "Period",
     "cron": "Cron",
     "type": "Type",
-    "run_pipeline":"Run Pipeline"
+    "run_pipeline":"Run Pipeline",
+    "results":"Results"
   },
   "alert_list":{
-    "alert_details":"Alert Details"
+    "alert_details":"Alert Details",
+    "alert_history":"Alert History"
   }
 
 }

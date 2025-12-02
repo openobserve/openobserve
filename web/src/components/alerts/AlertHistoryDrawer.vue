@@ -15,422 +15,330 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <Teleport to="body">
-  <q-drawer
-    v-model="isOpen"
-    side="right"
-    bordered
-    :width="600"
-    overlay
-    elevated
-    behavior="mobile"
-    class="alert-history-drawer"
-  >
-    <div class="tw-h-full tw-flex tw-flex-col">
-      <!-- Header -->
-      <div
-        class="tw-flex tw-items-center tw-justify-between tw-p-4 tw-border-b"
-        :class="
-          store.state.theme === 'dark'
-            ? 'tw-border-gray-600'
-            : 'tw-border-gray-200'
-        "
-      >
-        <div class="tw-flex tw-items-center tw-gap-3">
-          <q-icon name="history" size="24px" />
-          <div>
-            <div class="tw-font-semibold tw-text-lg">{{ props.alertName }}</div>
-            <div class="tw-text-sm tw-text-gray-500 dark:tw-text-gray-400">
-              {{ t("alerts.alertHistory") }}
-            </div>
+  <div style="width: 50vw;" :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'">
+    <!-- Header -->
+    <q-card-section class="q-ma-none">
+      <div class="row items-center no-wrap">
+        <div class="col">
+          <div class="tw-text-[18px] tw-flex tw-items-center" data-test="alert-details-title">
+            {{ t('alert_list.alert_history') }}
+            <!-- Alert Name Badge -->
+            <span
+              v-if="alertDetails"
+              :class="[
+                'tw-font-bold tw-mr-4 tw-px-2 tw-py-1 tw-rounded-md tw-ml-2 tw-max-w-xs tw-truncate tw-inline-block',
+                store.state.theme === 'dark'
+                  ? 'tw-text-blue-400 tw-bg-blue-900/50'
+                  : 'tw-text-blue-600 tw-bg-blue-50'
+              ]"
+            >
+              {{ alertDetails.name }}
+              <q-tooltip v-if="alertDetails.name && alertDetails.name.length > 35" class="tw-text-xs">
+                {{ alertDetails.name }}
+              </q-tooltip>
+            </span>
           </div>
         </div>
-        <q-btn
-          icon="close"
-          flat
-          round
-          dense
-          @click="close"
-          data-test="alert-history-drawer-close-btn"
-        />
-      </div>
-
-      <!-- Stats Summary -->
-      <div
-        v-if="stats"
-        class="tw-p-4 tw-border-b"
-        :class="
-          store.state.theme === 'dark'
-            ? 'tw-border-gray-600 tw-bg-gray-800'
-            : 'tw-border-gray-200 tw-bg-gray-50'
-        "
-      >
-        <div class="tw-grid tw-grid-cols-2 tw-gap-4">
-          <div>
-            <div class="tw-text-xs tw-text-gray-500 dark:tw-text-gray-400">
-              {{ t("alerts.totalEvaluations") }}
-            </div>
-            <div class="tw-text-xl tw-font-semibold">
-              {{ stats.total }}
-            </div>
-          </div>
-          <div>
-            <div class="tw-text-xs tw-text-gray-500 dark:tw-text-gray-400">
-              {{ t("alerts.firingCount") }}
-            </div>
-            <div class="tw-text-xl tw-font-semibold tw-text-red-500">
-              {{ stats.firing }}
-            </div>
-          </div>
-          <div>
-            <div class="tw-text-xs tw-text-gray-500 dark:tw-text-gray-400">
-              {{ t("alerts.avgEvaluationTime") }}
-            </div>
-            <div class="tw-text-lg tw-font-semibold">
-              {{ formatDuration(stats.avgDuration) }}
-            </div>
-          </div>
-          <div>
-            <div class="tw-text-xs tw-text-gray-500 dark:tw-text-gray-400">
-              {{ t("alerts.successRate") }}
-            </div>
-            <div class="tw-text-lg tw-font-semibold tw-text-green-500">
-              {{ stats.successRate }}%
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Timeline -->
-      <div class="tw-flex-1 tw-overflow-y-auto tw-p-4">
-        <div v-if="loading" class="tw-flex tw-justify-center tw-py-8">
-          <q-spinner color="primary" size="40px" />
-        </div>
-
-        <div v-else-if="historyItems.length === 0" class="tw-text-center tw-py-8">
-          <q-icon name="history" size="48px" class="tw-text-gray-400" />
-          <div class="tw-mt-2 tw-text-gray-600 dark:tw-text-gray-400">
-            {{ t("alerts.noHistoryData") }}
-          </div>
-        </div>
-
-        <q-timeline v-else color="primary" class="tw-mt-2">
-          <q-timeline-entry
-            v-for="(item, index) in historyItems"
-            :key="index"
-            :color="getStatusColor(item.status)"
-            :icon="getStatusIcon(item.status)"
-          >
-            <template #title>
-              <div class="tw-flex tw-items-center tw-justify-between">
-                <span class="tw-font-medium">{{ formatStatus(item.status) }}</span>
-                <span class="tw-text-xs tw-text-gray-500">
-                  {{ formatTimestamp(item.timestamp) }}
-                </span>
-              </div>
-            </template>
-
-            <template #subtitle>
-              <div class="tw-text-sm tw-mt-1 tw-space-y-1">
-                <div v-if="item.is_realtime">
-                  <q-badge color="blue" label="Real-time" />
-                </div>
-                <div v-if="item.is_silenced">
-                  <q-badge color="orange" label="Silenced" />
-                </div>
-                <div v-if="item.evaluation_took_in_secs">
-                  <span class="tw-text-gray-600 dark:tw-text-gray-400">
-                    Duration: {{ formatDuration(item.evaluation_took_in_secs) }}
-                  </span>
-                </div>
-                <div v-if="item.error" class="tw-text-red-500 tw-mt-1">
-                  <q-icon name="error" size="14px" class="tw-mr-1" />
-                  {{ item.error }}
-                </div>
-              </div>
-            </template>
-          </q-timeline-entry>
-        </q-timeline>
-
-        <!-- Load more button -->
-        <div v-if="hasMore && !loading" class="tw-text-center tw-mt-4">
+        <div class="col-auto tw-flex tw-items-center tw-gap-2">
           <q-btn
+            data-test="alert-details-refresh-btn"
+            class="text-bold no-border o2-secondary-button tw-h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             flat
-            color="primary"
-            :label="t('alerts.loadMore')"
-            @click="loadMore"
-            data-test="alert-history-load-more-btn"
+            no-caps
+            @click="refreshHistory"
+            :loading="isLoadingHistory"
+            :disable="isLoadingHistory"
+          >
+            <q-icon name="refresh" size="18px" />
+            <span class="tw-ml-2">{{ t("common.refresh") }}</span>
+          </q-btn>
+          <q-btn
+            data-test="alert-details-close-btn"
+            v-close-popup="true"
+            round
+            dense
+            flat
+            icon="cancel"
           />
         </div>
       </div>
+    </q-card-section>
+    <q-separator />
+
+    <!-- Content -->
+    <div class="q-px-md q-py-md alert-details-content" v-if="alertDetails">
+      <!-- SQL Query / Conditions -->
+      <div class="tw-mb-6">
+        <div class="tw-flex tw-items-center tw-justify-between tw-mb-2">
+          <div class="section-label">
+            {{ alertDetails.type == "sql" ? t('alerts.alertDetails.sqlQuery') : t('alerts.alertDetails.conditions') }}
+          </div>
+          <q-btn
+            v-if="alertDetails.conditions != '' && alertDetails.conditions != '--'"
+            @click="copyToClipboard(alertDetails.conditions, t('alerts.alertDetails.conditions'))"
+            size="sm"
+            flat
+            dense
+            icon="content_copy"
+            class="tw-ml-2"
+            data-test="alert-details-copy-conditions-btn"
+          >
+            <q-tooltip>{{ t('alerts.alertDetails.copy') }}</q-tooltip>
+          </q-btn>
+        </div>
+        <pre
+          class="el-border el-border-radius tw-p-3 tw-text-sm tw-overflow-x-auto"
+          style="white-space: pre-wrap"
+        >{{
+          alertDetails.conditions != "" && alertDetails.conditions != "--"
+            ? (alertDetails.type == 'sql' ? alertDetails.conditions : alertDetails.conditions.length != 2 ? `if ${alertDetails.conditions}` : t('alerts.alertDetails.noCondition'))
+            : t('alerts.alertDetails.noCondition')
+        }}</pre>
+      </div>
+
+      <!-- Description (only show if exists) -->
+      <div v-if="alertDetails.description" class="tw-mb-6">
+        <div class="section-label tw-mb-2">{{ t('common.description') }}</div>
+        <pre
+          class="el-border el-border-radius tw-p-3 tw-text-sm"
+          style="white-space: pre-wrap"
+        >{{ alertDetails.description }}</pre>
+      </div>
+
+      <!-- Alert History Table -->
+      <div class="tw-mb-6 tw-flex tw-flex-col" style="min-height: 300px;">
+        <div class="section-label tw-mb-3">{{ t('alerts.alertDetails.evaluationHistory') }}</div>
+
+        <div v-if="isLoadingHistory" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1">
+          <q-spinner-hourglass size="32px" color="primary" />
+          <div class="tw-text-sm tw-mt-3" :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'">
+            {{ t('alerts.alertDetails.loadingHistory') }}
+          </div>
+        </div>
+
+        <div
+          v-else-if="alertHistory.length === 0"
+          class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1"
+          :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'"
+        >
+          <q-icon name="history" size="48px" class="tw-mb-2 tw-opacity-30" />
+          <div class="tw-text-sm">{{ t('alerts.alertDetails.noHistoryAvailable') }}</div>
+        </div>
+
+        <q-table
+          v-else
+          ref="qTableRef"
+          :rows="alertHistory"
+          :columns="historyTableColumns"
+          row-key="timestamp"
+          flat
+          dense
+          :pagination="pagination"
+          class="tw-shadow-sm"
+          data-test="alert-details-history-table"
+        >
+          <template v-slot:body-cell-status="props">
+            <q-td :props="props">
+              <q-badge
+                :color="props.row.status?.toLowerCase() === 'firing' || props.row.status?.toLowerCase() === 'error' ? 'negative' : 'positive'"
+                :label="props.row.status || 'Unknown'"
+              />
+            </q-td>
+          </template>
+
+          <template #bottom="scope">
+            <div class="bottom-btn tw-h-[48px]">
+              <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[120px] tw-mr-md">
+                {{ alertHistory.length }} {{ t('alerts.alertDetails.evaluationHistory') }}
+              </div>
+              <QTablePagination
+                :scope="scope"
+                :position="'bottom'"
+                :resultTotal="alertHistory.length"
+                :perPageOptions="perPageOptions"
+                @update:changeRecordPerPage="changePagination"
+              />
+            </div>
+          </template>
+        </q-table>
+      </div>
     </div>
-  </q-drawer>
-  </Teleport>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import { ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
+import { useQuasar, date } from "quasar";
+import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";
-import { date } from "quasar";
+import type { Ref } from "vue";
 
+// Composables
 const { t } = useI18n();
 const store = useStore();
+const $q = useQuasar();
 
-interface AlertHistoryItem {
-  timestamp: number;
-  status: string;
-  is_realtime: boolean;
-  is_silenced: boolean;
-  evaluation_took_in_secs?: number;
-  error?: string;
-}
-
-interface AlertHistoryStats {
-  total: number;
-  firing: number;
-  avgDuration: number;
-  successRate: number;
-}
-
+// Props & Emits
 interface Props {
-  modelValue: boolean;
+  alertDetails: any;
   alertId: string;
-  alertName: string;
 }
 
 const props = defineProps<Props>();
 
-const emit = defineEmits<{
-  (e: "update:modelValue", value: boolean): void;
-}>();
+// Emit is not used since v-close-popup handles closing
+// const emit = defineEmits(["close"]);
 
-const isOpen = computed({
-  get: () => props.modelValue,
-  set: (value) => emit("update:modelValue", value),
+// Refs
+const alertHistory: Ref<any[]> = ref([]);
+const isLoadingHistory = ref(false);
+const qTableRef: Ref<any> = ref(null);
+
+// Pagination (offline pagination - fetch 100 records by default)
+const selectedPerPage = ref<number>(100);
+const pagination: any = ref({
+  page: 1,
+  rowsPerPage: 100,
 });
 
-const loading = ref(false);
-const historyItems = ref<AlertHistoryItem[]>([]);
-const stats = ref<AlertHistoryStats | null>(null);
-const currentPage = ref(0);
-const pageSize = 50;
-const hasMore = ref(true);
+const perPageOptions = [
+  { label: "10", value: 10 },
+  { label: "20", value: 20 },
+  { label: "50", value: 50 },
+  { label: "100", value: 100 }
+];
 
-const getStatusIcon = (status: string) => {
-  switch (status.toLowerCase()) {
-    case "firing":
-      return "warning";
-    case "error":
-      return "error";
-    case "ok":
-    case "completed":
-      return "check_circle";
-    default:
-      return "info";
-  }
+const changePagination = (val: { label: string; value: any }) => {
+  selectedPerPage.value = val.value;
+  pagination.value.rowsPerPage = val.value;
+  pagination.value.page = 1; // Reset to first page when changing rows per page
+  qTableRef.value?.setPagination(pagination.value);
 };
 
-const getStatusColor = (status: string) => {
-  switch (status.toLowerCase()) {
-    case "firing":
-      return "warning";
-    case "error":
-      return "negative";
-    case "ok":
-    case "completed":
-      return "positive";
-    default:
-      return "grey";
-  }
-};
+// Constants
+const historyTableColumns = [
+  {
+    name: 'timestamp',
+    label: t('alerts.historyTable.timestamp'),
+    field: 'timestamp',
+    align: 'left' as const,
+    sortable: true,
+    format: (val: any) => convertUnixToQuasarFormat(val)
+  },
+  {
+    name: 'status',
+    label: t('alerts.historyTable.status'),
+    field: 'status',
+    align: 'center' as const,
+    sortable: true
+  },
+  {
+    name: 'evaluation_time',
+    label: t('alerts.historyTable.evaluationTime'),
+    field: 'evaluation_took_in_secs',
+    align: 'center' as const,
+    sortable: true,
+    format: (val: any) => val ? val.toFixed(3) : '-'
+  },
+  {
+    name: 'query_time',
+    label: t('alerts.historyTable.queryTime'),
+    field: 'query_took',
+    align: 'center' as const,
+    sortable: true,
+    format: (val: any) => val || '-'
+  },
+];
 
-const formatStatus = (status: string) => {
-  return status.charAt(0).toUpperCase() + status.slice(1);
-};
+// Helper Functions
+function convertUnixToQuasarFormat(unixMicroseconds: any) {
+  if (!unixMicroseconds) return "";
+  const unixSeconds = unixMicroseconds / 1e6;
+  const dateToFormat = new Date(unixSeconds * 1000);
+  const formattedDate = dateToFormat.toISOString();
+  return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+}
 
-const formatTimestamp = (timestamp: number) => {
-  if (!timestamp) return "N/A";
-  const now = Date.now() * 1000; // microseconds
-  const diff = now - timestamp;
+// Main Functions
+const fetchAlertHistory = async (alertId: string) => {
+  if (!alertId) return;
 
-  // Less than 1 hour
-  if (diff < 3600000000) {
-    const minutes = Math.floor(diff / 60000000);
-    return `${minutes} min ago`;
-  }
-
-  // Less than 24 hours
-  if (diff < 86400000000) {
-    const hours = Math.floor(diff / 3600000000);
-    return `${hours} hour${hours > 1 ? "s" : ""} ago`;
-  }
-
-  // Less than 7 days
-  if (diff < 604800000000) {
-    const days = Math.floor(diff / 86400000000);
-    return `${days} day${days > 1 ? "s" : ""} ago`;
-  }
-
-  // Format as date
-  return date.formatDate(timestamp / 1000, "MMM DD, YYYY HH:mm");
-};
-
-const formatDuration = (seconds: number) => {
-  if (!seconds) return "N/A";
-  if (seconds < 1) return `${(seconds * 1000).toFixed(0)}ms`;
-  if (seconds < 60) return `${seconds.toFixed(2)}s`;
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = (seconds % 60).toFixed(0);
-  return `${minutes}m ${remainingSeconds}s`;
-};
-
-const fetchHistory = async (append = false) => {
-  if (!props.alertId) return;
-
-  loading.value = true;
+  isLoadingHistory.value = true;
   try {
-    const orgIdentifier = store.state.selectedOrganization.identifier;
-    const endTime = Date.now() * 1000; // microseconds
-    const startTime = endTime - 30 * 24 * 60 * 60 * 1000000; // 30 days ago
+    // Get history for last 30 days
+    const endTime = Date.now() * 1000; // Convert to microseconds
+    const startTime = endTime - (30 * 24 * 60 * 60 * 1000000); // 30 days ago in microseconds
 
-    const response = await alertsService.getHistory(orgIdentifier, {
-      alert_id: props.alertId,
-      start_time: startTime,
-      end_time: endTime,
-      from: currentPage.value * pageSize,
-      size: pageSize,
-    });
-
-    if (response.data && response.data.hits) {
-      const items = response.data.hits.map((hit: any) => ({
-        timestamp: hit.timestamp,
-        status: hit.status,
-        is_realtime: hit.is_realtime,
-        is_silenced: hit.is_silenced,
-        evaluation_took_in_secs: hit.evaluation_took_in_secs,
-        error: hit.error,
-      }));
-
-      if (append) {
-        historyItems.value.push(...items);
-      } else {
-        historyItems.value = items;
+    const response = await alertsService.getHistory(
+      store?.state?.selectedOrganization?.identifier,
+      {
+        alert_id: alertId,
+        size: 100, // Get last 100 evaluations for offline pagination
+        start_time: startTime,
+        end_time: endTime
       }
-
-      hasMore.value = response.data.hits.length === pageSize;
-
-      // Calculate stats
-      calculateStats();
-    }
-  } catch (error) {
-    console.error("Failed to fetch alert history:", error);
-    store.dispatch("showNotification", {
-      message: t("alerts.failedToFetchHistory"),
-      color: "negative",
+    );
+    alertHistory.value = response.data?.hits || [];
+  } catch (error: any) {
+    alertHistory.value = [];
+    $q.notify({
+      type: "negative",
+      message: error.response?.data?.message || error.message || t("alerts.failedToFetchHistory"),
+      timeout: 5000,
     });
   } finally {
-    loading.value = false;
+    isLoadingHistory.value = false;
   }
 };
 
-const calculateStats = () => {
-  if (historyItems.value.length === 0) {
-    stats.value = null;
-    return;
-  }
-
-  const total = historyItems.value.length;
-  const firing = historyItems.value.filter(
-    (item) => item.status === "firing" || item.status === "error"
-  ).length;
-
-  const durations = historyItems.value
-    .filter((item) => item.evaluation_took_in_secs)
-    .map((item) => item.evaluation_took_in_secs!);
-
-  const avgDuration =
-    durations.length > 0
-      ? durations.reduce((sum, d) => sum + d, 0) / durations.length
-      : 0;
-
-  const successful = historyItems.value.filter(
-    (item) => item.status === "ok" || item.status === "completed"
-  ).length;
-
-  const successRate = total > 0 ? Math.round((successful / total) * 100) : 0;
-
-  stats.value = {
-    total,
-    firing,
-    avgDuration,
-    successRate,
-  };
-};
-
-const loadMore = () => {
-  currentPage.value++;
-  fetchHistory(true);
-};
-
-const close = () => {
-  isOpen.value = false;
-};
-
-// Handle ESC key
-const handleKeyDown = (event: KeyboardEvent) => {
-  if (event.key === "Escape" && isOpen.value) {
-    close();
+const refreshHistory = () => {
+  if (props.alertId) {
+    fetchAlertHistory(props.alertId);
   }
 };
 
-// Watch for drawer opening
-watch(
-  () => props.modelValue,
-  (newVal) => {
-    if (newVal && props.alertId) {
-      currentPage.value = 0;
-      historyItems.value = [];
-      fetchHistory();
-    }
-  }
-);
+const copyToClipboard = (text: string, type: string) => {
+  navigator.clipboard
+    .writeText(text)
+    .then(() => {
+      $q.notify({
+        type: "positive",
+        message: `${type} Copied Successfully!`,
+        timeout: 5000,
+      });
+    })
+    .catch(() => {
+      $q.notify({
+        type: "negative",
+        message: "Error while copy content.",
+        timeout: 5000,
+      });
+    });
+};
 
-// Watch for alert name changes
+// Watchers
 watch(
   () => props.alertId,
   (newVal) => {
-    if (newVal && props.modelValue) {
-      currentPage.value = 0;
-      historyItems.value = [];
-      fetchHistory();
+    if (newVal) {
+      fetchAlertHistory(newVal);
     }
-  }
+  },
+  { immediate: true }
 );
-
-// Add/remove keyboard event listener
-onMounted(() => {
-  document.addEventListener("keydown", handleKeyDown);
-});
-
-onUnmounted(() => {
-  document.removeEventListener("keydown", handleKeyDown);
-});
 </script>
 
-<style scoped lang="scss">
-.alert-history-drawer {
-  :deep(.q-drawer__content) {
-    overflow: hidden;
-  }
+<style lang="scss" scoped>
+.alert-details-content {
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+}
 
-  :deep(.q-timeline) {
-    padding: 0;
-  }
-
-  :deep(.q-timeline__entry) {
-    margin-bottom: 16px;
-  }
+.section-label {
+  font-size: 0.875rem;
+  font-weight: 600;
 }
 </style>

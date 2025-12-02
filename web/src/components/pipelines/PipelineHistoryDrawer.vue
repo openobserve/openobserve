@@ -15,200 +15,258 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <Teleport to="body">
-  <q-drawer
-    v-model="isOpen"
-    side="right"
-    bordered
-    :width="600"
-    overlay
-    elevated
-    behavior="mobile"
-    class="pipeline-history-drawer"
-  >
-    <div class="tw-h-full tw-flex tw-flex-col">
-      <!-- Header -->
-      <div
-        class="tw-flex tw-items-center tw-justify-between tw-p-4 tw-border-b"
-        :class="
-          store.state.theme === 'dark'
-            ? 'tw-border-gray-600'
-            : 'tw-border-gray-200'
-        "
-      >
-        <div class="tw-flex tw-items-center tw-gap-3">
-          <q-icon name="history" size="24px" />
-          <div>
-            <div class="tw-flex tw-items-center tw-gap-2 tw-font-semibold tw-text-lg">
-              <span>{{ props.pipelineName }}</span>
+  <div style="width: 50vw;" :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'">
+    <!-- Header -->
+    <q-card-section class="q-ma-none">
+      <div class="row items-center no-wrap">
+        <div class="col">
+          <div class="tw-text-[18px] tw-flex tw-items-center" data-test="pipeline-history-title">
+            {{ t("pipeline.history") }}
+            <!-- Pipeline Name Badge -->
+            <span
+              :class="[
+                'tw-font-bold tw-mr-4 tw-px-2 tw-py-1 tw-rounded-md tw-ml-2 tw-max-w-xs tw-truncate tw-inline-block',
+                store.state.theme === 'dark'
+                  ? 'tw-text-blue-400 tw-bg-blue-900/50'
+                  : 'tw-text-blue-600 tw-bg-blue-50'
+              ]"
+            >
+              {{ props.pipelineName }}
+              <q-tooltip v-if="props.pipelineName && props.pipelineName.length > 20" class="tw-text-xs">
+                {{ props.pipelineName }}
+              </q-tooltip>
+            </span>
+            <!-- Pipeline Type Badge -->
+            <div class="tw-flex tw-items-center tw-gap-2">
               <q-icon
-                :name="props.pipelineType === 'realtime' ? 'check_circle' : 'schedule'"
+                :name="props.pipelineType === 'realtime' ? 'bolt' : 'schedule'"
                 size="20px"
-                :color="props.pipelineType === 'realtime' ? 'positive' : 'grey'"
+                color="grey"
               >
                 <q-tooltip>{{ props.pipelineType === 'realtime' ? 'Real-time' : 'Scheduled' }}</q-tooltip>
               </q-icon>
-              <q-icon
-                :name="props.isSilenced ? 'volume_off' : 'volume_up'"
-                size="20px"
-                :color="props.isSilenced ? 'orange' : 'positive'"
-              >
-                <q-tooltip>{{ props.isSilenced ? 'Silenced' : 'Not Silenced' }}</q-tooltip>
-              </q-icon>
-            </div>
-            <div class="tw-text-sm tw-text-gray-500 dark:tw-text-gray-400">
-              {{ t("pipeline.history") }}
             </div>
           </div>
         </div>
-        <q-btn
-          icon="close"
-          flat
-          round
-          dense
-          @click="close"
-          data-test="pipeline-history-drawer-close-btn"
-        />
+        <div class="col-auto tw-flex tw-items-center tw-gap-2">
+          <q-btn
+            data-test="pipeline-history-refresh-btn"
+            class="text-bold no-border o2-secondary-button tw-h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            flat
+            no-caps
+            @click="refreshHistory"
+            :loading="loading"
+            :disable="loading"
+          >
+            <q-icon name="refresh" size="18px" />
+            <span class="tw-ml-2">{{ t("common.refresh") }}</span>
+          </q-btn>
+          <q-btn
+            data-test="pipeline-history-close-btn"
+            v-close-popup="true"
+            round
+            flat
+            dense
+            icon="cancel"
+          />
+        </div>
       </div>
+    </q-card-section>
+    <q-separator />
 
-      <!-- Stats Summary - Always shown -->
-      <div
-        class="tw-p-4 tw-border-b"
-        :class="
-          store.state.theme === 'dark'
-            ? 'tw-border-gray-600 tw-bg-gray-800'
-            : 'tw-border-gray-200 tw-bg-gray-50'
-        "
-      >
-        <div class="tw-grid tw-grid-cols-2 tw-gap-4">
-          <div>
-            <div class="tw-text-xs tw-text-gray-500 dark:tw-text-gray-400">
-              {{ t("pipeline.totalExecutions") }}
+    <!-- Stats Summary -->
+    <q-card-section class="q-ma-none q-pa-md">
+      <div class="tw-grid tw-grid-cols-4 tw-gap-2">
+        <!-- Total Executions Tile -->
+        <div class="tile" data-test="total-executions-tile">
+          <div
+            class="tile-content tw-rounded-lg tw-p-3 tw-text-center tw-border tw-shadow-sm tw-h-20 tw-flex tw-flex-col tw-justify-between"
+            :class="store.state.theme === 'dark' ? 'tw-bg-gray-800/50 tw-border-gray-700' : 'tw-bg-white tw-border-gray-200'"
+          >
+            <div class="tile-header tw-flex tw-justify-between tw-items-start">
+              <div
+                class="tile-title tw-text-xs tw-font-bold tw-text-left"
+                :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'"
+              >
+                {{ t("pipeline.totalExecutions") }}
+              </div>
             </div>
-            <div class="tw-text-xl tw-font-semibold">
+            <div
+              class="tile-value tw-text-lg tw-flex tw-items-end tw-justify-start"
+              :class="store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-gray-900'"
+            >
               {{ stats?.total || 0 }}
             </div>
           </div>
-          <div>
-            <div class="tw-text-xs tw-text-gray-500 dark:tw-text-gray-400">
-              {{ t("pipeline.errorCount") }}
+        </div>
+
+        <!-- Error Count Tile -->
+        <div class="tile" data-test="error-count-tile">
+          <div
+            class="tile-content tw-rounded-lg tw-p-3 tw-text-center tw-border tw-shadow-sm tw-h-20 tw-flex tw-flex-col tw-justify-between"
+            :class="store.state.theme === 'dark' ? 'tw-bg-gray-800/50 tw-border-gray-700' : 'tw-bg-white tw-border-gray-200'"
+          >
+            <div class="tile-header tw-flex tw-justify-between tw-items-start">
+              <div
+                class="tile-title tw-text-xs tw-font-bold tw-text-left"
+                :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'"
+              >
+                {{ t("pipeline.errorCount") }}
+              </div>
             </div>
-            <div class="tw-text-xl tw-font-semibold tw-text-red-500">
+            <div
+              class="tile-value tw-text-lg tw-flex tw-items-end tw-justify-start tw-text-red-500"
+            >
               {{ stats?.errors || 0 }}
             </div>
           </div>
-          <div>
-            <div class="tw-text-xs tw-text-gray-500 dark:tw-text-gray-400">
-              {{ t("pipeline.avgExecutionTime") }}
+        </div>
+
+        <!-- Avg Execution Time Tile -->
+        <div class="tile" data-test="avg-execution-time-tile">
+          <div
+            class="tile-content tw-rounded-lg tw-p-3 tw-text-center tw-border tw-shadow-sm tw-h-20 tw-flex tw-flex-col tw-justify-between"
+            :class="store.state.theme === 'dark' ? 'tw-bg-gray-800/50 tw-border-gray-700' : 'tw-bg-white tw-border-gray-200'"
+          >
+            <div class="tile-header tw-flex tw-justify-between tw-items-start">
+              <div
+                class="tile-title tw-text-xs tw-font-bold tw-text-left"
+                :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'"
+              >
+                {{ t("pipeline.avgExecutionTime") }}
+              </div>
             </div>
-            <div class="tw-text-lg tw-font-semibold">
-              {{ stats ? formatDuration(stats.avgDuration) : 'N/A' }}
+            <div
+              class="tile-value tw-text-lg tw-flex tw-items-end tw-justify-start"
+              :class="store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-gray-900'"
+            >
+              {{ stats ? formatDuration(stats.avgDuration) : 0 }}
             </div>
           </div>
-          <div>
-            <div class="tw-text-xs tw-text-gray-500 dark:tw-text-gray-400">
-              {{ t("pipeline.successRate") }}
+        </div>
+
+        <!-- Success Rate Tile -->
+        <div class="tile" data-test="success-rate-tile">
+          <div
+            class="tile-content tw-rounded-lg tw-p-3 tw-text-center tw-border tw-shadow-sm tw-h-20 tw-flex tw-flex-col tw-justify-between"
+            :class="store.state.theme === 'dark' ? 'tw-bg-gray-800/50 tw-border-gray-700' : 'tw-bg-white tw-border-gray-200'"
+          >
+            <div class="tile-header tw-flex tw-justify-between tw-items-start">
+              <div
+                class="tile-title tw-text-xs tw-font-bold tw-text-left"
+                :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'"
+              >
+                {{ t("pipeline.successRate") }}
+              </div>
             </div>
-            <div class="tw-text-lg tw-font-semibold tw-text-green-500">
+            <div
+              class="tile-value tw-text-lg tw-flex tw-items-end tw-justify-start tw-text-green-500"
+            >
               {{ stats?.successRate || 0 }}%
             </div>
           </div>
         </div>
       </div>
+    </q-card-section>
 
-      <!-- Timeline -->
-      <div class="tw-flex-1 tw-overflow-y-auto tw-p-4">
-        <div v-if="loading" class="tw-flex tw-justify-center tw-py-8">
-          <q-spinner color="primary" size="40px" />
-        </div>
+    <!-- Execution History Table -->
+    <div class="tw-px-2">
+      <div v-if="loading" class="tw-flex tw-flex-col tw-items-center tw-justify-center" style="min-height: 300px;">
+        <q-spinner-hourglass color="primary" size="40px" />
+      </div>
 
-        <div v-else-if="historyItems.length === 0" class="tw-text-center tw-py-8">
-          <q-icon name="history" size="48px" class="tw-text-gray-400" />
-          <div class="tw-mt-2 tw-text-gray-600 dark:tw-text-gray-400">
-            {{ t("pipeline.noHistoryData") }}
-          </div>
-        </div>
-
-        <q-timeline v-else color="primary" class="tw-mt-2">
-          <q-timeline-entry
-            v-for="(item, index) in historyItems"
-            :key="index"
-            :color="getStatusColor(item.status)"
-            :icon="getStatusIcon(item.status)"
-          >
-            <template #title>
-              <div class="tw-flex tw-items-center tw-justify-between">
-                <span class="tw-font-medium">{{ formatStatus(item.status) }}</span>
-                <span class="tw-text-xs tw-text-gray-500">
-                  {{ formatTimestamp(item.timestamp) }}
-                </span>
-              </div>
-            </template>
-
-            <template #subtitle>
-              <div class="tw-text-sm tw-mt-1 tw-space-y-1">
-                <div class="tw-flex tw-gap-2 tw-flex-wrap">
-                  <q-badge v-if="item.is_realtime" color="blue" label="Real-time" />
-                  <q-badge v-if="item.is_silenced" color="orange" label="Silenced" />
-                  <q-badge v-if="item.is_partial" color="warning" label="Partial" />
-                </div>
-                <div v-if="item.start_time" class="tw-text-gray-600 dark:tw-text-gray-400">
-                  <strong>Start Time:</strong> {{ formatDate(item.start_time) }}
-                </div>
-                <div v-if="item.end_time" class="tw-text-gray-600 dark:tw-text-gray-400">
-                  <strong>End Time:</strong> {{ formatDate(item.end_time) }}
-                </div>
-                <div v-if="item.start_time && item.end_time" class="tw-text-gray-600 dark:tw-text-gray-400">
-                  <strong>Duration:</strong> {{ formatDuration((item.end_time - item.start_time) / 1000000) }}
-                </div>
-                <div v-if="item.evaluation_took_in_secs" class="tw-text-gray-600 dark:tw-text-gray-400">
-                  <strong>Eval Time:</strong> {{ formatDuration(item.evaluation_took_in_secs) }}
-                </div>
-                <div v-if="item.query_took" class="tw-text-gray-600 dark:tw-text-gray-400">
-                  <strong>Query Time:</strong> {{ (item.query_took / 1000).toFixed(2) }}ms
-                </div>
-                <div v-if="item.retries" class="tw-text-gray-600 dark:tw-text-gray-400">
-                  <strong>Retries:</strong> {{ item.retries }}
-                </div>
-                <div v-if="item.delay_in_secs" class="tw-text-gray-600 dark:tw-text-gray-400">
-                  <strong>Delay:</strong> {{ item.delay_in_secs }}s
-                </div>
-                <div v-if="item.error" class="tw-text-red-500 tw-mt-1">
-                  <q-icon name="error" size="14px" class="tw-mr-1" />
-                  {{ item.error }}
-                </div>
-              </div>
-            </template>
-          </q-timeline-entry>
-        </q-timeline>
-
-        <!-- Load more button -->
-        <div v-if="hasMore && !loading" class="tw-text-center tw-mt-4">
-          <q-btn
-            flat
-            color="primary"
-            :label="t('common.loadMore')"
-            @click="loadMore"
-            data-test="pipeline-history-load-more-btn"
-          />
+      <div
+        v-else-if="historyItems.length === 0"
+        class="tw-flex tw-flex-col tw-items-center tw-justify-center"
+        :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'"
+        style="min-height: 300px;"
+      >
+        <q-icon name="history" size="48px" class="tw-opacity-30" />
+        <div class="tw-mt-2">
+          {{ t("pipeline.noHistoryData") }}
         </div>
       </div>
+
+      <q-table
+        v-else
+        ref="qTableRef"
+        :rows="historyItems"
+        :columns="historyTableColumns"
+        row-key="timestamp"
+        :pagination="pagination"
+        :style="historyItems.length > 0
+          ? 'width: 100%; height: calc(100vh - 190px)'
+          : 'width: 100%'"
+        class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+        data-test="pipeline-history-table"
+      >
+        <template v-slot:body="props">
+          <q-tr :props="props">
+            <q-td v-for="col in historyTableColumns" :key="col.name" :props="props">
+              <template v-if="col.name === 'status'">
+                <q-badge
+                  :color="getStatusColor(props.row.status)"
+                  :label="formatStatus(props.row.status)"
+                />
+              </template>
+              <template v-else-if="col.name === 'timestamp'">
+                {{ formatTimestamp(props.row.timestamp) }}
+              </template>
+              <template v-else-if="col.name === 'duration'">
+                {{ props.row.start_time && props.row.end_time
+                  ? formatDuration((props.row.end_time - props.row.start_time) / 1000000)
+                  : '-'
+                }}
+              </template>
+              <template v-else-if="col.name === 'error'">
+                <div v-if="props.row.error" class="tw-flex tw-items-center">
+                  <q-icon name="error" size="20px" class="tw-text-red-500 tw-cursor-pointer">
+                    <q-tooltip class="tw-text-xs tw-max-w-md">
+                      {{ props.row.error }}
+                    </q-tooltip>
+                  </q-icon>
+                </div>
+                <span v-else>--</span>
+              </template>
+            </q-td>
+          </q-tr>
+        </template>
+
+        <template #bottom="scope">
+          <div class="bottom-btn tw-h-[48px] tw-flex tw-w-full">
+            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[220px] tw-mr-md">
+              {{ historyItems.length }} {{ t('pipeline_list.results') }}
+            </div>
+            <QTablePagination
+              :scope="scope"
+              :position="'bottom'"
+              :resultTotal="historyItems.length"
+              :perPageOptions="perPageOptions"
+              @update:changeRecordPerPage="changePagination"
+            />
+          </div>
+        </template>
+      </q-table>
     </div>
-  </q-drawer>
-  </Teleport>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import { ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useQuasar, date } from "quasar";
 import http from "@/services/http";
+import type { Ref } from "vue";
+import QTablePagination from "@/components/shared/grid/Pagination.vue";
 
+// Composables
 const { t } = useI18n();
 const store = useStore();
 const $q = useQuasar();
 
+// Props & Emits
 interface PipelineHistoryItem {
   timestamp: number;
   status: string;
@@ -232,48 +290,82 @@ interface PipelineHistoryStats {
 }
 
 interface Props {
-  modelValue: boolean;
   pipelineId: string;
   pipelineName: string;
   pipelineType?: string;
-  isSilenced?: boolean;
 }
 
 const props = defineProps<Props>();
 
-const emit = defineEmits<{
-  (e: "update:modelValue", value: boolean): void;
-}>();
+// Emit is not used since v-close-popup handles closing
+// const emit = defineEmits(["close"]);
 
-const isOpen = computed({
-  get: () => props.modelValue,
-  set: (value) => emit("update:modelValue", value),
+// Refs
+const loading = ref(false);
+const historyItems: Ref<PipelineHistoryItem[]> = ref([]);
+const stats: Ref<PipelineHistoryStats | null> = ref(null);
+const qTableRef: Ref<any> = ref(null);
+
+// Pagination (offline pagination - fetch 100 records by default)
+const selectedPerPage = ref<number>(100);
+const pagination: any = ref({
+  page: 1,
+  rowsPerPage: 100,
 });
 
-const loading = ref(false);
-const historyItems = ref<PipelineHistoryItem[]>([]);
-const stats = ref<PipelineHistoryStats | null>(null);
-const currentPage = ref(0);
-const pageSize = 50;
-const hasMore = ref(true);
+const perPageOptions = [
+  { label: "10", value: 10 },
+  { label: "20", value: 20 },
+  { label: "50", value: 50 },
+  { label: "100", value: 100 },
+];
 
-const getStatusIcon = (status: string) => {
-  switch (status.toLowerCase()) {
-    case "firing":
-    case "error":
-      return "error";
-    case "ok":
-    case "completed":
-      return "check_circle";
-    default:
-      return "info";
-  }
+const changePagination = (val: { label: string; value: any }) => {
+  selectedPerPage.value = val.value;
+  pagination.value.rowsPerPage = val.value;
+  pagination.value.page = 1; // Reset to first page when changing rows per page
+  qTableRef.value?.setPagination(pagination.value);
 };
+
+// Table Columns
+const historyTableColumns = [
+  {
+    name: "timestamp",
+    field: "timestamp",
+    label: "Timestamp",
+    align: "left" as const,
+    sortable: true,
+  },
+  {
+    name: "status",
+    field: "status",
+    label: "Status",
+    align: "left" as const,
+    sortable: true,
+  },
+  {
+    name: "duration",
+    field: "duration",
+    label: "Duration",
+    align: "left" as const,
+    sortable: false,
+  },
+  {
+    name: "error",
+    field: "error",
+    label: "Error",
+    align: "left" as const,
+    sortable: false,
+  },
+];
+
+// Helper Functions
 
 const getStatusColor = (status: string) => {
   switch (status.toLowerCase()) {
     case "firing":
     case "error":
+    case "failed":
       return "negative";
     case "ok":
     case "completed":
@@ -323,15 +415,11 @@ const formatDuration = (seconds: number) => {
   return `${minutes}m ${remainingSeconds}s`;
 };
 
-const formatDate = (timestamp: number) => {
-  if (!timestamp) return "-";
-  return date.formatDate(timestamp / 1000, "YYYY-MM-DD HH:mm:ss");
-};
-
-const fetchHistory = async (append = false) => {
+// Main Functions
+const fetchHistory = async () => {
   if (!props.pipelineId) return;
 
-  loading.value = true;
+  loading.value = true; 
   try {
     const orgIdentifier = store.state.selectedOrganization.identifier;
     const endTime = Date.now() * 1000; // microseconds
@@ -341,8 +429,8 @@ const fetchHistory = async (append = false) => {
       pipeline_id: props.pipelineId,
       start_time: startTime.toString(),
       end_time: endTime.toString(),
-      from: (currentPage.value * pageSize).toString(),
-      size: pageSize.toString(),
+      from: "0",
+      size: "100", // Fetch 100 records for offline pagination
     };
 
     const url = `/api/${orgIdentifier}/pipelines/history`;
@@ -364,13 +452,7 @@ const fetchHistory = async (append = false) => {
         error: hit.error,
       }));
 
-      if (append) {
-        historyItems.value.push(...items);
-      } else {
-        historyItems.value = items;
-      }
-
-      hasMore.value = response.data.hits.length === pageSize;
+      historyItems.value = items;
 
       // Calculate stats
       calculateStats();
@@ -387,6 +469,10 @@ const fetchHistory = async (append = false) => {
   } finally {
     loading.value = false;
   }
+};
+
+const refreshHistory = () => {
+  fetchHistory();
 };
 
 const calculateStats = () => {
@@ -419,47 +505,19 @@ const calculateStats = () => {
   };
 };
 
-const loadMore = () => {
-  currentPage.value++;
-  fetchHistory(true);
-};
-
-const close = () => {
-  isOpen.value = false;
-};
-
-// Handle ESC key
-const handleKeyDown = (event: KeyboardEvent) => {
-  if (event.key === "Escape" && isOpen.value) {
-    close();
-  }
-};
-
-// Watch for drawer opening
-watch(isOpen, (newValue) => {
-  if (newValue) {
-    currentPage.value = 0;
-    historyItems.value = [];
-    stats.value = null;
-    hasMore.value = true;
-    fetchHistory();
-  }
-});
-
-// Add/remove keyboard event listener
-onMounted(() => {
-  document.addEventListener("keydown", handleKeyDown);
-});
-
-onUnmounted(() => {
-  document.removeEventListener("keydown", handleKeyDown);
-});
+// Watchers
+watch(
+  () => props.pipelineId,
+  (newVal) => {
+    if (newVal) {
+      historyItems.value = [];
+      stats.value = null;
+      fetchHistory();
+    }
+  },
+  { immediate: true }
+);
 </script>
 
-<style scoped lang="scss">
-.pipeline-history-drawer {
-  :deep(.q-drawer__content) {
-    overflow: hidden;
-  }
-}
+<style lang="scss" scoped>
 </style>

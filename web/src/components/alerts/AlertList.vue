@@ -533,108 +533,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmDelete"
     />
 
-    <!-- Alert Details Drawer -->
-    <q-drawer
-      v-model="showAlertDetailsDrawer"
-      side="right"
-      :width="600"
-      bordered
-      overlay
-      behavior="mobile"
-      class="alert-details-drawer"
-    >
-      <div class="tw-h-full tw-flex tw-flex-col">
-        <!-- Drawer Header -->
-        <div class="tw-px-6 tw-py-4 tw-border-b tw-flex tw-items-center tw-justify-between">
-          <div class="tw-flex tw-items-center">
-            <q-icon name="info" size="24px" class="tw-mr-2" />
-            <h6 class="tw-text-lg tw-font-semibold tw-m-0">{{ t('alert_list.alert_details') }}</h6>
-          </div>
-          <q-btn
-            flat
-            round
-            dense
-            icon="close"
-            @click="showAlertDetailsDrawer = false"
-          />
-        </div>
-
-        <!-- Drawer Content -->
-        <div class="tw-flex-1 tw-overflow-y-auto tw-px-6 tw-py-4" v-if="selectedAlertDetails">
-          <!-- Alert Name -->
-          <div class="tw-mb-6">
-            <div class="tw-text-sm tw-font-semibold tw-text-gray-600 tw-mb-1">Alert Name</div>
-            <div class="tw-text-base">{{ selectedAlertDetails.name }}</div>
-          </div>
-
-          <!-- SQL Query / Conditions -->
-          <div class="tw-mb-6">
-            <div class="tw-flex tw-items-center tw-justify-between tw-mb-2">
-              <div class="tw-text-sm tw-font-semibold tw-text-gray-600">
-                {{ selectedAlertDetails.type == "sql" ? "SQL Query" : "Conditions" }}
-              </div>
-              <q-btn
-                v-if="selectedAlertDetails.conditions != '' && selectedAlertDetails.conditions != '--'"
-                @click="copyToClipboard(selectedAlertDetails.conditions, 'Conditions')"
-                size="sm"
-                flat
-                dense
-                icon="content_copy"
-                class="tw-ml-2"
-              >
-                <q-tooltip>Copy</q-tooltip>
-              </q-btn>
-            </div>
-            <pre class="tw-bg-gray-100 tw-p-3 tw-rounded tw-text-sm tw-overflow-x-auto" style="white-space: pre-wrap">{{
-              selectedAlertDetails.conditions != "" && selectedAlertDetails.conditions != "--"
-                ? (selectedAlertDetails.type == 'sql' ? selectedAlertDetails.conditions : selectedAlertDetails.conditions.length != 2 ? `if ${selectedAlertDetails.conditions}` : 'No condition')
-                : "No condition"
-            }}</pre>
-          </div>
-
-          <!-- Description -->
-          <div class="tw-mb-6">
-            <div class="tw-text-sm tw-font-semibold tw-text-gray-600 tw-mb-2">Description</div>
-            <pre class="tw-bg-gray-100 tw-p-3 tw-rounded tw-text-sm" style="white-space: pre-wrap">{{ selectedAlertDetails.description || "No description" }}</pre>
-          </div>
-
-          <!-- Alert History Table -->
-          <div class="tw-mb-6">
-            <div class="tw-text-sm tw-font-semibold tw-text-gray-600 tw-mb-3">Evaluation History</div>
-
-            <div v-if="isLoadingHistory" class="tw-text-center tw-py-8">
-              <q-spinner size="32px" color="primary" />
-              <div class="tw-text-sm tw-mt-3 tw-text-gray-600">Loading history...</div>
-            </div>
-
-            <div v-else-if="expandedAlertHistory.length === 0" class="tw-text-center tw-py-8 tw-text-gray-500">
-              <q-icon name="history" size="48px" class="tw-mb-2 tw-opacity-30" />
-              <div class="tw-text-sm">No evaluation history available for this alert</div>
-            </div>
-
-            <q-table
-              v-else
-              :rows="expandedAlertHistory"
-              :columns="historyTableColumns"
-              row-key="timestamp"
-              flat
-              dense
-              :pagination="{ rowsPerPage: 10 }"
-              class="tw-shadow-sm"
-            >
-              <template v-slot:body-cell-status="props">
-                <q-td :props="props">
-                  <q-badge
-                    :color="props.row.status?.toLowerCase() === 'firing' || props.row.status?.toLowerCase() === 'error' ? 'negative' : 'positive'"
-                    :label="props.row.status || 'Unknown'"
-                  />
-                </q-td>
-              </template>
-            </q-table>
-          </div>
-        </div>
-      </div>
-    </q-drawer>
 
     <template>
       <q-dialog class="q-pa-md" v-model="showForm" persistent>
@@ -744,13 +642,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @updated="updateAcrossFolders"
         />
       </q-dialog>
-
-      <!-- Alert History Drawer -->
-      <AlertHistoryDrawer
-        v-model="showHistoryDrawer"
-        :alert-id="selectedHistoryAlertId"
-        :alert-name="selectedHistoryAlertName"
-      />
+            <!-- Alert Details Dialog -->
+      <q-dialog
+        v-model="showAlertDetailsDrawer"
+        position="right"
+        full-height
+        maximized
+        data-test="alert-details-dialog"
+      >
+        <AlertHistoryDrawer
+          :alert-details="selectedAlertDetails"
+          :alert-id="selectedAlertDetails?.alert_id || ''"
+          @close="showAlertDetailsDrawer = false"
+        />
+      </q-dialog>
     </template>
   </div>
 </template>
@@ -852,9 +757,6 @@ export default defineComponent({
     const isSubmitting = ref(false);
 
     const showImportAlertDialog = ref(false);
-    const showHistoryDrawer = ref(false);
-    const selectedHistoryAlertId = ref("");
-    const selectedHistoryAlertName = ref("");
 
     const { getStreams } = useStreams();
 
@@ -877,113 +779,13 @@ export default defineComponent({
     const showMoveAlertDialog = ref(false);
     const showAlertDetailsDrawer = ref(false);
     const selectedAlertDetails: Ref<any> = ref(null);
-    const expandedAlertHistory: Ref<any[]> = ref([]);
-    const isLoadingHistory = ref(false);
-
-    const historyTableColumns = [
-      {
-        name: 'timestamp',
-        label: 'Timestamp',
-        field: 'timestamp',
-        align: 'left',
-        sortable: true,
-        format: (val: any) => convertUnixToQuasarFormat(val)
-      },
-      {
-        name: 'status',
-        label: 'Status',
-        field: 'status',
-        align: 'center',
-        sortable: true
-      },
-      {
-        name: 'evaluation_time',
-        label: 'Evaluation (s)',
-        field: 'evaluation_took_in_secs',
-        align: 'center',
-        sortable: true,
-        format: (val: any) => val ? val.toFixed(3) : '-'
-      },
-      {
-        name: 'query_time',
-        label: 'Query (ms)',
-        field: 'query_took',
-        align: 'center',
-        sortable: true,
-        format: (val: any) => val || '-'
-      },
-    ];
-
-    const fetchAlertHistory = async (alertId: string) => {
-      isLoadingHistory.value = true;
-      try {
-        // Get history for last 30 days
-        const endTime = Date.now() * 1000; // Convert to microseconds
-        const startTime = endTime - (30 * 24 * 60 * 60 * 1000000); // 30 days ago in microseconds
-
-        const response = await alertsService.getHistory(
-          store?.state?.selectedOrganization?.identifier,
-          {
-            alert_id: alertId,
-            size: 50, // Get last 50 evaluations
-            start_time: startTime,
-            end_time: endTime
-          }
-        );
-        expandedAlertHistory.value = response.data?.hits || [];
-      } catch (error) {
-        console.error("Failed to fetch alert history:", error);
-        expandedAlertHistory.value = [];
-      } finally {
-        isLoadingHistory.value = false;
-      }
-    };
 
     const triggerExpand = (props: any) => {
       // Open drawer instead of inline expansion
       selectedAlertDetails.value = props.row;
       showAlertDetailsDrawer.value = true;
-      // Fetch history for this alert
-      fetchAlertHistory(props.row.alert_id);
     };
 
-    // Handle ESC key and click outside to close drawer
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && showAlertDetailsDrawer.value) {
-        showAlertDetailsDrawer.value = false;
-      }
-    };
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (!showAlertDetailsDrawer.value) return;
-
-      const target = event.target as HTMLElement;
-
-      // Check if clicked element is the backdrop or outside drawer content
-      if (
-        target.classList.contains('q-drawer__backdrop') ||
-        target.classList.contains('q-layout__shadow')
-      ) {
-        showAlertDetailsDrawer.value = false;
-        return;
-      }
-
-      // Check if the click is outside the drawer content
-      const drawerElement = document.querySelector('.alert-details-drawer .q-drawer__content');
-      if (drawerElement && !drawerElement.contains(target)) {
-        showAlertDetailsDrawer.value = false;
-      }
-    };
-
-    onMounted(() => {
-      document.addEventListener('keydown', handleKeyDown);
-      document.addEventListener('click', handleClickOutside, true);
-    });
-
-    onBeforeUnmount(() => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('click', handleClickOutside, true);
-    });
 
     const activeFolderToMove = ref("default");
 
@@ -2441,11 +2243,7 @@ export default defineComponent({
       triggerExpand,
       showAlertDetailsDrawer,
       selectedAlertDetails,
-      expandedAlertHistory,
-      isLoadingHistory,
-      historyTableColumns,
       allSelectedAlerts,
-      copyToClipboard,
       openMenu,
       outlinedMoreVert,
       getAlertsFn,
@@ -2454,9 +2252,6 @@ export default defineComponent({
       computedOwner,
       tabs,
       filterAlertsByTab,
-      showHistoryDrawer,
-      selectedHistoryAlertId,
-      selectedHistoryAlertName,
       refreshImportedAlerts,
       folderIdToBeCloned,
       updateFolderIdToBeCloned,
