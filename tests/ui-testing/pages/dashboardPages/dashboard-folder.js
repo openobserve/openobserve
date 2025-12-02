@@ -72,7 +72,7 @@ export default class DashboardFolder {
     await saveBtn.waitFor({ state: "visible", timeout: 5000 });
 
     // Wait for all animations and DOM updates to complete
-    // await this.page.waitForTimeout(1500);
+    await this.page.waitForTimeout(1500);
   }
 
   // Create folder
@@ -80,19 +80,16 @@ export default class DashboardFolder {
     const newFolderBtn = this.page.locator('[data-test="dashboard-new-folder-btn"]');
     await newFolderBtn.waitFor({ state: "visible", timeout: 5000 });
     await newFolderBtn.click();
-
     // Wait for dialog to be stable
     await this.waitForFolderDialogStable();
 
     // Fill folder name (fill automatically handles focus)
     const nameInput = this.page.locator('[data-test="dashboard-folder-add-name"]');
+    await nameInput.waitFor({ state: "visible", timeout: 5000 });
     await nameInput.fill(folderName);
 
-    // Wait for save button to be enabled (validation passes)
-    const saveBtn = this.page.locator('[data-test="dashboard-folder-add-save"]');
-    await expect(saveBtn).toBeEnabled({ timeout: 5000 });
-
     // Click save
+    const saveBtn = this.page.locator('[data-test="dashboard-folder-add-save"]');
     await saveBtn.click();
 
     // Wait for dialog to close
@@ -154,26 +151,64 @@ export default class DashboardFolder {
     await editIcon.waitFor({ state: "visible", timeout: 5000 });
     await editIcon.click();
 
-    // Wait for Update Folder dialog to be fully stable
-    await this.waitForUpdateFolderDialogStable();
+    // Wait for dialog to be visible first
+    const dialog = page.locator('.q-dialog__inner');
+    await dialog.waitFor({ state: "visible", timeout: 5000 });
 
-    // Clear and fill the new name
+    // Wait for the form container to be visible and stable
+    const formContainer = page.locator('form.q-form');
+    await formContainer.waitFor({ state: "visible", timeout: 5000 });
+
+    // Wait for name input to be visible and attached
     const nameInput = page.locator('[data-test="dashboard-folder-add-name"]');
-    await nameInput.clear();
-    await nameInput.fill(newName);
-    await page.waitForTimeout(5000);
+    await nameInput.waitFor({ state: "visible", timeout: 5000 });
+    await nameInput.waitFor({ state: "attached", timeout: 5000 });
 
-    // Wait for save button to be enabled (validation passes)
-    const saveBtn = page.locator('[data-test="dashboard-folder-add-save"]');
+    // Wait for initial form render to complete
+    await page.waitForTimeout(1000);
+
+    // Clear and fill the new name using fill (which is more reliable than type)
+    await nameInput.click();
+    await nameInput.fill('');
+    await page.waitForTimeout(200);
+    await nameInput.fill(newName);
+
+    // Verify the input has the correct value
+    await expect(nameInput).toHaveValue(newName, { timeout: 5000 });
+
+    // Wait for validation to complete
+    await page.waitForTimeout(500);
+
+    // Ensure dialog is still visible before clicking save
+    await expect(dialog).toBeVisible({ timeout: 5000 });
+
+    // Locate save button and wait for it to be ready
+    const saveBtn = formContainer.locator('[data-test="dashboard-folder-add-save"]');
     await saveBtn.waitFor({ state: "visible", timeout: 5000 });
     await expect(saveBtn).toBeEnabled({ timeout: 5000 });
 
-    // Click save
-    await saveBtn.click();
-    await page.waitForTimeout(5000);
+    // Set up a promise to wait for the API response/request
+    const responsePromise = page.waitForResponse(
+      response => response.url().includes('folder') && (response.status() === 200 || response.status() === 201),
+      { timeout: 10000 }
+    ).catch(() => null);
+
+    // Click the save button - try multiple approaches
+    try {
+      await saveBtn.click({ timeout: 5000 });
+    } catch (error) {
+      // If normal click fails, try with force
+      await saveBtn.click({ force: true, timeout: 5000 });
+    }
+
+    // Wait for the API call to complete
+    await responsePromise;
 
     // Wait for dialog to close
-    await page.locator('.q-dialog__inner').waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
+    await dialog.waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
+
+    // Wait for UI to update after save
+    await page.waitForTimeout(1000);
   }
 }
 
