@@ -69,6 +69,7 @@ test.describe("dashboard multi y axis testcases", () => {
     await page
       .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
       .click();
+    await page.waitForTimeout(5000);
     await expect(
       page
         .getByRole("cell", {
