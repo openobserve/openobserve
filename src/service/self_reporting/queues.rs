@@ -307,7 +307,7 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
             if let Ok(trigger) = json::from_value::<TriggerData>(trigger_json.clone()) {
                 let org_id = &trigger.org;
                 #[cfg(feature = "cloud")]
-                match organization::is_org_in_free_trial_period(&org_id).await {
+                match organization::is_org_in_free_trial_period(org_id).await {
                     Ok(ongoing) => {
                         if !ongoing {
                             continue;
