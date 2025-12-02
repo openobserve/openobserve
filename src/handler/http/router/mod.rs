@@ -633,8 +633,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(domain_management::set_domain_management_config)
         .service(license::get_license_info)
         .service(license::store_license)
-        .service(traces::get_service_graph_metrics)
-        .service(traces::get_store_stats)
+        .service(traces::get_current_topology)
         .service(patterns::extract_patterns);
 
     #[cfg(feature = "enterprise")]

@@ -920,6 +920,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }}
                   </q-btn>
                   <q-btn
+                    v-if="activeMainTab != 'configuration'"
                     v-bind:disable="
                       !selectedFields.length && !selectedDateFields.length
                     "
