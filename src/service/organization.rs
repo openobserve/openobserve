@@ -567,7 +567,6 @@ pub async fn generate_invitation(
         }
     }
     if let Some(org) = get_org(org_id).await {
-        let invite_token = config::ider::generate();
         let expires_at = Utc::now().timestamp_micros()
             + Duration::days(cfg.common.org_invite_expiry as i64)
                 .num_microseconds()
@@ -577,7 +576,6 @@ pub async fn generate_invitation(
             &invites.role.to_string(),
             user_email,
             org_id,
-            &invite_token,
             expires_at,
             invites.invites.clone(),
         )
@@ -594,14 +592,8 @@ pub async fn generate_invitation(
             if !cfg.smtp.smtp_reply_to.is_empty() {
                 email = email.reply_to(cfg.smtp.smtp_reply_to.parse()?);
             }
-            let msg = get_invite_email_body(
-                org_id,
-                &org.name,
-                &inviter_name,
-                &invite_token,
-                invites.role,
-                expires_at,
-            );
+            let msg =
+                get_invite_email_body(org_id, &org.name, &inviter_name, invites.role, expires_at);
             let email = email.singlepart(SinglePart::html(msg)).unwrap();
 
             // Send the email
