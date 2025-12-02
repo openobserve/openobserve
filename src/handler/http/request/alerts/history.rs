@@ -350,10 +350,10 @@ pub async fn get_alert_history(
 
     // Add alert ID filter if provided
     // The key field contains the alert ID in the format "alert_name/alert_id"
-    if let Some(ref alert_name) = query.alert_id {
-        // We need to filter where key starts with the alert ID
-        let escaped_name = escape_like(alert_name);
-        where_clause.push_str(&format!(" AND key LIKE '{escaped_name}\\/%' ESCAPE '\\'"));
+    if let Some(ref alert_id) = query.alert_id {
+        // We need to filter where key ends with the alert ID (after the /)
+        let escaped_id = escape_like(alert_id);
+        where_clause.push_str(&format!(" AND key LIKE '%\\/{escaped_id}' ESCAPE '\\'"));
     } else if let Some(permitted_ids) = permitted_alert_ids {
         // Filter by permitted alerts only
         if permitted_ids.is_empty() {
