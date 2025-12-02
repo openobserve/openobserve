@@ -370,6 +370,11 @@ async fn handle_alert_triggers(
     };
 
     let evaluation_took = Instant::now();
+    log::debug!(
+        "[SCHEDULER trace_id {scheduler_trace_id}] evaluating alert: {}/{}",
+        &new_trigger.org,
+        &new_trigger.module_key
+    );
     // evaluate alert
     let result = alert
         .evaluate(
@@ -379,6 +384,11 @@ async fn handle_alert_triggers(
         )
         .await;
     let evaluation_took = evaluation_took.elapsed().as_secs_f64();
+    log::debug!(
+        "[SCHEDULER trace_id {scheduler_trace_id}] alert: {}/{} evaluation done, took: {evaluation_took} seconds",
+        &new_trigger.org,
+        &new_trigger.module_key
+    );
     trigger_data_stream.evaluation_took_in_secs = Some(evaluation_took);
     if result.is_err() {
         let err = result.err().unwrap();
@@ -614,6 +624,7 @@ async fn handle_alert_triggers(
     );
     // publish the triggers as stream
     publish_triggers_usage(trigger_data_stream).await;
+    log::debug!("[SCHEDULER trace_id {scheduler_trace_id}] publish_triggers_usage done");
 
     Ok(())
 }
@@ -1280,6 +1291,11 @@ async fn handle_derived_stream_triggers(
                             ingestion_error_msg = Some(err_msg);
                         }
                         Ok(pl_results) => {
+                            log::debug!(
+                                "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream(org: {}/module_key: {}): ExecutablePipeline processed.",
+                                new_trigger.org,
+                                new_trigger.module_key
+                            );
                             for (stream_params, stream_pl_results) in pl_results {
                                 if matches!(
                                     stream_params.stream_type,
@@ -1325,12 +1341,30 @@ async fn handle_derived_stream_triggers(
                             ingestion_type: Some(cluster_rpc::IngestionType::Json.into()),
                             metadata: request_metadata,
                         };
+                        log::debug!(
+                            "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream(org: {}/module_key: {}): Ingesting result to destination {}/{}/{}",
+                            new_trigger.org,
+                            new_trigger.module_key,
+                            org_id,
+                            stream_name,
+                            stream_type
+                        );
+                        let ingestion_start = Instant::now();
                         match ingestion_service::ingest(req).await {
-                            Ok(resp) if resp.status_code == 200 => {
-                                log::info!(
-                                    "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream result ingested to destination {org_id}/{stream_name}/{stream_type}, records: {}",
-                                    records_len
-                                );
+                            Ok(resp) => {
+                                let ingestion_took = ingestion_start.elapsed().as_secs_f64();
+                                if resp.status_code == 200 {
+                                    log::info!(
+                                        "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream result ingested to destination {org_id}/{stream_name}/{stream_type}, records: {}, took: {ingestion_took} seconds",
+                                        records_len
+                                    );
+                                } else {
+                                    log::debug!(
+                                        "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream result failed to ingest to destination {org_id}/{stream_name}/{stream_type}, status code: {}, message: {}, took: {ingestion_took} seconds",
+                                        resp.status_code,
+                                        resp.message
+                                    );
+                                }
                             }
                             error => {
                                 let err = error.map_or_else(|e| e.to_string(), |resp| resp.message);
@@ -1359,6 +1393,12 @@ async fn handle_derived_stream_triggers(
                     trigger_data_stream.error = Some(err.clone());
                     trigger_data_stream.retries += 1;
 
+                    log::error!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline org/name({}/{}) failed to ingest processed results to destination stream, caused by {}",
+                        pipeline.org,
+                        pipeline.name,
+                        err
+                    );
                     // report pipeline error
                     let pipeline_error = PipelineError {
                         pipeline_id: pipeline.id.to_string(),
@@ -1372,6 +1412,11 @@ async fn handle_derived_stream_triggers(
                         error_source: ErrorSource::Pipeline(pipeline_error),
                     })
                     .await;
+                    log::debug!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline org/name({}/{}) publish_error done to self reporting",
+                        &pipeline.org,
+                        &pipeline.name
+                    );
 
                     // do not move time window forward
                 } else {
@@ -1438,7 +1483,7 @@ async fn handle_derived_stream_triggers(
         }
     }
     trigger_data_stream.next_run_at = new_trigger.next_run_at;
-    log::warn!(
+    log::info!(
         "[SCHEDULER trace_id {scheduler_trace_id}] module key: {}, execution_time: {}, start_time: {}, end_time: {}, next_run_at: {}",
         new_trigger.module_key,
         chrono::DateTime::from_timestamp_micros(trigger.next_run_at)
@@ -1457,6 +1502,10 @@ async fn handle_derived_stream_triggers(
 
     // publish the triggers as stream
     publish_triggers_usage(trigger_data_stream).await;
+    log::debug!(
+        "[SCHEDULER trace_id {scheduler_trace_id}] publish_triggers_usage done to self reporting for trigger: {}",
+        &new_trigger.module_key
+    );
 
     // If it reaches max retries, go to the next nun at, but use the same trigger start time
     if new_trigger.retries >= max_retries {
@@ -1481,6 +1530,10 @@ async fn handle_derived_stream_triggers(
             error_source: ErrorSource::Pipeline(pipeline_error),
         })
         .await;
+        log::debug!(
+            "[SCHEDULER trace_id {scheduler_trace_id}] publish_error done to self reporting for trigger: {}",
+            &new_trigger.module_key
+        );
         new_trigger.retries = 0; // start over
     }
 
@@ -1492,6 +1545,12 @@ async fn handle_derived_stream_triggers(
             e
         );
     }
+
+    log::debug!(
+        "[SCHEDULER trace_id {scheduler_trace_id}] update_trigger done for trigger: {}/{}",
+        &pipeline.org,
+        &pipeline.name
+    );
 
     Ok(())
 }
