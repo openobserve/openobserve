@@ -86,7 +86,8 @@
     "contactUs": "문의하기",
     "addFolder": "폴더 추가",
     "status": "상태",
-    "cancel": "취소"
+    "cancel": "취소",
+    "loadMore": "더 불러오기"
   },
   "search": {
     "selectIndex": "스트림 우선 선택",
@@ -1109,6 +1110,23 @@
         "dashboardConfig": "대시보드 구성 로드 중...",
         "refreshing": "대시보드 새로 고침 중..."
       }
+    },
+    "historyTable": {
+      "timestamp": "타임스탬프",
+      "status": "상태",
+      "evaluationTime": "평가 (들)",
+      "queryTime": "쿼리 (밀리초)"
+    },
+    "alertDetails": {
+      "alertName": "경고 이름",
+      "sqlQuery": "SQL 쿼리",
+      "conditions": "조건",
+      "copy": "복사",
+      "noCondition": "조건 없음",
+      "noDescription": "설명 없음",
+      "evaluationHistory": "평가 기록",
+      "loadingHistory": "기록 로드 중...",
+      "noHistoryAvailable": "이 알림에 대한 평가 기록이 없습니다."
     }
   },
   "alert_templates": {
@@ -1312,7 +1330,13 @@
     "delay": "지연",
     "history": "파이프라인 역사",
     "searchHistory": "파이프라인 이름 입력",
-    "destination_type": "목적지 유형"
+    "destination_type": "목적지 유형",
+    "totalExecutions": "총 실행 건수",
+    "errorCount": "오류",
+    "avgExecutionTime": "평균.실행 시간",
+    "successRate": "성공률",
+    "noHistoryData": "사용 가능한 기록 데이터 없음",
+    "failedToFetchHistory": "파이프라인 기록을 가져오지 못했습니다."
   },
   "reports": {
     "header": "보고서",
@@ -1533,7 +1557,8 @@
     "get_history": "기록 가져오기",
     "executed_at": "실행 날짜",
     "sql_query": "SQL 쿼리",
-    "resuls": "결과"
+    "resuls": "결과",
+    "results": "결과"
   },
   "search_scheduler_job": {
     "title": "작업 스케줄러 검색",
@@ -1593,10 +1618,12 @@
     "period": "기간",
     "cron": "크론",
     "type": "타입",
-    "run_pipeline": "파이프라인 실행"
+    "run_pipeline": "파이프라인 실행",
+    "results": "결과"
   },
   "alert_list": {
-    "alert_details": "경고 세부 정보"
+    "alert_details": "경고 세부 정보",
+    "alert_history": "알림 기록"
   },
   "latencyInsights": {
     "title": "인사이트",

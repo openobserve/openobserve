@@ -86,7 +86,8 @@
     "contactUs": "Entre em contato conosco",
     "addFolder": "Adicionar pasta",
     "status": "Status",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "loadMore": "Carregar mais"
   },
   "search": {
     "selectIndex": "Selecione Stream First",
@@ -1109,6 +1110,23 @@
         "dashboardConfig": "Carregando a configuração do painel...",
         "refreshing": "Atualizando o painel..."
       }
+    },
+    "historyTable": {
+      "timestamp": "Carimbo de data/hora",
+      "status": "Status",
+      "evaluationTime": "Avaliação (ões)",
+      "queryTime": "Consulta (ms)"
+    },
+    "alertDetails": {
+      "alertName": "Nome do alerta",
+      "sqlQuery": "Consulta SQL",
+      "conditions": "Condições",
+      "copy": "Copiar",
+      "noCondition": "Sem condição",
+      "noDescription": "Sem descrição",
+      "evaluationHistory": "Histórico de avaliação",
+      "loadingHistory": "Carregando histórico...",
+      "noHistoryAvailable": "Não há histórico de avaliação disponível para este alerta"
     }
   },
   "alert_templates": {
@@ -1312,7 +1330,13 @@
     "delay": "Atraso",
     "history": "História do pipeline",
     "searchHistory": "Insira o nome do pipeline",
-    "destination_type": "Tipo de destino"
+    "destination_type": "Tipo de destino",
+    "totalExecutions": "Total de execuções",
+    "errorCount": "Erros",
+    "avgExecutionTime": "Média. Tempo de execução",
+    "successRate": "Taxa de sucesso",
+    "noHistoryData": "Nenhum histórico de dados disponível",
+    "failedToFetchHistory": "Falha ao buscar o histórico do pipeline"
   },
   "reports": {
     "header": "Relatórios",
@@ -1533,7 +1557,8 @@
     "get_history": "Obtenha o histórico",
     "executed_at": "Executado em",
     "sql_query": "Consulta SQL",
-    "resuls": "Resultados"
+    "resuls": "Resultados",
+    "results": "Resultados"
   },
   "search_scheduler_job": {
     "title": "Agendador de tarefas de pesquisa",
@@ -1593,10 +1618,12 @@
     "period": "Período",
     "cron": "Cron",
     "type": "Tipo",
-    "run_pipeline": "Executar Pipeline"
+    "run_pipeline": "Executar Pipeline",
+    "results": "Resultados"
   },
   "alert_list": {
-    "alert_details": "Detalhes do alerta"
+    "alert_details": "Detalhes do alerta",
+    "alert_history": "Histórico de alertas"
   },
   "latencyInsights": {
     "title": "Percepções",

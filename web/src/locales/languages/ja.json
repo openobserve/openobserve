@@ -86,7 +86,8 @@
     "contactUs": "お問い合わせ",
     "addFolder": "[フォルダを追加]",
     "status": "ステータス",
-    "cancel": "[キャンセル]"
+    "cancel": "[キャンセル]",
+    "loadMore": "さらに読み込む"
   },
   "search": {
     "metrics": "メトリクス",
@@ -1119,6 +1120,23 @@
         "dashboardConfig": "ダッシュボードの設定をロード中...",
         "refreshing": "ダッシュボードを更新中..."
       }
+    },
+    "historyTable": {
+      "timestamp": "タイムスタンプ",
+      "status": "ステータス",
+      "evaluationTime": "評価 (s)",
+      "queryTime": "クエリ (ミリ秒)"
+    },
+    "alertDetails": {
+      "alertName": "アラート名",
+      "sqlQuery": "SQL クエリー",
+      "conditions": "条件",
+      "copy": "[コピー]",
+      "noCondition": "条件なし",
+      "noDescription": "説明なし",
+      "evaluationHistory": "評価履歴",
+      "loadingHistory": "履歴をロード中...",
+      "noHistoryAvailable": "このアラートの評価履歴はありません"
     }
   },
   "alert_templates": {
@@ -1326,7 +1344,13 @@
     "delay": "ディレイ",
     "history": "パイプライン履歴",
     "searchHistory": "パイプライン名を入力",
-    "destination_type": "デスティネーションタイプ"
+    "destination_type": "デスティネーションタイプ",
+    "totalExecutions": "合計実行数",
+    "errorCount": "エラー",
+    "avgExecutionTime": "平均。実行時間",
+    "successRate": "成功率",
+    "noHistoryData": "履歴データはありません",
+    "failedToFetchHistory": "パイプライン履歴を取得できませんでした"
   },
   "reports": {
     "header": "レポート",
@@ -1526,7 +1550,8 @@
     "get_history": "履歴を取得",
     "executed_at": "実行日",
     "sql_query": "SQL クエリー",
-    "resuls": "結果"
+    "resuls": "結果",
+    "results": "結果"
   },
   "search_scheduler_job": {
     "title": "ジョブスケジューラを検索する",
@@ -1586,10 +1611,12 @@
     "period": "ピリオド",
     "cron": "クロン",
     "type": "タイプ",
-    "run_pipeline": "パイプラインを実行"
+    "run_pipeline": "パイプラインを実行",
+    "results": "結果"
   },
   "alert_list": {
-    "alert_details": "アラートの詳細"
+    "alert_details": "アラートの詳細",
+    "alert_history": "アラート履歴"
   },
   "latencyInsights": {
     "title": "インサイト",

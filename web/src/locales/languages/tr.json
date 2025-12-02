@@ -86,7 +86,8 @@
     "contactUs": "Bize Ulaşın",
     "addFolder": "Klasör Ekle",
     "status": "Durum",
-    "cancel": "İptal"
+    "cancel": "İptal",
+    "loadMore": "Daha Fazla Yükle"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -1109,6 +1110,23 @@
         "dashboardConfig": "Kontrol paneli yapılandırması yükleniyor...",
         "refreshing": "Kontrol paneli yenileniyor..."
       }
+    },
+    "historyTable": {
+      "timestamp": "Zaman damgası",
+      "status": "Durum",
+      "evaluationTime": "Değerlendirme (lar)",
+      "queryTime": "Sorgu (ms)"
+    },
+    "alertDetails": {
+      "alertName": "Uyarı Adı",
+      "sqlQuery": "SQL Sorgu",
+      "conditions": "Koşullar",
+      "copy": "Kopyalama",
+      "noCondition": "Koşulsuz",
+      "noDescription": "Açıklama yok",
+      "evaluationHistory": "Değerlendirme Geçmişi",
+      "loadingHistory": "Geçmiş yükleniyor...",
+      "noHistoryAvailable": "Bu uyarı için değerlendirme geçmişi mevcut değil"
     }
   },
   "alert_templates": {
@@ -1312,7 +1330,13 @@
     "delay": "Gecikme",
     "history": "Boru Hattı Geçmişi",
     "searchHistory": "Boru Hattı Adını Girin",
-    "destination_type": "Hedef Türü"
+    "destination_type": "Hedef Türü",
+    "totalExecutions": "Toplam İnfaz",
+    "errorCount": "Hatalar",
+    "avgExecutionTime": "Ort. Yürütme Süresi",
+    "successRate": "Başarı Oranı",
+    "noHistoryData": "Geçmiş verisi yok",
+    "failedToFetchHistory": "Boru hattı geçmişi alınamadı"
   },
   "reports": {
     "header": "Raporlar",
@@ -1533,7 +1557,8 @@
     "get_history": "Geçmişi Al",
     "executed_at": "İdam Edildi",
     "sql_query": "SQL Sorgu",
-    "resuls": "Sonuçlar"
+    "resuls": "Sonuçlar",
+    "results": "Sonuçlar"
   },
   "search_scheduler_job": {
     "title": "İş Zamanlayıcı Ara",
@@ -1593,10 +1618,12 @@
     "period": "Dönem",
     "cron": "Cron",
     "type": "Tür",
-    "run_pipeline": "Boru Hattı Çalıştır"
+    "run_pipeline": "Boru Hattı Çalıştır",
+    "results": "Sonuçlar"
   },
   "alert_list": {
-    "alert_details": "Uyarı Ayrıntıları"
+    "alert_details": "Uyarı Ayrıntıları",
+    "alert_history": "Uyarı Geçmişi"
   },
   "latencyInsights": {
     "title": "İçgörüler",

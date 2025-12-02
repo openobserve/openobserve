@@ -86,7 +86,8 @@
     "contactUs": "Neem contact met ons op",
     "addFolder": "Map toevoegen",
     "status": "Status",
-    "cancel": "Annuleer"
+    "cancel": "Annuleer",
+    "loadMore": "Meer laden"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
@@ -1109,6 +1110,23 @@
         "dashboardConfig": "Dashboardconfiguratie wordt geladen...",
         "refreshing": "Verfrissend dashboard..."
       }
+    },
+    "historyTable": {
+      "timestamp": "Tijdstempel",
+      "status": "Status",
+      "evaluationTime": "Evaluatie (s)",
+      "queryTime": "Zoekopdracht (ms)"
+    },
+    "alertDetails": {
+      "alertName": "Naam van de waarschuwing",
+      "sqlQuery": "SQL-zoekopdracht",
+      "conditions": "Voorwaarden",
+      "copy": "Kopiëren",
+      "noCondition": "Geen voorwaarde",
+      "noDescription": "Geen beschrijving",
+      "evaluationHistory": "Geschiedenis van de evaluatie",
+      "loadingHistory": "Geschiedenis wordt geladen...",
+      "noHistoryAvailable": "Geen evaluatiegeschiedenis beschikbaar voor deze waarschuwing"
     }
   },
   "alert_templates": {
@@ -1312,7 +1330,13 @@
     "delay": "Uitstel",
     "history": "Geschiedenis van pijpleidingen",
     "searchHistory": "Voer de naam van de pipeline in",
-    "destination_type": "Soort bestemming"
+    "destination_type": "Soort bestemming",
+    "totalExecutions": "Totaal aantal executies",
+    "errorCount": "Fouten",
+    "avgExecutionTime": "Gemiddeld. Uitvoeringstijd",
+    "successRate": "Succespercentage",
+    "noHistoryData": "Geen historische gegevens beschikbaar",
+    "failedToFetchHistory": "Kon de geschiedenis van de pijplijn niet ophalen"
   },
   "reports": {
     "header": "Rapporten",
@@ -1533,7 +1557,8 @@
     "get_history": "Geschiedenis ophalen",
     "executed_at": "Uitgevoerd op",
     "sql_query": "SQL-zoekopdracht",
-    "resuls": "Resultaten"
+    "resuls": "Resultaten",
+    "results": "Resultaten"
   },
   "search_scheduler_job": {
     "title": "Zoek Job Scheduler",
@@ -1593,10 +1618,12 @@
     "period": "Periode",
     "cron": "Cron",
     "type": "Typ",
-    "run_pipeline": "Pipeline uitvoeren"
+    "run_pipeline": "Pipeline uitvoeren",
+    "results": "Resultaten"
   },
   "alert_list": {
-    "alert_details": "Details van de waarschuwing"
+    "alert_details": "Details van de waarschuwing",
+    "alert_history": "Waarschuwingsgeschiedenis"
   },
   "latencyInsights": {
     "title": "Inzichten",

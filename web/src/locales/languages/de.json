@@ -86,7 +86,8 @@
     "contactUs": "Kontaktiere uns",
     "addFolder": "Ordner hinzufügen",
     "status": "Status",
-    "cancel": "Stornieren"
+    "cancel": "Stornieren",
+    "loadMore": "Mehr laden"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
@@ -1109,6 +1110,23 @@
         "dashboardConfig": "Dashboard-Konfiguration wird geladen...",
         "refreshing": "Das Dashboard wird aktualisiert..."
       }
+    },
+    "historyTable": {
+      "timestamp": "Zeitstempel",
+      "status": "Status",
+      "evaluationTime": "Bewertung (en)",
+      "queryTime": "Anfrage (ms)"
+    },
+    "alertDetails": {
+      "alertName": "Name der Warnung",
+      "sqlQuery": "SQL-Abfrage",
+      "conditions": "Bedingungen",
+      "copy": "Kopieren",
+      "noCondition": "Keine Bedingung",
+      "noDescription": "Keine Beschreibung",
+      "evaluationHistory": "Verlauf der Evaluierung",
+      "loadingHistory": "Verlauf wird geladen...",
+      "noHistoryAvailable": "Für diese Warnung ist kein Bewertungsverlauf verfügbar"
     }
   },
   "alert_templates": {
@@ -1312,7 +1330,13 @@
     "delay": "Verzögerung",
     "history": "Historie der Pipeline",
     "searchHistory": "Pipeline-Namen eingeben",
-    "destination_type": "Art des Reiseziels"
+    "destination_type": "Art des Reiseziels",
+    "totalExecutions": "Hinrichtungen insgesamt",
+    "errorCount": "Fehler",
+    "avgExecutionTime": "Durchschn. Ausführungszeit",
+    "successRate": "Erfolgsquote",
+    "noHistoryData": "Keine Verlaufsdaten verfügbar",
+    "failedToFetchHistory": "Fehler beim Abrufen des Pipeline-Verlaufs"
   },
   "reports": {
     "header": "Berichte",
@@ -1533,7 +1557,8 @@
     "get_history": "Verlauf abrufen",
     "executed_at": "Ausgeführt am",
     "sql_query": "SQL-Abfrage",
-    "resuls": "Ergebnisse"
+    "resuls": "Ergebnisse",
+    "results": "Ergebnisse"
   },
   "search_scheduler_job": {
     "title": "Job Scheduler durchsuchen",
@@ -1593,10 +1618,12 @@
     "period": "Zeitraum",
     "cron": "Cron",
     "type": "Typ",
-    "run_pipeline": "Pipeline ausführen"
+    "run_pipeline": "Pipeline ausführen",
+    "results": "Ergebnisse"
   },
   "alert_list": {
-    "alert_details": "Details zur Warnung"
+    "alert_details": "Details zur Warnung",
+    "alert_history": "Verlauf der Warnmeldungen"
   },
   "latencyInsights": {
     "title": "Einblicke",

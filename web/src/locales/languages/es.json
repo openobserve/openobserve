@@ -86,7 +86,8 @@
     "contactUs": "Póngase en contacto con nosotros",
     "addFolder": "Agregar carpeta",
     "status": "Estado",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "loadMore": "Cargar más"
   },
   "search": {
     "selectIndex": "Selecciona el índice primero",
@@ -1109,6 +1110,23 @@
         "dashboardConfig": "Cargando la configuración del panel...",
         "refreshing": "Actualizando el tablero..."
       }
+    },
+    "historyTable": {
+      "timestamp": "Marca de tiempo",
+      "status": "Estado",
+      "evaluationTime": "Evaluación (es)",
+      "queryTime": "Consulta (ms)"
+    },
+    "alertDetails": {
+      "alertName": "Nombre de alerta",
+      "sqlQuery": "Consulta SQL",
+      "conditions": "Condiciones",
+      "copy": "Copiar",
+      "noCondition": "Sin condición",
+      "noDescription": "Sin descripción",
+      "evaluationHistory": "Historial de evaluación",
+      "loadingHistory": "Cargando historial...",
+      "noHistoryAvailable": "No hay ningún historial de evaluación disponible para esta alerta"
     }
   },
   "alert_templates": {
@@ -1312,7 +1330,13 @@
     "delay": "Retraso",
     "history": "Historia del oleoducto",
     "searchHistory": "Introduzca el nombre del oleoducto",
-    "destination_type": "Tipo de destino"
+    "destination_type": "Tipo de destino",
+    "totalExecutions": "Total de ejecuciones",
+    "errorCount": "Errores",
+    "avgExecutionTime": "Promedio. Tiempo de ejecución",
+    "successRate": "Tasa de éxito",
+    "noHistoryData": "No hay datos de historial disponibles",
+    "failedToFetchHistory": "No se pudo obtener el historial del oleoducto"
   },
   "reports": {
     "header": "Informes",
@@ -1533,7 +1557,8 @@
     "get_history": "Obtenga el historial",
     "executed_at": "Ejecutado en",
     "sql_query": "Consulta SQL",
-    "resuls": "Resultados"
+    "resuls": "Resultados",
+    "results": "Resultados"
   },
   "search_scheduler_job": {
     "title": "Planificador de tareas de búsqueda",
@@ -1593,10 +1618,12 @@
     "period": "Período",
     "cron": "Cron",
     "type": "Tipo",
-    "run_pipeline": "Ejecute Pipeline"
+    "run_pipeline": "Ejecute Pipeline",
+    "results": "Resultados"
   },
   "alert_list": {
-    "alert_details": "Detalles de la alerta"
+    "alert_details": "Detalles de la alerta",
+    "alert_history": "Historial de alertas"
   },
   "latencyInsights": {
     "title": "Perspectivas",

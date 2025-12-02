@@ -86,7 +86,8 @@
     "contactUs": "Contattaci",
     "addFolder": "Aggiungi cartella",
     "status": "Status",
-    "cancel": "Annulla"
+    "cancel": "Annulla",
+    "loadMore": "Carica altro"
   },
   "search": {
     "selectIndex": "Seleziona Stream First",
@@ -1109,6 +1110,23 @@
         "dashboardConfig": "Caricamento della configurazione del dashboard...",
         "refreshing": "Aggiornamento del pannello di controllo..."
       }
+    },
+    "historyTable": {
+      "timestamp": "Timestamp",
+      "status": "Status",
+      "evaluationTime": "Valutazione/i",
+      "queryTime": "Interrogazione (ms)"
+    },
+    "alertDetails": {
+      "alertName": "Nome dell'avviso",
+      "sqlQuery": "Interrogazione SQL",
+      "conditions": "Condizioni",
+      "copy": "Copia",
+      "noCondition": "Nessuna condizione",
+      "noDescription": "Nessuna descrizione",
+      "evaluationHistory": "Cronologia delle valutazioni",
+      "loadingHistory": "Caricamento della cronologia...",
+      "noHistoryAvailable": "Nessuna cronologia delle valutazioni disponibile per questo avviso"
     }
   },
   "alert_templates": {
@@ -1312,7 +1330,13 @@
     "delay": "Ritardo",
     "history": "Cronologia della pipeline",
     "searchHistory": "Inserisci il nome della pipeline",
-    "destination_type": "Tipo di destinazione"
+    "destination_type": "Tipo di destinazione",
+    "totalExecutions": "Esecuzioni totali",
+    "errorCount": "Errori",
+    "avgExecutionTime": "Avg. Tempo di esecuzione",
+    "successRate": "Percentuale di successo",
+    "noHistoryData": "Nessun dato cronologico disponibile",
+    "failedToFetchHistory": "Impossibile recuperare la cronologia della pipeline"
   },
   "reports": {
     "header": "Rapporti",
@@ -1533,7 +1557,8 @@
     "get_history": "Ottieni la cronologia",
     "executed_at": "Eseguito a",
     "sql_query": "Interrogazione SQL",
-    "resuls": "Risultati"
+    "resuls": "Risultati",
+    "results": "Risultati"
   },
   "search_scheduler_job": {
     "title": "Cerca Job Scheduler",
@@ -1593,10 +1618,12 @@
     "period": "Periodo",
     "cron": "Cron",
     "type": "Tipo",
-    "run_pipeline": "Esegui pipeline"
+    "run_pipeline": "Esegui pipeline",
+    "results": "Risultati"
   },
   "alert_list": {
-    "alert_details": "Dettagli dell'avviso"
+    "alert_details": "Dettagli dell'avviso",
+    "alert_history": "Cronologia avvisi"
   },
   "latencyInsights": {
     "title": "Approfondimenti",

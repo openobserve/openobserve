@@ -86,7 +86,8 @@
     "contactUs": "Nous contacter",
     "addFolder": "Ajouter un dossier",
     "status": "État",
-    "cancel": "Annuler"
+    "cancel": "Annuler",
+    "loadMore": "Charger plus"
   },
   "search": {
     "selectIndex": "Sélectionnez Stream First",
@@ -1109,6 +1110,23 @@
         "dashboardConfig": "Charger la configuration du tableau de bord...",
         "refreshing": "Tableau de bord rafraîchissant..."
       }
+    },
+    "historyTable": {
+      "timestamp": "Horodatage",
+      "status": "État",
+      "evaluationTime": "Évaluation (s)",
+      "queryTime": "Requête (ms)"
+    },
+    "alertDetails": {
+      "alertName": "Nom de l'alerte",
+      "sqlQuery": "Requête SQL",
+      "conditions": "Conditions",
+      "copy": "Copier",
+      "noCondition": "Aucune condition",
+      "noDescription": "Aucune description",
+      "evaluationHistory": "Historique de l'évaluation",
+      "loadingHistory": "Historique de chargement...",
+      "noHistoryAvailable": "Aucun historique d'évaluation disponible pour cette alerte"
     }
   },
   "alert_templates": {
@@ -1312,7 +1330,13 @@
     "delay": "Retard",
     "history": "Historique du pipeline",
     "searchHistory": "Entrez le nom du pipeline",
-    "destination_type": "Type de destination"
+    "destination_type": "Type de destination",
+    "totalExecutions": "Nombre total d'exécutions",
+    "errorCount": "Erreurs",
+    "avgExecutionTime": "Moyenne. Délai d'exécution",
+    "successRate": "Taux de réussite",
+    "noHistoryData": "Aucune donnée d'historique disponible",
+    "failedToFetchHistory": "Impossible de récupérer l'historique du pipeline"
   },
   "reports": {
     "header": "Rapports",
@@ -1533,7 +1557,8 @@
     "get_history": "Obtenir l'historique",
     "executed_at": "Exécuté à",
     "sql_query": "Requête SQL",
-    "resuls": "Résultats"
+    "resuls": "Résultats",
+    "results": "Résultats"
   },
   "search_scheduler_job": {
     "title": "Rechercher un planificateur de tâches",
@@ -1593,10 +1618,12 @@
     "period": "Période",
     "cron": "Cron",
     "type": "Tapez",
-    "run_pipeline": "Exécuter un pipeline"
+    "run_pipeline": "Exécuter un pipeline",
+    "results": "Résultats"
   },
   "alert_list": {
-    "alert_details": "Détails de l'alerte"
+    "alert_details": "Détails de l'alerte",
+    "alert_history": "Historique des alertes"
   },
   "latencyInsights": {
     "title": "Perspectives",

@@ -86,7 +86,8 @@
     "contactUs": "联系我们",
     "addFolder": "添加文件夹",
     "status": "状态",
-    "cancel": "取消"
+    "cancel": "取消",
+    "loadMore": "加载更多"
   },
   "search": {
     "selectIndex": "选择数据流",
@@ -1105,6 +1106,23 @@
         "dashboardConfig": "正在加载仪表板配置...",
         "refreshing": "正在刷新仪表板..."
       }
+    },
+    "historyTable": {
+      "timestamp": "时间戳",
+      "status": "状态",
+      "evaluationTime": "评估",
+      "queryTime": "查询 (ms)"
+    },
+    "alertDetails": {
+      "alertName": "警报名称",
+      "sqlQuery": "SQL 查询",
+      "conditions": "条件",
+      "copy": "复制",
+      "noCondition": "无条件",
+      "noDescription": "没有描述",
+      "evaluationHistory": "评估历史",
+      "loadingHistory": "正在加载历史记录...",
+      "noHistoryAvailable": "此警报没有评估历史记录"
     }
   },
   "alert_templates": {
@@ -1308,7 +1326,13 @@
     "delay": "延迟",
     "history": "管道历史",
     "searchHistory": "输入管道名称",
-    "destination_type": "目的地类型"
+    "destination_type": "目的地类型",
+    "totalExecutions": "总执行次数",
+    "errorCount": "错误",
+    "avgExecutionTime": "平均值。执行时间",
+    "successRate": "成功率",
+    "noHistoryData": "没有可用的历史数据",
+    "failedToFetchHistory": "无法获取管道历史记录"
   },
   "reports": {
     "header": "报表",
@@ -1529,7 +1553,8 @@
     "get_history": "获取历史记录",
     "executed_at": "处决于",
     "sql_query": "SQL 查询",
-    "resuls": "结果"
+    "resuls": "结果",
+    "results": "结果"
   },
   "search_scheduler_job": {
     "title": "搜索任务调度器",
@@ -1589,10 +1614,12 @@
     "period": "时期",
     "cron": "Cron",
     "type": "类型",
-    "run_pipeline": "运行管道"
+    "run_pipeline": "运行管道",
+    "results": "结果"
   },
   "alert_list": {
-    "alert_details": "警报详情"
+    "alert_details": "警报详情",
+    "alert_history": "警报历史"
   },
   "latencyInsights": {
     "title": "见解",
