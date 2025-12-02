@@ -4634,8 +4634,10 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .expand-on-focus {
-  height: calc(100vh - 12.5rem) !important; // 200px
+  position: fixed !important;
+  height: calc(100vh - 12.5rem) !important;
   z-index: 20 !important;
+  width: calc(100% - 104px);
 }
 
 .file-type label {

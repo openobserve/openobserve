@@ -434,6 +434,21 @@ export const convertServiceGraphToNetwork = (
   layoutType: string = "force",
   cachedPositions?: Map<string, { x: number; y: number }>
 ) => {
+  // Validate layout type - graph view only supports 'force' and 'circular'
+  // Tree layouts ('horizontal', 'vertical', 'radial') should use convertServiceGraphToTree instead
+  const validLayouts = ['force', 'circular'];
+  const normalizedLayoutType = validLayouts.includes(layoutType) ? layoutType : 'force';
+
+  if (layoutType !== normalizedLayoutType) {
+    console.warn(`[convertServiceGraphToNetwork] Invalid layout '${layoutType}' for graph view, defaulting to 'force'`);
+  }
+
+  console.log('[convertServiceGraphToNetwork] VERSION: 2025-11-26-v4 - Fixed bidirectional edge overlap');
+  console.log('[convertServiceGraphToNetwork] Input:', {
+    nodeCount: graphData.nodes?.length || 0,
+    edgeCount: graphData.edges?.length || 0,
+    layoutType: normalizedLayoutType
+  });
   // Build node metrics map (requests, errors, connections)
   const nodeMetrics = new Map<string, { requests: number; errors: number; connections: number }>();
 
@@ -467,7 +482,16 @@ export const convertServiceGraphToNetwork = (
     }
   });
 
-  const nodes = graphData.nodes.map((node: any) => {
+  // Validate that all nodes have valid IDs
+  const validNodes = graphData.nodes.filter((node: any) => {
+    if (!node || !node.id) {
+      console.warn('[convertServiceGraphToNetwork] Skipping node with invalid ID:', node);
+      return false;
+    }
+    return true;
+  });
+
+  const nodes = validNodes.map((node: any) => {
     const metrics = nodeMetrics.get(node.id) || { requests: 0, errors: 0 };
     const errorRate = metrics.requests > 0 ? (metrics.errors / metrics.requests) * 100 : 0;
 
@@ -528,15 +552,82 @@ export const convertServiceGraphToNetwork = (
     return nodeData;
   });
 
+  // Create a set of valid node IDs for edge validation
+  const validNodeIds = new Set(nodes.map((n: any) => n.id));
+
+  console.log('[convertServiceGraphToNetwork] Valid node IDs:', Array.from(validNodeIds));
+
   // Prepare edges with arrows showing flow direction
   // For circular layout, use curved lines; for force layout, use straight lines
-  const edges = graphData.edges.map((edge: any, edgeIndex: number) => {
+  // Filter out any invalid edges and ensure all required fields are present
+  const edgeMap = new Map<string, any>(); // Deduplicate edges by source-target pair
+
+  graphData.edges.forEach((edge: any) => {
+    // Validate edge structure and node references
+    if (!edge || !edge.from || !edge.to) {
+      console.warn('[convertServiceGraphToNetwork] Skipping edge with missing from/to:', edge);
+      return;
+    }
+
+    if (!validNodeIds.has(edge.from)) {
+      console.warn('[convertServiceGraphToNetwork] Skipping edge - source node not found:', edge.from);
+      return;
+    }
+
+    if (!validNodeIds.has(edge.to)) {
+      console.warn('[convertServiceGraphToNetwork] Skipping edge - target node not found:', edge.to);
+      return;
+    }
+
+    // Create unique key for deduplication
+    const edgeKey = `${edge.from}|||${edge.to}`;
+
+    // If duplicate, keep the one with more requests
+    if (edgeMap.has(edgeKey)) {
+      const existing = edgeMap.get(edgeKey);
+      if ((edge.total_requests || 0) > (existing.total_requests || 0)) {
+        edgeMap.set(edgeKey, edge);
+      }
+    } else {
+      edgeMap.set(edgeKey, edge);
+    }
+  });
+
+  console.log('[convertServiceGraphToNetwork] Valid edges after dedup:', edgeMap.size);
+
+  // Detect bidirectional edges and assign curvature direction
+  // For bidirectional edges, one edge curves left, the other curves right
+  const edgeCurvature = new Map<string, number>();
+  const processedPairs = new Set<string>();
+
+  edgeMap.forEach((edge, key) => {
+    const reverseKey = `${edge.to}|||${edge.from}`;
+    const pairKey = [edge.from, edge.to].sort().join('|||');
+
+    if (edgeMap.has(reverseKey) && !processedPairs.has(pairKey)) {
+      // This is a bidirectional edge
+      processedPairs.add(pairKey);
+
+      // Assign curvature to both directions
+      // Positive curvature for one direction, negative for the other
+      edgeCurvature.set(key, 0.2);
+      edgeCurvature.set(reverseKey, -0.2);
+    } else if (!edgeCurvature.has(key)) {
+      // Not bidirectional, no curvature needed
+      edgeCurvature.set(key, 0);
+    }
+  });
+
+  console.log('[convertServiceGraphToNetwork] Bidirectional pairs:', processedPairs.size);
+
+  const edges = Array.from(edgeMap.entries()).map(([edgeKey, edge]: [string, any], edgeIndex: number) => {
     const errorRate = edge.total_requests > 0 ? (edge.failed_requests / edge.total_requests) * 100 : 0;
 
-    // For circular layout, calculate curveness to route through center
-    // Use positive curveness values to curve inward toward center
-    let curveness = 0;
-    if (layoutType === 'circular') {
+    // Get the assigned curvature for this edge
+    let curveness = edgeCurvature.get(edgeKey) || 0;
+
+    // For circular layout, override with circular-specific curveness
+    if (normalizedLayoutType === 'circular') {
       // Vary curveness based on edge index to create visual separation
       // Range from 0.3 to 0.6 (positive values should curve inward)
       curveness = 0.3 + (edgeIndex % 4) * 0.1;
@@ -570,7 +661,7 @@ export const convertServiceGraphToNetwork = (
   const hasPositions = cachedPositions && cachedPositions.size > 0;
 
   // For force layout without cached positions, compute layout with D3-force
-  if (layoutType === 'force' && !hasPositions) {
+  if (normalizedLayoutType === 'force' && !hasPositions) {
     console.log('[convertServiceGraphToNetwork] Computing force layout with D3-force');
     const positionedNodes = computeForceLayout(nodes, graphData.edges, 800, 600);
 
@@ -588,7 +679,7 @@ export const convertServiceGraphToNetwork = (
   }
 
   // For circular layout, calculate positions manually on the periphery
-  if (layoutType === 'circular' && !hasPositions) {
+  if (normalizedLayoutType === 'circular' && !hasPositions) {
     const nodeCount = nodes.length;
     const nodeSize = 15; // Node diameter
     const radius = 280; // Radius where node centers are positioned
@@ -617,12 +708,11 @@ export const convertServiceGraphToNetwork = (
     console.log('[convertServiceGraphToNetwork] Using circular layout with', nodeCount, 'nodes on periphery');
   } else if (hasPositions) {
     console.log('[convertServiceGraphToNetwork] Using cached positions for', cachedPositions.size, 'nodes');
-  } else if (layoutType !== 'force') {
-    console.log('[convertServiceGraphToNetwork] Using', layoutType, 'layout');
   }
 
   // Use "none" layout when we have fixed positions (D3-force computed, circular, or cached)
-  const layoutMode = (hasPositions || layoutType === 'circular' || layoutType === 'force') ? "none" : layoutType;
+  // Always use "none" since we compute positions manually or use cached ones
+  const layoutMode = "none";
 
   const options = {
     tooltip: {
@@ -649,7 +739,7 @@ export const convertServiceGraphToNetwork = (
           min: 0.4,
           max: 3,
         },
-        label: layoutType === 'circular' ? {
+        label: normalizedLayoutType === 'circular' ? {
           show: true,
           position: 'top',
           formatter: (params: any) => params.data.name,
@@ -701,11 +791,11 @@ export const convertServiceGraphToNetwork = (
           },
         },
         lineStyle: {
-          opacity: layoutType === 'circular' ? 0.5 : 0.7,
+          opacity: normalizedLayoutType === 'circular' ? 0.5 : 0.7,
           curveness: 'auto', // Let individual edges control curveness
         },
         edgeSymbol: ['none', 'arrow'],
-        edgeSymbolSize: [0, layoutType === 'circular' ? 10 : 15],
+        edgeSymbolSize: [0, normalizedLayoutType === 'circular' ? 10 : 15],
       },
     ],
   };

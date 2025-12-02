@@ -13,18 +13,29 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Service Graph Module
+//! Service Graph Module - Enterprise Feature
 //!
-//! This module provides API endpoints for the service graph feature.
-//! The core logic is implemented in the enterprise repository.
+//! Daemon-based service graph that queries traces periodically.
+//! No inline processing during trace ingestion.
 
+// OSS modules
+pub mod aggregator;
 pub mod api;
+pub mod processor;
 
-// Re-export API handlers for routing
-pub use api::{get_service_graph_metrics, get_store_stats};
-// Re-export enterprise types and functions for internal use
+// Re-export API handler for router
+// Re-export aggregator function (used by processor)
+pub use aggregator::write_sql_aggregated_edges;
+pub use api::get_current_topology;
+// Re-export enterprise types and functions
 #[cfg(feature = "enterprise")]
 pub use o2_enterprise::enterprise::service_graph::{
-    ConnectionType, SERVICE_GRAPH_DROPPED_SPANS, SpanForGraph, SpanKind, init_background_workers,
-    process_span, shutdown_workers, span_to_graph_span,
+    // Data types
+    ConnectionType,
+    SpanForGraph,
+    SpanKind,
+    // Processing functions
+    span_to_graph_span,
 };
+// Re-export processor for compactor
+pub use processor::process_service_graph;

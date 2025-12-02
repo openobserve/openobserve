@@ -56,30 +56,7 @@
               <q-tooltip>Refresh Service Graph</q-tooltip>
             </q-btn>
 
-            <!-- 2. Auto-refresh toggle with interval input -->
-            <div class="tw-flex tw-items-center tw-gap-[0.5rem]">
-              <span class="tw-text-[0.875rem]" :class="{ 'tw-text-gray-400': !autoRefresh }">Refresh every</span>
-              <q-toggle
-                v-model="autoRefresh"
-                dense
-                size="sm"
-                @update:model-value="toggleAutoRefresh"
-              />
-              <q-input
-                v-model.number="refreshInterval"
-                type="number"
-                dense
-                filled
-                class="tw-w-[80px]"
-                input-class="tw-text-center"
-                :disable="!autoRefresh"
-                min="5"
-                max="300"
-              />
-              <span class="tw-text-[0.875rem]" :class="{ 'tw-text-gray-400': !autoRefresh }">seconds</span>
-            </div>
-
-            <!-- 3. Tree/Graph view toggle buttons -->
+            <!-- 2. Tree/Graph view toggle buttons -->
             <q-btn-toggle
               v-model="visualizationType"
               toggle-color="primary"
@@ -92,7 +69,7 @@
               @update:model-value="setVisualizationType"
             />
 
-            <!-- 4. Layout dropdown -->
+            <!-- 3. Layout dropdown -->
             <q-select
               v-model="layoutType"
               :options="layoutOptions"
@@ -143,7 +120,7 @@
                   <div class="text-h6 q-mt-md text-grey-7">No Service Graph Data</div>
                   <div class="text-body2 text-grey-6 q-mt-sm" style="max-width: 500px">
                     Send distributed traces with client and server spans to see the service graph.
-                    Make sure <code>ZO_SGRAPH_ENABLED=true</code> is set.
+                    Make sure <code>O2_SERVICE_GRAPH_ENABLED=true</code> is set.
                   </div>
                   <q-btn
                     outline
@@ -179,14 +156,9 @@
         <q-separator />
         <q-card-section>
           <div class="q-gutter-md">
-            <q-toggle
-              v-model="autoRefresh"
-              label="Auto-refresh (every 30 seconds)"
-              @update:model-value="toggleAutoRefresh"
-            />
-            <div class="text-caption text-grey-7 q-mt-md">
-              Store Size: {{ storeStats?.store_size || 0 }} edges
-              <q-tooltip>Number of pending span pairs waiting to be matched</q-tooltip>
+            <div class="text-caption text-grey-7">
+              Stream-based topology - all data persisted to storage
+              <q-tooltip>Service graph uses stream-only architecture with zero in-memory state</q-tooltip>
             </div>
           </div>
         </q-card-section>
@@ -200,7 +172,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, onBeforeUnmount, computed, watch } from "vue";
+import { defineComponent, ref, onMounted, computed } from "vue";
 import { useStore } from "vuex";
 import serviceGraphService from "@/services/service_graph";
 import AppTabs from "@/components/common/AppTabs.vue";
@@ -219,8 +191,6 @@ export default defineComponent({
     const loading = ref(false);
     const error = ref<string | null>(null);
     const showSettings = ref(false);
-    const autoRefresh = ref(true);
-    const refreshInterval = ref(30); // Default 30 seconds
     const lastUpdated = ref("");
 
     // Persist visualization type in localStorage
@@ -267,9 +237,6 @@ export default defineComponent({
     });
 
     const stats = ref<any>(null);
-    const storeStats = ref<any>(null);
-
-    let refreshIntervalTimer: any = null;
 
     // Store node positions for graph view to prevent re-layout on updates
     const graphNodePositions = ref<Map<string, { x: number; y: number }>>(new Map());
@@ -301,17 +268,16 @@ export default defineComponent({
         return { options: {}, notMerge: true };
       }
 
-      // For graph view, only regenerate options when chartKey changes (layout/type change)
-      // This prevents chart recreation on data refreshes, keeping positions stable
-      if (visualizationType.value === "graph" && lastChartOptions.value && chartKey.value === lastChartOptions.value.key) {
-        console.log('[ServiceGraph] Reusing cached chart options, chartKey:', chartKey.value);
-        // Return with notMerge: false to update data incrementally without re-layout
-        return {
-          options: lastChartOptions.value.data.options,
-          notMerge: false, // Incremental update - preserves positions
-          lazyUpdate: true
-        };
-      }
+      // Disabled caching to ensure fresh edges with __original property
+      // Position stability maintained through graphNodePositions passed to conversion
+      // if (visualizationType.value === "graph" && lastChartOptions.value && chartKey.value === lastChartOptions.value.key) {
+      //   console.log('[ServiceGraph] Reusing cached chart options, chartKey:', chartKey.value);
+      //   return {
+      //     options: lastChartOptions.value.data.options,
+      //     notMerge: false,
+      //     lazyUpdate: true
+      //   };
+      // }
 
       console.log('[ServiceGraph] Generating new chart options, chartKey:', chartKey.value);
       const newOptions = visualizationType.value === "tree"
@@ -347,48 +313,83 @@ export default defineComponent({
           throw new Error("No organization selected");
         }
 
-        // Load store stats with timeout
-        const statsResponse: any = await Promise.race([
-          serviceGraphService.getStats(orgId),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("Request timeout")), 30000)
-          )
-        ]);
-        storeStats.value = statsResponse.data;
+        // Stream-only implementation - no store stats needed
+        // Use JSON topology endpoint
+        const response = await serviceGraphService.getCurrentTopology(
+          orgId,
+          streamFilter.value && streamFilter.value !== "all" ? streamFilter.value : undefined
+        );
 
-        if (!storeStats.value?.enabled) {
-          error.value = "Service Graph is not enabled. Set ZO_SGRAPH_ENABLED=true";
-          loading.value = false;
-          return;
+        // Convert API response to expected format
+        const rawData = response.data;
+
+        // Ensure nodes have all required fields
+        const nodes = (rawData.nodes || []).map((node: any) => ({
+          id: node.id,
+          label: node.label || node.id,
+          requests: node.requests || 0,
+          errors: node.errors || 0,
+          error_rate: node.error_rate || 0,
+          is_virtual: node.is_virtual || false,
+        }));
+
+        // Ensure edges have all required fields and valid node references
+        const nodeIds = new Set(nodes.map((n: any) => n.id));
+        const edges = (rawData.edges || [])
+          .filter((edge: any) => {
+            // Filter out edges with missing endpoints
+            const hasValidEndpoints = edge.from && edge.to && nodeIds.has(edge.from) && nodeIds.has(edge.to);
+            if (!hasValidEndpoints) {
+              console.warn('[ServiceGraph] Skipping edge with invalid endpoints:', edge);
+            }
+            return hasValidEndpoints;
+          })
+          .map((edge: any) => ({
+            id: `${edge.from}->${edge.to}`,
+            from: edge.from,
+            to: edge.to,
+            connection_type: edge.connection_type || "standard",
+            total_requests: edge.total_requests || 0,
+            failed_requests: edge.failed_requests || 0,
+            error_rate: edge.error_rate || 0,
+            p50_latency_ns: edge.p50_latency_ns || 0,
+            p95_latency_ns: edge.p95_latency_ns || 0,
+            p99_latency_ns: edge.p99_latency_ns || 0,
+          }));
+
+        graphData.value = {
+          nodes,
+          edges,
+          availableStreams: rawData.availableStreams || [],
+        };
+
+        // Update availableStreams ref for the stream selector dropdown
+        // Extract unique stream names from edges if not provided by API
+        if (rawData.availableStreams && rawData.availableStreams.length > 0) {
+          availableStreams.value = rawData.availableStreams;
+        } else {
+          // Fallback: extract stream names from connection_type or other edge properties
+          const streamSet = new Set<string>();
+          edges.forEach((edge: any) => {
+            // If edges have stream_name property, collect them
+            if (edge.stream_name) {
+              streamSet.add(edge.stream_name);
+            }
+          });
+          availableStreams.value = Array.from(streamSet).sort();
         }
 
-        // First, load all metrics to discover available streams
-        const allMetricsResponse = await serviceGraphService.getMetrics(orgId);
-        const allParsedData = parsePrometheusMetrics(allMetricsResponse.data);
-        availableStreams.value = allParsedData.availableStreams || [];
-
-        // Log available streams for debugging
+        console.log('[ServiceGraph] Loaded topology:', graphData.value);
         console.log('[ServiceGraph] Available streams:', availableStreams.value);
         console.log('[ServiceGraph] Active stream filter:', streamFilter.value);
 
-        // Now parse with stream filter if one is active
-        let parsedData;
-        if (streamFilter.value && streamFilter.value !== "all") {
-          const filteredResponse = await serviceGraphService.getMetrics(orgId, streamFilter.value);
-          parsedData = parsePrometheusMetrics(filteredResponse.data);
-        } else {
-          parsedData = allParsedData;
-        }
-
-        graphData.value = parsedData;
-
         // Calculate stats
-        const totalRequests = parsedData.edges.reduce((sum: number, e: any) => sum + e.total_requests, 0);
-        const totalErrors = parsedData.edges.reduce((sum: number, e: any) => sum + e.failed_requests, 0);
+        const totalRequests = graphData.value.edges.reduce((sum: number, e: any) => sum + e.total_requests, 0);
+        const totalErrors = graphData.value.edges.reduce((sum: number, e: any) => sum + e.failed_requests, 0);
 
         stats.value = {
-          services: parsedData.nodes.length,
-          connections: parsedData.edges.length,
+          services: graphData.value.nodes.length,
+          connections: graphData.value.edges.length,
           totalRequests,
           totalErrors,
           errorRate: totalRequests > 0 ? (totalErrors / totalRequests) * 100 : 0,
@@ -405,7 +406,7 @@ export default defineComponent({
         if (err.message === "Request timeout") {
           error.value = "Request timed out. The service graph may be processing large amounts of data. Please try again.";
         } else if (err.response?.status === 404) {
-          error.value = "Service Graph API endpoint not found. Ensure you're running a version that supports Service Graph.";
+          error.value = "Service Graph API endpoint not found. Ensure you're running enterprise version of OpenObserve.";
         } else if (err.response?.status === 403) {
           error.value = "Access denied. You may not have permission to view the service graph for this organization.";
         } else if (err.response?.status === 500) {
@@ -582,39 +583,8 @@ export default defineComponent({
       return num.toString();
     };
 
-    const toggleAutoRefresh = (enabled: boolean) => {
-      if (refreshIntervalTimer) {
-        clearInterval(refreshIntervalTimer);
-        refreshIntervalTimer = null;
-      }
-
-      if (enabled) {
-        // Convert seconds to milliseconds
-        const intervalMs = refreshInterval.value * 1000;
-        refreshIntervalTimer = setInterval(loadServiceGraph, intervalMs);
-      }
-    };
-
-    // Watch for changes in refreshInterval and restart the timer if auto-refresh is enabled
-    watch(refreshInterval, () => {
-      if (autoRefresh.value) {
-        toggleAutoRefresh(true);
-      }
-    });
-
     onMounted(() => {
       loadServiceGraph();
-
-      // Start auto-refresh if enabled
-      if (autoRefresh.value) {
-        toggleAutoRefresh(true);
-      }
-    });
-
-    onBeforeUnmount(() => {
-      if (refreshIntervalTimer) {
-        clearInterval(refreshIntervalTimer);
-      }
     });
 
     return {
@@ -623,10 +593,7 @@ export default defineComponent({
       graphData,
       filteredGraphData,
       stats,
-      storeStats,
       showSettings,
-      autoRefresh,
-      refreshInterval,
       lastUpdated,
       searchFilter,
       streamFilter,
@@ -645,7 +612,6 @@ export default defineComponent({
       onStreamFilterChange,
       setLayout,
       setVisualizationType,
-      toggleAutoRefresh,
     };
   },
 });
