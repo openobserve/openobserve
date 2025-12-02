@@ -28,30 +28,51 @@ export default class DashboardFolder {
 
   // Wait for folder dialog to be fully stable
   async waitForFolderDialogStable() {
-    // First ensure any previous dialog is gone
-    try {
-      await this.page.locator('.q-dialog__inner').waitFor({ state: "hidden", timeout: 2000 });
-    } catch (e) {
-      // No previous dialog, continue
-    }
-
     // Wait for dialog to be visible
     const dialog = this.page.locator('.q-dialog__inner');
-    await dialog.waitFor({ state: "visible", timeout: 15000 });
+    await dialog.waitFor({ state: "visible", timeout: 50000 });
 
-    // Wait for dialog to be attached
-    await dialog.waitFor({ state: "attached", timeout: 5000 });
+    // Wait for name input to be visible
+    const nameInput = this.page.locator('[data-test="dashboard-folder-add-name"]');
+    await nameInput.waitFor({ state: "visible", timeout: 15000 });
 
-    // Wait for animation to complete (300ms as per style)
-    await this.page.waitForTimeout(800);
+    // Wait for save button to be visible
+    const saveBtn = this.page.locator('[data-test="dashboard-folder-add-save"]');
+    await saveBtn.waitFor({ state: "visible", timeout: 5000 });
 
-    // Wait for name input to be stable
+    // Wait for animations to complete
+    await this.page.waitForTimeout(1000);
+  }
+
+  // Wait for Update Folder dialog to be fully stable
+  async waitForUpdateFolderDialogStable() {
+    // Wait for dialog inner container to be visible
+    const dialogInner = this.page.locator('.q-dialog__inner');
+    await dialogInner.waitFor({ state: "visible", timeout: 15000 });
+
+    // Wait for the card container with "Update Folder" title
+    const updateFolderCard = this.page.locator('.q-card').filter({ hasText: 'Update Folder' });
+    await updateFolderCard.waitFor({ state: "visible", timeout: 10000 });
+
+    // Wait for name input field to be visible and attached
     const nameInput = this.page.locator('[data-test="dashboard-folder-add-name"]');
     await nameInput.waitFor({ state: "visible", timeout: 15000 });
     await nameInput.waitFor({ state: "attached", timeout: 5000 });
 
-    // Additional wait to ensure DOM is fully stable
-    await this.page.waitForTimeout(500);
+    // Wait for description field to be visible (ensures form is fully loaded)
+    const descriptionInput = this.page.locator('[data-test="dashboard-folder-add-description"]');
+    await descriptionInput.waitFor({ state: "visible", timeout: 5000 });
+
+    // Wait for cancel button in the form to be visible
+    const cancelBtn = this.page.locator('[data-test="dashboard-folder-add-cancel"]').last();
+    await cancelBtn.waitFor({ state: "visible", timeout: 5000 });
+
+    // Wait for save button to be visible
+    const saveBtn = this.page.locator('[data-test="dashboard-folder-add-save"]');
+    await saveBtn.waitFor({ state: "visible", timeout: 5000 });
+
+    // Wait for all animations and DOM updates to complete
+    // await this.page.waitForTimeout(1500);
   }
 
   // Create folder
@@ -60,16 +81,18 @@ export default class DashboardFolder {
     await newFolderBtn.waitFor({ state: "visible", timeout: 5000 });
     await newFolderBtn.click();
 
-    // Wait for dialog to be fully stable
+    // Wait for dialog to be stable
     await this.waitForFolderDialogStable();
 
-    // Now interact with the form
+    // Fill folder name (fill automatically handles focus)
     const nameInput = this.page.locator('[data-test="dashboard-folder-add-name"]');
-    await nameInput.click();
     await nameInput.fill(folderName);
 
+    // Wait for save button to be enabled (validation passes)
     const saveBtn = this.page.locator('[data-test="dashboard-folder-add-save"]');
-    await saveBtn.waitFor({ state: "visible", timeout: 5000 });
+    await expect(saveBtn).toBeEnabled({ timeout: 5000 });
+
+    // Click save
     await saveBtn.click();
 
     // Wait for dialog to close
@@ -131,23 +154,23 @@ export default class DashboardFolder {
     await editIcon.waitFor({ state: "visible", timeout: 5000 });
     await editIcon.click();
 
-    // Give time for the click to register and dialog to start opening
-    await page.waitForTimeout(500);
+    // Wait for Update Folder dialog to be fully stable
+    await this.waitForUpdateFolderDialogStable();
 
-    // Wait for dialog to be fully stable
-    await this.waitForFolderDialogStable();
-
-    // Now interact with the form
+    // Clear and fill the new name
     const nameInput = page.locator('[data-test="dashboard-folder-add-name"]');
-    await nameInput.click();
-    await page.keyboard.press("Control+A");
-    await page.keyboard.press("Backspace");
+    await nameInput.clear();
     await nameInput.fill(newName);
+    await page.waitForTimeout(5000);
 
-    // Save
+    // Wait for save button to be enabled (validation passes)
     const saveBtn = page.locator('[data-test="dashboard-folder-add-save"]');
     await saveBtn.waitFor({ state: "visible", timeout: 5000 });
+    await expect(saveBtn).toBeEnabled({ timeout: 5000 });
+
+    // Click save
     await saveBtn.click();
+    await page.waitForTimeout(5000);
 
     // Wait for dialog to close
     await page.locator('.q-dialog__inner').waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});

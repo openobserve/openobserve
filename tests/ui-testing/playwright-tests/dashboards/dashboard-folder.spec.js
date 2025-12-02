@@ -91,6 +91,7 @@ test.describe("dashboard folder testcases", () => {
     const updatedName = folderName + "_updated";
     await pm.dashboardFolder.editFolderName(folderName, updatedName);
     await pm.dashboardFolder.searchFolder(updatedName);
+
     await expect(page.locator(`text=${updatedName}`)).toBeVisible();
 
     await pm.dashboardFolder.deleteFolder(updatedName);
