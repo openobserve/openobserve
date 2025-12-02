@@ -239,6 +239,13 @@ async fn main() -> Result<(), anyhow::Error> {
         bytes_to_human_readable(cfg.memory_cache.datafusion_max_size as f64),
     );
 
+    // install ring as the default crypto provider if TLS is enabled
+    if cfg.http.tls_enabled || cfg.grpc.tls_enabled {
+        rustls::crypto::ring::default_provider()
+            .install_default()
+            .expect("Failed to install rustls crypto provider");
+    }
+
     // init script server
     #[cfg(feature = "enterprise")]
     if config::cluster::LOCAL_NODE.is_script_server() && config::cluster::LOCAL_NODE.is_standalone()
@@ -310,13 +317,6 @@ async fn main() -> Result<(), anyhow::Error> {
             if let Err(e) = job::init().await {
                 job_init_tx.send(false).ok();
                 panic!("job init failed: {e}");
-            }
-
-            // init service graph workers
-            #[cfg(feature = "enterprise")]
-            if cfg.service_graph.enabled {
-                log::info!("Initializing service graph background workers");
-                openobserve::service::traces::service_graph::init_background_workers();
             }
 
             // Register job runtime for metrics collection
@@ -784,7 +784,6 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
                     factory
                         .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
-                        .wrap(middleware::from_fn(middlewares::check_keep_alive))
                         .service(get_metrics)
                         .service(router::http::config)
                         .service(router::http::config_paths)
@@ -800,7 +799,6 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
             app = app.service({
                 let scope = web::scope(&cfg.common.base_uri)
                     .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
-                    .wrap(middleware::from_fn(middlewares::check_keep_alive))
                     .service(get_metrics)
                     .configure(get_config_routes)
                     .configure(get_service_routes)
@@ -890,7 +888,6 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
                     factory
                         .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
-                        .wrap(middleware::from_fn(middlewares::check_keep_alive))
                         .service(get_metrics)
                         .service(router::http::config)
                         .service(router::http::config_paths)
@@ -906,7 +903,6 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
             app = app.service({
                 let scope = web::scope(&cfg.common.base_uri)
                     .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
-                    .wrap(middleware::from_fn(middlewares::check_keep_alive))
                     .service(get_metrics)
                     .configure(get_config_routes)
                     .configure(get_service_routes)

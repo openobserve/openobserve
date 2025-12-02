@@ -28,6 +28,7 @@ pub const USAGE_STREAM: &str = "usage";
 pub const STATS_STREAM: &str = "stats";
 pub const TRIGGERS_STREAM: &str = "triggers";
 pub const ERROR_STREAM: &str = "errors";
+pub const DATA_RETENTION_USAGE_STREAM: &str = "data_retention_usage";
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum TriggerDataStatus {
@@ -78,6 +79,110 @@ pub struct TriggerData {
     pub query_took: Option<i64>,
     pub scheduler_trace_id: Option<String>,
     pub time_in_queue_ms: Option<i64>,
+    // Deduplication tracking fields
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dedup_enabled: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dedup_suppressed: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dedup_count: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grouped: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_size: Option<i32>,
+}
+
+impl Default for TriggerData {
+    fn default() -> Self {
+        Self {
+            _timestamp: 0,
+            org: String::new(),
+            module: TriggerDataType::Alert,
+            key: String::new(),
+            next_run_at: 0,
+            is_realtime: false,
+            is_silenced: false,
+            status: TriggerDataStatus::Completed,
+            start_time: 0,
+            end_time: 0,
+            retries: 0,
+            skipped_alerts_count: None,
+            error: None,
+            success_response: None,
+            is_partial: None,
+            delay_in_secs: None,
+            evaluation_took_in_secs: None,
+            source_node: None,
+            query_took: None,
+            scheduler_trace_id: None,
+            time_in_queue_ms: None,
+            dedup_enabled: None,
+            dedup_suppressed: None,
+            dedup_count: None,
+            grouped: None,
+            group_size: None,
+        }
+    }
+}
+
+impl TriggerData {
+    /// Creates a sample TriggerData instance with all fields populated.
+    ///
+    /// This is used for:
+    /// - Schema inference via reflection (ensures all Optional fields are present)
+    /// - Field name extraction for testing/validation
+    ///
+    /// All Optional fields are set to Some() with default values to ensure they appear
+    /// in serialization (avoiding `#[serde(skip_serializing_if = "Option::is_none")]`).
+    pub fn init_for_reflection() -> Self {
+        Self {
+            _timestamp: 0,
+            org: String::new(),
+            module: TriggerDataType::Alert,
+            key: String::new(),
+            next_run_at: 0,
+            is_realtime: false,
+            is_silenced: false,
+            status: TriggerDataStatus::Completed,
+            start_time: 0,
+            end_time: 0,
+            retries: 0,
+            // Populate all Optional fields to ensure they're in the schema
+            skipped_alerts_count: Some(0),
+            error: Some(String::new()),
+            success_response: Some(String::new()),
+            is_partial: Some(false),
+            delay_in_secs: Some(0),
+            evaluation_took_in_secs: Some(0.0),
+            source_node: Some(String::new()),
+            query_took: Some(0),
+            scheduler_trace_id: Some(String::new()),
+            time_in_queue_ms: Some(0),
+            dedup_enabled: Some(false),
+            dedup_suppressed: Some(false),
+            dedup_count: Some(0),
+            grouped: Some(false),
+            group_size: Some(0),
+        }
+    }
+
+    /// Returns all field names for TriggerData struct by introspecting a sample instance.
+    ///
+    /// This is primarily used for testing/validation. For schema creation, use
+    /// `sample_for_reflection()` directly with schema inference.
+    ///
+    /// Field names respect serde rename attributes (e.g., `#[serde(rename_all = "snake_case")]`).
+    pub fn get_field_names() -> Vec<String> {
+        let sample = Self::init_for_reflection();
+
+        // Serialize to JSON and extract keys
+        let json_value = serde_json::to_value(&sample).unwrap();
+        if let serde_json::Value::Object(map) = json_value {
+            map.keys().cloned().collect()
+        } else {
+            vec![]
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -148,6 +253,20 @@ pub struct GroupKey {
 pub struct AggregatedData {
     pub usage_data: UsageData,
     pub count: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct DataRetentionUsageData {
+    pub _timestamp: i64,
+    pub org_id: String,
+    pub year: i32,
+    pub month: u32,
+    pub day: u32,
+    pub hour: u32,
+    pub event_time_hour: String,
+    pub mb_hours: f64,
+    pub storage_size_mb: f64,
+    pub unit: String,
 }
 
 #[derive(Hash, Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -645,6 +764,11 @@ mod tests {
             query_took: Some(500),
             scheduler_trace_id: Some("trace123".to_string()),
             time_in_queue_ms: Some(100),
+            dedup_enabled: None,
+            dedup_suppressed: None,
+            dedup_count: None,
+            grouped: None,
+            group_size: None,
         };
 
         let json = serde_json::to_string(&trigger_data).unwrap();

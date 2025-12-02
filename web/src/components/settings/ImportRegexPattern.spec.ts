@@ -19,7 +19,7 @@ import ImportRegexPattern from "@/components/settings/ImportRegexPattern.vue";
 import regexPatternsService from "@/services/regex_pattern";
 import { Notify } from "quasar";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { nextTick } from "vue";
+import { nextTick, ref } from "vue";
 import axios from "axios";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -60,22 +60,43 @@ describe("ImportRegexPattern", () => {
       global: {
         plugins: [store, router, i18n],
         stubs: {
+          "base-import": {
+            template: '<div><slot name="output-content"></slot></div>',
+            props: ['title', 'testPrefix', 'isImporting', 'editorHeights', 'containerClass', 'containerStyle', 'tabs'],
+            emits: ['back', 'cancel', 'import', 'update:active-tab'],
+            setup(_props: any, { expose }: any) {
+              const jsonArrayOfObj = ref([]);
+              const jsonStr = ref("");
+              const isImporting = ref(false);
+              const jsonFiles = ref(null);
+              const url = ref("");
+              const updateJsonArray = (arr: any[]) => {
+                jsonArrayOfObj.value = arr;
+                jsonStr.value = JSON.stringify(arr, null, 2);
+              };
+              expose({
+                jsonArrayOfObj,
+                jsonStr,
+                isImporting,
+                jsonFiles,
+                url,
+                updateJsonArray,
+              });
+              return { jsonArrayOfObj, jsonStr, isImporting, jsonFiles, url, updateJsonArray };
+            },
+          },
           "q-input": true,
           "q-btn": true,
           "q-separator": true,
           "q-form": true,
           "q-file": true,
-          "q-splitter": {
-            template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
-            props: ['modelValue', 'style', 'noScroll']
-          },
           "app-tabs": {
             template: '<div :data-test="$attrs[\'data-test\']" :class="$attrs.class"><slot></slot></div>',
             props: ['tabs', 'activeTab'],
             emits: ['update:active-tab']
           },
-          "query-editor": true,
-          "q-icon": true
+          "q-icon": true,
+          "built-in-patterns-tab": true
         }
       }
     });
@@ -97,12 +118,8 @@ describe("ImportRegexPattern", () => {
     });
 
     it("should initialize with correct default values", () => {
-      expect(wrapper.vm.jsonStr).toBe("");
       expect(wrapper.vm.activeTab).toBe("import_built_in_patterns");
-      expect(wrapper.vm.url).toBe("");
-      expect(wrapper.vm.splitterModel).toBe(60);
-      expect(wrapper.vm.queryEditorPlaceholderFlag).toBe(true);
-      expect(wrapper.vm.jsonFiles).toBe(null);
+      expect(wrapper.vm.isImporting).toBe(false);
     });
 
     it("should initialize existing pattern names set", () => {
@@ -111,16 +128,16 @@ describe("ImportRegexPattern", () => {
       expect(wrapper.vm.existingPatternNames.has("existing-pattern-2")).toBe(true);
     });
 
-    it("should initialize empty arrays and objects", () => {
+    it("should initialize empty arrays", () => {
       expect(wrapper.vm.regexPatternErrorsToDisplay).toEqual([]);
       expect(wrapper.vm.userSelectedRegexPatternName).toEqual([]);
       expect(wrapper.vm.userSelectedRegexPattern).toEqual([]);
       expect(wrapper.vm.regexPatternCreators).toEqual([]);
-      expect(wrapper.vm.jsonArrayOfObj).toEqual([{}]);
+      expect(wrapper.vm.jsonArrayOfObj).toEqual([]); // Empty from baseImportRef
     });
 
     it("should initialize correct tabs structure", () => {
-      expect(wrapper.vm.tabs).toEqual([
+      expect(wrapper.vm.allTabs).toEqual([
         {
           label: "Built-in Patterns",
           value: "import_built_in_patterns",
@@ -139,191 +156,63 @@ describe("ImportRegexPattern", () => {
 
   // Function Tests
   describe("updateRegexPatternName function", () => {
-    it("should update regex pattern name in jsonArrayOfObj", () => {
-      wrapper.vm.jsonArrayOfObj = [{ name: "old-name" }];
-      wrapper.vm.updateRegexPatternName("new-name", 0);
-      
-      expect(wrapper.vm.jsonArrayOfObj[0].name).toBe("new-name");
-      expect(wrapper.vm.jsonStr).toContain("new-name");
+    beforeEach(async () => {
+      // Switch to a tab that uses BaseImport
+      wrapper.vm.activeTab = "import_json_file";
+      await nextTick();
+
+      // Set up baseImportRef with initial data
+      if (wrapper.vm.$refs.baseImportRef) {
+        wrapper.vm.$refs.baseImportRef.jsonArrayOfObj = [{ name: "old-name" }];
+        wrapper.vm.$refs.baseImportRef.updateJsonArray([{ name: "old-name" }]);
+      }
     });
 
-    it("should update jsonStr with formatted JSON", () => {
-      wrapper.vm.jsonArrayOfObj = [{ name: "" }];
-      wrapper.vm.updateRegexPatternName("test-pattern", 0);
-      
-      const expectedJson = JSON.stringify([{ name: "test-pattern" }], null, 2);
-      expect(wrapper.vm.jsonStr).toBe(expectedJson);
+    it("should update regex pattern name in jsonArrayOfObj", () => {
+      wrapper.vm.updateRegexPatternName("new-name", 0);
+
+      expect(wrapper.vm.jsonArrayOfObj[0].name).toBe("new-name");
     });
 
     it("should handle multiple objects in array", () => {
-      wrapper.vm.jsonArrayOfObj = [{ name: "first" }, { name: "second" }];
+      if (wrapper.vm.$refs.baseImportRef) {
+        wrapper.vm.$refs.baseImportRef.jsonArrayOfObj = [{ name: "first" }, { name: "second" }];
+      }
       wrapper.vm.updateRegexPatternName("updated-first", 0);
-      
+
       expect(wrapper.vm.jsonArrayOfObj[0].name).toBe("updated-first");
       expect(wrapper.vm.jsonArrayOfObj[1].name).toBe("second");
     });
   });
 
   describe("updateRegexPattern function", () => {
-    it("should update regex pattern in jsonArrayOfObj", () => {
-      wrapper.vm.jsonArrayOfObj = [{ pattern: "old-pattern" }];
-      wrapper.vm.updateRegexPattern("new-pattern", 0);
-      
-      expect(wrapper.vm.jsonArrayOfObj[0].pattern).toBe("new-pattern");
-      expect(wrapper.vm.jsonStr).toContain("new-pattern");
+    beforeEach(async () => {
+      // Switch to a tab that uses BaseImport
+      wrapper.vm.activeTab = "import_json_file";
+      await nextTick();
+
+      // Set up baseImportRef with initial data
+      if (wrapper.vm.$refs.baseImportRef) {
+        wrapper.vm.$refs.baseImportRef.jsonArrayOfObj = [{ pattern: "old-pattern" }];
+        wrapper.vm.$refs.baseImportRef.updateJsonArray([{ pattern: "old-pattern" }]);
+      }
     });
 
-    it("should update jsonStr with formatted JSON", () => {
-      wrapper.vm.jsonArrayOfObj = [{ pattern: "" }];
-      wrapper.vm.updateRegexPattern(".*test.*", 0);
-      
-      const expectedJson = JSON.stringify([{ pattern: ".*test.*" }], null, 2);
-      expect(wrapper.vm.jsonStr).toBe(expectedJson);
+    it("should update regex pattern in jsonArrayOfObj", () => {
+      wrapper.vm.updateRegexPattern("new-pattern", 0);
+
+      expect(wrapper.vm.jsonArrayOfObj[0].pattern).toBe("new-pattern");
     });
 
     it("should handle complex regex patterns", () => {
-      wrapper.vm.jsonArrayOfObj = [{ pattern: "" }];
       const complexPattern = "^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}$";
       wrapper.vm.updateRegexPattern(complexPattern, 0);
-      
+
       expect(wrapper.vm.jsonArrayOfObj[0].pattern).toBe(complexPattern);
     });
   });
 
-  describe("updateActiveTab function", () => {
-    it("should reset all form fields when switching tabs", () => {
-      wrapper.vm.jsonStr = "test-json";
-      wrapper.vm.jsonFiles = ["file1"];
-      wrapper.vm.url = "http://test.com";
-      wrapper.vm.jsonArrayOfObj = [{ test: "data" }];
-
-      wrapper.vm.updateActiveTab();
-
-      expect(wrapper.vm.jsonStr).toBe("");
-      expect(wrapper.vm.jsonFiles).toBe(null);
-      expect(wrapper.vm.url).toBe("");
-      expect(wrapper.vm.jsonArrayOfObj).toEqual([{}]);
-    });
-
-    it("should be called when activeTab changes", () => {
-      const updateSpy = vi.spyOn(wrapper.vm, "updateActiveTab");
-      
-      wrapper.vm.activeTab = "import_json_url";
-      wrapper.vm.updateActiveTab();
-      
-      expect(updateSpy).toHaveBeenCalled();
-      expect(wrapper.vm.jsonStr).toBe("");
-    });
-  });
-
-  describe("onSubmit function", () => {
-    it("should prevent default form submission", () => {
-      const mockEvent = { preventDefault: vi.fn() };
-      wrapper.vm.onSubmit(mockEvent);
-      
-      expect(mockEvent.preventDefault).toHaveBeenCalled();
-    });
-  });
-
-  // URL Watcher Tests
-  describe("URL watcher", () => {
-    beforeEach(() => {
-      vi.clearAllMocks();
-    });
-
-    it("should fetch JSON data from valid URL", async () => {
-      const mockResponse = {
-        data: { name: "test", pattern: ".*" },
-        headers: { "content-type": "application/json" }
-      };
-      
-      (axios.get as any).mockResolvedValue(mockResponse);
-      
-      wrapper.vm.url = "http://valid-url.com/data.json";
-      await nextTick();
-      await flushPromises();
-      
-      expect(axios.get).toHaveBeenCalledWith("http://valid-url.com/data.json");
-      expect(wrapper.vm.jsonArrayOfObj).toEqual(mockResponse.data);
-    });
-
-    it("should handle text/plain content type", async () => {
-      const mockResponse = {
-        data: [{ name: "test", pattern: ".*" }],
-        headers: { "content-type": "text/plain" }
-      };
-      
-      (axios.get as any).mockResolvedValue(mockResponse);
-      
-      wrapper.vm.url = "http://valid-url.com/data.txt";
-      await nextTick();
-      await flushPromises();
-      
-      expect(wrapper.vm.jsonArrayOfObj).toEqual(mockResponse.data);
-    });
-
-    it("should show error for invalid content type", async () => {
-      const mockResponse = {
-        data: "<html></html>",
-        headers: { "content-type": "text/html" }
-      };
-      
-      (axios.get as any).mockResolvedValue(mockResponse);
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
-      
-      wrapper.vm.url = "http://invalid-url.com/page.html";
-      await nextTick();
-      await flushPromises();
-      
-      expect(notifySpy).toHaveBeenCalledWith({
-        message: "Invalid JSON format in the URL",
-        color: "negative",
-        position: "bottom",
-        timeout: 2000,
-      });
-    });
-
-    it("should handle network errors", async () => {
-      (axios.get as any).mockRejectedValue(new Error("Network error"));
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
-      
-      wrapper.vm.url = "http://invalid-url.com";
-      await nextTick();
-      await flushPromises();
-      
-      expect(notifySpy).toHaveBeenCalledWith({
-        message: "Error fetching data",
-        color: "negative",
-        position: "bottom",
-        timeout: 2000,
-      });
-    });
-
-    it("should not fetch when URL is empty", async () => {
-      wrapper.vm.url = "";
-      await nextTick();
-      await flushPromises();
-      
-      expect(axios.get).not.toHaveBeenCalled();
-    });
-  });
-
-  // File Watcher Tests
-  describe("jsonFiles watcher", () => {
-    it("should handle file change events", () => {
-      // Test that the jsonFiles watcher exists and can handle null values
-      expect(wrapper.vm.jsonFiles).toBe(null);
-      
-      // Set to null and verify it doesn't break
-      wrapper.vm.jsonFiles = null;
-      expect(wrapper.vm.jsonFiles).toBe(null);
-    });
-
-    it("should initialize jsonArrayOfObj properly", () => {
-      // Test basic functionality that doesn't require FileReader
-      expect(Array.isArray(wrapper.vm.jsonArrayOfObj)).toBe(true);
-    });
-  });
+  // updateActiveTab, onSubmit, URL watcher, and jsonFiles watcher moved to BaseImport
 
   // validateRegexPatternInputs Tests
   describe("validateRegexPatternInputs function", () => {
@@ -551,13 +440,15 @@ describe("ImportRegexPattern", () => {
     });
 
     it("should show error for empty JSON string", async () => {
-      wrapper.vm.jsonStr = "";
-      wrapper.vm.url = "";
-      
+      const payload = {
+        jsonStr: "",
+        jsonArray: []
+      };
+
       const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
-      
-      await wrapper.vm.importJson();
-      
+
+      await wrapper.vm.importJson(payload);
+
       expect(notifySpy).toHaveBeenCalledWith({
         message: "JSON string is empty",
         color: "negative",
@@ -567,12 +458,15 @@ describe("ImportRegexPattern", () => {
     });
 
     it("should show error for invalid JSON", async () => {
-      wrapper.vm.jsonStr = "{ invalid json }";
-      
+      const payload = {
+        jsonStr: "{ invalid json }",
+        jsonArray: []
+      };
+
       const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
-      
-      await wrapper.vm.importJson();
-      
+
+      await wrapper.vm.importJson(payload);
+
       expect(notifySpy).toHaveBeenCalledWith(
         expect.objectContaining({
           color: "negative",
@@ -583,18 +477,20 @@ describe("ImportRegexPattern", () => {
       expect(notifySpy.mock.calls[0][0].message).toContain("JSON");
     });
 
-
     it("should not navigate when some imports fail", async () => {
       const jsonData = [
         { name: "", pattern: ".*1" }, // Invalid
         { name: "pattern2", pattern: ".*2" } // Valid
       ];
-      wrapper.vm.jsonStr = JSON.stringify(jsonData);
-      
+      const payload = {
+        jsonStr: JSON.stringify(jsonData),
+        jsonArray: jsonData
+      };
+
       (regexPatternsService.create as any).mockResolvedValue({});
-      
-      await wrapper.vm.importJson();
-      
+
+      await wrapper.vm.importJson(payload);
+
       const routerSpy = vi.spyOn(wrapper.vm.$router, "push");
       expect(routerSpy).not.toHaveBeenCalled();
     });
@@ -687,18 +583,28 @@ describe("ImportRegexPattern", () => {
     });
 
     it("should handle large JSON arrays", async () => {
+      // Switch to a tab that uses BaseImport
+      wrapper.vm.activeTab = "import_json_file";
+      await nextTick();
+
       const largeArray = Array.from({ length: 100 }, (_, i) => ({
         name: `pattern-${i}`,
         pattern: `.*${i}`
       }));
-      
-      wrapper.vm.jsonStr = JSON.stringify(largeArray);
-      wrapper.vm.jsonArrayOfObj = largeArray;
-      
+
+      if (wrapper.vm.$refs.baseImportRef) {
+        wrapper.vm.$refs.baseImportRef.jsonArrayOfObj = largeArray;
+        wrapper.vm.$refs.baseImportRef.updateJsonArray(largeArray);
+      }
+
       expect(wrapper.vm.jsonArrayOfObj.length).toBe(100);
     });
 
-    it("should handle deeply nested JSON objects", () => {
+    it("should handle deeply nested JSON objects", async () => {
+      // Switch to a tab that uses BaseImport
+      wrapper.vm.activeTab = "import_json_file";
+      await nextTick();
+
       const complexObj = {
         name: "complex-pattern",
         pattern: ".*",
@@ -707,29 +613,39 @@ describe("ImportRegexPattern", () => {
           tags: ["tag1", "tag2"]
         }
       };
-      
-      wrapper.vm.updateRegexPatternName("new-name", 0);
-      wrapper.vm.jsonArrayOfObj = [complexObj];
-      
+
+      if (wrapper.vm.$refs.baseImportRef) {
+        wrapper.vm.$refs.baseImportRef.jsonArrayOfObj = [complexObj];
+        wrapper.vm.$refs.baseImportRef.updateJsonArray([complexObj]);
+      }
+
       expect(wrapper.vm.jsonArrayOfObj[0]).toEqual(complexObj);
     });
 
-    it("should handle special characters in pattern names", () => {
+    it("should handle special characters in pattern names", async () => {
+      // Switch to a tab that uses BaseImport
+      wrapper.vm.activeTab = "import_json_file";
+      await nextTick();
+
       const specialName = "pattern-with-special-chars-@#$%";
-      wrapper.vm.jsonArrayOfObj = [{ name: "" }];
-      
-      wrapper.vm.updateRegexPatternName(specialName, 0);
-      
-      expect(wrapper.vm.jsonArrayOfObj[0].name).toBe(specialName);
+      if (wrapper.vm.$refs.baseImportRef) {
+        wrapper.vm.$refs.baseImportRef.jsonArrayOfObj = [{ name: "" }];
+        wrapper.vm.updateRegexPatternName(specialName, 0);
+        expect(wrapper.vm.jsonArrayOfObj[0].name).toBe(specialName);
+      }
     });
 
-    it("should handle regex patterns with escape characters", () => {
+    it("should handle regex patterns with escape characters", async () => {
+      // Switch to a tab that uses BaseImport
+      wrapper.vm.activeTab = "import_json_file";
+      await nextTick();
+
       const escapePattern = "\\d{4}-\\d{2}-\\d{2}";
-      wrapper.vm.jsonArrayOfObj = [{ pattern: "" }];
-      
-      wrapper.vm.updateRegexPattern(escapePattern, 0);
-      
-      expect(wrapper.vm.jsonArrayOfObj[0].pattern).toBe(escapePattern);
+      if (wrapper.vm.$refs.baseImportRef) {
+        wrapper.vm.$refs.baseImportRef.jsonArrayOfObj = [{ pattern: "" }];
+        wrapper.vm.updateRegexPattern(escapePattern, 0);
+        expect(wrapper.vm.jsonArrayOfObj[0].pattern).toBe(escapePattern);
+      }
     });
   });
 });

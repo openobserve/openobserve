@@ -33,15 +33,14 @@ use config::{
         parquet::{read_recordbatch_from_bytes, write_recordbatch_to_parquet},
     },
 };
-use hashbrown::HashSet;
 use infra::{file_list as infra_file_list, storage};
 use once_cell::sync::Lazy;
-use parking_lot::RwLock;
+use scc::HashSet;
 use tokio::sync::{Semaphore, mpsc};
 
 use crate::{common::infra::cluster::get_node_from_consistent_hash, service::db};
 
-static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
+static PROCESSING_FILES: Lazy<HashSet<String>> = Lazy::new(HashSet::new);
 
 pub async fn run_generate(worker_tx: mpsc::Sender<FileKey>) -> Result<(), anyhow::Error> {
     let semaphore = std::sync::Arc::new(Semaphore::new(get_config().limit.file_merge_thread_num));
@@ -135,15 +134,14 @@ pub async fn generate_by_stream(
     );
 
     for file in files {
-        if PROCESSING_FILES.read().contains(&file.key) {
+        if PROCESSING_FILES.contains_async(&file.key).await {
             continue;
         }
         // add into queue
-        PROCESSING_FILES.write().insert(file.key.clone());
+        let _ = PROCESSING_FILES.insert_async(file.key.clone()).await;
         worker_tx.send(file).await?;
     }
 
-    PROCESSING_FILES.write().shrink_to_fit();
     Ok(())
 }
 
@@ -189,7 +187,7 @@ pub async fn generate_file(file: &FileKey) -> Result<(), anyhow::Error> {
     // upload filee
     storage::put(&file.account, &new_file, new_data.into()).await?;
     // delete from queue
-    PROCESSING_FILES.write().remove(&file.key);
+    PROCESSING_FILES.remove_async(&file.key).await;
     log::info!(
         "[FLATTEN_COMPACTOR] generated flatten new file {}, took {} ms",
         new_file,
@@ -225,7 +223,7 @@ fn generate_vertical_partition_recordbatch(
         return Ok(vec![batches]);
     };
 
-    let mut inserted_fields = HashSet::with_capacity(128);
+    let mut inserted_fields = hashbrown::HashSet::with_capacity(128);
     for i in 0..records_len {
         inserted_fields.clear();
         let value = all_values.value(i);

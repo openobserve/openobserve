@@ -34,9 +34,29 @@ struct LicenseResponse {
     ingestion_exceeded: u8,
 }
 
-#[derive(Serialize, Deserialize)]
 struct SaveLicenseRequest {
-    key: String,
+    key: License,
+    raw_key: String,
+}
+
+impl<'de> Deserialize<'de> for SaveLicenseRequest {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct Helper {
+            key: String,
+        }
+
+        let helper = Helper::deserialize(deserializer)?;
+        let license = License::load_from_str(&helper.key).map_err(serde::de::Error::custom)?;
+
+        Ok(SaveLicenseRequest {
+            key: license,
+            raw_key: helper.key,
+        })
+    }
 }
 
 async fn check_license_permission(user_id: &str, method: &str) -> Result<(), anyhow::Error> {
@@ -99,34 +119,20 @@ pub async fn get_license_info(Headers(_email): Headers<UserEmail>) -> HttpRespon
 
 #[post("/license")]
 pub async fn store_license(
-    body: web::Bytes,
+    web::Json(req): web::Json<SaveLicenseRequest>,
     Headers(user_email): Headers<UserEmail>,
 ) -> HttpResponse {
     let email = user_email.user_id;
-    if let Err(_) = check_license_permission(&email, "PUT").await {
+    if check_license_permission(&email, "PUT").await.is_err() {
         return HttpResponse::Forbidden().json("Unauthorized Access to license");
     }
 
-    let req: SaveLicenseRequest = match serde_json::from_slice(&body) {
-        Ok(v) => v,
-        Err(e) => {
-            return HttpResponse::BadRequest().json(serde_json::json!({"message":e.to_string()}));
-        }
-    };
-
-    let license = match License::load_from_str(&req.key) {
-        Ok(l) => l,
-        Err(e) => {
-            return HttpResponse::BadRequest().json(serde_json::json!({"message":e.to_string()}));
-        }
-    };
-
-    if let Err(e) = check_license(&license).await {
+    if let Err(e) = check_license(&req.key).await {
         return HttpResponse::BadRequest().json(serde_json::json!({"message":e.to_string()}));
     };
 
     let db = infra::db::get_db().await;
-    db.put(LICENSE_DB_KEY, req.key.into(), false, None)
+    db.put(LICENSE_DB_KEY, req.raw_key.into(), false, None)
         .await
         .unwrap();
     match license::update().await {

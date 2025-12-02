@@ -4,7 +4,7 @@ on:
       - "v*.*.*"
 name: Release
 env:
-  RUST_TOOLCHAIN: nightly-2025-07-20
+  RUST_TOOLCHAIN: nightly-2025-11-11
 jobs:
   build:
     name: Build binary
@@ -76,6 +76,7 @@ jobs:
         uses: arduino/setup-protoc@v3
         with:
           version: "21.12"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies for linux-gnu
         if: contains(matrix.arch, 'linux-gnu')
@@ -197,6 +198,7 @@ jobs:
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           name: "Release ${{ github.ref_name }}"
           generate_release_notes: true
           body: ${{ steps.generate-body.outputs.body }}
@@ -204,6 +206,7 @@ jobs:
       - name: Send release notification to Strapi
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             // Get release info from workflow dispatch inputs
             const tag = context.ref.replace("refs/tags/", "");

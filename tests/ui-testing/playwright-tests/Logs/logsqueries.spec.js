@@ -129,10 +129,10 @@ test.describe("Logs Queries testcases", () => {
     await pm.logsPage.clickConfirmButton();
   });
 
-  test("should redirect to logs after clicking on stream explorer via stream page", {
+  test("should create saved view and delete it", {
     tag: ['@streamExplorer', '@all', '@logs']
   }, async ({ page }) => {
-    testLogger.info('Testing stream explorer redirect functionality');
+    testLogger.info('Testing saved view creation and deletion functionality');
     // Generate a random saved view name
     const randomSavedViewName = `streamslog${Math.random().toString(36).substring(2, 10)}`;
   
@@ -142,6 +142,15 @@ test.describe("Logs Queries testcases", () => {
     await pm.logsPage.clickSaveViewButton();
     await pm.logsPage.fillSavedViewName(randomSavedViewName); // Use the random name
     await pm.logsPage.clickSavedViewDialogSave();
+    
+    // Wait for the success toast message to appear briefly after save
+    try {
+      await pm.logsPage.page.waitForSelector('.q-notification__message:has-text("View created successfully")', { timeout: 3000 });
+      testLogger.info('Success toast validated: View created successfully');
+    } catch (error) {
+      testLogger.info('View creation toast may have appeared and disappeared quickly - continuing with test');
+    }
+    
     // Strategic 2000ms wait for saved view creation - this is functionally necessary
     await pm.logsPage.waitForTimeout(2000);
     await pm.logsPage.clickStreamsMenuItem();
@@ -163,12 +172,17 @@ test.describe("Logs Queries testcases", () => {
     await pm.logsPage.clickSavedViewsExpand();
     await pm.logsPage.clickSavedViewSearchInput();
     await pm.logsPage.clickSavedViewByTitle(randomSavedViewName); // Use the random name here
-  
-    // Dynamic delete button selector using the random saved view name
-    await pm.logsPage.clickDeleteSavedViewButton(randomSavedViewName);
-    await pm.logsPage.clickConfirmButton(); // Confirm deletion
     
-    testLogger.info('Stream explorer redirect test completed');
+    // Wait for UI to stabilize before attempting deletion
+    await pm.logsPage.waitForTimeout(1000);
+    
+    // Delete the saved view
+    await pm.logsPage.clickDeleteSavedViewButton(randomSavedViewName);
+    await pm.logsPage.waitForTimeout(500);
+    await pm.logsPage.clickConfirmButton(); // Confirm deletion
+    testLogger.info(`Successfully deleted saved view: ${randomSavedViewName}`);
+    
+    testLogger.info('Saved view creation and deletion test completed');
   });
 
   test("should reset the editor on clicking reset filter button", {
@@ -438,5 +452,92 @@ test.describe("Logs Queries testcases", () => {
     await pm.logsPage.expectPaginationNotVisible();
     
     testLogger.info('Pagination SQL group/order/limit query test completed');
+  });
+
+  test("should reset pagination to page 1 after running query again", {
+    tag: ['@pagination', '@logs', '@all']
+  }, async ({ page }) => {
+    testLogger.info('Testing pagination reset behavior after re-running query');
+    
+    // Set up conditions to ensure we have enough data for pagination
+    await pm.logsPage.waitForTimeout(2000);
+    await pm.logsPage.clickDateTimeButton();
+    await pm.logsPage.waitForTimeout(1000);
+    
+    // Use wider time range to capture ingested data
+    const oneHourButton = page.getByText('Last 1 hour');
+    const twelveHourButton = page.getByText('Last 12 hours');
+    
+    if (await oneHourButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await oneHourButton.click();
+      testLogger.info('Set time range to Last 1 hour to capture ingested data');
+    } else if (await twelveHourButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await twelveHourButton.click();
+      testLogger.info('Set time range to Last 12 hours to capture ingested data');
+    } else {
+      await pm.logsPage.clickRelative15MinButton();
+      testLogger.info('Fallback to 15 minute time range');
+    }
+    
+    // Run initial query to get results
+    await pm.logsPage.clickRefreshButton();
+    await pm.logsPage.waitForTimeout(3000);
+    
+    // Pagination should exist after ingesting data - expect it to be visible
+    await pm.logsPage.expectResultPaginationVisible();
+    testLogger.info('Pagination controls found, proceeding with test');
+    
+    // Get available page count using POM
+    const pageCount = await pm.logsPage.getPaginationPageCount();
+    testLogger.info(`Found ${pageCount} page buttons`);
+    
+    // Navigate to page 4 using POM
+    testLogger.info('Navigating to page 4');
+    await pm.logsPage.clickPaginationPage(4);
+    await pm.logsPage.waitForTimeout(2000);
+    
+    // Verify we're on page 4 using POM
+    await pm.logsPage.waitForTimeout(3000);
+    const page4Classes = await pm.logsPage.getPaginationPageClasses(4);
+    testLogger.info(`Page 4 button classes: ${page4Classes}`);
+    
+    // Run query again while on page 4
+    testLogger.info('Running query again while on page 4');
+    await pm.logsPage.clickRefreshButton();
+    await pm.logsPage.waitForTimeout(3000);
+    
+    // Verify pagination resets to page 1 using POM
+    await pm.logsPage.waitForTimeout(2000);
+    
+    const page4ClassesAfter = await pm.logsPage.getPaginationPageClasses(4).catch(() => null);
+    const page1ClassesAfter = await pm.logsPage.getPaginationPageClasses(1).catch(() => null);
+    
+    testLogger.info(`After query - Page 1 classes: ${page1ClassesAfter}`);
+    testLogger.info(`After query - Page 4 classes: ${page4ClassesAfter}`);
+    
+    // Check pagination state using POM methods
+    const isStillOnPage4 = await pm.logsPage.isPaginationPageActive(4).catch(() => false);
+    const isBackToPage1 = await pm.logsPage.isPaginationPageActive(1).catch(() => false);
+    
+    if (isStillOnPage4) {
+      testLogger.error('🐛 BUG DETECTED: Pagination stayed on page 4 instead of resetting to page 1');
+      expect(isStillOnPage4).toBeFalsy();
+    } else if (isBackToPage1) {
+      testLogger.info('✅ Pagination correctly reset to page 1 after re-running query');
+      expect(isBackToPage1).toBeTruthy();
+    } else {
+      testLogger.info('Using fallback method to check pagination state');
+      const activePage = await page.locator('[data-test="logs-search-result-pagination"] .q-btn--unelevated').first().textContent({ timeout: 5000 }).catch(() => 'unknown');
+      testLogger.info(`Active page (fallback): ${activePage}`);
+      
+      if (activePage === '4') {
+        testLogger.error('🐛 BUG DETECTED: Pagination stayed on page 4 (fallback method)');
+        expect(activePage).toBe('1');
+      } else {
+        testLogger.info('✅ Pagination appears to have reset correctly (fallback method)');
+      }
+    }
+    
+    testLogger.info('Pagination reset behavior test completed');
   });
 });

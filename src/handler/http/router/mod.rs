@@ -259,21 +259,30 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
             .service(users::get_auth),
     );
 
-    svc.service(
-        web::scope("/node")
+    {
+        let mut node_scope = web::scope("/node")
             .wrap(HttpAuthentication::with_fn(
                 super::auth::validator::oo_validator,
             ))
             .wrap(cors.clone())
             .service(status::cache_status)
             .service(status::enable_node)
-            .service(status::flush_node)
+            .service(status::flush_node);
+
+        #[cfg(feature = "enterprise")]
+        {
+            node_scope = node_scope.service(status::drain_status);
+        }
+
+        node_scope = node_scope
             .service(status::list_node)
             .service(status::node_metrics)
             .service(status::consistent_hash)
             .service(status::refresh_nodes_list)
-            .service(status::refresh_user_sessions),
-    );
+            .service(status::refresh_user_sessions);
+
+        svc.service(node_scope);
+    }
 
     if get_config().common.swagger_enabled {
         svc.service(
@@ -337,6 +346,7 @@ pub fn get_config_routes(svc: &mut web::ServiceConfig) {
             .wrap(cors.clone())
             .service(status::zo_config)
             .service(status::logout)
+            .service(status::config_runtime)
             .service(web::scope("/reload").service(status::config_reload)),
     );
 }
@@ -353,6 +363,7 @@ pub fn get_config_routes(svc: &mut web::ServiceConfig) {
             .service(status::refresh_token_with_dex)
             .service(status::logout)
             .service(users::service_accounts::exchange_token)
+            .service(status::config_runtime)
             .service(web::scope("/reload").service(status::config_reload)),
     );
 }
@@ -511,6 +522,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(alerts::trigger_alert)
         .service(alerts::move_alerts)
         .service(alerts::history::get_alert_history)
+        .service(alerts::dedup_stats::get_dedup_summary)
         .service(alerts::deprecated::save_alert)
         .service(alerts::deprecated::update_alert)
         .service(alerts::deprecated::get_alert)
@@ -621,9 +633,14 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(domain_management::set_domain_management_config)
         .service(license::get_license_info)
         .service(license::store_license)
-        .service(traces::get_service_graph_metrics)
-        .service(traces::get_store_stats)
+        .service(traces::get_current_topology)
         .service(patterns::extract_patterns);
+
+    #[cfg(feature = "enterprise")]
+    let service = service
+        .service(alerts::deduplication::get_config)
+        .service(alerts::deduplication::set_config)
+        .service(alerts::deduplication::delete_config);
 
     #[cfg(feature = "cloud")]
     let service = service

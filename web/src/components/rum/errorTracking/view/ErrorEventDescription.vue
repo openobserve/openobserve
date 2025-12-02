@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template
       v-else-if="column.type === 'resource' && column.resource_type === 'xhr'"
     >
-      <span class="text-bold q-pr-sm" style="font-size: 12px">{{
+      <span class="text-bold q-pr-sm tw-text-[0.75rem]">{{
         column.resource_method
       }}</span>
       <a
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="q-pl-sm">[ {{ column.resource_status_code }} ]</span>
     </template>
     <template v-else>
-      <span style="font-size: 14px">{{ getDescription }}</span>
+      <span class="tw-text-[0.875rem]">{{ getDescription }}</span>
     </template>
   </div>
 </template>

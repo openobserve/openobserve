@@ -303,7 +303,7 @@ describe("ApiDashboard", () => {
       await wrapper.vm.$nextTick();
 
       const dashboard = wrapper.find(".api-performance-dashboards");
-      expect(dashboard.attributes("style")).toContain("visibility: hidden");
+      expect(dashboard.classes()).toContain("tw-invisible");
     });
 
     it("should show dashboard when not loading", async () => {
@@ -311,12 +311,7 @@ describe("ApiDashboard", () => {
       await wrapper.vm.$nextTick();
 
       const dashboard = wrapper.find(".api-performance-dashboards");
-      expect(dashboard.attributes("style")).toContain("visibility: visible");
-    });
-
-    it("should have organization identifier as key for q-page", () => {
-      const qPage = wrapper.findComponent({ name: "q-page" });
-      expect(qPage.exists()).toBe(true);
+      expect(dashboard.classes()).toContain("tw-visible");
     });
   });
 

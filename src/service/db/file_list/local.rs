@@ -14,18 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::stream::{FileKey, FileListDeleted};
-use hashbrown::HashSet;
 use infra::errors::Result;
 use once_cell::sync::Lazy;
-use tokio::sync::RwLock;
+use scc::HashSet;
 
-static PENDING_DELETE_FILES: Lazy<RwLock<HashSet<String>>> =
-    Lazy::new(|| RwLock::new(HashSet::new()));
+static PENDING_DELETE_FILES: Lazy<HashSet<String>> = Lazy::new(HashSet::new);
 
-static REMOVING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
+static REMOVING_FILES: Lazy<HashSet<String>> = Lazy::new(HashSet::new);
 
 pub async fn exist_pending_delete(file: &str) -> bool {
-    PENDING_DELETE_FILES.read().await.contains(file)
+    PENDING_DELETE_FILES.contains_async(file).await
 }
 
 pub async fn add_pending_delete(org_id: &str, account: &str, file: &str) -> Result<()> {
@@ -45,7 +43,7 @@ pub async fn add_pending_delete(org_id: &str, account: &str, file: &str) -> Resu
         )
         .await?;
     // add to memory cache
-    PENDING_DELETE_FILES.write().await.insert(file.to_string());
+    let _ = PENDING_DELETE_FILES.insert_async(file.to_string()).await;
     Ok(())
 }
 
@@ -55,23 +53,28 @@ pub async fn remove_pending_delete(file: &str) -> Result<()> {
         .batch_remove_deleted(&[FileKey::from_file_name(file)])
         .await?;
     // remove from memory cache
-    PENDING_DELETE_FILES.write().await.remove(file);
+    PENDING_DELETE_FILES.remove_async(file).await;
     Ok(())
 }
 
 pub async fn get_pending_delete() -> Vec<String> {
-    PENDING_DELETE_FILES.read().await.iter().cloned().collect()
+    let mut pending_delete_files = vec![];
+    PENDING_DELETE_FILES
+        .iter_async(|v| {
+            pending_delete_files.push(v.clone());
+            true
+        })
+        .await;
+
+    pending_delete_files
 }
 
 pub async fn filter_by_pending_delete(mut files: Vec<String>) -> Vec<String> {
     // Acquire locks in a consistent order to prevent deadlocks
-    let pending = PENDING_DELETE_FILES.read().await;
-    let removing = REMOVING_FILES.read().await;
-
     // Filter in a single pass using both sets
-    files.retain(|file| !pending.contains(file) && !removing.contains(file));
-    drop(pending);
-    drop(removing);
+    files.retain(|file| {
+        !PENDING_DELETE_FILES.contains_sync(file) && !REMOVING_FILES.contains_sync(file)
+    });
 
     files
 }
@@ -81,7 +84,7 @@ pub async fn load_pending_delete() -> Result<()> {
     let files = infra::file_list::LOCAL_CACHE.list_deleted().await?;
     for file in files {
         if ingester::is_wal_file(local_mode, &file.file) {
-            PENDING_DELETE_FILES.write().await.insert(file.file);
+            let _ = PENDING_DELETE_FILES.insert_async(file.file).await;
         }
     }
     Ok(())
@@ -89,13 +92,13 @@ pub async fn load_pending_delete() -> Result<()> {
 
 pub async fn add_removing(file: &str) -> Result<()> {
     // add to memory cache
-    REMOVING_FILES.write().await.insert(file.to_string());
+    let _ = REMOVING_FILES.insert_async(file.to_string()).await;
     Ok(())
 }
 
 pub async fn remove_removing(file: &str) -> Result<()> {
     // remove from memory cache
-    REMOVING_FILES.write().await.remove(file);
+    REMOVING_FILES.remove_async(file).await;
     Ok(())
 }
 
@@ -111,24 +114,23 @@ mod tests {
 
         // Add a file and test it exists
         let test_file = "test_file_exist.parquet";
-        PENDING_DELETE_FILES
-            .write()
-            .await
-            .insert(test_file.to_string());
+        let _ = PENDING_DELETE_FILES
+            .insert_async(test_file.to_string())
+            .await;
 
         let exists = exist_pending_delete(test_file).await;
         assert!(exists);
 
         // Clean up
-        PENDING_DELETE_FILES.write().await.remove(test_file);
+        let _ = PENDING_DELETE_FILES.remove_async(test_file).await;
     }
 
     #[test]
     fn test_static_variables() {
         // Test that static variables are accessible
         tokio::runtime::Runtime::new().unwrap().block_on(async {
-            let pending_count = PENDING_DELETE_FILES.read().await.len();
-            let removing_count = REMOVING_FILES.read().await.len();
+            let pending_count = PENDING_DELETE_FILES.len();
+            let removing_count = REMOVING_FILES.len();
 
             // Just verify they're accessible (counts can be anything)
             // Counts are usize so they're always >= 0, just verify they exist
@@ -158,10 +160,9 @@ mod tests {
         }
 
         // All files should be removed
-        let removing_files = REMOVING_FILES.read().await;
         for i in 0..10 {
             let file = format!("{test_file}_{i}");
-            assert!(!removing_files.contains(&file));
+            assert!(!REMOVING_FILES.contains_async(&file).await);
         }
     }
 }

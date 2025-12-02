@@ -9,7 +9,7 @@ test.describe("Schema testcases", () => {
     let pm;
     const streamName = `stream${Date.now()}`;
 
-    // Ingestion helper function
+    // Ingestion helper function 
     async function ingestion(page, testStreamName) {
         testLogger.debug('Starting ingestion for test stream', { testStreamName });
         const orgId = process.env["ORGNAME"];

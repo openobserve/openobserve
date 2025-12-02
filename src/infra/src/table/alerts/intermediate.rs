@@ -596,6 +596,7 @@ impl From<MetaStreamType> for StreamType {
             MetaStreamType::Logs => Self::Logs,
             MetaStreamType::Metrics => Self::Metrics,
             MetaStreamType::Traces => Self::Traces,
+            MetaStreamType::ServiceGraph => Self::Metadata, // Map to Metadata for alerts
             MetaStreamType::EnrichmentTables => Self::EnrichmentTables,
             MetaStreamType::Filelist => Self::FileList,
             MetaStreamType::Metadata => Self::Metadata,
@@ -614,6 +615,59 @@ impl From<StreamType> for MetaStreamType {
             StreamType::FileList => Self::Filelist,
             StreamType::Metadata => Self::Metadata,
             StreamType::Index => Self::Index,
+        }
+    }
+}
+
+/// Row template type. Stored in the DB as a 16-bit integer.
+pub enum RowTemplateTypeDb {
+    String,
+    Json,
+}
+
+impl RowTemplateTypeDb {
+    const STRING: i16 = 0;
+    const JSON: i16 = 1;
+}
+
+impl From<RowTemplateTypeDb> for i16 {
+    fn from(value: RowTemplateTypeDb) -> Self {
+        match value {
+            RowTemplateTypeDb::String => RowTemplateTypeDb::STRING,
+            RowTemplateTypeDb::Json => RowTemplateTypeDb::JSON,
+        }
+    }
+}
+
+impl TryFrom<i16> for RowTemplateTypeDb {
+    type Error = FromI16Error;
+
+    fn try_from(value: i16) -> Result<Self, Self::Error> {
+        match value {
+            Self::STRING => Ok(RowTemplateTypeDb::String),
+            Self::JSON => Ok(RowTemplateTypeDb::Json),
+            _ => Err(FromI16Error {
+                value,
+                ty: "RowTemplateTypeDb".to_owned(),
+            }),
+        }
+    }
+}
+
+impl From<config::meta::alerts::alert::RowTemplateType> for RowTemplateTypeDb {
+    fn from(value: config::meta::alerts::alert::RowTemplateType) -> Self {
+        match value {
+            config::meta::alerts::alert::RowTemplateType::String => RowTemplateTypeDb::String,
+            config::meta::alerts::alert::RowTemplateType::Json => RowTemplateTypeDb::Json,
+        }
+    }
+}
+
+impl From<RowTemplateTypeDb> for config::meta::alerts::alert::RowTemplateType {
+    fn from(value: RowTemplateTypeDb) -> Self {
+        match value {
+            RowTemplateTypeDb::String => config::meta::alerts::alert::RowTemplateType::String,
+            RowTemplateTypeDb::Json => config::meta::alerts::alert::RowTemplateType::Json,
         }
     }
 }

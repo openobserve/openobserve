@@ -301,11 +301,48 @@ const  functionInfo = (data) =>  {
       return pipelineObj.functions[data.name] || null;
   }
 
-const getTruncatedConditions = (conditions) => {
-  const allConditionsText = conditions.map(condition => 
-    `${condition.column} ${condition.operator} ${condition.value}`
+const getTruncatedConditions = (conditionData) => {
+  // Handle null/undefined
+  if (!conditionData) return '';
+
+  // Helper to recursively extract all conditions from ConditionList
+  const extractConditions = (node) => {
+    if (!node) return [];
+
+    // Handle OR node
+    if (node.or && Array.isArray(node.or)) {
+      return node.or.flatMap(item => extractConditions(item));
+    }
+
+    // Handle AND node
+    if (node.and && Array.isArray(node.and)) {
+      return node.and.flatMap(item => extractConditions(item));
+    }
+
+    // Handle NOT node
+    if (node.not) {
+      return extractConditions(node.not);
+    }
+
+    // Handle single condition (EndCondition) - has column/operator/value
+    if (node.column && node.operator) {
+      return [node];
+    }
+
+    // If it's an array (legacy format), return as-is
+    if (Array.isArray(node)) {
+      return node.filter(c => c.column && c.operator);
+    }
+
+    return [];
+  };
+
+  const allConditions = extractConditions(conditionData);
+
+  const allConditionsText = allConditions.map(condition =>
+    `${condition.column} ${condition.operator} ${condition.value || ''}`
   ).join(', ');
-  
+
   return allConditionsText.length > 30 ? allConditionsText.substring(0, 30) + '...' : allConditionsText;
 }
 
@@ -706,7 +743,7 @@ function getIcon(data, ioType) {
       text-overflow: ellipsis;
     "
   >
-    {{ getTruncatedConditions(data.conditions) }}
+    {{ getTruncatedConditions(data.condition || data.conditions) }}
   </div>
       </div>
 

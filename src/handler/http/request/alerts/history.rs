@@ -57,6 +57,12 @@ pub struct AlertHistoryQuery {
     pub from: Option<i64>,
     /// Number of results to return
     pub size: Option<i64>,
+    /// Field to sort by (timestamp, alert_name, status, is_realtime, is_silenced, start_time,
+    /// end_time, duration, retries, delay_in_secs, evaluation_took_in_secs, source_node,
+    /// query_took)
+    pub sort_by: Option<String>,
+    /// Sort order (asc or desc, default: desc)
+    pub sort_order: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -77,6 +83,17 @@ pub struct AlertHistoryEntry {
     pub evaluation_took_in_secs: Option<f64>,
     pub source_node: Option<String>,
     pub query_took: Option<i64>,
+    // Deduplication information
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dedup_enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dedup_suppressed: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dedup_count: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grouped: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group_size: Option<i32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -127,6 +144,8 @@ pub fn escape_like(input: impl AsRef<str>) -> String {
         ("end_time" = Option<i64>, Query, description = "End time in Unix timestamp microseconds"),
         ("from" = Option<i64>, Query, description = "Pagination offset (default: 0)"),
         ("size" = Option<i64>, Query, description = "Number of results to return (default: 100, max: 1000)"),
+        ("sort_by" = Option<String>, Query, description = "Field to sort by: timestamp, alert_name, status, is_realtime, is_silenced, start_time, end_time, duration, retries, delay_in_secs, evaluation_took_in_secs, source_node, query_took (default: timestamp)"),
+        ("sort_order" = Option<String>, Query, description = "Sort order: asc or desc (default: desc)"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(AlertHistoryResponse)),
@@ -159,6 +178,47 @@ pub async fn get_alert_history(
     if start_time >= end_time {
         return MetaHttpResponse::bad_request("start_time must be before end_time");
     }
+
+    // Validate and map sort_by field to SQL column name or expression
+    let sort_column = if let Some(ref sort_by) = query.sort_by {
+        match sort_by.to_lowercase().as_str() {
+            "timestamp" => "_timestamp",
+            "alert_name" => "key", // alert_name is extracted from key field
+            "status" => "status",
+            "is_realtime" => "is_realtime",
+            "is_silenced" => "is_silenced",
+            "start_time" => "start_time",
+            "end_time" => "end_time",
+            "duration" => "(end_time - start_time)", // Calculated field
+            "retries" => "retries",
+            "delay_in_secs" => "delay_in_secs",
+            "evaluation_took_in_secs" => "evaluation_took_in_secs",
+            "source_node" => "source_node",
+            "query_took" => "query_took",
+            _ => {
+                return MetaHttpResponse::bad_request(format!(
+                    "Invalid sort_by field: '{sort_by}'. Valid fields are: timestamp, alert_name, status, is_realtime, is_silenced, start_time, end_time, duration, retries, delay_in_secs, evaluation_took_in_secs, source_node, query_took"
+                ));
+            }
+        }
+    } else {
+        "_timestamp" // Default sort by timestamp
+    };
+
+    // Validate sort_order
+    let sort_order = if let Some(ref order) = query.sort_order {
+        match order.to_lowercase().as_str() {
+            "asc" => "ASC",
+            "desc" => "DESC",
+            _ => {
+                return MetaHttpResponse::bad_request(format!(
+                    "Invalid sort_order: '{order}'. Valid values are: asc, desc"
+                ));
+            }
+        }
+    } else {
+        "DESC" // Default sort order
+    };
 
     // If alert_id filter is provided, validate it exists
     let _folder_id = if let Some(ref alert_id) = query.alert_id {
@@ -381,7 +441,7 @@ pub async fn get_alert_history(
          source_node, query_took \
          FROM \"{TRIGGERS_STREAM}\" \
          WHERE {where_clause} \
-         ORDER BY _timestamp DESC LIMIT {size} OFFSET {from}"
+         ORDER BY {sort_column} {sort_order} LIMIT {size} OFFSET {from}"
     );
 
     let data_req = SearchRequest {
@@ -471,6 +531,18 @@ pub async fn get_alert_history(
                 .and_then(|v| v.as_str())
                 .map(String::from),
             query_took: hit.get("query_took").and_then(|v| v.as_i64()),
+            // Deduplication fields - populated from trigger data if available
+            dedup_enabled: hit.get("dedup_enabled").and_then(|v| v.as_bool()),
+            dedup_suppressed: hit.get("dedup_suppressed").and_then(|v| v.as_bool()),
+            dedup_count: hit
+                .get("dedup_count")
+                .and_then(|v| v.as_i64())
+                .map(|v| v as i32),
+            grouped: hit.get("grouped").and_then(|v| v.as_bool()),
+            group_size: hit
+                .get("group_size")
+                .and_then(|v| v.as_i64())
+                .map(|v| v as i32),
         });
     }
 
@@ -497,6 +569,8 @@ mod tests {
             end_time: None,
             from: None,
             size: None,
+            sort_by: None,
+            sort_order: None,
         };
 
         assert!(query.alert_id.is_none());
@@ -504,6 +578,8 @@ mod tests {
         assert!(query.end_time.is_none());
         assert!(query.from.is_none());
         assert!(query.size.is_none());
+        assert!(query.sort_by.is_none());
+        assert!(query.sort_order.is_none());
     }
 
     #[test]
@@ -514,6 +590,8 @@ mod tests {
             end_time: Some(1234567990000000),
             from: Some(0),
             size: Some(50),
+            sort_by: Some("status".to_string()),
+            sort_order: Some("asc".to_string()),
         };
 
         assert_eq!(query.alert_id, Some("test_alert".to_string()));
@@ -521,6 +599,8 @@ mod tests {
         assert_eq!(query.end_time, Some(1234567990000000));
         assert_eq!(query.from, Some(0));
         assert_eq!(query.size, Some(50));
+        assert_eq!(query.sort_by, Some("status".to_string()));
+        assert_eq!(query.sort_order, Some("asc".to_string()));
     }
 
     #[test]
@@ -542,6 +622,11 @@ mod tests {
             evaluation_took_in_secs: Some(1.5),
             source_node: Some("node1".to_string()),
             query_took: Some(100),
+            dedup_enabled: None,
+            dedup_suppressed: None,
+            dedup_count: None,
+            grouped: None,
+            group_size: None,
         };
 
         assert_eq!(entry.alert_name, "test_alert");
@@ -587,6 +672,11 @@ mod tests {
             evaluation_took_in_secs: None,
             source_node: None,
             query_took: None,
+            dedup_enabled: None,
+            dedup_suppressed: None,
+            dedup_count: None,
+            grouped: None,
+            group_size: None,
         };
 
         let response = AlertHistoryResponse {
@@ -621,6 +711,11 @@ mod tests {
             evaluation_took_in_secs: Some(5.5),
             source_node: Some("node2".to_string()),
             query_took: Some(500),
+            dedup_enabled: None,
+            dedup_suppressed: None,
+            dedup_count: None,
+            grouped: None,
+            group_size: None,
         };
 
         assert_eq!(entry.status, "error");
@@ -639,9 +734,73 @@ mod tests {
             end_time: None,
             from: Some(100),
             size: Some(25),
+            sort_by: None,
+            sort_order: None,
         };
 
         assert_eq!(query.from.unwrap(), 100);
         assert_eq!(query.size.unwrap(), 25);
+    }
+
+    #[test]
+    fn test_alert_history_query_with_sorting() {
+        // Test sorting parameters for different fields
+        let sort_fields = vec![
+            "timestamp",
+            "alert_name",
+            "status",
+            "is_realtime",
+            "is_silenced",
+            "start_time",
+            "end_time",
+            "duration",
+            "retries",
+            "delay_in_secs",
+            "evaluation_took_in_secs",
+            "source_node",
+            "query_took",
+        ];
+
+        for field in sort_fields {
+            let query = AlertHistoryQuery {
+                alert_id: None,
+                start_time: None,
+                end_time: None,
+                from: None,
+                size: None,
+                sort_by: Some(field.to_string()),
+                sort_order: Some("asc".to_string()),
+            };
+
+            assert_eq!(query.sort_by, Some(field.to_string()));
+            assert_eq!(query.sort_order, Some("asc".to_string()));
+        }
+    }
+
+    #[test]
+    fn test_alert_history_query_sort_order_options() {
+        // Test ascending order
+        let query_asc = AlertHistoryQuery {
+            alert_id: None,
+            start_time: None,
+            end_time: None,
+            from: None,
+            size: None,
+            sort_by: Some("timestamp".to_string()),
+            sort_order: Some("asc".to_string()),
+        };
+        assert_eq!(query_asc.sort_order, Some("asc".to_string()));
+
+        // Test descending order
+        let query_desc = AlertHistoryQuery {
+            alert_id: None,
+            start_time: None,
+            end_time: None,
+            from: None,
+            size: None,
+            sort_by: Some("timestamp".to_string()),
+            sort_order: Some("desc".to_string()),
+        };
+        assert_eq!(query_desc.sort_order, Some("desc".to_string()));
     }
 }

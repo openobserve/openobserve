@@ -68,9 +68,17 @@ export default defineComponent({
     watch(darkMode, () => {
       setTheme(darkMode.value ? "dark" : "light");
     });
+
+    // Watch store.state.theme for external changes
+    // because we re changing theme from predefinedTheme.vue or general.vue when user changes tabs we are changing the theme
     watch(
       () => store.state.theme,
-      () => {}
+      (newTheme) => {
+        const shouldBeDark = newTheme === "dark";
+        if (darkMode.value !== shouldBeDark) {
+          darkMode.value = shouldBeDark;
+        }
+      }
     );
 
     const setTheme = (theme: any) => {

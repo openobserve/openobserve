@@ -68,6 +68,7 @@ use crate::{
 pub async fn remote_write(
     org_id: &str,
     body: web::Bytes,
+    user_email: &str,
 ) -> std::result::Result<(), anyhow::Error> {
     // check system resource
     check_ingestion_allowed(org_id, StreamType::Metrics, None).await?;
@@ -114,6 +115,13 @@ pub async fn remote_write(
     // parse metadata
     for item in request.metadata {
         let metric_name = format_stream_name(&item.metric_family_name.clone());
+        let schema = infra::schema::get(org_id, &metric_name, StreamType::Metrics)
+            .await
+            .unwrap_or(Schema::empty());
+        if schema.metadata().contains_key(METADATA_LABEL) {
+            // already has metadata, skip
+            continue;
+        }
         let metadata = Metadata {
             metric_family_name: item.metric_family_name.clone(),
             metric_type: item.r#type().into(),
@@ -125,27 +133,10 @@ pub async fn remote_write(
             METADATA_LABEL.to_string(),
             json::to_string(&metadata).unwrap(),
         );
-        let stream_schema = infra::schema::get(org_id, &metric_name, StreamType::Metrics)
-            .await
-            .unwrap_or(Schema::empty());
-        let schema_metadata = stream_schema.metadata();
-        // check if need to update metadata
-        let mut need_update = false;
-        for (k, v) in extra_metadata.iter() {
-            if schema_metadata.contains_key(k) && schema_metadata.get(k).unwrap() == v {
-                continue;
-            }
-            need_update = true;
-            break;
-        }
-        if need_update
-            && let Err(e) = db::schema::update_setting(
-                org_id,
-                &metric_name,
-                StreamType::Metrics,
-                extra_metadata,
-            )
-            .await
+        log::info!("Metadata for stream {org_id}/metrics/{metric_name} needs to be updated");
+        if let Err(e) =
+            db::schema::update_setting(org_id, &metric_name, StreamType::Metrics, extra_metadata)
+                .await
         {
             log::error!("Error updating metadata for stream: {metric_name}, err: {e}");
         }
@@ -479,8 +470,8 @@ pub async fn remote_write(
                 }
             }
             drop(schema_fields);
-            if need_schema_check
-                && check_for_schema(
+            if need_schema_check {
+                let (schema_evolution, _infer_schema) = check_for_schema(
                     org_id,
                     &stream_name,
                     StreamType::Metrics,
@@ -489,10 +480,10 @@ pub async fn remote_write(
                     timestamp,
                     false, // is_derived is false for metrics
                 )
-                .await
-                .is_ok()
-            {
-                schema_evolved.insert(stream_name.clone(), true);
+                .await?;
+                if schema_evolution.is_schema_changed {
+                    schema_evolved.insert(stream_name.clone(), true);
+                }
             }
 
             let schema = metric_schema_map
@@ -582,6 +573,11 @@ pub async fn remote_write(
                         .map_or(0, |exec_pl| exec_pl.num_of_func())
                 });
         req_stats.response_time = start.elapsed().as_secs_f64();
+        req_stats.user_email = if user_email.is_empty() {
+            None
+        } else {
+            Some(user_email.to_string())
+        };
         report_request_usage_stats(
             req_stats,
             org_id,

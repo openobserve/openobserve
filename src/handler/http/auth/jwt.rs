@@ -97,7 +97,19 @@ pub async fn process_token(
         let mut source_orgs: Vec<UserOrg> = vec![];
         let mut custom_roles: Vec<String> = vec![];
         let mut tuples_to_add = HashMap::new();
-        if groups.is_empty() {
+
+        // Try custom claim parsing first
+        if let Some((parsed_orgs, parsed_roles)) =
+            process_custom_claim_parsing(&dec_token.claims).await
+        {
+            log::info!(
+                "Using custom claim parsing results: {} orgs, {} custom roles",
+                parsed_orgs.len(),
+                parsed_roles.len()
+            );
+            source_orgs = parsed_orgs;
+            custom_roles = parsed_roles;
+        } else if groups.is_empty() {
             let role = if let Some(role) = &res.0.user_role {
                 role.clone()
             } else {
@@ -128,18 +140,36 @@ pub async fn process_token(
             }
         }
 
+        // Deduplicate source_orgs by org name to avoid duplicate key errors
+        // when user has multiple LDAP groups mapping to same org
+        if !source_orgs.is_empty() {
+            let mut seen_orgs = std::collections::HashSet::new();
+            source_orgs.retain(|org| seen_orgs.insert(org.name.clone()));
+        }
+
         // Assign users custom roles in RBAC
-        if openfga_cfg.map_group_to_role {
+        // Only use custom role mapping if we have custom roles to assign
+        log::info!(
+            "Config check: map_group_to_role={}, custom_roles.len()={}, source_orgs.len()={}",
+            openfga_cfg.map_group_to_role,
+            custom_roles.len(),
+            source_orgs.len()
+        );
+
+        if openfga_cfg.map_group_to_role && !custom_roles.is_empty() {
+            log::info!("Calling map_group_to_custom_role");
             map_group_to_custom_role(&user_email, &name, custom_roles, res.0.user_role).await;
             return Ok(None);
         }
 
+        log::info!("Using standard user creation flow");
         // Check if the user exists in the database
         let db_user = db::user::get_user_by_email(&user_email).await;
 
         if let Some(db_user) = db_user {
             // check if user is service account and skip the role update ,
             // assumption is always a service account irrespective of the orgs it belongs to
+            println!("{:?}", db_user.organizations);
             if res
                 .0
                 .user_role
@@ -373,9 +403,12 @@ fn parse_dn(dn: &str) -> Option<RoleOrg> {
         custom_role = Some(dn.to_owned());
         org = &dex_cfg.default_org;
     } else {
+        // Try to parse as LDAP DN format first
+        let mut found_ldap_format = false;
         for part in dn.split(',') {
             let parts: Vec<&str> = part.split('=').collect();
             if parts.len() == 2 {
+                found_ldap_format = true;
                 if parts[0].eq(&dex_cfg.group_attribute) && org.is_empty() {
                     org = parts[1];
                 }
@@ -384,6 +417,11 @@ fn parse_dn(dn: &str) -> Option<RoleOrg> {
                 }
             }
         }
+
+        // If not LDAP format (e.g., GitHub/OAuth simple strings), use the whole string as org name
+        if !found_ldap_format && org.is_empty() {
+            org = dn;
+        }
     }
     let role = if role.is_empty() {
         UserRole::from_str(&dex_cfg.default_role).unwrap()
@@ -391,6 +429,7 @@ fn parse_dn(dn: &str) -> Option<RoleOrg> {
         UserRole::from_str(role).unwrap()
     };
 
+    // Only fall back to default org if org is still empty (shouldn't happen with the above logic)
     if org.is_empty() {
         org = &dex_cfg.default_org;
     }
@@ -424,30 +463,131 @@ async fn map_group_to_custom_role(
             UserRole::from_str(&dex_cfg.default_role).unwrap()
         };
 
+        // Extract unique orgs from custom roles BEFORE moving custom_roles (format: "org/role")
+        // Check if custom claim parsing was used by looking for roles with custom orgs
+        // If custom claim parsing is disabled, custom_roles come from LDAP groups and should use
+        // default org
+        let use_custom_orgs = openfga_cfg.custom_claim_parsing_enabled;
+
+        let custom_orgs: std::collections::HashMap<String, String> = if use_custom_orgs {
+            custom_roles
+                .iter()
+                .filter_map(|r| {
+                    let mut parts = r.split('/');
+                    let org = parts.next()?;
+                    let role = parts.next()?;
+                    Some((org.to_string(), role.to_string()))
+                })
+                .collect()
+        } else {
+            // LDAP groups: use default org with all roles
+            std::collections::HashMap::new()
+        };
+
+        // Always create default org; additionally create custom orgs if needed
+        let _ = organization::check_and_create_org(&dex_cfg.default_org).await;
+        if use_custom_orgs && !custom_orgs.is_empty() {
+            for org_name in custom_orgs.keys() {
+                if org_name != &dex_cfg.default_org {
+                    let _ = organization::check_and_create_org(org_name).await;
+                }
+            }
+        }
+
         if openfga_cfg.enabled {
-            let _ = organization::check_and_create_org(&dex_cfg.default_org).await;
+            // Always add user to default org
             get_add_user_to_org_tuples(
                 &dex_cfg.default_org,
                 user_email,
                 &role.to_string(),
                 &mut tuples,
             );
+
+            // If custom claim parsing enabled, also add to custom orgs
+            if use_custom_orgs && !custom_orgs.is_empty() {
+                for org_name in custom_orgs.keys() {
+                    if org_name != &dex_cfg.default_org {
+                        get_add_user_to_org_tuples(
+                            org_name,
+                            user_email,
+                            &role.to_string(),
+                            &mut tuples,
+                        );
+                    }
+                }
+            }
+
             // this check added to avoid service accounts from logging in
             if !role.eq(&UserRole::ServiceAccount) {
                 get_new_user_creation_tuple(user_email, &mut tuples);
             }
-            let start = std::time::Instant::now();
-            check_and_get_crole_tuple_for_new_user(
-                user_email,
-                &dex_cfg.default_org,
-                custom_roles,
-                &mut tuples,
-            )
-            .await;
-            log::info!(
-                "group_to_custom_role: Time taken to get crole tuple: {:?}",
-                start.elapsed()
-            );
+
+            // Write user-to-org tuples FIRST so the orgs exist in OpenFGA
+            // before we query for roles
+            if let Err(e) = update_tuples(tuples.clone(), vec![]).await {
+                log::error!("Error writing user-to-org tuples: {e}");
+            }
+
+            // Clear the tuples vector since we've already written them
+            // Now we'll collect only the role assignment tuples
+            tuples.clear();
+
+            // Group custom roles by organization
+            if use_custom_orgs && !custom_orgs.is_empty() {
+                // Custom claim parsing: roles are assigned to their respective orgs
+                let mut roles_by_org: std::collections::HashMap<String, Vec<String>> =
+                    std::collections::HashMap::new();
+                for (org_name, role_name) in &custom_orgs {
+                    roles_by_org
+                        .entry(org_name.clone())
+                        .or_default()
+                        .push(format!("{org_name}/{role_name}"));
+                }
+
+                for (org_name, org_roles) in roles_by_org {
+                    check_and_get_crole_tuple_for_new_user(
+                        user_email,
+                        &org_name,
+                        org_roles,
+                        &mut tuples,
+                    )
+                    .await;
+                }
+            } else {
+                // LDAP groups: all roles belong to default org
+                check_and_get_crole_tuple_for_new_user(
+                    user_email,
+                    &dex_cfg.default_org,
+                    custom_roles.clone(),
+                    &mut tuples,
+                )
+                .await;
+            }
+        }
+
+        // Build organizations list for DB
+        // - If custom claim parsing enabled and custom orgs exist: add to those orgs
+        // - Otherwise: add to default org only
+        let mut organizations = Vec::new();
+
+        if use_custom_orgs && !custom_orgs.is_empty() {
+            // Custom claim parsing: add user to custom orgs
+            for org_name in custom_orgs.keys() {
+                organizations.push(UserOrg {
+                    role: role.clone(),
+                    name: org_name.clone(),
+                    token: Default::default(),
+                    rum_token: Default::default(),
+                });
+            }
+        } else {
+            // LDAP groups or no custom orgs: add to default org
+            organizations.push(UserOrg {
+                role: role.clone(),
+                name: dex_cfg.default_org.clone(),
+                token: Default::default(),
+                rum_token: Default::default(),
+            });
         }
 
         let updated_db_user = DBUser {
@@ -456,54 +596,103 @@ async fn map_group_to_custom_role(
             last_name: "".to_owned(),
             password: "".to_owned(),
             salt: "".to_owned(),
-            organizations: vec![UserOrg {
-                role,
-                name: dex_cfg.default_org.clone(),
-                token: Default::default(),
-                rum_token: Default::default(),
-            }],
+            organizations,
             is_external: true,
             password_ext: Some("".to_owned()),
         };
 
         match users::create_new_user(updated_db_user).await {
             Ok(_) => {
-                log::info!("group_to_custom_role: User added to the database");
-                if openfga_cfg.enabled {
-                    let start = std::time::Instant::now();
-                    match update_tuples(tuples, vec![]).await {
-                        Ok(_) => {
-                            log::info!("group_to_custom_role: User updated to the openfga");
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "group_to_custom_role: Error updating user to the openfga: {e}"
-                            );
-                        }
-                    }
-
-                    log::info!(
-                        "group_to_custom_role: Time taken to update roles to db for new user: {:?}",
-                        start.elapsed()
-                    );
+                if openfga_cfg.enabled
+                    && let Err(e) = update_tuples(tuples, vec![]).await
+                {
+                    log::error!("Error writing role tuples to OpenFGA: {e}");
                 }
             }
             Err(e) => {
-                log::error!("group_to_custom_role: Error adding user to the database: {e}");
+                log::error!("Error adding user to the database: {e}");
             }
         }
-    } else {
+    } else if let Some(mut existing_user) = db_user {
         // check if user is service account and skip the role update
-        if default_role.is_some_and(|r| r.eq(&UserRole::ServiceAccount)) {
+        if default_role
+            .as_ref()
+            .is_some_and(|r| r.eq(&UserRole::ServiceAccount))
+        {
             log::info!(
                 "group_to_custom_role: User is external service account and skipping the role update"
             );
             return;
         }
         log::info!("group_to_custom_role: User exists in the database");
+
+        // Extract unique orgs from custom roles (format: "org/role")
+        let custom_orgs: std::collections::HashMap<String, String> = custom_roles
+            .iter()
+            .filter_map(|r| {
+                let mut parts = r.split('/');
+                let org = parts.next()?;
+                let role = parts.next()?;
+                Some((org.to_string(), role.to_string()))
+            })
+            .collect();
+
+        // Create any new organizations
+        for org_name in custom_orgs.keys() {
+            let _ = organization::check_and_create_org(org_name).await;
+        }
+
+        // Get existing user and update their organizations list
+        let existing_org_names: std::collections::HashSet<String> = existing_user
+            .organizations
+            .iter()
+            .map(|org| org.name.clone())
+            .collect();
+
+        let role = if let Some(role) = default_role {
+            role
+        } else {
+            UserRole::from_str(&dex_cfg.default_role).unwrap()
+        };
+
         let mut add_tuples = vec![];
         let mut remove_tuples = vec![];
-        // user exists in the db with default org hence skip org creation tuples
+
+        // Add new orgs to user's organizations list with default role
+        for org_name in custom_orgs.keys() {
+            if !existing_org_names.contains(org_name) {
+                let new_org = UserOrg {
+                    role: role.clone(),
+                    name: org_name.clone(),
+                    token: Default::default(),
+                    rum_token: Default::default(),
+                };
+                existing_user.organizations.push(new_org.clone());
+
+                // Add user to org in the database
+                if let Err(e) = db::org_users::add(
+                    org_name,
+                    user_email,
+                    role.clone(),
+                    &new_org.token,
+                    new_org.rum_token.clone(),
+                )
+                .await
+                {
+                    log::error!("Error adding user to org {org_name} in DB: {e}");
+                }
+
+                // Add user to org tuples for OpenFGA
+                if openfga_cfg.enabled {
+                    get_add_user_to_org_tuples(
+                        org_name,
+                        user_email,
+                        &role.to_string(),
+                        &mut add_tuples,
+                    );
+                }
+            }
+        }
         let existing_roles = get_roles_for_user(user_email).await;
 
         // Find roles to delete: present in existing_role but not in custom_role
@@ -515,36 +704,40 @@ async fn map_group_to_custom_role(
         }
 
         // Find new roles to add: present in custom_role but not in existing_role
-        let new_roles = custom_roles
+        let new_roles: Vec<String> = custom_roles
             .iter()
             .filter(|&role| !existing_roles.contains(role))
             .cloned()
             .collect();
-        log::debug!("new roles: {new_roles:#?}");
 
-        check_and_get_crole_tuple_for_new_user(
-            user_email,
-            &dex_cfg.default_org,
-            new_roles,
-            &mut add_tuples,
-        )
-        .await;
-        log::debug!("add_tuples: {add_tuples:#?}\nremove_tuples: {remove_tuples:#?}");
-
-        if openfga_cfg.enabled {
-            let start = std::time::Instant::now();
-            match update_tuples(add_tuples, remove_tuples).await {
-                Ok(_) => {
-                    log::info!("group_to_custom_role: User updated to the openfga");
-                }
-                Err(e) => {
-                    log::error!("group_to_custom_role: Error updating user to the openfga: {e}");
-                }
+        // Group new roles by organization
+        let mut new_roles_by_org: std::collections::HashMap<String, Vec<String>> =
+            std::collections::HashMap::new();
+        for role_str in &new_roles {
+            let mut parts = role_str.split('/');
+            if let (Some(org_name), Some(_role_name)) = (parts.next(), parts.next()) {
+                new_roles_by_org
+                    .entry(org_name.to_string())
+                    .or_default()
+                    .push(role_str.clone());
             }
-            log::info!(
-                "group_to_custom_role: Time taken to update roles to db for existing user: {:?}",
-                start.elapsed()
-            );
+        }
+
+        // Add tuples for each org
+        for (org_name, org_roles) in new_roles_by_org {
+            check_and_get_crole_tuple_for_new_user(
+                user_email,
+                &org_name,
+                org_roles,
+                &mut add_tuples,
+            )
+            .await;
+        }
+
+        if openfga_cfg.enabled
+            && let Err(e) = update_tuples(add_tuples, remove_tuples).await
+        {
+            log::error!("Error updating user role tuples to OpenFGA: {e}");
         }
     }
 }
@@ -731,6 +924,194 @@ pub async fn check_and_add_to_org(
     }
 
     Ok((is_new_user, pending_invites))
+}
+
+/// Process custom claim parsing and populate source_orgs and custom_roles
+///
+/// Returns Some((source_orgs, custom_roles)) if custom parsing succeeded
+/// Returns None if custom parsing is disabled or not available
+#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+async fn process_custom_claim_parsing(
+    claims: &HashMap<String, Value>,
+) -> Option<(Vec<UserOrg>, Vec<String>)> {
+    use o2_openfga::config::get_config as get_openfga_config;
+
+    let openfga_cfg = get_openfga_config();
+    let dex_cfg = get_dex_config();
+
+    // Check if custom claim parsing is enabled
+    if !openfga_cfg.custom_claim_parsing_enabled {
+        return None;
+    }
+
+    log::info!("Custom claim parsing is enabled, attempting to parse claims");
+
+    // Prepare callback functions for claim parser
+    let iam_settings_fn = || {
+        Box::pin(async {
+            match db::organization::get_org_setting("_meta").await {
+                Ok(settings) => settings.claim_parser_function,
+                Err(_) => "claim_parser".to_string(),
+            }
+        }) as std::pin::Pin<Box<dyn std::future::Future<Output = String> + Send>>
+    };
+
+    let org_exists_fn = |org_name: &str| {
+        let org_name = org_name.to_string();
+        Box::pin(async move {
+            match db::organization::get_org(&org_name).await {
+                Ok(_) => Ok(true),
+                Err(_) => Ok(false),
+            }
+        })
+            as std::pin::Pin<
+                Box<dyn std::future::Future<Output = Result<bool, anyhow::Error>> + Send>,
+            >
+    };
+
+    let function_loader_fn = |function_name: &str| {
+        let function_name = function_name.to_string();
+        Box::pin(async move {
+            match db::functions::get("_meta", &function_name).await {
+                Ok(func) => Ok(func.function),
+                Err(e) => Err(anyhow::anyhow!(
+                    "Failed to load function '{}' from _meta org: {}",
+                    function_name,
+                    e
+                )),
+            }
+        })
+            as std::pin::Pin<
+                Box<dyn std::future::Future<Output = Result<String, anyhow::Error>> + Send>,
+            >
+    };
+
+    // Use String as compiled program type for Send compatibility
+    let vrl_compile_fn = |function_content: &str| -> Result<String, anyhow::Error> {
+        // Just validate that it compiles, but return the source for execution
+        crate::service::ingestion::compile_vrl_function(function_content, "_meta")
+            .map_err(|e| anyhow::anyhow!("VRL compilation failed: {}", e))?;
+        Ok(function_content.to_string())
+    };
+
+    let vrl_execute_fn = |function_content: &String,
+                          claims: Value|
+     -> Result<Value, anyhow::Error> {
+        use vrl::compiler::{TargetValue, runtime::Runtime};
+
+        // Compile the VRL function
+        let vrl_config = crate::service::ingestion::compile_vrl_function(function_content, "_meta")
+            .map_err(|e| anyhow::anyhow!("VRL compilation failed: {}", e))?;
+
+        let mut runtime = Runtime::default();
+        let timezone = vrl::compiler::TimeZone::Local;
+        let mut target = TargetValue {
+            value: claims.into(),
+            metadata: vrl::value::Value::Object(Default::default()),
+            secrets: vrl::value::Secrets::new(),
+        };
+
+        let result = match vrl::compiler::VrlRuntime::default() {
+            vrl::compiler::VrlRuntime::Ast => {
+                runtime.resolve(&mut target, &vrl_config.program, &timezone)
+            }
+        };
+
+        match result {
+            Ok(res) => {
+                let output: Value = res
+                    .try_into()
+                    .map_err(|e| anyhow::anyhow!("Failed to convert VRL result: {:?}", e))?;
+                Ok(output)
+            }
+            Err(e) => Err(anyhow::anyhow!("VRL execution failed: {}", e)),
+        }
+    };
+
+    let error_publish_fn =
+        |error: o2_enterprise::enterprise::auth::claim_parser::ClaimParserError| {
+            Box::pin(async move {
+                use chrono::Utc;
+                use config::meta::{
+                    self_reporting::error::{ErrorData, ErrorSource, SsoClaimParserError},
+                    stream::StreamParams,
+                };
+
+                let claims_json = error
+                    .claims
+                    .as_ref()
+                    .map(|c| serde_json::to_string(c).unwrap_or_default());
+
+                let error_data = ErrorData {
+                    _timestamp: Utc::now().timestamp_micros(),
+                    stream_params: StreamParams::default(),
+                    error_source: ErrorSource::SsoClaimParser(SsoClaimParserError {
+                        function_name: error.function_name,
+                        error_type: error.error_type,
+                        error: error.error,
+                        claims_json,
+                    }),
+                };
+
+                crate::service::self_reporting::publish_error(error_data).await;
+            }) as std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
+        };
+
+    match o2_enterprise::enterprise::auth::claim_parser::parse_claims(
+        claims,
+        iam_settings_fn,
+        org_exists_fn,
+        function_loader_fn,
+        vrl_compile_fn,
+        vrl_execute_fn,
+        error_publish_fn,
+    )
+    .await
+    {
+        Ok(Some(assignments)) => {
+            log::info!(
+                "Custom claim parsing successful, processing {} assignments",
+                assignments.len()
+            );
+
+            let mut source_orgs = Vec::new();
+            let mut custom_roles = Vec::new();
+
+            // Process assignments based on map_group_to_role setting
+
+            // All roles go through custom role flow
+            for assignment in assignments {
+                custom_roles.push(format_role_name(&assignment.org, &assignment.role));
+                log::info!(
+                    "Custom claim parser: added custom role '{}/{}'",
+                    assignment.org,
+                    assignment.role
+                );
+                source_orgs.push(UserOrg {
+                    role: UserRole::from_str(&dex_cfg.default_role).unwrap(),
+                    name: assignment.org.clone(),
+                    token: Default::default(),
+                    rum_token: Default::default(),
+                });
+            }
+
+            log::info!(
+                "Custom claim parsing result: {} source_orgs, {} custom_roles",
+                source_orgs.len(),
+                custom_roles.len()
+            );
+
+            Some((source_orgs, custom_roles))
+        }
+        Ok(None) => {
+            log::info!("Custom claim parsing returned no assignments");
+            None
+        }
+        Err(e) => {
+            log::error!("Custom claim parsing failed: {}", e);
+            None
+        }
+    }
 }
 
 #[cfg(feature = "enterprise")]

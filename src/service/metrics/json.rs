@@ -60,7 +60,7 @@ use crate::{
     },
 };
 
-pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse> {
+pub async fn ingest(org_id: &str, body: web::Bytes, user_email: &str) -> Result<IngestionResponse> {
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None).await {
         // we do not want to log trial period expired errors
@@ -416,7 +416,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             }
 
             // check for schema evolution
-            let _ = check_for_schema(
+            let (_schema_evolution, _infer_schema) = check_for_schema(
                 org_id,
                 &stream_name,
                 StreamType::Metrics,
@@ -425,7 +425,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                 timestamp,
                 false, // is_derived is false for metrics
             )
-            .await;
+            .await?;
 
             // write into buffer
             let schema = stream_schema_map
@@ -504,6 +504,11 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
         let fsync = false;
         let mut req_stats = write_file(&writer, org_id, &stream_name, stream_data, fsync).await?;
 
+        req_stats.user_email = if user_email.is_empty() {
+            None
+        } else {
+            Some(user_email.to_string())
+        };
         req_stats.response_time = start.elapsed().as_secs_f64();
         let fns_length: usize =
             stream_executable_pipelines

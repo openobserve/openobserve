@@ -28,6 +28,8 @@ use crate::{
     service::{db, self_reporting, users},
 };
 
+#[cfg(feature = "enterprise")]
+pub mod alert_grouping;
 mod alert_manager;
 #[cfg(feature = "enterprise")]
 mod cipher;
@@ -308,6 +310,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { metrics::run().await });
     let _ = promql::run();
     tokio::task::spawn(async move { alert_manager::run().await });
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(async move { alert_grouping::process_expired_batches().await });
     tokio::task::spawn(async move { file_downloader::run().await });
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { pipeline::run().await });
@@ -346,8 +350,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
             .await
             .expect("cloud ofga migrations failed");
 
-        use crate::service::self_reporting::search::get_usage;
-        o2_enterprise::enterprise::metering::init(get_usage)
+        use crate::service::self_reporting::{ingest_data_retention_usages, search::get_usage};
+        o2_enterprise::enterprise::metering::init(get_usage, ingest_data_retention_usages)
             .await
             .expect("cloud usage metering job init failed");
 

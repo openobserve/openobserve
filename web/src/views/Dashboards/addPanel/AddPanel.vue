@@ -520,7 +520,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="dashboardPanelData.data.type == 'custom_chart'"
           class="col"
           style="
-            height: calc(100vh - 99px);
             overflow-y: auto;
             display: flex;
             flex-direction: row;

@@ -58,6 +58,8 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use {
     crate::service::search::sql::visitor::group_by::get_group_by_fields,
     config::META_ORG_ID,
+    config::meta::search::CardinalityLevel,
+    config::meta::search::generate_aggregation_search_interval,
     config::meta::self_reporting::usage::USAGE_STREAM,
     config::utils::sql::is_simple_aggregate_query,
     infra::client::grpc::make_grpc_search_client,
@@ -65,12 +67,9 @@ use {
         common::config::get_config as get_o2_config,
         search::{
             TaskStatus, WorkGroup,
-            cache::{
-                CardinalityLevel,
-                streaming_agg::{
-                    create_aggregation_cache_file_path, generate_aggregation_cache_interval,
-                    get_aggregation_cache_key_from_request,
-                },
+            cache::streaming_agg::{
+                create_aggregation_cache_file_path, discover_cache_for_query,
+                generate_optimal_partitions, get_aggregation_cache_key_from_request,
             },
             cache_aggs_util,
             datafusion::distributed_plan::streaming_aggs_exec,
@@ -179,6 +178,7 @@ pub async fn search(
         Some((query.start_time, query.end_time)),
         in_req.search_type.map(|v| v.to_string()),
         in_req.query.histogram_interval,
+        in_req.clear_cache,
     );
     if in_req.query.streaming_output && !in_req.query.track_total_hits {
         request.set_streaming_output(true, in_req.query.streaming_id.clone());
@@ -259,12 +259,12 @@ pub async fn search(
             match stat.work_group.as_ref() {
                 Some(WorkGroup::Short) => _work_group = Some("short".to_string()),
                 Some(WorkGroup::Long) => _work_group = Some("long".to_string()),
+                Some(WorkGroup::Background) => _work_group = Some("background".to_string()),
                 None => _work_group = None,
             }
         };
     }
 
-    // do this because of clippy warning
     match res {
         Ok(mut res) => {
             if in_req.query.streaming_output && meta.order_by.is_empty() {
@@ -280,7 +280,6 @@ pub async fn search(
                             | search::SearchEventType::Dashboards
                             | search::SearchEventType::Values
                             | search::SearchEventType::Other
-                            // Alerts search now uses grpc cache::search which does report usage
                             | search::SearchEventType::Alerts
                             | search::SearchEventType::DerivedStream
                     ) {
@@ -622,6 +621,7 @@ pub async fn search_partition(
     skip_max_query_range: bool,
     is_http_req: bool,
     enable_align_histogram: bool,
+    use_aggs_cache: bool,
 ) -> Result<search::SearchPartitionResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -683,8 +683,6 @@ pub async fn search_partition(
 
     #[cfg(not(feature = "enterprise"))]
     let is_streaming_aggregate = false;
-    #[cfg(not(feature = "enterprise"))]
-    let streaming_interval_micros = 0;
 
     // if need streaming output and is simple query, we shouldn't skip file list
     if skip_get_file_list && req.streaming_output && is_streaming_aggregate {
@@ -696,7 +694,7 @@ pub async fn search_partition(
         skip_get_file_list = true;
     }
 
-    let mut files = Vec::new();
+    let mut files = Vec::with_capacity(sql.schemas.len() * 10);
 
     let mut step_factor = 1;
 
@@ -768,7 +766,7 @@ pub async fn search_partition(
             let records = (stats.doc_num as i64 / data_retention) * query_duration;
             let original_size = (stats.storage_size as i64 / data_retention) * query_duration;
             log::info!(
-                "[trace_id {trace_id}] using approximation: stream: {stream_name}, records: {records}, original_size: {original_size} , data_retention in seconds: {data_retention}",
+                "[trace_id {trace_id}] using approximation: stream: {stream_name}, records: {records}, original_size: {original_size}, data_retention in seconds: {data_retention}",
             );
             files.push(infra::file_list::FileId {
                 id: Utc::now().timestamp_micros(),
@@ -991,10 +989,7 @@ pub async fn search_partition(
 
     #[cfg(feature = "enterprise")]
     // check if we need to use streaming_output
-    let (streaming_id, streaming_interval_micros) = if req.streaming_output
-        && is_streaming_aggregate
-        && !skip_get_file_list
-    {
+    let streaming_id = if req.streaming_output && is_streaming_aggregate && !skip_get_file_list {
         let (stream_name, _all_streams) = match resolve_stream_names(&req.sql) {
             // TODO: cache don't not support multiple stream names
             Ok(v) => (v[0].clone(), v.join(",")),
@@ -1016,7 +1011,7 @@ pub async fn search_partition(
 
         let cardinality_value = cardinality_map.values().product::<f64>();
         let cardinality_level = CardinalityLevel::from(cardinality_value);
-        let cache_interval = generate_aggregation_cache_interval(
+        let cache_interval = generate_aggregation_search_interval(
             query.start_time,
             query.end_time,
             cardinality_level,
@@ -1032,7 +1027,7 @@ pub async fn search_partition(
             // so we set is_streaming_aggregate to false and return None
             is_streaming_aggregate = false;
             // skip_get_file_list = true;
-            (None, 0)
+            None
         } else {
             let streaming_id = ider::uuid();
             let hashed_query = get_aggregation_cache_key_from_request(req);
@@ -1041,24 +1036,72 @@ pub async fn search_partition(
                 &stream_type.to_string(),
                 &stream_name,
                 hashed_query,
-                cache_interval_mins,
             );
+
+            // Discover existing cache files for this query
+            let cache_discovery_result = if !use_aggs_cache {
+                o2_enterprise::enterprise::search::cache::streaming_agg::CacheDiscoveryResult::empty(
+                    query.start_time,
+                    query.end_time,
+                )
+            } else {
+                match discover_cache_for_query(&cache_file_path, query.start_time, query.end_time)
+                    .await
+                {
+                    Ok(result) => result,
+                    Err(e) => {
+                        log::warn!(
+                            "[trace_id {trace_id}] [streaming_id: {streaming_id}] Failed to discover cache: {e}, proceeding without cache optimization"
+                        );
+                        // Create empty discovery result to proceed without cache
+                        o2_enterprise::enterprise::search::cache::streaming_agg::CacheDiscoveryResult::empty(
+                            query.start_time,
+                            query.end_time,
+                        )
+                    }
+                }
+            };
+
+            log::info!(
+                "[trace_id {trace_id}] [streaming_id: {streaming_id}] Cache discovery: coverage={:.2}%, cached_ranges={}, uncached_ranges={}",
+                cache_discovery_result.cache_coverage_ratio * 100.0,
+                cache_discovery_result.cached_ranges.len(),
+                cache_discovery_result.uncached_ranges.len()
+            );
+
+            // Generate optimal partitions based on cache discovery
+            let partition_strategy = generate_optimal_partitions(
+                cache_discovery_result,
+                query.start_time,
+                query.end_time,
+                cardinality_level,
+            );
+
+            log::info!(
+                "[trace_id {trace_id}] [streaming_id: {streaming_id}] Partition strategy: {}, requires_execution={}, execution_partitions={}",
+                partition_strategy.strategy_name(),
+                partition_strategy.requires_execution(),
+                partition_strategy.execution_partition_count()
+            );
+
             streaming_aggs_exec::init_cache(
                 &streaming_id,
                 query.start_time,
                 query.end_time,
                 &cache_file_path,
+                cache_interval_mins,
             );
+
+            // Store partition strategy for use in do_partitioned_search
+            streaming_aggs_exec::set_partition_strategy(&streaming_id, partition_strategy);
+
             log::info!(
                 "[trace_id {trace_id}] [streaming_id: {streaming_id}] init streaming_agg cache: cache_file_path: {cache_file_path}"
             );
-            (
-                Some(streaming_id),
-                cache_interval.get_interval_microseconds(),
-            )
+            Some(streaming_id)
         }
     } else {
-        (None, 0)
+        None
     };
     #[cfg(feature = "enterprise")]
     let streaming_aggs = is_streaming_aggregate && req.streaming_output && streaming_id.is_some();
@@ -1066,8 +1109,30 @@ pub async fn search_partition(
     {
         resp.streaming_output = streaming_aggs;
         resp.streaming_aggs = streaming_aggs;
-        resp.streaming_id = streaming_id;
+        resp.streaming_id = streaming_id.clone();
     }
+
+    // Get cache strategy for streaming aggregates (enterprise only)
+    #[cfg(feature = "enterprise")]
+    let stremaing_aggs_cache_strategy = if streaming_aggs && streaming_id.is_some() {
+        let streaming_id_ref = streaming_id.as_ref().unwrap();
+        match streaming_aggs_exec::get_partition_strategy(streaming_id_ref) {
+            Some(strategy) => {
+                log::info!(
+                    "[trace_id {trace_id}] [streaming_id: {streaming_id_ref}] Using cache-aware partition strategy"
+                );
+                Some(strategy)
+            }
+            None => {
+                log::warn!(
+                    "[trace_id {trace_id}] [streaming_id: {streaming_id_ref}] No partition strategy found, using default generation"
+                );
+                None
+            }
+        }
+    } else {
+        None
+    };
 
     // Generate partitions
     let partitions = generator.generate_partitions(
@@ -1076,9 +1141,9 @@ pub async fn search_partition(
         step,
         sql_order_by,
         is_aggregate,
-        is_streaming_aggregate,
-        streaming_interval_micros,
         add_mini_partition,
+        #[cfg(feature = "enterprise")]
+        stremaing_aggs_cache_strategy,
     );
 
     if sql_order_by == OrderBy::Asc {
@@ -1109,8 +1174,8 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
 
     // make cluster request
     let trace_id = config::ider::generate_trace_id();
-    let mut tasks = Vec::new();
-    for node in nodes.iter().cloned() {
+    let mut tasks = Vec::with_capacity(nodes.len());
+    for node in nodes {
         let node_addr = node.grpc_addr.clone();
         let grpc_span = info_span!(
             "service:search:cluster:grpc_query_status",
@@ -1143,7 +1208,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
         tasks.push(task);
     }
 
-    let mut results = Vec::new();
+    let mut results = Vec::with_capacity(tasks.len());
     for task in tasks {
         match task.await {
             Ok(res) => match res {
@@ -1281,7 +1346,7 @@ pub async fn cancel_query(
         tasks.push(task);
     }
 
-    let mut results = Vec::new();
+    let mut results = Vec::with_capacity(tasks.len());
     for task in tasks {
         match task.await {
             Ok(res) => match res {
@@ -1437,10 +1502,12 @@ pub async fn search_partition_multi(
                 query_fn: req.query_fn.clone(),
                 streaming_output: req.streaming_output,
                 histogram_interval: req.histogram_interval,
+                sampling_ratio: None,
             },
             false,
             true,
             enable_align_histogram,
+            false, // disable aggs cache
         )
         .await
         {

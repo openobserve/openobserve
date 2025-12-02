@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="report-list-page"
-    class="flex"
+    class="flex q-mt-xs"
   >
     <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
       <div class="card-container tw-mb-[0.625rem]">
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
-        <div class="card-container full-width o2-quasar-table o2-row-md o2-quasar-table-header-sticky tw-h-[calc(100vh-124px)]">
+        <div class="card-container full-width o2-quasar-table o2-row-md o2-quasar-table-header-sticky tw-h-[calc(100vh-128px)]">
           <q-table
             data-test="report-list-table"
             ref="reportListTableRef"
@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, onBeforeMount, reactive, computed } from "vue";
+import { ref, onBeforeMount, reactive, computed, watch } from "vue";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -532,7 +532,12 @@ const visibleRows = computed(() => {
   if (!filterQuery.value) return reportsTableRows.value || [];
   return filterData(reportsTableRows.value || [], filterQuery.value);
 });
-const hasVisibleRows = computed(() => visibleRows.value.length > 0)
+const hasVisibleRows = computed(() => visibleRows.value.length > 0);
+
+// Watch visibleRows to sync resultTotal with search filter
+watch(visibleRows, (newVisibleRows) => {
+  resultTotal.value = newVisibleRows.length;
+}, { immediate: true });
 
 </script>
 

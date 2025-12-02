@@ -36,6 +36,7 @@ use lettre::{
     },
 };
 use once_cell::sync::Lazy;
+use serde::Serialize;
 use sha256::digest;
 
 use crate::{
@@ -52,7 +53,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 12;
+pub const DB_SCHEMA_VERSION: u64 = 13;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -468,7 +469,7 @@ pub static BLOCKED_STREAMS: Lazy<Vec<String>> = Lazy::new(|| {
         .collect()
 });
 
-#[derive(EnvConfig, Default)]
+#[derive(Serialize, EnvConfig, Default)]
 pub struct Config {
     pub auth: Auth,
     pub http_streaming: HttpStreaming,
@@ -496,10 +497,9 @@ pub struct Config {
     pub health_check: HealthCheck,
     pub encryption: Encryption,
     pub enrichment_table: EnrichmentTable,
-    pub service_graph: ServiceGraph,
 }
 
-#[derive(EnvConfig, Default)]
+#[derive(Serialize, EnvConfig, Default)]
 pub struct HttpStreaming {
     #[env_config(
         name = "ZO_STREAMING_RESPONSE_CHUNK_SIZE_MB",
@@ -515,7 +515,7 @@ pub struct HttpStreaming {
     pub streaming_enabled: bool,
 }
 
-#[derive(EnvConfig, Default)]
+#[derive(Serialize, EnvConfig, Default)]
 pub struct ReportServer {
     #[env_config(name = "ZO_ENABLE_EMBEDDED_REPORT_SERVER", default = false)]
     pub enable_report_server: bool,
@@ -531,7 +531,7 @@ pub struct ReportServer {
     pub ipv6_enabled: bool,
 }
 
-#[derive(EnvConfig, Default)]
+#[derive(Serialize, EnvConfig, Default)]
 pub struct TokioConsole {
     #[env_config(name = "ZO_TOKIO_CONSOLE_SERVER_ADDR", default = "0.0.0.0")]
     pub tokio_console_server_addr: String,
@@ -541,7 +541,7 @@ pub struct TokioConsole {
     pub tokio_console_retention: u64,
 }
 
-#[derive(EnvConfig, Default)]
+#[derive(Serialize, EnvConfig, Default)]
 pub struct Chrome {
     #[env_config(name = "ZO_CHROME_ENABLED", default = false)]
     pub chrome_enabled: bool,
@@ -565,7 +565,7 @@ pub struct Chrome {
     pub chrome_window_height: u32,
 }
 
-#[derive(EnvConfig, Default)]
+#[derive(Serialize, EnvConfig, Default)]
 pub struct Smtp {
     #[env_config(name = "ZO_SMTP_ENABLED", default = false)]
     pub smtp_enabled: bool,
@@ -585,7 +585,7 @@ pub struct Smtp {
     pub smtp_encryption: String,
 }
 
-#[derive(EnvConfig, Default)]
+#[derive(Serialize, EnvConfig, Default)]
 pub struct Profiling {
     #[env_config(
         name = "ZO_PROF_PPROF_ENABLED",
@@ -625,7 +625,7 @@ pub struct Profiling {
     pub pyroscope_project_name: String,
 }
 
-#[derive(EnvConfig, Default)]
+#[derive(Serialize, EnvConfig, Default)]
 pub struct Auth {
     #[env_config(name = "ZO_ROOT_USER_EMAIL")]
     pub root_user_email: String,
@@ -647,7 +647,7 @@ pub struct Auth {
     pub action_server_token: String,
 }
 
-#[derive(EnvConfig, Default)]
+#[derive(Serialize, EnvConfig, Default)]
 pub struct Http {
     #[env_config(name = "ZO_HTTP_PORT", default = 5080)]
     pub port: u16,
@@ -677,7 +677,7 @@ pub struct Http {
     pub access_log_format: String,
 }
 
-#[derive(EnvConfig, Default)]
+#[derive(Serialize, EnvConfig, Default)]
 pub struct Grpc {
     #[env_config(name = "ZO_GRPC_PORT", default = 5081)]
     pub port: u16,
@@ -709,7 +709,7 @@ pub struct Grpc {
     pub tls_key_path: String,
 }
 
-#[derive(PartialEq, Default)]
+#[derive(Serialize, PartialEq, Default)]
 pub enum RouteDispatchStrategy {
     #[default]
     Workload,
@@ -729,7 +729,7 @@ impl std::str::FromStr for RouteDispatchStrategy {
     }
 }
 
-#[derive(EnvConfig, Default)]
+#[derive(Serialize, EnvConfig, Default)]
 pub struct Route {
     #[env_config(name = "ZO_ROUTE_TIMEOUT", default = 600)]
     pub timeout: u64,
@@ -739,7 +739,7 @@ pub struct Route {
     pub dispatch_strategy: RouteDispatchStrategy,
 }
 
-#[derive(EnvConfig, Default)]
+#[derive(Serialize, EnvConfig, Default)]
 pub struct Common {
     #[env_config(name = "ZO_APP_NAME", default = "openobserve")]
     pub app_name: String,
@@ -751,7 +751,7 @@ pub struct Common {
     pub is_local_storage: bool,
     #[env_config(name = "ZO_CLUSTER_COORDINATOR", default = "nats")]
     pub cluster_coordinator: String,
-    #[env_config(name = "ZO_QUEUE_STORE", default = "")]
+    #[env_config(name = "ZO_QUEUE_STORE", default = "nats")]
     pub queue_store: String,
     #[env_config(name = "ZO_META_STORE", default = "")]
     pub meta_store: String,
@@ -891,6 +891,18 @@ pub struct Common {
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
     pub ui_sql_base64_enabled: bool,
+    #[env_config(
+        name = "ZO_DEFAULT_THEME_LIGHT_MODE_COLOR",
+        default = "",
+        help = "Default theme color for light mode. If not set, uses application default."
+    )]
+    pub default_theme_light_mode_color: String,
+    #[env_config(
+        name = "ZO_DEFAULT_THEME_DARK_MODE_COLOR",
+        default = "",
+        help = "Default theme color for dark mode. If not set, uses application default."
+    )]
+    pub default_theme_dark_mode_color: String,
     #[env_config(name = "ZO_METRICS_DEDUP_ENABLED", default = true)]
     pub metrics_dedup_enabled: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_ENABLED", default = true)]
@@ -925,6 +937,12 @@ pub struct Common {
         help = "Reject write when write queue is full"
     )]
     pub wal_write_queue_full_reject: bool,
+    #[env_config(
+        name = "ZO_WAL_DEDICATED_RUNTIME_ENABLED",
+        default = false,
+        help = "Enable dedicated runtime with CPU binding for WAL writer threads"
+    )]
+    pub wal_dedicated_runtime_enabled: bool,
     #[env_config(name = "ZO_TRACING_ENABLED", default = false)]
     pub tracing_enabled: bool,
     #[env_config(name = "ZO_TRACING_SEARCH_ENABLED", default = false)]
@@ -995,6 +1013,12 @@ pub struct Common {
     )]
     // in seconds
     pub usage_publish_interval: i64,
+    #[env_config(
+        name = "ZO_ERROR_PUBLISH_TIMEOUT_SECS",
+        default = 2,
+        help = "timeout in seconds for publishing error data to self-reporting queue"
+    )]
+    pub error_publish_timeout_secs: u64,
     // MMDB
     #[env_config(name = "ZO_MMDB_DATA_DIR")] // ./data/openobserve/mmdb/
     pub mmdb_data_dir: String,
@@ -1145,12 +1169,6 @@ pub struct Common {
         help = "Strategy to use for result cache, default is both, possible value - both, overlap, duration"
     )]
     pub result_cache_selection_strategy: String,
-    #[env_config(
-        name = "ZO_METRICS_CACHE_ENABLED",
-        default = true,
-        help = "Enable result cache for PromQL metrics queries"
-    )]
-    pub metrics_cache_enabled: bool,
     #[env_config(name = "ZO_SWAGGER_ENABLED", default = true)]
     pub swagger_enabled: bool,
     #[env_config(
@@ -1237,9 +1255,21 @@ pub struct Common {
         help = "Which fields to show by default in logs search page. Valid values - all,uds,interesting"
     )]
     pub log_page_default_field_list: String,
+    #[env_config(
+        name = "ZO_TRACES_LIST_INDEX_ENABLED",
+        default = true,
+        help = "enable trace list index for traces"
+    )]
+    pub traces_list_index_enabled: bool,
+    #[env_config(
+        name = "ZO_INGESTION_LOG_ENABLED",
+        default = true,
+        help = "enable ingestion error logs reporting"
+    )]
+    pub ingestion_log_enabled: bool,
 }
 
-#[derive(EnvConfig, Default)]
+#[derive(Serialize, EnvConfig, Default)]
 pub struct Limit {
     // no need set by environment
     pub cpu_num: usize,
@@ -1254,10 +1284,10 @@ pub struct Limit {
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
     // MB, per log file size limit on disk
-    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 128)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 256)]
     pub max_file_size_on_disk: usize,
     // MB, per data file size limit in memory
-    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 128)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 256)]
     pub max_file_size_in_memory: usize,
     #[deprecated(
         since = "0.14.1",
@@ -1332,6 +1362,8 @@ pub struct Limit {
     pub query_ingester_timeout: u64,
     #[env_config(name = "ZO_QUERY_DEFAULT_LIMIT", default = 1000)]
     pub query_default_limit: i64,
+    #[env_config(name = "ZO_QUERY_VALUES_DEFAULT_NUM", default = 10)]
+    pub query_values_default_num: i64,
     #[env_config(name = "ZO_QUERY_PARTITION_BY_SECS", default = 1)] // seconds
     pub query_partition_by_secs: usize,
     #[env_config(name = "ZO_QUERY_GROUP_BASE_SPEED", default = 768)] // MB/s/core
@@ -1353,7 +1385,7 @@ pub struct Limit {
     pub logs_file_retention: String,
     #[env_config(name = "ZO_TRACES_FILE_RETENTION", default = "hourly")]
     pub traces_file_retention: String,
-    #[env_config(name = "ZO_METRICS_FILE_RETENTION", default = "daily")]
+    #[env_config(name = "ZO_METRICS_FILE_RETENTION", default = "hourly")]
     pub metrics_file_retention: String,
     #[env_config(name = "ZO_METRICS_LEADER_PUSH_INTERVAL", default = 15)]
     pub metrics_leader_push_interval: u64,
@@ -1417,8 +1449,6 @@ pub struct Limit {
         help = "Integer value representing the delay in percentage of the alert frequency that will be included in alert evaluation timerange. Default is 20. This can be changed in runtime."
     )]
     pub alert_considerable_delay: i32,
-    #[env_config(name = "ZO_SCHEDULER_CLEAN_INTERVAL", default = 30)] // seconds
-    pub scheduler_clean_interval: i64,
     #[env_config(name = "ZO_SCHEDULER_WATCH_INTERVAL", default = 30)] // seconds
     pub scheduler_watch_interval: i64,
     #[env_config(name = "ZO_SEARCH_JOB_WORKS", default = 1)]
@@ -1607,7 +1637,7 @@ pub struct Limit {
     pub aggs_min_num_partition_secs: usize,
 }
 
-#[derive(EnvConfig, Default)]
+#[derive(Serialize, EnvConfig, Default)]
 pub struct Compact {
     #[env_config(name = "ZO_COMPACT_ENABLED", default = true)]
     pub enabled: bool,
@@ -1643,6 +1673,8 @@ pub struct Compact {
     #[env_config(name = "ZO_COMPACT_FILE_LIST_DELETED_MODE", default = "deleted")]
     // "history" "deleted" "none"
     pub file_list_deleted_mode: String,
+    #[env_config(name = "ZO_COMPACT_FILE_LIST_DELETED_BATCH_SIZE", default = 1000)]
+    pub file_list_deleted_batch_size: usize,
     #[env_config(
         name = "ZO_COMPACT_BATCH_SIZE",
         default = 0,
@@ -1665,9 +1697,15 @@ pub struct Compact {
     pub pending_jobs_metric_interval: u64,
     #[env_config(name = "ZO_COMPACT_MAX_GROUP_FILES", default = 10000)]
     pub max_group_files: usize,
+    #[env_config(
+        name = "ZO_COMPACT_RETENTION_ALLOWED_HOURS",
+        default = "",
+        help = "Comma-separated list of hours (0-23) when retention can run. Empty means run at all hours. Example: 5,6,8"
+    )]
+    pub retention_allowed_hours: String,
 }
 
-#[derive(EnvConfig, Default)]
+#[derive(Serialize, EnvConfig, Default)]
 pub struct CacheLatestFiles {
     #[env_config(name = "ZO_CACHE_LATEST_FILES_ENABLED", default = false)]
     pub enabled: bool,
@@ -1685,7 +1723,7 @@ pub struct CacheLatestFiles {
     pub download_node_size: i64,
 }
 
-#[derive(EnvConfig, Default)]
+#[derive(Serialize, EnvConfig, Default)]
 pub struct MemoryCache {
     #[env_config(name = "ZO_MEMORY_CACHE_ENABLED", default = false)]
     pub enabled: bool,
@@ -1718,12 +1756,12 @@ pub struct MemoryCache {
     pub datafusion_memory_pool: String,
 }
 
-#[derive(EnvConfig, Default)]
+#[derive(Serialize, EnvConfig, Default)]
 pub struct DiskCache {
     #[env_config(name = "ZO_DISK_CACHE_ENABLED", default = true)]
     pub enabled: bool,
     // Disk data cache strategy, default is lru, other value is fifo, time_lru
-    #[env_config(name = "ZO_DISK_CACHE_STRATEGY", default = "lru")]
+    #[env_config(name = "ZO_DISK_CACHE_STRATEGY", default = "time_lru")]
     pub cache_strategy: String,
     // Disk data cache bucket num, multiple bucket means multiple locker, default is 0
     #[env_config(name = "ZO_DISK_CACHE_BUCKET_NUM", default = 0)]
@@ -1751,7 +1789,7 @@ pub struct DiskCache {
     pub multi_dir: String,
 }
 
-#[derive(EnvConfig, Default)]
+#[derive(Serialize, EnvConfig, Default)]
 pub struct Log {
     #[env_config(name = "RUST_LOG", default = "info")]
     pub level: String,
@@ -1781,7 +1819,7 @@ pub struct Log {
     pub events_batch_size: usize,
 }
 
-#[derive(Debug, EnvConfig, Default)]
+#[derive(Serialize, Debug, EnvConfig, Default)]
 pub struct Nats {
     #[env_config(name = "ZO_NATS_ADDR", default = "localhost:4222")]
     pub addr: String,
@@ -1851,7 +1889,7 @@ pub struct Nats {
     pub kv_watch_modules: String,
 }
 
-#[derive(Debug, Default, EnvConfig)]
+#[derive(Serialize, Debug, Default, EnvConfig)]
 pub struct S3 {
     #[env_config(
         name = "ZO_S3_ACCOUNTS",
@@ -1910,7 +1948,7 @@ pub struct S3 {
     pub multi_part_upload_size: usize,
 }
 
-#[derive(Debug, EnvConfig, Default)]
+#[derive(Serialize, Debug, EnvConfig, Default)]
 pub struct Sns {
     #[env_config(name = "ZO_SNS_ENDPOINT", default = "")]
     pub endpoint: String,
@@ -1920,7 +1958,7 @@ pub struct Sns {
     pub operation_timeout: u64,
 }
 
-#[derive(Debug, EnvConfig, Default)]
+#[derive(Serialize, Debug, EnvConfig, Default)]
 pub struct Prometheus {
     #[env_config(name = "ZO_PROMETHEUS_HA_CLUSTER", default = "cluster")]
     pub ha_cluster_label: String,
@@ -1928,7 +1966,7 @@ pub struct Prometheus {
     pub ha_replica_label: String,
 }
 
-#[derive(Debug, EnvConfig, Default)]
+#[derive(Serialize, Debug, EnvConfig, Default)]
 pub struct RUM {
     #[env_config(name = "ZO_RUM_ENABLED", default = false)]
     pub enabled: bool,
@@ -1952,7 +1990,7 @@ pub struct RUM {
     pub insecure_http: bool,
 }
 
-#[derive(Debug, EnvConfig, Default)]
+#[derive(Serialize, Debug, EnvConfig, Default)]
 pub struct Pipeline {
     #[env_config(
         name = "ZO_PIPELINE_REMOTE_STREAM_WAL_DIR",
@@ -2064,7 +2102,7 @@ pub struct Pipeline {
     pub max_retry_time_in_hours: u64,
     #[env_config(
         name = "ZO_PIPELINE_MAX_FILE_SIZE_ON_DISK_MB",
-        default = 128,
+        default = 256,
         help = "pipeline max file size on disk in MB"
     )]
     pub pipeline_max_file_size_on_disk_mb: usize,
@@ -2100,7 +2138,7 @@ pub struct Pipeline {
     pub error_cleanup_interval: u64,
 }
 
-#[derive(EnvConfig, Default)]
+#[derive(Serialize, EnvConfig, Default)]
 pub struct Encryption {
     #[env_config(name = "ZO_MASTER_ENCRYPTION_ALGORITHM", default = "")]
     pub algorithm: String,
@@ -2108,7 +2146,7 @@ pub struct Encryption {
     pub master_key: String,
 }
 
-#[derive(EnvConfig, Default)]
+#[derive(Serialize, EnvConfig, Default)]
 pub struct HealthCheck {
     #[env_config(name = "ZO_HEALTH_CHECK_ENABLED", default = true)]
     pub enabled: bool,
@@ -2126,7 +2164,7 @@ pub struct HealthCheck {
     pub failed_times: usize,
 }
 
-#[derive(EnvConfig, Default)]
+#[derive(Serialize, EnvConfig, Default)]
 pub struct EnrichmentTable {
     #[env_config(
         name = "ZO_ENRICHMENT_TABLE_CACHE_DIR",
@@ -2146,38 +2184,6 @@ pub struct EnrichmentTable {
         help = "Background sync interval in seconds"
     )]
     pub merge_interval: u64,
-}
-
-/// Service Graph Configuration
-///
-/// Note: Worker count is fixed at 256 (one per shard) for optimal concurrency.
-/// No async channels are used in the current implementation.
-#[derive(EnvConfig, Default)]
-pub struct ServiceGraph {
-    #[env_config(
-        name = "ZO_SGRAPH_ENABLED",
-        default = true,
-        help = "Enable service graph feature"
-    )]
-    pub enabled: bool,
-    #[env_config(
-        name = "ZO_SGRAPH_WAIT_DURATION_MS",
-        default = 10000,
-        help = "Wait duration for span pairing in milliseconds"
-    )]
-    pub wait_duration_ms: u64,
-    #[env_config(
-        name = "ZO_SGRAPH_MAX_ITEMS_PER_SHARD",
-        default = 100000,
-        help = "Maximum items per shard in edge store (256 shards total)"
-    )]
-    pub max_items_per_shard: usize,
-    #[env_config(
-        name = "ZO_SGRAPH_CLEANUP_INTERVAL_MS",
-        default = 2000,
-        help = "Cleanup interval for expired edges in milliseconds"
-    )]
-    pub cleanup_interval_ms: u64,
 }
 
 pub fn init() -> Config {
@@ -2418,13 +2424,13 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // check max_file_size_on_disk to MB
     if cfg.limit.max_file_size_on_disk == 0 {
-        cfg.limit.max_file_size_on_disk = 128 * 1024 * 1024; // 128MB
+        cfg.limit.max_file_size_on_disk = 256 * 1024 * 1024; // 256MB
     } else {
         cfg.limit.max_file_size_on_disk *= 1024 * 1024;
     }
     // check max_file_size_in_memory to MB
     if cfg.limit.max_file_size_in_memory == 0 {
-        cfg.limit.max_file_size_in_memory = 128 * 1024 * 1024; // 128MB
+        cfg.limit.max_file_size_in_memory = 256 * 1024 * 1024; // 256MB
     } else {
         cfg.limit.max_file_size_in_memory *= 1024 * 1024;
     }
@@ -2512,6 +2518,19 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!(
             "Meta store is MySQL, you must set ZO_META_MYSQL_DSN"
         ));
+    }
+
+    // Print MySQL deprecation warning (logger not initialized yet at this stage)
+    if cfg.common.meta_store.starts_with("mysql") {
+        eprintln!("╔════════════════════════════════════════════════════════════════════════════╗");
+        eprintln!(
+            "║                              ⚠️  WARNING  ⚠️                                 ║"
+        );
+        eprintln!("║                                                                            ║");
+        eprintln!("║  MySQL support is DEPRECATED and will be removed in future.                ║");
+        eprintln!("║  Please migrate to PostgreSQL.                                             ║");
+        eprintln!("║                                                                            ║");
+        eprintln!("╚════════════════════════════════════════════════════════════════════════════╝");
     }
 
     // If the default scrape interval is less than 5s, raise an error
@@ -2754,19 +2773,15 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // disable disk cache for local disk storage
     if cfg.common.is_local_storage
         && !cfg.common.result_cache_enabled
-        && !cfg.common.metrics_cache_enabled
         && !cfg.common.feature_query_streaming_aggs
     {
         cfg.disk_cache.enabled = false;
     }
 
-    // disable result cache and metrics cache if disk cache is disabled
+    // disable result cache if disk cache is disabled
     if !cfg.disk_cache.enabled {
         cfg.common.result_cache_enabled = false;
-        cfg.common.metrics_cache_enabled = false;
         cfg.common.feature_query_streaming_aggs = false;
-        cfg.cache_latest_files.enabled = false;
-        cfg.cache_latest_files.delete_merge_files = false;
     }
 
     let disks = sysinfo::disk::get_disk_usage();
@@ -2863,6 +2878,8 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             .count(),
     );
     cfg.disk_cache.max_size /= cfg.disk_cache.bucket_num;
+    cfg.disk_cache.result_max_size /= cfg.disk_cache.bucket_num;
+    cfg.disk_cache.aggregation_max_size /= cfg.disk_cache.bucket_num;
     cfg.disk_cache.release_size /= cfg.disk_cache.bucket_num;
     cfg.disk_cache.gc_size /= cfg.disk_cache.bucket_num;
 

@@ -23,6 +23,7 @@ use std::{
 
 use config::{
     get_config,
+    meta::promql::value::{RangeValue, Value},
     utils::{
         hash::{Sum64, gxhash},
         time::{get_ymdh_from_micros, now_micros, second_micros},
@@ -33,8 +34,6 @@ use infra::errors::{Error, Result};
 use once_cell::sync::Lazy;
 use prost::Message;
 use tokio::sync::RwLock;
-
-use super::{RangeValue, Value};
 
 const METRICS_INDEX_CACHE_GC_TRIGGER_NUM: usize = 10;
 const METRICS_INDEX_CACHE_GC_PERCENT: usize = 10; // 10% of the items will be removed
@@ -56,7 +55,7 @@ static GLOBAL_CACHE: Lazy<Vec<RwLock<MetricsIndex>>> = Lazy::new(|| {
 
 pub async fn init() -> Result<()> {
     let cfg = get_config();
-    if !cfg.common.metrics_cache_enabled {
+    if !cfg.common.result_cache_enabled {
         return Ok(());
     }
 
@@ -353,7 +352,7 @@ pub async fn set(
 /// load the cache item from the secondary storage
 pub async fn load(cache_key: &str) -> Result<()> {
     let cfg = get_config();
-    if !cfg.common.metrics_cache_enabled {
+    if !cfg.common.result_cache_enabled {
         return Ok(());
     }
     let Some((key, start, end)) = parse_cache_item_key(cache_key) else {
@@ -477,11 +476,10 @@ impl MetricsIndexCacheItem {
 
 #[cfg(test)]
 mod tests {
+    use config::meta::promql::value::{Labels, Sample};
+
     use super::*;
-    use crate::service::promql::{
-        adjust_start_end,
-        value::{Labels, Sample},
-    };
+    use crate::service::promql::adjust_start_end;
 
     #[test]
     fn test_promql_cache_hash_key_generation() {
@@ -512,7 +510,7 @@ mod tests {
         let end = now_micros();
         let start = end - second_micros(3600);
         let step = second_micros(15);
-        let (start, end) = adjust_start_end(start, end, step, false);
+        let (start, end) = adjust_start_end(start, end, step);
 
         // Create test samples
         let mut range_values = vec![RangeValue {
@@ -564,7 +562,7 @@ mod tests {
         let end = now_micros();
         let start = end - second_micros(3600);
         let step = second_micros(15);
-        let (start, end) = adjust_start_end(start, end, step, false);
+        let (start, end) = adjust_start_end(start, end, step);
 
         // Add more than METRICS_INDEX_CACHE_MAX_ITEMS entries
         for i in 0..METRICS_INDEX_CACHE_MAX_ITEMS + 2 {

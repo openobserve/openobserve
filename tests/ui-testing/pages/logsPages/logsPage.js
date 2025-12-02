@@ -35,12 +35,17 @@ export class LogsPage {
         this.exploreButton = '[data-test="logs-search-explore-btn"]';
         this.timestampColumnMenu = '[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]';
         this.resultText = '[data-test="logs-search-search-result"]';
+        this.logsSearchResultLogsTable = '[data-test="logs-search-result-logs-table"]';
+        this.kubernetesFieldsSelector = '[data-test*="log-search-expand-kubernetes"]';
+        this.allFieldsSelector = '[data-test*="log-search-expand-"]';
+        this.matchingFieldsSelector = '[data-test*="log-search-expand-"]';
         this.logTableColumnSource = '[data-test="log-table-column-0-source"]';
         this.logsSearchBarQueryEditor = '[data-test="logs-search-bar-query-editor"]';
         this.searchBarRefreshButton = '[data-cy="search-bar-refresh-button"] > .q-btn__content';
         this.relative15MinButton = '[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block';
         this.relative6WeeksButton = '[data-test="date-time-relative-6-w-btn"] > .q-btn__content';
         this.relative30SecondsButton = '[data-test="date-time-relative-30-s-btn"] > .q-btn__content > .block';
+        this.relative1HourButton = '[data-test="date-time-relative-1-h-btn"]';
         this.absoluteTab = '[data-test="date-time-absolute-tab"]';
         this.scheduleText = '[data-test="date-time-btn"]';
         this.timeZoneDropdown = '[data-test="timezone-select"]';
@@ -76,6 +81,10 @@ export class LogsPage {
         this.errorMessage = '[data-test="logs-search-error-message"]';
         this.warningElement = 'text=warning Query execution';
         this.logsTable = '[data-test="logs-search-result-logs-table"]';
+        // Additional locators for multistream functionality
+        this.logsSearchIndexList = '[data-test="logs-search-index-list"]';
+        this.notificationErrorMessage = '.q-notification__message:has-text("error")';
+        this.vrlFunctionText = (text) => `text=${text}`;
         this.barChartCanvas = '[data-test="logs-search-result-bar-chart"] canvas';
         this.expandLabel = label => `Expand "${label}"`;
         this.collapseLabel = label => `Collapse "${label}"`;
@@ -121,6 +130,11 @@ export class LogsPage {
         this.cmLine = '.view-line';
         this.searchFunctionInput = { placeholder: 'Search Function' };
         this.timestampFieldTable = '[data-test="log-search-index-list-fields-table"]';
+
+        // Error handling locators
+        this.errorIcon = 'text=error';
+        this.resultErrorDetailsBtn = '[data-test="logs-page-result-error-details-btn"]';
+        this.searchDetailErrorMessage = '[data-test="logs-search-detail-error-message"]';
     }
 
 
@@ -223,10 +237,19 @@ export class LogsPage {
     }
 
     async selectIndexAndStreamJoin() {
+        // Select both default and e2e_automate streams for join queries
         await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
         await this.page.waitForTimeout(3000);
+
+        // Select default stream
         await this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first().click();
         await this.page.waitForTimeout(1000);
+
+        // Select e2e_automate stream (dropdown stays open after first selection)
+        await this.page.locator('[data-test="log-search-index-list-stream-toggle-e2e_automate"] div').first().click();
+        await this.page.waitForTimeout(1000);
+
+        // Close dropdown
         await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
     }
 
@@ -591,6 +614,10 @@ export class LogsPage {
     async waitForSearchResultAndCheckText(expectedText) {
         await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]');
         await expect(this.page.locator('[data-test="logs-search-result-logs-table"]')).toContainText(expectedText);
+    }
+
+    async expectLogsTableRowCount(count) {
+        return await expect(this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr')).toHaveCount(count);
     }
 
     // Time and date methods
@@ -1411,7 +1438,27 @@ export class LogsPage {
 
     async clickDeleteSavedViewButton(savedViewName) {
         const deleteButtonSelector = `[data-test="logs-search-bar-delete-${savedViewName}-saved-view-btn"]`;
-        return await this.page.locator(deleteButtonSelector).click();
+        
+        // Wait for the saved views area to be stable after navigation
+        await this.waitForTimeout(2000);
+        
+        // Ensure saved views panel is expanded and wait for stability
+        await this.clickSavedViewsExpand();
+        await this.waitForTimeout(1000);
+        
+        // Wait for the search input to be stable and ready
+        await this.page.locator(this.savedViewSearchInput).waitFor({ state: 'attached', timeout: 5000 });
+        await this.waitForTimeout(500);
+        
+        // Click and fill the search input with better error handling
+        await this.page.locator(this.savedViewSearchInput).click({ force: true });
+        await this.page.locator(this.savedViewSearchInput).fill(savedViewName);
+        await this.waitForTimeout(1500);
+        
+        // Wait for and click the delete button
+        await this.page.locator(deleteButtonSelector).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.locator(deleteButtonSelector).click({ force: true });
+        await this.waitForTimeout(500);
     }
 
     async clickResetFiltersButton() {
@@ -1748,6 +1795,29 @@ export class LogsPage {
 
     async expectPaginationNotVisible() {
         return await expect(this.page.locator(this.pagination)).not.toBeVisible();
+    }
+
+    async expectResultPaginationVisible() {
+        return await expect(this.page.locator(this.resultPagination)).toBeVisible();
+    }
+
+    async clickPaginationPage(pageNumber) {
+        return await this.page.locator(`${this.resultPagination} .q-btn`).filter({ hasText: pageNumber.toString() }).first().click();
+    }
+
+    async getPaginationPageCount() {
+        const pageButtons = this.page.locator(`${this.resultPagination} .q-btn`).filter({ hasText: /^\d+$/ });
+        return await pageButtons.count();
+    }
+
+    async getPaginationPageClasses(pageNumber) {
+        const pageButton = this.page.locator(`${this.resultPagination} .q-btn`).filter({ hasText: pageNumber.toString() }).first();
+        return await pageButton.getAttribute('class');
+    }
+
+    async isPaginationPageActive(pageNumber) {
+        const classes = await this.getPaginationPageClasses(pageNumber);
+        return classes && (classes.includes('bg-primary') || classes.includes('unelevated'));
     }
 
     async expectSQLPaginationNotVisible() {
@@ -2266,5 +2336,404 @@ export class LogsPage {
     async expectFieldNotInTableHeader(fieldName) {
         // When field is removed, the source column should be visible again
         return await expect(this.page.locator('[data-test="log-search-result-table-th-source"]').getByText('source')).toBeVisible();
+    }
+
+    // New POM methods for PR tests
+
+    async executeBlankQueryWithKeyboardShortcut() {
+        // Clear any existing query and ensure editor is focused
+        await this.page.locator(this.queryEditor).click();
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+        await this.page.keyboard.press("Backspace");
+        await this.page.waitForTimeout(500);
+        
+        // Try to run the blank query with cmd+enter
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
+        
+        // Wait for any response
+        await this.page.waitForTimeout(3000);
+    }
+
+    async expectBlankQueryError() {
+        // Verify proper error handling for blank SQL query (the actual behavior from PR #9023)
+        const errorMessage = this.page.getByText("Error occurred while retrieving search events");
+        await expect(errorMessage).toBeVisible();
+        
+        // Verify there's a clickable error details button
+        const errorDetailsBtn = this.page.locator('[data-test="logs-page-result-error-details-btn"]');
+        if (await errorDetailsBtn.isVisible()) {
+            await errorDetailsBtn.click();
+            await this.page.waitForTimeout(1000);
+            testLogger.info('✓ Error details button clicked successfully');
+        }
+    }
+
+    async openFirstLogDetails() {
+        // Click on the first log entry to open details (expand the _timestamp column)
+        await this.page.locator('[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]').click();
+        await this.page.waitForTimeout(1000);
+    }
+
+    async addIncludeSearchTermFromLogDetails() {
+        // Click on include/exclude button for a field in the opened log details
+        const includeExcludeButtons = this.page.locator('[data-test="log-details-include-exclude-field-btn"]');
+        await expect(includeExcludeButtons.first()).toBeVisible();
+        await includeExcludeButtons.first().click();
+        await this.page.waitForTimeout(500);
+        
+        // Click 'Include Search Term'
+        await this.page.getByText('Include Search Term').click();
+        await this.page.waitForTimeout(1000);
+    }
+
+    async expectIncludeExcludeButtonsVisibleInLogDetails() {
+        // CRITICAL ASSERTION: After running query, the include/exclude buttons should still be visible
+        const postQueryButtons = this.page.locator('[data-test="log-details-include-exclude-field-btn"]');
+        
+        // Assert that include/exclude buttons are still visible after query run
+        await expect(postQueryButtons.first()).toBeVisible();
+        await expect(postQueryButtons.nth(1)).toBeVisible();
+        
+        // Assert that we still have multiple buttons available
+        const buttonCount = await postQueryButtons.count();
+        expect(buttonCount).toBeGreaterThanOrEqual(2);
+        
+        testLogger.info(`✓ ${buttonCount} include/exclude buttons remain visible in open log details AFTER query run`);
+        return buttonCount;
+    }
+
+    async setupAPICallTracking() {
+        const allRequests = [];
+        
+        const requestHandler = (request) => {
+            if (request.url().includes('/_search') && request.method() === 'POST') {
+                let postData = null;
+                try {
+                    postData = request.postData();
+                } catch (e) {
+                    postData = 'Unable to read post data';
+                }
+                
+                allRequests.push({
+                    url: request.url(),
+                    postData: postData,
+                    timestamp: Date.now()
+                });
+            }
+        };
+        
+        this.page.on('request', requestHandler);
+        
+        return { allRequests, requestHandler };
+    }
+
+    async executeQueryWithKeyboardShortcutAndTrackAPICalls(query) {
+        // Clear any existing query and add a test query
+        await this.page.locator(this.queryEditor).click();
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+        await this.page.keyboard.press("Backspace");
+        await this.page.keyboard.type(query);
+        await this.page.waitForTimeout(500);
+        
+        // Use cmd+enter to run the query
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
+        
+        // Wait for the API calls to complete
+        await this.page.waitForTimeout(4000);
+    }
+
+    async verifyAPICallCounts(allRequests, requestHandler) {
+        // Filter recent requests made after cmd+enter
+        const recentRequests = allRequests.filter(req => Date.now() - req.timestamp < 5000);
+        
+        // Histogram calls have size: 0, regular search calls have size > 0 (typically 51)
+        const searchCalls = recentRequests.filter(req => 
+            req.postData && (req.postData.includes('"size":51') || req.postData.includes('"size": 51'))
+        );
+        const histogramCalls = recentRequests.filter(req => 
+            req.postData && (req.postData.includes('"size":0') || req.postData.includes('"size": 0'))
+        );
+        
+        // Verify exactly 1 search call and 1 histogram call are made
+        expect(searchCalls.length).toBe(1);
+        expect(histogramCalls.length).toBe(1);
+        expect(recentRequests.length).toBe(2);
+        
+        // Clean up event listener
+        this.page.off('request', requestHandler);
+        
+        return { searchCalls: searchCalls.length, histogramCalls: histogramCalls.length, total: recentRequests.length };
+    }
+
+    async getEditorContentBefore() {
+        // Get the actual Monaco editor content using a more specific selector
+        const monacoEditor = this.page.locator('[data-test="logs-search-bar-query-editor"] .monaco-editor .view-lines');
+        const initialQuery = await monacoEditor.textContent();
+        return initialQuery?.trim().replace(/\s+/g, ' ') || '';
+    }
+
+    async getEditorContentAfter() {
+        // Check editor content after cmd+enter
+        const monacoEditor = this.page.locator('[data-test="logs-search-bar-query-editor"] .monaco-editor .view-lines');
+        const finalEditorContent = await monacoEditor.textContent();
+        return finalEditorContent?.trim().replace(/\s+/g, ' ') || '';
+    }
+
+    async setupEditorForCursorTest(query) {
+        // Click in the query editor and add a simple query
+        const queryEditor = this.page.locator(this.queryEditor);
+        await queryEditor.click();
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+        await this.page.keyboard.press("Backspace");
+        await this.page.keyboard.type(query);
+        
+        // Position cursor at the end of the query
+        await this.page.keyboard.press("End");
+        await this.page.waitForTimeout(500);
+    }
+
+    async executeQueryWithKeyboardShortcutForEditor() {
+        // Press cmd+enter to run the query
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
+        await this.page.waitForTimeout(2000);
+    }
+
+    async verifyEditorContentIntegrity(initialQuery, finalQuery) {
+        // The query content should remain exactly the same 
+        expect(finalQuery).toBe(initialQuery);
+        expect(finalQuery).toBe('select * from "e2e_automate"');
+        
+        // Additional integrity checks
+        expect(finalQuery).not.toMatch(/\n/); // No newlines
+        expect(finalQuery).not.toMatch(/\r/); // No carriage returns  
+        expect(finalQuery).not.toMatch(/^\d/); // No leading numbers
+        expect(finalQuery).not.toContain('monaco'); // No Monaco artifacts
+    }
+
+    // Additional POM methods to eliminate all locators from spec file
+
+    async expectLogsSearchResultLogsTableVisible() {
+        await expect(this.page.locator(this.logsSearchResultLogsTable)).toBeVisible();
+    }
+
+    async getKubernetesFields() {
+        return this.page.locator(this.kubernetesFieldsSelector);
+    }
+
+    async getKubernetesFieldsCount() {
+        const kubernetesFields = this.page.locator(this.kubernetesFieldsSelector);
+        return await kubernetesFields.count();
+    }
+
+    async getSpecificFieldLocator(fieldName) {
+        return this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`);
+    }
+
+    async getAllFields() {
+        return this.page.locator(this.allFieldsSelector);
+    }
+
+    async getMatchingFields() {
+        return this.page.locator(this.matchingFieldsSelector);
+    }
+
+    async countMatchingFields() {
+        const matchingFields = this.page.locator(this.matchingFieldsSelector);
+        return await matchingFields.count();
+    }
+
+    async ensureQuickModeState(desiredState) {
+        const quickModeToggle = this.page.locator(this.quickModeToggle);
+        const isEnabled = await quickModeToggle.getAttribute('aria-pressed');
+        
+        if ((desiredState && isEnabled !== 'true') || (!desiredState && isEnabled === 'true')) {
+            await quickModeToggle.click();
+            await this.page.waitForTimeout(500);
+        }
+    }
+
+    async ensureHistogramToggleState(desiredState) {
+        const histogramToggle = this.page.locator(this.histogramToggle);
+        const isEnabled = await histogramToggle.getAttribute('aria-pressed');
+        
+        if ((desiredState && isEnabled !== 'true') || (!desiredState && isEnabled === 'true')) {
+            await histogramToggle.click();
+            await this.page.waitForTimeout(500);
+            return true; // State was changed
+        }
+        return false; // State was already correct
+    }
+
+    async getQuickModeToggleAttributes() {
+        const quickModeToggle = this.page.locator(this.quickModeToggle);
+        const ariaPressed = await quickModeToggle.getAttribute('aria-pressed');
+        const classNames = await quickModeToggle.getAttribute('class');
+        return { ariaPressed, classNames };
+    }
+
+    async expectQuickModeToggleVisible() {
+        await expect(this.page.locator(this.quickModeToggle)).toBeVisible();
+    }
+
+    async waitForUI(timeout = 500) {
+        await this.page.waitForTimeout(timeout);
+    }
+
+    // Methods specifically for multistream testing that don't already exist
+    async navigateToHome() {
+        return await this.page.locator('[data-test="menu-link-\\/-item"]').click();
+    }
+
+    async fillStreamFilter(streamName) {
+        return await this.page.locator('[data-test="log-search-index-list-select-stream"]').fill(streamName);
+    }
+
+    async toggleStreamSelection(streamName) {
+        return await this.page.locator(`[data-test="log-search-index-list-stream-toggle-${streamName}"] div`).nth(2).click();
+    }
+
+    async toggleQueryModeEditor() {
+        return await this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] div').first().click();
+    }
+
+    async clickMonacoEditor() {
+        return await this.page.locator('#fnEditor').locator('.monaco-editor').click();
+    }
+
+    async fillMonacoEditor(text) {
+        return await this.page.locator('#fnEditor').locator('.inputarea').fill(text);
+    }
+
+    async getCellByName(name) {
+        return await this.page.getByRole('cell', { name });
+    }
+
+    async clickCellByName(name) {
+        return await this.page.getByRole('cell', { name }).click();
+    }
+
+    async clickTableExpandMenuFirst() {
+        return await this.page.locator('[data-test="table-row-expand-menu"]').first().click({ force: true });
+    }
+
+    async clickTimestampColumnMenu() {
+        return await this.page.locator('[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]').click();
+    }
+
+    async clickDateTimeButton() {
+        return await this.page.locator('[data-test="date-time-btn"]').click();
+    }
+
+    async selectRelative6Hours() {
+        return await this.page.locator('[data-test="date-time-relative-6-h-btn"]').click();
+    }
+
+    async selectRelative1Hour() {
+        return await this.page.locator(this.relative1HourButton).click();
+    }
+
+    async clickAbsoluteTimeTab() {
+        return await this.page.locator('[data-test="date-time-absolute-tab"]').click();
+    }
+
+    async fillStartDate(date) {
+        return await this.page.locator('[data-test="date-time-absolute-start-date"]').fill(date);
+    }
+
+    async fillEndDate(date) {
+        return await this.page.locator('[data-test="date-time-absolute-end-date"]').fill(date);
+    }
+
+    async clickApplyDateRange() {
+        return await this.page.locator('[data-test="date-time-btn-apply"]').click();
+    }
+
+    async searchFieldByName(fieldName) {
+        return await this.page.locator('[data-cy="index-field-search-input"]').fill(fieldName);
+    }
+
+    async navigateToStreams() {
+        return await this.page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
+    }
+
+    async navigateToStreamsAlternate() {
+        return await this.page.locator('[data-test="menu-link-\\/streams-item"]').click({ force: true });
+    }
+
+    async searchStreamByPlaceholder(searchText) {
+        await this.page.getByPlaceholder("Search Stream").click();
+        return await this.page.getByPlaceholder("Search Stream").fill(searchText);
+    }
+
+    async clickFirstExploreButton() {
+        return await this.page.getByRole("button", { name: "Explore" }).first().click({ force: true });
+    }
+
+    // Additional methods for multistream functionality
+    async expectLogsSearchIndexListContainsText(text) {
+        return await expect(this.page.locator(this.logsSearchIndexList)).toContainText(text);
+    }
+
+    async getLogsTableContent() {
+        return await this.page.locator(this.logsTable).textContent();
+    }
+
+    async getLogsTableRowCount() {
+        return await this.page.locator(`${this.logsTable} tbody tr`).count();
+    }
+
+    async expectVrlFunctionVisible(functionText) {
+        return await expect(this.page.locator(this.vrlFunctionText(functionText))).toBeVisible();
+    }
+
+    async expectNotificationErrorNotVisible() {
+        return await expect(this.page.locator(this.notificationErrorMessage)).not.toBeVisible();
+    }
+
+    async expectErrorWhileFetchingNotVisible() {
+        return await expect(this.page.getByText('Error while fetching')).not.toBeVisible();
+    }
+
+    async fillQueryEditorWithRole(text) {
+        return await this.page.locator(this.queryEditor).getByRole('textbox', { name: 'Editor content' }).fill(text);
+    }
+
+    async clickTimeCell() {
+        // Click on the time cell (access_time icon)
+        return await this.page.getByRole('cell', { name: ':' }).getByLabel('access_time').first().click();
+    }
+
+    async fillTimeCellWithInvalidValue(value) {
+        // Fill time cell with partial/invalid value
+        return await this.page.getByRole('cell', { name: ':' }).getByLabel('access_time').first().fill(value);
+    }
+
+    async expectErrorIconVisible() {
+        return await expect(this.page.getByText('error')).toBeVisible();
+    }
+
+    async expectResultErrorDetailsButtonVisible() {
+        return await expect(this.page.locator(this.resultErrorDetailsBtn)).toBeVisible();
+    }
+
+    async clickResultErrorDetailsButton() {
+        return await this.page.locator(this.resultErrorDetailsBtn).click();
+    }
+
+    async expectSearchDetailErrorMessageVisible() {
+        return await expect(this.page.locator(this.searchDetailErrorMessage)).toBeVisible();
+    }
+
+    async expectStartTimeVisible() {
+        return await expect(this.page.getByRole('cell', { name: 'Start time' })).toBeVisible();
+    }
+
+    async expectEndTimeVisible() {
+        return await expect(this.page.getByRole('cell', { name: 'End time' })).toBeVisible();
+    }
+
+    async clickOutsideTimeInput() {
+        // Click outside to trigger validation
+        return await this.page.locator('body').click({ position: { x: 0, y: 0 } });
     }
 } 

@@ -530,10 +530,19 @@ class APICleanup {
             const functions = await this.fetchFunctions();
             testLogger.info('Fetched functions', { total: functions.length });
 
-            // Filter functions matching pattern: "Pipeline" followed by exactly 3 digits
-            const pattern = /^Pipeline\d{3}$/;
-            const matchingFunctions = functions.filter(f => pattern.test(f.name));
-            testLogger.info('Found functions matching cleanup pattern', { count: matchingFunctions.length });
+            // Filter functions matching patterns:
+            // 1. "Pipeline" followed by 2 or 3 digits
+            // 2. "first" followed by 2 or 3 digits
+            // 3. "second" followed by 2 or 3 digits
+            const patterns = [
+                /^Pipeline\d{2,3}$/,
+                /^first\d{2,3}$/,
+                /^second\d{2,3}$/
+            ];
+            const matchingFunctions = functions.filter(f =>
+                patterns.some(pattern => pattern.test(f.name))
+            );
+            testLogger.info('Found functions matching cleanup patterns', { count: matchingFunctions.length });
 
             if (matchingFunctions.length === 0) {
                 testLogger.info('No functions to clean up');
@@ -821,6 +830,11 @@ class APICleanup {
             return true;
         }
 
+        // Pattern 4: sdr_* (SDR test streams)
+        if (streamName.startsWith('sdr_')) {
+            return true;
+        }
+
         // Pattern 4: Random 8-9 char lowercase strings
         // First check if it matches the basic pattern
         if (!/^[a-z]{8,9}$/.test(streamName)) {
@@ -889,6 +903,105 @@ class APICleanup {
 
         } catch (error) {
             testLogger.error('Streams cleanup failed', { error: error.message });
+        }
+    }
+
+    /**
+     * Fetch all pipeline destinations
+     * @returns {Promise<Array>} Array of pipeline destination objects
+     */
+    async fetchPipelineDestinations() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/alerts/destinations?page_num=1&page_size=100000&sort_by=name&desc=false&module=pipeline`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to fetch pipeline destinations', { status: response.status });
+                return [];
+            }
+
+            const destinations = await response.json();
+            return destinations;
+        } catch (error) {
+            testLogger.error('Failed to fetch pipeline destinations', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Delete a pipeline destination
+     * @param {string} name - Name of the destination to delete
+     * @returns {Promise<Object>} Delete result with code and message
+     */
+    async deletePipelineDestination(name) {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/alerts/destinations/${name}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const result = await response.json();
+            return { code: response.status, ...result };
+        } catch (error) {
+            testLogger.error('Failed to delete pipeline destination', { name, error: error.message });
+            return { code: 500, message: error.message };
+        }
+    }
+
+    /**
+     * Clean up all pipeline destinations matching test patterns
+     * Deletes destinations starting with "destination" followed by 2-3 digits
+     */
+    async cleanupPipelineDestinations() {
+        testLogger.info('Starting pipeline destinations cleanup');
+
+        try {
+            // Fetch all pipeline destinations
+            const destinations = await this.fetchPipelineDestinations();
+            testLogger.info('Fetched pipeline destinations', { total: destinations.length });
+
+            // Filter destinations matching pattern: "destination" followed by 2-3 digits
+            const pattern = /^destination\d{2,3}$/;
+            const matchingDestinations = destinations.filter(d => pattern.test(d.name));
+            testLogger.info('Found pipeline destinations matching cleanup pattern', { count: matchingDestinations.length });
+
+            if (matchingDestinations.length === 0) {
+                testLogger.info('No pipeline destinations to clean up');
+                return;
+            }
+
+            // Delete each destination
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const destination of matchingDestinations) {
+                const result = await this.deletePipelineDestination(destination.name);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.debug('Deleted pipeline destination', { name: destination.name });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete pipeline destination', { name: destination.name, result });
+                }
+            }
+
+            testLogger.info('Pipeline destinations cleanup completed', {
+                total: matchingDestinations.length,
+                deleted: deletedCount,
+                failed: failedCount
+            });
+
+        } catch (error) {
+            testLogger.error('Pipeline destinations cleanup failed', { error: error.message });
         }
     }
 
@@ -1100,6 +1213,156 @@ class APICleanup {
 
         } catch (error) {
             testLogger.error('Users cleanup failed', { error: error.message });
+        }
+    }
+
+    /**
+     * Clean up regex patterns that match test data
+     * Deletes patterns whose names appear in test data files:
+     * - tests/test-data/regex_patterns_import.json
+     * - tests/test-data/sdr_test_data.json
+     */
+    async cleanupRegexPatterns() {
+        testLogger.info('Starting regex patterns cleanup');
+
+        try {
+            // Fetch all regex patterns
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/re_patterns`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            // Handle 404 or other errors gracefully (feature may not be available in OSS)
+            if (!response.ok) {
+                if (response.status === 404) {
+                    testLogger.info('Regex patterns endpoint not available (OSS edition or feature not enabled)');
+                } else {
+                    testLogger.warn('Failed to fetch regex patterns', { status: response.status });
+                }
+                return;
+            }
+
+            const data = await response.json();
+            const patterns = data.patterns || [];
+            testLogger.info('Fetched regex patterns', { total: patterns.length });
+
+            if (patterns.length === 0) {
+                testLogger.info('No regex patterns found');
+                return;
+            }
+
+            // Load test data pattern names
+            const regexPatternsImport = require('../../test-data/regex_patterns_import.json');
+            const sdrTestData = require('../../test-data/sdr_test_data.json');
+
+            // Collect all pattern names from test data
+            const testPatternNames = new Set();
+
+            // From regex_patterns_import.json
+            regexPatternsImport.forEach(pattern => {
+                testPatternNames.add(pattern.name);
+            });
+
+            // From sdr_test_data.json
+            if (sdrTestData.regexPatterns) {
+                sdrTestData.regexPatterns.forEach(pattern => {
+                    testPatternNames.add(pattern.name);
+                });
+            }
+
+            testLogger.info('Loaded test pattern names', { count: testPatternNames.size });
+
+            // Filter patterns that match test data names
+            const matchingPatterns = patterns.filter(pattern => testPatternNames.has(pattern.name));
+            testLogger.info('Found patterns matching test data', { count: matchingPatterns.length });
+
+            if (matchingPatterns.length === 0) {
+                testLogger.info('No regex patterns to clean up');
+                return;
+            }
+
+            // Delete each matching pattern
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const pattern of matchingPatterns) {
+                try {
+                    const deleteResponse = await fetch(`${this.baseUrl}/api/${this.org}/re_patterns/${pattern.id}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': this.authHeader,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (deleteResponse.ok) {
+                        deletedCount++;
+                        testLogger.debug('Deleted regex pattern', { name: pattern.name, id: pattern.id });
+                    } else {
+                        failedCount++;
+                        testLogger.warn('Failed to delete regex pattern', {
+                            name: pattern.name,
+                            id: pattern.id,
+                            status: deleteResponse.status
+                        });
+                    }
+                } catch (error) {
+                    failedCount++;
+                    testLogger.error('Error deleting regex pattern', {
+                        name: pattern.name,
+                        id: pattern.id,
+                        error: error.message
+                    });
+                }
+            }
+
+            testLogger.info('Regex patterns cleanup completed', {
+                total: matchingPatterns.length,
+                deleted: deletedCount,
+                failed: failedCount
+            });
+
+        } catch (error) {
+            testLogger.error('Regex patterns cleanup failed', { error: error.message });
+        }
+    }
+
+    /**
+     * Clean up custom logo from _meta organization
+     * Deletes the custom logo via DELETE API call
+     */
+    async cleanupLogo() {
+        testLogger.info('Starting logo cleanup');
+
+        try {
+            const response = await fetch(`${this.baseUrl}/api/_meta/settings/logo`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to delete logo', { status: response.status });
+                return { successful: 'false', status: response.status };
+            }
+
+            const result = await response.json();
+
+            if (result.successful === 'true') {
+                testLogger.info('Logo cleanup completed successfully');
+            } else {
+                testLogger.warn('Logo cleanup returned unexpected result', { result });
+            }
+
+            return result;
+        } catch (error) {
+            testLogger.error('Logo cleanup failed', { error: error.message });
+            return { successful: 'false', error: error.message };
         }
     }
 

@@ -18,22 +18,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div>
     <div class="tags-title text-bold q-ml-xs">Tags</div>
     <div class="row items-center">
-      <div class="q-mr-lg row items-center">
+      <div class="q-mr-lg items-center">
         <img
           :src="ip"
           alt="IP"
-          class="col-6 q-mr-sm"
-          style="height: 30px; width: 30px"
+          class="q-mr-sm inline-block !tw-w-[1.875rem] !tw-h-auto"
         />
-        <div class="q-pl-xs">{{ error.ip }}</div>
+        <div class="inline-block">
+          <div class="q-pl-xs">IP</div>
+          <span class="q-pl-xs"> {{ error.ip }} </span>
+        </div>
       </div>
       <q-separator vertical />
       <div class="q-mx-lg items-center">
         <img
           :src="browserIcon"
           alt="Chrome"
-          class="q-mr-md inline-block"
-          style="height: auto; width: 30px"
+          class="q-mr-md inline-block tw-h-auto tw-w-[1.875rem]"
         />
         <div class="inline-block">
           <div class="q-pl-xs">{{ error.user_agent_user_agent_family }}</div>
@@ -45,8 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <img
           :src="osIcon"
           alt="OS"
-          class="q-mr-md inline-block"
-          style="height: auto; width: 30px"
+          class="q-mr-md inline-block tw-h-auto tw-w-[1.875rem]"
         />
         <div class="inline-block">
           <div class="q-pl-xs">{{ error.user_agent_os_family }}</div>

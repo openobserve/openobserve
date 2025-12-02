@@ -260,7 +260,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             query_took: None,
             scheduler_trace_id: None,
             time_in_queue_ms: None,
-            skipped_alerts_count: None,
+            ..Default::default()
         };
         match alert.send_notification(val, now, None, now).await {
             Err(e) => {
@@ -321,7 +321,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
     }
 
     for trigger_data_stream in trigger_usage_reports {
-        publish_triggers_usage(trigger_data_stream).await;
+        publish_triggers_usage(trigger_data_stream);
     }
 }
 

@@ -283,8 +283,8 @@ fn generate_result_path(
         month = datetime.month(),
         day = datetime.day(),
         trace_id = trace_id,
-        partition_id = if partition_id.is_some() {
-            partition_id.unwrap().to_string()
+        partition_id = if let Some(partition_id) = partition_id {
+            partition_id.to_string()
         } else {
             "final".to_string()
         }

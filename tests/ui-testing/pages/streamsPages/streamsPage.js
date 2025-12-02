@@ -144,16 +144,16 @@ export class StreamsPage {
             await this.page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
         } catch (error) {
             console.warn('Retry clicking streams menu:', error.message);
-            await this.page.waitForTimeout(2000);
+            await this.waitForUI(2000);
             await this.page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
         }
-        await this.page.waitForTimeout(1000);
+        await this.waitForUI(1000);
     }
 
     async searchStream(streamName) {
         await this.page.getByPlaceholder("Search Stream").click();
         await this.page.getByPlaceholder("Search Stream").fill(streamName);
-        await this.page.waitForTimeout(3000);
+        await this.waitForUI(3000);
     }
 
     async verifyStreamNameVisibility(streamName) {
@@ -164,7 +164,7 @@ export class StreamsPage {
         const streamButton = this.page.getByRole("button", { name: 'Explore' });
         await expect(streamButton).toBeVisible();
         await streamButton.click({ force: true });
-        await this.page.waitForTimeout(1000);
+        await this.waitForUI(1000);
     }
 
     async verifyStreamExploration() {
@@ -173,7 +173,7 @@ export class StreamsPage {
 
     async goBack() {
         await this.page.goBack();
-        await this.page.waitForTimeout(1000);
+        await this.waitForUI(1000);
     }
 
     // Ingestion methods - delegate to IngestionPage
@@ -250,5 +250,207 @@ export class StreamsPage {
 
     async streamsURLValidation() {
         await expect(this.page).toHaveURL(/streams/);
+    }
+
+    // Stream Settings Methods (minimal set for stream-settings.spec.js)
+    async expectStreamExistsExact(streamName) {
+        await expect(this.page.getByRole('cell', { name: streamName, exact: true })).toBeVisible();
+    }
+
+    async openStreamDetail(streamName) {
+        await this.page.getByRole('button', { name: 'Stream Detail' }).first().click();
+    }
+
+    async searchForField(fieldName) {
+        await this.page.locator('[data-test="schema-field-search-input"]').click();
+        await this.page.locator('[data-test="schema-field-search-input"]').fill(fieldName);
+    }
+
+    async selectFullTextSearch() {
+        // Open dropdown first
+        await this.page.locator('[data-test="schema-stream-index-select"] div').filter({ hasText: 'arrow_drop_down' }).nth(1).click();
+        await this.waitForUI(500);
+        
+        // Then select Full text search option
+        await this.page.locator('div').filter({ hasText: /^Full text search$/ }).nth(1).click();
+    }
+
+    async selectSecondaryIndex() {
+        // Dropdown stays open after first selection, so just select the option
+        await this.page.getByText('Secondary index').click();
+    }
+
+    async clickUpdateSettingsButton() {
+        await this.page.locator('[data-test="schema-update-settings-button"]').click();
+    }
+
+    async expectValidationErrorVisible() {
+        // Field-agnostic validation error - matches any field name
+        await expect(this.page.locator("text=/Field\\(s\\) '.*' cannot have/")).toBeVisible();
+    }
+
+    async verifyIndexTypeOptions() {
+        // Wait a bit for the page to load completely
+        await this.waitForUI(2000);
+        
+        try {
+            // Click the dropdown arrow to open the options
+            const dropdownArrow = this.page.locator('[data-test="schema-stream-index-select"] div').filter({ hasText: 'arrow_drop_down' }).nth(1);
+            await dropdownArrow.click({ timeout: 5000 });
+            console.log('✅ Clicked dropdown arrow');
+            
+            // Wait for dropdown to open
+            await this.waitForUI(1000);
+            
+            // Check if Full text search and Secondary index options are visible in the dropdown
+            const fullTextOption = this.page.locator('div').filter({ hasText: /^Full text search$/ }).nth(1);
+            const secondaryIndexOption = this.page.getByText('Secondary index');
+            
+            const options = [];
+            try {
+                if (await fullTextOption.isVisible({ timeout: 3000 })) {
+                    options.push('Full text search');
+                    console.log('✅ Found Full text search option');
+                }
+            } catch (e) {
+                console.log('⚠️  Full text search option not found');
+            }
+            
+            try {
+                if (await secondaryIndexOption.isVisible({ timeout: 3000 })) {
+                    options.push('Secondary index');
+                    console.log('✅ Found Secondary index option');
+                }
+            } catch (e) {
+                console.log('⚠️  Secondary index option not found');
+            }
+            
+            console.log(`Found ${options.length} options:`, options);
+            return options;
+            
+        } catch (error) {
+            console.log('⚠️  Error in verifyIndexTypeOptions:', error.message);
+            return [];
+        }
+    }
+
+    async clearIndexTypeSelection(indexType) {
+        if (indexType === 'Full text search') {
+            // When both are selected, UI shows "Secondary index, Full text" 
+            // We need to click the combined option first, then clear full text
+            try {
+                // First check if both are selected (combined state)
+                const combinedOption = this.page.getByText('Secondary index, Full text');
+                if (await combinedOption.isVisible({ timeout: 2000 })) {
+                    await this.page.locator('div').filter({ hasText: /^Full text search$/ }).nth(1).click();
+                    return;
+                }
+            } catch (e) {
+                // Fallback to individual clearing
+            }
+            
+            // Try individual selector
+            try {
+                const element = this.page.locator('tr:has-text("Full text search") .q-checkbox__inner');
+                if (await element.isVisible({ timeout: 1000 })) {
+                    await element.click();
+                }
+            } catch (e) {
+                // Continue silently
+            }
+        }
+        await this.waitForUI(1000);
+    }
+
+    // Extended Retention Methods
+    async navigateToExtendedRetention() {
+        // First open the stream detail view
+        await this.page.getByRole('button', { name: 'Stream Detail' }).first().click();
+        await this.waitForUI(2000);
+        
+        // Navigate to Extended Retention tab directly
+        await this.page.getByText('Extended Retention').click();
+        await this.waitForUI(1000);
+    }
+
+    async selectDateRange(startDay, endDay) {
+        await this.page.locator('[data-test="date-time-btn"]').click();
+        
+        // Wait for date picker to be visible
+        await this.page.locator('.q-date').waitFor({ state: 'visible' });
+        
+        // Ensure we're in the correct view (day view, not year/month view)
+        // If year view is visible, click on current year to go to month view
+        if (await this.page.locator('.q-date__view--years').isVisible()) {
+            const currentYear = new Date().getFullYear();
+            await this.page.locator('.q-date__years .q-btn').filter({ hasText: currentYear.toString() }).click();
+        }
+        
+        // If month view is visible, click on current month to go to day view  
+        if (await this.page.locator('.q-date__view--months').isVisible()) {
+            const currentMonth = new Date().toLocaleDateString('en', { month: 'short' });
+            await this.page.locator('.q-date__months .q-btn').filter({ hasText: currentMonth }).click();
+        }
+        
+        // Now we should be in day view, wait for calendar to be ready
+        await this.page.locator('.q-date__calendar').waitFor({ state: 'visible' });
+        await this.page.waitForTimeout(500); // Small wait for transitions
+        
+        // Use specific calendar locators to avoid strict mode violation
+        // Click start day with retry logic
+        try {
+            await this.page.locator('.q-date__calendar .q-btn').filter({ hasText: startDay.toString() }).first().click({ timeout: 5000 });
+        } catch (error) {
+            // Fallback: try to click any available day close to startDay
+            const availableDays = await this.page.locator('.q-date__calendar .q-btn').filter({ hasText: /^\d+$/ }).all();
+            if (availableDays.length > 0) {
+                await availableDays[0].click();
+            }
+        }
+        
+        // Wait a bit between clicks
+        await this.page.waitForTimeout(300);
+        
+        // Click end day with retry logic
+        try {
+            await this.page.locator('.q-date__calendar .q-btn').filter({ hasText: endDay.toString() }).first().click({ timeout: 5000 });
+        } catch (error) {
+            // Fallback: try to click any available day close to endDay
+            const availableDays = await this.page.locator('.q-date__calendar .q-btn').filter({ hasText: /^\d+$/ }).all();
+            if (availableDays.length > 1) {
+                await availableDays[1].click();
+            }
+        }
+        
+        await this.page.locator('[data-test="date-time-apply-btn"]').click();
+    }
+
+    async selectDateRangeForCurrentMonth() {
+        const currentDate = new Date();
+        const currentDay = currentDate.getDate();
+        
+        // Calculate a safe end day - ensure it's within the current month and not too far
+        const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+        const endDay = Math.min(currentDay + 3, daysInMonth - 1, 25); // Conservative approach - max 25th
+        
+        await this.selectDateRange(currentDay, endDay);
+        
+        // Return the date range text for later use
+        return `${currentDay.toString().padStart(2, '0')}-${(currentDate.getMonth() + 1).toString().padStart(2, '0')}-${currentDate.getFullYear()} ${endDay.toString().padStart(2, '0')}-${(currentDate.getMonth() + 1).toString().padStart(2, '0')}-${currentDate.getFullYear()}`;
+    }
+
+    async deleteRetentionPeriod(dateRangeText) {
+        // Select the checkbox for deletion
+        await this.page.getByRole('row', { name: dateRangeText }).locator('[data-test="schema-stream-delete-undefined-field-fts-key-checkbox"]').click();
+        await this.page.locator('[data-test="schema-delete-button"]').click();
+        await this.page.locator('[data-test="confirm-button"]').click();
+    }
+
+    async expectStreamSettingsUpdatedMessage() {
+        await expect(this.page.getByText('Stream settings updated')).toBeVisible();
+    }
+
+    async waitForUI(milliseconds) {
+        await this.page.waitForTimeout(milliseconds);
     }
 } 

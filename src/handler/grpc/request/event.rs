@@ -46,7 +46,7 @@ impl Event for Eventer {
         let start = std::time::Instant::now();
         let parent_cx =
             global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(req.metadata())));
-        tracing::Span::current().set_parent(parent_cx);
+        let _ = tracing::Span::current().set_parent(parent_cx);
 
         let req = req.get_ref();
         let grpc_addr = req.node_addr.clone();
@@ -308,7 +308,7 @@ mod tests {
     #[test]
     fn test_filter_deleted_items() {
         // Test filtering deleted items from FileList
-        let items = vec![
+        let items = [
             FileKey {
                 id: 1,
                 key: "test/file1.parquet".to_string(),

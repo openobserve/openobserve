@@ -64,6 +64,9 @@ pub struct Alert {
     pub row_template: String,
 
     #[serde(default)]
+    pub row_template_type: meta_alerts::alert::RowTemplateType,
+
+    #[serde(default)]
     pub description: String,
 
     #[serde(default)]
@@ -298,6 +301,7 @@ impl From<(meta_alerts::alert::Alert, Option<Trigger>)> for Alert {
             destinations: alert.destinations,
             context_attributes: alert.context_attributes,
             row_template: alert.row_template,
+            row_template_type: alert.row_template_type,
             description: alert.description,
             enabled: alert.enabled,
             tz_offset: alert.tz_offset,
@@ -450,6 +454,9 @@ impl From<meta_stream::StreamType> for StreamType {
             meta_stream::StreamType::Logs => Self::Logs,
             meta_stream::StreamType::Metrics => Self::Metrics,
             meta_stream::StreamType::Traces => Self::Traces,
+            meta_stream::StreamType::ServiceGraph => Self::Metadata, // ServiceGraph not
+            // alertable, map to
+            // Metadata
             meta_stream::StreamType::EnrichmentTables => Self::EnrichmentTables,
             meta_stream::StreamType::Filelist => Self::Filelist,
             meta_stream::StreamType::Metadata => Self::Metadata,
@@ -475,6 +482,7 @@ impl From<Alert> for meta_alerts::alert::Alert {
         alert.destinations = value.destinations;
         alert.context_attributes = value.context_attributes;
         alert.row_template = value.row_template;
+        alert.row_template_type = value.row_template_type;
         alert.description = value.description;
         alert.enabled = value.enabled;
         alert.tz_offset = value.tz_offset;

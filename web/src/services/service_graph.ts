@@ -17,17 +17,14 @@ import http from "./http";
 
 const serviceGraphService = {
   /**
-   * Get service graph metrics in Prometheus format
+   * Get current service graph topology in JSON format
+   * Stream-only implementation - NO in-memory metrics
+   * @param orgId - Organization ID
+   * @param streamName - Optional stream name to filter topology
    */
-  getMetrics: (orgId: string) => {
-    return http().get(`/api/${orgId}/traces/service_graph/metrics`);
-  },
-
-  /**
-   * Get service graph store statistics
-   */
-  getStats: (orgId: string) => {
-    return http().get(`/api/${orgId}/traces/service_graph/stats`);
+  getCurrentTopology: (orgId: string, streamName?: string) => {
+    const params = streamName && streamName !== 'all' ? { stream_name: streamName } : {};
+    return http().get(`/api/${orgId}/traces/service_graph/topology/current`, { params });
   },
 };
 

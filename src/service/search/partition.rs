@@ -16,6 +16,8 @@
 use std::cmp::max;
 
 use config::meta::sql::OrderBy;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::search::cache::streaming_agg::StreamingAggsPartitionStrategy;
 
 /// Generates partitions for search queries
 pub struct PartitionGenerator {
@@ -43,9 +45,13 @@ impl PartitionGenerator {
     /// * `start_time` - Start time in microseconds
     /// * `end_time` - End time in microseconds
     /// * `step` - Regular partition step size in microseconds
+    /// * `order_by` - Sort order for partitions
+    /// * `is_aggregate` - Whether this is an aggregate query
+    /// * `add_mini_partition` - Whether to add a mini partition for faster initial results
+    /// * `cache_strategy` - Optional cache-aware partition strategy (enterprise only)
     ///
     /// # Returns
-    /// Vector of [start, end] time ranges in microseconds, in DESC order
+    /// Vector of [start, end] time ranges in microseconds
     #[allow(clippy::too_many_arguments)]
     pub fn generate_partitions(
         &self,
@@ -54,20 +60,18 @@ impl PartitionGenerator {
         step: i64,
         order_by: OrderBy,
         is_aggregate: bool,
-        _is_streaming_aggregate: bool,
-        _streaming_interval_micros: i64,
         add_mini_partition: bool,
+        #[cfg(feature = "enterprise")] streaming_aggs_cache_strategy: Option<
+            StreamingAggsPartitionStrategy,
+        >,
     ) -> Vec<[i64; 2]> {
+        // If cache-aware strategy is provided, use it (enterprise only)
         #[cfg(feature = "enterprise")]
-        if _is_streaming_aggregate {
-            return self.generate_partitions_with_streaming_aggregate_partition_window(
-                start_time,
-                end_time,
-                _streaming_interval_micros,
-                order_by,
-            );
+        if let Some(strategy) = streaming_aggs_cache_strategy {
+            return strategy.to_time_partitions(order_by);
         }
 
+        // Otherwise, use standard partition generation logic
         if self.is_histogram {
             self.generate_partitions_aligned_with_histogram_interval(
                 start_time,
@@ -141,37 +145,6 @@ impl PartitionGenerator {
         }
 
         self.handle_empty_partitions(&mut partitions, start_time, end_time);
-        partitions
-    }
-
-    #[cfg(feature = "enterprise")]
-    fn generate_partitions_with_streaming_aggregate_partition_window(
-        &self,
-        start_time: i64,
-        end_time: i64,
-        interval_micros: i64,
-        order_by: OrderBy,
-    ) -> Vec<[i64; 2]> {
-        // Generate partitions by DESC order
-        let mut end_window = end_time - (end_time % interval_micros);
-
-        let mut partitions = Vec::new();
-
-        // Only add the first partition if it's not empty (end_time != end_window_hour)
-        if end_time != end_window {
-            partitions.push([end_window, end_time]);
-        }
-
-        while end_window > start_time {
-            let start = std::cmp::max(end_window - interval_micros, start_time);
-            partitions.push([start, end_window]);
-            end_window = start;
-        }
-
-        if order_by == OrderBy::Asc {
-            partitions.reverse();
-        }
-
         partitions
     }
 
@@ -417,9 +390,9 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            false,
-            0,
             false, // add_mini_partition = false
+            #[cfg(feature = "enterprise")]
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -445,9 +418,9 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            false,
-            0,
             false, // add_mini_partition = false
+            #[cfg(feature = "enterprise")]
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -489,9 +462,9 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            false,
-            0,
             false, // add_mini_partition = false
+            #[cfg(feature = "enterprise")]
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -519,9 +492,9 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            false,
-            0,
             false, // add_mini_partition = false
+            #[cfg(feature = "enterprise")]
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -564,9 +537,9 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            false,
-            0,
             false, // add_mini_partition = false
+            #[cfg(feature = "enterprise")]
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -594,9 +567,9 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            false,
-            0,
             false, // add_mini_partition = false
+            #[cfg(feature = "enterprise")]
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -617,7 +590,7 @@ mod tests {
     #[test]
     fn test_partition_generator_with_histogram_alignment_no_mini_partition_with_uneven_time_range_2()
      {
-        let start_time = 1746073920000000; // Thursday, May 1, 2025 at 10:02:00 AM GMT+5:30 
+        let start_time = 1746073920000000; // Thursday, May 1, 2025 at 10:02:00 AM GMT+5:30
         let end_time = 1746074820000000; // Thursday, May 1, 2025 at 10:17:00 AM GMT+5:30
         let min_step_seconds = 300; // 5 minutes in seconds
         let min_step = min_step_seconds * 1_000_000; // 5 minutes in microseconds
@@ -637,9 +610,9 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            false,
-            0,
             false, // add_mini_partition = false
+            #[cfg(feature = "enterprise")]
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -667,9 +640,9 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            false,
-            0,
             false, // add_mini_partition = false
+            #[cfg(feature = "enterprise")]
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -690,7 +663,7 @@ mod tests {
 
     #[test]
     fn test_partition_generator_with_histogram_alignment_mini_partition_with_uneven_time_range_2() {
-        let start_time = 1746073920000000; // Thursday, May 1, 2025 at 10:02:00 AM GMT+5:30 
+        let start_time = 1746073920000000; // Thursday, May 1, 2025 at 10:02:00 AM GMT+5:30
         let end_time = 1746074820000000; // Thursday, May 1, 2025 at 10:17:00 AM GMT+5:30
         let min_step_seconds = 300; // 5 minutes in seconds
         let min_step = min_step_seconds * 1_000_000; // 5 minutes in microseconds
@@ -710,9 +683,9 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            false,
-            0,
             true, // add_mini_partition = true
+            #[cfg(feature = "enterprise")]
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -741,9 +714,9 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            false,
-            0,
             true, // add_mini_partition = true
+            #[cfg(feature = "enterprise")]
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -789,9 +762,9 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            false,
-            0,
             true, // add_mini_partition = true
+            #[cfg(feature = "enterprise")]
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -817,9 +790,9 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            false,
-            0,
             true, // add_mini_partition = true
+            #[cfg(feature = "enterprise")]
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -862,9 +835,9 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            false,
-            0,
             true, // add_mini_partition = true
+            #[cfg(feature = "enterprise")]
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -893,9 +866,9 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            false,
-            0,
             true, // add_mini_partition = true
+            #[cfg(feature = "enterprise")]
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -921,7 +894,7 @@ mod tests {
     #[test]
     fn test_partition_generator_with_histogram_alignment_and_mini_partition_with_step_greater_than_query_duration()
      {
-        let start_time = 1746073920000000; // Thursday, May 1, 2025 at 10:02:00 AM GMT+5:30 
+        let start_time = 1746073920000000; // Thursday, May 1, 2025 at 10:02:00 AM GMT+5:30
         let end_time = 1746161220000000; // Friday, May 2, 2025 at 10:17:00 AM GMT+5:30
         let min_step_seconds = 3600; // 60 minutes in seconds
         let min_step = min_step_seconds * 1_000_000; // 30 minutes in microseconds
@@ -941,9 +914,9 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            false,
-            0,
             true, // add_mini_partition = true
+            #[cfg(feature = "enterprise")]
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -970,9 +943,9 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            false,
-            0,
             true, // add_mini_partition = true
+            #[cfg(feature = "enterprise")]
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -996,7 +969,7 @@ mod tests {
     #[test]
     fn test_partition_generator_with_histogram_alignment_and_mini_partition_with_step_greater_than_query_duration_bug()
      {
-        let start_time = 1752568628000000; // Thursday, May 1, 2025 at 10:02:00 AM GMT+5:30 
+        let start_time = 1752568628000000; // Thursday, May 1, 2025 at 10:02:00 AM GMT+5:30
         let end_time = 1752741428000000; // Friday, May 2, 2025 at 10:17:00 AM GMT+5:30
         let min_step_seconds = 18000; // 300 minutes in seconds
         let min_step = min_step_seconds * 1_000_000; // 30 minutes in microseconds
@@ -1016,9 +989,9 @@ mod tests {
             step,
             OrderBy::Desc,
             false,
-            false,
-            0,
             true, // add_mini_partition = true
+            #[cfg(feature = "enterprise")]
+            None,
         );
 
         print_partitions("Input", &[[start_time, end_time]]);
@@ -1038,9 +1011,9 @@ mod tests {
             step,
             OrderBy::Asc,
             false,
-            false,
-            0,
             true, // add_mini_partition = true
+            #[cfg(feature = "enterprise")]
+            None,
         );
 
         println!("partitions: {partitions:#?}");
@@ -1072,17 +1045,14 @@ mod enterprise_tests {
         let generator = PartitionGenerator::new(min_step, mini_partition_duration_secs, false);
         let step = 300000000; // 5 minutes
 
-        let interval = 3600000000;
-
         let partitions = generator.generate_partitions(
             start_time,
             end_time,
             step,
             OrderBy::Desc,
             true,
-            true,
-            interval,
             false,
+            None,
         );
 
         let mut expected_partitions = vec![
@@ -1100,9 +1070,8 @@ mod enterprise_tests {
             step,
             OrderBy::Asc,
             true,
-            true,
-            interval,
             false,
+            None,
         );
         expected_partitions.reverse();
         assert_eq!(partitions_asc, expected_partitions);
@@ -1121,17 +1090,14 @@ mod enterprise_tests {
         let generator = PartitionGenerator::new(min_step, mini_partition_duration_secs, false);
         let step = 300000000; // 5 minutes
 
-        let interval = 3600000000;
-
         let partitions = generator.generate_partitions(
             start_time,
             end_time,
             step,
             OrderBy::Desc,
             true,
-            true,
-            interval,
             false,
+            None,
         );
 
         // Verify no empty partitions exist

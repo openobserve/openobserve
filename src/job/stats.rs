@@ -59,6 +59,8 @@ fn file_list_update_stats() -> Option<tokio::task::JoinHandle<()>> {
     ))
 }
 
+// For enterprise with super cluster enabled, we need to wait one round before starting this job
+// For OSS version, we will cache the stats first
 async fn cache_stream_stats() -> Option<tokio::task::JoinHandle<()>> {
     if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_compactor() {
         return None;
@@ -90,7 +92,8 @@ async fn cache_stream_stats() -> Option<tokio::task::JoinHandle<()>> {
             } else {
                 log::debug!("[STATS] run cached stream stats success");
             }
-        }
+        },
+        sleep_after
     ))
 }
 

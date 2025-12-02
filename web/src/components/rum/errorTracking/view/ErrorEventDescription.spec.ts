@@ -84,7 +84,7 @@ describe("ErrorEventDescription Component", () => {
 
     it("should display error message with correct font size", () => {
       const span = wrapper.find(".description span");
-      expect(span.attributes("style")).toContain("font-size: 14px");
+      expect(span.classes()).toContain("tw-text-[0.875rem]");
     });
 
     it("should handle different error messages", async () => {
@@ -175,7 +175,7 @@ describe("ErrorEventDescription Component", () => {
       expect(method.exists()).toBe(true);
       expect(method.text()).toBe("DELETE");
       expect(method.classes()).toContain("q-pr-sm");
-      expect(method.attributes("style")).toContain("font-size: 12px");
+      expect(method.classes()).toContain("tw-text-[0.75rem]");
     });
   });
 

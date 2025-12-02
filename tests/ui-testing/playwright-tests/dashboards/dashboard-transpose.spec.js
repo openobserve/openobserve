@@ -6,6 +6,7 @@ const {
 import PageManager from "../../pages/page-manager";
 import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
+import { waitForStreamComplete, waitForTableWithData } from "../utils/streaming-helpers.js";
 const testLogger = require('../utils/test-logger.js');
 
 const randomDashboardName =
@@ -31,6 +32,9 @@ test.describe("dashboard UI testcases", () => {
     // Navigate to the dashboards list
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
+
+    // Wait for dashboard UI to be fully stable
+    await pm.dashboardCreate.waitForDashboardUIStable();
 
     // Create a new dashboard and add a panel
     await pm.dashboardCreate.createDashboard(randomDashboardName);
@@ -70,6 +74,9 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
+     // Wait for dashboard UI to be fully stable
+     await pm.dashboardCreate.waitForDashboardUIStable();
+
     // Create a new dashboard and add a panel
     await pm.dashboardCreate.createDashboard(randomDashboardName);
     await pm.dashboardCreate.addPanel();
@@ -81,9 +88,15 @@ test.describe("dashboard UI testcases", () => {
       "kubernetes_container_name",
       "y"
     );
-    // Apply chart and wait for API completion
+
+    // Apply chart and wait for streaming to complete
+    const initialStreamPromise = waitForStreamComplete(page);
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await initialStreamPromise;
     await pm.chartTypeSelector.waitForTableDataLoad();
+
+    // Wait for table to have data before capturing
+    await waitForTableWithData(page);
 
     // Store initial data (before transpose)
     const initialTableData = await captureTableData(page);
@@ -92,10 +105,15 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardPanelConfigs.openConfigPanel();
     await pm.dashboardPanelConfigs.selectTranspose();
 
-    // Apply transpose and wait for chart to render
+    // Apply transpose and wait for streaming to complete
+    const transposedStreamPromise = waitForStreamComplete(page);
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await transposedStreamPromise;
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.chartTypeSelector.waitForTableDataLoad();
+
+    // Wait for table to have data before capturing
+    await waitForTableWithData(page);
 
     // Store transposed data after rendering is complete
     const transposedTableData = await captureTableData(page);
@@ -125,11 +143,27 @@ test.describe("dashboard UI testcases", () => {
             .filter((row) => row.length > 0 && row.some((cell) => cell !== ""))
       );
 
+      // Log captured data for debugging
+      testLogger.info(`Captured ${data.length} rows with ${headers.length} headers`);
+      if (data.length > 0) {
+        testLogger.info(`First row has ${data[0].length} cells`);
+      }
+
       return { headers, data };
     }
 
     // Helper function to verify transpose is working correctly
     function verifyTransposeWorking(initialData, transposedData) {
+      // Log data for debugging
+      testLogger.info(`Initial data: ${initialData.data.length} rows, ${initialData.headers.length} headers`);
+      testLogger.info(`Initial headers: ${JSON.stringify(initialData.headers)}`);
+      testLogger.info(`Transposed data: ${transposedData.data.length} rows`);
+      testLogger.info(`Transposed headers: ${JSON.stringify(transposedData.headers)}`);
+
+      if (transposedData.data.length > 0) {
+        testLogger.info(`Transposed first row has ${transposedData.data[0].length} cells: ${JSON.stringify(transposedData.data[0])}`);
+      }
+
       // Verify that transposed data exists
       expect(transposedData.data.length).toBeGreaterThan(0);
 
@@ -145,11 +179,25 @@ test.describe("dashboard UI testcases", () => {
       const expectedFieldName = initialData.headers.slice(1)[0]; // Get first data header (excluding first column)
       const transposedFieldNames = transposedData.data.map((row) => row[0]);
 
+      testLogger.info(`Expected field name: ${expectedFieldName}`);
+      testLogger.info(`Transposed field names: ${JSON.stringify(transposedFieldNames)}`);
+
       expect(transposedFieldNames).toContain(expectedFieldName);
 
       // Verify that transpose actually changed the structure
       // Initial should have more columns, transposed should have 2 main columns
       expect(initialData.headers.length).toBeGreaterThanOrEqual(2);
+
+      // Verify first row has at least 2 cells
+      if (!transposedData.data[0] || transposedData.data[0].length < 2) {
+        testLogger.error(`Transposed table first row issue:`);
+        testLogger.error(`  - First row exists: ${!!transposedData.data[0]}`);
+        testLogger.error(`  - First row length: ${transposedData.data[0]?.length || 0}`);
+        testLogger.error(`  - First row content: ${JSON.stringify(transposedData.data[0] || [])}`);
+        testLogger.error(`  - All transposed data: ${JSON.stringify(transposedData.data)}`);
+      }
+
+      expect(transposedData.data[0]).toBeDefined();
       expect(transposedData.data[0].length).toBeGreaterThanOrEqual(2);
     }
 
@@ -172,6 +220,9 @@ test.describe("dashboard UI testcases", () => {
     // Navigate to the dashboards list
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
+
+     // Wait for dashboard UI to be fully stable
+     await pm.dashboardCreate.waitForDashboardUIStable();
 
     // Create a new dashboard and add a panel
     await pm.dashboardCreate.createDashboard(randomDashboardName);
@@ -220,6 +271,8 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
+     // Wait for dashboard UI to be fully stable
+     await pm.dashboardCreate.waitForDashboardUIStable();
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
 
@@ -264,6 +317,9 @@ test.describe("dashboard UI testcases", () => {
     // Navigate to the dashboards list
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
+
+     // Wait for dashboard UI to be fully stable
+     await pm.dashboardCreate.waitForDashboardUIStable();
 
     // Create a new dashboard and add a panel
     await pm.dashboardCreate.createDashboard(randomDashboardName);

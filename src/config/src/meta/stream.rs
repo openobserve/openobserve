@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, fmt::Display, str::FromStr};
+use std::{cmp::max, fmt::Display, str::FromStr, sync::Arc};
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use hashbrown::HashMap;
@@ -27,7 +27,7 @@ use crate::{
     meta::self_reporting::usage::Stats,
     utils::{
         hash::{Sum64, gxhash},
-        json::{self, Map, Value},
+        json::{self, Value},
     },
 };
 
@@ -106,10 +106,11 @@ impl PartialEq for DataField {
     }
 }
 
-pub const ALL_STREAM_TYPES: [StreamType; 7] = [
+pub const ALL_STREAM_TYPES: [StreamType; 8] = [
     StreamType::Logs,
     StreamType::Metrics,
     StreamType::Traces,
+    StreamType::ServiceGraph,
     StreamType::EnrichmentTables,
     StreamType::Filelist,
     StreamType::Metadata,
@@ -123,6 +124,8 @@ pub enum StreamType {
     Logs,
     Metrics,
     Traces,
+    #[serde(rename = "service_graph")]
+    ServiceGraph,
     #[serde(rename = "enrichment_tables")]
     EnrichmentTables,
     #[serde(rename = "file_list")]
@@ -151,6 +154,7 @@ impl StreamType {
             StreamType::Logs => "logs",
             StreamType::Metrics => "metrics",
             StreamType::Traces => "traces",
+            StreamType::ServiceGraph => "service_graph",
             StreamType::EnrichmentTables => "enrichment_tables",
             StreamType::Filelist => "file_list",
             StreamType::Metadata => "metadata",
@@ -165,6 +169,7 @@ impl From<&str> for StreamType {
             "logs" => StreamType::Logs,
             "metrics" => StreamType::Metrics,
             "traces" => StreamType::Traces,
+            "service_graph" => StreamType::ServiceGraph,
             "enrichment_tables" | "enrich" => StreamType::EnrichmentTables,
             "file_list" => StreamType::Filelist,
             "metadata" => StreamType::Metadata,
@@ -186,6 +191,7 @@ impl std::fmt::Display for StreamType {
             StreamType::Logs => write!(f, "logs"),
             StreamType::Metrics => write!(f, "metrics"),
             StreamType::Traces => write!(f, "traces"),
+            StreamType::ServiceGraph => write!(f, "service_graph"),
             StreamType::EnrichmentTables => write!(f, "enrichment_tables"),
             StreamType::Filelist => write!(f, "file_list"),
             StreamType::Metadata => write!(f, "metadata"),
@@ -259,7 +265,7 @@ pub struct FileKey {
     pub key: String,
     pub meta: FileMeta,
     pub deleted: bool,
-    pub segment_ids: Option<BitVec>,
+    pub segment_ids: Option<Arc<BitVec>>,
 }
 
 impl FileKey {
@@ -286,7 +292,7 @@ impl FileKey {
     }
 
     pub fn with_segment_ids(&mut self, segment_ids: BitVec) {
-        self.segment_ids = Some(segment_ids);
+        self.segment_ids = Some(Arc::new(segment_ids));
     }
 }
 
@@ -335,7 +341,7 @@ pub struct FileListDeleted {
     pub flattened: bool,
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Serialize, Debug, Default, Clone, PartialEq)]
 pub enum QueryPartitionStrategy {
     #[default]
     FileNum,
@@ -1172,127 +1178,6 @@ impl Display for StreamPartitionType {
 pub struct PartitioningDetails {
     pub partition_keys: Vec<StreamPartition>,
     pub partition_time_level: Option<PartitionTimeLevel>,
-}
-
-// Code Duplicated from alerts
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct RoutingCondition {
-    pub column: String,
-    pub operator: Operator,
-    #[schema(value_type = Object)]
-    pub value: Value,
-    #[serde(default)]
-    pub ignore_case: bool,
-}
-// Code Duplicated from alerts
-impl RoutingCondition {
-    pub fn evaluate(&self, row: &Map<String, Value>) -> bool {
-        let val = match row.get(&self.column) {
-            Some(val) => val,
-            None => {
-                // field not found -> dropped
-                return false;
-            }
-        };
-        match val {
-            Value::String(v) => {
-                let val = v.as_str();
-                let con_val = self.value.as_str().unwrap_or_default().trim_matches('"'); // "" is interpreted as empty string
-                match self.operator {
-                    Operator::EqualTo => val == con_val,
-                    Operator::NotEqualTo => val != con_val,
-                    Operator::GreaterThan => val > con_val,
-                    Operator::GreaterThanEquals => val >= con_val,
-                    Operator::LessThan => val < con_val,
-                    Operator::LessThanEquals => val <= con_val,
-                    Operator::Contains => val.contains(con_val),
-                    Operator::NotContains => !val.contains(con_val),
-                }
-            }
-            Value::Number(_) => {
-                let val = val.as_f64().unwrap_or_default();
-                let con_val = if self.value.is_number() {
-                    self.value.as_f64().unwrap_or_default()
-                } else {
-                    self.value
-                        .as_str()
-                        .unwrap_or_default()
-                        .parse()
-                        .unwrap_or_default()
-                };
-                match self.operator {
-                    Operator::EqualTo => val == con_val,
-                    Operator::NotEqualTo => val != con_val,
-                    Operator::GreaterThan => val > con_val,
-                    Operator::GreaterThanEquals => val >= con_val,
-                    Operator::LessThan => val < con_val,
-                    Operator::LessThanEquals => val <= con_val,
-                    _ => false,
-                }
-            }
-            Value::Bool(v) => {
-                let val = v.to_owned();
-                let con_val = if self.value.is_boolean() {
-                    self.value.as_bool().unwrap_or_default()
-                } else {
-                    self.value
-                        .as_str()
-                        .unwrap_or_default()
-                        .parse()
-                        .unwrap_or_default()
-                };
-                match self.operator {
-                    Operator::EqualTo => val == con_val,
-                    Operator::NotEqualTo => val != con_val,
-                    _ => false,
-                }
-            }
-            Value::Null => {
-                matches!(self.operator, Operator::EqualTo)
-                    && matches!(&self.value, Value::String(v) if v == "null")
-            }
-            _ => false,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub enum Operator {
-    #[serde(rename = "=")]
-    EqualTo,
-    #[serde(rename = "!=")]
-    NotEqualTo,
-    #[serde(rename = ">")]
-    GreaterThan,
-    #[serde(rename = ">=")]
-    GreaterThanEquals,
-    #[serde(rename = "<")]
-    LessThan,
-    #[serde(rename = "<=")]
-    LessThanEquals,
-    Contains,
-    NotContains,
-}
-
-impl Default for Operator {
-    fn default() -> Self {
-        Self::EqualTo
-    }
-}
-
-impl std::fmt::Display for Operator {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Operator::EqualTo => write!(f, "="),
-            Operator::NotEqualTo => write!(f, "!="),
-            Operator::GreaterThan => write!(f, ">"),
-            Operator::GreaterThanEquals => write!(f, ">="),
-            Operator::LessThan => write!(f, "<"),
-            Operator::LessThanEquals => write!(f, "<="),
-            Operator::Contains => write!(f, "contains"),
-            Operator::NotContains => write!(f, "not contains"),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

@@ -52,14 +52,13 @@ class="tw-mx-1 tw-text-red-500" />
       >
         <span class="chip-label"
           >{{ filter.panelTitle }}
-          <span
-            v-if="
-              filter.panelTitle === 'Errors' || filter.panelTitle === 'Rate'
-            "
-          >
-            >= {{ filter.start }}</span
-          >
-          <span v-if="filter.panelTitle === 'Duration'">
+          <span v-if="filter.panelTitle === 'Rate'">
+            : {{ t('latencyInsights.timeRangeSelected') }}
+          </span>
+          <span v-else-if="filter.panelTitle === 'Errors'">
+            >= {{ filter.start }}
+          </span>
+          <span v-else-if="filter.panelTitle === 'Duration'">
             <span v-if="filter.start !== null && filter.end !== null">
               {{ formatTimeWithSuffix(filter.start) }} -
               {{ formatTimeWithSuffix(filter.end) }}
@@ -70,6 +69,9 @@ class="tw-mx-1 tw-text-red-500" />
             <span v-else-if="filter.end !== null">
               <= {{ formatTimeWithSuffix(filter.end) }}
             </span>
+            <span v-if="filter.timeStart && filter.timeEnd">
+              | {{ t('latencyInsights.timeRangeSelected') }}
+            </span>
           </span>
         </span>
         <q-icon
@@ -79,6 +81,22 @@ class="tw-mx-1 tw-text-red-500" />
           @click="removeRangeFilter(panelId)"
         />
       </div>
+
+      <!-- Unified Analyze Dimensions Button (only shown when brush selection exists) -->
+      <q-btn
+        v-if="hasAnyBrushSelection"
+        outline
+        dense
+        no-caps
+        color="primary"
+        icon="analytics"
+        :label="t('latencyInsights.analyzeButtonLabel')"
+        class="analyze-button tw-h-[2rem]"
+        @click="openUnifiedAnalysisDashboard"
+        data-test="analyze-dimensions-button"
+      >
+        <q-tooltip>{{ t('latencyInsights.analyzeTooltip') }}</q-tooltip>
+      </q-btn>
     </div>
 
     <!-- Charts Section -->
@@ -109,6 +127,22 @@ class="tw-mx-1 tw-text-red-500" />
       @select="handleContextMenuSelect"
       @close="hideContextMenu"
     />
+
+    <!-- Unified Analysis Dashboard with Tabs -->
+    <TracesAnalysisDashboard
+      v-if="showAnalysisDashboard"
+      :streamName="streamName"
+      streamType="traces"
+      :timeRange="originalTimeRangeBeforeSelection || timeRange"
+      :rateFilter="analysisRateFilter"
+      :durationFilter="analysisDurationFilter"
+      :errorFilter="analysisErrorFilter"
+      :baseFilter="filter"
+      :streamFields="streamFields"
+      :analysisType="defaultAnalysisTab"
+      :availableAnalysisTypes="['volume', 'latency', 'error']"
+      @close="showAnalysisDashboard = false"
+    />
   </div>
 </template>
 
@@ -119,8 +153,11 @@ import {
   onBeforeUnmount,
   computed,
   defineAsyncComponent,
+  watch,
+  triggerRef,
 } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import useNotifications from "@/composables/useNotifications";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import metrics from "./metrics.json";
@@ -135,6 +172,10 @@ const TracesMetricsContextMenu = defineAsyncComponent(
   () => import("./TracesMetricsContextMenu.vue"),
 );
 
+const TracesAnalysisDashboard = defineAsyncComponent(
+  () => import("./TracesAnalysisDashboard.vue"),
+);
+
 interface TimeRange {
   startTime: number;
   endTime: number;
@@ -145,6 +186,7 @@ const props = defineProps<{
   timeRange: TimeRange;
   filter?: string;
   show?: boolean;
+  streamFields?: any[];
 }>();
 
 const emit = defineEmits<{
@@ -154,6 +196,7 @@ const emit = defineEmits<{
 const { showErrorNotification } = useNotifications();
 const store = useStore();
 const { searchObj } = useTraces();
+const { t } = useI18n();
 
 const autoRefreshEnabled = ref(false);
 const autoRefreshIntervalId = ref<number | null>(null);
@@ -168,6 +211,33 @@ const currentTimeObj = ref({
 
 const dashboardData = ref(null);
 
+// Unified Analysis Dashboard state
+const showAnalysisDashboard = ref(false);
+const analysisDurationFilter = ref({ start: 0, end: 0 });
+const analysisRateFilter = ref({ start: 0, end: 0 });
+const analysisErrorFilter = ref({ start: 0, end: 0 });
+const defaultAnalysisTab = ref<"latency" | "volume" | "error">("volume");
+// Store the original time range before selection for baseline comparison
+const originalTimeRangeBeforeSelection = ref<TimeRange | null>(null);
+
+// Reactivity trigger for Map changes (Vue 3 doesn't track Map.set() automatically)
+const rangeFiltersVersion = ref(0);
+
+// Stream fields for dimension selector
+// Priority: props > userDefinedSchema > selectedStreamFields
+const streamFields = computed(() => {
+  if (props.streamFields) {
+    return props.streamFields;
+  }
+
+  // Prefer user-defined schema if available
+  if (searchObj.data.stream.userDefinedSchema?.length > 0) {
+    return searchObj.data.stream.userDefinedSchema;
+  }
+
+  return searchObj.data.stream.selectedStreamFields || [];
+});
+
 // Use filters from searchObj
 const showErrorOnly = computed({
   get: () => searchObj.meta.showErrorOnly,
@@ -176,6 +246,83 @@ const showErrorOnly = computed({
   },
 });
 const rangeFilters = computed(() => searchObj.meta.metricsRangeFilters);
+
+// Check if duration filter exists
+const hasDurationFilter = computed(() => {
+  // Force reactivity by accessing rangeFiltersVersion
+  rangeFiltersVersion.value;
+
+  let hasFilter = false;
+  rangeFilters.value.forEach((filter) => {
+    if (filter.panelTitle === "Duration") {
+      // Show analyze button if we have any duration filter (start or end)
+      if (filter.start !== null || filter.end !== null) {
+        hasFilter = true;
+      }
+    }
+  });
+  return hasFilter;
+});
+
+// Check if rate filter exists
+const hasRateFilter = computed(() => {
+  // Force reactivity by accessing rangeFiltersVersion
+  rangeFiltersVersion.value;
+
+  let hasFilter = false;
+  rangeFilters.value.forEach((filter) => {
+    if (filter.panelTitle === "Rate") {
+      // Show volume analyze button if we have any rate filter (start or end)
+      if (filter.start !== null || filter.end !== null) {
+        hasFilter = true;
+      }
+    }
+  });
+  return hasFilter;
+});
+
+// Check if error filter exists
+const hasErrorFilter = computed(() => {
+  // Force reactivity by accessing rangeFiltersVersion
+  rangeFiltersVersion.value;
+
+  let hasFilter = false;
+  rangeFilters.value.forEach((filter) => {
+    if (filter.panelTitle === "Errors") {
+      // Show error analyze button if we have any error filter (start or end)
+      if (filter.start !== null || filter.end !== null) {
+        hasFilter = true;
+      }
+    }
+  });
+  return hasFilter;
+});
+
+// Check if ANY RED panel has a time-based brush selection
+// This controls the visibility of the "Analyze Dimensions" button
+// - Button shows ONLY when user has made a brush selection on Rate, Duration, or Errors panel
+// - Button hides when no selection exists (baseline = selected, no point in analysis)
+// - When button is clicked, analysis dashboard opens with comparison mode
+const hasAnyBrushSelection = computed(() => {
+  // Force reactivity by accessing rangeFiltersVersion
+  rangeFiltersVersion.value;
+
+  let hasSelection = false;
+  rangeFilters.value.forEach((filter) => {
+    // Check if any RED panel has a time range selection
+    if (
+      (filter.panelTitle === "Duration" ||
+       filter.panelTitle === "Rate" ||
+       filter.panelTitle === "Errors") &&
+      filter.timeStart !== null &&
+      filter.timeEnd !== null
+    ) {
+      hasSelection = true;
+    }
+  });
+
+  return hasSelection;
+});
 
 // Context menu state
 const contextMenuVisible = ref(false);
@@ -223,6 +370,7 @@ const loadDashboard = async () => {
         end_time: new Date(props.timeRange.endTime),
       },
     };
+
     // Convert the dashboard schema and update stream names
     const convertedDashboard = convertDashboardSchemaVersion(deepCopy(metrics));
 
@@ -252,11 +400,13 @@ const loadDashboard = async () => {
           : "";
       }
 
+      const streamName = searchObj.data.stream.selectedStream.value;
+
       convertedDashboard.tabs[0].panels[index]["queries"][0].query = panel[
         "queries"
       ][0].query.replace(
         "[STREAM_NAME]",
-        `"${searchObj.data.stream.selectedStream.value}"`,
+        `"${streamName}"`,
       );
 
       convertedDashboard.tabs[0].panels[index]["queries"][0].query = panel[
@@ -284,20 +434,22 @@ const refreshDashboard = () => {
   }
 };
 
-// const onDataZoom = (event: any) => {
-//   console.log("event -----", event);
-// };
 
-const createRangeFilter = (data, start = null, end = null) => {
+const createRangeFilter = (data, start = null, end = null, timeStart = null, timeEnd = null) => {
   const panelId = data?.id;
   const panelTitle = data?.title || "Chart";
 
-  if (panelId && panelTitle === "Duration") {
+  // Support Duration, Rate, and Errors panels
+  if (panelId && (panelTitle === "Duration" || panelTitle === "Rate" || panelTitle === "Errors")) {
     searchObj.meta.metricsRangeFilters.set(panelId, {
       panelTitle,
       start: start ? Math.floor(start) : null,
       end: end ? Math.floor(end) : null,
+      timeStart: timeStart ? Math.floor(timeStart) : null,
+      timeEnd: timeEnd ? Math.floor(timeEnd) : null,
     });
+    // Increment version to trigger reactivity
+    rangeFiltersVersion.value++;
   }
 };
 
@@ -314,15 +466,47 @@ const onDataZoom = ({
   end1: number;
   data: any; // contains panel schema with data.id as panel id
 }) => {
+
   if (start && end) {
-    // Create or update range filter chip for this panel
-    createRangeFilter(data, start1, end1);
+    const panelTitle = data?.title;
+
+    // Store the original time range BEFORE selection for volume analysis baseline
+    // This must be done before emit() which triggers the parent to update the datetime control
+    originalTimeRangeBeforeSelection.value = {
+      startTime: props.timeRange.startTime,
+      endTime: props.timeRange.endTime,
+    };
+
+    // For Rate and Errors panels: use placeholder values to indicate time-based selection
+    // Volume/Error analysis will use the time range, not Y-axis values
+    if (panelTitle === "Rate" || panelTitle === "Errors") {
+      // Convert milliseconds to microseconds for OpenObserve timestamp format
+      const timeStartMicros = start * 1000;
+      const timeEndMicros = end * 1000;
+
+  
+      // Use -1 as placeholder to indicate time-based zoom (not Y-axis value zoom)
+      // Pass actual time range as timeStart/timeEnd for volume/error analysis
+      createRangeFilter(data, -1, -1, timeStartMicros, timeEndMicros);
+    } else {
+      // For Duration/other panels: use actual Y-axis values (start1, end1)
+      // ALSO pass time range so all tabs can use it for comparison
+      const timeStartMicros = start * 1000;
+      const timeEndMicros = end * 1000;
+
+
+      createRangeFilter(data, start1, end1, timeStartMicros, timeEndMicros);
+    }
+
+    // All panels emit time-range-selected to update global datetime control
     emit("time-range-selected", { start, end });
-  }
+  } 
 };
 
 const removeRangeFilter = (panelId: string) => {
   searchObj.meta.metricsRangeFilters.delete(panelId);
+  // Increment version to trigger reactivity
+  rangeFiltersVersion.value++;
 };
 
 const formatTimestamp = (timestamp: number) => {
@@ -354,6 +538,140 @@ const hideContextMenu = () => {
   contextMenuVisible.value = false;
 };
 
+const openAnalysisDashboard = () => {
+  // Get the current duration range from existing filters
+  let durationStart = null;
+  let durationEnd = null;
+
+  rangeFilters.value.forEach((filter) => {
+    if (filter.panelTitle === "Duration") {
+      durationStart = filter.start;
+      durationEnd = filter.end;
+    }
+  });
+
+  // Set the duration filter for analysis
+  analysisDurationFilter.value = {
+    start: durationStart || 0,
+    end: durationEnd || Number.MAX_SAFE_INTEGER,
+  };
+
+  showAnalysisDashboard.value = true;
+};
+
+const openVolumeAnalysisDashboard = () => {
+  // Get the current rate range from existing filters
+  let rateStart = null;
+  let rateEnd = null;
+  let timeStart = null;
+  let timeEnd = null;
+
+  rangeFilters.value.forEach((filter) => {
+    if (filter.panelTitle === "Rate") {
+      rateStart = filter.start;
+      rateEnd = filter.end;
+      timeStart = filter.timeStart;
+      timeEnd = filter.timeEnd;
+    }
+  });
+
+  // Set the rate filter for analysis
+  analysisRateFilter.value = {
+    start: rateStart || 0,
+    end: rateEnd || Number.MAX_SAFE_INTEGER,
+    timeStart: timeStart || undefined,
+    timeEnd: timeEnd || undefined,
+  };
+
+  showVolumeAnalysisDashboard.value = true;
+};
+
+const openErrorAnalysisDashboard = () => {
+  // Get the current error range from existing filters
+  let errorStart = null;
+  let errorEnd = null;
+  let timeStart = null;
+  let timeEnd = null;
+
+  rangeFilters.value.forEach((filter) => {
+    if (filter.panelTitle === "Errors") {
+      errorStart = filter.start;
+      errorEnd = filter.end;
+      timeStart = filter.timeStart;
+      timeEnd = filter.timeEnd;
+    }
+  });
+
+  // Set the error filter for analysis
+  analysisErrorFilter.value = {
+    start: errorStart || 0,
+    end: errorEnd || Number.MAX_SAFE_INTEGER,
+    timeStart: timeStart || undefined,
+    timeEnd: timeEnd || undefined,
+  };
+
+  showErrorAnalysisDashboard.value = true;
+};
+
+// Unified function to open analysis dashboard with all filters populated
+const openUnifiedAnalysisDashboard = () => {
+  // Populate all filter types from range filters
+  let durationStart = null, durationEnd = null, durationTimeStart = null, durationTimeEnd = null;
+  let rateStart = null, rateEnd = null, rateTimeStart = null, rateTimeEnd = null;
+  let errorStart = null, errorEnd = null, errorTimeStart = null, errorTimeEnd = null;
+  let latestFilterType = null;
+
+  rangeFilters.value.forEach((filter) => {
+
+    if (filter.panelTitle === "Duration") {
+      durationStart = filter.start;
+      durationEnd = filter.end;
+      durationTimeStart = filter.timeStart;
+      durationTimeEnd = filter.timeEnd;
+      latestFilterType = "latency";
+    } else if (filter.panelTitle === "Rate") {
+      rateStart = filter.start;
+      rateEnd = filter.end;
+      rateTimeStart = filter.timeStart;
+      rateTimeEnd = filter.timeEnd;
+      latestFilterType = "volume";
+    } else if (filter.panelTitle === "Errors") {
+      errorStart = filter.start;
+      errorEnd = filter.end;
+      errorTimeStart = filter.timeStart;
+      errorTimeEnd = filter.timeEnd;
+      latestFilterType = "error";
+    }
+  });
+
+  // Set all filters
+  analysisDurationFilter.value = {
+    start: durationStart || 0,
+    end: durationEnd || Number.MAX_SAFE_INTEGER,
+    timeStart: durationTimeStart || undefined,
+    timeEnd: durationTimeEnd || undefined,
+  };
+
+  analysisRateFilter.value = {
+    start: rateStart || 0,
+    end: rateEnd || Number.MAX_SAFE_INTEGER,
+    timeStart: rateTimeStart || undefined,
+    timeEnd: rateTimeEnd || undefined,
+  };
+
+  analysisErrorFilter.value = {
+    start: errorStart || 0,
+    end: errorEnd || Number.MAX_SAFE_INTEGER,
+    timeStart: errorTimeStart || undefined,
+    timeEnd: errorTimeEnd || undefined,
+  };
+
+  // Set default tab based on most recent selection, or volume if no selection
+  defaultAnalysisTab.value = latestFilterType || "volume";
+
+  showAnalysisDashboard.value = true;
+};
+
 const handleContextMenuSelect = (selection: {
   condition: string;
   value: number;
@@ -369,9 +687,6 @@ const handleContextMenuSelect = (selection: {
   );
 
   hideContextMenu();
-
-  // You can emit this to parent or handle filtering logic here
-  // For example: emit("filter-applied", selection);
 };
 
 const toggleAutoRefresh = () => {
@@ -448,6 +763,19 @@ defineExpose({
     &:hover {
       color: #0d447a;
     }
+  }
+}
+
+// Analyze button
+.analyze-button {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0 0.75rem;
+  transition: all 0.2s;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
 }
 

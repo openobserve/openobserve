@@ -23,13 +23,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="flex items-center tw-h-[60px]">
         <div
-          class="flex justify-center items-center q-mr-md cursor-pointer"
-          style="
-            border: 1.5px solid;
-            border-radius: 50%;
-            width: 22px;
-            height: 22px;
-          "
+          no-caps
+            padding="xs"
+            outline
+            icon="arrow_back_ios_new"
+            class="el-border tw-w-6 tw-h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
           title="Go Back"
           @click="$emit('cancel:hideform')"
         >
@@ -135,6 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('alerts.cancel')"
               no-caps
               flat
+              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
               @click="$emit('cancel:hideform')"
               data-test="add-template-cancel-btn"
             />
@@ -143,6 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('alerts.save')"
               no-caps
               flat
+              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
               @click="saveTemplate"
               data-test="add-template-submit-btn"
             />
@@ -226,6 +226,10 @@ import { useRouter } from "vue-router";
 import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
+import {
+  validateTemplateBody,
+  getTemplateValidationErrorMessage,
+} from "@/utils/templates/validation";
 
 const props = defineProps<{ template: TemplateData | null }>();
 const emit = defineEmits(["get:templates", "cancel:hideform"]);
@@ -307,17 +311,17 @@ const setupTemplateData = () => {
 };
 
 const isTemplateBodyValid = () => {
-  try {
-    JSON.parse(formData.value.body);
-    return true;
-  } catch (e) {
+  const result = validateTemplateBody(formData.value.body);
+
+  if (!result.valid) {
     q.notify({
       type: "negative",
-      message: "Please enter valid JSON in template body",
+      message: getTemplateValidationErrorMessage(),
       timeout: 1500,
     });
-    return false;
   }
+
+  return result.valid;
 };
 
 const router = useRouter();

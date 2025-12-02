@@ -42,7 +42,7 @@ style="min-height: auto">
 
       <!-- Service Maps Tab Content -->
       <div
-        v-if="activeTab === 'service-maps'"
+        v-if="activeTab === 'service-maps' && store.state.zoConfig.service_graph_enabled"
         class="tw-px-[0.625rem] tw-pb-[0.625rem] tw-h-[calc(100vh-98px)] tw-overflow-hidden"
       >
         <service-graph class="tw-h-full" />
@@ -1074,7 +1074,8 @@ function generateHistogramData() {
 
 async function loadPageData() {
   searchObj.loadingStream = true;
-  searchObj.data.resultGrid.currentPage = 0;
+  if (!searchObj.data?.queryResults?.hits?.length)
+    searchObj.data.resultGrid.currentPage = 0;
 
   // resetSearchObj();
   searchObj.organizationIdentifier =
@@ -1101,7 +1102,13 @@ onBeforeMount(async () => {
   // Restore active tab from URL query params
   const queryParams = router.currentRoute.value.query;
   if (queryParams.tab === 'service-maps') {
-    activeTab.value = 'service-maps';
+    // Only allow service-maps tab if service graph is enabled
+    if (store.state.zoConfig.service_graph_enabled) {
+      activeTab.value = 'service-maps';
+    } else {
+      // If service graph is disabled, default to search tab
+      activeTab.value = 'search';
+    }
   }
   await importSqlParser();
   if (searchObj.loading == false) {
@@ -1368,7 +1375,14 @@ watch(updateSelectedColumns, () => {
 watch(activeTab, (newTab) => {
   const query = { ...router.currentRoute.value.query };
   if (newTab === 'service-maps') {
-    query.tab = 'service-maps';
+    // Only set service-maps tab if service graph is enabled
+    if (store.state.zoConfig.service_graph_enabled) {
+      query.tab = 'service-maps';
+    } else {
+      // If service graph is disabled, force back to search tab
+      activeTab.value = 'search';
+      delete query.tab;
+    }
   } else {
     delete query.tab;
   }

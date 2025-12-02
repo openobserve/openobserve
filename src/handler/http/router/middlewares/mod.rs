@@ -13,13 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-mod check_keep_alive;
 mod compress;
 mod encoding;
 mod org_blocking;
 mod slow_log;
 
-pub use check_keep_alive::check_keep_alive;
 pub use compress::Compress;
 pub use org_blocking::blocked_orgs_middleware;
 pub use slow_log::SlowLog;

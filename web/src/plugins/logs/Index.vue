@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #before>
                 <div class="relative-position tw-h-full tw-pl-[0.625rem]">
                   <index-list
-                    v-show="searchObj.meta.showFields"
+                    v-if="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
                     class="card-container"
                     @setInterestingFieldInSQLQuery="
@@ -418,7 +418,6 @@ import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useLogs from "@/composables/useLogs";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
-import VisualizeLogsQuery from "@/plugins/logs/VisualizeLogsQuery.vue";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { reactive } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
@@ -452,24 +451,26 @@ import { useHistogram } from "@/composables/useLogs/useHistogram";
 import useStreams from "@/composables/useStreams";
 import { contextRegistry } from "@/composables/contextProviders";
 import { createLogsContextProvider } from "@/composables/contextProviders/logsContextProvider";
+import IndexList from "@/plugins/logs/IndexList.vue";
 
 export default defineComponent({
   name: "PageSearch",
   components: {
     SearchBar,
-    SearchSchedulersList,
-    IndexList: defineAsyncComponent(
-      () => import("@/plugins/logs/IndexList.vue"),
-    ),
+    IndexList,
     SearchResult: defineAsyncComponent(
       () => import("@/plugins/logs/SearchResult.vue"),
     ),
-    ConfirmDialog: defineAsyncComponent(
-      () => import("@/components/ConfirmDialog.vue"),
+    SearchSchedulersList: defineAsyncComponent(
+      () => import("@/plugins/logs/SearchSchedulersList.vue"),
     ),
     SanitizedHtmlRenderer,
-    VisualizeLogsQuery,
-    SearchHistory,
+    VisualizeLogsQuery: defineAsyncComponent(
+      () => import("@/plugins/logs/VisualizeLogsQuery.vue"),
+    ),
+    SearchHistory: defineAsyncComponent(
+      () => import("@/plugins/logs/SearchHistory.vue"),
+    ),
   },
   mixins: [MainLayoutCloudMixin],
   emits: ["sendToAiChat"],
@@ -651,6 +652,7 @@ export default defineComponent({
       isLimitQuery,
       updateUrlQueryParams,
       addTraceId,
+      checkTimestampAlias,
     } = logsUtils();
     const {
       getHistogramData,
@@ -923,8 +925,9 @@ export default defineComponent({
           return;
         }
 
-        // Override the size with the pattern scan size from UI
-        queryReq.query.size = patternsState.value.scanSize;
+        // Set size to -1 to let backend determine sampling size based on config
+        console.log("[Patterns] Using default sampling from backend configuration");
+        queryReq.query.size = -1;
 
         const streamName = searchObj.data.stream.selectedStream[0];
         if (!streamName) {
@@ -1234,16 +1237,8 @@ export default defineComponent({
           //   currentQuery.toLowerCase().indexOf("select ") == 0;
           if (!hasSelect) {
             if (currentQuery != "") {
-              currentQuery = currentQuery.split("|");
-              if (currentQuery.length > 1) {
-                selectFields = "," + currentQuery[0].trim();
-                if (currentQuery[1].trim() != "") {
-                  whereClause = "WHERE " + currentQuery[1].trim();
-                }
-              } else if (currentQuery[0].trim() != "") {
-                if (currentQuery[0].trim() != "") {
-                  whereClause = "WHERE " + currentQuery[0].trim();
-                }
+              if (currentQuery.trim() != "") {
+                  whereClause = "WHERE " + currentQuery;
               }
             }
 
@@ -1320,6 +1315,16 @@ export default defineComponent({
     const collapseFieldList = () => {
       if (searchObj.meta.showFields) searchObj.meta.showFields = false;
       else searchObj.meta.showFields = true;
+
+      // Redraw chart after field list collapse/expand
+      nextTick(() => {
+        if (
+          searchObj.meta.showHistogram &&
+          searchResultRef.value?.reDrawChart
+        ) {
+          searchResultRef.value.reDrawChart();
+        }
+      });
     };
 
     const areStreamsPresent = computed(() => {

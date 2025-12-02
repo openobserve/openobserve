@@ -30,15 +30,14 @@ module.exports = defineConfig({
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
-  /* Retry failed tests: 2 times on CI, 1 time locally */
-  retries: process.env.CI ? 5 : 0,
+  /* Retry failed tests: 3 times on CI, 0 times locally */
+  retries: process.env.CI ? 3 : 0,
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 5 : 5,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: process.env.CI
     ? [
-        ['blob'], // Use blob reporter in CI for merging across shards
-        ['json', { outputFile: 'playwright-results/report.json' }] // JSON reporter for TestDino
+        ['blob', { outputDir: 'blob-report' }], // Use blob reporter in CI - JSON created during merge
       ]
     : [
         ['html', { outputFolder: 'playwright-results/html-report', open: 'never' }], // HTML reporter
@@ -59,6 +58,9 @@ module.exports = defineConfig({
     /* Capture screenshots and videos on failure for CI debugging */
     screenshot: process.env.CI ? 'only-on-failure' : 'off',
     video: process.env.CI ? 'retain-on-failure' : 'off',
+
+    /* Slow down execution for Pipeline tests on deployed environments to avoid sync issues */
+    slowMo: (process.env.SLOW_MO_TESTS === 'true' && process.env.TEST_SHARD === 'Pipelines') ? 1000 : 0,
     },
   /* Test timeout: 3 minutes locally, 5 minutes in CI */
   timeout: process.env.CI ? 5 * 60 * 1000 : 3 * 60 * 1000,

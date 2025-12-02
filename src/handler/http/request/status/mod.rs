@@ -16,7 +16,7 @@
 use std::{io::Error, sync::Arc};
 
 use actix_web::{
-    HttpRequest, HttpResponse, cookie,
+    HttpResponse, cookie,
     cookie::{Cookie, SameSite},
     get, head,
     http::header,
@@ -58,7 +58,7 @@ use {
     o2_enterprise::enterprise::common::{
         auditor::{AuditMessage, Protocol, ResponseMeta},
         config::{get_config as get_o2_config, refresh_config as refresh_o2_config},
-        settings::{get_logo, get_logo_text},
+        settings::{get_logo, get_logo_dark, get_logo_text},
     },
     o2_openfga::config::{
         get_config as get_openfga_config, refresh_config as refresh_openfga_config,
@@ -122,6 +122,7 @@ struct ConfigResponse<'a> {
     custom_docs_url: String,
     rum: Rum,
     custom_logo_img: Option<String>,
+    custom_logo_dark_img: Option<String>,
     custom_hide_menus: String,
     custom_hide_self_logo: bool,
     meta_org: String,
@@ -152,6 +153,12 @@ struct ConfigResponse<'a> {
     #[cfg(feature = "enterprise")]
     ingestion_quota_used: f64,
     log_page_default_field_list: String,
+    query_values_default_num: i64,
+    mysql_deprecated_warning: bool,
+    #[cfg(feature = "enterprise")]
+    service_graph_enabled: bool,
+    #[cfg(not(feature = "enterprise"))]
+    service_graph_enabled: bool,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -284,6 +291,12 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let logo = None;
 
     #[cfg(feature = "enterprise")]
+    let logo_dark = get_logo_dark().await;
+
+    #[cfg(not(feature = "enterprise"))]
+    let logo_dark = None;
+
+    #[cfg(feature = "enterprise")]
     let custom_hide_menus = &o2cfg.common.custom_hide_menus;
     #[cfg(not(feature = "enterprise"))]
     let custom_hide_menus = "";
@@ -297,6 +310,11 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let ai_enabled = o2cfg.ai.enabled;
     #[cfg(not(feature = "enterprise"))]
     let ai_enabled = false;
+
+    #[cfg(feature = "enterprise")]
+    let service_graph_enabled = o2cfg.service_graph.enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let service_graph_enabled = false;
 
     #[cfg(all(feature = "cloud", not(feature = "enterprise")))]
     let build_type = "cloud";
@@ -356,6 +374,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         custom_slack_url: custom_slack_url.to_string(),
         custom_docs_url: custom_docs_url.to_string(),
         custom_logo_img: logo,
+        custom_logo_dark_img: logo_dark,
         custom_hide_menus: custom_hide_menus.to_string(),
         custom_hide_self_logo,
         rum: Rum {
@@ -398,6 +417,9 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         license_server_url,
         #[cfg(feature = "enterprise")]
         ingestion_quota_used,
+        query_values_default_num: cfg.limit.query_values_default_num,
+        mysql_deprecated_warning: cfg.common.meta_store.starts_with("mysql"),
+        service_graph_enabled,
     }))
 }
 
@@ -513,6 +535,65 @@ pub async fn config_reload() -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().json(serde_json::json!({"status": status})))
 }
 
+fn hide_sensitive_fields(mut value: serde_json::Value) -> serde_json::Value {
+    if let Some(obj) = value.as_object_mut() {
+        for (key, val) in obj.iter_mut() {
+            let key_lower = key.to_lowercase();
+
+            // Simple rule: contains any of these sensitive keywords
+            // Also hide header values that might contain credentials
+            let is_sensitive = key_lower.contains("password")
+                || key_lower.contains("secret")
+                || key_lower.contains("key")
+                || key_lower.contains("auth")
+                || key_lower.contains("token")
+                || key_lower.contains("credential")
+                || (key_lower.contains("header") && key_lower.contains("value"));
+
+            if is_sensitive && let Some(s) = val.as_str() {
+                *val = if s.is_empty() {
+                    serde_json::Value::String("[not set]".to_string())
+                } else {
+                    serde_json::Value::String("[hidden]".to_string())
+                };
+            }
+
+            if val.is_object() {
+                *val = hide_sensitive_fields(val.clone());
+            }
+        }
+    }
+    value
+}
+
+#[get("/runtime")]
+pub async fn config_runtime() -> Result<HttpResponse, Error> {
+    let cfg = get_config();
+    let mut config_value = serde_json::to_value(cfg.as_ref())
+        .map_err(|e| Error::other(format!("Failed to serialize config: {e}")))?;
+
+    config_value = hide_sensitive_fields(config_value);
+
+    let mut final_response = serde_json::Map::new();
+    final_response.insert(
+        "_metadata".to_string(),
+        json::json!({
+            "version": config::VERSION,
+            "commit_hash": config::COMMIT_HASH,
+            "build_date": config::BUILD_DATE,
+            "instance_id": get_instance_id(),
+        }),
+    );
+
+    if let Some(config_obj) = config_value.as_object() {
+        for (key, value) in config_obj {
+            final_response.insert(key.clone(), value.clone());
+        }
+    }
+
+    Ok(HttpResponse::Ok().json(final_response))
+}
+
 async fn get_stream_schema_status() -> (usize, usize, usize) {
     let mut stream_num = 0;
     let mut stream_schema_num = 0;
@@ -540,7 +621,7 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
 
 #[cfg(feature = "enterprise")]
 #[get("/redirect")]
-pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
+pub async fn redirect(req: actix_web::HttpRequest) -> Result<HttpResponse, Error> {
     use config::meta::user::UserRole;
 
     use crate::common::meta::user::AuthTokens;
@@ -918,21 +999,51 @@ async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
 }
 
 #[put("/enable")]
-async fn enable_node(req: HttpRequest) -> Result<HttpResponse, Error> {
+async fn enable_node(
+    web::Query(query): web::Query<HashMap<String, String>>,
+) -> Result<HttpResponse, Error> {
     let node_id = LOCAL_NODE.uuid.clone();
     let Some(mut node) = cluster::get_node_by_uuid(&node_id).await else {
         return Ok(MetaHttpResponse::not_found("node not found"));
     };
 
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let enable = match query.get("value") {
-        Some(v) => v.parse::<bool>().unwrap_or_default(),
-        None => false,
+    let enable = match query.get("value").and_then(|v| v.parse::<bool>().ok()) {
+        Some(v) => v,
+        None => {
+            return Ok(MetaHttpResponse::bad_request(
+                "invalid or missing 'value' query parameter (expected true or false)",
+            ));
+        }
     };
     node.scheduled = enable;
     if !node.scheduled {
         // release all the searching files
-        crate::common::infra::wal::clean_lock_files();
+        crate::common::infra::wal::clean_lock_files().await;
+
+        #[cfg(feature = "enterprise")]
+        {
+            log::info!("[NODE] Disabling node, initiating graceful drain");
+
+            // If this is an ingester node, set draining mode and flush
+            if LOCAL_NODE.is_ingester() {
+                // Flush memory to WAL
+                if let Err(e) = ingester::flush_all().await {
+                    log::error!("[NODE] Error flushing ingester during disable: {e}");
+                    return Ok(MetaHttpResponse::internal_error(e));
+                }
+                // Set draining flag to trigger immediate S3 upload after flush memory to disk
+                o2_enterprise::enterprise::drain::set_draining(true);
+                log::info!("[NODE] Ingester flushed successfully, S3 upload will be prioritized");
+            }
+        }
+    } else {
+        #[cfg(feature = "enterprise")]
+        {
+            // Re-enabling the node
+            if LOCAL_NODE.is_ingester() {
+                o2_enterprise::enterprise::drain::set_draining(false);
+            }
+        }
     }
     match cluster::update_local_node(&node).await {
         Ok(_) => Ok(MetaHttpResponse::json(true)),
@@ -947,12 +1058,20 @@ async fn flush_node() -> Result<HttpResponse, Error> {
     };
 
     // release all the searching files
-    crate::common::infra::wal::clean_lock_files();
+    crate::common::infra::wal::clean_lock_files().await;
 
     match ingester::flush_all().await {
         Ok(_) => Ok(MetaHttpResponse::json(true)),
         Err(e) => Ok(MetaHttpResponse::internal_error(e)),
     }
+}
+
+#[cfg(feature = "enterprise")]
+#[get("/drain_status")]
+async fn drain_status() -> Result<HttpResponse, Error> {
+    let is_ingester = LOCAL_NODE.is_ingester();
+    let response = o2_enterprise::enterprise::drain::get_drain_status(is_ingester);
+    Ok(MetaHttpResponse::json(response))
 }
 
 #[get("/list")]

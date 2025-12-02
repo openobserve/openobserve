@@ -268,6 +268,11 @@ Our Slack community is the most active place for:
 
 [Join the conversation →](https://short.openobserve.ai/community)
 
+### 📱 Join OpenObserve community on WeChat
+
+<img src="./screenshots/wechat_qr.jpg" width="300">
+
+
 ### Other ways to connect
 
 - 💬 [GitHub Discussions](https://github.com/openobserve/openobserve/discussions) - For longer-form discussions and Q&A

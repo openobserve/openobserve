@@ -110,8 +110,8 @@ pub async fn ingest(
         &StreamType::Logs,
     )
     .await;
-    let mut pipeline_inputs = Vec::new();
-    let mut original_options = Vec::new();
+    let mut pipeline_inputs = Vec::with_capacity(stream_params.len());
+    let mut original_options = Vec::with_capacity(stream_params.len());
     // End pipeline params construction
 
     if let Some(exec_pl) = &executable_pipeline {
@@ -666,7 +666,7 @@ impl<'a> IngestionData<'a> {
                 }
             }
             IngestionData::KinesisFH(request) => {
-                let mut events = Vec::new();
+                let mut events = Vec::with_capacity(request.records.len());
                 let request_id = &request.request_id;
                 let req_timestamp = request.timestamp.unwrap_or(Utc::now().timestamp_micros());
 

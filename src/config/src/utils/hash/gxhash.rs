@@ -30,7 +30,7 @@ pub fn new_hasher() -> impl Hasher {
     }
     #[cfg(not(feature = "gxhash"))]
     {
-        hash::Ahash::new()
+        ahash::AHasher::default()
     }
 }
 

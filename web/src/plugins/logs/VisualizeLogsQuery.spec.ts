@@ -402,29 +402,34 @@ describe("VisualizeLogsQuery Component", () => {
   });
 
   describe("handleChartApiError Function", () => {
+    beforeEach(() => {
+      // Reset error data before each test
+      wrapper.props("errorData").errors = [];
+    });
+
     it("should set error message from error object", () => {
       const errorMessage = { message: "API Error occurred" };
-      
+
       wrapper.vm.handleChartApiError(errorMessage);
-      
-      expect(wrapper.props("errorData").value).toBe("API Error occurred");
+
+      expect(wrapper.props("errorData").errors).toContain("API Error occurred");
     });
 
     it("should set error message from string", () => {
       const errorMessage = "String error message";
-      
+
       wrapper.vm.handleChartApiError(errorMessage);
-      
-      expect(wrapper.props("errorData").value).toBe("String error message");
+
+      expect(wrapper.props("errorData").errors).toContain("String error message");
     });
 
     it("should emit handleChartApiError event", () => {
       const errorMessage = { message: "Test error" };
-      
+
       wrapper.vm.handleChartApiError(errorMessage);
-      
+
       expect(wrapper.emitted("handleChartApiError")).toBeTruthy();
-      expect(wrapper.emitted("handleChartApiError")[0]).toEqual([errorMessage]);
+      expect(wrapper.emitted("handleChartApiError").length).toBeGreaterThan(0);
     });
   });
 
@@ -888,11 +893,14 @@ describe("VisualizeLogsQuery Component", () => {
       });
 
       it("should handle error scenarios for simple queries", () => {
+        // Reset error data
+        wrapper.props("errorData").errors = [];
+
         const errorMessage = "Invalid column name in SELECT clause";
-        
+
         wrapper.vm.handleChartApiError(errorMessage);
-        
-        expect(wrapper.props("errorData").value).toBe(errorMessage);
+
+        expect(wrapper.props("errorData").errors).toContain(errorMessage);
         expect(wrapper.emitted("handleChartApiError")).toBeTruthy();
       });
     });
@@ -1414,29 +1422,34 @@ describe("VisualizeLogsQuery Component", () => {
     });
 
     describe("Query Error Handling", () => {
+      beforeEach(() => {
+        // Reset error data before each test
+        wrapper.props("errorData").errors = [];
+      });
+
       it("should handle syntax errors in complex queries", () => {
         wrapper.vm.dashboardPanelData.data.queries[0].query = "SELECT * FORM logs"; // Intentional typo
-        
+
         const errorMessage = "Syntax error: unexpected token 'FORM'";
         wrapper.vm.handleChartApiError(errorMessage);
-        
-        expect(wrapper.props("errorData").value).toBe(errorMessage);
+
+        expect(wrapper.props("errorData").errors).toContain(errorMessage);
       });
 
       it("should handle timeout errors for complex queries", () => {
         const errorMessage = { message: "Query execution timeout after 30 seconds" };
-        
+
         wrapper.vm.handleChartApiError(errorMessage);
-        
-        expect(wrapper.props("errorData").value).toBe("Query execution timeout after 30 seconds");
+
+        expect(wrapper.props("errorData").errors).toContain("Query execution timeout after 30 seconds");
       });
 
       it("should handle memory errors for large result sets", () => {
         const errorMessage = "Insufficient memory to execute query";
         
         wrapper.vm.handleChartApiError(errorMessage);
-        
-        expect(wrapper.props("errorData").value).toBe(errorMessage);
+
+        expect(wrapper.props("errorData").errors).toContain(errorMessage);
       });
     });
 

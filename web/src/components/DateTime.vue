@@ -141,11 +141,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="row q-gutter-sm">
                   <div class="col">
                     <q-input
-                      v-model="relativeValue"
+                      v-model.number="relativeValue"
                       type="number"
                       dense
                       filled
                       min="1"
+                      :step="1"
                       :max="
                         relativePeriodsMaxValue[relativePeriod] > 0
                           ? relativePeriodsMaxValue[relativePeriod]
@@ -621,6 +622,9 @@ export default defineComponent({
             ? relativePeriodsMaxValue.value[relativePeriod.value]
             : 15;
       }
+
+      relativeValue.value = parseInt(relativeValue.value);
+
       if (props.autoApply) saveDate("relative-custom");
     };
 
@@ -707,9 +711,9 @@ export default defineComponent({
     const saveDate = (dateType) => {
       // displayValue.value = getDisplayValue();
       const date = getConsumableDateTime();
-      if (isNaN(date.endTime) || isNaN(date.startTime)) {
-        return false;
-      }
+      // if (isNaN(date.endTime) || isNaN(date.startTime)) {
+      //   // return false;
+      // }
       datePayload.value = date;
       date["valueType"] = dateType || selectedType.value;
       // date["relativeTimePeriod"] = "";
@@ -819,8 +823,8 @@ export default defineComponent({
             selectedTime.value.startTime,
           )
         ) {
-          console.error(`Invalid start date/time: ${startDateStr}`);
-          return new Date();
+          // console.warn(`Invalid start date/time: ${startDateStr}`);
+          // return new Date();
         }
 
         const endDateStr =
@@ -831,8 +835,8 @@ export default defineComponent({
             selectedTime.value.endTime,
           )
         ) {
-          console.error(`Invalid end date/time: ${endDateStr}`);
-          return new Date();
+          // console.error(`Invalid end date/time: ${endDateStr}`);
+          // return new Date();
         }
 
         let start, end;

@@ -262,7 +262,7 @@ export const addPanel = async (
 
     const newLayoutObj = {
       x: 0,
-      y: tab.panels?.length > 0 ? maxY + 10 : 0,
+      y: tab.panels?.length > 0 ? maxY + 20 : 0,
       w: 96,
       h: 18,
       i: maxI + 1,
@@ -752,7 +752,7 @@ export const deleteTab = async (
 
       // for each panel, need to recalculate layout object
       deleteTabData.panels.forEach((panel: any) => {
-        maxY += 10;
+        maxY += 20;
         panel.layout.i = ++maxI;
         panel.layout.y = maxY;
       });
@@ -875,7 +875,7 @@ export const movePanelToAnotherTab = async (
 
     //set layout of new panel
     panelData.layout.i = maxI + 1;
-    panelData.layout.y = maxY + 10;
+    panelData.layout.y = maxY + 20;
     moveToTabData.panels.push(panelData);
 
     return await updateDashboard(

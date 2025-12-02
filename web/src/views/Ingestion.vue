@@ -56,8 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="showUpdateDialogFn"
           />
           <span
-            class="text-subtitle bg-warning float-right q-mt-xs q-pa-sm text-bold"
-            style="margin-right: 14%"
+            class="text-subtitle bg-warning float-right q-pa-sm text-bold"
             v-if="
               store.state.zoConfig.hasOwnProperty(
                 'restricted_routes_on_empty_data'
@@ -68,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("ingestion.redirectionIngestionMsg") }}
           </span>
+          <div style="clear: both;"></div>
           <ConfirmDialog
             title="Reset Token"
             message="Are you sure you want to update token for this organization?"
