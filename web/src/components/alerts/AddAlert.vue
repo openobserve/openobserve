@@ -1013,6 +1013,113 @@ export default defineComponent({
       return validateSqlQueryUtil(formData.value, validationContext);
     };
 
+    /**
+     * Validates that all condition fields are in the available filtered fields when UDS is configured
+     * This ensures users only create conditions using fields that are part of the defined schema
+     *
+     * Note: We skip validation for "sql" and "promql" query types as users write custom queries there
+     * We use the already filtered originalStreamFields instead of fetching stream again for efficiency
+     *
+     * @returns {{ isValid: boolean, invalidFields: string[] }} Validation result with invalid fields list
+     */
+    const validateConditionsAgainstUDS = () => {
+      // Skip validation if query type is "sql" or "promql" - users write custom queries there
+      if (
+        formData.value.query_condition?.type === "sql" ||
+        formData.value.query_condition?.type === "promql"
+      ) {
+        return { isValid: true, invalidFields: [] };
+      }
+
+      // Skip validation if no stream is selected or no fields are available
+      if (
+        !formData.value.stream_name ||
+        !formData.value.stream_type ||
+        !originalStreamFields.value ||
+        originalStreamFields.value.length === 0
+      ) {
+        return { isValid: true, invalidFields: [] };
+      }
+
+      // Use the already filtered fields from originalStreamFields
+      // These are already filtered by UDS in updateStreamFields function
+      const allowedFieldNames = new Set(
+        originalStreamFields.value.map((field: any) => field.value)
+      );
+
+      // If originalStreamFields has all fields from the schema, it means UDS is not configured
+      // In that case, skip validation (all fields are allowed)
+      // We can't determine this easily, so we'll just validate against available fields
+
+      // Recursively collect all column names used in conditions
+      const invalidFields: string[] = [];
+
+      const checkConditionFields = (condition: any) => {
+        if (!condition) return;
+
+        // If it's a condition group (has items array)
+        if (condition.items && Array.isArray(condition.items)) {
+          condition.items.forEach((item: any) => {
+            checkConditionFields(item);
+          });
+        }
+        // If it's a single condition (has column property)
+        else if (condition.column) {
+          // Check if the column is in the allowed fields
+          // Skip empty columns
+          if (condition.column && condition.column !== "" && !allowedFieldNames.has(condition.column)) {
+            // Add to invalid fields if not already present
+            if (!invalidFields.includes(condition.column)) {
+              invalidFields.push(condition.column);
+            }
+          }
+        }
+      };
+
+      // Check conditions for real-time and scheduled alerts (custom query type only)
+      if (
+        formData.value.query_condition?.conditions &&
+        formData.value.query_condition?.type === "custom"
+      ) {
+        checkConditionFields(formData.value.query_condition.conditions);
+      }
+
+      // Also check aggregation having clause if present (for scheduled alerts with custom query type)
+      if (
+        isAggregationEnabled.value &&
+        formData.value.query_condition?.type === "custom" &&
+        formData.value.query_condition?.aggregation?.having?.column
+      ) {
+        const havingColumn = formData.value.query_condition.aggregation.having.column;
+        if (havingColumn && havingColumn !== "" && !allowedFieldNames.has(havingColumn)) {
+          if (!invalidFields.includes(havingColumn)) {
+            invalidFields.push(havingColumn);
+          }
+        }
+      }
+
+      // Also check group_by fields if present (for scheduled alerts with custom query type)
+      if (
+        isAggregationEnabled.value &&
+        formData.value.query_condition?.type === "custom" &&
+        formData.value.query_condition?.aggregation?.group_by &&
+        Array.isArray(formData.value.query_condition.aggregation.group_by)
+      ) {
+        formData.value.query_condition.aggregation.group_by.forEach((field: string) => {
+          if (field && field !== "" && !allowedFieldNames.has(field)) {
+            if (!invalidFields.includes(field)) {
+              invalidFields.push(field);
+            }
+          }
+        });
+      }
+
+      return {
+        isValid: invalidFields.length === 0,
+        invalidFields
+      };
+    };
+
     const updateFunctionVisibility = () => {
       // if validateSqlQueryPromise has error "function_error" then reset the promise when function is disabled
       if (!showVrlFunction.value && vrlFunctionError.value) {
@@ -1428,6 +1535,7 @@ export default defineComponent({
       showVrlFunction,
       validateSqlQuery,
       validateSqlQueryPromise,
+      validateConditionsAgainstUDS,
       isValidResourceName,
       sqlQueryErrorMsg,
       vrlFunctionError,
@@ -1655,6 +1763,33 @@ export default defineComponent({
         }
         if (!isAlertValid || !isScheduledAlertValid || !isRealTimeAlertValid) return false;
 
+        // Validate that conditions use only available fields (respects UDS filtering if configured)
+        // Only validates "custom" query type - skips "sql" and "promql" as users write custom queries
+        const udsValidation = this.validateConditionsAgainstUDS();
+        if (!udsValidation.isValid) {
+          const invalidCount = udsValidation.invalidFields.length;
+          let message = '';
+
+          if (invalidCount === 1) {
+            // Single field - show the field name
+            message = `Field "${udsValidation.invalidFields[0]}" is not available. Please use only the available fields in your conditions.`;
+          } else if (invalidCount <= 3) {
+            // 2-3 fields - show all field names
+            message = `Fields ${udsValidation.invalidFields.map((f: string) => `"${f}"`).join(', ')} are not available. Please use only the available fields in your conditions.`;
+          } else {
+            // More than 3 fields - show count and first few fields
+            const firstThree = udsValidation.invalidFields.slice(0, 3).map((f: string) => `"${f}"`).join(', ');
+            const remaining = invalidCount - 3;
+            message = `${invalidCount} fields are not available (${firstThree} and ${remaining} more). Please use only the available fields in your conditions.`;
+          }
+
+          this.q.notify({
+            type: "negative",
+            message: message,
+            timeout: 6000,
+          });
+          return false;
+        }
 
         const payload = this.getAlertPayload();
         if (!this.validateInputs(payload)) return;
