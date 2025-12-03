@@ -1367,6 +1367,112 @@ class APICleanup {
     }
 
     /**
+     * Fetch all saved views
+     * @returns {Promise<Array>} Array of saved view objects
+     */
+    async fetchSavedViews() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/savedviews`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to fetch saved views', { status: response.status });
+                return [];
+            }
+
+            const data = await response.json();
+            return data.views || [];
+        } catch (error) {
+            testLogger.error('Failed to fetch saved views', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Delete a single saved view
+     * @param {string} viewId - The saved view ID
+     * @returns {Promise<Object>} Deletion result
+     */
+    async deleteSavedView(viewId) {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/savedviews/${viewId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to delete saved view', { viewId, status: response.status });
+                return { code: response.status, message: 'Failed to delete saved view' };
+            }
+
+            const result = await response.json();
+            return { code: 200, ...result };
+        } catch (error) {
+            testLogger.error('Failed to delete saved view', { viewId, error: error.message });
+            return { code: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Clean up all saved views matching test patterns
+     * Deletes saved views starting with "streamslog" or "multistream_view_"
+     */
+    async cleanupSavedViews() {
+        testLogger.info('Starting saved views cleanup');
+
+        try {
+            // Fetch all saved views
+            const savedViews = await this.fetchSavedViews();
+            testLogger.info('Fetched saved views', { total: savedViews.length });
+
+            // Filter saved views matching patterns: starts with "streamslog" or "multistream_view_"
+            const matchingSavedViews = savedViews.filter(view =>
+                view.view_name.startsWith('streamslog') ||
+                view.view_name.startsWith('multistream_view_')
+            );
+            testLogger.info('Found saved views matching cleanup patterns', { count: matchingSavedViews.length });
+
+            if (matchingSavedViews.length === 0) {
+                testLogger.info('No saved views to clean up');
+                return;
+            }
+
+            // Delete each saved view
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const view of matchingSavedViews) {
+                const result = await this.deleteSavedView(view.view_id);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.debug('Deleted saved view', { viewId: view.view_id, viewName: view.view_name });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete saved view', { viewId: view.view_id, viewName: view.view_name, result });
+                }
+            }
+
+            testLogger.info('Saved views cleanup completed', {
+                total: matchingSavedViews.length,
+                deleted: deletedCount,
+                failed: failedCount
+            });
+
+        } catch (error) {
+            testLogger.error('Saved views cleanup failed', { error: error.message });
+        }
+    }
+
+    /**
      * Complete cascade cleanup: Alert -> Folder -> Destination -> Template
      * Only deletes resources linked to destinations matching the prefix
      * @param {string} prefix - Prefix to match destination names (e.g., 'auto_playwright')
