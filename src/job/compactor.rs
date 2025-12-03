@@ -117,20 +117,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
         }
     );
 
-    // Service graph processing
-    #[cfg(feature = "enterprise")]
-    spawn_pausable_job!(
-        "service_graph_processor",
-        get_o2_config().service_graph.processing_interval_secs,
-        {
-            log::debug!("[COMPACTOR::SERVICE_GRAPH] Running service graph processing");
-            if let Err(e) = crate::service::traces::service_graph::process_service_graph().await {
-                log::error!("[COMPACTOR::SERVICE_GRAPH] Processing failed: {e}");
-            }
-        },
-        sleep_after
-    );
-
     #[cfg(feature = "enterprise")]
     spawn_pausable_job!(
         "compactor_downsampling_sync_to_db",
