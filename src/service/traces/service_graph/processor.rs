@@ -108,17 +108,108 @@ async fn process_stream(
         (end_time - start_time) / 1_000_000
     );
 
-    let sql = format!(
-        "WITH edges AS (
+    // Build service graph using span_kind and peer identification attributes
+    // Uses ONLY mandatory fields + COALESCE for optional peer attributes
+    //
+    // Mandatory fields: service_name, span_kind (always present)
+    // Optional peer attributes (priority order): peer_service, server_address, db_name, db_system
+    //
+    // Logic:
+    //   - CLIENT spans (span_kind='3'): client=service_name, server=COALESCE(peer attrs)
+    //   - SERVER spans (span_kind='2'): client=COALESCE(peer attrs), server=service_name
+    //   - INTERNAL/other spans: ignored (can't determine client/server relationship)
+
+    // Check schema for available peer identification attributes
+    let schema = match infra::schema::get_cache(org_id, stream_name, StreamType::Traces).await {
+        Ok(schema) => schema,
+        Err(e) => {
+            log::debug!(
+                "[ServiceGraph] Failed to get schema for {}/{}: {} - skipping",
+                org_id,
+                stream_name,
+                e
+            );
+            return Ok(());
+        }
+    };
+
+    let schema_arrow = schema.schema();
+
+    // Build COALESCE expression for peer identification
+    // Try multiple attributes in priority order (following OTel conventions)
+    let peer_attr_candidates = [
+        "peer_service",   // peer.service - explicit peer service name
+        "server_address", // server.address - logical server name
+        "db_name",        // db.name - database name
+        "db_system",      // db.system - database type
+        "http_url",       // http.url - for HTTP calls (extract hostname)
+    ];
+
+    let mut available_peer_attrs = Vec::new();
+    for attr in peer_attr_candidates {
+        if schema_arrow.field_with_name(attr).is_ok() {
+            available_peer_attrs.push(attr);
+        }
+    }
+
+    // If no peer attributes are available, we can still process INTERNAL spans
+    // by using a fallback value for the peer/server side
+    let peer_expr = if available_peer_attrs.is_empty() {
+        log::debug!(
+            "[ServiceGraph] Stream {}/{} has no peer identification attributes - will use 'internal' fallback for INTERNAL spans",
+            org_id,
+            stream_name
+        );
+        "'internal'".to_string() // Literal string fallback
+    } else if available_peer_attrs.len() > 1 {
+        format!("COALESCE({})", available_peer_attrs.join(", "))
+    } else {
+        available_peer_attrs[0].to_string()
+    };
+
+    log::debug!(
+        "[ServiceGraph] Stream {}/{} using peer expression: {}",
+        org_id,
+        stream_name,
+        peer_expr
+    );
+
+    // Check if INTERNAL spans should be excluded (default: include them)
+    let exclude_internal = get_o2_config().service_graph.exclude_internal_spans;
+
+    if exclude_internal {
+        log::debug!(
+            "[ServiceGraph] INTERNAL spans (span_kind='1') will be excluded from {}/{}",
+            org_id,
+            stream_name
+        );
+    }
+
+    let span_kinds = if exclude_internal {
+        // Exclude INTERNAL spans (span_kind='1')
+        "('2', '3')"
+    } else {
+        // Include INTERNAL spans (span_kind='1') - default behavior
+        "('1', '2', '3')"
+    };
+
+    let sql = if exclude_internal {
+        format!(
+            "WITH edges AS (
            SELECT
-             CASE WHEN CAST(span_kind AS VARCHAR) = '3' THEN service_name ELSE peer_service END as client,
-             CASE WHEN CAST(span_kind AS VARCHAR) = '3' THEN peer_service ELSE service_name END as server,
+             CASE
+               WHEN CAST(span_kind AS VARCHAR) = '3' THEN service_name
+               WHEN CAST(span_kind AS VARCHAR) = '2' THEN {}
+             END as client,
+             CASE
+               WHEN CAST(span_kind AS VARCHAR) = '3' THEN {}
+               WHEN CAST(span_kind AS VARCHAR) = '2' THEN service_name
+             END as server,
              end_time - start_time as duration,
              span_status
            FROM \"{}\"
            WHERE _timestamp >= {} AND _timestamp < {}
-             AND CAST(span_kind AS VARCHAR) IN ('2', '3')
-             AND peer_service IS NOT NULL
+             AND CAST(span_kind AS VARCHAR) IN {}
          )
          SELECT
            {} as start,
@@ -133,9 +224,48 @@ async fn process_stream(
            approx_percentile_cont(duration, 0.95) as p95,
            approx_percentile_cont(duration, 0.99) as p99
          FROM edges
+         WHERE client IS NOT NULL AND server IS NOT NULL
          GROUP BY client, server",
-        stream_name, start_time, end_time, start_time, end_time
-    );
+            peer_expr, peer_expr, stream_name, start_time, end_time, span_kinds, start_time, end_time
+        )
+    } else {
+        format!(
+            "WITH edges AS (
+           SELECT
+             CASE
+               WHEN CAST(span_kind AS VARCHAR) = '3' THEN service_name
+               WHEN CAST(span_kind AS VARCHAR) = '2' THEN {}
+               WHEN CAST(span_kind AS VARCHAR) = '1' THEN service_name
+             END as client,
+             CASE
+               WHEN CAST(span_kind AS VARCHAR) = '3' THEN {}
+               WHEN CAST(span_kind AS VARCHAR) = '2' THEN service_name
+               WHEN CAST(span_kind AS VARCHAR) = '1' THEN COALESCE({}, 'internal')
+             END as server,
+             end_time - start_time as duration,
+             span_status
+           FROM \"{}\"
+           WHERE _timestamp >= {} AND _timestamp < {}
+             AND CAST(span_kind AS VARCHAR) IN {}
+         )
+         SELECT
+           {} as start,
+           {} as end,
+           client,
+           server,
+           'standard' as connection_type,
+           COUNT(*) as total_requests,
+           COUNT(*) FILTER (WHERE span_status = 'ERROR') as errors,
+           CAST(COUNT(*) FILTER (WHERE span_status = 'ERROR') * 100.0 / COUNT(*) AS DOUBLE) as error_rate,
+           approx_median(duration) as p50,
+           approx_percentile_cont(duration, 0.95) as p95,
+           approx_percentile_cont(duration, 0.99) as p99
+         FROM edges
+         WHERE client IS NOT NULL AND server IS NOT NULL
+         GROUP BY client, server",
+            peer_expr, peer_expr, peer_expr, stream_name, start_time, end_time, span_kinds, start_time, end_time
+        )
+    };
 
     // Execute search
     let req = config::meta::search::Request {
