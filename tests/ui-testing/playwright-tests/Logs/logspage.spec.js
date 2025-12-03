@@ -588,7 +588,32 @@ test.describe("Logs Page testcases", () => {
     await pm.logsPage.clickRefreshButton();
     await page.waitForLoadState('networkidle'); // Replace hard wait
     await pm.logsPage.expectPaginationNotVisible();
-    
+
     testLogger.info('Pagination SQL group/order/limit query test completed');
+  });
+
+  test.afterEach(async ({ page }) => {
+    // Clean up screenshots regardless of test pass/fail
+    const fs = require('fs');
+    const path = require('path');
+
+    const screenshotsToDelete = [
+      'playwright-tests/Logs/vrl-before-toggle.png',
+      'playwright-tests/Logs/vrl-after-toggle.png',
+      'playwright-tests/Logs/vrl-before-toggle-off.png',
+      'playwright-tests/Logs/vrl-after-toggle-off.png',
+      'playwright-tests/Logs/vrl-editor-state-check.png',
+      'playwright-tests/Logs/include-menu-debug.png'
+    ];
+
+    for (const screenshot of screenshotsToDelete) {
+      try {
+        if (fs.existsSync(screenshot)) {
+          fs.unlinkSync(screenshot);
+        }
+      } catch (error) {
+        // Pass gracefully if deletion fails
+      }
+    }
   });
 });
