@@ -283,7 +283,8 @@ export class LogsPage {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // Wait for the stream to be visible in the dropdown
-        const streamLocator = this.page.getByText(stream, { exact: true }).first();
+        // Scope the search to only dropdown menu items (div.q-item) to avoid hidden elements
+        const streamLocator = this.page.locator("div.q-item").getByText(stream, { exact: true }).first();
         await streamLocator.waitFor({ state: 'visible', timeout: 15000 });
         await streamLocator.click();
     }
