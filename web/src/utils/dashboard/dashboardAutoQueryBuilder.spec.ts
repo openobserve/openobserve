@@ -1421,7 +1421,7 @@ describe("dashboardAutoQueryBuilder", () => {
         value: "act",
       };
       const result = buildCondition(condition, mockDashboardPanelData);
-      expect(result).toBe("status LIKE '%act%'");
+      expect(result).toBe("str_match(status, 'act')");
     });
 
     it("should build condition with Not Contains operator", () => {
@@ -1779,7 +1779,7 @@ describe("dashboardAutoQueryBuilder", () => {
         value: "10",
       };
       const result = buildCondition(condition, mockDashboardPanelData);
-      expect(result).toBe("count LIKE %10%");
+      expect(result).toBe("str_match(count, 10)");
     });
 
     it("should handle custom operator (default case)", () => {
