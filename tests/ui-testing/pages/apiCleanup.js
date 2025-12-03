@@ -835,7 +835,12 @@ class APICleanup {
             return true;
         }
 
-        // Pattern 4: Random 8-9 char lowercase strings
+        // Pattern 5: e2e_join_* (UNION test streams)
+        if (streamName.startsWith('e2e_join_')) {
+            return true;
+        }
+
+        // Pattern 6: Random 8-9 char lowercase strings
         // First check if it matches the basic pattern
         if (!/^[a-z]{8,9}$/.test(streamName)) {
             return false;
