@@ -253,6 +253,24 @@ export class LogsPage {
         await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
     }
 
+    async selectIndexAndStreamJoinUnion() {
+        // Select both e2e_join_a and e2e_join_b streams for UNION queries
+        // These streams have identical schemas to support UNION operations
+        await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+        await this.page.waitForTimeout(3000);
+
+        // Select e2e_join_a stream
+        await this.page.locator('[data-test="log-search-index-list-stream-toggle-e2e_join_a"] div').first().click();
+        await this.page.waitForTimeout(1000);
+
+        // Select e2e_join_b stream (dropdown stays open after first selection)
+        await this.page.locator('[data-test="log-search-index-list-stream-toggle-e2e_join_b"] div').first().click();
+        await this.page.waitForTimeout(1000);
+
+        // Close dropdown
+        await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+    }
+
     async selectIndexStreamDefault() {
         await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
         await this.page.waitForTimeout(3000);
