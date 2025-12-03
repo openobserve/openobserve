@@ -978,7 +978,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card-section class="row items-center q-pb-sm q-pt-md q-px-md">
         <div class="text-subtitle1 text-weight-medium">Add Search & Index Fields</div>
         <q-space />
-        <q-btn icon="close" flat round dense size="sm" @click="skipPerformanceFields" />
+        <q-btn icon="cancel" flat round dense size="sm" @click="skipPerformanceFields" />
       </q-card-section>
 
       <q-card-section class="q-pt-none q-pb-sm q-px-md">
