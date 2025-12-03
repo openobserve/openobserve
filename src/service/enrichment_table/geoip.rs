@@ -15,7 +15,7 @@
 //
 // The file re-use code snippets from https://github.com/vectordotdev/vector/blob/master/src/enrichment_tables/geoip.rs ,modified to suit openobserve needs
 
-use std::{collections::BTreeMap, fs, net::IpAddr, sync::Arc, time::SystemTime};
+use std::{fs, net::IpAddr, sync::Arc, time::SystemTime};
 
 use config::{MMDB_CITY_FILE_NAME, get_config};
 #[cfg(feature = "enterprise")]
@@ -136,11 +136,11 @@ impl Geoip {
         // Check if we can read database with dummy Ip.
         let ip = IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED);
         let result = match dbkind {
-            DatabaseKind::Asn | DatabaseKind::Isp => dbreader.lookup::<Isp>(ip).map(|_| ()),
-            DatabaseKind::ConnectionType => dbreader.lookup::<ConnectionType>(ip).map(|_| ()),
-            DatabaseKind::City => dbreader.lookup::<City>(ip).map(|_| ()),
+            DatabaseKind::Asn | DatabaseKind::Isp => dbreader.lookup(ip).map(|_| ()),
+            DatabaseKind::ConnectionType => dbreader.lookup(ip).map(|_| ()),
+            DatabaseKind::City => dbreader.lookup(ip).map(|_| ()),
             #[cfg(feature = "enterprise")]
-            DatabaseKind::Enterprise => dbreader.lookup::<Enterprise>(ip).map(|_| ()),
+            DatabaseKind::Enterprise => dbreader.lookup(ip).map(|_| ()),
         };
 
         match result {
@@ -175,7 +175,7 @@ impl Geoip {
 
         match self.dbkind {
             DatabaseKind::Asn | DatabaseKind::Isp => {
-                let data = self.dbreader.lookup::<Isp>(ip).ok()??;
+                let data = self.dbreader.lookup(ip).ok()?.decode::<Isp>().ok()??;
 
                 add_field!("autonomous_system_number", data.autonomous_system_number);
                 add_field!(
@@ -186,143 +186,138 @@ impl Geoip {
                 add_field!("organization", data.organization);
             }
             DatabaseKind::City => {
-                let data = self.dbreader.lookup::<City>(ip).ok()??;
+                let data = self.dbreader.lookup(ip).ok()?.decode::<City>().ok()??;
 
                 add_field!(
                     "city_name",
-                    self.take_translation(data.city.as_ref().and_then(|c| c.names.as_ref()))
+                    self.take_translation_from_names(&data.city.names)
                 );
 
-                add_field!("continent_code", data.continent.and_then(|c| c.code));
+                add_field!("continent_code", data.continent.code);
 
-                let country = data.country.as_ref();
-                add_field!("country_code", country.and_then(|country| country.iso_code));
+                add_field!("country_code", data.country.iso_code);
                 add_field!(
                     "country_name",
-                    self.take_translation(country.and_then(|c| c.names.as_ref()))
+                    self.take_translation_from_names(&data.country.names)
                 );
 
-                let location = data.location.as_ref();
-                add_field!("timezone", location.and_then(|location| location.time_zone));
-                add_field!("latitude", location.and_then(|location| location.latitude));
-                add_field!(
-                    "longitude",
-                    location.and_then(|location| location.longitude)
-                );
-                add_field!(
-                    "metro_code",
-                    location.and_then(|location| location.metro_code)
-                );
+                add_field!("timezone", data.location.time_zone);
+                add_field!("latitude", data.location.latitude);
+                add_field!("longitude", data.location.longitude);
+                add_field!("metro_code", data.location.metro_code);
 
                 // last subdivision is most specific per https://github.com/maxmind/GeoIP2-java/blob/39385c6ce645374039450f57208b886cf87ade47/src/main/java/com/maxmind/geoip2/model/AbstractCityResponse.java#L96-L107
-                let subdivision = data.subdivisions.as_ref().and_then(|s| s.last());
+                let subdivision = data.subdivisions.last();
                 add_field!(
                     "region_name",
-                    self.take_translation(subdivision.and_then(|s| s.names.as_ref()))
+                    subdivision.and_then(|s| self.take_translation_from_names(&s.names))
                 );
                 add_field!(
                     "region_code",
                     subdivision.and_then(|subdivision| subdivision.iso_code)
                 );
-                add_field!("postal_code", data.postal.and_then(|p| p.code));
+                add_field!("postal_code", data.postal.code);
             }
             DatabaseKind::ConnectionType => {
-                let data = self.dbreader.lookup::<ConnectionType>(ip).ok()??;
+                let data = self
+                    .dbreader
+                    .lookup(ip)
+                    .ok()?
+                    .decode::<ConnectionType>()
+                    .ok()??;
 
                 add_field!("connection_type", data.connection_type);
             }
             #[cfg(feature = "enterprise")]
             DatabaseKind::Enterprise => {
-                let data = self.dbreader.lookup::<Enterprise>(ip).ok()??;
+                let data = self
+                    .dbreader
+                    .lookup(ip)
+                    .ok()?
+                    .decode::<Enterprise>()
+                    .ok()??;
 
                 add_field!(
                     "city_name",
-                    self.take_translation(data.city.as_ref().and_then(|c| c.names.as_ref()))
+                    self.take_translation_from_names(&data.city.names)
                 );
 
-                add_field!("continent_code", data.continent.and_then(|c| c.code));
+                add_field!("continent_code", data.continent.code);
 
-                let country = data.country.as_ref();
-                add_field!("country_code", country.and_then(|country| country.iso_code));
+                add_field!("country_code", data.country.iso_code);
                 add_field!(
                     "country_name",
-                    self.take_translation(country.and_then(|c| c.names.as_ref()))
+                    self.take_translation_from_names(&data.country.names)
                 );
 
-                let location = data.location.as_ref();
-                add_field!("timezone", location.and_then(|location| location.time_zone));
-                add_field!("latitude", location.and_then(|location| location.latitude));
-                add_field!(
-                    "longitude",
-                    location.and_then(|location| location.longitude)
-                );
-                add_field!(
-                    "metro_code",
-                    location.and_then(|location| location.metro_code)
-                );
+                add_field!("timezone", data.location.time_zone);
+                add_field!("latitude", data.location.latitude);
+                add_field!("longitude", data.location.longitude);
+                add_field!("metro_code", data.location.metro_code);
 
                 // last subdivision is most specific per https://github.com/maxmind/GeoIP2-java/blob/39385c6ce645374039450f57208b886cf87ade47/src/main/java/com/maxmind/geoip2/model/AbstractCityResponse.java#L96-L107
-                let subdivision = data.subdivisions.as_ref().and_then(|s| s.last());
+                let subdivision = data.subdivisions.last();
                 add_field!(
                     "region_name",
-                    self.take_translation(subdivision.and_then(|s| s.names.as_ref()))
+                    subdivision.and_then(|s| self.take_translation_from_names(&s.names))
                 );
                 add_field!(
                     "region_code",
                     subdivision.and_then(|subdivision| subdivision.iso_code)
                 );
-                add_field!("postal_code", data.postal.and_then(|p| p.code));
+                add_field!("postal_code", data.postal.code);
 
-                let registered_country: Option<&maxminddb::geoip2::enterprise::Country<'_>> =
-                    data.registered_country.as_ref();
-                add_field!(
-                    "registered_country_code",
-                    registered_country.and_then(|c| c.iso_code)
-                );
+                add_field!("registered_country_code", data.registered_country.iso_code);
                 add_field!(
                     "registered_country_name",
-                    self.take_translation(registered_country.and_then(|c| c.names.as_ref()))
+                    self.take_translation_from_names(&data.registered_country.names)
                 );
 
-                let represented_country: Option<
-                    &maxminddb::geoip2::enterprise::RepresentedCountry<'_>,
-                > = data.represented_country.as_ref();
                 add_field!(
                     "represented_country_code",
-                    represented_country.and_then(|c| c.iso_code)
+                    data.represented_country.iso_code
                 );
                 add_field!(
                     "represented_country_name",
-                    self.take_translation(represented_country.and_then(|c| c.names.as_ref()))
+                    self.take_translation_from_names(&data.represented_country.names)
                 );
 
-                if let Some(traits) = data.traits {
-                    add_field!("autonomous_system_number", traits.autonomous_system_number);
-                    add_field!(
-                        "autonomous_system_organization",
-                        traits.autonomous_system_organization
-                    );
-                    add_field!("isp", traits.isp);
-                    add_field!("organization", traits.organization);
-                    add_field!("connection_type", traits.connection_type);
-                    add_field!("user_type", traits.user_type);
-                    add_field!("mobile_country_code", traits.mobile_country_code);
-                    add_field!("mobile_network_code", traits.mobile_network_code);
-                    add_field!("domain", traits.domain);
-                };
+                add_field!(
+                    "autonomous_system_number",
+                    data.traits.autonomous_system_number
+                );
+                add_field!(
+                    "autonomous_system_organization",
+                    data.traits.autonomous_system_organization
+                );
+                add_field!("isp", data.traits.isp);
+                add_field!("organization", data.traits.organization);
+                add_field!("connection_type", data.traits.connection_type);
+                add_field!("user_type", data.traits.user_type);
+                add_field!("mobile_country_code", data.traits.mobile_country_code);
+                add_field!("mobile_network_code", data.traits.mobile_network_code);
+                add_field!("domain", data.traits.domain);
             }
         }
 
         Some(map)
     }
 
-    fn take_translation<'a>(
+    fn take_translation_from_names<'a>(
         &self,
-        translations: Option<&BTreeMap<&str, &'a str>>,
+        names: &maxminddb::geoip2::Names<'a>,
     ) -> Option<&'a str> {
-        translations
-            .and_then(|translations| translations.get(&*self.config.locale))
-            .copied()
+        match self.config.locale.as_str() {
+            "en" => names.english,
+            "es" => names.spanish,
+            "fr" => names.french,
+            "de" => names.german,
+            "ja" => names.japanese,
+            "pt-BR" => names.brazilian_portuguese,
+            "ru" => names.russian,
+            "zh-CN" => names.simplified_chinese,
+            _ => names.english, // fallback to English
+        }
     }
 }
 
