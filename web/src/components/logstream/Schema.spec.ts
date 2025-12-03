@@ -647,8 +647,285 @@ describe("Schema Component Tests", async () => {
     it("should not disable non-conflicting options", () => {
       const schema = { index_type: ["fullTextSearchKey"] };
       const bloomOption = { value: "bloomFilterKey" };
-      
+
       expect(wrapper.vm.disableOptions(schema, bloomOption)).toBe(false);
+    });
+  });
+
+  // Performance Fields Popup Tests
+  describe("Performance Fields Popup Tests", () => {
+    beforeEach(async () => {
+      wrapper = mount(LogStream, {
+        props: {
+          modelValue: {
+            name: "test-stream",
+            storage_type: "s3",
+            stream_type: "logs",
+            stats: {
+              doc_time_min: 1678448628630259,
+              doc_time_max: 1678448628652947,
+              doc_num: 400,
+              file_num: 1,
+              storage_size: 0.74,
+              compressed_size: 0.03,
+            },
+            schema: [
+              {
+                name: "user_id",
+                type: "Utf8",
+                index_type: ["fullTextSearchKey"],
+              },
+              {
+                name: "log_level",
+                type: "Utf8",
+                index_type: ["secondaryIndexKey"],
+              },
+              {
+                name: "message",
+                type: "Utf8",
+                index_type: ["fullTextSearchKey"],
+              },
+              {
+                name: "timestamp",
+                type: "Int64",
+                index_type: [],
+              },
+            ],
+            settings: {
+              partition_time_level: "hourly",
+              partition_keys: {},
+              full_text_search_keys: ["user_id", "message"],
+              index_fields: ["log_level"],
+              bloom_filter_fields: [],
+              data_retention: 30,
+              max_query_range: 0,
+              store_original_data: false,
+              approx_partition: false,
+              defined_schema_fields: [],
+              extended_retention_days: [],
+              pattern_associations: []
+            },
+          },
+        },
+        global: {
+          provide: {
+            store: {
+              ...store,
+              state: {
+                ...store.state,
+                zoConfig: {
+                  ...store.state.zoConfig,
+                  default_fts_keys: ["user_id"],
+                  default_secondary_index_fields: ["log_level"],
+                  user_defined_schema_max_fields: 100,
+                }
+              }
+            },
+          },
+          plugins: [i18n],
+        },
+      });
+      await flushPromises();
+    });
+
+    // Test 1: getMissingPerformanceFields should detect missing FTS fields
+    it("should detect missing FTS fields", () => {
+      const selectedFieldsSet = new Set(["timestamp"]); // Not selecting FTS fields
+      const missing = wrapper.vm.getMissingPerformanceFields(selectedFieldsSet);
+
+      expect(missing.length).toBeGreaterThan(0);
+      const ftsFields = missing.filter(f => f.type === "Full Text Search");
+      expect(ftsFields.length).toBeGreaterThan(0);
+      expect(ftsFields.some(f => f.name === "user_id" || f.name === "message")).toBe(true);
+    });
+
+    // Test 2: getMissingPerformanceFields should detect missing Secondary Index fields
+    it("should detect missing Secondary Index fields", () => {
+      const selectedFieldsSet = new Set(["timestamp"]); // Not selecting secondary index fields
+      const missing = wrapper.vm.getMissingPerformanceFields(selectedFieldsSet);
+
+      expect(missing.length).toBeGreaterThan(0);
+      const secondaryIndexFields = missing.filter(f => f.type === "Secondary Index");
+      expect(secondaryIndexFields.length).toBeGreaterThan(0);
+      expect(secondaryIndexFields.some(f => f.name === "log_level")).toBe(true);
+    });
+
+    // Test 3: getMissingPerformanceFields should not detect fields already selected
+    it("should not detect fields already selected by user", () => {
+      const selectedFieldsSet = new Set(["user_id", "message", "log_level", "timestamp"]);
+      const missing = wrapper.vm.getMissingPerformanceFields(selectedFieldsSet);
+
+      expect(missing.length).toBe(0);
+    });
+
+    // Test 4: getMissingPerformanceFields should detect default FTS keys from config
+    it("should detect default FTS keys from backend config", () => {
+      // user_id is in default_fts_keys
+      const selectedFieldsSet = new Set(["message", "timestamp"]); // Not including user_id
+      const missing = wrapper.vm.getMissingPerformanceFields(selectedFieldsSet);
+
+      const ftsFields = missing.filter(f => f.type === "Full Text Search");
+      expect(ftsFields.some(f => f.name === "user_id")).toBe(true);
+    });
+
+    // Test 5: getMissingPerformanceFields should detect default secondary index keys from config
+    it("should detect default secondary index keys from backend config", () => {
+      // log_level is in default_secondary_index_fields
+      const selectedFieldsSet = new Set(["user_id", "timestamp"]); // Not including log_level
+      const missing = wrapper.vm.getMissingPerformanceFields(selectedFieldsSet);
+
+      const secondaryIndexFields = missing.filter(f => f.type === "Secondary Index");
+      expect(secondaryIndexFields.some(f => f.name === "log_level")).toBe(true);
+    });
+
+    // Test 6: updateDefinedSchemaFields should show popup when UDS is enabled first time with missing fields
+    it("should show performance fields popup when enabling UDS for first time", () => {
+      wrapper.vm.indexData.defined_schema_fields = []; // First time enabling UDS
+      wrapper.vm.selectedFields = [{ name: "timestamp" }];
+      wrapper.vm.activeTab = "allFields";
+
+      wrapper.vm.updateDefinedSchemaFields();
+
+      expect(wrapper.vm.confirmAddPerformanceFieldsDialog).toBe(true);
+      expect(wrapper.vm.missingPerformanceFields.length).toBeGreaterThan(0);
+      expect(wrapper.vm.pendingSelectedFields).toEqual(["timestamp"]);
+    });
+
+    // Test 7: updateDefinedSchemaFields should not show popup when all performance fields are selected
+    it("should not show popup when all performance fields are already selected", () => {
+      wrapper.vm.indexData.defined_schema_fields = []; // First time enabling UDS
+      wrapper.vm.selectedFields = [
+        { name: "user_id" },
+        { name: "message" },
+        { name: "log_level" },
+        { name: "timestamp" }
+      ];
+      wrapper.vm.activeTab = "allFields";
+
+      wrapper.vm.updateDefinedSchemaFields();
+
+      expect(wrapper.vm.confirmAddPerformanceFieldsDialog).toBe(false);
+      expect(wrapper.vm.indexData.defined_schema_fields).toContain("user_id");
+      expect(wrapper.vm.indexData.defined_schema_fields).toContain("message");
+    });
+
+    // Test 8: updateDefinedSchemaFields should not show popup when UDS already has fields
+    it("should not show popup when UDS already has existing fields", () => {
+      wrapper.vm.indexData.defined_schema_fields = ["existing_field"]; // Already has fields
+      wrapper.vm.selectedFields = [{ name: "timestamp" }];
+      wrapper.vm.activeTab = "allFields";
+
+      wrapper.vm.updateDefinedSchemaFields();
+
+      expect(wrapper.vm.confirmAddPerformanceFieldsDialog).toBe(false);
+      expect(wrapper.vm.indexData.defined_schema_fields).toContain("existing_field");
+      expect(wrapper.vm.indexData.defined_schema_fields).toContain("timestamp");
+    });
+
+    // Test 9: addPerformanceFields should add missing fields when user clicks OK
+    it("should add missing performance fields when user clicks OK", () => {
+      wrapper.vm.pendingSelectedFields = ["timestamp"];
+      wrapper.vm.missingPerformanceFields = [
+        { name: "user_id", type: "Full Text Search" },
+        { name: "log_level", type: "Secondary Index" }
+      ];
+
+      wrapper.vm.addPerformanceFields();
+
+      expect(wrapper.vm.confirmAddPerformanceFieldsDialog).toBe(false);
+      expect(wrapper.vm.indexData.defined_schema_fields).toContain("timestamp");
+      expect(wrapper.vm.indexData.defined_schema_fields).toContain("user_id");
+      expect(wrapper.vm.indexData.defined_schema_fields).toContain("log_level");
+      expect(wrapper.vm.missingPerformanceFields).toEqual([]);
+      expect(wrapper.vm.pendingSelectedFields).toEqual([]);
+    });
+
+    // Test 10: skipPerformanceFields should not add missing fields when user clicks Skip
+    it("should not add missing performance fields when user clicks Skip", () => {
+      wrapper.vm.pendingSelectedFields = ["timestamp"];
+      wrapper.vm.missingPerformanceFields = [
+        { name: "user_id", type: "Full Text Search" },
+        { name: "log_level", type: "Secondary Index" }
+      ];
+
+      wrapper.vm.skipPerformanceFields();
+
+      expect(wrapper.vm.confirmAddPerformanceFieldsDialog).toBe(false);
+      expect(wrapper.vm.indexData.defined_schema_fields).toContain("timestamp");
+      expect(wrapper.vm.indexData.defined_schema_fields).not.toContain("user_id");
+      expect(wrapper.vm.indexData.defined_schema_fields).not.toContain("log_level");
+      expect(wrapper.vm.missingPerformanceFields).toEqual([]);
+      expect(wrapper.vm.pendingSelectedFields).toEqual([]);
+    });
+
+    // Test 11: missingPerformanceFieldsByType should group fields by type
+    it("should group missing fields by FTS and Secondary Index types", () => {
+      wrapper.vm.missingPerformanceFields = [
+        { name: "field1", type: "Full Text Search" },
+        { name: "field2", type: "Full Text Search" },
+        { name: "field3", type: "Secondary Index" }
+      ];
+
+      const grouped = wrapper.vm.missingPerformanceFieldsByType;
+
+      expect(grouped.fts.length).toBe(2);
+      expect(grouped.secondaryIndex.length).toBe(1);
+      expect(grouped.fts[0].name).toBe("field1");
+      expect(grouped.secondaryIndex[0].name).toBe("field3");
+    });
+
+    // Test 12: proceedWithAddingFields should filter out timestamp and allFields
+    it("should filter out timestamp and _all fields when adding", () => {
+      const selectedFieldsSet = new Set(["user_id", "_all", "_timestamp"]);
+      wrapper.vm.store.state.zoConfig.timestamp_column = "_timestamp";
+
+      wrapper.vm.proceedWithAddingFields(selectedFieldsSet);
+
+      expect(wrapper.vm.indexData.defined_schema_fields).toContain("user_id");
+      expect(wrapper.vm.indexData.defined_schema_fields).not.toContain("_all");
+      expect(wrapper.vm.indexData.defined_schema_fields).not.toContain("_timestamp");
+    });
+
+    // Test 13: proceedWithAddingFields should mark form as dirty
+    it("should mark form as dirty when adding fields", () => {
+      wrapper.vm.formDirtyFlag = false;
+      const selectedFieldsSet = new Set(["user_id"]);
+
+      wrapper.vm.proceedWithAddingFields(selectedFieldsSet);
+
+      expect(wrapper.vm.formDirtyFlag).toBe(true);
+    });
+
+    // Test 14: getMissingPerformanceFields should only include fields that exist in schema
+    it("should only include backend default fields that exist in current schema", () => {
+      // Add a field to default config that doesn't exist in schema
+      wrapper.vm.store.state.zoConfig.default_fts_keys = ["user_id", "nonexistent_field"];
+
+      const selectedFieldsSet = new Set(["timestamp"]);
+      const missing = wrapper.vm.getMissingPerformanceFields(selectedFieldsSet);
+
+      const ftsFields = missing.filter(f => f.type === "Full Text Search");
+      expect(ftsFields.some(f => f.name === "user_id")).toBe(true);
+      expect(ftsFields.some(f => f.name === "nonexistent_field")).toBe(false);
+    });
+
+    // Test 15: updateDefinedSchemaFields should respect max field limit
+    it("should show error when exceeding max field limit", () => {
+      const notifySpy = vi.spyOn(wrapper.vm.q, "notify");
+      wrapper.vm.store.state.zoConfig.user_defined_schema_max_fields = 5;
+      wrapper.vm.indexData.defined_schema_fields = ["f1", "f2", "f3", "f4"];
+      wrapper.vm.selectedFields = [{ name: "f5" }, { name: "f6" }]; // Would exceed limit
+      wrapper.vm.activeTab = "allFields";
+
+      wrapper.vm.updateDefinedSchemaFields();
+
+      expect(notifySpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "negative",
+          message: expect.stringContaining("Maximum allowed fields")
+        })
+      );
+      expect(wrapper.vm.selectedFields).toEqual([]);
     });
   });
 });
