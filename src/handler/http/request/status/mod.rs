@@ -1018,7 +1018,7 @@ async fn enable_node(
     node.scheduled = enable;
     if !node.scheduled {
         // release all the searching files
-        crate::common::infra::wal::clean_lock_files().await;
+        crate::common::infra::wal::clean_lock_files();
 
         #[cfg(feature = "enterprise")]
         {
@@ -1058,7 +1058,7 @@ async fn flush_node() -> Result<HttpResponse, Error> {
     };
 
     // release all the searching files
-    crate::common::infra::wal::clean_lock_files().await;
+    crate::common::infra::wal::clean_lock_files();
 
     match ingester::flush_all().await {
         Ok(_) => Ok(MetaHttpResponse::json(true)),
