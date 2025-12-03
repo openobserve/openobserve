@@ -84,18 +84,22 @@ test.describe("dashboard Import testcases", () => {
     // Assert that the title is correctly displayed on the UI
     await expect(page.getByText(`"${title}"`)).toBeVisible();
 
-    // Fetch the title from the JSON data
-    let jsonTitle = await page
-      .getByText("Cloudfront to OpenObserve")
+    // Fetch the title from the JSON data - look for the line containing "title": in the JSON editor
+    const jsonLine = await page
+      .locator('.view-lines .view-line')
+      .filter({ hasText: '"title":' })
+      .first()
       .innerText();
 
-    // need to remove double quote, before comparing
-    jsonTitle = jsonTitle?.substring?.(1, jsonTitle?.length - 1);
+    // Extract the title value from the JSON line (e.g., '"title": "Cloudfront to OpenObserve"')
+    const titleMatch = jsonLine.match(/"title":\s*"([^"]+)"/);
+    let jsonTitle = titleMatch ? titleMatch[1] : "";
 
-    // Normalize: Trim spaces, remove newlines, and replace multiple spaces with a single space
-    const normalizedJsonTitle = jsonTitle.trim().replace(/\s+/g, " ");
+    // Normalize both strings to handle any invisible characters or whitespace differences
+    const normalizedJsonTitle = jsonTitle.trim().replace(/\s+/g, " ").replace(/[\u200B-\u200D\uFEFF]/g, "");
+    const normalizedExpectedTitle = title.trim().replace(/\s+/g, " ").replace(/[\u200B-\u200D\uFEFF]/g, "");
 
-    expect(normalizedJsonTitle).toBe(title);
+    expect(normalizedJsonTitle).toBe(normalizedExpectedTitle);
     await pm.dashboardImport.clickImportButton();
     await waitForDashboardPage(page);
 
@@ -117,7 +121,7 @@ test.describe("dashboard Import testcases", () => {
 
     await pm.dashboardImport.clickImportDashboard();
 
-    await page.locator('[data-test="tab-import_json_url"]').click();
+    await pm.dashboardImport.clickUrlImportTab();
 
     await page.getByLabel("Add your url").click();
 
@@ -162,7 +166,11 @@ test.describe("dashboard Import testcases", () => {
 
     await pm.dashboardImport.uploadDashboardFile(fileContentPath);
 
-    await page.getByText("close").click();
+    // Wait for file to be uploaded and close button to be visible
+    await page.waitForTimeout(1000);
+
+    // Click the close icon to remove the uploaded file
+    await page.locator('.q-file .q-icon').filter({ hasText: 'close' }).click();
 
     await expect(page.getByLabel("cloud_uploadDrop your file")).toBeVisible();
 
@@ -366,7 +374,7 @@ test.describe("dashboard Import testcases", () => {
 
     await pm.dashboardImport.clickImportDashboard();
 
-    await page.locator('[data-test="tab-import_json_url"]').click();
+    await pm.dashboardImport.clickUrlImportTab();
     await page.getByLabel("Add your url").click();
     await page
       .getByLabel("Add your url")
@@ -421,7 +429,7 @@ test.describe("dashboard Import testcases", () => {
 
     await pm.dashboardImport.clickImportDashboard();
 
-    await page.locator('[data-test="tab-import_json_url"]').click();
+    await pm.dashboardImport.clickUrlImportTab();
 
     await page.getByLabel("Add your url").click();
     await page
