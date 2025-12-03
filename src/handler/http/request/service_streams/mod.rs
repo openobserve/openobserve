@@ -390,48 +390,9 @@ pub struct CorrelationRequest {
     pub available_dimensions: std::collections::HashMap<String, String>,
 }
 
-// Re-export types from enterprise module
-#[cfg(feature = "enterprise")]
-pub use o2_enterprise::enterprise::service_streams::meta::{
-    CorrelationResponse, DimensionAnalyticsSummary, RelatedStreams, StreamInfo,
+// Re-export shared types from common meta for API documentation (utoipa)
+// These types are the same for both enterprise and non-enterprise builds
+pub use crate::common::meta::service_streams::{
+    CardinalityClass, CorrelationResponse, DimensionAnalytics, DimensionAnalyticsSummary,
+    RelatedStreams, StreamInfo,
 };
-
-// Provide stub types for non-enterprise builds
-#[cfg(not(feature = "enterprise"))]
-mod stubs {
-    use std::collections::HashMap;
-
-    #[derive(Debug, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
-    pub struct CorrelationResponse {
-        pub service_name: String,
-        pub matched_dimensions: HashMap<String, String>,
-        pub additional_dimensions: HashMap<String, String>,
-        pub related_streams: RelatedStreams,
-    }
-
-    #[derive(Debug, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
-    pub struct RelatedStreams {
-        pub logs: Vec<StreamInfo>,
-        pub traces: Vec<StreamInfo>,
-        pub metrics: Vec<StreamInfo>,
-    }
-
-    #[derive(Debug, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
-    pub struct StreamInfo {
-        pub stream_name: String,
-        pub filters: HashMap<String, String>,
-    }
-
-    #[derive(Debug, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
-    pub struct DimensionAnalyticsSummary {
-        pub org_id: String,
-        pub total_dimensions: usize,
-        pub by_cardinality: HashMap<String, Vec<String>>,
-        pub recommended_priority_dimensions: Vec<String>,
-        pub dimensions: Vec<String>, // Simplified for stub
-        pub generated_at: i64,
-    }
-}
-
-#[cfg(not(feature = "enterprise"))]
-pub use stubs::*;

@@ -104,6 +104,7 @@ pub struct ServiceRecord {
 }
 
 impl ServiceRecord {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         org_id: &str,
         service_key: &str,
