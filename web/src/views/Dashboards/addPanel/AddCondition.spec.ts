@@ -318,7 +318,7 @@ describe("AddCondition.vue", () => {
       expect(result).toBe("required_field IS NOT NULL");
     });
 
-    it("should return LIKE condition for Contains operator", () => {
+    it("should return str_match condition for Contains operator", () => {
       wrapper = createWrapper({
         condition: {
           ...defaultProps.condition,
@@ -329,7 +329,7 @@ describe("AddCondition.vue", () => {
       });
 
       const result = wrapper.vm.computedLabel(wrapper.props().condition);
-      expect(result).toBe("message LIKE %error%");
+      expect(result).toBe("str_match(message, 'error')");
     });
 
     it("should return NOT LIKE condition for Not Contains operator", () => {
