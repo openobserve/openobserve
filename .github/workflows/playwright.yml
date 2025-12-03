@@ -107,7 +107,7 @@ jobs:
       labels: repo-openobserve-standard-8
     # container:
     #   image: mcr.microsoft.com/playwright:v1.50.0-jammy
-    #   options: --user root
+    #   options: --user root 
     strategy:
       matrix:
         include:
