@@ -784,12 +784,15 @@ export default defineComponent({
 
     const updateStreamFields = async (stream_name: any) => {
       let streamCols: any = [];
+
+      // Fetch stream details including schema and settings
       const streams: any = await getStream(
         stream_name,
         formData.value.stream_type,
         true,
       );
 
+      // Map all schema fields to column objects with label, value, and type
       if (streams && Array.isArray(streams.schema)) {
         streamCols = streams.schema.map((column: any) => ({
           label: column.name,
@@ -798,6 +801,37 @@ export default defineComponent({
         }));
       }
 
+      // Check if User Defined Schema (UDS) fields are configured
+      // If defined_schema_fields exists and is not empty, we should filter to show only those fields
+      if (
+        streams?.settings?.defined_schema_fields &&
+        Array.isArray(streams.settings.defined_schema_fields) &&
+        streams.settings.defined_schema_fields.length > 0
+      ) {
+        const definedFields = streams.settings.defined_schema_fields;
+
+        // get timestamp and all fields 
+        // why we need this because we need to show timestamp and all fields in defined schema fields 
+        // we dont get them in defined_schema_fields so if they are present in schema then we should keep them as it is
+        const timestampColumn = store.state.zoConfig?.timestamp_column || '_timestamp';
+        const allFieldsName = store.state.zoConfig?.all_fields_name;
+
+        // Filter the columns to include:
+        // 1.(timestamp and all_fields) (_timestamp , _all) --> this will be varied depending upon the env variables
+        // 2. User-defined schema fields - only the fields user explicitly configured as UDS
+        streamCols = streamCols.filter((col: any) => {
+          // Always include timestamp column (e.g., '_timestamp')
+          // Always include all fields column (e.g., '_all')
+          if (col.value === timestampColumn || col.value === allFieldsName) {
+            return true;
+          }
+          // Include field only if it's in the defined_schema_fields list
+          return definedFields.includes(col.value);
+        });
+      }
+      // If defined_schema_fields is not present or empty, show all schema fields (default behavior)
+
+      // Store the filtered/unfiltered columns for use in the component
       originalStreamFields.value = [...streamCols];
       filteredColumns.value = [...streamCols];
 
