@@ -226,10 +226,11 @@ export const convertServiceGraphToTree = (
       .map((edge: any) => buildTree(edge.to, new Set(visited)))
       .filter((child: any) => child !== null);
 
-    // Calculate node metrics
-    const totalRequests = outgoingEdges.reduce((sum: number, e: any) => sum + (e.total_requests || 0), 0);
-    const failedRequests = outgoingEdges.reduce((sum: number, e: any) => sum + (e.failed_requests || 0), 0);
-    const errorRate = totalRequests > 0 ? (failedRequests / totalRequests) * 100 : 0;
+    // Calculate node metrics - use node's own request count, not just outgoing edges
+    // This ensures leaf nodes show their actual traffic instead of 0
+    const totalRequests = node.requests || 0;
+    const failedRequests = node.errors || 0;
+    const errorRate = node.error_rate || 0;
 
     // Determine node color based on error rate
     let nodeColor = "#4CAF50"; // Green for healthy
