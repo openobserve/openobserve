@@ -51,6 +51,11 @@ pub struct Model {
     #[sea_orm(column_type = "String(StringLen::N(512))")]
     pub service_key: String,
 
+    /// Correlation key (hash of stable dimensions only)
+    /// Used as the primary identity for grouping services and preventing DB explosion
+    #[sea_orm(column_type = "String(StringLen::N(64))", default_value = "")]
+    pub correlation_key: String,
+
     /// Service name (e.g., "api-server", "web-server")
     #[sea_orm(column_type = "String(StringLen::N(256))")]
     pub service_name: String,
@@ -89,6 +94,7 @@ impl ActiveModelBehavior for ActiveModel {}
 pub struct ServiceRecord {
     pub org_id: String,
     pub service_key: String,
+    pub correlation_key: String,
     pub service_name: String,
     pub dimensions: String,
     pub streams: String,
@@ -101,6 +107,7 @@ impl ServiceRecord {
     pub fn new(
         org_id: &str,
         service_key: &str,
+        correlation_key: &str,
         service_name: &str,
         dimensions: &str,
         streams: &str,
@@ -110,6 +117,7 @@ impl ServiceRecord {
         Self {
             org_id: org_id.to_owned(),
             service_key: service_key.to_owned(),
+            correlation_key: correlation_key.to_owned(),
             service_name: service_name.to_owned(),
             dimensions: dimensions.to_owned(),
             streams: streams.to_owned(),
@@ -148,10 +156,11 @@ pub async fn put(record: ServiceRecord) -> Result<(), errors::Error> {
     let _lock = get_lock().await;
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
-    // Try to find existing record by unique constraint (org_id, service_key)
+    // Try to find existing record by unique constraint (org_id, correlation_key)
+    // This ensures services with the same stable dimensions are deduplicated
     let existing = Entity::find()
         .filter(Column::OrgId.eq(&record.org_id))
-        .filter(Column::ServiceKey.eq(&record.service_key))
+        .filter(Column::CorrelationKey.eq(&record.correlation_key))
         .one(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
@@ -159,6 +168,8 @@ pub async fn put(record: ServiceRecord) -> Result<(), errors::Error> {
     if let Some(existing_record) = existing {
         // Update existing record
         let mut active_model: ActiveModel = existing_record.into();
+        active_model.service_key = Set(record.service_key);
+        active_model.correlation_key = Set(record.correlation_key);
         active_model.service_name = Set(record.service_name);
         active_model.dimensions = Set(record.dimensions);
         active_model.streams = Set(record.streams);
@@ -177,6 +188,7 @@ pub async fn put(record: ServiceRecord) -> Result<(), errors::Error> {
             id: Set(id),
             org_id: Set(record.org_id),
             service_key: Set(record.service_key),
+            correlation_key: Set(record.correlation_key),
             service_name: Set(record.service_name),
             dimensions: Set(record.dimensions),
             streams: Set(record.streams),
@@ -208,6 +220,7 @@ pub async fn get(org_id: &str, service_key: &str) -> Result<Option<ServiceRecord
     Ok(record.map(|r| ServiceRecord {
         org_id: r.org_id,
         service_key: r.service_key,
+        correlation_key: r.correlation_key,
         service_name: r.service_name,
         dimensions: r.dimensions,
         streams: r.streams,
@@ -232,6 +245,7 @@ pub async fn list(org_id: &str) -> Result<Vec<ServiceRecord>, errors::Error> {
         .map(|r| ServiceRecord {
             org_id: r.org_id,
             service_key: r.service_key,
+            correlation_key: r.correlation_key,
             service_name: r.service_name,
             dimensions: r.dimensions,
             streams: r.streams,
@@ -261,6 +275,7 @@ pub async fn list_by_name(
         .map(|r| ServiceRecord {
             org_id: r.org_id,
             service_key: r.service_key,
+            correlation_key: r.correlation_key,
             service_name: r.service_name,
             dimensions: r.dimensions,
             streams: r.streams,
@@ -325,6 +340,7 @@ mod tests {
         let record = ServiceRecord::new(
             org_id,
             service_key,
+            "test_correlation_key_1",
             "api-server",
             r#"{"environment":"production"}"#,
             r#"{"logs":[],"metrics":[],"traces":[]}"#,
@@ -353,6 +369,7 @@ mod tests {
         let record1 = ServiceRecord::new(
             org_id,
             service_key,
+            "test_correlation_key_2",
             "web-server",
             r#"{}"#,
             r#"{"logs":["stream1"],"metrics":[],"traces":[]}"#,
@@ -361,10 +378,11 @@ mod tests {
         );
         put(record1).await.unwrap();
 
-        // Upsert with updated streams
+        // Upsert with updated streams (same correlation_key)
         let record2 = ServiceRecord::new(
             org_id,
             service_key,
+            "test_correlation_key_2",
             "web-server",
             r#"{}"#,
             r#"{"logs":["stream1","stream2"],"metrics":[],"traces":[]}"#,
@@ -392,6 +410,7 @@ mod tests {
         put(ServiceRecord::new(
             org_id,
             "svc1",
+            "corr_key_svc1",
             "svc1",
             r#"{}"#,
             r#"{"logs":[],"metrics":[],"traces":[]}"#,
@@ -404,6 +423,7 @@ mod tests {
         put(ServiceRecord::new(
             org_id,
             "svc2",
+            "corr_key_svc2",
             "svc2",
             r#"{}"#,
             r#"{"logs":[],"metrics":[],"traces":[]}"#,
@@ -427,6 +447,7 @@ mod tests {
         put(ServiceRecord::new(
             org_id,
             "api?env=prod",
+            "corr_key_api_prod",
             "api",
             r#"{"env":"prod"}"#,
             r#"{"logs":[],"metrics":[],"traces":[]}"#,
@@ -439,6 +460,7 @@ mod tests {
         put(ServiceRecord::new(
             org_id,
             "api?env=staging",
+            "corr_key_api_staging",
             "api",
             r#"{"env":"staging"}"#,
             r#"{"logs":[],"metrics":[],"traces":[]}"#,
@@ -451,6 +473,7 @@ mod tests {
         put(ServiceRecord::new(
             org_id,
             "web",
+            "corr_key_web",
             "web",
             r#"{}"#,
             r#"{"logs":[],"metrics":[],"traces":[]}"#,
@@ -477,6 +500,7 @@ mod tests {
         put(ServiceRecord::new(
             org_id,
             service_key,
+            "corr_key_delete",
             "delete-me",
             r#"{}"#,
             r#"{"logs":[],"metrics":[],"traces":[]}"#,
