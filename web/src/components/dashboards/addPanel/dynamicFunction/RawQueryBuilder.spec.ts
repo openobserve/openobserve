@@ -154,7 +154,7 @@ describe("RawQueryBuilder", () => {
       wrapper = createWrapper();
       const textarea = wrapper.find("textarea");
       expect(textarea.attributes("data-test")).toBe(
-        "dashboard-drilldown-url-textarea"
+        "dashboard-raw-query-textarea"
       );
     });
 
