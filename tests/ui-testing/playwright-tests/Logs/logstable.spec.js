@@ -538,7 +538,8 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     const fs = require('fs');
 
     const screenshotsToDelete = [
-      'playwright-tests/Logs/include-menu-debug.png'
+      'playwright-tests/Logs/include-menu-debug.png',
+      'playwright-tests/Logs/include-menu-after-click.png'
     ];
 
     for (const screenshot of screenshotsToDelete) {

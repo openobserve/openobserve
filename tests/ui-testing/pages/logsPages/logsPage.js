@@ -2398,6 +2398,19 @@ export class LogsPage {
     }
 
     async addIncludeSearchTermFromLogDetails() {
+        // Ensure Quick Mode is OFF for include/exclude buttons to work
+        const quickModeToggle = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] div').nth(1);
+        const quickModeClass = await quickModeToggle.getAttribute('class');
+        const isQuickModeOn = quickModeClass && quickModeClass.includes('text-primary');
+
+        if (isQuickModeOn) {
+            testLogger.info('Quick Mode is ON - turning it OFF for include/exclude functionality');
+            await quickModeToggle.click();
+            await this.page.waitForTimeout(1000);
+        } else {
+            testLogger.info('Quick Mode is already OFF');
+        }
+
         // Check if there's a direct include button (newer UI)
         const directIncludeButton = this.page.locator('[data-test="log-details-include-field-btn"]');
         const directIncludeCount = await directIncludeButton.count();
@@ -2410,15 +2423,50 @@ export class LogsPage {
         }
 
         // Otherwise use the dropdown approach (older UI)
+        // Don't use the first button (which is for _timestamp field), use the second one
         const includeExcludeButtons = this.page.locator('[data-test="log-details-include-exclude-field-btn"]');
-        await expect(includeExcludeButtons.first()).toBeVisible();
-        await includeExcludeButtons.first().click();
-        await this.page.waitForTimeout(1000);
+        const buttonCount = await includeExcludeButtons.count();
+        testLogger.info(`Found ${buttonCount} include/exclude buttons in log details`);
 
-        // Click 'Include Search Term' from the menu
-        const includeMenuItem = this.page.getByText('Include Search Term');
-        await includeMenuItem.waitFor({ state: 'visible', timeout: 10000 });
-        await includeMenuItem.click();
+        // Use the second button (index 1) to skip _timestamp field
+        if (buttonCount > 1) {
+            await expect(includeExcludeButtons.nth(1)).toBeVisible();
+            await includeExcludeButtons.nth(1).click();
+        } else if (buttonCount > 0) {
+            // Fallback to first if only one exists
+            await expect(includeExcludeButtons.first()).toBeVisible();
+            await includeExcludeButtons.first().click();
+        } else {
+            throw new Error('No include/exclude buttons found in log details');
+        }
+        await this.page.waitForTimeout(1500);
+
+        // Take screenshot to see what menu appears
+        await this.page.screenshot({ path: 'playwright-tests/Logs/include-menu-after-click.png', fullPage: true });
+        testLogger.info('Screenshot saved after clicking include/exclude button');
+
+        // Try to find the menu in different ways
+        const includeByText = this.page.getByText('Include Search Term');
+        const includeExact = this.page.getByText('Include Search Term', { exact: true });
+        const includePartial = this.page.getByText(/Include.*Search/i);
+
+        const textCount = await includeByText.count();
+        const exactCount = await includeExact.count();
+        const partialCount = await includePartial.count();
+
+        testLogger.info(`Found menus: text=${textCount}, exact=${exactCount}, partial=${partialCount}`);
+
+        // Try clicking whichever is found
+        if (textCount > 0) {
+            await includeByText.first().click();
+        } else if (exactCount > 0) {
+            await includeExact.first().click();
+        } else if (partialCount > 0) {
+            await includePartial.first().click();
+        } else {
+            throw new Error('Include Search Term menu item not found');
+        }
+
         await this.page.waitForTimeout(1000);
     }
 
