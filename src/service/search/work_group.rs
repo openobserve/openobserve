@@ -12,11 +12,10 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#[cfg(feature = "enterprise")]
+use config::meta::search::SearchEventType;
 use config::{
-    datafusion::request::Request,
-    get_config,
-    meta::{cluster::Node, search::SearchEventType},
-    metrics,
+    datafusion::request::Request, get_config, meta::cluster::Node, metrics,
     utils::stopwatch::StopWatch,
 };
 use infra::{
