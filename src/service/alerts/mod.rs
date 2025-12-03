@@ -44,6 +44,7 @@ use crate::service::{
 };
 
 pub mod alert;
+pub mod backfill;
 #[cfg(feature = "enterprise")]
 pub mod deduplication;
 pub mod derived_streams;

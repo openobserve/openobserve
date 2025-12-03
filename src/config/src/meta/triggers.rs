@@ -36,6 +36,7 @@ pub enum TriggerModule {
     Alert,
     DerivedStream,
     QueryRecommendations,
+    Backfill,
 }
 
 impl std::fmt::Display for TriggerModule {
@@ -45,6 +46,7 @@ impl std::fmt::Display for TriggerModule {
             Self::Report => write!(f, "report"),
             Self::DerivedStream => write!(f, "derived_stream"),
             Self::QueryRecommendations => write!(f, "query_recommendations"),
+            Self::Backfill => write!(f, "backfill"),
         }
     }
 }
@@ -84,6 +86,55 @@ pub struct ScheduledTriggerData {
     pub tolerance: i64,
     #[serde(default)]
     pub last_satisfied_at: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub backfill_job: Option<BackfillJob>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BackfillJob {
+    /// Reference to the source pipeline ID
+    pub source_pipeline_id: String,
+
+    /// Time range to backfill
+    pub start_time: i64,  // microseconds
+    pub end_time: i64,    // microseconds
+
+    /// Optional: chunk size for processing large ranges
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chunk_period_minutes: Option<i64>,
+
+    /// Progress tracking
+    pub current_position: i64,
+
+    /// Optional: rate limiting
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_execution_time_secs: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delay_between_chunks_secs: Option<i64>,
+
+    /// Delete existing data before backfilling
+    #[serde(default)]
+    pub delete_before_backfill: bool,
+
+    /// Deletion phase tracking
+    #[serde(default)]
+    pub deletion_status: DeletionStatus,
+
+    /// Deletion job ID for tracking compactor job
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deletion_job_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum DeletionStatus {
+    Pending,
+    InProgress,
+    Completed,
+    #[serde(untagged)]
+    Failed(String),
+    #[default]
+    NotRequired,
 }
 
 impl ScheduledTriggerData {
