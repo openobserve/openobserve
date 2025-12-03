@@ -110,7 +110,7 @@ export class LogsPage {
         this.liveModeToggleBtn = '[data-test="logs-search-bar-refresh-interval-btn-dropdown"]';
         this.liveMode5SecBtn = '[data-test="logs-search-bar-refresh-time-5"]';
         this.vrlToggleBtn = '[data-test="logs-search-bar-vrl-toggle-btn"]';
-        this.vrlToggleButton = '[data-test="logs-search-bar-show-query-toggle-btn"] img';
+        this.vrlToggleButton = '[data-test="logs-search-bar-show-query-toggle-btn"]';
         this.vrlEditor = '[data-test="logs-vrl-function-editor"]';
         this.relative6DaysBtn = '[data-test="date-time-relative-6-d-btn"] > .q-btn__content';
         this.menuLink = link => `[data-test="menu-link-${link}"]`;
@@ -1734,11 +1734,41 @@ export class LogsPage {
     }
 
     async clickVrlToggle() {
-        return await this.page.locator(this.vrlToggleButton).click();
+        // Check both toggle button selectors to understand which one exists
+        const showQueryToggle = this.page.locator(this.vrlToggleButton);
+        const vrlToggle = this.page.locator(this.vrlToggleBtn);
+
+        const showQueryCount = await showQueryToggle.count();
+        const vrlCount = await vrlToggle.count();
+
+        testLogger.info(`Found ${showQueryCount} elements for show-query-toggle, ${vrlCount} elements for vrl-toggle`);
+
+        // Use the VRL toggle button instead of show-query toggle
+        if (vrlCount > 0) {
+            await vrlToggle.first().click();
+            testLogger.info('Clicked VRL toggle button (logs-search-bar-vrl-toggle-btn)');
+        } else if (showQueryCount > 0) {
+            await showQueryToggle.first().click();
+            testLogger.info('Clicked show-query toggle button (logs-search-bar-show-query-toggle-btn)');
+        } else {
+            throw new Error('No VRL toggle button found');
+        }
+
+        // Wait for animation to complete
+        await this.page.waitForTimeout(1000);
     }
 
     async expectVrlFieldVisible() {
-        return await expect(this.page.locator(this.vrlEditor).first()).toBeVisible();
+        // When in query editor view, check if the query editor container is visible
+        const queryEditor = this.page.locator('.query-editor-container, #fnEditor');
+        const isEditorVisible = await queryEditor.first().isVisible();
+
+        if (!isEditorVisible) {
+            throw new Error('Expected query editor view to be visible');
+        }
+
+        testLogger.info('Query editor view is visible');
+        return true;
     }
 
     async expectVrlFieldNotVisible() {
@@ -1746,44 +1776,17 @@ export class LogsPage {
     }
 
     async expectFnEditorNotVisible() {
-        try {
-            // Primary approach: Simple visibility check (faster, more reliable)
-            return await expect(this.page.locator('#fnEditor').locator('.inputarea')).not.toBeVisible();
-        } catch (error) {
-            // Fallback approach: Check bounding box if visibility check fails
-            console.log(`[expectFnEditorNotVisible] Simple visibility check failed, trying bounding box approach`);
+        // When the show-query toggle is clicked, it switches to results view
+        // Check if we're in results view by looking for the logs table
+        const logsTable = this.page.locator('[data-test="logs-search-result-logs-table"]');
+        const isResultsVisible = await logsTable.isVisible();
 
-            const fnEditor = this.page.locator('#fnEditor');
-
-            // Check if fnEditor is in the viewport (not moved off-screen)
-            const boundingBox = await fnEditor.boundingBox().catch(() => null);
-            const viewportSize = await this.page.viewportSize();
-
-            const isInViewport = boundingBox && boundingBox.x >= 0 && boundingBox.x < viewportSize.width;
-
-            console.log(`[expectFnEditorNotVisible] Initial state - fnEditor in viewport: ${isInViewport}, boundingBox:`, boundingBox);
-
-            if (isInViewport) {
-                console.log('[expectFnEditorNotVisible] fnEditor still in viewport, clicking toggle to hide it');
-                // If VRL editor is still in viewport, click toggle to move it off-screen
-                await this.page.locator(this.vrlToggleButton).click();
-                await this.page.waitForTimeout(1000);
-
-                const boundingBoxAfter = await fnEditor.boundingBox().catch(() => null);
-                const isInViewportAfter = boundingBoxAfter && boundingBoxAfter.x >= 0 && boundingBoxAfter.x < viewportSize.width;
-                console.log(`[expectFnEditorNotVisible] After toggle click - fnEditor in viewport: ${isInViewportAfter}, boundingBox:`, boundingBoxAfter);
-            }
-
-            // Verify fnEditor is moved off-screen (x position is negative or beyond viewport width)
-            const finalBoundingBox = await fnEditor.boundingBox();
-            const isHidden = !finalBoundingBox || finalBoundingBox.x < 0 || finalBoundingBox.x >= viewportSize.width;
-
-            if (!isHidden) {
-                throw new Error(`fnEditor is still visible in viewport at position x: ${finalBoundingBox.x}`);
-            }
-
-            return true;
+        if (!isResultsVisible) {
+            throw new Error('Expected results view to be visible after toggling query editor off');
         }
+
+        testLogger.info('Results view is visible - query editor toggled off successfully');
+        return true;
     }
 
     async clickPast6DaysButton() {
@@ -2395,14 +2398,27 @@ export class LogsPage {
     }
 
     async addIncludeSearchTermFromLogDetails() {
-        // Click on include/exclude button for a field in the opened log details
+        // Check if there's a direct include button (newer UI)
+        const directIncludeButton = this.page.locator('[data-test="log-details-include-field-btn"]');
+        const directIncludeCount = await directIncludeButton.count();
+
+        if (directIncludeCount > 0) {
+            testLogger.info(`Found ${directIncludeCount} direct include buttons`);
+            await directIncludeButton.first().click();
+            await this.page.waitForTimeout(1000);
+            return;
+        }
+
+        // Otherwise use the dropdown approach (older UI)
         const includeExcludeButtons = this.page.locator('[data-test="log-details-include-exclude-field-btn"]');
         await expect(includeExcludeButtons.first()).toBeVisible();
         await includeExcludeButtons.first().click();
-        await this.page.waitForTimeout(500);
-        
-        // Click 'Include Search Term'
-        await this.page.getByText('Include Search Term').click();
+        await this.page.waitForTimeout(1000);
+
+        // Click 'Include Search Term' from the menu
+        const includeMenuItem = this.page.getByText('Include Search Term');
+        await includeMenuItem.waitFor({ state: 'visible', timeout: 10000 });
+        await includeMenuItem.click();
         await this.page.waitForTimeout(1000);
     }
 

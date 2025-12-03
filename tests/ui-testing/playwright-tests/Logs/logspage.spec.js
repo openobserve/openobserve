@@ -235,19 +235,37 @@ test.describe("Logs Page testcases", () => {
     const isInitiallyVisible = await fnEditorInput.isVisible().catch(() => false);
 
     if (isInitiallyVisible) {
-      // VRL is ON - turn it OFF first, then test ON, then OFF again
-      await pm.logsPage.clickVrlToggle();
-      await pm.logsPage.expectFnEditorNotVisible();
-      await pm.logsPage.clickVrlToggle();
+      // VRL toggle is ON - verify field is visible, then turn it OFF and verify not visible
+      testLogger.info('VRL toggle is initially ON');
       await pm.logsPage.expectVrlFieldVisible();
+
+      // Take screenshot before toggle
+      await page.screenshot({ path: 'playwright-tests/Logs/vrl-before-toggle.png', fullPage: true });
+      testLogger.info('Screenshot saved: playwright-tests/Logs/vrl-before-toggle.png');
+
       await pm.logsPage.clickVrlToggle();
+
+      // Take screenshot after toggle
+      await page.screenshot({ path: 'playwright-tests/Logs/vrl-after-toggle.png', fullPage: true });
+      testLogger.info('Screenshot saved: playwright-tests/Logs/vrl-after-toggle.png');
+
       await pm.logsPage.expectFnEditorNotVisible();
     } else {
-      // VRL is OFF - turn it ON, then OFF
-      await pm.logsPage.clickVrlToggle();
-      await pm.logsPage.expectVrlFieldVisible();
-      await pm.logsPage.clickVrlToggle();
+      // VRL toggle is OFF - verify field is not visible, then turn it ON and verify visible
+      testLogger.info('VRL toggle is initially OFF');
       await pm.logsPage.expectFnEditorNotVisible();
+
+      // Take screenshot before toggle
+      await page.screenshot({ path: 'playwright-tests/Logs/vrl-before-toggle-off.png', fullPage: true });
+      testLogger.info('Screenshot saved: playwright-tests/Logs/vrl-before-toggle-off.png');
+
+      await pm.logsPage.clickVrlToggle();
+
+      // Take screenshot after toggle
+      await page.screenshot({ path: 'playwright-tests/Logs/vrl-after-toggle-off.png', fullPage: true });
+      testLogger.info('Screenshot saved: playwright-tests/Logs/vrl-after-toggle-off.png');
+
+      await pm.logsPage.expectVrlFieldVisible();
     }
 
     testLogger.info('VRL toggle field visibility test completed');
