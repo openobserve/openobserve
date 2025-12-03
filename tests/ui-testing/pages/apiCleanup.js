@@ -1367,6 +1367,105 @@ class APICleanup {
     }
 
     /**
+     * Fetch all search jobs
+     * @returns {Promise<Array>} Array of search job objects
+     */
+    async fetchSearchJobs() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/search_jobs?type=logs`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to fetch search jobs', { status: response.status });
+                return [];
+            }
+
+            const searchJobs = await response.json();
+            return searchJobs || [];
+        } catch (error) {
+            testLogger.error('Failed to fetch search jobs', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Delete a single search job
+     * @param {string} jobId - The search job ID
+     * @returns {Promise<Object>} Deletion result
+     */
+    async deleteSearchJob(jobId) {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/search_jobs/${jobId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to delete search job', { jobId, status: response.status });
+                return { code: response.status, message: 'Failed to delete search job' };
+            }
+
+            const result = await response.json();
+            return { code: 200, ...result };
+        } catch (error) {
+            testLogger.error('Failed to delete search job', { jobId, error: error.message });
+            return { code: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Clean up all search jobs
+     * Deletes all search jobs for the organization
+     */
+    async cleanupSearchJobs() {
+        testLogger.info('Starting search jobs cleanup');
+
+        try {
+            // Fetch all search jobs
+            const searchJobs = await this.fetchSearchJobs();
+            testLogger.info('Fetched search jobs', { total: searchJobs.length });
+
+            if (searchJobs.length === 0) {
+                testLogger.info('No search jobs to clean up');
+                return;
+            }
+
+            // Delete each search job
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const job of searchJobs) {
+                const result = await this.deleteSearchJob(job.id);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.debug('Deleted search job', { jobId: job.id, userId: job.user_id });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete search job', { jobId: job.id, userId: job.user_id, result });
+                }
+            }
+
+            testLogger.info('Search jobs cleanup completed', {
+                total: searchJobs.length,
+                deleted: deletedCount,
+                failed: failedCount
+            });
+
+        } catch (error) {
+            testLogger.error('Search jobs cleanup failed', { error: error.message });
+        }
+    }
+
+    /**
      * Fetch all saved views
      * @returns {Promise<Array>} Array of saved view objects
      */
