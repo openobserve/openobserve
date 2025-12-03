@@ -35,6 +35,7 @@ pub mod ratelimit;
 pub mod search;
 pub mod self_reporting;
 pub mod service_graph;
+pub mod service_streams;
 pub mod short_url;
 pub mod sql;
 pub mod stream;

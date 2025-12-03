@@ -390,9 +390,9 @@ pub struct CorrelationRequest {
     pub available_dimensions: std::collections::HashMap<String, String>,
 }
 
-// Re-export shared types from common meta for API documentation (utoipa)
+// Re-export shared types from config for API documentation (utoipa)
 // These types are the same for both enterprise and non-enterprise builds
-pub use crate::common::meta::service_streams::{
+pub use config::meta::service_streams::{
     CardinalityClass, CorrelationResponse, DimensionAnalytics, DimensionAnalyticsSummary,
     RelatedStreams, StreamInfo,
 };

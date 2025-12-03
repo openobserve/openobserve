@@ -20,9 +20,10 @@
 
 use std::collections::HashMap;
 
-use config::meta::stream::StreamType;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+use crate::meta::stream::StreamType;
 
 /// Information about a stream where a service was discovered
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
@@ -235,6 +236,38 @@ pub struct DimensionAnalytics {
     /// Sample values (limited to 10 for inspection)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub sample_values: Vec<String>,
+}
+
+impl DimensionAnalytics {
+    /// Create new dimension analytics
+    pub fn new(dimension_name: String) -> Self {
+        let now = chrono::Utc::now().timestamp_micros();
+        Self {
+            dimension_name,
+            cardinality: 0,
+            cardinality_class: CardinalityClass::VeryLow,
+            service_count: 0,
+            first_seen: now,
+            last_updated: now,
+            sample_values: Vec::new(),
+        }
+    }
+
+    /// Update analytics with new data
+    pub fn update(&mut self, cardinality: usize, service_count: usize, sample_values: Vec<String>) {
+        self.cardinality = cardinality;
+        self.cardinality_class = CardinalityClass::from_cardinality(cardinality);
+        self.service_count = service_count;
+        self.last_updated = chrono::Utc::now().timestamp_micros();
+
+        // Keep only first 10 sample values
+        self.sample_values = sample_values.into_iter().take(10).collect();
+    }
+
+    /// Check if this dimension is suitable for correlation
+    pub fn is_suitable_for_correlation(&self) -> bool {
+        self.cardinality_class.is_suitable_for_correlation()
+    }
 }
 
 /// Cardinality classification for dimensions
