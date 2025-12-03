@@ -411,7 +411,7 @@ async fn search_in_cluster(
     }
 
     log::info!(
-        "[trace_id {trace_id}] promql->search timing breakdown:\n{}",
+        "[trace_id {trace_id}] promql->search search finished {}",
         stop_watch.get_summary()
     );
 
