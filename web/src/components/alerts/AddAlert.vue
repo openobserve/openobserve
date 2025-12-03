@@ -1023,14 +1023,6 @@ export default defineComponent({
      * @returns {{ isValid: boolean, invalidFields: string[] }} Validation result with invalid fields list
      */
     const validateConditionsAgainstUDS = () => {
-      // Skip validation if query type is "sql" or "promql" - users write custom queries there
-      if (
-        formData.value.query_condition?.type === "sql" ||
-        formData.value.query_condition?.type === "promql"
-      ) {
-        return { isValid: true, invalidFields: [] };
-      }
-
       // Skip validation if no stream is selected or no fields are available
       if (
         !formData.value.stream_name ||
@@ -1041,15 +1033,21 @@ export default defineComponent({
         return { isValid: true, invalidFields: [] };
       }
 
+      // For scheduled alerts: Skip validation if query type is "sql" or "promql" - users write custom queries there
+      // For real-time alerts: Always validate since they use the conditions UI
+      const isRealTime = formData.value.is_real_time === "true" || formData.value.is_real_time === true;
+      const isScheduled = !isRealTime;
+      const queryType = formData.value.query_condition?.type;
+
+      if (isScheduled && (queryType === "sql" || queryType === "promql")) {
+        return { isValid: true, invalidFields: [] };
+      }
+
       // Use the already filtered fields from originalStreamFields
       // These are already filtered by UDS in updateStreamFields function
       const allowedFieldNames = new Set(
         originalStreamFields.value.map((field: any) => field.value)
       );
-
-      // If originalStreamFields has all fields from the schema, it means UDS is not configured
-      // In that case, skip validation (all fields are allowed)
-      // We can't determine this easily, so we'll just validate against available fields
 
       // Recursively collect all column names used in conditions
       const invalidFields: string[] = [];
@@ -1076,42 +1074,50 @@ export default defineComponent({
         }
       };
 
-      // Check conditions for real-time and scheduled alerts (custom query type only)
-      if (
-        formData.value.query_condition?.conditions &&
-        formData.value.query_condition?.type === "custom"
-      ) {
-        checkConditionFields(formData.value.query_condition.conditions);
-      }
-
-      // Also check aggregation having clause if present (for scheduled alerts with custom query type)
-      if (
-        isAggregationEnabled.value &&
-        formData.value.query_condition?.type === "custom" &&
-        formData.value.query_condition?.aggregation?.having?.column
-      ) {
-        const havingColumn = formData.value.query_condition.aggregation.having.column;
-        if (havingColumn && havingColumn !== "" && !allowedFieldNames.has(havingColumn)) {
-          if (!invalidFields.includes(havingColumn)) {
-            invalidFields.push(havingColumn);
-          }
+      // Check conditions based on alert type
+      if (isRealTime) {
+        // Real-time alerts: Always check conditions since they use the conditions UI
+        if (formData.value.query_condition?.conditions) {
+          checkConditionFields(formData.value.query_condition.conditions);
         }
-      }
+      } else {
+        // Scheduled alerts: Only check if query type is "custom"
+        if (
+          formData.value.query_condition?.conditions &&
+          queryType === "custom"
+        ) {
+          checkConditionFields(formData.value.query_condition.conditions);
+        }
 
-      // Also check group_by fields if present (for scheduled alerts with custom query type)
-      if (
-        isAggregationEnabled.value &&
-        formData.value.query_condition?.type === "custom" &&
-        formData.value.query_condition?.aggregation?.group_by &&
-        Array.isArray(formData.value.query_condition.aggregation.group_by)
-      ) {
-        formData.value.query_condition.aggregation.group_by.forEach((field: string) => {
-          if (field && field !== "" && !allowedFieldNames.has(field)) {
-            if (!invalidFields.includes(field)) {
-              invalidFields.push(field);
+        // Also check aggregation having clause if present (for scheduled alerts with custom query type)
+        if (
+          isAggregationEnabled.value &&
+          queryType === "custom" &&
+          formData.value.query_condition?.aggregation?.having?.column
+        ) {
+          const havingColumn = formData.value.query_condition.aggregation.having.column;
+          if (havingColumn && havingColumn !== "" && !allowedFieldNames.has(havingColumn)) {
+            if (!invalidFields.includes(havingColumn)) {
+              invalidFields.push(havingColumn);
             }
           }
-        });
+        }
+
+        // Also check group_by fields if present (for scheduled alerts with custom query type)
+        if (
+          isAggregationEnabled.value &&
+          queryType === "custom" &&
+          formData.value.query_condition?.aggregation?.group_by &&
+          Array.isArray(formData.value.query_condition.aggregation.group_by)
+        ) {
+          formData.value.query_condition.aggregation.group_by.forEach((field: string) => {
+            if (field && field !== "" && !allowedFieldNames.has(field)) {
+              if (!invalidFields.includes(field)) {
+                invalidFields.push(field);
+              }
+            }
+          });
+        }
       }
 
       return {
