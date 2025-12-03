@@ -123,13 +123,9 @@ test.describe("dashboard Import testcases", () => {
 
     await pm.dashboardImport.clickUrlImportTab();
 
-    await page.getByLabel("Add your url").click();
-
-    await page
-      .getByLabel("Add your url")
-      .fill(
-        "https://raw.githubusercontent.com/openobserve/dashboards/refs/heads/main/AWS%20Cloudfront%20Access%20Logs/Cloudfront_to_OpenObserve.dashboard.json"
-      );
+    await page.getByLabel("Add your url").fill(
+      "https://raw.githubusercontent.com/openobserve/dashboards/refs/heads/main/AWS%20Cloudfront%20Access%20Logs/Cloudfront_to_OpenObserve.dashboard.json"
+    );
 
     await expect(
       page.locator(".view-lines").locator(".view-line").filter({ hasText: '"dashboardId": "' })
@@ -166,11 +162,9 @@ test.describe("dashboard Import testcases", () => {
 
     await pm.dashboardImport.uploadDashboardFile(fileContentPath);
 
-    // Wait for file to be uploaded and close button to be visible
-    await page.waitForTimeout(1000);
-
-    // Click the close icon to remove the uploaded file
-    await page.locator('.q-file .q-icon').filter({ hasText: 'close' }).click();
+    const closeIcon = page.locator('.q-file .q-icon').filter({ hasText: 'close' });
+    await closeIcon.waitFor({ state: 'visible', timeout: 5000 });
+    await closeIcon.click();
 
     await expect(page.getByLabel("cloud_uploadDrop your file")).toBeVisible();
 
@@ -375,16 +369,13 @@ test.describe("dashboard Import testcases", () => {
     await pm.dashboardImport.clickImportDashboard();
 
     await pm.dashboardImport.clickUrlImportTab();
-    await page.getByLabel("Add your url").click();
     await page
       .getByLabel("Add your url")
       .fill(
         "https://raw.githubusercontent.com/openobserve/dashboards/refs/heads/main/Azure/Azure%20Loadblancer.dashboard.json"
       );
 
-    await page.waitForTimeout(2000);
-
-    await page.waitForSelector(".view-lines");
+    await page.waitForSelector(".view-lines", { state: "visible", timeout: 10000 });
     await expect(
       page
         .locator(".view-lines")
@@ -400,7 +391,7 @@ test.describe("dashboard Import testcases", () => {
 
     await expect(
       page.getByRole("cell", { name: "Azure Loadblancer" }).first()
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 20000 });
 
     await pm.dashboardImport.deleteImportedDashboard("01", "Azure Loadblancer");
 
@@ -431,15 +422,17 @@ test.describe("dashboard Import testcases", () => {
 
     await pm.dashboardImport.clickUrlImportTab();
 
-    await page.getByLabel("Add your url").click();
     await page
       .getByLabel("Add your url")
       .fill(
         "https://raw.githubusercontent.com/openobserve/dashboards/refs/heads/main/Kubernetes(kube-prometheus-stack)/Kubernetes%20_%20Compute%20Resources%20_%20Cluster.dashboard.json"
       );
-    await page.waitForTimeout(1000);
 
-    //is used for setting the file to be importedad
+    // Wait for JSON content to load
+    // await page.locator('.view-lines .view-line').first().waitFor({ state: "visible", timeout: 10000 });
+
+    await page.waitForTimeout(5000);
+
     await pm.dashboardImport.clickImportButton();
 
     await waitForDashboardPage(page);
