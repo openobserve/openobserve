@@ -36,6 +36,14 @@ pub async fn ingest(
         },
     );
 
+    log::debug!(
+        "destination stream: {}/{}/{} ingesting to {addr}, records size in bytes: {}",
+        req.org_id,
+        req.stream_type,
+        req.stream_name,
+        req.data.as_ref().map(|data| data.data.len()).unwrap_or(0)
+    );
+
     // set ingestion timeout
     let mut request = tonic::Request::new(req);
     request.set_timeout(std::time::Duration::from_secs(

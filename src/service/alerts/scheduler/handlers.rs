@@ -1342,12 +1342,13 @@ async fn handle_derived_stream_triggers(
                             metadata: request_metadata,
                         };
                         log::debug!(
-                            "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream(org: {}/module_key: {}): Ingesting result to destination {}/{}/{}",
+                            "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream(org: {}/module_key: {}): Ingesting result to destination {}/{}/{}, records len: {}",
                             new_trigger.org,
                             new_trigger.module_key,
                             org_id,
                             stream_name,
-                            stream_type
+                            stream_type,
+                            records_len
                         );
                         let ingestion_start = Instant::now();
                         match ingestion_service::ingest(req).await {
@@ -1367,9 +1368,10 @@ async fn handle_derived_stream_triggers(
                                 }
                             }
                             error => {
+                                let ingestion_error_took = ingestion_start.elapsed().as_secs_f64();
                                 let err = error.map_or_else(|e| e.to_string(), |resp| resp.message);
                                 log::error!(
-                                    "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline org/name({}/{}) failed to ingest processed results to destination {}/{}/{}, caused by {}",
+                                    "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline org/name({}/{}) failed to ingest processed results to destination {}/{}/{}, took: {ingestion_error_took} seconds, caused by {}",
                                     pipeline.org,
                                     pipeline.name,
                                     org_id,

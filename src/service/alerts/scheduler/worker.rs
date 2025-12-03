@@ -320,8 +320,8 @@ impl SchedulerJobPuller {
             }
 
             // Send all jobs to be processed
-            let mut retry_ttl = 1;
             for job in jobs {
+                let mut retry_ttl = 1;
                 loop {
                     match self.tx.try_send(job.clone()) {
                         Ok(()) => {
@@ -385,6 +385,7 @@ impl Scheduler {
         // Share receiver between workers
         let rx = Arc::new(Mutex::new(rx));
 
+        log::debug!("creating {} workers", max_workers);
         // Create workers
         let workers = (0..max_workers)
             .map(|id| SchedulerWorker::new(id, config.clone(), rx.clone()))
