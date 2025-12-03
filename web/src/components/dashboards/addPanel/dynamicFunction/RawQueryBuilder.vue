@@ -18,7 +18,7 @@
         "
         v-model="fields.rawQuery"
         :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
-        data-test="dashboard-drilldown-url-textarea"
+        data-test="dashboard-raw-query-textarea"
         :rows="6"
       ></textarea>
     </div>

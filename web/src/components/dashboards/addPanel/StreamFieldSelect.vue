@@ -25,6 +25,7 @@
             :default-opened="scope.index === 0 ? true : false"
             header-class="text-weight-bold"
             :label="scope.opt.label"
+            :data-test="`stream-field-select-group-${scope.index}`"
           >
             <template v-for="child in scope.opt.children" :key="child.name">
               <q-item
@@ -32,6 +33,7 @@
                 v-ripple
                 v-close-popup
                 @click="selectField(child)"
+                :data-test="`stream-field-select-option-${child.name}`"
               >
                 <q-item-section>
                   <q-item-label v-html="child.name"></q-item-label>

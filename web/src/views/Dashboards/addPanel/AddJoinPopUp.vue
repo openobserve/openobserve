@@ -45,6 +45,7 @@
             class="join-type-option"
             @click="handleJoinTypeChange('left')"
             :aria-label="t('panel.leftJoin')"
+            data-test="dashboard-join-type-left"
           >
             <LeftJoinTypeSvg :shouldFill="localJoinType === 'left'" />
             <div :class="getJoinTypeLabelClass('left')">Left</div>
@@ -53,6 +54,7 @@
             class="join-type-option"
             @click="handleJoinTypeChange('inner')"
             :aria-label="t('panel.innerJoin')"
+            data-test="dashboard-join-type-inner"
           >
             <InnerJoinTypeSvg :shouldFill="localJoinType === 'inner'" />
             <div :class="getJoinTypeLabelClass('inner')">Inner</div>
@@ -61,6 +63,7 @@
             class="join-type-option"
             @click="handleJoinTypeChange('right')"
             :aria-label="t('panel.rightJoin')"
+            data-test="dashboard-join-type-right"
           >
             <RightJoinTypeSvg :shouldFill="localJoinType === 'right'" />
             <div :class="getJoinTypeLabelClass('right')">Right</div>
@@ -168,6 +171,7 @@
             flat
             icon="add"
             :aria-label="t('panel.addClause')"
+            :data-test="`dashboard-join-condition-add-${argIndex}`"
           >
             <q-tooltip
               class="bg-grey-8"

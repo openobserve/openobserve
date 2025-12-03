@@ -11,6 +11,7 @@
               store.state.theme === 'dark' ? 'bg-grey-10' : '',
               'edit-input',
             ]"
+            data-test="dynamic-function-popup-label-input"
           />
         </div>
         <div>
@@ -22,6 +23,7 @@
               store.state.theme === 'dark' ? 'bg-grey-10' : '',
               'edit-input',
             ]"
+            data-test="dynamic-function-popup-alias-input"
           />
         </div>
         <div v-if="!customQuery && !fields.isDerived">
@@ -100,6 +102,7 @@
             no-caps
             @click="toggleHavingFilter"
             v-if="!isHavingFilterVisible()"
+            data-test="dynamic-function-popup-having-add-btn"
           />
         </div>
 
@@ -114,6 +117,7 @@
             :options="havingOperators"
             borderless
             style="width: 60px;"
+            data-test="dynamic-function-popup-having-operator"
           />
 
           <q-input
@@ -123,9 +127,16 @@
             style="width: 50%"
             type="number"
             placeholder="Value"
+            data-test="dynamic-function-popup-having-value"
           />
 
-          <q-btn dense flat icon="close" @click="cancelHavingFilter" />
+          <q-btn
+            dense
+            flat
+            icon="close"
+            @click="cancelHavingFilter"
+            data-test="dynamic-function-popup-having-cancel-btn"
+          />
         </div>
       </div>
       <div v-if="chartType === 'table'" class="q-mt-sm q-mb-sm">
@@ -133,6 +144,7 @@
           v-model="fields.treatAsNonTimestamp"
           :label="'Mark this field as non-timestamp'"
           dense
+          data-test="dynamic-function-popup-treat-as-non-timestamp"
         />
       </div>
     </div>
