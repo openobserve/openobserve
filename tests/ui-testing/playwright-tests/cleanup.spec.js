@@ -57,6 +57,9 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up custom logo from _meta organization
     await pm.apiCleanup.cleanupLogo();
 
+    // Clean up saved views matching test patterns
+    await pm.apiCleanup.cleanupSavedViews();
+
     testLogger.info('Pre-test cleanup completed successfully');
   });
 });
