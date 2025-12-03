@@ -250,19 +250,40 @@ const dashboardRenderKey = ref(0);
 const showMetricSelector = ref(false);
 const metricSearchText = ref("");
 
-// Selected metric streams (default to first 6)
+// Get unique metric streams by stream_name
+const getUniqueStreams = (streams: StreamInfo[]) => {
+  const seen = new Set<string>();
+  const unique: StreamInfo[] = [];
+
+  for (const stream of streams) {
+    if (!seen.has(stream.stream_name)) {
+      seen.add(stream.stream_name);
+      unique.push(stream);
+    }
+  }
+
+  return unique;
+};
+
+const uniqueMetricStreams = computed(() => {
+  return getUniqueStreams(props.metricStreams);
+});
+
+// Selected metric streams (default to first 6 unique streams)
 const selectedMetricStreams = ref<StreamInfo[]>(
-  props.metricStreams.slice(0, 6)
+  getUniqueStreams(props.metricStreams).slice(0, 6)
 );
 
 // Filter metric streams based on search text
 const filteredMetricStreams = computed(() => {
+  const streams = uniqueMetricStreams.value;
+
   if (!metricSearchText.value?.trim()) {
-    return props.metricStreams;
+    return streams;
   }
 
   const searchLower = metricSearchText.value.toLowerCase();
-  return props.metricStreams.filter(stream =>
+  return streams.filter(stream =>
     stream.stream_name.toLowerCase().includes(searchLower)
   );
 });
@@ -281,17 +302,6 @@ const currentTimeObj = computed(() => {
       end_time: new Date(props.timeRange.endTime),
     },
   };
-
-  console.log("[TelemetryCorrelationDashboard] currentTimeObj computed:", {
-    "startTime (microseconds)": props.timeRange.startTime,
-    "endTime (microseconds)": props.timeRange.endTime,
-    "startTime digits": props.timeRange.startTime.toString().length,
-    "endTime digits": props.timeRange.endTime.toString().length,
-    startTimeDate: timeObj.__global.start_time,
-    endTimeDate: timeObj.__global.end_time,
-    "start_time.getTime()": timeObj.__global.start_time.getTime(),
-    "end_time.getTime()": timeObj.__global.end_time.getTime(),
-  });
 
   return timeObj;
 });
@@ -318,19 +328,9 @@ const loadDashboard = async () => {
     loading.value = true;
     error.value = null;
 
-    console.log("[TelemetryCorrelationDashboard] loadDashboard started");
-    console.log("[TelemetryCorrelationDashboard] Props:", {
-      serviceName: props.serviceName,
-      matchedDimensions: props.matchedDimensions,
-      metricStreams: props.metricStreams.length,
-      metricStreamsDetail: props.metricStreams,
-      timeRange: props.timeRange,
-    });
-
     // Validate that we have metric streams
     if (selectedMetricStreams.value.length === 0) {
       error.value = "No metric streams selected";
-      console.error("[TelemetryCorrelationDashboard] No metric streams to display");
       return;
     }
 
@@ -342,30 +342,11 @@ const loadDashboard = async () => {
       timeRange: props.timeRange,
     };
 
-    console.log("[TelemetryCorrelationDashboard] Config:", config);
-    console.log("[TelemetryCorrelationDashboard] Selected metric streams:", selectedMetricStreams.value.length);
-    console.log("[TelemetryCorrelationDashboard] Selected metric streams detail:", JSON.stringify(selectedMetricStreams.value, null, 2));
-
     // Generate dashboard JSON
     const dashboard = generateDashboard(selectedMetricStreams.value, config);
 
-    console.log("[TelemetryCorrelationDashboard] Generated dashboard:", {
-      title: dashboard.title,
-      tabs: dashboard.tabs.length,
-      tabId: dashboard.tabs[0]?.tabId,
-      panels: dashboard.tabs[0]?.panels?.length,
-      firstPanel: dashboard.tabs[0]?.panels?.[0],
-    });
-
-    console.log("[TelemetryCorrelationDashboard] FULL DASHBOARD JSON:");
-    console.log(JSON.stringify(dashboard, null, 2));
-
-    console.log("[TelemetryCorrelationDashboard] selectedTabId provided to RenderDashboardCharts:", selectedTabId.value);
-
     dashboardData.value = dashboard;
     dashboardRenderKey.value++;
-
-    console.log("[TelemetryCorrelationDashboard] Dashboard data set, renderKey:", dashboardRenderKey.value);
   } catch (err: any) {
     console.error("[TelemetryCorrelationDashboard] Error loading correlation dashboard:", err);
     error.value = err.message || t('correlation.failedToLoad');

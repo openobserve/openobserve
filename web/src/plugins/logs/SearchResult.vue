@@ -930,11 +930,16 @@ export default defineComponent({
         // context.timestamp is in microseconds - pass microseconds directly (like TracesAnalysisDashboard)
         const timeWindowMicros = 5 * 60 * 1000000; // 5 minutes in microseconds
         const startTimeMicros = context.timestamp - timeWindowMicros;
-        const endTimeMicros = context.timestamp + timeWindowMicros;
+        let endTimeMicros = context.timestamp + timeWindowMicros;
+
+        // Cap end time to current UTC time (never allow future timestamps)
+        const currentTimeMicros = Date.now() * 1000; // Current time in microseconds
+        if (endTimeMicros > currentTimeMicros) {
+          endTimeMicros = currentTimeMicros;
+        }
 
         // Check if there are any metrics to show
         if (!result.correlationData.related_streams.metrics || result.correlationData.related_streams.metrics.length === 0) {
-          console.log("[SearchResult] No metrics found for correlation");
           $q.notify({
             type: "info",
             message: "No correlated metrics found for this service",
@@ -953,24 +958,8 @@ export default defineComponent({
           },
         };
 
-        console.log("[SearchResult] Time range for correlation dashboard:", {
-          contextTimestamp: context.timestamp,
-          contextTimestampMicros: context.timestamp,
-          timeWindowMinutes: 5,
-          startTimeMicros,
-          endTimeMicros,
-          "startTime digits": startTimeMicros.toString().length,
-          "endTime digits": endTimeMicros.toString().length,
-          startTimeDate: new Date(startTimeMicros / 1000).toISOString(),
-          endTimeDate: new Date(endTimeMicros / 1000).toISOString(),
-        });
-
-        console.log("[SearchResult] Opening correlation dashboard with:", correlationDashboardProps.value);
-        console.log("[SearchResult] Metrics count:", result.correlationData.related_streams.metrics.length);
-
         // Open the correlation dashboard
         showCorrelation.value = true;
-        console.log("[SearchResult] showCorrelation set to:", showCorrelation.value);
       } catch (err: any) {
         console.error("[SearchResult] Error in openCorrelationFromLog:", err);
         $q.notify({

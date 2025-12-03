@@ -39,20 +39,8 @@ export function useMetricsCorrelationDashboard() {
     streams: StreamInfo[],
     config: MetricsCorrelationConfig
   ) => {
-    console.log("[useMetricsCorrelationDashboard] generateDashboard called with:", {
-      streamsCount: streams.length,
-      config,
-    });
-
     const panels = streams.map((stream, index) => {
-      const panel = createMetricPanel(stream, index, config);
-      console.log(`[useMetricsCorrelationDashboard] Created panel ${index}:`, {
-        id: panel.id,
-        title: panel.title,
-        query: panel.queries[0]?.query,
-        fields: panel.queries[0]?.fields,
-      });
-      return panel;
+      return createMetricPanel(stream, index, config);
     });
 
     // Create dashboard variables from matched dimensions (using correct structure)
@@ -95,21 +83,6 @@ export function useMetricsCorrelationDashboard() {
       },
     };
 
-    console.log("[useMetricsCorrelationDashboard] Generated dashboard:", {
-      title: dashboard.title,
-      version: dashboard.version,
-      panelsCount: panels.length,
-      variablesCount: dashboard.variables.list.length,
-      dashboardId: dashboard.dashboardId,
-      tabId: dashboard.tabs[0].tabId,
-      defaultDatetimeDuration: dashboard.defaultDatetimeDuration,
-      "CRITICAL CHECK - defaultDatetimeDuration.startTime": dashboard.defaultDatetimeDuration.startTime,
-      "CRITICAL CHECK - defaultDatetimeDuration.endTime": dashboard.defaultDatetimeDuration.endTime,
-      "CRITICAL CHECK - startTime digits": dashboard.defaultDatetimeDuration.startTime.toString().length,
-      "CRITICAL CHECK - endTime digits": dashboard.defaultDatetimeDuration.endTime.toString().length,
-      firstPanelFull: JSON.stringify(panels[0], null, 2),
-    });
-
     return dashboard;
   };
 
@@ -121,12 +94,6 @@ export function useMetricsCorrelationDashboard() {
     index: number,
     config: MetricsCorrelationConfig
   ) => {
-    console.log(`[useMetricsCorrelationDashboard] createMetricPanel for stream: ${stream.stream_name}`, {
-      filters: stream.filters,
-      index,
-      timeRange: config.timeRange,
-    });
-
     // Build WHERE clause from stream filters
     // Quote field names that contain special characters (hyphens, dots, etc.)
     const whereConditions = Object.entries(stream.filters)
@@ -147,10 +114,6 @@ FROM "${stream.stream_name}"
 ${whereClause}
 GROUP BY x_axis_1
 ORDER BY x_axis_1`;
-
-    console.log(`[useMetricsCorrelationDashboard] Generated SQL for ${stream.stream_name}:`, query);
-    console.log(`[useMetricsCorrelationDashboard] Stream info:`, JSON.stringify(stream, null, 2));
-    console.log(`[useMetricsCorrelationDashboard] WHERE conditions:`, whereConditions);
 
     // Calculate panel position (3 columns)
     const col = index % 3;
