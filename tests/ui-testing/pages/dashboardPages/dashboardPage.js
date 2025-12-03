@@ -33,7 +33,23 @@ export class DashboardPage {
   async createDashboard() {
     await this.page.waitForSelector('[data-test="dashboard-add"]');
     await this.addDashboardButton.click();
-    await this.page.waitForTimeout(5000);
+
+    // Ensure dashboard name field is visible before entering name
+    let isNameFieldVisible = await this.dashboardNameInput.isVisible().catch(() => false);
+
+    if (!isNameFieldVisible) {
+      // First retry: click the button again
+      await this.page.waitForTimeout(1000);
+      await this.addDashboardButton.click();
+      await this.page.waitForTimeout(2000);
+      isNameFieldVisible = await this.dashboardNameInput.isVisible().catch(() => false);
+
+      // If still not visible, fail with a clear error message
+      if (!isNameFieldVisible) {
+        throw new Error('Dashboard name field is not visible after clicking the add dashboard button twice');
+      }
+    }
+
     await this.dashboardNameInput.fill(this.dashboardName);
     await this.page.waitForSelector('[data-test="dashboard-add-submit"]');
     await this.dashboardSubmitButton.click();

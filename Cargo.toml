@@ -106,7 +106,7 @@ http-auth-basic = "0.3"
 itertools.workspace = true
 jsonwebtoken = "9.3"
 log.workspace = true
-maxminddb = "0.26"
+maxminddb = "0.27"
 md5.workspace = true
 memchr.workspace = true
 mimalloc = { version = "0.1.43", default-features = false, optional = true }
@@ -276,7 +276,7 @@ env_logger = "0.11.8"
 faststr = { version = "0.2", features = ["serde"] }
 flate2 = { version = "1.0", features = ["zlib"] }
 futures = "0.3"
-get_if_addrs = "0.5"
+local-ip-address = "0.6"
 hashlink = "0.10"
 hashbrown = { version = "0.16.0", features = ["serde"] }
 hex = "0.4"
