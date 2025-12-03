@@ -1397,7 +1397,9 @@ export class LogsPage {
     }
 
     async clickSavedViewByTitle(title) {
-        return await this.page.getByTitle(title).click();
+        const element = this.page.getByTitle(title);
+        await element.waitFor({ state: 'visible', timeout: 10000 });
+        return await element.click();
     }
 
     async clickDeleteButton() {
