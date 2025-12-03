@@ -213,9 +213,9 @@ jobs:
                 "streaming.spec.js",
                 "stream-settings.spec.js",
               ]
-          # - testfolder: "RegressionSet"
-          #   browser: "chrome"
-          #   run_files: ["logs-regression.spec.js"]
+          - testfolder: "RegressionSet"
+            browser: "chrome"
+            run_files: ["logs-regression.spec.js"]
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
