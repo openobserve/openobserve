@@ -352,12 +352,15 @@ const loadDashboard = async () => {
     console.log("[TelemetryCorrelationDashboard] Generated dashboard:", {
       title: dashboard.title,
       tabs: dashboard.tabs.length,
+      tabId: dashboard.tabs[0]?.tabId,
       panels: dashboard.tabs[0]?.panels?.length,
       firstPanel: dashboard.tabs[0]?.panels?.[0],
     });
 
     console.log("[TelemetryCorrelationDashboard] FULL DASHBOARD JSON:");
     console.log(JSON.stringify(dashboard, null, 2));
+
+    console.log("[TelemetryCorrelationDashboard] selectedTabId provided to RenderDashboardCharts:", selectedTabId.value);
 
     dashboardData.value = dashboard;
     dashboardRenderKey.value++;
@@ -378,9 +381,10 @@ const onClose = () => {
 
 // Helper function to format time range
 const formatTimeRange = (range: TimeRange) => {
-  // range.startTime and range.endTime are already in milliseconds
-  const startDate = new Date(range.startTime);
-  const endDate = new Date(range.endTime);
+  // range.startTime and range.endTime are in microseconds (16 digits)
+  // Convert to milliseconds by dividing by 1000
+  const startDate = new Date(range.startTime / 1000);
+  const endDate = new Date(range.endTime / 1000);
 
   const formatTime = (date: Date) => {
     const hours = String(date.getHours()).padStart(2, "0");
@@ -389,9 +393,9 @@ const formatTimeRange = (range: TimeRange) => {
     return `${hours}:${minutes}:${seconds}`;
   };
 
-  // Calculate duration in milliseconds, then convert to minutes
-  const durationMs = range.endTime - range.startTime;
-  const durationMinutes = Math.round(durationMs / 60000);
+  // Calculate duration in microseconds, then convert to minutes
+  const durationMicros = range.endTime - range.startTime;
+  const durationMinutes = Math.round(durationMicros / 1000 / 60000);
 
   return `${formatTime(startDate)} - ${formatTime(endDate)} (${durationMinutes} min)`;
 };

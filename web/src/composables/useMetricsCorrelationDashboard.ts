@@ -158,15 +158,14 @@ ORDER BY x_axis_1`;
 
     return {
       id: `panel_${stream.stream_name}_${index}`,
-      type: "area-stacked",
+      type: "line",
       title: stream.stream_name,
       description: `Time series for ${stream.stream_name}`,
       config: {
-        show_legends: true,
+        show_legends: false,
         legends_position: "bottom",
         unit: "short",
         unit_custom: "",
-        axis_width: 80,
         promql_legend: "",
         axis_border_show: true,
         color: {
@@ -230,22 +229,20 @@ ORDER BY x_axis_1`;
               {
                 label: "",
                 alias: "x_axis_1",
-                column: "_timestamp",
+                column: "x_axis_1",
                 color: null,
                 isDerived: false,
                 havingConditions: [],
-                aggregationFunction: "histogram",
               },
             ],
             y: [
               {
-                label: stream.stream_name,
+                label: "",
                 alias: "y_axis_1",
-                column: "value",
+                column: "y_axis_1",
                 color: "#5960b2",
                 isDerived: false,
                 havingConditions: [],
-                aggregationFunction: "avg",
               },
             ],
             z: [],
