@@ -37,7 +37,7 @@ pub async fn ingest(
     );
 
     log::debug!(
-        "destination stream: {}/{}/{} ingesting to {addr}, records len: {}",
+        "destination stream: {}/{}/{} ingesting to {addr}, records size in bytes: {}",
         req.org_id,
         req.stream_type,
         req.stream_name,
