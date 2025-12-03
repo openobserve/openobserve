@@ -21,8 +21,8 @@ export interface MetricsCorrelationConfig {
   metricStreams: StreamInfo[];
   orgIdentifier: string;
   timeRange: {
-    startTime: number;
-    endTime: number;
+    startTime: number; // Timestamp in microseconds (16 digits)
+    endTime: number;   // Timestamp in microseconds (16 digits)
   };
 }
 
@@ -89,10 +89,9 @@ export function useMetricsCorrelationDashboard() {
       defaultDatetimeDuration: {
         type: "relative",
         relativeTimePeriod: "15m",
-        // Dashboard expects microseconds, but config.timeRange has milliseconds
-        // Convert milliseconds to microseconds by multiplying by 1000
-        startTime: config.timeRange.startTime * 1000,
-        endTime: config.timeRange.endTime * 1000,
+        // config.timeRange already contains microseconds (16 digits), pass directly
+        startTime: config.timeRange.startTime,
+        endTime: config.timeRange.endTime,
       },
     };
 
@@ -104,6 +103,10 @@ export function useMetricsCorrelationDashboard() {
       dashboardId: dashboard.dashboardId,
       tabId: dashboard.tabs[0].tabId,
       defaultDatetimeDuration: dashboard.defaultDatetimeDuration,
+      "CRITICAL CHECK - defaultDatetimeDuration.startTime": dashboard.defaultDatetimeDuration.startTime,
+      "CRITICAL CHECK - defaultDatetimeDuration.endTime": dashboard.defaultDatetimeDuration.endTime,
+      "CRITICAL CHECK - startTime digits": dashboard.defaultDatetimeDuration.startTime.toString().length,
+      "CRITICAL CHECK - endTime digits": dashboard.defaultDatetimeDuration.endTime.toString().length,
       firstPanelFull: JSON.stringify(panels[0], null, 2),
     });
 
@@ -138,8 +141,7 @@ export function useMetricsCorrelationDashboard() {
     const whereClause = whereConditions ? `WHERE ${whereConditions}` : "";
 
     // Time-series SQL query for metrics
-    // Use avg(value) for metrics aggregation instead of count(*)
-    // Note: No explicit time filter in SQL - the time range is applied by the dashboard system
+    // Note: Time range comes from dashboard defaultDatetimeDuration, not embedded in SQL
     const query = `SELECT histogram(_timestamp) as x_axis_1, avg(value) as y_axis_1
 FROM "${stream.stream_name}"
 ${whereClause}

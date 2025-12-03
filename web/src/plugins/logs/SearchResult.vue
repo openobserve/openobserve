@@ -927,14 +927,10 @@ export default defineComponent({
 
         // Prepare props for the dashboard
         // Calculate time range: ±5 minutes from log timestamp
-        // context.timestamp is in microseconds, convert to milliseconds for dashboard
+        // context.timestamp is in microseconds - pass microseconds directly (like TracesAnalysisDashboard)
         const timeWindowMicros = 5 * 60 * 1000000; // 5 minutes in microseconds
         const startTimeMicros = context.timestamp - timeWindowMicros;
         const endTimeMicros = context.timestamp + timeWindowMicros;
-
-        // Convert microseconds to milliseconds (divide by 1000)
-        const startTimeMs = Math.floor(startTimeMicros / 1000);
-        const endTimeMs = Math.floor(endTimeMicros / 1000);
 
         // Check if there are any metrics to show
         if (!result.correlationData.related_streams.metrics || result.correlationData.related_streams.metrics.length === 0) {
@@ -952,21 +948,21 @@ export default defineComponent({
           matchedDimensions: result.correlationData.matched_dimensions,
           metricStreams: result.correlationData.related_streams.metrics,
           timeRange: {
-            startTime: startTimeMs,
-            endTime: endTimeMs,
+            startTime: startTimeMicros,
+            endTime: endTimeMicros,
           },
         };
 
-        console.log("[SearchResult] Time range conversion:", {
+        console.log("[SearchResult] Time range for correlation dashboard:", {
           contextTimestamp: context.timestamp,
-          contextTimestampMs: Math.floor(context.timestamp / 1000),
+          contextTimestampMicros: context.timestamp,
           timeWindowMinutes: 5,
           startTimeMicros,
           endTimeMicros,
-          startTimeMs,
-          endTimeMs,
-          startTimeDate: new Date(startTimeMs).toISOString(),
-          endTimeDate: new Date(endTimeMs).toISOString(),
+          "startTime digits": startTimeMicros.toString().length,
+          "endTime digits": endTimeMicros.toString().length,
+          startTimeDate: new Date(startTimeMicros / 1000).toISOString(),
+          endTimeDate: new Date(endTimeMicros / 1000).toISOString(),
         });
 
         console.log("[SearchResult] Opening correlation dashboard with:", correlationDashboardProps.value);

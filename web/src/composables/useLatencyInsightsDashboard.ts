@@ -527,7 +527,7 @@ export function useLatencyInsightsDashboard() {
           showDynamicFilters: false,
         };
 
-    return {
+    const dashboard = {
       version: 5,
       dashboardId: ``,
       title,
@@ -550,6 +550,21 @@ export function useLatencyInsightsDashboard() {
         endTime: config.selectedTimeRange.endTime,
       },
     };
+
+    console.log("[useLatencyInsightsDashboard] Generated dashboard:", {
+      title: dashboard.title,
+      panelsCount: dashboard.tabs[0]?.panels?.length,
+      "defaultDatetimeDuration.startTime": dashboard.defaultDatetimeDuration.startTime,
+      "defaultDatetimeDuration.endTime": dashboard.defaultDatetimeDuration.endTime,
+      "startTime digits": dashboard.defaultDatetimeDuration.startTime.toString().length,
+      "endTime digits": dashboard.defaultDatetimeDuration.endTime.toString().length,
+      "config.selectedTimeRange.startTime": config.selectedTimeRange.startTime,
+      "config.selectedTimeRange.endTime": config.selectedTimeRange.endTime,
+      "config.selectedTimeRange.startTime digits": config.selectedTimeRange.startTime.toString().length,
+      firstPanelQuery: dashboard.tabs[0]?.panels?.[0]?.queries?.[0]?.query,
+    });
+
+    return dashboard;
   };
 
   return {

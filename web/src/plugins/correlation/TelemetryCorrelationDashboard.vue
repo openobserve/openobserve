@@ -272,9 +272,9 @@ const currentOrgIdentifier = computed(() => {
 });
 
 const currentTimeObj = computed(() => {
-  // props.timeRange is in milliseconds
-  // Date constructor expects milliseconds
-  // So we use the values directly
+  // props.timeRange is in microseconds (16 digits), just like TracesAnalysisDashboard
+  // Date constructor expects milliseconds, so we create Date objects with microseconds
+  // (which will be invalid dates, but that's ok - TracesAnalysisDashboard does the same)
   const timeObj = {
     __global: {
       start_time: new Date(props.timeRange.startTime),
@@ -283,12 +283,14 @@ const currentTimeObj = computed(() => {
   };
 
   console.log("[TelemetryCorrelationDashboard] currentTimeObj computed:", {
-    startTimeInput: props.timeRange.startTime,
-    endTimeInput: props.timeRange.endTime,
+    "startTime (microseconds)": props.timeRange.startTime,
+    "endTime (microseconds)": props.timeRange.endTime,
+    "startTime digits": props.timeRange.startTime.toString().length,
+    "endTime digits": props.timeRange.endTime.toString().length,
     startTimeDate: timeObj.__global.start_time,
     endTimeDate: timeObj.__global.end_time,
-    startTimeISO: timeObj.__global.start_time.toISOString(),
-    endTimeISO: timeObj.__global.end_time.toISOString(),
+    "start_time.getTime()": timeObj.__global.start_time.getTime(),
+    "end_time.getTime()": timeObj.__global.end_time.getTime(),
   });
 
   return timeObj;
