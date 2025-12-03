@@ -84,6 +84,7 @@ pub fn generate_remote_scan_rules(
         equal_keys,
         is_leader,
         context,
+        sql.sampling_config.clone(),
     ))
 }
 
@@ -103,6 +104,7 @@ impl RemoteScanRule {
         equal_keys: HashMap<TableReference, Vec<KvItem>>,
         is_leader: bool,
         opentelemetry_context: opentelemetry::Context,
+        sampling_config: Option<proto::cluster_rpc::SamplingConfig>,
     ) -> Self {
         let remote_scan_nodes = RemoteScanNodes::new(
             req,
@@ -111,6 +113,7 @@ impl RemoteScanRule {
             equal_keys,
             is_leader,
             opentelemetry_context,
+            sampling_config,
         );
         let remote_scan_nodes = Arc::new(remote_scan_nodes);
         Self {
@@ -134,6 +137,7 @@ impl RemoteScanRule {
             HashMap::new(),
             false,
             tracing::Span::current().context(),
+            None,
         );
         let remote_scan_nodes = Arc::new(remote_scan_nodes);
         Self {

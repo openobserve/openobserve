@@ -172,7 +172,11 @@ export default class DashboardSetting {
     await this.page
       .locator('[data-test="dashboard-variable-type-select"]')
       .click();
-    await this.page.getByRole("option", { name: type }).click();
+
+    // Wait for the type option to be visible before clicking
+    const typeOption = this.page.getByRole("option", { name: type });
+    await typeOption.waitFor({ state: "visible", timeout: 10000 });
+    await typeOption.click();
     await this.page.locator('[data-test="dashboard-variable-name"]').click();
     await this.page
       .locator('[data-test="dashboard-variable-name"]')
@@ -180,15 +184,80 @@ export default class DashboardSetting {
     await this.page
       .locator('[data-test="dashboard-variable-stream-type-select"]')
       .click();
-    await this.page.getByRole("option", { name: streamType }).click();
+
+    // Wait for the dropdown option to be visible before clicking
+    const streamTypeOption = this.page.getByRole("option", { name: streamType });
+    await streamTypeOption.waitFor({ state: "visible", timeout: 10000 });
+    await streamTypeOption.click();
+
     await this.page
       .locator('[data-test="dashboard-variable-stream-select"]')
       .click();
-    await this.page.getByText(Stream, { exact: true }).click();
-    await this.page
-      .locator('[data-test="dashboard-variable-field-select"]')
-      .click();
-    await this.page.getByRole("option", { name: field }).click();
+
+    // Wait for the stream option to be visible before clicking
+    const streamOption = this.page.getByText(Stream, { exact: true });
+    await streamOption.waitFor({ state: "visible", timeout: 10000 });
+    await streamOption.click();
+
+    // Wait for field data to load after stream selection
+    await this.page.waitForTimeout(1000);
+
+    // Wait for the field select dropdown to be ready
+    const fieldSelect = this.page.locator('[data-test="dashboard-variable-field-select"]');
+    await fieldSelect.waitFor({ state: "visible", timeout: 10000 });
+    await fieldSelect.click();
+    await fieldSelect.fill(field);
+
+    // Wait for dropdown to have options available
+    await this.page.waitForFunction(
+      () => {
+        const options = document.querySelectorAll('[role="option"]');
+        return options.length > 0;
+      },
+      { timeout: 10000, polling: 100 }
+    );
+
+    // Try to select the field from dropdown - use multiple strategies (from dashboard-variables.js)
+    let fieldSelected = false;
+
+    // Strategy 1: Try exact match
+    try {
+      const fieldOption = this.page.getByRole("option", { name: field, exact: true });
+      await fieldOption.waitFor({ state: "visible", timeout: 5000 });
+      await fieldOption.click();
+      fieldSelected = true;
+    } catch (e) {
+      // Strategy 2: Try partial match
+      try {
+        const fieldOption = this.page.getByRole("option", { name: field, exact: false }).first();
+        await fieldOption.waitFor({ state: "visible", timeout: 5000 });
+        await fieldOption.click();
+        fieldSelected = true;
+      } catch (e2) {
+        // Strategy 3: Use keyboard to select the first visible option
+        try {
+          await this.page.keyboard.press('ArrowDown');
+          // Wait for selection to be highlighted
+          await this.page.waitForFunction(
+            () => {
+              const highlighted = document.querySelector('[role="option"][aria-selected="true"]') ||
+                                 document.querySelector('[role="option"].q-manual-focusable--focused') ||
+                                 document.querySelector('[role="option"].q-focusable--focused');
+              return highlighted !== null;
+            },
+            { timeout: 3000, polling: 100 }
+          );
+          await this.page.keyboard.press('Enter');
+          fieldSelected = true;
+        } catch (e3) {
+          fieldSelected = false;
+        }
+      }
+    }
+
+    if (!fieldSelected) {
+      throw new Error(`Failed to select field: ${field}`);
+    }
   }
 
   //select Constant type

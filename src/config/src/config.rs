@@ -497,7 +497,6 @@ pub struct Config {
     pub health_check: HealthCheck,
     pub encryption: Encryption,
     pub enrichment_table: EnrichmentTable,
-    pub service_graph: ServiceGraph,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
@@ -2187,38 +2186,6 @@ pub struct EnrichmentTable {
     pub merge_interval: u64,
 }
 
-/// Service Graph Configuration
-///
-/// Note: Worker count is fixed at 256 (one per shard) for optimal concurrency.
-/// No async channels are used in the current implementation.
-#[derive(Serialize, EnvConfig, Default)]
-pub struct ServiceGraph {
-    #[env_config(
-        name = "ZO_SGRAPH_ENABLED",
-        default = true,
-        help = "Enable service graph feature"
-    )]
-    pub enabled: bool,
-    #[env_config(
-        name = "ZO_SGRAPH_WAIT_DURATION_MS",
-        default = 10000,
-        help = "Wait duration for span pairing in milliseconds"
-    )]
-    pub wait_duration_ms: u64,
-    #[env_config(
-        name = "ZO_SGRAPH_MAX_ITEMS_PER_SHARD",
-        default = 100000,
-        help = "Maximum items per shard in edge store (256 shards total)"
-    )]
-    pub max_items_per_shard: usize,
-    #[env_config(
-        name = "ZO_SGRAPH_CLEANUP_INTERVAL_MS",
-        default = 2000,
-        help = "Cleanup interval for expired edges in milliseconds"
-    )]
-    pub cleanup_interval_ms: u64,
-}
-
 pub fn init() -> Config {
     if let Err(e) = load_config() {
         log::error!("Failed to load config {e}");
@@ -2911,6 +2878,8 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             .count(),
     );
     cfg.disk_cache.max_size /= cfg.disk_cache.bucket_num;
+    cfg.disk_cache.result_max_size /= cfg.disk_cache.bucket_num;
+    cfg.disk_cache.aggregation_max_size /= cfg.disk_cache.bucket_num;
     cfg.disk_cache.release_size /= cfg.disk_cache.bucket_num;
     cfg.disk_cache.gc_size /= cfg.disk_cache.bucket_num;
 

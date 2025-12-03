@@ -467,7 +467,7 @@ export default defineComponent({
         field: (row: any) => formatSizeFromMB(row.compressed_size),
         label: t("logStream.compressedSize"),
         align: "left",
-        sortable: false,
+        sortable: true,
         sort: (a, b, rowA, rowB) =>
           parseInt(rowA.compressed_size) - parseInt(rowB.compressed_size),
       },

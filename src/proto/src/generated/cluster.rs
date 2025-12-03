@@ -492,6 +492,14 @@ pub struct MetricsQueryRequest {
     pub timeout: i64,
     #[prost(bool, tag = "9")]
     pub use_cache: bool,
+    #[prost(string, tag = "10")]
+    pub search_event_type: ::prost::alloc::string::String,
+    #[prost(string, repeated, tag = "11")]
+    pub regions: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(string, repeated, tag = "12")]
+    pub clusters: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(bool, tag = "13")]
+    pub is_super_cluster: bool,
 }
 #[derive(serde::Serialize)]
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
@@ -506,6 +514,10 @@ pub struct MetricsQueryStmt {
     pub step: i64,
     #[prost(bool, tag = "5")]
     pub query_exemplars: bool,
+    #[prost(bool, tag = "6")]
+    pub query_data: bool,
+    #[prost(string, repeated, tag = "7")]
+    pub label_selector: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(serde::Serialize)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -682,6 +694,28 @@ pub mod metrics_client {
             req.extensions_mut().insert(GrpcMethod::new("cluster.Metrics", "Query"));
             self.inner.unary(req, path, codec).await
         }
+        /// Server-streaming RPC: Data will stream multiple MetricsQueryResponse messages
+        pub async fn data(
+            &mut self,
+            request: impl tonic::IntoRequest<super::MetricsQueryRequest>,
+        ) -> std::result::Result<
+            tonic::Response<tonic::codec::Streaming<super::MetricsQueryResponse>>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic_prost::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/cluster.Metrics/Data");
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("cluster.Metrics", "Data"));
+            self.inner.server_streaming(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -704,6 +738,17 @@ pub mod metrics_server {
             tonic::Response<super::MetricsQueryResponse>,
             tonic::Status,
         >;
+        /// Server streaming response type for the Data method.
+        type DataStream: tonic::codegen::tokio_stream::Stream<
+                Item = std::result::Result<super::MetricsQueryResponse, tonic::Status>,
+            >
+            + std::marker::Send
+            + 'static;
+        /// Server-streaming RPC: Data will stream multiple MetricsQueryResponse messages
+        async fn data(
+            &self,
+            request: tonic::Request<super::MetricsQueryRequest>,
+        ) -> std::result::Result<tonic::Response<Self::DataStream>, tonic::Status>;
     }
     #[derive(Debug)]
     pub struct MetricsServer<T> {
@@ -826,6 +871,52 @@ pub mod metrics_server {
                     };
                     Box::pin(fut)
                 }
+                "/cluster.Metrics/Data" => {
+                    #[allow(non_camel_case_types)]
+                    struct DataSvc<T: Metrics>(pub Arc<T>);
+                    impl<
+                        T: Metrics,
+                    > tonic::server::ServerStreamingService<super::MetricsQueryRequest>
+                    for DataSvc<T> {
+                        type Response = super::MetricsQueryResponse;
+                        type ResponseStream = T::DataStream;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::ResponseStream>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::MetricsQueryRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Metrics>::data(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let method = DataSvc(inner);
+                        let codec = tonic_prost::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.server_streaming(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
                 _ => {
                     Box::pin(async move {
                         let mut response = http::Response::new(
@@ -942,7 +1033,7 @@ pub struct GetResultResponse {
     pub response: ::prost::alloc::vec::Vec<u8>,
 }
 /// Search request query
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SearchQuery {
     #[prost(string, tag = "1")]
     pub sql: ::prost::alloc::string::String,
@@ -970,6 +1061,27 @@ pub struct SearchQuery {
     pub action_id: ::prost::alloc::string::String,
     #[prost(int64, tag = "16")]
     pub histogram_interval: i64,
+    /// Simplified sampling: just specify ratio (0.0-1.0), backend uses optimal defaults
+    /// Backend converts this to SamplingConfig for internal node communication
+    #[prost(double, optional, tag = "18")]
+    pub sampling_ratio: ::core::option::Option<f64>,
+}
+/// Sampling configuration for query performance optimization
+#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SamplingConfig {
+    /// Sampling ratio (0.0 to 1.0, e.g., 0.1 = 10% sample)
+    #[prost(double, tag = "1")]
+    pub sampling_ratio: f64,
+    /// Sampling mode: "system" (row group level) or "bernoulli" (row level)
+    #[prost(string, tag = "2")]
+    pub sampling_mode: ::prost::alloc::string::String,
+    /// Temporal strategy: "random" or "stratified"
+    #[prost(string, tag = "3")]
+    pub temporal_strategy: ::prost::alloc::string::String,
+    /// Number of time buckets for stratified sampling (e.g., 24 for hourly over a day)
+    #[prost(int32, optional, tag = "4")]
+    pub num_time_strata: ::core::option::Option<i32>,
 }
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct SearchEventContext {
@@ -2709,6 +2821,8 @@ pub struct StreamingAggsExecNode {
     pub aggregate_plan: ::core::option::Option<
         ::datafusion_proto::protobuf::PhysicalPlanNode,
     >,
+    #[prost(bool, tag = "8")]
+    pub overwrite_cache: bool,
 }
 /// Search request
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -2740,7 +2854,7 @@ pub struct QueryIdentifier {
     #[prost(bool, tag = "6")]
     pub enrich_mode: bool,
 }
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SearchInfo {
     #[prost(bytes = "vec", tag = "1")]
     pub plan: ::prost::alloc::vec::Vec<u8>,
@@ -2758,6 +2872,10 @@ pub struct SearchInfo {
     pub histogram_interval: i64,
     #[prost(bool, tag = "9")]
     pub is_analyze: bool,
+    #[prost(message, optional, tag = "10")]
+    pub sampling_config: ::core::option::Option<SamplingConfig>,
+    #[prost(bool, tag = "11")]
+    pub clear_cache: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IndexInfo {

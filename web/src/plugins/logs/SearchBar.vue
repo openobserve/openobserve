@@ -3075,7 +3075,13 @@ export default defineComponent({
                 clearInterval(store.state.refreshIntervalID);
               }
               searchObj.data.stream.selectedStream.push(...selectedStreams);
-              await updatedLocalLogFilterField();
+              // we dont need to update local log filter field because 
+              // if visualize is there for any saved views we will get right any previous local filter fields 
+              // they will get applied to the current visualize selected stream 
+              // so we need to make sure we dont update that local filter fields when it is visualize
+              if(extractedObj.meta.logsVisualizeToggle ==  "logs"){
+                await updatedLocalLogFilterField();
+              }
               await getStreams("logs", true);
             } else {
               // ----- Here we are explicitly handling stream change -----
@@ -3185,7 +3191,13 @@ export default defineComponent({
               } else {
                 clearInterval(store.state.refreshIntervalID);
               }
-              await updatedLocalLogFilterField();
+              // we dont need to update local log filter field because 
+              // if visualize is there for any saved views we will get right any previous local filter fields 
+              // they will get applied to the current visualize selected stream 
+              // so we need to make sure we dont update that local filter fields when it is visualize
+              if(extractedObj.meta.logsVisualizeToggle ==  "logs" ){
+                await updatedLocalLogFilterField();
+              }
             }
 
             if (searchObj.meta.toggleFunction == false) {
@@ -4597,8 +4609,10 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .expand-on-focus {
-  height: calc(100vh - 12.5rem) !important; // 200px
+  position: fixed !important;
+  height: calc(100vh - 12.5rem) !important;
   z-index: 20 !important;
+  width: calc(100% - 104px);
 }
 
 .file-type label {

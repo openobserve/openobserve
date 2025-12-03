@@ -90,6 +90,7 @@ pub async fn otlp_proto(
     org_id: &str,
     body: web::Bytes,
     in_stream_name: Option<&str>,
+    user_email: &str,
 ) -> Result<HttpResponse, Error> {
     let request = match ExportTraceServiceRequest::decode(body) {
         Ok(v) => v,
@@ -106,6 +107,7 @@ pub async fn otlp_proto(
         request,
         OtlpRequestType::HttpProtobuf,
         in_stream_name,
+        user_email,
     )
     .await
     {
@@ -123,6 +125,7 @@ pub async fn otlp_json(
     org_id: &str,
     body: web::Bytes,
     in_stream_name: Option<&str>,
+    user_email: &str,
 ) -> Result<HttpResponse, Error> {
     let request = match serde_json::from_slice::<ExportTraceServiceRequest>(body.as_ref()) {
         Ok(req) => req,
@@ -134,7 +137,15 @@ pub async fn otlp_json(
             )));
         }
     };
-    match handle_otlp_request(org_id, request, OtlpRequestType::HttpJson, in_stream_name).await {
+    match handle_otlp_request(
+        org_id,
+        request,
+        OtlpRequestType::HttpJson,
+        in_stream_name,
+        user_email,
+    )
+    .await
+    {
         Ok(v) => Ok(v),
         Err(e) => {
             log::error!("[TRACES:OTLP] Error while handling http trace request: {e}");
@@ -148,6 +159,7 @@ pub async fn handle_otlp_request(
     request: ExportTraceServiceRequest,
     req_type: OtlpRequestType,
     in_stream_name: Option<&str>,
+    user_email: &str,
 ) -> Result<HttpResponse, Error> {
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None).await {
@@ -383,49 +395,8 @@ pub async fn handle_otlp_request(
                     links: json::to_string(&links).unwrap(),
                 };
 
-                // Process span for service graph if enabled
-                #[cfg(feature = "enterprise")]
-                if cfg.service_graph.enabled {
-                    // Wrap in catch_unwind to prevent panics from crashing trace ingestion
-                    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                        log::trace!(
-                            "[ServiceGraph] Processing span: trace_id={}, span_id={}",
-                            trace_id,
-                            span_id
-                        );
-                        let parent_span_id_opt =
-                            span_ref.get(PARENT_SPAN_ID).map(|s| Arc::from(s.as_str()));
-                        // Convert HashMap to json::Map
-                        let mut attrs_map = json::Map::new();
-                        for (k, v) in &span_att_map {
-                            attrs_map.insert(k.clone(), v.clone());
-                        }
-                        let graph_span = service_graph::span_to_graph_span(
-                            Arc::from(trace_id.as_str()),
-                            Arc::from(span_id.as_str()),
-                            parent_span_id_opt,
-                            Arc::from(service_name.as_str()),
-                            Arc::from(traces_stream_name.as_str()),
-                            &local_val.span_kind,
-                            start_time,
-                            end_time,
-                            &local_val.span_status,
-                            &attrs_map,
-                        );
-                        service_graph::process_span(org_id, graph_span);
-                    }));
-
-                    if let Err(e) = result {
-                        log::error!(
-                            "[ServiceGraph] Panic caught during span processing: {:?}",
-                            e
-                        );
-                        // Increment error metric
-                        service_graph::SERVICE_GRAPH_DROPPED_SPANS
-                            .with_label_values(&[org_id])
-                            .inc();
-                    }
-                }
+                // Service graph processing is handled by periodic daemon
+                // No inline processing during trace ingestion
 
                 let mut value: json::Value = json::to_value(local_val).unwrap();
                 // add timestamp
@@ -560,7 +531,13 @@ pub async fn handle_otlp_request(
         return format_response(partial_success, req_type);
     }
 
-    if let Err(e) = write_traces_by_stream(org_id, (started_at, &start), json_data_by_stream).await
+    if let Err(e) = write_traces_by_stream(
+        org_id,
+        (started_at, &start),
+        json_data_by_stream,
+        user_email,
+    )
+    .await
     {
         log::error!("Error while writing traces: {e}");
         // Check if this is a schema validation error (InvalidData)
@@ -605,6 +582,7 @@ pub async fn ingest_json(
     body: web::Bytes,
     req_type: OtlpRequestType,
     traces_stream_name: &str,
+    user_email: &str,
 ) -> Result<HttpResponse, Error> {
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None).await {
@@ -706,7 +684,13 @@ pub async fn ingest_json(
         return format_response(partial_success, req_type);
     }
 
-    if let Err(e) = write_traces_by_stream(org_id, (started_at, &start), json_data_by_stream).await
+    if let Err(e) = write_traces_by_stream(
+        org_id,
+        (started_at, &start),
+        json_data_by_stream,
+        user_email,
+    )
+    .await
     {
         log::error!("Error while writing traces: {e}");
         // Check if this is a schema validation error (InvalidData)
@@ -791,6 +775,7 @@ async fn write_traces_by_stream(
     org_id: &str,
     time_stats: (i64, &Instant),
     json_data_by_stream: HashMap<String, O2IngestJsonData>,
+    user_email: &str,
 ) -> Result<(), Error> {
     for (traces_stream_name, (json_data, fn_num)) in json_data_by_stream {
         // for cloud, we want to sent event when user creates a new stream
@@ -823,6 +808,11 @@ async fn write_traces_by_stream(
         };
         let time = time_stats.1.elapsed().as_secs_f64();
         req_stats.response_time = time;
+        req_stats.user_email = if user_email.is_empty() {
+            None
+        } else {
+            Some(user_email.to_string())
+        };
         // metric + data usage
         report_request_usage_stats(
             req_stats,
