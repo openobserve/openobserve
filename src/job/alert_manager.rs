@@ -59,7 +59,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         .await?;
     }
 
-    tokio::task::spawn(async move { run_schedule_jobs().await });
+    tokio::task::spawn(run_schedule_jobs());
     spawn_pausable_job!(
         "alert_manager_watch_timeout",
         get_config().limit.scheduler_watch_interval,
