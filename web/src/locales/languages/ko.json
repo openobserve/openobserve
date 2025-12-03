@@ -210,7 +210,9 @@
     "anomalyLabel": "변칙",
     "includePatternInSearch": "검색에 패턴 포함",
     "excludePatternFromSearch": "검색에서 패턴 제외",
-    "showPatternDetails": "세부 정보 보기 ({변수} 변수, {예제} 예제)"
+    "showPatternDetails": "세부 정보 보기 ({변수} 변수, {예제} 예제)",
+    "viewRelated": "관련 보기",
+    "viewRelatedTooltip": "관련 추적 및 지표 보기"
   },
   "menu": {
     "home": "홈",
@@ -1639,5 +1641,17 @@
     "tabLabel": "오류",
     "errorSpikePeriod": "오류 스파이크 기간:",
     "errorsGreaterThan": "오류 >="
+  },
+  "correlation": {
+    "title": "상관 지표 - {서비스}",
+    "loading": "상관관계가 있는 지표 로드 중...",
+    "loadingMetrics": "{count} 개의 메트릭 스트림을 로드하는 중",
+    "failedToLoad": "상관 관계 대시보드를 로드하지 못했습니다.",
+    "retryButton": "재시도",
+    "noMetrics": "상관관계를 분석할 수 있는 지표가 없습니다.",
+    "matchedDimensions": "일치하는 치수",
+    "metricsButton": "{개수} 지표",
+    "metricsTooltip": "표시할 지표 스트림 선택",
+    "selectMetrics": "지표 스트림 선택"
   }
 }
