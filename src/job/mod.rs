@@ -226,7 +226,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::alerts::alert::watch());
     tokio::task::spawn(db::organization::org_settings_watch());
     #[cfg(feature = "enterprise")]
-    tokio::task::spawn(o2_enterprise::enterprise::domain_management::db::watch().await);
+    tokio::task::spawn(o2_enterprise::enterprise::domain_management::db::watch());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(db::ai_prompts::watch());
 
