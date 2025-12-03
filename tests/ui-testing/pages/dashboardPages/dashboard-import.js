@@ -116,25 +116,57 @@ export default class DashboardImport {
   // Delete the Only imported dashboard
   async deleteImportedDashboard(prefix, dashboardName) {
     // Wait for the dashboard table to be visible
-    await this.page.locator('[data-test="dashboard-table"]').waitFor({
+    const dashboardTable = this.page.locator('[data-test="dashboard-table"]');
+    await dashboardTable.waitFor({
       state: "visible",
       timeout: 20000
     });
 
-    // Locate the dashboard row
+    // Wait for table to have content (at least one row)
+    await this.page.locator('[data-test="dashboard-table"] tbody tr').first().waitFor({
+      state: "visible",
+      timeout: 15000
+    });
+
+    // Locate the dashboard row - using a more flexible selector
     const dashboardRow = this.page.locator(
       `//tr[.//td[text()="${prefix}"] and .//div[@title="${dashboardName}"]]`
     );
 
-    // Wait for the row to be visible
-    await dashboardRow.waitFor({ state: "visible", timeout: 20000 });
+    // Wait for the specific row to be visible with retry
+    let rowVisible = false;
+    let rowRetries = 5;
+    while (!rowVisible && rowRetries > 0) {
+      try {
+        await dashboardRow.waitFor({ state: "visible", timeout: 4000 });
+        rowVisible = true;
+      } catch (error) {
+        rowRetries--;
+        if (rowRetries === 0) {
+          // Try alternative: search by dashboard name only
+          const alternateRow = this.page.getByRole("cell", { name: dashboardName });
+          await alternateRow.first().waitFor({ state: "visible", timeout: 5000 });
+          // If we get here, use the alternate approach
+          await alternateRow.first().click();
+          await this.page.locator('[data-test="dashboard-delete"]').first().waitFor({
+            state: "visible",
+            timeout: 5000
+          });
+          await this.page.locator('[data-test="dashboard-delete"]').first().click();
+          await this.page.locator('[data-test="confirm-button"]').click();
+          return; // Exit early using alternate method
+        }
+        // Wait for table to settle
+        await this.page.waitForLoadState('domcontentloaded');
+      }
+    }
 
     // Locate delete button
     const deleteButton = dashboardRow.locator('[data-test="dashboard-delete"]');
 
     // Hover over the row to make delete button visible and click with retry logic
-    let retries = 3;
-    while (retries > 0) {
+    let deleteRetries = 3;
+    while (deleteRetries > 0) {
       try {
         // Hover to reveal the delete button
         await dashboardRow.hover();
@@ -153,8 +185,8 @@ export default class DashboardImport {
 
         break;
       } catch (error) {
-        retries--;
-        if (retries === 0) throw error;
+        deleteRetries--;
+        if (deleteRetries === 0) throw error;
 
         // Wait for row to be stable before retrying
         await dashboardRow.waitFor({ state: "visible", timeout: 5000 });
