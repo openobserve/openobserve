@@ -94,21 +94,15 @@ impl StopWatch {
 
     /// Generate a formatted summary of all splits
     pub fn get_summary(&self) -> String {
-        let mut result = "StopWatch Summary\n".to_string();
-        result.push_str(&format!("  Total: {} ms\n", self.total_millis()));
-        result.push_str(&format!("  Splits: {}\n", self.splits.len()));
-
-        let mut cumulative_ms = 0u64;
-        for split in &self.splits {
-            let duration_ms = split.duration.as_millis() as u64;
-            cumulative_ms += duration_ms;
-            result.push_str(&format!(
-                "    {}: {} ms (at {} ms)\n",
-                split.name, duration_ms, cumulative_ms
-            ));
-        }
-
-        result
+        format!(
+            "total: {} ms, breakdown: {}",
+            self.total_millis(),
+            self.splits
+                .iter()
+                .map(|s| format!("{}={}ms", s.name, s.duration.as_millis()))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
     }
 }
 

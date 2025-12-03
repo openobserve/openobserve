@@ -197,50 +197,15 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
         .with_label_values(&[&req.org_id])
         .inc();
 
-    #[cfg(not(feature = "enterprise"))]
-    let _lock = crate::service::search::work_group::check_work_group(
+    let _lock = crate::service::search::work_group::acquire_work_group_lock(
         trace_id,
-        &req.org_id,
-        req.timeout as u64,
+        &req,
         &mut stop_watch,
         "logs",
+        &nodes,
+        &file_id_list_vec,
     )
     .await?;
-
-    // workgroup cleanup is automatic via _lock drop)
-    #[cfg(feature = "enterprise")]
-    let _lock = {
-        // Predict workgroup first
-        let is_background_task = req
-            .search_event_type
-            .as_ref()
-            .and_then(|st| config::meta::search::SearchEventType::try_from(st.as_str()).ok())
-            .map(|st| st.is_background())
-            .unwrap_or(false);
-
-        let work_group = o2_enterprise::enterprise::search::work_group::predict(
-            &nodes,
-            &file_id_list_vec,
-            is_background_task,
-        );
-
-        SEARCH_SERVER
-            .add_work_group(trace_id, Some(work_group.clone()))
-            .await;
-
-        let user_id = req.user_id.as_deref();
-
-        crate::service::search::work_group::check_work_group(
-            trace_id,
-            &req.org_id,
-            user_id,
-            req.timeout as u64,
-            work_group,
-            &mut stop_watch,
-            "logs",
-        )
-        .await?
-    };
 
     let took_wait = _lock.took_wait;
     let work_group_str = _lock.work_group_str.clone();
@@ -357,9 +322,8 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
         Err(err) => Err(err),
     }?;
 
-    log::info!("[trace_id {trace_id}] flight->search: search finished");
     log::info!(
-        "[trace_id {trace_id}] flight->search timing breakdown:\n{}",
+        "[trace_id {trace_id}] flight->search: search finished, {}",
         stop_watch.get_summary()
     );
 

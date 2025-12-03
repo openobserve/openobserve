@@ -25,7 +25,9 @@ use futures_core::ready;
 use tracing::info_span;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{handler::grpc::flight::clear_session_data, service::search::utils::AsyncDefer};
+use crate::{
+    handler::grpc::flight::clear_session_data, service::search::work_group::WorkGroupLock,
+};
 
 pub struct FlightEncoderStreamBuilder {
     encoder: FlightDataEncoder,
@@ -34,7 +36,7 @@ pub struct FlightEncoderStreamBuilder {
     // query context
     trace_id: String,
     is_super: bool,
-    defer: Option<AsyncDefer>,
+    defer_lock: Option<WorkGroupLock>,
     start: std::time::Instant,
 }
 
@@ -46,7 +48,7 @@ impl FlightEncoderStreamBuilder {
             custom_messages: vec![],
             trace_id: String::new(),
             is_super: false,
-            defer: None,
+            defer_lock: None,
             start: std::time::Instant::now(),
         }
     }
@@ -66,8 +68,8 @@ impl FlightEncoderStreamBuilder {
         self
     }
 
-    pub fn with_defer(mut self, defer: Option<AsyncDefer>) -> Self {
-        self.defer = defer;
+    pub fn with_defer_lock(mut self, lock: Option<WorkGroupLock>) -> Self {
+        self.defer_lock = lock;
         self
     }
 
@@ -91,7 +93,7 @@ impl FlightEncoderStreamBuilder {
             custom_messages: self.custom_messages,
             trace_id: self.trace_id,
             is_super: self.is_super,
-            defer: self.defer,
+            defer_lock: self.defer_lock,
             start: self.start,
             first_batch: true,
             span,
@@ -113,7 +115,7 @@ pub struct FlightEncoderStream {
     // query context
     trace_id: String,
     is_super: bool,
-    defer: Option<AsyncDefer>,
+    defer_lock: Option<WorkGroupLock>,
     start: std::time::Instant,
     span: tracing::Span,
     child_span: tracing::Span,
@@ -269,7 +271,7 @@ impl Drop for FlightEncoderStream {
             .inc();
 
         // defer is only set for super cluster follower leader
-        if let Some(defer) = self.defer.take() {
+        if let Some(defer) = self.defer_lock.take() {
             drop(defer);
         } else {
             log::info!(

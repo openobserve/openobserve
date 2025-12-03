@@ -12,12 +12,23 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-use config::{get_config, metrics, utils::stopwatch::StopWatch};
-use infra::errors::{Error, Result};
+use config::{
+    datafusion::request::Request,
+    get_config,
+    meta::{cluster::Node, search::SearchEventType},
+    metrics,
+    utils::stopwatch::StopWatch,
+};
+use infra::{
+    errors::{Error, Result},
+    file_list::FileId,
+};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::WorkGroup;
 
 use super::utils::AsyncDefer;
+#[cfg(feature = "enterprise")]
+use crate::service::search::SEARCH_SERVER;
 
 /// Guard that automatically releases work group lock when dropped
 pub struct WorkGroupLock {
@@ -254,4 +265,80 @@ async fn work_group_need_wait(
             }
         }
     }
+}
+
+/// Acquire work group lock with automatic work group prediction (enterprise)
+/// or simple distributed lock (OSS)
+///
+/// This is a high-level helper that encapsulates:
+/// - Determining if request is a background task
+/// - Predicting appropriate work group (enterprise only)
+/// - Adding work group to search server (enterprise only)
+/// - Acquiring the work group lock
+#[cfg(not(feature = "enterprise"))]
+pub async fn acquire_work_group_lock(
+    trace_id: &str,
+    req: &Request,
+    stop_watch: &mut StopWatch,
+    caller: &str,
+    _nodes: &[Node],
+    _file_id_list_vec: &[&FileId],
+) -> Result<WorkGroupLock> {
+    check_work_group(
+        trace_id,
+        &req.org_id,
+        req.timeout as u64,
+        stop_watch,
+        caller,
+    )
+    .await
+}
+
+/// Acquire work group lock with automatic work group prediction (enterprise)
+/// or simple distributed lock (OSS)
+///
+/// This is a high-level helper that encapsulates:
+/// - Determining if request is a background task
+/// - Predicting appropriate work group (enterprise only)
+/// - Adding work group to search server (enterprise only)
+/// - Acquiring the work group lock
+#[cfg(feature = "enterprise")]
+pub async fn acquire_work_group_lock(
+    trace_id: &str,
+    req: &Request,
+    stop_watch: &mut StopWatch,
+    caller: &str,
+    nodes: &[Node],
+    file_id_list_vec: &[&FileId],
+) -> Result<WorkGroupLock> {
+    // Predict workgroup first
+    let is_background_task = req
+        .search_event_type
+        .as_ref()
+        .and_then(|st| SearchEventType::try_from(st.as_str()).ok())
+        .map(|st| st.is_background())
+        .unwrap_or(false);
+
+    let work_group = o2_enterprise::enterprise::search::work_group::predict(
+        nodes,
+        file_id_list_vec,
+        is_background_task,
+    );
+
+    SEARCH_SERVER
+        .add_work_group(trace_id, Some(work_group.clone()))
+        .await;
+
+    let user_id = req.user_id.as_deref();
+
+    check_work_group(
+        trace_id,
+        &req.org_id,
+        user_id,
+        req.timeout as u64,
+        work_group,
+        stop_watch,
+        caller,
+    )
+    .await
 }
