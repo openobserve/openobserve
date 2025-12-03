@@ -57,6 +57,20 @@ pub struct SemanticFieldGroup {
     /// Whether to normalize values (lowercase + trim)
     #[serde(default)]
     pub normalize: bool,
+
+    /// Whether this dimension is stable (low cardinality) and should be used for correlation key
+    ///
+    /// Stable dimensions (true): service, environment, k8s-cluster, k8s-namespace, k8s-deployment
+    /// Transient dimensions (false): k8s-pod, host, ip-address, container-id, trace-id
+    ///
+    /// Stable dimensions are used to compute correlation_key which prevents DB explosion.
+    /// Transient dimensions are stored but not used for service record identity.
+    #[serde(default = "default_is_stable")]
+    pub is_stable: bool,
+}
+
+fn default_is_stable() -> bool {
+    false // Conservative default: assume dimensions are transient unless marked stable
 }
 
 impl SemanticFieldGroup {
@@ -74,6 +88,26 @@ impl SemanticFieldGroup {
             group: None,
             fields,
             normalize,
+            is_stable: false, // Default to transient
+        }
+    }
+
+    pub fn new_stable(
+        id: impl Into<String>,
+        display: impl Into<String>,
+        fields: &[&str],
+        normalize: bool,
+        is_stable: bool,
+    ) -> Self {
+        let fields = fields.iter().map(|v| v.to_string()).collect_vec();
+
+        Self {
+            id: id.into(),
+            display: display.into(),
+            group: None,
+            fields,
+            normalize,
+            is_stable,
         }
     }
 
@@ -92,6 +126,27 @@ impl SemanticFieldGroup {
             group: Some(group.into()),
             fields,
             normalize,
+            is_stable: false, // Default to transient
+        }
+    }
+
+    pub fn with_group_stable(
+        id: impl Into<String>,
+        display: impl Into<String>,
+        group: impl Into<String>,
+        fields: &[&str],
+        normalize: bool,
+        is_stable: bool,
+    ) -> Self {
+        let fields = fields.iter().map(|v| v.to_string()).collect_vec();
+
+        Self {
+            id: id.into(),
+            display: display.into(),
+            group: Some(group.into()),
+            fields,
+            normalize,
+            is_stable,
         }
     }
 
