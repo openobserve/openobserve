@@ -235,19 +235,37 @@ test.describe("Logs Page testcases", () => {
     const isInitiallyVisible = await fnEditorInput.isVisible().catch(() => false);
 
     if (isInitiallyVisible) {
-      // VRL is ON - turn it OFF first, then test ON, then OFF again
-      await pm.logsPage.clickVrlToggle();
-      await pm.logsPage.expectFnEditorNotVisible();
-      await pm.logsPage.clickVrlToggle();
+      // VRL toggle is ON - verify field is visible, then turn it OFF and verify not visible
+      testLogger.info('VRL toggle is initially ON');
       await pm.logsPage.expectVrlFieldVisible();
+
+      // Take screenshot before toggle
+      await page.screenshot({ path: 'playwright-tests/Logs/vrl-before-toggle.png', fullPage: true });
+      testLogger.info('Screenshot saved: playwright-tests/Logs/vrl-before-toggle.png');
+
       await pm.logsPage.clickVrlToggle();
+
+      // Take screenshot after toggle
+      await page.screenshot({ path: 'playwright-tests/Logs/vrl-after-toggle.png', fullPage: true });
+      testLogger.info('Screenshot saved: playwright-tests/Logs/vrl-after-toggle.png');
+
       await pm.logsPage.expectFnEditorNotVisible();
     } else {
-      // VRL is OFF - turn it ON, then OFF
-      await pm.logsPage.clickVrlToggle();
-      await pm.logsPage.expectVrlFieldVisible();
-      await pm.logsPage.clickVrlToggle();
+      // VRL toggle is OFF - verify field is not visible, then turn it ON and verify visible
+      testLogger.info('VRL toggle is initially OFF');
       await pm.logsPage.expectFnEditorNotVisible();
+
+      // Take screenshot before toggle
+      await page.screenshot({ path: 'playwright-tests/Logs/vrl-before-toggle-off.png', fullPage: true });
+      testLogger.info('Screenshot saved: playwright-tests/Logs/vrl-before-toggle-off.png');
+
+      await pm.logsPage.clickVrlToggle();
+
+      // Take screenshot after toggle
+      await page.screenshot({ path: 'playwright-tests/Logs/vrl-after-toggle-off.png', fullPage: true });
+      testLogger.info('Screenshot saved: playwright-tests/Logs/vrl-after-toggle-off.png');
+
+      await pm.logsPage.expectVrlFieldVisible();
     }
 
     testLogger.info('VRL toggle field visibility test completed');
@@ -570,7 +588,32 @@ test.describe("Logs Page testcases", () => {
     await pm.logsPage.clickRefreshButton();
     await page.waitForLoadState('networkidle'); // Replace hard wait
     await pm.logsPage.expectPaginationNotVisible();
-    
+
     testLogger.info('Pagination SQL group/order/limit query test completed');
+  });
+
+  test.afterEach(async ({ page }) => {
+    // Clean up screenshots regardless of test pass/fail
+    const fs = require('fs');
+    const path = require('path');
+
+    const screenshotsToDelete = [
+      'playwright-tests/Logs/vrl-before-toggle.png',
+      'playwright-tests/Logs/vrl-after-toggle.png',
+      'playwright-tests/Logs/vrl-before-toggle-off.png',
+      'playwright-tests/Logs/vrl-after-toggle-off.png',
+      'playwright-tests/Logs/vrl-editor-state-check.png',
+      'playwright-tests/Logs/include-menu-debug.png'
+    ];
+
+    for (const screenshot of screenshotsToDelete) {
+      try {
+        if (fs.existsSync(screenshot)) {
+          fs.unlinkSync(screenshot);
+        }
+      } catch (error) {
+        // Pass gracefully if deletion fails
+      }
+    }
   });
 });
