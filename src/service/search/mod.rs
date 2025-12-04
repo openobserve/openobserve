@@ -1044,7 +1044,7 @@ pub async fn search_partition(
                     query.end_time,
                 )
             } else {
-                match discover_cache_for_query(&cache_file_path, query.start_time, query.end_time)
+                match discover_cache_for_query(&cache_file_path, query.start_time, query.end_time, cache_interval)
                     .await
                 {
                     Ok(result) => result,
