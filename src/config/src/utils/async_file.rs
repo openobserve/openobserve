@@ -186,35 +186,35 @@ pub fn create_wal_dir_datetime_filter(
             .filter_map(|osc| osc.to_str());
 
         let year = match components.next().map(|c| c.parse::<i32>()) {
-            Some(Ok(y @ 1901..=9999)) => y, // A plausible year
-            Some(_) => return false,        // Parsed, but not a plausible year
-            None => return true,            /* Not present or failed to parse, could be a
-                                              * skippable path */
+            Some(Ok(y @ 1901..=9999)) => y,
+            Some(_) => return false,
+            None => return true, // Not present, could be a skippable path
         };
 
         let month = match components.next().map(|c| c.parse::<u32>()) {
             Some(Ok(m @ 1..=12)) => m,
-            Some(_) => return false,    // Parsed, but invalid month number
-            None => start_time.month(), // Not present or failed to parse
+            Some(_) => return false,
+            None => start_time.month(),
         };
 
-        let month_days = [31u32, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-        let days =
-            month_days[(month - 1) as usize] + if month == 2 && year % 4 == 0 { 1 } else { 0 };
+        // validation of the day will be done in `with_ymd_and_hms`
+        // For incomplete paths (directories):
+        // - If same year/month as start_time: use start_time.day() to avoid including earlier dates
+        // - Otherwise: use day=1 to allow traversal of other months in the range
         let day = match components.next().map(|c| c.parse::<u32>()) {
-            Some(Ok(day)) => {
-                if 1 <= day && day <= days {
-                    day
+            Some(Ok(day @ 1..=31)) => day,
+            Some(_) => return false,
+            None => {
+                if year == start_time.year() && month == start_time.month() {
+                    start_time.day()
                 } else {
-                    return false;
+                    1
                 }
             }
-            Some(_) => return false,
-            None => start_time.day(),
         };
 
         let hour = match components.next().map(|c| c.parse::<u32>()) {
-            Some(Ok(hour @ 0..24)) => hour,
+            Some(Ok(hour @ 0..=23)) => hour,
             Some(_) => return false,
             None => start_time.hour(),
         };
@@ -501,5 +501,263 @@ mod tests {
 
         // Cleanup
         std::fs::remove_dir_all(test_dir).unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_filter_leap_year_feb_29() {
+        // Test February 29th on leap years (2024, 2000) and non-leap years (2023, 1900)
+        let wal_root = tempfile::tempdir().expect("Temp dir");
+        let inner_path = wal_root.path().join("files").join("org");
+
+        // Create directory structure for Feb 29, 2024 (valid leap year)
+        let leap_year_path = inner_path.join("2024/2/29/12");
+        tokio::fs::create_dir_all(&leap_year_path).await.unwrap();
+        tokio::fs::File::create(leap_year_path.join("test.parquet"))
+            .await
+            .unwrap();
+
+        // Create directory structure for Feb 29, 2000 (valid leap year - divisible by 400)
+        let leap_year_2000_path = inner_path.join("2000/2/29/12");
+        tokio::fs::create_dir_all(&leap_year_2000_path)
+            .await
+            .unwrap();
+        tokio::fs::File::create(leap_year_2000_path.join("test.parquet"))
+            .await
+            .unwrap();
+
+        // Create directory structure for Feb 29, 2023 (invalid - not a leap year)
+        let non_leap_year_path = inner_path.join("2023/2/29/12");
+        tokio::fs::create_dir_all(&non_leap_year_path)
+            .await
+            .unwrap();
+        tokio::fs::File::create(non_leap_year_path.join("test.parquet"))
+            .await
+            .unwrap();
+
+        // Create directory structure for Feb 29, 1900 (invalid - divisible by 100 but not 400)
+        let non_leap_1900_path = inner_path.join("1900/2/29/12");
+        tokio::fs::create_dir_all(&non_leap_1900_path)
+            .await
+            .unwrap();
+        tokio::fs::File::create(non_leap_1900_path.join("test.parquet"))
+            .await
+            .unwrap();
+
+        // Create directory structure for Feb 28, 2023 (always valid)
+        let feb_28_path = inner_path.join("2023/2/28/12");
+        tokio::fs::create_dir_all(&feb_28_path).await.unwrap();
+        tokio::fs::File::create(feb_28_path.join("test.parquet"))
+            .await
+            .unwrap();
+
+        // Test filter for 2024 Feb 29 (should include valid leap year date)
+        let start_time = Utc.with_ymd_and_hms(2024, 2, 29, 0, 0, 0).single().unwrap();
+        let end_time = Utc
+            .with_ymd_and_hms(2024, 2, 29, 23, 0, 0)
+            .single()
+            .unwrap();
+        let filter = create_wal_dir_datetime_filter(
+            start_time,
+            end_time,
+            "parquet".to_string(),
+            inner_path.components().count(),
+        );
+        let files = scan_files_filtered(&inner_path, filter, None)
+            .await
+            .unwrap();
+        assert_eq!(files.len(), 1, "Should find 2024/2/29 file");
+
+        // Test filter for 2000 Feb 29 (should include valid leap year date)
+        let start_time = Utc.with_ymd_and_hms(2000, 2, 29, 0, 0, 0).single().unwrap();
+        let end_time = Utc
+            .with_ymd_and_hms(2000, 2, 29, 23, 0, 0)
+            .single()
+            .unwrap();
+        let filter = create_wal_dir_datetime_filter(
+            start_time,
+            end_time,
+            "parquet".to_string(),
+            inner_path.components().count(),
+        );
+        let files = scan_files_filtered(&inner_path, filter, None)
+            .await
+            .unwrap();
+        assert_eq!(files.len(), 1, "Should find 2000/2/29 file");
+
+        // Test filter for 2023 Feb 29 (should NOT include invalid date)
+        let start_time = Utc.with_ymd_and_hms(2023, 2, 28, 0, 0, 0).single().unwrap();
+        let end_time = Utc.with_ymd_and_hms(2023, 3, 1, 23, 0, 0).single().unwrap();
+        let filter = create_wal_dir_datetime_filter(
+            start_time,
+            end_time,
+            "parquet".to_string(),
+            inner_path.components().count(),
+        );
+        let files = scan_files_filtered(&inner_path, filter, None)
+            .await
+            .unwrap();
+        // Should only find Feb 28, not Feb 29 (invalid date should be filtered out)
+        assert_eq!(files.len(), 1, "Should find only 2023/2/28 file");
+        assert!(files[0].contains("2023/2/28"));
+
+        // Test filter for 1900 Feb 29 (should NOT include - not a leap year)
+        let start_time = Utc.with_ymd_and_hms(1900, 2, 28, 0, 0, 0).single().unwrap();
+        let end_time = Utc.with_ymd_and_hms(1900, 3, 1, 23, 0, 0).single().unwrap();
+        let filter = create_wal_dir_datetime_filter(
+            start_time,
+            end_time,
+            "parquet".to_string(),
+            inner_path.components().count(),
+        );
+        let files = scan_files_filtered(&inner_path, filter, None)
+            .await
+            .unwrap();
+        assert_eq!(
+            files.len(),
+            0,
+            "Should not find 1900/2/29 file (invalid leap year)"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_filter_invalid_dates() {
+        // Test invalid dates like April 31, June 31, etc.
+        let wal_root = tempfile::tempdir().expect("Temp dir");
+        let inner_path = wal_root.path().join("files").join("org");
+
+        // Create directory structure for April 31 (invalid - April has 30 days)
+        let april_31_path = inner_path.join("2024/4/31/12");
+        tokio::fs::create_dir_all(&april_31_path).await.unwrap();
+        tokio::fs::File::create(april_31_path.join("test.parquet"))
+            .await
+            .unwrap();
+
+        // Create directory structure for April 30 (valid)
+        let april_30_path = inner_path.join("2024/4/30/12");
+        tokio::fs::create_dir_all(&april_30_path).await.unwrap();
+        tokio::fs::File::create(april_30_path.join("test.parquet"))
+            .await
+            .unwrap();
+
+        // Create directory structure for June 31 (invalid - June has 30 days)
+        let june_31_path = inner_path.join("2024/6/31/12");
+        tokio::fs::create_dir_all(&june_31_path).await.unwrap();
+        tokio::fs::File::create(june_31_path.join("test.parquet"))
+            .await
+            .unwrap();
+
+        // Create directory structure for September 31 (invalid - September has 30 days)
+        let sept_31_path = inner_path.join("2024/9/31/12");
+        tokio::fs::create_dir_all(&sept_31_path).await.unwrap();
+        tokio::fs::File::create(sept_31_path.join("test.parquet"))
+            .await
+            .unwrap();
+
+        // Create directory structure for November 31 (invalid - November has 30 days)
+        let nov_31_path = inner_path.join("2024/11/31/12");
+        tokio::fs::create_dir_all(&nov_31_path).await.unwrap();
+        tokio::fs::File::create(nov_31_path.join("test.parquet"))
+            .await
+            .unwrap();
+
+        // Test filter for April (should only find valid April 30)
+        let start_time = Utc.with_ymd_and_hms(2024, 4, 1, 0, 0, 0).single().unwrap();
+        let end_time = Utc
+            .with_ymd_and_hms(2024, 4, 30, 23, 0, 0)
+            .single()
+            .unwrap();
+        let filter = create_wal_dir_datetime_filter(
+            start_time,
+            end_time,
+            "parquet".to_string(),
+            inner_path.components().count(),
+        );
+        let files = scan_files_filtered(&inner_path, filter, None)
+            .await
+            .unwrap();
+        assert_eq!(files.len(), 1, "Should find only valid April 30");
+        assert!(files[0].contains("2024/4/30"));
+
+        // Test broader filter that would catch invalid dates if they weren't filtered
+        let start_time = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).single().unwrap();
+        let end_time = Utc
+            .with_ymd_and_hms(2024, 12, 31, 23, 0, 0)
+            .single()
+            .unwrap();
+        let filter = create_wal_dir_datetime_filter(
+            start_time,
+            end_time,
+            "parquet".to_string(),
+            inner_path.components().count(),
+        );
+        let files = scan_files_filtered(&inner_path, filter, None)
+            .await
+            .unwrap();
+        // Should only find April 30 (the only valid date)
+        assert_eq!(
+            files.len(),
+            1,
+            "Should filter out all invalid dates (Apr 31, Jun 31, Sep 31, Nov 31)"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_filter_month_boundaries() {
+        // Test month boundaries and transitions
+        let wal_root = tempfile::tempdir().expect("Temp dir");
+        let inner_path = wal_root.path().join("files").join("org");
+
+        // Create files at month boundaries
+        let jan_31 = inner_path.join("2024/1/31/12");
+        tokio::fs::create_dir_all(&jan_31).await.unwrap();
+        tokio::fs::File::create(jan_31.join("test.parquet"))
+            .await
+            .unwrap();
+
+        let feb_1 = inner_path.join("2024/2/1/12");
+        tokio::fs::create_dir_all(&feb_1).await.unwrap();
+        tokio::fs::File::create(feb_1.join("test.parquet"))
+            .await
+            .unwrap();
+
+        let feb_29 = inner_path.join("2024/2/29/12"); // 2024 is a leap year
+        tokio::fs::create_dir_all(&feb_29).await.unwrap();
+        tokio::fs::File::create(feb_29.join("test.parquet"))
+            .await
+            .unwrap();
+
+        let mar_1 = inner_path.join("2024/3/1/12");
+        tokio::fs::create_dir_all(&mar_1).await.unwrap();
+        tokio::fs::File::create(mar_1.join("test.parquet"))
+            .await
+            .unwrap();
+
+        // Test filter spanning January 31 to February 1
+        let start_time = Utc.with_ymd_and_hms(2024, 1, 31, 0, 0, 0).single().unwrap();
+        let end_time = Utc.with_ymd_and_hms(2024, 2, 1, 23, 0, 0).single().unwrap();
+        let filter = create_wal_dir_datetime_filter(
+            start_time,
+            end_time,
+            "parquet".to_string(),
+            inner_path.components().count(),
+        );
+        let files = scan_files_filtered(&inner_path, filter, None)
+            .await
+            .unwrap();
+        assert_eq!(files.len(), 2, "Should find Jan 31 and Feb 1");
+
+        // Test filter spanning February 29 to March 1 (leap year boundary)
+        let start_time = Utc.with_ymd_and_hms(2024, 2, 29, 0, 0, 0).single().unwrap();
+        let end_time = Utc.with_ymd_and_hms(2024, 3, 1, 23, 0, 0).single().unwrap();
+        let filter = create_wal_dir_datetime_filter(
+            start_time,
+            end_time,
+            "parquet".to_string(),
+            inner_path.components().count(),
+        );
+        let files = scan_files_filtered(&inner_path, filter, None)
+            .await
+            .unwrap();
+        assert_eq!(files.len(), 2, "Should find Feb 29 and Mar 1");
     }
 }
