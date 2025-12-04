@@ -740,11 +740,7 @@ alt="Quick Mode" class="toolbar-icon" />
                 class="q-pa-sm saved-view-item download-menu-parent"
                 clickable
                 v-close-popup
-                v-bind:disable="
-                  searchObj.data.queryResults &&
-                  searchObj.data.queryResults.hasOwnProperty('hits') &&
-                  !searchObj.data.queryResults.hits.length
-                "
+
                 @mouseenter="showDownloadMenu = true"
               >
                 <q-item-section class="cursor-pointer">
@@ -2493,6 +2489,17 @@ export default defineComponent({
       //eg: {body:"hey this is the email body , with some info in it "}
       //after converting it will treat hey this is the email body this as the body and remaining will be the next column
       //to solve this issue we are using json2csv package
+
+      if (!data || data.length === 0) {
+        $q.notify({
+          message: "No data found to download.",
+          color: "positive",
+          position: "top",
+          timeout: 2000,
+        });
+        return;
+      }
+
       try {
         let filename = "logs-data";
         let dataobj;
@@ -2506,13 +2513,6 @@ export default defineComponent({
         } else {
           filename += ".json";
           dataobj = JSON.stringify(data, null, 2);
-        }
-        if (dataobj.length === 0) {
-          $q.notify({
-            type: "negative",
-            message: "No data available to download.",
-          });
-          return;
         }
         if (format === "csv") {
           dataobj = new Blob([dataobj], { type: "text/csv" });
