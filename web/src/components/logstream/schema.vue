@@ -981,7 +981,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <q-card-section class="q-pt-none q-pb-sm q-px-md">
-        <div class="text-body2 q-mb-sm" :class="store.state.theme === 'dark' ? 'text-grey-5' : ''" style="color: #666;">
+        <div class="text-body2 q-mb-sm performance-fields-description">
           We found some fields with full-text search or secondary indexes that are not included in your schema.
           These fields improve search and indexing behavior.
           Do you want to auto-add them?
@@ -991,7 +991,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-caption text-weight-medium q-mb-xs">
             Full Text Search ({{ missingPerformanceFieldsByType.fts.length }})
           </div>
-          <div class="performance-fields-container bordered-scroll-area">
+          <div class="performance-fields-container bordered-scroll-area" :class="store.state.theme === 'dark' ? 'bordered-scroll-area-dark' : 'bordered-scroll-area-light'">
             <q-chip
               v-for="field in missingPerformanceFieldsByType.fts"
               :key="field.name"
@@ -1009,7 +1009,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-caption text-weight-medium q-mb-xs">
             Secondary Index ({{ missingPerformanceFieldsByType.secondaryIndex.length }})
           </div>
-          <div class="performance-fields-container bordered-scroll-area">
+          <div class="performance-fields-container bordered-scroll-area" :class="store.state.theme === 'dark' ? 'bordered-scroll-area-dark' : 'bordered-scroll-area-light'">
             <q-chip
               v-for="field in missingPerformanceFieldsByType.secondaryIndex"
               :key="field.name"
@@ -2754,14 +2754,20 @@ export default defineComponent({
   }
 }
 
+.performance-fields-description {
+  color: var(--o2-text-muted);
+}
+
 .bordered-scroll-area {
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--o2-border-color);
   border-radius: 4px;
+}
+
+.bordered-scroll-area-light {
   background-color: #fafafa;
 }
 
-.body--dark .bordered-scroll-area {
-  border-color: #3a3a3a;
+.bordered-scroll-area-dark {
   background-color: #1e1e1e;
 }
 
@@ -2772,9 +2778,5 @@ export default defineComponent({
   display: flex;
   flex-wrap: wrap;
   align-content: flex-start;
-}
-
-.body--dark .performance-fields-container {
-  background-color: #1e1e1e;
 }
 </style>
