@@ -215,7 +215,10 @@
     "viewRelatedTooltip": "查看相关的追踪和指标",
     "noStreamSelectedMessage": "选择直播并按 “运行查询” 继续。此外，您可以应用其他筛选条件并调整日期范围以增强搜索效果。",
     "refreshCacheAndRunQuery": "刷新缓存并运行查询",
-    "noFieldFoundInStream": "在所选直播中找不到字段。"
+    "noFieldFoundInStream": "在所选直播中找不到字段。",
+    "searchHistory": "搜索历史",
+    "createScheduledSearch": "创建预设搜索",
+    "listScheduledSearch": "列出预设搜索"
   },
   "menu": {
     "home": "主页",

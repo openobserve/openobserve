@@ -215,7 +215,10 @@
     "viewRelatedTooltip": "Verwandte Traces und Metriken anzeigen",
     "noStreamSelectedMessage": "Wählen Sie einen Stream aus und klicken Sie auf „Abfrage ausführen“, um fortzufahren. Zusätzlich kannst du zusätzliche Filter anwenden und den Datumsbereich anpassen, um die Suche zu verbessern.",
     "refreshCacheAndRunQuery": "Cache aktualisieren und Abfrage ausführen",
-    "noFieldFoundInStream": "Im ausgewählten Stream wurde kein Feld gefunden."
+    "noFieldFoundInStream": "Im ausgewählten Stream wurde kein Feld gefunden.",
+    "searchHistory": "Verlauf durchsuchen",
+    "createScheduledSearch": "Geplante Suche erstellen",
+    "listScheduledSearch": "Geplante Suche auflisten"
   },
   "menu": {
     "home": "Startseite",

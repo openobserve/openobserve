@@ -215,7 +215,10 @@
     "viewRelatedTooltip": "관련 추적 및 지표 보기",
     "noStreamSelectedMessage": "스트림을 선택하고 '쿼리 실행'을 눌러 계속합니다.또한 추가 필터를 적용하고 날짜 범위를 조정하여 검색을 개선할 수 있습니다.",
     "refreshCacheAndRunQuery": "캐시 새로 고침 및 쿼리 실행",
-    "noFieldFoundInStream": "선택한 스트림에 필드가 없습니다."
+    "noFieldFoundInStream": "선택한 스트림에 필드가 없습니다.",
+    "searchHistory": "검색 기록",
+    "createScheduledSearch": "예약 검색 생성",
+    "listScheduledSearch": "예약 검색 목록"
   },
   "menu": {
     "home": "홈",

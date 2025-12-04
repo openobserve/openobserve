@@ -215,7 +215,10 @@
     "viewRelatedTooltip": "関連するトレースとメトリクスを表示する",
     "noStreamSelectedMessage": "ストリームを選択し、[クエリを実行] を押して続行します。さらに、追加のフィルターを適用したり、日付範囲を調整したりして、検索範囲を絞り込むこともできます。",
     "refreshCacheAndRunQuery": "キャッシュを更新してクエリを実行",
-    "noFieldFoundInStream": "選択したストリームにフィールドが見つかりません。"
+    "noFieldFoundInStream": "選択したストリームにフィールドが見つかりません。",
+    "searchHistory": "検索履歴",
+    "createScheduledSearch": "スケジュール検索の作成",
+    "listScheduledSearch": "スケジュール検索を一覧表示"
   },
   "menu": {
     "home": "ホーム",

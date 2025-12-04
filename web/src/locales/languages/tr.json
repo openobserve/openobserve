@@ -215,7 +215,10 @@
     "viewRelatedTooltip": "İlgili izleri ve metrikleri görüntüleme",
     "noStreamSelectedMessage": "Bir akış seçin ve devam etmek için 'Sorguyu çalıştır'a basın. bunlara ek olarak, aramayı geliştirmek için ek filtreler uygulayabilir ve tarih aralığını ayarlayabilirsiniz.",
     "refreshCacheAndRunQuery": "Önbelleği Yenile ve Sorguyu Çalıştır",
-    "noFieldFoundInStream": "Seçilen akışta alan bulunamadı."
+    "noFieldFoundInStream": "Seçilen akışta alan bulunamadı.",
+    "searchHistory": "Arama Geçmişi",
+    "createScheduledSearch": "Zamanlanmış Arama Oluştur",
+    "listScheduledSearch": "Planlanmış Aramayı Listele"
   },
   "menu": {
     "home": "Ana Sayfa",

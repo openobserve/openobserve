@@ -215,7 +215,10 @@
     "viewRelatedTooltip": "Afficher les traces et les métriques associées",
     "noStreamSelectedMessage": "Sélectionnez un flux et appuyez sur « Exécuter la requête » pour continuer. Vous pouvez également appliquer des filtres supplémentaires et ajuster la plage de dates pour améliorer la recherche.",
     "refreshCacheAndRunQuery": "Actualiser le cache et exécuter une requête",
-    "noFieldFoundInStream": "Aucun champ n'a été trouvé dans le flux sélectionné."
+    "noFieldFoundInStream": "Aucun champ n'a été trouvé dans le flux sélectionné.",
+    "searchHistory": "Historique des recherches",
+    "createScheduledSearch": "Créer une recherche planifiée",
+    "listScheduledSearch": "Liste des recherches planifiées"
   },
   "menu": {
     "home": "Accueil",

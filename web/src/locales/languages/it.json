@@ -215,7 +215,10 @@
     "viewRelatedTooltip": "Visualizza le tracce e le metriche correlate",
     "noStreamSelectedMessage": "Seleziona uno stream e premi «Esegui query» per continuare. Inoltre, puoi applicare filtri aggiuntivi e modificare l'intervallo di date per migliorare la ricerca.",
     "refreshCacheAndRunQuery": "Aggiorna la cache ed esegui la query",
-    "noFieldFoundInStream": "Nessun campo trovato nello stream selezionato."
+    "noFieldFoundInStream": "Nessun campo trovato nello stream selezionato.",
+    "searchHistory": "Cronologia delle ricerche",
+    "createScheduledSearch": "Crea ricerca pianificata",
+    "listScheduledSearch": "Elenca ricerca pianificata"
   },
   "menu": {
     "home": "Home",
