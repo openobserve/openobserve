@@ -981,7 +981,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <q-card-section class="q-pt-none q-pb-sm q-px-md">
-        <div class="text-body2 q-mb-sm" style="color: #666;">
+        <div class="text-body2 q-mb-sm" :class="store.state.theme === 'dark' ? 'text-grey-5' : ''" style="color: #666;">
           We found some fields with full-text search or secondary indexes that are not included in your schema.
           These fields improve search and indexing behavior.
           Do you want to auto-add them?
@@ -995,8 +995,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-chip
               v-for="field in missingPerformanceFieldsByType.fts"
               :key="field.name"
-              color="blue-2"
-              text-color="blue-9"
+              :color="store.state.theme === 'dark' ? 'blue-9' : 'blue-2'"
+              :text-color="store.state.theme === 'dark' ? 'blue-2' : 'blue-9'"
               size="sm"
               class="q-mr-xs q-mb-xs"
             >
@@ -1013,8 +1013,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-chip
               v-for="field in missingPerformanceFieldsByType.secondaryIndex"
               :key="field.name"
-              color="green-2"
-              text-color="green-9"
+              :color="store.state.theme === 'dark' ? 'green-9' : 'green-2'"
+              :text-color="store.state.theme === 'dark' ? 'green-2' : 'green-9'"
               size="sm"
               class="q-mr-xs q-mb-xs"
             >
