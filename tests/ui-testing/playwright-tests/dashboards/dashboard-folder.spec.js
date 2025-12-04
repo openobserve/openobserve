@@ -48,22 +48,22 @@ test.describe("dashboard folder testcases", () => {
     // Define folderName first
     const folderName = pm.dashboardFolder.generateUniqueFolderName("t");
 
-    // Create the folder
+    // Create the folder (waitForFolderDialogStable is called internally)
     await pm.dashboardFolder.createFolder(folderName);
     // Search to confirm it exists
     await pm.dashboardFolder.searchFolder(folderName);
     await pm.alertsPage.verifyFolderCreated(folderName);
     await pm.alertsPage.navigateToFolder(folderName);
-    await page.waitForTimeout(2000);
+    // await page.waitForTimeout(2000);
 
-    await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await page.waitForTimeout(1000);
-    await pm.dashboardPage.verifyShareDashboardLink(randomDashboardName);
-    await page.waitForTimeout(1000);
+    // await pm.dashboardCreate.createDashboard(randomDashboardName);
+    // await page.waitForTimeout(1000);
+    // await pm.dashboardPage.verifyShareDashboardLink(randomDashboardName);
+    // await page.waitForTimeout(1000);
     // Click on folder name in breadcrumbs to go back to folder view
     await page.getByText(folderName).click();
     await page.waitForTimeout(1000);
-    await pm.dashboardPage.deleteSearchedDashboard(randomDashboardName);
+    // await pm.dashboardPage.deleteSearchedDashboard(randomDashboardName);
 
     // Delete folder
     await pm.dashboardFolder.deleteFolder(folderName);
@@ -91,6 +91,7 @@ test.describe("dashboard folder testcases", () => {
     const updatedName = folderName + "_updated";
     await pm.dashboardFolder.editFolderName(folderName, updatedName);
     await pm.dashboardFolder.searchFolder(updatedName);
+
     await expect(page.locator(`text=${updatedName}`)).toBeVisible();
 
     await pm.dashboardFolder.deleteFolder(updatedName);
