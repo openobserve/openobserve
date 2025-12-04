@@ -16,7 +16,7 @@
 use config::meta::search::SearchEventType;
 use config::{
     datafusion::request::Request, get_config, meta::cluster::Node, metrics,
-    utils::stopwatch::StopWatch,
+    utils::took_watcher::TookWatcher,
 };
 use infra::{
     errors::{Error, Result},
@@ -30,7 +30,7 @@ use super::utils::AsyncDefer;
 use crate::service::search::SEARCH_SERVER;
 
 /// Guard that automatically releases work group lock when dropped
-pub struct WorkGroupLock {
+pub struct DeferredLock {
     pub took_wait: usize,
     pub work_group_str: String,
     #[cfg(feature = "enterprise")]
@@ -50,9 +50,9 @@ pub async fn check_work_group(
     trace_id: &str,
     org_id: &str,
     timeout: u64,
-    stop_watch: &mut StopWatch,
+    stop_watch: &mut TookWatcher,
     caller: &str,
-) -> Result<WorkGroupLock> {
+) -> Result<DeferredLock> {
     let cfg = get_config();
     let work_group_str = "global".to_string();
 
@@ -84,7 +84,7 @@ pub async fn check_work_group(
         }
     });
 
-    Ok(WorkGroupLock {
+    Ok(DeferredLock {
         took_wait,
         work_group_str,
         _guard: guard,
@@ -104,9 +104,9 @@ pub async fn check_work_group(
     user_id: Option<&str>,
     timeout: u64,
     work_group: WorkGroup,
-    stop_watch: &mut StopWatch,
+    stop_watch: &mut TookWatcher,
     caller: &str,
-) -> Result<WorkGroupLock> {
+) -> Result<DeferredLock> {
     let cfg = get_config();
     let work_group_str = work_group.to_string();
 
@@ -203,7 +203,7 @@ pub async fn check_work_group(
         log::info!("[trace_id {trace_id_owned}] search completed, metrics decremented");
     });
 
-    Ok(WorkGroupLock {
+    Ok(DeferredLock {
         took_wait,
         work_group_str,
         work_group: Some(work_group),
@@ -220,7 +220,7 @@ pub async fn check_work_group(
 )]
 async fn work_group_need_wait(
     trace_id: &str,
-    stop_watch: &mut StopWatch,
+    stop_watch: &mut TookWatcher,
     org_id: &str,
     timeout: u64,
     work_group: &WorkGroup,
@@ -278,11 +278,11 @@ async fn work_group_need_wait(
 pub async fn acquire_work_group_lock(
     trace_id: &str,
     req: &Request,
-    stop_watch: &mut StopWatch,
+    stop_watch: &mut TookWatcher,
     caller: &str,
     _nodes: &[Node],
     _file_id_list_vec: &[&FileId],
-) -> Result<WorkGroupLock> {
+) -> Result<DeferredLock> {
     check_work_group(
         trace_id,
         &req.org_id,
@@ -305,11 +305,11 @@ pub async fn acquire_work_group_lock(
 pub async fn acquire_work_group_lock(
     trace_id: &str,
     req: &Request,
-    stop_watch: &mut StopWatch,
+    stop_watch: &mut TookWatcher,
     caller: &str,
     nodes: &[Node],
     file_id_list_vec: &[&FileId],
-) -> Result<WorkGroupLock> {
+) -> Result<DeferredLock> {
     // Predict workgroup first
     let is_background_task = req
         .search_event_type

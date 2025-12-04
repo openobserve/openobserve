@@ -24,16 +24,16 @@ pub struct Split {
 }
 
 #[derive(Clone)]
-pub struct StopWatch {
+pub struct TookWatcher {
     start_time: Instant,
     last_split: Option<Instant>,
     splits: Vec<Split>,
 }
 
-impl StopWatch {
+impl TookWatcher {
     /// Creates and starts the internal timer
     pub fn new() -> Self {
-        StopWatch {
+        TookWatcher {
             start_time: Instant::now(),
             last_split: None,
             splits: Vec::new(),
@@ -106,13 +106,13 @@ impl StopWatch {
     }
 }
 
-impl Default for StopWatch {
+impl Default for TookWatcher {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl fmt::Debug for StopWatch {
+impl fmt::Debug for TookWatcher {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("StopWatch")
             .field("elapsed_ms", &self.split_elapsed_millis())
@@ -122,7 +122,7 @@ impl fmt::Debug for StopWatch {
     }
 }
 
-impl fmt::Display for StopWatch {
+impl fmt::Display for TookWatcher {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}ms", self.total_millis())
     }

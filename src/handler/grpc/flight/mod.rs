@@ -53,7 +53,7 @@ use crate::{
     service::search::{
         grpc::flight as grpcFlight,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        work_group::WorkGroupLock,
+        work_group::DeferredLock,
     },
 };
 
@@ -313,7 +313,7 @@ impl FlightService for FlightServiceImpl {
 type PlanResult = (
     datafusion::prelude::SessionContext,
     Arc<dyn datafusion::physical_plan::ExecutionPlan>,
-    Option<WorkGroupLock>,
+    Option<DeferredLock>,
     ScanStats,
 );
 

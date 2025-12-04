@@ -28,8 +28,8 @@ use config::{
         stream::StreamType,
     },
     utils::{
-        stopwatch::StopWatch,
         time::{now_micros, second_micros},
+        took_watcher::TookWatcher,
     },
 };
 use futures::future::try_join_all;
@@ -90,7 +90,7 @@ async fn search_in_cluster(
     req: cluster_rpc::MetricsQueryRequest,
     user_email: &str,
 ) -> Result<Value> {
-    let mut stop_watch = StopWatch::new();
+    let mut stop_watch = TookWatcher::new();
     let started_at = now_micros();
     let cfg = get_config();
     let timeout = if req.timeout > 0 {

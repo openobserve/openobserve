@@ -28,7 +28,7 @@ use config::{
         stream::{QueryPartitionStrategy, StreamType},
     },
     metrics,
-    utils::{json, stopwatch::StopWatch, time::now_micros},
+    utils::{json, time::now_micros, took_watcher::TookWatcher},
 };
 use datafusion::{
     common::TableReference, physical_plan::visit_execution_plan, prelude::SessionContext,
@@ -76,7 +76,7 @@ use crate::{
     fields(org_id = req.org_id)
 )]
 pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<SearchResult> {
-    let mut stop_watch = StopWatch::new();
+    let mut stop_watch = TookWatcher::new();
     let cfg = get_config();
     log::info!("[trace_id {trace_id}] flight->search: start {sql}");
 

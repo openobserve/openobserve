@@ -25,9 +25,7 @@ use futures_core::ready;
 use tracing::info_span;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{
-    handler::grpc::flight::clear_session_data, service::search::work_group::WorkGroupLock,
-};
+use crate::{handler::grpc::flight::clear_session_data, service::search::work_group::DeferredLock};
 
 pub struct FlightEncoderStreamBuilder {
     encoder: FlightDataEncoder,
@@ -36,7 +34,7 @@ pub struct FlightEncoderStreamBuilder {
     // query context
     trace_id: String,
     is_super: bool,
-    defer_lock: Option<WorkGroupLock>,
+    defer_lock: Option<DeferredLock>,
     start: std::time::Instant,
 }
 
@@ -68,7 +66,7 @@ impl FlightEncoderStreamBuilder {
         self
     }
 
-    pub fn with_defer_lock(mut self, lock: Option<WorkGroupLock>) -> Self {
+    pub fn with_defer_lock(mut self, lock: Option<DeferredLock>) -> Self {
         self.defer_lock = lock;
         self
     }
@@ -115,7 +113,7 @@ pub struct FlightEncoderStream {
     // query context
     trace_id: String,
     is_super: bool,
-    defer_lock: Option<WorkGroupLock>,
+    defer_lock: Option<DeferredLock>,
     start: std::time::Instant,
     span: tracing::Span,
     child_span: tracing::Span,

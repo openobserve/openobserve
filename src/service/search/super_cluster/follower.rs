@@ -52,7 +52,7 @@ use crate::service::{
             exec::{DataFusionContextBuilder, register_udf},
         },
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        work_group::WorkGroupLock,
+        work_group::DeferredLock,
     },
 };
 
@@ -70,10 +70,10 @@ pub async fn search(
 ) -> Result<(
     SessionContext,
     Arc<dyn ExecutionPlan>,
-    WorkGroupLock,
+    DeferredLock,
     ScanStats,
 )> {
-    let mut stop_watch = config::utils::stopwatch::StopWatch::new();
+    let mut stop_watch = config::utils::took_watcher::TookWatcher::new();
 
     let cfg = config::get_config();
     let mut req: Request = (*flight_request).clone().into();
