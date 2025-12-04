@@ -290,7 +290,8 @@
     "commitHash": "Hash übertragen",
     "buildDate": "Datum der Erstellung",
     "logoMsg": "Beobachtbarkeit vereinfacht.",
-    "buildType": "Plattform"
+    "buildType": "Plattform",
+    "manage_license": "Lizenz verwalten"
   },
   "login": {
     "userid": "Benutzer-ID",
