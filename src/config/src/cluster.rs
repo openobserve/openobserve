@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    net::IpAddr,
-    sync::atomic::{AtomicI32, Ordering},
-};
+use std::sync::atomic::{AtomicI32, Ordering};
 
 use once_cell::sync::Lazy;
 
@@ -104,12 +101,16 @@ pub fn get_local_grpc_ip() -> String {
 }
 
 pub fn get_local_node_ip() -> String {
-    for adapter in get_if_addrs::get_if_addrs().unwrap() {
-        if !adapter.is_loopback() && matches!(adapter.ip(), IpAddr::V4(_)) {
-            return adapter.ip().to_string();
-        }
-    }
-    String::new()
+    // returns ipv4
+    local_ip_address::local_ip()
+        .map(|ip| ip.to_string())
+        .unwrap_or_else(|e| {
+            log::warn!(
+                "Failed to get local IP address: {}, falling back to 127.0.0.1",
+                e
+            );
+            "127.0.0.1".to_string()
+        })
 }
 
 pub fn get_grpc_schema() -> String {

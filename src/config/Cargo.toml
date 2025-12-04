@@ -36,7 +36,7 @@ dotenv_config.workspace = true
 dotenvy.workspace = true
 faststr.workspace = true
 futures.workspace = true
-get_if_addrs.workspace = true
+local-ip-address.workspace = true
 gxhash = { version = "~3.4.1", optional = true }
 hashbrown.workspace = true
 hex.workspace = true
