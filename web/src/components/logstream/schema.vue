@@ -976,15 +976,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-dialog v-model="confirmAddPerformanceFieldsDialog" persistent>
     <q-card style="min-width: 500px; max-width: 650px">
       <q-card-section class="row items-center q-pb-sm q-pt-md q-px-md">
-        <div class="text-subtitle1 text-weight-medium">Recommended Fields Detected</div>
+        <div class="text-subtitle1 text-weight-medium">Index Fields Detected</div>
         <q-space />
       </q-card-section>
 
       <q-card-section class="q-pt-none q-pb-sm q-px-md">
         <div class="text-body2 q-mb-sm performance-fields-description">
           We found some fields with full-text search or secondary indexes that are not included in your schema.
-          These fields improve search and indexing behavior.
-          Do you want to auto-add them?
+          These fields affects search performance and indexing behavior.
+          Do you want to add them?
         </div>
 
         <div v-if="missingPerformanceFieldsByType.fts.length > 0" class="q-mb-sm">
@@ -999,6 +999,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :text-color="store.state.theme === 'dark' ? 'blue-2' : 'blue-9'"
               size="sm"
               class="q-mr-xs q-mb-xs"
+              removable
+              @remove="removeFieldFromList('fts', field.name)"
             >
               {{ field.name }}
             </q-chip>
@@ -1017,6 +1019,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :text-color="store.state.theme === 'dark' ? 'green-2' : 'green-9'"
               size="sm"
               class="q-mr-xs q-mb-xs"
+              removable
+              @remove="removeFieldFromList('secondaryIndex', field.name)"
             >
               {{ field.name }}
             </q-chip>
@@ -2060,6 +2064,21 @@ export default defineComponent({
       pendingSelectedFields.value = [];
     };
 
+    // Function to remove a specific field from the missing fields list
+    const removeFieldFromList = (type: 'fts' | 'secondaryIndex', fieldName: string) => {
+      // Remove from missingPerformanceFields
+      missingPerformanceFields.value = missingPerformanceFields.value.filter(
+        field => field.name !== fieldName
+      );
+
+      // If no more fields left, close the dialog and proceed
+      if (missingPerformanceFields.value.length === 0) {
+        confirmAddPerformanceFieldsDialog.value = false;
+        proceedWithAddingFields(new Set(pendingSelectedFields.value));
+        pendingSelectedFields.value = [];
+      }
+    };
+
     // Function to proceed with adding fields
     const proceedWithAddingFields = (selectedFieldsSet) => {
       markFormDirty();
@@ -2459,6 +2478,7 @@ export default defineComponent({
       getMissingPerformanceFields,
       addPerformanceFields,
       skipPerformanceFields,
+      removeFieldFromList,
       proceedWithAddingFields,
       deleteFields,
       markFormDirty,
