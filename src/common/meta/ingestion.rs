@@ -43,7 +43,7 @@ pub struct StreamStatus {
     pub name: String,
     #[serde(flatten)]
     pub status: RecordStatus,
-    #[serde(skip_serializing)]
+    #[serde(skip_serializing, skip_deserializing)]
     pub items: Vec<HashMap<String, BulkResponseItem>>,
 }
 
