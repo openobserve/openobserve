@@ -200,6 +200,8 @@ use crate::{common::meta, handler::http::request};
         request::search::search_job::retry_job,
         request::search::search_stream::search_http2_stream,
         request::search::search_stream::values_http2_stream,
+        request::service_streams::get_dimension_analytics,
+        request::service_streams::correlate_streams,
     ),
     components(
         schemas(
