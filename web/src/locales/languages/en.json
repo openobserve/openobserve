@@ -280,7 +280,8 @@
     "commitHash": "Commit Hash",
     "buildDate": "Build Date",
     "logoMsg": "Observability simplified.",
-    "buildType": "Platform"
+    "buildType": "Platform",
+    "manage_license":"Manage License"
   },
   "login": {
     "userid": "User ID",
