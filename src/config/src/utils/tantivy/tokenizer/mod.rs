@@ -17,7 +17,7 @@ mod o2_tokenizer;
 mod remove_short;
 
 pub use o2_tokenizer::{CollectType, O2Tokenizer};
-use tantivy::tokenizer::{SimpleTokenizer, TextAnalyzer, Token};
+use tantivy::tokenizer::{TextAnalyzer, Token};
 
 use crate::{get_config, utils::tantivy::tokenizer::remove_short::RemoveShortFilter};
 
@@ -31,23 +31,13 @@ pub fn o2_tokenizer_build(collect_type: CollectType) -> TextAnalyzer {
         std::cmp::max(cfg.limit.inverted_index_min_token_length, MIN_TOKEN_LENGTH);
     let max_token_length =
         std::cmp::max(cfg.limit.inverted_index_max_token_length, MAX_TOKEN_LENGTH);
-    if cfg.common.inverted_index_camel_case_tokenizer_disabled {
-        tantivy::tokenizer::TextAnalyzer::builder(SimpleTokenizer::default())
-            .filter(RemoveShortFilter::limit(min_token_length))
-            .filter(tantivy::tokenizer::RemoveLongFilter::limit(
-                max_token_length,
-            ))
-            .filter(tantivy::tokenizer::LowerCaser)
-            .build()
-    } else {
-        tantivy::tokenizer::TextAnalyzer::builder(O2Tokenizer::new(collect_type))
-            .filter(RemoveShortFilter::limit(min_token_length))
-            .filter(tantivy::tokenizer::RemoveLongFilter::limit(
-                max_token_length,
-            ))
-            .filter(tantivy::tokenizer::LowerCaser)
-            .build()
-    }
+    tantivy::tokenizer::TextAnalyzer::builder(O2Tokenizer::new(collect_type))
+        .filter(RemoveShortFilter::limit(min_token_length))
+        .filter(tantivy::tokenizer::RemoveLongFilter::limit(
+            max_token_length,
+        ))
+        .filter(tantivy::tokenizer::LowerCaser)
+        .build()
 }
 
 pub fn o2_collect_search_tokens(text: &str) -> Vec<String> {

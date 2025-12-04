@@ -206,13 +206,12 @@ pub async fn handle_otlp_request(
 
     let cfg = get_config();
     let traces_stream_name = match in_stream_name {
-        Some(name) => format_stream_name(name),
+        Some(name) => format_stream_name(name.to_string()),
         None => "default".to_owned(),
     };
-    let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
-        .timestamp_micros();
-    let max_ts = (Utc::now() + Duration::try_hours(cfg.limit.ingest_allowed_in_future).unwrap())
-        .timestamp_micros();
+    let now = now_micros();
+    let min_ts = now - cfg.limit.ingest_allowed_upto_micro;
+    let max_ts = now + cfg.limit.ingest_allowed_in_future_micro;
 
     // Start retrieving associated pipeline and construct pipeline params
     let executable_pipeline = crate::service::ingestion::get_stream_executable_pipeline(
