@@ -19,6 +19,8 @@ use ::datafusion::{arrow::datatypes::Schema, error::DataFusionError};
 use arrow::array::RecordBatch;
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
+#[cfg(feature = "enterprise")]
+use config::utils::parquet::read_recordbatch_from_bytes;
 use config::{
     FILE_EXT_PARQUET, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
@@ -31,9 +33,7 @@ use config::{
     },
     metrics,
     utils::{
-        parquet::{
-            get_recordbatch_reader_from_bytes, read_recordbatch_from_bytes, read_schema_from_bytes,
-        },
+        parquet::{get_recordbatch_reader_from_bytes, read_schema_from_bytes},
         record_batch_ext::concat_batches,
         schema_ext::SchemaExt,
         time::{day_micros, hour_micros},
