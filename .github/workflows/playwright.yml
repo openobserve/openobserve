@@ -471,19 +471,23 @@ jobs:
                           if [ "$PREV_JOB_STATUS" = "cancelled" ] || [ "$PREV_JOB_STATUS" = "null" ] || [ -z "$PREV_JOB_STATUS" ]; then
                             echo "::warning::⚠️ Previous shard was cancelled/abruptly ended - running FULL test suite"
                             npx playwright test $FILE_PATHS
+                            exit $?
                           elif [ "$PREV_JOB_STATUS" = "success" ]; then
                             echo "::notice::✅ Previous shard completed successfully - no tests to rerun"
                             exit 0
                           elif [ "$PREV_JOB_STATUS" = "failure" ]; then
                             echo "::warning::⚠️ Previous shard failed but TestDino has no failures recorded - running FULL test suite"
                             npx playwright test $FILE_PATHS
+                            exit $?
                           else
                             echo "::warning::⚠️ Unknown job status - running FULL test suite for safety"
                             npx playwright test $FILE_PATHS
+                            exit $?
                           fi
                         else
                           echo "::error::Failed to fetch job status from GitHub API - running FULL test suite"
                           npx playwright test $FILE_PATHS
+                          exit $?
                         fi
                       else
                         echo "::notice::✅ This is the first run, no previous attempt to check"
@@ -530,6 +534,7 @@ jobs:
                       echo "::warning::Treating as FAILED - running FULL test suite for this shard"
                       echo "DEBUG: Running all matrix tests: npx playwright test $FILE_PATHS"
                       npx playwright test $FILE_PATHS
+                      exit $?
                     elif [ "$PREV_JOB_STATUS" = "success" ]; then
                       echo "::notice::✅ Previous shard completed successfully - all tests passed"
                       echo "::notice::No failed tests to rerun. Exiting successfully."
@@ -539,17 +544,20 @@ jobs:
                       echo "::warning::This shouldn't happen - running FULL test suite for safety"
                       echo "DEBUG: Running all matrix tests: npx playwright test $FILE_PATHS"
                       npx playwright test $FILE_PATHS
+                      exit $?
                     else
                       echo "::warning::⚠️ Unknown job status: $PREV_JOB_STATUS"
                       echo "::warning::Running FULL test suite for safety"
                       echo "DEBUG: Running all matrix tests: npx playwright test $FILE_PATHS"
                       npx playwright test $FILE_PATHS
+                      exit $?
                     fi
                   else
                     echo "::error::Failed to fetch job status from GitHub API"
                     echo "::warning::Falling back to running FULL test suite for safety"
                     echo "DEBUG: Running all matrix tests: npx playwright test $FILE_PATHS"
                     npx playwright test $FILE_PATHS
+                    exit $?
                   fi
                 else
                   echo "::notice::✅ This is the first run, no previous attempt to check"
@@ -667,7 +675,8 @@ jobs:
               echo "::notice::This is VALID behavior for optimized reruns"
               echo "::notice::Creating empty report structure for downstream jobs"
               mkdir -p playwright-results/html-report
-              echo '{"config":{},"suites":[],"errors":[]}' > playwright-results/report.json
+              # Add stats object to make report compatible with TestDino
+              echo '{"config":{},"suites":[],"errors":[],"stats":{"startTime":'$(date +%s000)',"duration":0,"expected":0,"unexpected":0,"flaky":0,"skipped":0}}' > playwright-results/report.json
               echo "<html><body><h1>No tests executed - all shards skipped</h1><p>All test shards exited early because tests had already passed in a previous attempt.</p></body></html>" > playwright-results/html-report/index.html
               echo "::endgroup::"
               exit 0
