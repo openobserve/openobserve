@@ -4129,6 +4129,14 @@ export default defineComponent({
         // if(searchObj.meta.jobId != ""){
         //   searchObj.meta.jobId = "";
         // }
+        if (!searchObj.data.stream.selectedStream || searchObj.data.stream.selectedStream.length === 0) {
+          $q.notify({
+            type: "negative",
+            message: "Please select a stream before scheduling a job",
+            timeout: 3000,
+          });
+          return;
+        }
         if (searchObj.meta.jobId != "") {
           $q.notify({
             type: "negative",
