@@ -53,14 +53,17 @@ test.describe("Join for logs", () => {
 
   test("Run query after selecting two streams, selecting field and SQL Mode On", async ({ page }) => {
     testLogger.info('Testing two streams with field selection and SQL Mode');
-    
+
+    // Use dedicated UNION test ingestion and streams to ensure schema compatibility
+    await pm.ingestionPage.ingestionJoinUnion();
+
     await pm.logsPage.navigateToLogs();
-    await pm.logsPage.selectIndexAndStreamJoin();
+    await pm.logsPage.selectIndexAndStreamJoinUnion();
     await pm.logsPage.kubernetesContainerName();
     await pm.logsPage.enableSQLMode();
     await pm.logsPage.selectRunQuery();
     await pm.logsPage.validateResult();
-    
+
     testLogger.info('Field selection with SQL Mode query validated successfully');
   });
 
