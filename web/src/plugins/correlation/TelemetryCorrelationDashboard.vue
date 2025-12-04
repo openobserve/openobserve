@@ -53,22 +53,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Matched Dimensions Display -->
       <q-card-section class="tw-py-2 tw-px-4 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)]">
-        <div class="tw-flex tw-items-center tw-gap-2 tw-flex-wrap">
+        <div class="tw-flex tw-items-center tw-gap-3 tw-flex-wrap">
           <span class="tw-text-xs tw-font-semibold tw-uppercase tw-opacity-70">
-            MATCHED DIMENSIONS:
+            DIMENSIONS:
           </span>
-          <q-chip
-            v-for="(value, key) in matchedDimensions"
+          <div
+            v-for="(value, key) in activeDimensions"
             :key="key"
-            size="sm"
-            dense
-            square
-            color="positive"
-            text-color="white"
+            class="tw-flex tw-items-center tw-gap-2"
           >
-            <span class="tw-font-medium">{{ key }}:</span>
-            <span class="tw-ml-1">{{ value }}</span>
-          </q-chip>
+            <span class="tw-text-xs tw-font-semibold">{{ key }}:</span>
+            <q-select
+              v-model="activeDimensions[key]"
+              :options="getDimensionOptions(key, value)"
+              dense
+              outlined
+              emit-value
+              map-options
+              @update:model-value="onDimensionChange"
+              class="dimension-dropdown"
+              borderless
+              style="min-width: 120px"
+            />
+          </div>
         </div>
       </q-card-section>
 
@@ -281,6 +288,7 @@ import { useI18n } from "vue-i18n";
 import useNotifications from "@/composables/useNotifications";
 import { useMetricsCorrelationDashboard, type MetricsCorrelationConfig } from "@/composables/useMetricsCorrelationDashboard";
 import type { StreamInfo } from "@/services/service_streams";
+import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue")
@@ -331,6 +339,9 @@ const logsDashboardRenderKey = ref(0);
 const showMetricSelector = ref(false);
 const metricSearchText = ref("");
 const activeTab = ref("logs"); // Default to logs tab
+
+// Active dimensions that can be removed
+const activeDimensions = ref<Record<string, string>>({ ...props.matchedDimensions });
 
 // Get unique metric streams by stream_name
 const getUniqueStreams = (streams: StreamInfo[]) => {
@@ -405,6 +416,78 @@ const toggleMetricStream = (stream: StreamInfo) => {
   }
 };
 
+// Get dropdown options for a dimension
+const getDimensionOptions = (key: string, currentValue: string) => {
+  const originalValue = props.matchedDimensions[key];
+
+  // Create options array, avoiding duplicates
+  const options = [
+    {
+      label: "All",
+      value: SELECT_ALL_VALUE,
+    },
+  ];
+
+  // Only add the original value if it's not the same as SELECT_ALL_VALUE
+  if (originalValue !== SELECT_ALL_VALUE) {
+    options.push({
+      label: originalValue,
+      value: originalValue,
+    });
+  }
+
+  return options;
+};
+
+// Handle dimension value change
+const onDimensionChange = () => {
+  console.log("[TelemetryCorrelationDashboard] Dimension changed:", activeDimensions.value);
+
+  // Update metric stream filters with new dimension values
+  // Need to map semantic keys to actual filter field names
+  selectedMetricStreams.value = selectedMetricStreams.value.map(stream => {
+    const updatedFilters = { ...stream.filters };
+
+    // Update each filter based on the active dimensions
+    for (const [semanticKey, newValue] of Object.entries(activeDimensions.value)) {
+      // Try to find the matching filter field in the stream
+      // First, try direct match with semantic key
+      if (updatedFilters[semanticKey] !== undefined) {
+        updatedFilters[semanticKey] = newValue;
+      } else {
+        // Try normalized key (replace hyphens with underscores)
+        const normalizedKey = semanticKey.replace(/-/g, '_');
+        if (updatedFilters[normalizedKey] !== undefined) {
+          updatedFilters[normalizedKey] = newValue;
+        } else {
+          // If not found, check if any filter field matches the original value
+          // This handles cases where the stream uses the semantic key directly
+          const originalValue = props.matchedDimensions[semanticKey];
+          for (const [filterKey, filterValue] of Object.entries(stream.filters)) {
+            if (filterValue === originalValue) {
+              updatedFilters[filterKey] = newValue;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    return {
+      ...stream,
+      filters: updatedFilters,
+    };
+  });
+
+  console.log("[TelemetryCorrelationDashboard] Updated metric streams:", selectedMetricStreams.value);
+
+  // Note: For logs, the filters are built from config.matchedDimensions in the composable
+  // which we're already updating via activeDimensions
+
+  // Reload the dashboard with updated filters
+  loadDashboard();
+};
+
 const loadDashboard = async () => {
   try {
     loading.value = true;
@@ -412,7 +495,7 @@ const loadDashboard = async () => {
 
     const config: MetricsCorrelationConfig = {
       serviceName: props.serviceName,
-      matchedDimensions: props.matchedDimensions,
+      matchedDimensions: activeDimensions.value,
       metricStreams: selectedMetricStreams.value,
       logStreams: props.logStreams,
       traceStreams: props.traceStreams,
@@ -557,6 +640,23 @@ watch(
       line-height: 1.25rem;
       font-family: monospace;
     }
+  }
+}
+
+// Dimension dropdown styling
+.dimension-dropdown {
+  :deep(.q-field__control) {
+    min-height: 2rem;
+    padding: 0 0.5rem;
+  }
+
+  :deep(.q-field__native) {
+    font-size: 0.875rem;
+    padding: 0.25rem 0;
+  }
+
+  :deep(.q-field__append) {
+    padding-left: 0.25rem;
   }
 }
 
