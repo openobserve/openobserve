@@ -17,7 +17,10 @@ use std::io::Error;
 
 use actix_web::{HttpResponse, get, web};
 
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+use crate::{
+    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
+    handler::http::extractors::Headers,
+};
 
 /// GET /api/{org_id}/service_streams/_analytics
 ///
@@ -40,13 +43,21 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
     ),
     responses(
         (status = 200, description = "Dimension analytics", body = DimensionAnalyticsSummary),
+        (status = 401, description = "Unauthorized - Authentication required"),
         (status = 403, description = "Forbidden - Enterprise feature"),
         (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("Authorization" = [])
     )
 )]
 #[get("/{org_id}/service_streams/_analytics")]
-pub async fn get_dimension_analytics(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
+pub async fn get_dimension_analytics(
+    org_id: web::Path<String>,
+    Headers(_user_email): Headers<UserEmail>, // Require authentication
+) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
+    // Note: No stream-specific permissions needed - this is org-level analytics
 
     #[cfg(feature = "enterprise")]
     {
@@ -108,17 +119,23 @@ pub async fn get_dimension_analytics(org_id: web::Path<String>) -> Result<HttpRe
     responses(
         (status = 200, description = "Correlation results", body = CorrelationResponse),
         (status = 400, description = "Bad request"),
+        (status = 401, description = "Unauthorized - Authentication required"),
         (status = 403, description = "Forbidden - Enterprise feature"),
         (status = 404, description = "No matching service found"),
         (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("Authorization" = [])
     )
 )]
 #[actix_web::post("/{org_id}/service_streams/_correlate")]
 pub async fn correlate_streams(
     org_id: web::Path<String>,
     req: web::Json<CorrelationRequest>,
+    Headers(_user_email): Headers<UserEmail>, // Require authentication
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
+    // Note: No stream-specific permissions needed - user already has access to source stream
 
     #[cfg(feature = "enterprise")]
     {
