@@ -313,7 +313,20 @@ pub static SERVICE_STREAMS_DIMENSION_CARDINALITY: Lazy<IntGaugeVec> = Lazy::new(
     IntGaugeVec::new(
         Opts::new(
             "service_streams_dimension_cardinality",
-            "Current cardinality (unique stream count) for each dimension",
+            "Estimated unique value count per dimension",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "dimension"],
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_HIGH_CARDINALITY_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "service_streams_high_cardinality_total",
+            "Count of high cardinality dimension detections",
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -1446,6 +1459,9 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(SERVICE_STREAMS_DIMENSION_CARDINALITY.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_HIGH_CARDINALITY_TOTAL.clone()))
         .expect("Metric registered");
 
     // querier stats
