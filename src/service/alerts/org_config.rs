@@ -18,7 +18,7 @@
 //! This module provides functions to store and retrieve org-level alert configs
 //! using the existing key-value DB interface.
 
-use config::meta::alerts::deduplication::GlobalDeduplicationConfig;
+use config::meta::alerts::deduplication::{GlobalDeduplicationConfig, SemanticFieldGroup};
 use infra::db;
 
 const MODULE: &str = "alert_config";
@@ -66,6 +66,81 @@ pub async fn delete_deduplication_config(org_id: &str) -> Result<(), anyhow::Err
         .await
         .map_err(|e| anyhow::anyhow!("Failed to delete deduplication config: {}", e))?;
 
+    Ok(())
+}
+
+/// Get semantic field groups for an organization
+///
+/// Returns the semantic field groups stored in the organization's deduplication config.
+/// If no config exists, initializes with default groups from JSON file/hardcoded presets.
+///
+/// # Returns
+/// - `Ok(Vec<SemanticFieldGroup>)` - Semantic groups for the organization
+pub async fn get_semantic_groups(org_id: &str) -> Result<Vec<SemanticFieldGroup>, anyhow::Error> {
+    match get_deduplication_config(org_id).await? {
+        Some(config) => Ok(config.semantic_field_groups),
+        None => {
+            // No config exists, initialize with defaults
+            #[cfg(feature = "enterprise")]
+            let defaults =
+                o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file();
+
+            #[cfg(not(feature = "enterprise"))]
+            let defaults = SemanticFieldGroup::load_defaults_from_file();
+
+            // Auto-initialize for this org
+            let config = GlobalDeduplicationConfig {
+                enabled: false, // Start disabled
+                semantic_field_groups: defaults.clone(),
+                alert_dedup_enabled: false,
+                alert_fingerprint_groups: vec![],
+                time_window_minutes: None,
+            };
+
+            // Try to save, but don't fail if it doesn't work
+            if let Err(e) = set_deduplication_config(org_id, &config).await {
+                log::warn!(
+                    "Failed to auto-initialize semantic groups for org {}: {}",
+                    org_id,
+                    e
+                );
+            }
+
+            Ok(defaults)
+        }
+    }
+}
+
+/// Initialize semantic field groups for a new organization
+///
+/// Called during organization creation to set up default semantic groups.
+/// Loads defaults from JSON file (or hardcoded fallback) and stores them.
+///
+/// # Returns
+/// - `Ok(())` if initialization succeeded
+/// - `Err` if failed to save configuration
+pub async fn initialize_semantic_groups(org_id: &str) -> Result<(), anyhow::Error> {
+    // Check if already initialized
+    if get_deduplication_config(org_id).await?.is_some() {
+        log::debug!("Semantic groups already initialized for org {}", org_id);
+        return Ok(());
+    }
+
+    #[cfg(feature = "enterprise")]
+    let defaults = o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file();
+
+    #[cfg(not(feature = "enterprise"))]
+    let defaults = SemanticFieldGroup::load_defaults_from_file();
+    let config = GlobalDeduplicationConfig {
+        enabled: false,
+        semantic_field_groups: defaults,
+        alert_dedup_enabled: false,
+        alert_fingerprint_groups: vec![],
+        time_window_minutes: None,
+    };
+
+    set_deduplication_config(org_id, &config).await?;
+    log::info!("Initialized semantic groups for org {}", org_id);
     Ok(())
 }
 

@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Preset Templates -->
     <div class="row q-col-gutter-md q-mb-md">
-      <div class="col-12 col-md-6">
+      <div class="col-12 col-md-4">
         <q-select
           v-model="selectedPreset"
           :options="presetOptions"
@@ -55,7 +55,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-select>
       </div>
-      <div class="col-12 col-md-6 flex items-center">
+      <div class="col-12 col-md-8 flex items-center justify-end q-gutter-sm">
+        <q-btn
+          outline
+          color="primary"
+          label="Import from JSON"
+          icon="upload_file"
+          size="sm"
+          @click="navigateToImport"
+        />
         <q-btn
           color="primary"
           label="Add Custom Group"
@@ -119,12 +127,19 @@ class="q-mb-sm" />
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
+import { useRouter } from "vue-router";
+import { useStore } from "vuex";
+import alertsService from "@/services/alerts";
 import SemanticGroupItem from "./SemanticGroupItem.vue";
+
+const router = useRouter();
+const store = useStore();
 
 interface SemanticGroup {
   id: string;
   display: string;
+  group?: string;
   fields: string[];
   normalize: boolean;
 }
@@ -149,6 +164,8 @@ const emit = defineEmits<{
 const localGroups = ref<SemanticGroup[]>([...props.semanticFieldGroups]);
 const localFingerprintFields = ref<string[]>([...props.fingerprintFields]);
 const selectedPreset = ref<string | null>(null);
+const availableSemanticGroups = ref<SemanticGroup[]>([]);
+const loadingPresets = ref(false);
 
 // Watch for external changes
 watch(
@@ -166,14 +183,31 @@ watch(
   },
 );
 
-// Preset options
-const presetOptions = [
-  { label: "Common", value: "common" },
-  { label: "Kubernetes", value: "kubernetes" },
-  { label: "AWS", value: "aws" },
-  { label: "GCP", value: "gcp" },
-  { label: "Azure", value: "azure" },
-];
+// Dynamically build preset options from backend semantic groups
+const presetOptions = computed(() => {
+  if (availableSemanticGroups.value.length === 0) {
+    return [];
+  }
+
+  // Group semantic groups by their 'group' field
+  const groupsMap = new Map<string, SemanticGroup[]>();
+
+  for (const group of availableSemanticGroups.value) {
+    const category = group.group || "Other";
+    if (!groupsMap.has(category)) {
+      groupsMap.set(category, []);
+    }
+    groupsMap.get(category)!.push(group);
+  }
+
+  // Convert to preset options, sorted by category name
+  return Array.from(groupsMap.keys())
+    .sort()
+    .map(category => ({
+      label: category,
+      value: category.toLowerCase().replace(/\s+/g, '-'),
+    }));
+});
 
 // Group ID options for fingerprint selection
 const groupIdOptions = computed(() => {
@@ -183,151 +217,41 @@ const groupIdOptions = computed(() => {
   }));
 });
 
-// Preset templates
-const presets: Record<
-  string,
-  { groups: SemanticGroup[]; fingerprint: string[] }
-> = {
-  common: {
-    groups: [
-      {
-        id: "host",
-        display: "Host",
-        fields: ["host", "hostname", "node", "server"],
-        normalize: true,
-      },
-      {
-        id: "service",
-        display: "Service",
-        fields: ["service", "service_name", "application", "app"],
-        normalize: true,
-      },
-      {
-        id: "environment",
-        display: "Environment",
-        fields: ["environment", "env", "stage"],
-        normalize: true,
-      },
-      {
-        id: "ip-address",
-        display: "IP Address",
-        fields: ["ip", "ip_address", "ipaddr", "client_ip"],
-        normalize: false,
-      },
-    ],
-    fingerprint: ["service", "host"],
-  },
-  kubernetes: {
-    groups: [
-      {
-        id: "k8s-cluster",
-        display: "K8s Cluster",
-        fields: ["cluster", "k8s_cluster", "kubernetes_cluster"],
-        normalize: true,
-      },
-      {
-        id: "k8s-namespace",
-        display: "K8s Namespace",
-        fields: ["namespace", "k8s_namespace", "kubernetes_namespace"],
-        normalize: true,
-      },
-      {
-        id: "k8s-pod",
-        display: "K8s Pod",
-        fields: ["pod", "pod_name", "k8s_pod"],
-        normalize: true,
-      },
-      {
-        id: "k8s-container",
-        display: "K8s Container",
-        fields: ["container", "container_name", "k8s_container"],
-        normalize: true,
-      },
-    ],
-    fingerprint: ["k8s-cluster", "k8s-namespace", "k8s-pod"],
-  },
-  aws: {
-    groups: [
-      {
-        id: "aws-account",
-        display: "AWS Account",
-        fields: ["account_id", "aws_account", "account"],
-        normalize: false,
-      },
-      {
-        id: "aws-region",
-        display: "AWS Region",
-        fields: ["region", "aws_region"],
-        normalize: true,
-      },
-      {
-        id: "aws-service",
-        display: "AWS Service",
-        fields: ["service", "aws_service", "service_name"],
-        normalize: true,
-      },
-    ],
-    fingerprint: ["aws-account", "aws-region", "aws-service"],
-  },
-  gcp: {
-    groups: [
-      {
-        id: "gcp-project",
-        display: "GCP Project",
-        fields: ["project_id", "gcp_project", "project"],
-        normalize: false,
-      },
-      {
-        id: "gcp-zone",
-        display: "GCP Zone",
-        fields: ["zone", "gcp_zone", "availability_zone"],
-        normalize: true,
-      },
-      {
-        id: "gcp-service",
-        display: "GCP Service",
-        fields: ["service", "gcp_service", "service_name"],
-        normalize: true,
-      },
-    ],
-    fingerprint: ["gcp-project", "gcp-zone", "gcp-service"],
-  },
-  azure: {
-    groups: [
-      {
-        id: "azure-subscription",
-        display: "Azure Subscription",
-        fields: ["subscription_id", "azure_subscription"],
-        normalize: false,
-      },
-      {
-        id: "azure-resource-group",
-        display: "Azure Resource Group",
-        fields: ["resource_group", "azure_resource_group", "rg"],
-        normalize: true,
-      },
-      {
-        id: "azure-service",
-        display: "Azure Service",
-        fields: ["service", "azure_service", "service_name"],
-        normalize: true,
-      },
-    ],
-    fingerprint: [
-      "azure-subscription",
-      "azure-resource-group",
-      "azure-service",
-    ],
-  },
+// Load semantic groups from backend on mount
+const loadSemanticGroups = async () => {
+  loadingPresets.value = true;
+  try {
+    const orgId = store.state.selectedOrganization.identifier;
+    const response = await alertsService.getSemanticGroups(orgId);
+    availableSemanticGroups.value = response.data;
+    console.log(`Loaded ${availableSemanticGroups.value.length} semantic groups from backend`);
+  } catch (error) {
+    console.error("Failed to load semantic groups:", error);
+    availableSemanticGroups.value = [];
+  } finally {
+    loadingPresets.value = false;
+  }
 };
 
+// Load preset by category name
 const loadPreset = (presetKey: string | null) => {
-  if (!presetKey) return;
+  if (!presetKey || availableSemanticGroups.value.length === 0) return;
 
-  const preset = presets[presetKey];
-  if (preset) {
-    localGroups.value = [...preset.groups];
-    localFingerprintFields.value = [...preset.fingerprint];
+  // Find the category name from the preset key
+  const categoryOption = presetOptions.value.find(opt => opt.value === presetKey);
+  if (!categoryOption) return;
+
+  const categoryName = categoryOption.label;
+
+  // Filter groups by category
+  const categoryGroups = availableSemanticGroups.value.filter(
+    group => group.group === categoryName
+  );
+
+  if (categoryGroups.length > 0) {
+    localGroups.value = [...categoryGroups];
+    // Auto-select all groups for fingerprinting
+    localFingerprintFields.value = categoryGroups.map(g => g.id);
     emitUpdate();
   }
 };
@@ -360,10 +284,21 @@ const removeGroup = (index: number) => {
   emitUpdate();
 };
 
+const navigateToImport = () => {
+  router.push({
+    name: "importSemanticGroups",
+  });
+};
+
 const emitUpdate = () => {
   emit("update:semanticFieldGroups", [...localGroups.value]);
   emit("update:fingerprintFields", [...localFingerprintFields.value]);
 };
+
+// Load semantic groups from backend on component mount
+onMounted(() => {
+  loadSemanticGroups();
+});
 </script>
 
 <style lang="scss" scoped>

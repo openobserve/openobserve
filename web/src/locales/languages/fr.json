@@ -210,7 +210,9 @@
     "anomalyLabel": "ANOMALIE",
     "includePatternInSearch": "Inclure un motif dans la recherche",
     "excludePatternFromSearch": "Exclure le modèle de la recherche",
-    "showPatternDetails": "Afficher les détails ({variables} variables, {exemples} exemples)"
+    "showPatternDetails": "Afficher les détails ({variables} variables, {exemples} exemples)",
+    "viewRelated": "Afficher les articles connexes",
+    "viewRelatedTooltip": "Afficher les traces et les métriques associées"
   },
   "menu": {
     "home": "Accueil",
@@ -1639,5 +1641,17 @@
     "tabLabel": "Erreurs",
     "errorSpikePeriod": "Période de pointe d'erreur :",
     "errorsGreaterThan": "Erreurs >="
+  },
+  "correlation": {
+    "title": "Métriques corrélées - {service}",
+    "loading": "Chargement de métriques corrélées...",
+    "loadingMetrics": "Chargement de flux métriques {count}",
+    "failedToLoad": "Impossible de charger le tableau de bord de corrélation",
+    "retryButton": "Réessayez",
+    "noMetrics": "Aucune métrique disponible pour la corrélation",
+    "matchedDimensions": "Dimensions assorties",
+    "metricsButton": "{count} Métrique (s)",
+    "metricsTooltip": "Sélectionnez les flux métriques à afficher",
+    "selectMetrics": "Sélectionnez Metric Streams"
   }
 }
