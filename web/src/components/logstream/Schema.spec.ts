@@ -858,21 +858,9 @@ describe("Schema Component Tests", async () => {
       expect(wrapper.vm.pendingSelectedFields).toEqual([]);
     });
 
-    // Test 11: missingPerformanceFieldsByType should group fields by type
-    it("should group missing fields by FTS and Secondary Index types", () => {
-      wrapper.vm.missingPerformanceFields = [
-        { name: "field1", type: "Full Text Search" },
-        { name: "field2", type: "Full Text Search" },
-        { name: "field3", type: "Secondary Index" }
-      ];
-
-      const grouped = wrapper.vm.missingPerformanceFieldsByType;
-
-      expect(grouped.fts.length).toBe(2);
-      expect(grouped.secondaryIndex.length).toBe(1);
-      expect(grouped.fts[0].name).toBe("field1");
-      expect(grouped.secondaryIndex[0].name).toBe("field3");
-    });
+    // Test 11: Removed test for missingPerformanceFieldsByType
+    // This computed property is now internal to PerformanceFieldsDialog component
+    // The grouping functionality is still tested through the dialog component's behavior
 
     // Test 12: proceedWithAddingFields should filter out timestamp and allFields
     it("should filter out timestamp and _all fields when adding", () => {

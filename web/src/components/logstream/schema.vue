@@ -973,67 +973,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:cancel="confirmDeleteDatesDialog = false"
     v-model="confirmDeleteDatesDialog"
   />
-  <q-dialog v-model="confirmAddPerformanceFieldsDialog" persistent>
-    <q-card style="min-width: 500px; max-width: 650px">
-      <q-card-section class="row items-center q-pb-sm q-pt-md q-px-md">
-        <div class="text-subtitle1 text-weight-medium">Index Fields Detected</div>
-        <q-space />
-      </q-card-section>
-
-      <q-card-section class="q-pt-none q-pb-sm q-px-md">
-        <div class="text-body2 q-mb-sm performance-fields-description">
-          We found some fields with full-text search or secondary indexes that are not included in your schema.
-          These fields affects search performance and indexing behavior.
-          Do you want to add them?
-        </div>
-
-        <div v-if="missingPerformanceFieldsByType.fts.length > 0" class="q-mb-sm">
-          <div class="text-caption text-weight-medium q-mb-xs">
-            Full Text Search ({{ missingPerformanceFieldsByType.fts.length }})
-          </div>
-          <div class="performance-fields-container bordered-scroll-area" :class="store.state.theme === 'dark' ? 'bordered-scroll-area-dark' : 'bordered-scroll-area-light'">
-            <q-chip
-              v-for="field in missingPerformanceFieldsByType.fts"
-              :key="field.name"
-              :color="store.state.theme === 'dark' ? 'blue-9' : 'blue-2'"
-              :text-color="store.state.theme === 'dark' ? 'blue-2' : 'blue-9'"
-              size="sm"
-              class="q-mr-xs q-mb-xs"
-              removable
-              @remove="removeFieldFromList('fts', field.name)"
-            >
-              {{ field.name }}
-            </q-chip>
-          </div>
-        </div>
-
-        <div v-if="missingPerformanceFieldsByType.secondaryIndex.length > 0">
-          <div class="text-caption text-weight-medium q-mb-xs">
-            Secondary Index ({{ missingPerformanceFieldsByType.secondaryIndex.length }})
-          </div>
-          <div class="performance-fields-container bordered-scroll-area" :class="store.state.theme === 'dark' ? 'bordered-scroll-area-dark' : 'bordered-scroll-area-light'">
-            <q-chip
-              v-for="field in missingPerformanceFieldsByType.secondaryIndex"
-              :key="field.name"
-              :color="store.state.theme === 'dark' ? 'green-9' : 'green-2'"
-              :text-color="store.state.theme === 'dark' ? 'green-2' : 'green-9'"
-              size="sm"
-              class="q-mr-xs q-mb-xs"
-              removable
-              @remove="removeFieldFromList('secondaryIndex', field.name)"
-            >
-              {{ field.name }}
-            </q-chip>
-          </div>
-        </div>
-      </q-card-section>
-
-      <q-card-actions align="right" class="q-pt-none q-pb-md q-px-md">
-        <q-btn flat label="Skip" class="o2-secondary-button" @click="skipPerformanceFields" />
-        <q-btn unelevated label="Add Fields" class="o2-primary-button" @click="addPerformanceFields" />
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+  <PerformanceFieldsDialog
+    v-model="confirmAddPerformanceFieldsDialog"
+    :missing-fields="missingPerformanceFields"
+    @add-fields="addPerformanceFields"
+    @skip="skipPerformanceFields"
+    @remove-field="removeFieldFromList"
+  />
 </template>
 
 <script lang="ts">
@@ -1076,6 +1022,7 @@ import {
 import DateTime from "@/components/DateTime.vue";
 
 import AssociatedRegexPatterns from "./AssociatedRegexPatterns.vue";
+import PerformanceFieldsDialog from "./PerformanceFieldsDialog.vue";
 
 const defaultValue: any = () => {
   return {
@@ -1103,6 +1050,7 @@ export default defineComponent({
     QTablePagination,
     DateTime,
     AssociatedRegexPatterns,
+    PerformanceFieldsDialog,
   },
   setup({ modelValue }) {
     type PatternAssociation = {
@@ -1129,14 +1077,6 @@ export default defineComponent({
     const missingPerformanceFields = ref([]);
     const pendingSelectedFields = ref([]);
     const formDirtyFlag = ref(false);
-
-    // Computed property to group missing fields by type
-    const missingPerformanceFieldsByType = computed(() => {
-      return {
-        fts: missingPerformanceFields.value.filter(f => f.type === "Full Text Search"),
-        secondaryIndex: missingPerformanceFields.value.filter(f => f.type === "Secondary Index")
-      };
-    });
     const loadingState = ref(true);
     const rowsPerPage = ref(20);
     const filterField = ref("");
@@ -2472,7 +2412,6 @@ export default defineComponent({
       confirmQueryModeChangeDialog,
       confirmDeleteDatesDialog,
       confirmAddPerformanceFieldsDialog,
-      missingPerformanceFieldsByType,
       missingPerformanceFields,
       pendingSelectedFields,
       getMissingPerformanceFields,
@@ -2772,31 +2711,5 @@ export default defineComponent({
   .q-field__append {
     height: 24px !important;
   }
-}
-
-.performance-fields-description {
-  color: var(--o2-text-muted);
-}
-
-.bordered-scroll-area {
-  border: 1px solid var(--o2-border-color);
-  border-radius: 4px;
-}
-
-.bordered-scroll-area-light {
-  background-color: #fafafa;
-}
-
-.bordered-scroll-area-dark {
-  background-color: #1e1e1e;
-}
-
-.performance-fields-container {
-  padding: 8px;
-  max-height: 200px;
-  overflow-y: auto;
-  display: flex;
-  flex-wrap: wrap;
-  align-content: flex-start;
 }
 </style>
