@@ -186,7 +186,7 @@ pub async fn get_all_dimension_stats(org_id: &str) -> Result<Vec<DimensionStats>
     for record in results {
         stats_map
             .entry(record.dimension_name)
-            .or_insert_with(std::collections::HashSet::new)
+            .or_default()
             .insert(record.value_hash);
     }
 

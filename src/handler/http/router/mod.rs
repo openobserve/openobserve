@@ -644,11 +644,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(alerts::deduplication::get_semantic_groups)
         .service(alerts::deduplication::preview_semantic_groups_diff)
         .service(alerts::deduplication::save_semantic_groups)
-        .service(service_streams::list_services)
-        .service(service_streams::list_service_instances)
-        .service(service_streams::get_dimension_stats)
         .service(service_streams::get_dimension_analytics)
-        .service(service_streams::lookup_by_stream)
         .service(service_streams::correlate_streams);
 
     #[cfg(not(feature = "enterprise"))]
