@@ -1,5 +1,7 @@
 name: Playwright Auto-Rerun
 
+run-name: "Playwright Auto-Rerun - ${{ github.event.workflow_run.head_branch || 'Manual Trigger' }}"
+
 on:
   workflow_run:
     workflows: ["Playwright UI Tests"]
@@ -21,8 +23,7 @@ jobs:
     permissions:
       actions: write
       contents: read
-    runs-on:
-      labels: repo-openobserve-standard-8
+    runs-on: ubuntu-latest
     # Only trigger if the workflow failed on first attempt (for automatic triggers)
     # OR if manually triggered (for testing)
     if: |
@@ -37,12 +38,21 @@ jobs:
           echo "Repository: ${{ github.repository }}"
 
           if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            echo "::notice::🔄 Auto-rerun triggered for branch: ${{ github.event.workflow_run.head_branch }}"
             echo "Workflow run ID: ${{ github.event.workflow_run.id }}"
             echo "Workflow run conclusion: ${{ github.event.workflow_run.conclusion }}"
             echo "Workflow run attempt: ${{ github.event.workflow_run.run_attempt }}"
             echo "Workflow run status: ${{ github.event.workflow_run.status }}"
             echo "Workflow name: ${{ github.event.workflow_run.name }}"
             echo "Branch: ${{ github.event.workflow_run.head_branch }}"
+            echo "Commit: ${{ github.event.workflow_run.head_sha }}"
+            echo "Event type: ${{ github.event.workflow_run.event }}"
+
+            # For PR events, extract PR number from head_branch (format: refs/pull/123/merge or branch name)
+            if [ "${{ github.event.workflow_run.event }}" = "pull_request" ]; then
+              echo "::notice::📋 Triggered by PR event"
+              echo "PR Head Repo: ${{ github.event.workflow_run.head_repository.full_name }}"
+            fi
           else
             echo "Manual run_id input: ${{ inputs.run_id }}"
           fi

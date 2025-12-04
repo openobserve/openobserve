@@ -83,7 +83,7 @@ async fn schema(
 ) -> Result<HttpResponse, Error> {
     let (org_id, mut stream_name) = path.into_inner();
     if !config::get_config().common.skip_formatting_stream_name {
-        stream_name = format_stream_name(&stream_name);
+        stream_name = format_stream_name(stream_name);
     }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
@@ -171,7 +171,7 @@ async fn create(
 ) -> Result<HttpResponse, Error> {
     let (org_id, mut stream_name) = path.into_inner();
     if !config::get_config().common.skip_formatting_stream_name {
-        stream_name = format_stream_name(&stream_name);
+        stream_name = format_stream_name(stream_name);
     }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
@@ -222,7 +222,7 @@ async fn update_settings(
     let cfg = config::get_config();
     let (org_id, mut stream_name) = path.into_inner();
     if !cfg.common.skip_formatting_stream_name {
-        stream_name = format_stream_name(&stream_name);
+        stream_name = format_stream_name(stream_name);
     }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
@@ -266,7 +266,7 @@ async fn update_fields(
 ) -> Result<HttpResponse, Error> {
     let (org_id, mut stream_name) = path.into_inner();
     if !config::get_config().common.skip_formatting_stream_name {
-        stream_name = format_stream_name(&stream_name);
+        stream_name = format_stream_name(stream_name);
     }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query);
@@ -323,7 +323,7 @@ async fn delete_fields(
 ) -> Result<HttpResponse, Error> {
     let (org_id, mut stream_name) = path.into_inner();
     if !config::get_config().common.skip_formatting_stream_name {
-        stream_name = format_stream_name(&stream_name);
+        stream_name = format_stream_name(stream_name);
     }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query);
@@ -376,7 +376,7 @@ async fn delete(
 ) -> Result<HttpResponse, Error> {
     let (org_id, mut stream_name) = path.into_inner();
     if !config::get_config().common.skip_formatting_stream_name {
-        stream_name = format_stream_name(&stream_name);
+        stream_name = format_stream_name(stream_name);
     }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
@@ -603,7 +603,7 @@ async fn delete_stream_cache(
     }
     let (org_id, mut stream_name) = path.into_inner();
     if !config::get_config().common.skip_formatting_stream_name {
-        stream_name = format_stream_name(&stream_name);
+        stream_name = format_stream_name(stream_name);
     }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
@@ -661,7 +661,7 @@ async fn delete_stream_data_by_time_range(
     let cfg = config::get_config();
     let (org_id, mut stream_name) = path.into_inner();
     if !cfg.common.skip_formatting_stream_name {
-        stream_name = format_stream_name(&stream_name);
+        stream_name = format_stream_name(stream_name);
     }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
