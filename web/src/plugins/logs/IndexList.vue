@@ -64,7 +64,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :model-value="selected"
                 size="20px"
                 @update:model-value="toggleOption(opt.value)"
-                @click.stop
               />
             </q-item-section>
           </q-item>
@@ -209,7 +208,7 @@ export default defineComponent({
       //we will also us the quasar's updateInputValue method to clear the input value
       this.$nextTick(() => {
         const indexListSelectField = this.$refs.streamSelect;
-        if (indexListSelectField && indexListSelectField.updateInputValue) {
+        if (indexListSelectField && indexListSelectField.inputValue && indexListSelectField.updateInputValue) {
           indexListSelectField.updateInputValue("");
         }
       });
@@ -226,7 +225,7 @@ export default defineComponent({
       //we will also us the quasar's updateInputValue method to clear the input value
       this.$nextTick(() => {
         const indexListSelectField = this.$refs.streamSelect;
-        if (indexListSelectField && indexListSelectField.updateInputValue) {
+        if (indexListSelectField && indexListSelectField.inputValue && indexListSelectField.updateInputValue) {
           indexListSelectField.updateInputValue("");
         }
       });
