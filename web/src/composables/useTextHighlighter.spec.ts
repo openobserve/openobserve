@@ -485,6 +485,121 @@ describe("useTextHighlighter", () => {
   });
 
   describe("edge cases and error handling", () => {
+    it("should handle apostrophes within text without skipping characters", () => {
+      const mockColors = { stringValue: "#047857" };
+      const result = textHighlighter.processTextWithHighlights(
+        "it's working with someone's name",
+        "",
+        mockColors,
+      );
+      // Verify all text is preserved
+      expect(result).toContain("it's");
+      expect(result).toContain("working");
+      expect(result).toContain("someone's");
+      expect(result).toContain("name");
+      // Verify no characters are skipped
+      const textContent = result.replace(/<[^>]*>/g, '').replace(/&[^;]+;/g, '');
+      expect(textContent).toContain("it's");
+      expect(textContent).toContain("someone's");
+    });
+
+    it("should handle single-quoted strings with apostrophes inside", () => {
+      const mockColors = { stringValue: "#047857" };
+      const result = textHighlighter.processTextWithHighlights(
+        "'it's working'",
+        "",
+        mockColors,
+      );
+      // Verify the full content is preserved
+      expect(result).toContain("it's");
+      expect(result).toContain("working");
+    });
+
+    it("should handle double-quoted strings with apostrophes inside", () => {
+      const mockColors = { stringValue: "#047857" };
+      const result = textHighlighter.processTextWithHighlights(
+        "\"it's working fine\"",
+        "",
+        mockColors,
+      );
+      // Verify the full content is preserved
+      expect(result).toContain("it's");
+      expect(result).toContain("working");
+      expect(result).toContain("fine");
+    });
+
+    it("should handle apostrophes next to numbers (measurements)", () => {
+      const mockColors = { stringValue: "#047857" };
+      const result = textHighlighter.processTextWithHighlights(
+        "5'10\" tall",
+        "",
+        mockColors,
+      );
+      // Verify all text is preserved including the apostrophe between numbers
+      expect(result).toContain("5");
+      expect(result).toContain("10");
+      expect(result).toContain("tall");
+    });
+
+    it("should handle mixed apostrophes with numbers in sentences", () => {
+      const mockColors = { stringValue: "#047857" };
+      const result = textHighlighter.processTextWithHighlights(
+        "it's 5'6 and someone's car",
+        "",
+        mockColors,
+      );
+      // Verify all content is preserved
+      expect(result).toContain("it's");
+      expect(result).toContain("5");
+      expect(result).toContain("6");
+      expect(result).toContain("someone's");
+      expect(result).toContain("car");
+    });
+
+    it("should handle consecutive apostrophes and text at end", () => {
+      const mockColors = { stringValue: "#047857" };
+      const result = textHighlighter.processTextWithHighlights(
+        "nikhil2's' test openobserve",
+        "",
+        mockColors,
+      );
+
+      // Verify all content is preserved
+      expect(result).toContain("nikhil2");
+      expect(result).toContain("test");
+      expect(result).toContain("openobserve");
+
+      // Extract plain text to verify nothing is missing
+      const textContent = result.replace(/<[^>]*>/g, '').replace(/&[^;]+;/g, '');
+      expect(textContent).toBe("nikhil2's' test openobserve");
+
+      // Specifically check that the last character 'e' is present
+      expect(textContent.endsWith('e')).toBe(true);
+      expect(textContent).toHaveLength(27);
+    });
+
+    it("should handle the exact pattern from the screenshot: nikhil2's' ' test openobserve", () => {
+      const mockColors = { stringValue: "#047857" };
+      // This is the EXACT pattern from the screenshot: apostrophe-s-apostrophe-space-apostrophe
+      const input = "test message for nikhil2's' ' test openobserve";
+      const result = textHighlighter.processTextWithHighlights(
+        input,
+        "",
+        mockColors,
+      );
+
+      // Extract plain text to verify nothing is missing
+      const textContent = result.replace(/<[^>]*>/g, '').replace(/&[^;]+;/g, '');
+
+      // The text should be exactly the same as input
+      expect(textContent).toBe(input);
+
+      // Specifically verify "openobserve" is complete with 'e' at the end
+      expect(textContent).toContain("openobserve");
+      expect(textContent.endsWith("openobserve")).toBe(true);
+      expect(textContent).toHaveLength(input.length);
+    });
+
     it("should handle very long text", () => {
       const longText = "a".repeat(10000);
       const result = textHighlighter.processTextWithHighlights(
