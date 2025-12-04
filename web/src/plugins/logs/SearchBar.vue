@@ -729,8 +729,7 @@ alt="Quick Mode" class="toolbar-icon" />
                       alt="Search History"
                       style="width: 20px; height: 20px"
                     />
-
-                    Search History</q-item-label
+                    {{ t("search.searchHistory") }}</q-item-label
                   >
                 </q-item-section>
               </q-item>
@@ -863,7 +862,7 @@ class="q-pr-sm q-pt-xs" />
                       alt="Create Scheduled Search"
                       style="width: 20px; height: 20px"
                     />
-                    Create Scheduled Search</q-item-label
+                    {{ t("search.createScheduledSearch") }}</q-item-label
                   >
                 </q-item-section>
               </q-item>
@@ -885,8 +884,7 @@ class="q-pr-sm q-pt-xs" />
                       alt="List Scheduled Search"
                       style="width: 20px; height: 20px"
                     />
-
-                    List Scheduled Search</q-item-label
+                    {{ t("search.listScheduledSearch") }}</q-item-label
                   >
                 </q-item-section>
               </q-item>
