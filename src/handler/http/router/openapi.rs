@@ -348,6 +348,14 @@ use crate::{common::meta, handler::http::request};
             meta::ingestion::BulkResponseError,
             config::meta::promql::Metadata,
             config::meta::promql::MetricType,
+            // Service Streams
+            request::service_streams::CorrelationRequest,
+            request::service_streams::CorrelationResponse,
+            request::service_streams::DimensionAnalyticsSummary,
+            request::service_streams::DimensionAnalytics,
+            request::service_streams::CardinalityClass,
+            request::service_streams::StreamInfo,
+            request::service_streams::RelatedStreams,
             // Functions
          ),
     ),
