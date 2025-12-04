@@ -58,19 +58,20 @@ export default class DashboardVariables {
       .click();
 
     // Select Field
-    const fieldSelect = this.page.locator('[data-test="dashboard-variable-field-select"]');
+    const fieldSelect = await this.page.locator('[data-test="dashboard-variable-field-select"]');
     await fieldSelect.click();
-    await fieldSelect.fill(field);
+    await this.page.keyboard.type(field);
 
+    
     // Wait for dropdown to have options available
     await this.page.waitForFunction(
-      () => {
-        const options = document.querySelectorAll('[role="option"]');
-        return options.length > 0;
-      },
-      { timeout: 10000, polling: 100 }
-    );
-
+        () => {
+            const options = document.querySelectorAll('[role="option"]');
+            return options.length > 0;
+          },
+          { timeout: 10000, polling: 100 }
+        );
+        
     // Try to select the field from dropdown - use multiple strategies
     let fieldSelected = false;
 
@@ -104,7 +105,26 @@ export default class DashboardVariables {
           await this.page.keyboard.press('Enter');
           fieldSelected = true;
         } catch (e3) {
-          fieldSelected = false;
+          // Strategy 4: Use JavaScript to directly click matching option (for deploy environment)
+          try {
+            const clicked = await this.page.evaluate((fieldName) => {
+              const options = document.querySelectorAll('[role="option"]');
+              for (const option of options) {
+                if (option.textContent.trim() === fieldName) {
+                  option.click();
+                  return true;
+                }
+              }
+              return false;
+            }, field);
+
+            if (clicked) {
+              await this.page.waitForTimeout(500);
+              fieldSelected = true;
+            }
+          } catch (e4) {
+            fieldSelected = false;
+          }
         }
       }
     }
