@@ -415,6 +415,11 @@ color="warning" size="xs"></q-icon> Error while
       :service-name="correlationDashboardProps.serviceName"
       :matched-dimensions="correlationDashboardProps.matchedDimensions"
       :metric-streams="correlationDashboardProps.metricStreams"
+      :log-streams="correlationDashboardProps.logStreams"
+      :trace-streams="correlationDashboardProps.traceStreams"
+      :source-stream="correlationDashboardProps.sourceStream"
+      :source-type="correlationDashboardProps.sourceType"
+      :available-dimensions="correlationDashboardProps.availableDimensions"
       :time-range="correlationDashboardProps.timeRange"
       @close="showCorrelation = false"
     />
@@ -952,6 +957,11 @@ export default defineComponent({
           serviceName: result.correlationData.service_name,
           matchedDimensions: result.correlationData.matched_dimensions,
           metricStreams: result.correlationData.related_streams.metrics,
+          logStreams: result.correlationData.related_streams.logs || [],
+          traceStreams: result.correlationData.related_streams.traces || [],
+          sourceStream: searchObj.data.stream.selectedStream[0],
+          sourceType: "logs",
+          availableDimensions: context.fields, // Actual field names from the log record
           timeRange: {
             startTime: startTimeMicros,
             endTime: endTimeMicros,

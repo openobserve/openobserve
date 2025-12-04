@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-icon name="link" size="md" color="primary" />
           <div class="tw-flex tw-flex-col tw-gap-0">
             <span class="tw-text-lg tw-font-semibold">
-              {{ t('correlation.title', { service: serviceName }) }}
+              Correlated Streams - {{ serviceName }}
             </span>
             <span class="tw-text-xs tw-opacity-70">
               {{ formatTimeRange(timeRange) }}
@@ -40,20 +40,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="tw-flex tw-items-center tw-gap-3">
-          <!-- Metric stream selector button -->
-          <q-btn
-            outline
-            dense
-            no-caps
-            color="primary"
-            icon="show_chart"
-            :label="t('correlation.metricsButton', { count: selectedMetricStreams.length })"
-            @click="showMetricSelector = true"
-            data-test="metric-selector-button"
-          >
-            <q-tooltip>{{ t('correlation.metricsTooltip') }}</q-tooltip>
-          </q-btn>
-
           <q-btn
             flat
             round
@@ -69,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card-section class="tw-py-2 tw-px-4 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)]">
         <div class="tw-flex tw-items-center tw-gap-2 tw-flex-wrap">
           <span class="tw-text-xs tw-font-semibold tw-uppercase tw-opacity-70">
-            {{ t('correlation.matchedDimensions') }}:
+            MATCHED DIMENSIONS:
           </span>
           <q-chip
             v-for="(value, key) in matchedDimensions"
@@ -86,57 +72,143 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </q-card-section>
 
-      <!-- Dashboard Content -->
-      <q-card-section class="correlation-content tw-flex-1 tw-overflow-auto tw-p-0">
-        <!-- Loading State -->
-        <div
-          v-if="loading"
-          class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
-        >
-          <q-spinner-hourglass color="primary" size="3.75rem" class="tw-mb-4" />
-          <div class="tw-text-base">{{ t('correlation.loading') }}</div>
-          <div class="tw-text-xs tw-text-gray-500 tw-mt-2">
-            {{ t('correlation.loadingMetrics', { count: selectedMetricStreams.length }) }}
+      <!-- Tabs -->
+      <q-tabs
+        v-model="activeTab"
+        dense
+        class="tw-px-4 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)]"
+        active-color="primary"
+        indicator-color="primary"
+        align="left"
+      >
+        <q-tab name="logs" label="Logs" />
+        <q-tab name="metrics" label="Metrics" />
+        <q-tab name="traces" label="Traces" />
+      </q-tabs>
+
+      <!-- Tab Panels -->
+      <q-tab-panels
+        v-model="activeTab"
+        animated
+        class="correlation-content tw-flex-1 tw-overflow-auto"
+      >
+        <!-- Logs Tab Panel -->
+        <q-tab-panel name="logs" class="tw-p-0">
+          <!-- Loading State -->
+          <div
+            v-if="loading"
+            class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
+          >
+            <q-spinner-hourglass color="primary" size="3.75rem" class="tw-mb-4" />
+            <div class="tw-text-base">{{ t('correlation.loading') }}</div>
+            <div class="tw-text-xs tw-text-gray-500 tw-mt-2">Loading logs...</div>
           </div>
-        </div>
 
-        <!-- Error State -->
-        <div
-          v-else-if="error"
-          class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
-        >
-          <q-icon name="error_outline" size="3.75rem" color="negative" class="tw-mb-4" />
-          <div class="tw-text-base tw-mb-2">{{ t('correlation.failedToLoad') }}</div>
-          <div class="tw-text-sm tw-text-gray-500">{{ error }}</div>
-          <q-btn
-            outline
-            color="primary"
-            :label="t('correlation.retryButton')"
-            class="tw-mt-4"
-            @click="loadDashboard"
+          <!-- Logs Dashboard -->
+          <RenderDashboardCharts
+            v-else-if="logsDashboardData"
+            :key="logsDashboardRenderKey"
+            :dashboardData="logsDashboardData"
+            :currentTimeObj="currentTimeObj"
+            :viewOnly="true"
+            :allowAlertCreation="false"
+            searchType="dashboards"
           />
-        </div>
 
-        <!-- Dashboard -->
-        <RenderDashboardCharts
-          v-else-if="dashboardData"
-          :key="dashboardRenderKey"
-          :dashboardData="dashboardData"
-          :currentTimeObj="currentTimeObj"
-          :viewOnly="true"
-          :allowAlertCreation="false"
-          searchType="dashboards"
-        />
+          <!-- No Logs State -->
+          <div
+            v-else
+            class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
+          >
+            <q-icon name="article" size="3.75rem" color="grey-6" class="tw-mb-4" />
+            <div class="tw-text-base">No correlated logs found</div>
+            <div class="tw-text-sm tw-text-gray-500 tw-mt-2">
+              Service: {{ serviceName }}
+            </div>
+          </div>
+        </q-tab-panel>
 
-        <!-- No Metrics State -->
-        <div
-          v-else
-          class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
-        >
-          <q-icon name="info_outline" size="3.75rem" color="grey-6" class="tw-mb-4" />
-          <div class="tw-text-base">{{ t('correlation.noMetrics') }}</div>
-        </div>
-      </q-card-section>
+        <!-- Metrics Tab Panel -->
+        <q-tab-panel name="metrics" class="tw-p-0">
+          <!-- Metrics Selector Button (only shown in metrics tab) -->
+          <div class="tw-p-3 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-end">
+            <q-btn
+              outline
+              dense
+              no-caps
+              color="primary"
+              icon="show_chart"
+              :label="t('correlation.metricsButton', { count: selectedMetricStreams.length })"
+              @click="showMetricSelector = true"
+              data-test="metric-selector-button"
+            >
+              <q-tooltip>{{ t('correlation.metricsTooltip') }}</q-tooltip>
+            </q-btn>
+          </div>
+
+          <!-- Loading State -->
+          <div
+            v-if="loading"
+            class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
+          >
+            <q-spinner-hourglass color="primary" size="3.75rem" class="tw-mb-4" />
+            <div class="tw-text-base">{{ t('correlation.loading') }}</div>
+            <div class="tw-text-xs tw-text-gray-500 tw-mt-2">
+              {{ t('correlation.loadingMetrics', { count: selectedMetricStreams.length }) }}
+            </div>
+          </div>
+
+          <!-- Error State -->
+          <div
+            v-else-if="error"
+            class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
+          >
+            <q-icon name="error_outline" size="3.75rem" color="negative" class="tw-mb-4" />
+            <div class="tw-text-base tw-mb-2">{{ t('correlation.failedToLoad') }}</div>
+            <div class="tw-text-sm tw-text-gray-500">{{ error }}</div>
+            <q-btn
+              outline
+              color="primary"
+              :label="t('correlation.retryButton')"
+              class="tw-mt-4"
+              @click="loadDashboard"
+            />
+          </div>
+
+          <!-- Dashboard -->
+          <RenderDashboardCharts
+            v-else-if="dashboardData"
+            :key="dashboardRenderKey"
+            :dashboardData="dashboardData"
+            :currentTimeObj="currentTimeObj"
+            :viewOnly="true"
+            :allowAlertCreation="false"
+            searchType="dashboards"
+          />
+
+          <!-- No Metrics State -->
+          <div
+            v-else
+            class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
+          >
+            <q-icon name="info_outline" size="3.75rem" color="grey-6" class="tw-mb-4" />
+            <div class="tw-text-base">{{ t('correlation.noMetrics') }}</div>
+          </div>
+        </q-tab-panel>
+
+        <!-- Traces Tab Panel -->
+        <q-tab-panel name="traces" class="tw-p-0">
+          <div class="tw-h-full tw-flex tw-items-center tw-justify-center tw-py-20">
+            <div class="tw-text-center">
+              <q-icon name="account_tree" size="3.75rem" color="grey-6" class="tw-mb-4" />
+              <div class="tw-text-base">Traces will be implemented here</div>
+              <div class="tw-text-sm tw-text-gray-500 tw-mt-2">
+                Correlated traces for service: {{ serviceName }}
+              </div>
+            </div>
+          </div>
+        </q-tab-panel>
+      </q-tab-panels>
     </q-card>
   </q-dialog>
 
@@ -223,7 +295,12 @@ interface Props {
   serviceName: string;
   matchedDimensions: Record<string, string>;
   metricStreams: StreamInfo[];
+  logStreams?: StreamInfo[];
+  traceStreams?: StreamInfo[];
   timeRange: TimeRange;
+  sourceStream?: string; // The original stream user was viewing (e.g., logs stream)
+  sourceType?: string; // The type of source stream (logs/metrics/traces)
+  availableDimensions?: Record<string, string>; // Actual field names from source (for fallback queries)
 }
 
 const props = defineProps<Props>();
@@ -235,20 +312,25 @@ const emit = defineEmits<{
 const { showErrorNotification } = useNotifications();
 const store = useStore();
 const { t } = useI18n();
-const { generateDashboard } = useMetricsCorrelationDashboard();
+const { generateDashboard, generateLogsDashboard } = useMetricsCorrelationDashboard();
 
 // Provide selectedTabId for RenderDashboardCharts to use
-// The generated dashboard has tabId: "metrics"
-const selectedTabId = ref("metrics");
+const selectedTabId = computed(() => {
+  // Map our activeTab to dashboard tab IDs
+  return activeTab.value === "logs" ? "logs" : "metrics";
+});
 provide("selectedTabId", selectedTabId);
 
 const isOpen = ref(true);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const dashboardData = ref<any>(null);
+const logsDashboardData = ref<any>(null);
 const dashboardRenderKey = ref(0);
+const logsDashboardRenderKey = ref(0);
 const showMetricSelector = ref(false);
 const metricSearchText = ref("");
+const activeTab = ref("logs"); // Default to logs tab
 
 // Get unique metric streams by stream_name
 const getUniqueStreams = (streams: StreamInfo[]) => {
@@ -328,25 +410,41 @@ const loadDashboard = async () => {
     loading.value = true;
     error.value = null;
 
-    // Validate that we have metric streams
-    if (selectedMetricStreams.value.length === 0) {
-      error.value = "No metric streams selected";
-      return;
-    }
-
     const config: MetricsCorrelationConfig = {
       serviceName: props.serviceName,
       matchedDimensions: props.matchedDimensions,
       metricStreams: selectedMetricStreams.value,
+      logStreams: props.logStreams,
+      traceStreams: props.traceStreams,
       orgIdentifier: currentOrgIdentifier.value,
       timeRange: props.timeRange,
+      sourceStream: props.sourceStream,
+      sourceType: props.sourceType,
+      availableDimensions: props.availableDimensions,
     };
 
-    // Generate dashboard JSON
-    const dashboard = generateDashboard(selectedMetricStreams.value, config);
+    // Generate metrics dashboard JSON (if we have metrics)
+    if (selectedMetricStreams.value.length > 0) {
+      const dashboard = generateDashboard(selectedMetricStreams.value, config);
+      dashboardData.value = dashboard;
+      dashboardRenderKey.value++;
+    }
 
-    dashboardData.value = dashboard;
-    dashboardRenderKey.value++;
+    // Generate logs dashboard JSON
+    // If we have correlated log streams from API, use those
+    // Otherwise, if coming from logs page, use the source stream with matched dimensions
+    const shouldGenerateLogsDashboard =
+      (props.logStreams && props.logStreams.length > 0) ||
+      (props.sourceType === "logs" && props.sourceStream);
+
+    if (shouldGenerateLogsDashboard) {
+      const logsDashboard = generateLogsDashboard(props.logStreams || [], config);
+      logsDashboardData.value = logsDashboard;
+      logsDashboardRenderKey.value++;
+      console.log("[TelemetryCorrelationDashboard] Generated logs dashboard:", logsDashboard);
+    } else {
+      console.log("[TelemetryCorrelationDashboard] No log streams and not from logs page");
+    }
   } catch (err: any) {
     console.error("[TelemetryCorrelationDashboard] Error loading correlation dashboard:", err);
     error.value = err.message || t('correlation.failedToLoad');

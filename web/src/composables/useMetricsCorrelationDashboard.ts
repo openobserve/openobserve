@@ -19,11 +19,16 @@ export interface MetricsCorrelationConfig {
   serviceName: string;
   matchedDimensions: Record<string, string>;
   metricStreams: StreamInfo[];
+  logStreams?: StreamInfo[];
+  traceStreams?: StreamInfo[];
   orgIdentifier: string;
   timeRange: {
     startTime: number; // Timestamp in microseconds (16 digits)
     endTime: number;   // Timestamp in microseconds (16 digits)
   };
+  sourceStream?: string; // Original stream being viewed
+  sourceType?: string; // Type of source stream
+  availableDimensions?: Record<string, string>; // Actual field names (for source stream queries)
 }
 
 /**
@@ -58,8 +63,8 @@ export function useMetricsCorrelationDashboard() {
     const dashboard = {
       version: 5,
       dashboardId: ``,
-      title: `Correlated Metrics - ${config.serviceName}`,
-      description: `Metrics correlated with service ${config.serviceName}`,
+      title: `Correlated Streams - ${config.serviceName}`,
+      description: `Streams correlated with service ${config.serviceName}`,
       role: "",
       owner: "",
       created: new Date().toISOString(),
@@ -240,7 +245,161 @@ ORDER BY x_axis_1`;
     };
   };
 
+  /**
+   * Generate dashboard for logs (table panel)
+   */
+  const generateLogsDashboard = (
+    streams: StreamInfo[],
+    config: MetricsCorrelationConfig
+  ) => {
+    // When coming from logs page, use the source stream (the one user was viewing)
+    // Otherwise, use the first correlated log stream from API
+    let streamName: string;
+    let filters: Record<string, string>;
+
+    if (config.sourceType === "logs" && config.sourceStream) {
+      // Use the original logs stream user was viewing
+      streamName = config.sourceStream;
+      // Use only the matched dimensions from availableDimensions
+      // Extract only the fields that correspond to matched dimension keys
+      filters = {};
+      if (config.availableDimensions && config.matchedDimensions) {
+        // For each matched dimension, find the actual field name in availableDimensions
+        for (const [semanticKey, value] of Object.entries(config.matchedDimensions)) {
+          // Try to find a field in availableDimensions that matches this value
+          for (const [fieldName, fieldValue] of Object.entries(config.availableDimensions)) {
+            if (String(fieldValue) === String(value) && typeof fieldValue === 'string') {
+              filters[fieldName] = String(fieldValue);
+              break; // Found the field, move to next dimension
+            }
+          }
+        }
+      } else {
+        filters = config.matchedDimensions;
+      }
+    } else if (streams && streams.length > 0) {
+      // Use correlated log streams from API response
+      const primaryStream = streams[0];
+      streamName = primaryStream.stream_name;
+      filters = primaryStream.filters;
+    } else {
+      // No logs available
+      return null;
+    }
+
+    // Build WHERE clause from filters
+    // Filter out non-string values and internal fields
+    const whereConditions = Object.entries(filters)
+      .filter(([field, value]) => {
+        // Only include string values and skip internal fields
+        return typeof value === 'string' && !field.startsWith('_');
+      })
+      .map(([field, value]) => {
+        const quotedField = /[^a-zA-Z0-9_]/.test(field) ? `"${field}"` : field;
+        const escapedValue = value.replace(/'/g, "''");
+        return `${quotedField} = '${escapedValue}'`;
+      })
+      .join(" AND ");
+
+    const whereClause = whereConditions ? `WHERE ${whereConditions}` : "";
+
+    const query = `SELECT * FROM "${streamName}" ${whereClause} ORDER BY _timestamp DESC`;
+
+    console.log("[useMetricsCorrelationDashboard] Generated logs query:", query);
+    console.log("[useMetricsCorrelationDashboard] Using stream:", streamName);
+    console.log("[useMetricsCorrelationDashboard] Using filters:", filters);
+
+    const panel = {
+      id: "logs_table_panel",
+      type: "table",
+      title: `Logs - ${streamName}`,
+      description: `Correlated logs for service ${config.serviceName}`,
+      config: {
+        wrap_table_cells: false,
+        table_dynamic_columns: true,
+        show_legends: false,
+        legends_position: "bottom",
+        unit: "short",
+        unit_custom: "",
+        axis_border_show: true,
+        connect_nulls: true,
+        no_value_replacement: "",
+        table_transpose: false,
+      },
+      queryType: "sql",
+      queries: [
+        {
+          query: query,
+          vrlFunctionQuery: "",
+          customQuery: true,
+          fields: {
+            stream: streamName,
+            stream_type: "logs",
+            x: [],
+            y: [],
+            z: [],
+            breakdown: [],
+            filter: {
+              filterType: "group",
+              logicalOperator: "AND",
+              conditions: [],
+            },
+          },
+          config: {
+            limit: 150,
+            promql_legend: "",
+            layer_type: "scatter",
+            weight_fixed: 1,
+            min: 0,
+            max: 100,
+            time_shift: [],
+          },
+        },
+      ],
+      layout: {
+        x: 0,
+        y: 0,
+        w: 192,
+        h: 48,
+        i: "logs_table_panel",
+      },
+      htmlContent: "",
+      markdownContent: "",
+      customChartContent: "",
+    };
+
+    const dashboard = {
+      version: 5,
+      dashboardId: ``,
+      title: `Correlated Streams - ${config.serviceName}`,
+      description: `Logs correlated with service ${config.serviceName}`,
+      role: "",
+      owner: "",
+      created: new Date().toISOString(),
+      variables: {
+        list: [],
+        showDynamicFilters: false,
+      },
+      tabs: [
+        {
+          tabId: "logs",
+          name: "Logs",
+          panels: [panel],
+        },
+      ],
+      defaultDatetimeDuration: {
+        type: "relative",
+        relativeTimePeriod: "15m",
+        startTime: config.timeRange.startTime,
+        endTime: config.timeRange.endTime,
+      },
+    };
+
+    return dashboard;
+  };
+
   return {
     generateDashboard,
+    generateLogsDashboard,
   };
 }
