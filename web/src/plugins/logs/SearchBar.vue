@@ -1245,7 +1245,7 @@ class="q-pr-sm q-pt-xs" />
       </div>
       <q-btn
         data-test="logs-query-editor-full_screen-btn"
-        :title="isFocused ? 'Collapse' : 'Expand'"
+        :title="isFocused ? t('search.collapse') : t('search.expand')"
         dense
         size="10px"
         round
