@@ -570,7 +570,7 @@ async fn process_node(
                                     if cfg.common.skip_formatting_stream_name {
                                         stream_name.into()
                                     } else {
-                                        format_stream_name(&stream_name).into()
+                                        format_stream_name(stream_name).into()
                                     }
                             }
                             resolve_res => {
@@ -828,12 +828,9 @@ async fn process_node(
             log::debug!(
                 "[Pipeline]: Destination node {node_idx} starts processing, remote_stream : {remote_stream:?}"
             );
-            let min_ts = (Utc::now()
-                - chrono::Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
-            .timestamp_micros();
-            let max_ts = (Utc::now()
-                + chrono::Duration::try_hours(cfg.limit.ingest_allowed_in_future).unwrap())
-            .timestamp_micros();
+            let now = config::utils::time::now_micros();
+            let min_ts = now - cfg.limit.ingest_allowed_upto_micro;
+            let max_ts = now + cfg.limit.ingest_allowed_in_future_micro;
             while let Some(pipeline_item) = receiver.recv().await {
                 let PipelineItem {
                     mut record,

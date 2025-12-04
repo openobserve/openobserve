@@ -66,7 +66,7 @@ pub async fn save_enrichment_data(
     // let mut hour_key = String::new();
     // let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
     let table_name = table_name.trim();
-    let stream_name = &format_stream_name(table_name);
+    let stream_name = format_stream_name(table_name.to_string());
 
     if !LOCAL_NODE.is_ingester() {
         return Ok(HttpResponse::InternalServerError()
@@ -81,7 +81,7 @@ pub async fn save_enrichment_data(
     if db::compact::retention::is_deleting_stream(
         org_id,
         StreamType::EnrichmentTables,
-        stream_name,
+        &stream_name,
         None,
     ) {
         return Ok(HttpResponse::BadRequest()
@@ -110,7 +110,7 @@ pub async fn save_enrichment_data(
     }
 
     let current_size_in_bytes = if append_data {
-        db::enrichment_table::get_table_size(org_id, stream_name).await
+        db::enrichment_table::get_table_size(org_id, &stream_name).await
     } else {
         // If we are not appending data, we do not need to check the current size
         // we will simply use the payload size to check if it exceeds the max size
@@ -140,7 +140,7 @@ pub async fn save_enrichment_data(
     let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let stream_schema = stream_schema_exists(
         org_id,
-        stream_name,
+        &stream_name,
         StreamType::EnrichmentTables,
         &mut stream_schema_map,
     )
@@ -151,12 +151,12 @@ pub async fn save_enrichment_data(
         let now = Utc::now().timestamp_micros();
         delete_enrichment_table(
             org_id,
-            stream_name,
+            &stream_name,
             StreamType::EnrichmentTables,
             (start_time, now),
         )
         .await;
-        stream_schema_map.remove(stream_name);
+        stream_schema_map.remove(&stream_name);
     }
 
     let mut records = vec![];
@@ -188,7 +188,7 @@ pub async fn save_enrichment_data(
         infer_json_schema_from_map(value_iter.into_iter(), StreamType::EnrichmentTables)
             .map_err(|_e| std::io::Error::other("Error inferring schema"))?;
     let db_schema = stream_schema_map
-        .get(stream_name)
+        .get(&stream_name)
         .map(|s| s.schema().as_ref().clone())
         .unwrap_or(Schema::empty());
     if !db_schema.fields().is_empty() && db_schema.fields().ne(inferred_schema.fields()) {
@@ -207,7 +207,7 @@ pub async fn save_enrichment_data(
     // check for schema evolution
     let _ = check_for_schema(
         org_id,
-        stream_name,
+        &stream_name,
         StreamType::EnrichmentTables,
         &mut stream_schema_map,
         record_vals,
@@ -224,7 +224,7 @@ pub async fn save_enrichment_data(
     }
 
     let schema = stream_schema_map
-        .get(stream_name)
+        .get(&stream_name)
         .unwrap()
         .schema()
         .as_ref()
@@ -239,7 +239,7 @@ pub async fn save_enrichment_data(
     if (records_size as f64) < merge_threshold_mb * SIZE_IN_MB {
         if let Err(e) = crate::service::enrichment::storage::database::store(
             org_id,
-            stream_name,
+            &stream_name,
             &records,
             timestamp,
         )
@@ -260,7 +260,7 @@ pub async fn save_enrichment_data(
         // If data size is greater than the merge threshold, we can store it directly to s3
         if let Err(e) = crate::service::enrichment::storage::remote::store(
             org_id,
-            stream_name,
+            &stream_name,
             &records,
             timestamp,
         )
@@ -273,7 +273,7 @@ pub async fn save_enrichment_data(
     // write data to local cache
     if let Err(e) = crate::service::enrichment::storage::local::store(
         org_id,
-        stream_name,
+        &stream_name,
         Values::Json(std::sync::Arc::new(records)),
         timestamp,
     )
@@ -282,7 +282,7 @@ pub async fn save_enrichment_data(
         log::error!("Error writing enrichment table to local cache: {e}");
     }
 
-    let mut enrich_meta_stats = db::enrichment_table::get_meta_table_stats(org_id, stream_name)
+    let mut enrich_meta_stats = db::enrichment_table::get_meta_table_stats(org_id, &stream_name)
         .await
         .unwrap_or_default();
 
@@ -291,18 +291,18 @@ pub async fn save_enrichment_data(
     }
     if enrich_meta_stats.start_time == 0 {
         enrich_meta_stats.start_time =
-            db::enrichment_table::get_start_time(org_id, stream_name).await;
+            db::enrichment_table::get_start_time(org_id, &stream_name).await;
     }
     enrich_meta_stats.end_time = timestamp;
     enrich_meta_stats.size = total_expected_size_in_bytes as i64;
     // The stream_stats table takes some time to update, so we need to update the enrichment table
     // size in the meta table to avoid exceeding the `ZO_ENRICHMENT_TABLE_LIMIT`.
-    let _ =
-        db::enrichment_table::update_meta_table_stats(org_id, stream_name, enrich_meta_stats).await;
+    let _ = db::enrichment_table::update_meta_table_stats(org_id, &stream_name, enrich_meta_stats)
+        .await;
 
     // notify update
     if !schema.fields().is_empty()
-        && let Err(e) = super::db::enrichment_table::notify_update(org_id, stream_name).await
+        && let Err(e) = super::db::enrichment_table::notify_update(org_id, &stream_name).await
     {
         log::error!("Error notifying enrichment table {org_id}/{stream_name} update: {e}");
     }

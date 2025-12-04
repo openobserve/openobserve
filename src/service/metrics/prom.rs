@@ -114,7 +114,7 @@ pub async fn remote_write(
 
     // parse metadata
     for item in request.metadata {
-        let metric_name = format_stream_name(&item.metric_family_name.clone());
+        let metric_name = format_stream_name(item.metric_family_name.to_string());
         let schema = infra::schema::get(org_id, &metric_name, StreamType::Metrics)
             .await
             .unwrap_or(Schema::empty());

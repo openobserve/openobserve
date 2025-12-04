@@ -150,24 +150,27 @@ pub fn parse_str_to_time(s: &str) -> Result<DateTime<Utc>, anyhow::Error> {
     Ok(ret)
 }
 
+// return timestamp and is_valid micros value
 #[inline(always)]
-pub fn parse_timestamp_micro_from_value(v: &json::Value) -> Result<i64, anyhow::Error> {
-    let n = match v {
-        json::Value::String(s) => parse_str_to_timestamp_micros(s)?,
+pub fn parse_timestamp_micro_from_value(v: &json::Value) -> Result<(i64, bool), anyhow::Error> {
+    let (ts, is_i64) = match v {
+        json::Value::String(s) => (parse_str_to_timestamp_micros(s)?, false),
         json::Value::Number(n) => {
             if n.is_i64() {
-                n.as_i64().unwrap()
+                (n.as_i64().unwrap(), true)
             } else if n.is_u64() {
-                n.as_u64().unwrap() as i64
+                (n.as_u64().unwrap() as i64, true)
             } else if n.is_f64() {
-                n.as_f64().unwrap() as i64
+                (n.as_f64().unwrap() as i64, false)
             } else {
                 return Err(anyhow::anyhow!("Invalid time format [timestamp]"));
             }
         }
         _ => return Err(anyhow::anyhow!("Invalid time format [type]")),
     };
-    Ok(parse_i64_to_timestamp_micros(n))
+    let new_ts = parse_i64_to_timestamp_micros(ts);
+    let is_valid = is_i64 && new_ts == ts;
+    Ok((new_ts, is_valid))
 }
 
 pub fn parse_milliseconds(s: &str) -> Result<u64, anyhow::Error> {
@@ -362,10 +365,23 @@ mod tests {
 
     #[test]
     fn test_parse_timestamp_micro_from_value() {
-        let test_fn = parse_timestamp_micro_from_value;
         let v_exp_arr = [
             (1609459200000000, json::json!(1609459200000000i64)),
             (1609459200000000, json::json!("2021-01-01T00:00:00")),
+            (1609459200000000, json::json!("2021-01-01T00:00:00Z")),
+            (1609430400000000, json::json!("2021-01-01T00:00:00+08:00")),
+            (1609488000000000, json::json!("2021-01-01T00:00:00-08:00")),
+            (1609459200000000, json::json!("2021-01-01 00:00:00")),
+            (1609459200000000, json::json!("2021-01-01T00:00:00.000000Z")),
+            (
+                1609430400000000,
+                json::json!("2021-01-01T00:00:00.000000+08:00"),
+            ),
+            (
+                1678315611000000,
+                json::json!("Wed, 8 Mar 2023 16:46:51 CST"),
+            ),
+            (1609459200123000, json::json!("2021-01-01T00:00:00.123")),
             (1609459200000000, json::json!("2021-01-01T00:00:00Z")),
             (1609430400000000, json::json!("2021-01-01T00:00:00+08:00")),
             (1609488000000000, json::json!("2021-01-01T00:00:00-08:00")),
@@ -384,7 +400,7 @@ mod tests {
         ];
 
         for (v_exp, input) in v_exp_arr {
-            assert!(test_fn(&input).is_ok_and(|v| v == v_exp));
+            assert!(parse_timestamp_micro_from_value(&input).is_ok_and(|v| v.0 == v_exp));
         }
     }
 

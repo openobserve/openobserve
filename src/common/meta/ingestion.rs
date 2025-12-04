@@ -15,7 +15,7 @@
 
 use std::{
     collections::HashMap,
-    io::{BufReader, Lines},
+    io::{BufReader, Cursor, Lines},
 };
 
 use actix_web::web;
@@ -43,6 +43,8 @@ pub struct StreamStatus {
     pub name: String,
     #[serde(flatten)]
     pub status: RecordStatus,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub items: Vec<HashMap<String, BulkResponseItem>>,
 }
 
 impl StreamStatus {
@@ -50,6 +52,7 @@ impl StreamStatus {
         StreamStatus {
             name: name.to_string(),
             status: RecordStatus::default(),
+            items: vec![],
         }
     }
 }
@@ -319,22 +322,27 @@ pub struct GCPIngestionResponse {
     pub timestamp: String,
 }
 
-pub enum IngestionRequest<'a> {
-    JSON(&'a web::Bytes),
-    Multi(&'a web::Bytes),
-    Hec(&'a Vec<json::Value>),
-    Loki(&'a Vec<json::Value>),
-    GCP(&'a GCPIngestionRequest),
-    KinesisFH(&'a KinesisFHRequest),
-    RUM(&'a web::Bytes),
-    Usage(&'a web::Bytes),
+pub enum IngestionRequest {
+    JSON(web::Bytes),
+    Multi(web::Bytes),
+    JsonValues(IngestionValueType, Vec<json::Value>),
+    GCP(GCPIngestionRequest),
+    KinesisFH(KinesisFHRequest),
+    RUM(web::Bytes),
+    Usage(web::Bytes),
 }
 
-pub enum IngestionData<'a> {
-    JSON(&'a Vec<json::Value>),
-    Multi(&'a [u8]),
-    GCP(&'a GCPIngestionRequest),
-    KinesisFH(&'a KinesisFHRequest),
+pub enum IngestionValueType {
+    Bulk,
+    Hec,
+    Loki,
+}
+
+pub enum IngestionData {
+    JSON(Vec<json::Value>),
+    Multi(bytes::Bytes),
+    GCP(GCPIngestionRequest),
+    KinesisFH(KinesisFHRequest),
 }
 
 #[derive(Debug)]
@@ -357,9 +365,9 @@ impl From<std::io::Error> for IngestionError {
     }
 }
 
-pub enum IngestionDataIter<'a> {
-    JSONIter(std::slice::Iter<'a, json::Value>),
-    MultiIter(Lines<BufReader<&'a [u8]>>),
+pub enum IngestionDataIter {
+    JSONIter(std::vec::IntoIter<json::Value>),
+    MultiIter(Lines<BufReader<Cursor<bytes::Bytes>>>),
     GCP(
         std::vec::IntoIter<json::Value>,
         Option<GCPIngestionResponse>,

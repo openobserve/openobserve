@@ -66,7 +66,9 @@ pub async fn handle_request(
     let started_at = Utc::now().timestamp_micros();
 
     // check stream
-    let stream_name = in_stream_name.map_or_else(|| "default".to_owned(), format_stream_name);
+    let stream_name = in_stream_name
+        .map(|name| format_stream_name(name.to_string()))
+        .unwrap_or("default".to_string());
     check_ingestion_allowed(org_id, StreamType::Logs, Some(&stream_name)).await?;
 
     let cfg = get_config();
@@ -246,8 +248,8 @@ pub async fn handle_request(
                     original_options.push(original_data);
                     timestamps.push(timestamp);
                 } else {
-                    let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
-                    *_size += estimate_json_bytes(&rec);
+                    let size: &mut usize = size_by_stream.entry(stream_name.clone()).or_insert(0);
+                    *size += estimate_json_bytes(&rec);
                     // JSON Flattening - use per-stream flatten level
                     let flatten_level =
                         get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
@@ -413,10 +415,10 @@ pub async fn handle_request(
                             local_val.insert(ALL_VALUES_COL_NAME.to_string(), values.into());
                         }
 
-                        let _size = size_by_stream
+                        let size: &mut usize = size_by_stream
                             .entry(destination_stream.clone())
                             .or_insert(0);
-                        *_size += original_size;
+                        *size += original_size;
 
                         let (ts_data, fn_num) = json_data_by_stream
                             .entry(destination_stream.clone())
