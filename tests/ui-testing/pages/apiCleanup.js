@@ -835,7 +835,12 @@ class APICleanup {
             return true;
         }
 
-        // Pattern 4: Random 8-9 char lowercase strings
+        // Pattern 5: e2e_join_* (UNION test streams)
+        if (streamName.startsWith('e2e_join_')) {
+            return true;
+        }
+
+        // Pattern 6: Random 8-9 char lowercase strings
         // First check if it matches the basic pattern
         if (!/^[a-z]{8,9}$/.test(streamName)) {
             return false;
@@ -1363,6 +1368,211 @@ class APICleanup {
         } catch (error) {
             testLogger.error('Logo cleanup failed', { error: error.message });
             return { successful: 'false', error: error.message };
+        }
+    }
+
+    /**
+     * Fetch all search jobs
+     * @returns {Promise<Array>} Array of search job objects
+     */
+    async fetchSearchJobs() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/search_jobs?type=logs`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to fetch search jobs', { status: response.status });
+                return [];
+            }
+
+            const searchJobs = await response.json();
+            return searchJobs || [];
+        } catch (error) {
+            testLogger.error('Failed to fetch search jobs', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Delete a single search job
+     * @param {string} jobId - The search job ID
+     * @returns {Promise<Object>} Deletion result
+     */
+    async deleteSearchJob(jobId) {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/search_jobs/${jobId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to delete search job', { jobId, status: response.status });
+                return { code: response.status, message: 'Failed to delete search job' };
+            }
+
+            const result = await response.json();
+            return { code: 200, ...result };
+        } catch (error) {
+            testLogger.error('Failed to delete search job', { jobId, error: error.message });
+            return { code: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Clean up all search jobs
+     * Deletes all search jobs for the organization
+     */
+    async cleanupSearchJobs() {
+        testLogger.info('Starting search jobs cleanup');
+
+        try {
+            // Fetch all search jobs
+            const searchJobs = await this.fetchSearchJobs();
+            testLogger.info('Fetched search jobs', { total: searchJobs.length });
+
+            if (searchJobs.length === 0) {
+                testLogger.info('No search jobs to clean up');
+                return;
+            }
+
+            // Delete each search job
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const job of searchJobs) {
+                const result = await this.deleteSearchJob(job.id);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.debug('Deleted search job', { jobId: job.id, userId: job.user_id });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete search job', { jobId: job.id, userId: job.user_id, result });
+                }
+            }
+
+            testLogger.info('Search jobs cleanup completed', {
+                total: searchJobs.length,
+                deleted: deletedCount,
+                failed: failedCount
+            });
+
+        } catch (error) {
+            testLogger.error('Search jobs cleanup failed', { error: error.message });
+        }
+    }
+
+    /**
+     * Fetch all saved views
+     * @returns {Promise<Array>} Array of saved view objects
+     */
+    async fetchSavedViews() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/savedviews`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to fetch saved views', { status: response.status });
+                return [];
+            }
+
+            const data = await response.json();
+            return data.views || [];
+        } catch (error) {
+            testLogger.error('Failed to fetch saved views', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Delete a single saved view
+     * @param {string} viewId - The saved view ID
+     * @returns {Promise<Object>} Deletion result
+     */
+    async deleteSavedView(viewId) {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/savedviews/${viewId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to delete saved view', { viewId, status: response.status });
+                return { code: response.status, message: 'Failed to delete saved view' };
+            }
+
+            const result = await response.json();
+            return { code: 200, ...result };
+        } catch (error) {
+            testLogger.error('Failed to delete saved view', { viewId, error: error.message });
+            return { code: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Clean up all saved views matching test patterns
+     * Deletes saved views starting with "streamslog" or "multistream_view_"
+     */
+    async cleanupSavedViews() {
+        testLogger.info('Starting saved views cleanup');
+
+        try {
+            // Fetch all saved views
+            const savedViews = await this.fetchSavedViews();
+            testLogger.info('Fetched saved views', { total: savedViews.length });
+
+            // Filter saved views matching patterns: starts with "streamslog" or "multistream_view_"
+            const matchingSavedViews = savedViews.filter(view =>
+                view.view_name.startsWith('streamslog') ||
+                view.view_name.startsWith('multistream_view_')
+            );
+            testLogger.info('Found saved views matching cleanup patterns', { count: matchingSavedViews.length });
+
+            if (matchingSavedViews.length === 0) {
+                testLogger.info('No saved views to clean up');
+                return;
+            }
+
+            // Delete each saved view
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const view of matchingSavedViews) {
+                const result = await this.deleteSavedView(view.view_id);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.debug('Deleted saved view', { viewId: view.view_id, viewName: view.view_name });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete saved view', { viewId: view.view_id, viewName: view.view_name, result });
+                }
+            }
+
+            testLogger.info('Saved views cleanup completed', {
+                total: matchingSavedViews.length,
+                deleted: deletedCount,
+                failed: failedCount
+            });
+
+        } catch (error) {
+            testLogger.error('Saved views cleanup failed', { error: error.message });
         }
     }
 
