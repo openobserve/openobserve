@@ -212,7 +212,8 @@
     "excludePatternFromSearch": "Excluir patrón de la búsqueda",
     "showPatternDetails": "Mostrar detalles ({variables} variables, {ejemplos} ejemplos)",
     "viewRelated": "Ver relacionado",
-    "viewRelatedTooltip": "Ver los seguimientos y las métricas relacionados"
+    "viewRelatedTooltip": "Ver los seguimientos y las métricas relacionados",
+    "noStreamSelectedMessage": "Selecciona una transmisión y presiona «Ejecutar consulta» para continuar. Además, puedes aplicar filtros adicionales y ajustar el intervalo de fechas para mejorar la búsqueda."
   },
   "menu": {
     "home": "Inicio",

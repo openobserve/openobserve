@@ -212,7 +212,8 @@
     "excludePatternFromSearch": "Exclure le modèle de la recherche",
     "showPatternDetails": "Afficher les détails ({variables} variables, {exemples} exemples)",
     "viewRelated": "Afficher les articles connexes",
-    "viewRelatedTooltip": "Afficher les traces et les métriques associées"
+    "viewRelatedTooltip": "Afficher les traces et les métriques associées",
+    "noStreamSelectedMessage": "Sélectionnez un flux et appuyez sur « Exécuter la requête » pour continuer. Vous pouvez également appliquer des filtres supplémentaires et ajuster la plage de dates pour améliorer la recherche."
   },
   "menu": {
     "home": "Accueil",

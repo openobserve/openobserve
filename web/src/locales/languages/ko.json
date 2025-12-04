@@ -212,7 +212,8 @@
     "excludePatternFromSearch": "검색에서 패턴 제외",
     "showPatternDetails": "세부 정보 보기 ({변수} 변수, {예제} 예제)",
     "viewRelated": "관련 보기",
-    "viewRelatedTooltip": "관련 추적 및 지표 보기"
+    "viewRelatedTooltip": "관련 추적 및 지표 보기",
+    "noStreamSelectedMessage": "스트림을 선택하고 '쿼리 실행'을 눌러 계속합니다.또한 추가 필터를 적용하고 날짜 범위를 조정하여 검색을 개선할 수 있습니다."
   },
   "menu": {
     "home": "홈",

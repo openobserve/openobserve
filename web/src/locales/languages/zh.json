@@ -212,7 +212,8 @@
     "excludePatternFromSearch": "从搜索中排除模式",
     "showPatternDetails": "显示详细信息（{变量} 变量，{示例} 示例）",
     "viewRelated": "查看相关",
-    "viewRelatedTooltip": "查看相关的追踪和指标"
+    "viewRelatedTooltip": "查看相关的追踪和指标",
+    "noStreamSelectedMessage": "选择直播并按 “运行查询” 继续。此外，您可以应用其他筛选条件并调整日期范围以增强搜索效果。"
   },
   "menu": {
     "home": "主页",

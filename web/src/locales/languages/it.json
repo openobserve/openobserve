@@ -212,7 +212,8 @@
     "excludePatternFromSearch": "Escludi il pattern dalla ricerca",
     "showPatternDetails": "Mostra dettagli ({variabili}, {esempi} esempi)",
     "viewRelated": "Visualizza correlati",
-    "viewRelatedTooltip": "Visualizza le tracce e le metriche correlate"
+    "viewRelatedTooltip": "Visualizza le tracce e le metriche correlate",
+    "noStreamSelectedMessage": "Seleziona uno stream e premi «Esegui query» per continuare. Inoltre, puoi applicare filtri aggiuntivi e modificare l'intervallo di date per migliorare la ricerca."
   },
   "menu": {
     "home": "Home",

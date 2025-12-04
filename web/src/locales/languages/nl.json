@@ -212,7 +212,8 @@
     "excludePatternFromSearch": "Patroon uitsluiten van de zoekopdracht",
     "showPatternDetails": "Details weergeven ({variabelen} variabelen, {voorbeelden} voorbeelden)",
     "viewRelated": "Gerelateerd bekijken",
-    "viewRelatedTooltip": "Gerelateerde sporen en statistieken bekijken"
+    "viewRelatedTooltip": "Gerelateerde sporen en statistieken bekijken",
+    "noStreamSelectedMessage": "Selecteer een stream en druk op 'Query uitvoeren' om door te gaan. Bovendien kunt u extra filters toepassen en het datumbereik aanpassen om het zoeken te verbeteren."
   },
   "menu": {
     "home": "Home",

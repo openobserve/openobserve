@@ -212,7 +212,8 @@
     "excludePatternFromSearch": "Deseni aramadan hariç tut",
     "showPatternDetails": "Ayrıntıları göster ({değişkenler} değişkenler, {örnekler} örnekler)",
     "viewRelated": "İlgili Görüntüle",
-    "viewRelatedTooltip": "İlgili izleri ve metrikleri görüntüleme"
+    "viewRelatedTooltip": "İlgili izleri ve metrikleri görüntüleme",
+    "noStreamSelectedMessage": "Bir akış seçin ve devam etmek için 'Sorguyu çalıştır'a basın. bunlara ek olarak, aramayı geliştirmek için ek filtreler uygulayabilir ve tarih aralığını ayarlayabilirsiniz."
   },
   "menu": {
     "home": "Ana Sayfa",

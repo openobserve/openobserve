@@ -212,7 +212,8 @@
     "excludePatternFromSearch": "検索からパターンを除外",
     "showPatternDetails": "詳細を表示 ({変数} 変数、{例} 例)",
     "viewRelated": "関連を表示",
-    "viewRelatedTooltip": "関連するトレースとメトリクスを表示する"
+    "viewRelatedTooltip": "関連するトレースとメトリクスを表示する",
+    "noStreamSelectedMessage": "ストリームを選択し、[クエリを実行] を押して続行します。さらに、追加のフィルターを適用したり、日付範囲を調整したりして、検索範囲を絞り込むこともできます。"
   },
   "menu": {
     "home": "ホーム",
