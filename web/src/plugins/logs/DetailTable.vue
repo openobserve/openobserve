@@ -104,6 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @view-trace="viewTrace"
             @send-to-ai-chat="sendToAiChat"
             @closeTable="closeTable"
+            @show-correlation="showCorrelation"
           />
         </q-card-section>
       </q-tab-panel>
@@ -373,7 +374,8 @@ export default defineComponent({
     "add:table",
     "view-trace",
     "sendToAiChat",
-    "closeTable"
+    "closeTable",
+    "show-correlation"
   ],
   props: {
     modelValue: {
@@ -537,7 +539,14 @@ export default defineComponent({
     };
     const closeTable = () => {
       emit("closeTable");
-    }
+    };
+
+    const showCorrelation = () => {
+      console.log("[DetailTable] showCorrelation called with rowData:", rowData.value);
+      console.log("[DetailTable] Emitting show-correlation event with log data");
+      emit("show-correlation", rowData.value);
+    };
+
     return {
       t,
       store,
@@ -558,6 +567,7 @@ export default defineComponent({
       hasAggregationQuery,
       sendToAiChat,
       closeTable,
+      showCorrelation,
       statusColor,
       tableColumns,
       tableRows,

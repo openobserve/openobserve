@@ -115,6 +115,7 @@ pub(crate) mod streaming;
 #[cfg(feature = "enterprise")]
 pub(crate) mod super_cluster;
 pub(crate) mod utils;
+pub(crate) mod work_group;
 
 /// The result of search in cluster
 /// data, scan_stats, wait_in_queue, is_partial, partial_err

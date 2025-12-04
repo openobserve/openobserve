@@ -176,6 +176,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <h3 class="feature-title">Enterprise License Details</h3>
               </div>
+              <q-btn
+                no-caps
+                :label="t('about.manage_license')"
+                @click="navigateToLicense"
+                size="sm"
+                class="o2-primary-button"
+              />
             </div>
 
             <div v-if="loadingLicense" class="tw-text-center tw-py-8">
@@ -283,6 +290,7 @@ import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import licenseServer from "@/services/license_server";
 import FeatureComparisonTable from "@/components/about/FeatureComparisonTable.vue";
+import { useQuasar } from "quasar";
 
 export default defineComponent({
   name: "PageAbout",
@@ -294,6 +302,7 @@ export default defineComponent({
     const router = useRouter();
     const pageData = ref("Page Data");
     const { t } = useI18n();
+    const $q = useQuasar();
     const licenseData = ref<any>(null);
     const loadingLicense = ref(false);
 
@@ -337,6 +346,49 @@ export default defineComponent({
       }
     });
 
+    const navigateToLicense = () => {
+      // Get meta org identifier
+      const metaOrgIdentifier = store.state.zoConfig.meta_org;
+
+      // Find the meta org from the organizations list
+      const metaOrg = store.state.organizations?.find(
+        (org: any) => org.identifier === metaOrgIdentifier
+      );
+
+      if (metaOrg) {
+        // Create the org option object so that it will be used to switch to meta org
+        const metaOrgOption = {
+          label: metaOrg.name,
+          id: metaOrg.id,
+          identifier: metaOrg.identifier,
+          user_email: store.state.userInfo.email,
+          ingest_threshold: metaOrg.ingest_threshold,
+          search_threshold: metaOrg.search_threshold,
+        };
+
+        // Set the selected organization using dispatch
+        store.dispatch("setSelectedOrganization", metaOrgOption);
+
+        // Navigate to license page with the meta org identifier
+        router.push({
+          name: 'license',
+          query: { org_identifier: metaOrgIdentifier }
+        });
+      } else {
+        // Show error notification when user doesn't have access to meta org
+          $q.notify({
+            message: "You are not authorized to manage the license.",
+            color: 'negative',
+            timeout: 5000,
+          })
+        // router.push({
+        //   name: 'license',
+        //   query: { org_identifier: metaOrgIdentifier }
+        // });
+      }
+    };
+
+
     return {
       t,
       store,
@@ -347,6 +399,7 @@ export default defineComponent({
       licenseData,
       loadingLicense,
       formatLicenseDate,
+      navigateToLicense,
     };
   },
 });

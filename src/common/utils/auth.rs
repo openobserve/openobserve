@@ -726,6 +726,9 @@ impl FromRequest for AuthExtractor {
                 || path.contains("/bulk/enable")
                 // for license the function itself with do a perm check
                 || (url_len == 1 && path.contains("license"))
+                // service_streams APIs are org-level, not stream-specific
+                || path.contains("/service_streams/_analytics")
+                || path.contains("/service_streams/_correlate")
                 {
                     return Ok(AuthExtractor {
                         auth: auth_str.to_owned(),

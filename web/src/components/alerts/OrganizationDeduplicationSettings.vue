@@ -174,6 +174,7 @@ const $q = useQuasar();
 interface SemanticFieldGroup {
   id: string;
   display: string;
+  group?: string;
   fields: string[];
   normalize: boolean;
 }
@@ -283,6 +284,7 @@ const saveSettings = async () => {
 const loadConfig = async () => {
   if (!props.config) {
     try {
+      // Try to get existing config
       const response = await alertsService.getOrganizationDeduplicationConfig(props.orgId);
       const config = response.data;
       console.log("Loaded dedup config:", config);
@@ -295,7 +297,27 @@ const loadConfig = async () => {
       };
       localSemanticGroups.value = config.semantic_field_groups ?? [];
     } catch (error) {
-      console.log("No existing config, using defaults", error);
+      console.log("No existing config, loading default semantic groups from backend", error);
+
+      // Load default semantic groups from backend
+      try {
+        const semanticGroupsResponse = await alertsService.getSemanticGroups(props.orgId);
+        const defaultGroups = semanticGroupsResponse.data;
+        console.log(`Loaded ${defaultGroups.length} default semantic groups from backend`);
+
+        localConfig.value = {
+          enabled: true,
+          alert_dedup_enabled: true,
+          alert_fingerprint_groups: [],
+          time_window_minutes: undefined,
+          semantic_field_groups: defaultGroups,
+        };
+        localSemanticGroups.value = defaultGroups;
+      } catch (semanticError) {
+        console.error("Failed to load default semantic groups:", semanticError);
+        // Fallback to empty
+        localSemanticGroups.value = [];
+      }
     }
   } else {
     console.log("Using config from props:", props.config);

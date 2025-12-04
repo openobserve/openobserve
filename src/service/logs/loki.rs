@@ -26,12 +26,9 @@ use promql_parser::{
 };
 use proto::loki_rpc;
 
-use crate::{
-    common::meta::{
-        ingestion::{IngestionRequest, IngestionResponse},
-        loki::{LokiError, LokiPushRequest},
-    },
-    service::logs,
+use crate::common::meta::{
+    ingestion::{IngestionRequest, IngestionResponse, IngestionValueType},
+    loki::{LokiError, LokiPushRequest},
 };
 
 pub enum LokiRequest {
@@ -53,11 +50,11 @@ pub async fn handle_request(
     };
 
     for (stream_name, records) in streams_data {
-        logs::ingest::ingest(
+        super::ingest::ingest(
             thread_id,
             org_id,
             &stream_name,
-            IngestionRequest::Loki(&records),
+            IngestionRequest::JsonValues(IngestionValueType::Loki, records),
             user_email,
             None,
             false,
@@ -86,7 +83,6 @@ fn validate_and_process_json_request(
     }
 
     let mut streams_data = HashMap::new();
-
     for (stream_idx, loki_stream) in request.streams.into_iter().enumerate() {
         if loki_stream.stream.is_empty() {
             return Err(LokiError::InvalidLabels {
@@ -256,7 +252,7 @@ fn parse_prometheus_labels(labels_str: &str) -> Result<HashMap<String, String>, 
 fn determine_service_stream_name(labels: &HashMap<String, String>) -> String {
     labels
         .get(STREAM_NAME_LABEL)
-        .map(|name| format_stream_name(name))
+        .map(|name| format_stream_name(name.to_string()))
         .filter(|name| !name.is_empty())
         .unwrap_or_else(|| DEFAULT_STREAM_NAME.to_string())
 }
