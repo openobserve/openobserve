@@ -268,6 +268,73 @@ pub static PATTERN_EXTRACTION_TIME: Lazy<HistogramVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// service discovery metrics (enterprise feature)
+pub static SERVICE_STREAMS_SERVICES_DISCOVERED: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "service_streams_services_discovered_total",
+            "Total number of services discovered",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type"],
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_PROCESSING_TIME: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "service_streams_processing_time_seconds",
+            "Service discovery processing time in seconds",
+        )
+        .namespace(NAMESPACE)
+        .buckets(vec![0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0])
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_HIGH_CARDINALITY_BLOCKED: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "service_streams_high_cardinality_blocked_total",
+            "Total number of high-cardinality dimensions blocked",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "dimension"],
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_DIMENSION_CARDINALITY: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "service_streams_dimension_cardinality",
+            "Estimated unique value count per dimension",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "dimension"],
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_HIGH_CARDINALITY_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "service_streams_high_cardinality_total",
+            "Count of high cardinality dimension detections",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "dimension"],
+    )
+    .expect("Metric created")
+});
+
 // querier memory cache stats
 pub static QUERY_MEMORY_CACHE_LIMIT_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
@@ -1297,6 +1364,33 @@ pub static SELF_REPORTING_QUEUE_DEPTH: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// service streams cache stats
+pub static SERVICE_STREAMS_CACHE_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "service_streams_cache_bytes",
+            "Service streams cache memory usage in bytes by organization",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "cache_type"], // cache_type: "services" or "dimensions"
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_CACHE_ENTRIES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "service_streams_cache_entries",
+            "Number of entries in service streams cache by organization",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "cache_type"], // cache_type: "services" or "dimensions"
+    )
+    .expect("Metric created")
+});
+
 fn register_metrics(registry: &Registry) {
     // http latency
     registry
@@ -1353,6 +1447,21 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(PATTERN_EXTRACTION_TIME.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_SERVICES_DISCOVERED.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_PROCESSING_TIME.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_HIGH_CARDINALITY_BLOCKED.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_DIMENSION_CARDINALITY.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_HIGH_CARDINALITY_TOTAL.clone()))
         .expect("Metric registered");
 
     // querier stats
@@ -1636,6 +1745,14 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(SELF_REPORTING_QUEUE_DEPTH.clone()))
+        .expect("Metric registered");
+
+    // service streams cache
+    registry
+        .register(Box::new(SERVICE_STREAMS_CACHE_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_CACHE_ENTRIES.clone()))
         .expect("Metric registered");
 }
 
