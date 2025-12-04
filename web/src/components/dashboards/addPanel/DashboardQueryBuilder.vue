@@ -148,6 +148,103 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             />
                           </div>
                         </div>
+<<<<<<< HEAD
+=======
+                        <!-- histogram interval if auto sql and aggregation function is histogram-->
+                        <div
+                          v-if="
+                            !dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].customQuery &&
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields?.x[index]?.aggregationFunction ===
+                              'histogram' &&
+                            !dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.x[index].isDerived
+                          "
+                          class="q-mb-sm"
+                        >
+                          <!-- histogram interval for sql queries -->
+                          <HistogramIntervalDropDown
+                            v-if="!promqlMode"
+                            :model-value="
+                              getHistoramIntervalField(
+                                dashboardPanelData.data.queries[
+                                  dashboardPanelData.layout.currentQueryIndex
+                                ].fields?.x[index],
+                              )
+                            "
+                            @update:modelValue="
+                              (newValue: any) => {
+                                dashboardPanelData.data.queries[
+                                  dashboardPanelData.layout.currentQueryIndex
+                                ].fields.x[index].args[0].value =
+                                  newValue.value;
+                              }
+                            "
+                          />
+                        </div>
+                        <q-input
+                          dense
+                          data-test="dashboard-x-item-input"
+                          :label="t('common.label')"
+                          v-model="
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.x[index].label
+                          "
+                         borderless hide-bottom-space/>
+                        <div
+                          v-if="dashboardPanelData.data.type === 'table'"
+                          class="q-mt-sm q-mb-sm"
+                        >
+                          <div>
+                            <q-checkbox
+                              v-model="
+                                dashboardPanelData.data.queries[
+                                  dashboardPanelData.layout.currentQueryIndex
+                                ].fields.x[index].treatAsNonTimestamp
+                              "
+                              :label="'Mark this field as non-timestamp'"
+                              dense
+                            />
+                          </div>
+                          <div class="q-mt-xs">
+                            <q-checkbox
+                              v-model="
+                                dashboardPanelData.data.queries[
+                                  dashboardPanelData.layout.currentQueryIndex
+                                ].fields.x[index].showFieldAsJson
+                              "
+                              :label="'Render Data as JSON / Array'"
+                              dense
+                            />
+                          </div>
+                        </div>
+
+                        <div
+                          v-if="
+                            !dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].customQuery &&
+                            dashboardPanelData.data.queryType == 'sql' &&
+                            !dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.x[index].isDerived
+                          "
+                          class="q-mt-sm"
+                        >
+                          <SortByBtnGrp
+                            :fieldObj="
+                              dashboardPanelData.data.queries[
+                                dashboardPanelData.layout.currentQueryIndex
+                              ].fields?.x[index]
+                            "
+                          />
+                        </div>
+>>>>>>> main
                       </div>
                     </q-menu>
                   </q-btn>
@@ -480,6 +577,171 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </div>
                     </div>
+<<<<<<< HEAD
+=======
+                    <!-- histogram interval if auto sql and aggregation function is histogram-->
+                    <div
+                      v-if="
+                        !dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery &&
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields?.y[index]?.aggregationFunction ===
+                          'histogram' &&
+                        !dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.y[index].isDerived
+                      "
+                      class="q-mb-sm"
+                    >
+                      <!-- histogram interval for sql queries -->
+                      <HistogramIntervalDropDown
+                        v-if="!promqlMode"
+                        :model-value="
+                          getHistoramIntervalField(
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.y[index],
+                          )
+                        "
+                        @update:modelValue="
+                          (newValue: any) => {
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.y[index].args[0].value = newValue.value;
+                          }
+                        "
+                      />
+                    </div>
+                    <q-input
+                      dense
+                      :label="t('common.label')"
+                      data-test="dashboard-y-item-input"
+                      v-model="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.y[index].label
+                      "
+                     borderless hide-bottom-space/>
+                    <div
+                      v-if="dashboardPanelData.data.type === 'table'"
+                      class="q-mt-sm q-mb-sm"
+                    >
+                      <div>
+                        <q-checkbox
+                          v-model="
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.y[index].treatAsNonTimestamp
+                          "
+                          :label="'Mark this field as non-timestamp'"
+                          dense
+                        />
+                      </div>
+                      <div class="q-mt-xs">
+                        <q-checkbox
+                          v-model="
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.y[index].showFieldAsJson
+                          "
+                          :label="'Render Data as JSON / Array'"
+                          dense
+                        />
+                      </div>
+                    </div>
+                    <div
+                      style="width: 100%"
+                      class="tw-mb-2"
+                      v-if="dashboardPanelData.data.type != 'heatmap'"
+                    >
+                      <span class="tw-block tw-mb-1 tw-font-bold">Having</span>
+
+                      <q-btn
+                        dense
+                        outline
+                        color="primary"
+                        icon="add"
+                        label="Add"
+                        @click="toggleHavingFilter(index, 'y')"
+                        v-if="!isHavingFilterVisible(index, 'y')"
+                      />
+
+                      <div
+                        class="tw-flex tw-space-x-2 tw-mt-2 tw-items-center"
+                        v-if="isHavingFilterVisible(index, 'y')"
+                      >
+                        <q-select
+                          dense
+                          v-model="getHavingCondition(index, 'y').operator"
+                          :options="operators"
+                          style="width: 30%"
+                         borderless hide-bottom-space/>
+
+                        <q-input
+                          dense
+                          v-model.number="getHavingCondition(index, 'y').value"
+                          style="width: 50%"
+                          type="number"
+                          placeholder="Value"
+                         borderless hide-bottom-space/>
+
+                        <q-btn
+                          dense
+                          flat
+                          icon="close"
+                          @click="cancelHavingFilter(index, 'y')"
+                          class="el-border"
+                        />
+                      </div>
+                    </div>
+                    <div
+                      v-if="
+                        !dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery &&
+                        dashboardPanelData.data.queryType == 'sql' &&
+                        !dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.y[index].isDerived
+                      "
+                      class="q-mt-sm"
+                    >
+                      <SortByBtnGrp
+                        :fieldObj="
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].fields?.y[index]
+                        "
+                      />
+                          ? 'auto'
+                          : '771px',
+                    }"
+                  >
+                    <div>
+                      <div class="q-mr-xs q-mb-sm">
+                        <DynamicFunctionPopUp
+                          v-model="
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.y[index]
+                          "
+                          :allowAggregation="
+                            dashboardPanelData.data.type == 'heatmap'
+                              ? false
+                              : true
+                          "
+                          :customQuery="
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].customQuery
+                          "
+                          :chartType="dashboardPanelData.data.type"
+                        />
+                      </div>
+                    </div>
+>>>>>>> main
                   </div>
                 </q-menu>
               </q-btn>
@@ -788,15 +1050,26 @@ export default defineComponent({
         }
       };
 
+      const setShowFieldAsJsonForField = (field: any) => {
+        if (
+          field.showFieldAsJson === undefined ||
+          field.showFieldAsJson === null
+        ) {
+          field.showFieldAsJson = false;
+        }
+      };
+
       // Only X and Y axes for table charts
       if (currentQuery?.fields?.x) {
         currentQuery.fields.x.forEach((field: any) => {
           setTreatAsNonTimestampForField(field);
+          setShowFieldAsJsonForField(field);
         });
       }
       if (currentQuery?.fields?.y) {
         currentQuery.fields.y.forEach((field: any) => {
           setTreatAsNonTimestampForField(field);
+          setShowFieldAsJsonForField(field);
         });
       }
     };

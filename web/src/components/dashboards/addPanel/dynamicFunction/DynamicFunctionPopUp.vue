@@ -116,7 +116,7 @@
             v-model="getHavingCondition().operator"
             :options="havingOperators"
             borderless
-            style="width: 60px;"
+            style="width: 60px"
             data-test="dynamic-function-popup-having-operator"
           />
 
@@ -140,12 +140,22 @@
         </div>
       </div>
       <div v-if="chartType === 'table'" class="q-mt-sm q-mb-sm">
-        <q-checkbox
-          v-model="fields.treatAsNonTimestamp"
-          :label="'Mark this field as non-timestamp'"
-          dense
-          data-test="dynamic-function-popup-treat-as-non-timestamp"
-        />
+        <div>
+          <q-checkbox
+            v-model="fields.treatAsNonTimestamp"
+            :label="'Mark this field as non-timestamp'"
+            dense
+            data-test="dynamic-function-popup-treat-as-non-timestamp"
+          />
+        </div>
+        <div class="q-mt-xs">
+          <q-checkbox
+            v-model="fields.showFieldAsJson"
+            :label="'Render Data as JSON / Array'"
+            dense
+            data-test="dynamic-function-popup-show-field-as-json"
+          />
+        </div>
       </div>
     </div>
   </div>
