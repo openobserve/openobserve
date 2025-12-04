@@ -247,16 +247,14 @@ def test_histogram(
     # Adjust the assertion based on our expectations
     expected_hits_histog = expected_total_hits_results_histg  # we're expecting
     assert total_hits_histog == expected_hits_histog, (
-        f"Expected total {test_name} to be {expected_hits_histog}, but got {total_hits_histog}\n"
-        f"Response data: {json.dumps(res_data_histog, indent=2)}"
+        f"Expected total {test_name} to be {expected_hits_histog}, but got {total_hits_histog}"
     )
 
     # Validate zo_sql_num hits histogram in the first hit
     if total_hits_histog > 0:
         actual_zo_sql_num_hits_histog = res_data_histog["hits"][0]["zo_sql_num"]
         assert actual_zo_sql_num_hits_histog == expected_zo_sql_num_histg, (
-            f"Expected zo_sql_num histogram to be {expected_zo_sql_num_histg}, but got {actual_zo_sql_num_hits_histog}\n"
-            f"First hit: {json.dumps(res_data_histog['hits'][0], indent=2)}"
+            f"Expected zo_sql_num histogram to be {expected_zo_sql_num_histg}, but got {actual_zo_sql_num_hits_histog}"
         )
     else:
         pytest.fail("No hits found in the response.")
@@ -285,8 +283,7 @@ def test_histogram(
         expected_total_hits_results_histg  # what we're expecting
     )
     assert total_hits_histog_cache == expected_hits_histog_cache, (
-        f"Expected {test_name} total to be {expected_hits_histog_cache}, but got {total_hits_histog_cache}\n"
-        f"Response data: {json.dumps(res_data_histog_cache, indent=2)}"
+        f"Expected {test_name} total to be {expected_hits_histog_cache}, but got {total_hits_histog_cache}"
     )
 
     # Validate zo_sql_num hits histogram in the first hit
@@ -295,8 +292,7 @@ def test_histogram(
             "zo_sql_num"
         ]
         assert actual_zo_sql_num_hits_histog_cache == expected_zo_sql_num_histg, (
-            f"Expected zo_sql_num histogram to be {expected_zo_sql_num_histg}, but got {actual_zo_sql_num_hits_histog_cache}\n"
-            f"First hit: {json.dumps(res_data_histog_cache['hits'][0], indent=2)}"
+            f"Expected zo_sql_num histogram to be {expected_zo_sql_num_histg}, but got {actual_zo_sql_num_hits_histog_cache}"
         )
     else:
         pytest.fail("No hits found in the response.")
@@ -969,8 +965,7 @@ def test_streaming_histogram(
     # Adjust the assertion based on our expectations
     expected_hits_histog = expected_total_hits_results_histg  # we're expecting
     assert total_hits_histog == expected_hits_histog, (
-        f"Expected total {test_name} to be {expected_hits_histog}, but got {total_hits_histog}\n"
-        f"Response data: {json.dumps(res_data_histog, indent=2)}"
+        f"Expected total {test_name} to be {expected_hits_histog}, but got {total_hits_histog}"
     )
 
     # Validate zo_sql_num hits histogram in the first hit
@@ -979,8 +974,7 @@ def test_streaming_histogram(
             "zo_sql_num"
         ]
         assert actual_zo_sql_num_hits_histog == expected_zo_sql_num_histg, (
-            f"Expected zo_sql_num histogram to be {expected_zo_sql_num_histg}, but got {actual_zo_sql_num_hits_histog}\n"
-            f"First hit: {json.dumps(res_data_histog['results']['hits'][0], indent=2)}"
+            f"Expected zo_sql_num histogram to be {expected_zo_sql_num_histg}, but got {actual_zo_sql_num_hits_histog}"
         )
     else:
         pytest.fail("No hits found in the response.")
@@ -1016,8 +1010,7 @@ def test_streaming_histogram(
         expected_total_hits_results_histg  # what we're expecting
     )
     assert total_hits_histog_cache == expected_hits_histog_cache, (
-        f"Expected {test_name} total to be {expected_hits_histog_cache}, but got {total_hits_histog_cache}\n"
-        f"Response data: {json.dumps(res_data_histog_cache, indent=2)}"
+        f"Expected {test_name} total to be {expected_hits_histog_cache}, but got {total_hits_histog_cache}"
     )
 
     # Validate zo_sql_num hits histogram in the first hit
@@ -1026,8 +1019,7 @@ def test_streaming_histogram(
             0
         ]["zo_sql_num"]
         assert actual_zo_sql_num_hits_histog_cache == expected_zo_sql_num_histg, (
-            f"Expected zo_sql_num histogram to be {expected_zo_sql_num_histg}, but got {actual_zo_sql_num_hits_histog_cache}\n"
-            f"First hit: {json.dumps(res_data_histog_cache['results']['hits'][0], indent=2)}"
+            f"Expected zo_sql_num histogram to be {expected_zo_sql_num_histg}, but got {actual_zo_sql_num_hits_histog_cache}"
         )
     else:
         pytest.fail("No hits found in the response.")
