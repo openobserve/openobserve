@@ -1023,7 +1023,7 @@ class="q-pr-sm q-pt-xs" />
                   dense
                   flat
                   no-caps
-                  :title="'Refresh Cache & Run Query'"
+                  :title="t('search.refreshCacheAndRunQuery')"
                   class="q-pa-sm search-button-dropdown tw-text-[12px]"
                   v-close-popup
                   @click="handleRunQueryFn(true)"
@@ -1033,7 +1033,7 @@ class="q-pr-sm q-pt-xs" />
                   "
                 >
                   <q-icon name="refresh" class="q-mr-xs" />
-                  Refresh Cache & Run Query</q-btn
+                  {{ t("search.refreshCacheAndRunQuery") }}</q-btn
                 >
               </q-btn-dropdown>
               </div>
@@ -1107,7 +1107,7 @@ class="q-pr-sm q-pt-xs" />
                       dense
                       flat
                       no-caps
-                      :title="'Refresh Cache & Run Query'"
+                      :title="t('search.refreshCacheAndRunQuery')"
                       class="q-pa-sm tw-text-[12px] "
                       v-close-popup
                       @click="handleRunQueryFn(true)"
@@ -1117,7 +1117,7 @@ class="q-pr-sm q-pt-xs" />
                       "
                       >
                       <q-icon name="refresh" class="q-mr-xs" />
-                      Refresh Cache & Run Query</q-btn>
+                      {{ t("search.refreshCacheAndRunQuery") }}</q-btn>
               </q-btn-dropdown>
             </div>
           </div>
