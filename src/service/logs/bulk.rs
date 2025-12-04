@@ -77,8 +77,6 @@ pub async fn ingest(
     let stream_type = StreamType::Logs;
 
     let mut stream_key_cache: HashMap<String, String> = HashMap::new();
-    let mut blocked_stream_warnings: HashMap<String, bool> = HashMap::new();
-
     let mut streams_data: HashMap<String, Vec<json::Value>> = HashMap::new();
     let reader = BufReader::new(body.as_ref());
     let mut next_line_is_data = false;
@@ -134,23 +132,15 @@ pub async fn ingest(
             }
 
             // skip blocked streams
-            // Cache the key to avoid repeated allocations for the same stream
-            let key = match stream_key_cache.get(&stream_name) {
-                Some(v) => v,
-                None => {
-                    let key = format!("{org_id}/{}/{stream_name}", stream_type);
-                    stream_key_cache.insert(stream_name.clone(), key);
-                    stream_key_cache.get(&stream_name).unwrap()
+            if !stream_key_cache.contains_key(&stream_name) {
+                let key = format!("{org_id}/{}/{stream_name}", stream_type);
+                stream_key_cache.insert(stream_name.clone(), key.clone());
+                if BLOCKED_STREAMS.contains(&key) {
+                    log::warn!(
+                        "[LOGS:BULK] stream [{org_id}/{stream_name}] is blocked from ingestion"
+                    );
+                    continue; // skip
                 }
-            };
-            if BLOCKED_STREAMS.contains(key) {
-                // print warning only once
-                if blocked_stream_warnings.contains_key(key) {
-                    continue;
-                }
-                blocked_stream_warnings.insert(key.clone(), true);
-                log::warn!("[LOGS:BULK] stream [{org_id}/{stream_name}] is blocked from ingestion");
-                continue; // skip
             }
             next_line_is_data = true;
         } else {
