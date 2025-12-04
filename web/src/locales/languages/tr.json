@@ -213,7 +213,9 @@
     "showPatternDetails": "Ayrıntıları göster ({değişkenler} değişkenler, {örnekler} örnekler)",
     "viewRelated": "İlgili Görüntüle",
     "viewRelatedTooltip": "İlgili izleri ve metrikleri görüntüleme",
-    "noStreamSelectedMessage": "Bir akış seçin ve devam etmek için 'Sorguyu çalıştır'a basın. bunlara ek olarak, aramayı geliştirmek için ek filtreler uygulayabilir ve tarih aralığını ayarlayabilirsiniz."
+    "noStreamSelectedMessage": "Bir akış seçin ve devam etmek için 'Sorguyu çalıştır'a basın. bunlara ek olarak, aramayı geliştirmek için ek filtreler uygulayabilir ve tarih aralığını ayarlayabilirsiniz.",
+    "refreshCacheAndRunQuery": "Önbelleği Yenile ve Sorguyu Çalıştır",
+    "noFieldFoundInStream": "Seçilen akışta alan bulunamadı."
   },
   "menu": {
     "home": "Ana Sayfa",

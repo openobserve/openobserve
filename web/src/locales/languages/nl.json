@@ -213,7 +213,9 @@
     "showPatternDetails": "Details weergeven ({variabelen} variabelen, {voorbeelden} voorbeelden)",
     "viewRelated": "Gerelateerd bekijken",
     "viewRelatedTooltip": "Gerelateerde sporen en statistieken bekijken",
-    "noStreamSelectedMessage": "Selecteer een stream en druk op 'Query uitvoeren' om door te gaan. Bovendien kunt u extra filters toepassen en het datumbereik aanpassen om het zoeken te verbeteren."
+    "noStreamSelectedMessage": "Selecteer een stream en druk op 'Query uitvoeren' om door te gaan. Bovendien kunt u extra filters toepassen en het datumbereik aanpassen om het zoeken te verbeteren.",
+    "refreshCacheAndRunQuery": "Cache verversen en query uitvoeren",
+    "noFieldFoundInStream": "Geen veld gevonden in de geselecteerde stream."
   },
   "menu": {
     "home": "Home",

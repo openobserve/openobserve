@@ -213,7 +213,9 @@
     "showPatternDetails": "Mostrar detalhes ({variáveis} variáveis, {exemplos} exemplos)",
     "viewRelated": "Exibir relacionado",
     "viewRelatedTooltip": "Visualize rastreamentos e métricas relacionados",
-    "noStreamSelectedMessage": "Selecione um stream e pressione “Executar consulta” para continuar. Além disso, você pode aplicar filtros adicionais e ajustar o intervalo de datas para aprimorar a pesquisa."
+    "noStreamSelectedMessage": "Selecione um stream e pressione “Executar consulta” para continuar. Além disso, você pode aplicar filtros adicionais e ajustar o intervalo de datas para aprimorar a pesquisa.",
+    "refreshCacheAndRunQuery": "Atualizar o cache e executar a consulta",
+    "noFieldFoundInStream": "Nenhum campo foi encontrado no fluxo selecionado."
   },
   "menu": {
     "home": "Início",

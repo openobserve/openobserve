@@ -213,7 +213,9 @@
     "showPatternDetails": "Mostrar detalles ({variables} variables, {ejemplos} ejemplos)",
     "viewRelated": "Ver relacionado",
     "viewRelatedTooltip": "Ver los seguimientos y las métricas relacionados",
-    "noStreamSelectedMessage": "Selecciona una transmisión y presiona «Ejecutar consulta» para continuar. Además, puedes aplicar filtros adicionales y ajustar el intervalo de fechas para mejorar la búsqueda."
+    "noStreamSelectedMessage": "Selecciona una transmisión y presiona «Ejecutar consulta» para continuar. Además, puedes aplicar filtros adicionales y ajustar el intervalo de fechas para mejorar la búsqueda.",
+    "refreshCacheAndRunQuery": "Actualizar la caché y ejecutar la consulta",
+    "noFieldFoundInStream": "No se encontró ningún campo en la secuencia seleccionada."
   },
   "menu": {
     "home": "Inicio",

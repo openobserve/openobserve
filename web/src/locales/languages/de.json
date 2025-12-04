@@ -213,7 +213,9 @@
     "showPatternDetails": "Details anzeigen ({Variablen} Variablen, {Beispiele} Beispiele)",
     "viewRelated": "Verwandtes anzeigen",
     "viewRelatedTooltip": "Verwandte Traces und Metriken anzeigen",
-    "noStreamSelectedMessage": "Wählen Sie einen Stream aus und klicken Sie auf „Abfrage ausführen“, um fortzufahren. Zusätzlich kannst du zusätzliche Filter anwenden und den Datumsbereich anpassen, um die Suche zu verbessern."
+    "noStreamSelectedMessage": "Wählen Sie einen Stream aus und klicken Sie auf „Abfrage ausführen“, um fortzufahren. Zusätzlich kannst du zusätzliche Filter anwenden und den Datumsbereich anpassen, um die Suche zu verbessern.",
+    "refreshCacheAndRunQuery": "Cache aktualisieren und Abfrage ausführen",
+    "noFieldFoundInStream": "Im ausgewählten Stream wurde kein Feld gefunden."
   },
   "menu": {
     "home": "Startseite",
