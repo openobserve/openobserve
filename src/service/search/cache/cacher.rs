@@ -487,11 +487,13 @@ pub async fn get_cached_results(
     let last_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap());
     let data_start_time = std::cmp::min(first_ts, last_ts);
     let data_end_time = std::cmp::max(first_ts, last_ts);
+    // convert histogram interval to microseconds
+    let histogram_interval = cached_response.histogram_interval.unwrap_or_default() * 1_000_000;
     // check if need to filter the data
     if data_start_time < cache_req.q_start_time || data_end_time > cache_req.q_end_time {
         cached_response.hits.retain(|hit| {
             let hit_ts = get_ts_value(&cache_req.ts_column, hit);
-            hit_ts < hits_allowed_end_time && hit_ts >= hits_allowed_start_time
+            hit_ts + histogram_interval < hits_allowed_end_time && hit_ts >= hits_allowed_start_time
         });
         // if the data is empty after filtering, return None
         if cached_response.hits.is_empty() {
@@ -499,7 +501,8 @@ pub async fn get_cached_results(
         }
         // reset the start and end time
         let first_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.first().unwrap());
-        let last_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap());
+        let last_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap())
+            + histogram_interval;
         matching_meta.start_time = std::cmp::min(first_ts, last_ts);
         matching_meta.end_time = std::cmp::max(first_ts, last_ts);
     }
