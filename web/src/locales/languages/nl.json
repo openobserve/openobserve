@@ -210,7 +210,9 @@
     "anomalyLabel": "ANOMALIE",
     "includePatternInSearch": "Patroon opnemen in de zoekopdracht",
     "excludePatternFromSearch": "Patroon uitsluiten van de zoekopdracht",
-    "showPatternDetails": "Details weergeven ({variabelen} variabelen, {voorbeelden} voorbeelden)"
+    "showPatternDetails": "Details weergeven ({variabelen} variabelen, {voorbeelden} voorbeelden)",
+    "viewRelated": "Gerelateerd bekijken",
+    "viewRelatedTooltip": "Gerelateerde sporen en statistieken bekijken"
   },
   "menu": {
     "home": "Home",
@@ -1639,5 +1641,17 @@
     "tabLabel": "Fouten",
     "errorSpikePeriod": "Fout: piekperiode:",
     "errorsGreaterThan": "Fouten >="
+  },
+  "correlation": {
+    "title": "Gecorreleerde statistieken - {service}",
+    "loading": "Gecorreleerde statistieken worden geladen...",
+    "loadingMetrics": "Metrische stream (s) van {count} wordt geladen",
+    "failedToLoad": "Het laden van het correlatiedashboard is mislukt",
+    "retryButton": "Probeer het opnieuw",
+    "noMetrics": "Geen statistieken beschikbaar voor correlatie",
+    "matchedDimensions": "Op elkaar afgestemde afmetingen",
+    "metricsButton": "{count} Metriek (en)",
+    "metricsTooltip": "Selecteer metrische streams om weer te geven",
+    "selectMetrics": "Selecteer Metric Streams"
   }
 }

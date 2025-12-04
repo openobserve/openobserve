@@ -210,7 +210,9 @@
     "anomalyLabel": "ANOMALIE",
     "includePatternInSearch": "Muster in die Suche einbeziehen",
     "excludePatternFromSearch": "Muster von der Suche ausschließen",
-    "showPatternDetails": "Details anzeigen ({Variablen} Variablen, {Beispiele} Beispiele)"
+    "showPatternDetails": "Details anzeigen ({Variablen} Variablen, {Beispiele} Beispiele)",
+    "viewRelated": "Verwandtes anzeigen",
+    "viewRelatedTooltip": "Verwandte Traces und Metriken anzeigen"
   },
   "menu": {
     "home": "Startseite",
@@ -1639,5 +1641,17 @@
     "tabLabel": "Fehler",
     "errorSpikePeriod": "Zeitraum der Fehlerspitzen:",
     "errorsGreaterThan": "Fehler >="
+  },
+  "correlation": {
+    "title": "Korrelierte Metriken — {service}",
+    "loading": "Korrelierte Metriken werden geladen...",
+    "loadingMetrics": "{count} -Metrik-Stream (s) werden geladen",
+    "failedToLoad": "Korrelations-Dashboard konnte nicht geladen werden",
+    "retryButton": "Erneut versuchen",
+    "noMetrics": "Keine Metriken für die Korrelation verfügbar",
+    "matchedDimensions": "Abgestimmte Abmessungen",
+    "metricsButton": "{count} Metrik (en)",
+    "metricsTooltip": "Wählen Sie die anzuzeigenden Metrik-Streams aus",
+    "selectMetrics": "Wählen Sie Metric Streams"
   }
 }

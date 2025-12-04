@@ -210,7 +210,9 @@
     "anomalyLabel": "異常",
     "includePatternInSearch": "検索にパターンを含める",
     "excludePatternFromSearch": "検索からパターンを除外",
-    "showPatternDetails": "詳細を表示 ({変数} 変数、{例} 例)"
+    "showPatternDetails": "詳細を表示 ({変数} 変数、{例} 例)",
+    "viewRelated": "関連を表示",
+    "viewRelatedTooltip": "関連するトレースとメトリクスを表示する"
   },
   "menu": {
     "home": "ホーム",
@@ -1632,5 +1634,17 @@
     "tabLabel": "エラー",
     "errorSpikePeriod": "エラースパイク期間:",
     "errorsGreaterThan": "エラー >="
+  },
+  "correlation": {
+    "title": "相関指標-{サービス}",
+    "loading": "相関指標を読み込んでいます...",
+    "loadingMetrics": "{count} 個のメトリックスストリームをロード中",
+    "failedToLoad": "相関ダッシュボードを読み込めませんでした",
+    "retryButton": "リトライ",
+    "noMetrics": "相関に使用できる指標はありません",
+    "matchedDimensions": "寸法を合わせたもの",
+    "metricsButton": "{カウント} メトリックス",
+    "metricsTooltip": "表示するメトリックスストリームを選択",
+    "selectMetrics": "メトリックスストリームの選択"
   }
 }

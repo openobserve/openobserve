@@ -527,7 +527,7 @@ export function useLatencyInsightsDashboard() {
           showDynamicFilters: false,
         };
 
-    return {
+    const dashboard = {
       version: 5,
       dashboardId: ``,
       title,
@@ -550,6 +550,8 @@ export function useLatencyInsightsDashboard() {
         endTime: config.selectedTimeRange.endTime,
       },
     };
+
+    return dashboard;
   };
 
   return {

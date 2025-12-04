@@ -53,7 +53,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 14;
+pub const DB_SCHEMA_VERSION: u64 = 15;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1086,12 +1086,6 @@ pub struct Common {
     )]
     pub inverted_index_old_format: bool,
     #[env_config(
-        name = "ZO_INVERTED_INDEX_CAMEL_CASE_TOKENIZER_DISABLED",
-        default = false,
-        help = "Disable camel case tokenizer for inverted index."
-    )]
-    pub inverted_index_camel_case_tokenizer_disabled: bool,
-    #[env_config(
         name = "ZO_INVERTED_INDEX_COUNT_OPTIMIZER_ENABLED",
         default = true,
         help = "Toggle inverted index count optimizer."
@@ -1377,8 +1371,10 @@ pub struct Limit {
     pub query_recommendation_top_k: usize,
     #[env_config(name = "ZO_INGEST_ALLOWED_UPTO", default = 5)] // in hours - in past
     pub ingest_allowed_upto: i64,
+    pub ingest_allowed_upto_micro: i64,
     #[env_config(name = "ZO_INGEST_ALLOWED_IN_FUTURE", default = 24)] // in hours - in future
     pub ingest_allowed_in_future: i64,
+    pub ingest_allowed_in_future_micro: i64,
     #[env_config(name = "ZO_INGEST_FLATTEN_LEVEL", default = 3)] // default flatten level
     pub ingest_flatten_level: u32,
     #[env_config(name = "ZO_LOGS_FILE_RETENTION", default = "hourly")]
@@ -2401,6 +2397,11 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.limit.calculate_stats_step_limit_secs > 86400 {
         cfg.limit.calculate_stats_step_limit_secs = 86400;
     }
+
+    // format ingest allowed upto and in future to micro
+    cfg.limit.ingest_allowed_upto_micro = cfg.limit.ingest_allowed_upto * 3600 * 1_000_000;
+    cfg.limit.ingest_allowed_in_future_micro =
+        cfg.limit.ingest_allowed_in_future * 3600 * 1_000_000;
 
     Ok(())
 }

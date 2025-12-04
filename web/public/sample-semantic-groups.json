@@ -1,0 +1,57 @@
+[
+  {
+    "id": "host",
+    "display": "Host",
+    "fields": [
+      "host",
+      "hostname",
+      "node",
+      "node_name",
+      "server"
+    ],
+    "normalize": true
+  },
+  {
+    "id": "service",
+    "display": "Service",
+    "fields": [
+      "service",
+      "service_name",
+      "svc",
+      "app",
+      "application"
+    ],
+    "normalize": true
+  },
+  {
+    "id": "environment",
+    "display": "Environment",
+    "fields": [
+      "environment",
+      "env",
+      "stage",
+      "tier"
+    ],
+    "normalize": true
+  },
+  {
+    "id": "k8s-cluster",
+    "display": "K8s Cluster",
+    "fields": [
+      "cluster",
+      "k8s_cluster",
+      "kubernetes_cluster"
+    ],
+    "normalize": false
+  },
+  {
+    "id": "k8s-namespace",
+    "display": "K8s Namespace",
+    "fields": [
+      "namespace",
+      "k8s_namespace",
+      "kubernetes_namespace"
+    ],
+    "normalize": false
+  }
+]

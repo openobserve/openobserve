@@ -40,22 +40,20 @@ use infra::{
     schema::{SchemaCache, unwrap_partition_time_level},
 };
 
-use super::{
-    db::organization::get_org_setting,
-    ingestion::{TriggerAlertData, evaluate_trigger, write_file},
-    metadata::{
-        MetadataItem, MetadataType,
-        distinct_values::{DISTINCT_STREAM_PREFIX, DvItem},
-        write,
-    },
-    schema::stream_schema_exists,
-};
 #[cfg(feature = "cloud")]
 use crate::service::stream::get_stream;
 use crate::{
     common::meta::{ingestion::IngestionStatus, stream::SchemaRecords},
     service::{
-        alerts::alert::AlertExt, db, ingestion::get_write_partition_key, schema::check_for_schema,
+        alerts::alert::AlertExt,
+        db,
+        ingestion::{TriggerAlertData, evaluate_trigger, get_write_partition_key, write_file},
+        metadata::{
+            MetadataItem, MetadataType,
+            distinct_values::{DISTINCT_STREAM_PREFIX, DvItem},
+            write,
+        },
+        schema::{check_for_schema, stream_schema_exists},
         self_reporting::report_request_usage_stats,
     },
 };
@@ -71,7 +69,7 @@ static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
 
 pub type O2IngestJsonData = (Vec<(i64, Map<String, Value>)>, Option<usize>);
 
-fn parse_bulk_index(v: &Value) -> Option<(String, String, Option<String>)> {
+fn parse_bulk_index(v: &Value) -> Option<(&str, &str, Option<&str>)> {
     let local_val = v.as_object().unwrap();
     for action in BULK_OPERATORS {
         if let Some(val) = local_val.get(action) {
@@ -79,16 +77,11 @@ fn parse_bulk_index(v: &Value) -> Option<(String, String, Option<String>)> {
                 log::warn!("Invalid bulk index action: {action}");
                 continue;
             };
-            let Some(index) = local_val
-                .get("_index")
-                .and_then(|v| v.as_str().map(|v| v.to_string()))
-            else {
+            let Some(index) = local_val.get("_index").and_then(|v| v.as_str()) else {
                 continue;
             };
-            let doc_id = local_val
-                .get("_id")
-                .and_then(|v| v.as_str().map(|v| v.to_string()));
-            return Some((action.to_string(), index, doc_id));
+            let doc_id = local_val.get("_id").and_then(|v| v.as_str());
+            return Some((action, index, doc_id));
         };
     }
     None
@@ -455,7 +448,7 @@ async fn write_logs(
                         log_failed_record(log_ingest_errors, &record_val, &e.to_string());
                         bulk::add_record_status(
                             stream_name.to_string(),
-                            &doc_id,
+                            doc_id,
                             "".to_string(),
                             Some(Value::Object(record_val.clone())),
                             bulk_res,
@@ -552,7 +545,7 @@ async fn write_logs(
             IngestionStatus::Bulk(bulk_res) => {
                 bulk::add_record_status(
                     stream_name.to_string(),
-                    &doc_id,
+                    doc_id,
                     "".to_string(),
                     None,
                     bulk_res,
@@ -594,11 +587,10 @@ async fn ingestion_log_enabled() -> bool {
     if !get_config().common.ingestion_log_enabled {
         return false;
     }
-    // the logging will be enabled through meta only, so hardcoded
-    match get_org_setting(META_ORG_ID).await {
-        Ok(org_settings) => org_settings.toggle_ingestion_logs,
-        Err(_) => false,
-    }
+    // the logging will be enabled through meta only
+    db::organization::get_org_setting_toggle_ingestion_logs(META_ORG_ID)
+        .await
+        .unwrap_or(false)
 }
 
 fn log_failed_record<T: std::fmt::Debug>(enabled: bool, record: &T, error: &str) {

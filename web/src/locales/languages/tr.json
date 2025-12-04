@@ -210,7 +210,9 @@
     "anomalyLabel": "ANOMALİ",
     "includePatternInSearch": "Aramaya desen dahil et",
     "excludePatternFromSearch": "Deseni aramadan hariç tut",
-    "showPatternDetails": "Ayrıntıları göster ({değişkenler} değişkenler, {örnekler} örnekler)"
+    "showPatternDetails": "Ayrıntıları göster ({değişkenler} değişkenler, {örnekler} örnekler)",
+    "viewRelated": "İlgili Görüntüle",
+    "viewRelatedTooltip": "İlgili izleri ve metrikleri görüntüleme"
   },
   "menu": {
     "home": "Ana Sayfa",
@@ -1639,5 +1641,17 @@
     "tabLabel": "Hatalar",
     "errorSpikePeriod": "Hata Artış Süresi:",
     "errorsGreaterThan": "Hatalar >="
+  },
+  "correlation": {
+    "title": "İlişkili Metrikler - {service}",
+    "loading": "İlişkili metrikler yükleniyor...",
+    "loadingMetrics": "{count} metrik akış (lar) yükleniyor",
+    "failedToLoad": "Korelasyon panosu yüklenemedi",
+    "retryButton": "Tekrar dene",
+    "noMetrics": "Korelasyon için metrik mevcut değil",
+    "matchedDimensions": "Eşleşen Boyutlar",
+    "metricsButton": "{count} Metrik (ler)",
+    "metricsTooltip": "Görüntülenecek metrik akışları seçin",
+    "selectMetrics": "Metrik Akışları Seçin"
   }
 }

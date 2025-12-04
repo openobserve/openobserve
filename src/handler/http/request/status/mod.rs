@@ -159,6 +159,10 @@ struct ConfigResponse<'a> {
     service_graph_enabled: bool,
     #[cfg(not(feature = "enterprise"))]
     service_graph_enabled: bool,
+    #[cfg(feature = "enterprise")]
+    service_streams_enabled: bool,
+    #[cfg(not(feature = "enterprise"))]
+    service_streams_enabled: bool,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -316,6 +320,11 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(not(feature = "enterprise"))]
     let service_graph_enabled = false;
 
+    #[cfg(feature = "enterprise")]
+    let service_streams_enabled = o2cfg.service_streams.enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let service_streams_enabled = false;
+
     #[cfg(all(feature = "cloud", not(feature = "enterprise")))]
     let build_type = "cloud";
     #[cfg(feature = "enterprise")]
@@ -420,6 +429,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         query_values_default_num: cfg.limit.query_values_default_num,
         mysql_deprecated_warning: cfg.common.meta_store.starts_with("mysql"),
         service_graph_enabled,
+        service_streams_enabled,
     }))
 }
 

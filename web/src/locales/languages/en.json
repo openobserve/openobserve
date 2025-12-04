@@ -170,6 +170,8 @@
     "queryRangeRestrictionMsg": "The query range is restricted to {range}. Please adjust the date range accordingly. Otherwise, the start date will be automatically adjusted to fit within the allowed limit.",
     "cancel": "Cancel query",
     "viewTrace": "View Trace",
+    "viewRelated": "View Related",
+    "viewRelatedTooltip": "View related traces and metrics",
     "flattened": "Flattened",
     "unflattened": "Unflattened",
     "original": "Original",
@@ -1569,6 +1571,18 @@
     "executed_at":"Executed At",
     "sql_query":"SQL Query",
     "resuls":"Results"
+  },
+  "correlation": {
+    "title": "Correlated Metrics - {service}",
+    "loading": "Loading correlated metrics...",
+    "loadingMetrics": "Loading {count} metric stream(s)",
+    "failedToLoad": "Failed to load correlation dashboard",
+    "retryButton": "Retry",
+    "noMetrics": "No metrics available for correlation",
+    "matchedDimensions": "Matched Dimensions",
+    "metricsButton": "{count} Metric(s)",
+    "metricsTooltip": "Select metric streams to display",
+    "selectMetrics": "Select Metric Streams"
   },
   "search_scheduler_job": {
     "title": "Search Job Scheduler",
