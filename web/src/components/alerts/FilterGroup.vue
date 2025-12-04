@@ -430,11 +430,11 @@ const previewString = computed(() => {
 
 // Check if group has only one condition and no sub-groups (to disable AND/OR toggle)
 const hasOnlyOneCondition = computed(() => {
-  const conditions = groups.value.items.filter((item: any) => !isGroup(item));
-  const subGroups = groups.value.items.filter((item: any) => isGroup(item));
+  const conditions = groups?.value?.items?.filter((item: any) => !isGroup(item));
+  const subGroups = groups?.value?.items?.filter((item: any) => isGroup(item));
 
   // Disable only if there's exactly 1 condition AND no sub-groups
-  return conditions.length === 1 && subGroups.length === 0;
+  return conditions?.length === 1 && subGroups?.length === 0;
 });
 
 // Expose functions for testing

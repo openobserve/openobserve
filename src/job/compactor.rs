@@ -206,7 +206,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         }
     );
 
-    tokio::task::spawn(async move { run_enrichment_table_merge().await });
+    tokio::task::spawn(run_enrichment_table_merge());
 
     Ok(())
 }
