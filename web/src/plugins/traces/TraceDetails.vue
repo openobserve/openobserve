@@ -1103,8 +1103,11 @@ export default defineComponent({
         "end_time",
         "duration",
         "operation_name",
+        "service_name",
         "trace_id",
+        "span_id",
       ];
+      
       const missing: string[] = [];
 
       requiredFields.forEach((field) => {
