@@ -23,8 +23,7 @@ jobs:
     permissions:
       actions: write
       contents: read
-    runs-on:
-      labels: repo-openobserve-standard-8
+    runs-on: ubuntu-latest
     # Only trigger if the workflow failed on first attempt (for automatic triggers)
     # OR if manually triggered (for testing)
     if: |
