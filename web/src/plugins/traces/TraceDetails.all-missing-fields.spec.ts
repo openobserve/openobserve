@@ -401,7 +401,6 @@ describe("TraceDetails - All Missing Fields (Real Data)", () => {
     it("should validate span and report missing optional fields", () => {
       const validation = wrapper.vm.validateSpan(realWorldProblematicSpan);
 
-      console.log(realWorldProblematicSpan);
       // All required fields are present in real data
       expect(validation.valid).toBe(true);
       expect(validation.missing).toEqual([]);
