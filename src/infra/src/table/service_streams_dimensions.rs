@@ -67,7 +67,7 @@ impl RelationTrait for Relation {
 
 impl ActiveModelBehavior for ActiveModel {}
 
-#[derive(FromQueryResult, Debug, Serialize, Deserialize)]
+#[derive(Clone, FromQueryResult, Debug, Serialize, Deserialize)]
 pub struct DimensionValueRecord {
     pub org_id: String,
     pub dimension_name: String,

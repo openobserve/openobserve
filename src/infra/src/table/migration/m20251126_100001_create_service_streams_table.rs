@@ -69,6 +69,12 @@ fn create_service_streams_table_statement() -> TableCreateStatement {
                 .not_null(),
         )
         .col(
+            ColumnDef::new(ServiceStreams::CorrelationKey)
+                .string_len(64)
+                .not_null()
+                .default(""),
+        )
+        .col(
             ColumnDef::new(ServiceStreams::ServiceName)
                 .string_len(256)
                 .not_null(),
@@ -128,6 +134,7 @@ enum ServiceStreams {
     Id,
     OrgId,
     ServiceKey,
+    CorrelationKey,
     ServiceName,
     Dimensions,
     Streams,
