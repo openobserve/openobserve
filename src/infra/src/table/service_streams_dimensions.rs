@@ -172,21 +172,32 @@ pub async fn get_dimension_values(
 pub async fn get_all_dimension_stats(org_id: &str) -> Result<Vec<DimensionStats>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
-    let query = r#"
-        SELECT dimension_name, COUNT(*) as value_count
-        FROM service_streams_dimensions
-        WHERE org_id = ?
-        GROUP BY dimension_name
-    "#;
+    // Use Entity::find() with filters instead of raw SQL to avoid placeholder issues
+    let results = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
-    let stats = DimensionStats::find_by_statement(sea_orm::Statement::from_sql_and_values(
-        client.get_database_backend(),
-        query,
-        vec![org_id.into()],
-    ))
-    .all(client)
-    .await
-    .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    // Group by dimension_name and count unique value_hashes
+    let mut stats_map: std::collections::HashMap<String, std::collections::HashSet<String>> =
+        std::collections::HashMap::new();
+
+    for record in results {
+        stats_map
+            .entry(record.dimension_name)
+            .or_insert_with(std::collections::HashSet::new)
+            .insert(record.value_hash);
+    }
+
+    // Convert to DimensionStats
+    let stats: Vec<DimensionStats> = stats_map
+        .into_iter()
+        .map(|(dimension_name, value_hashes)| DimensionStats {
+            dimension_name,
+            value_count: value_hashes.len() as i64,
+        })
+        .collect();
 
     Ok(stats)
 }
