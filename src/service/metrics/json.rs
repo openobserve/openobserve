@@ -113,7 +113,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, user_email: &str) -> Result<
         // check data type
         let record = record.as_object_mut().unwrap();
         let stream_name = match record.get(NAME_LABEL).ok_or(anyhow!("missing __name__"))? {
-            json::Value::String(s) => format_stream_name(s),
+            json::Value::String(s) => format_stream_name(s.to_string()),
             _ => {
                 return Err(anyhow::anyhow!("invalid __name__, need to be string"));
             }

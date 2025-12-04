@@ -210,7 +210,9 @@
     "anomalyLabel": "ANOMALIA",
     "includePatternInSearch": "Incluir padrão na pesquisa",
     "excludePatternFromSearch": "Excluir padrão da pesquisa",
-    "showPatternDetails": "Mostrar detalhes ({variáveis} variáveis, {exemplos} exemplos)"
+    "showPatternDetails": "Mostrar detalhes ({variáveis} variáveis, {exemplos} exemplos)",
+    "viewRelated": "Exibir relacionado",
+    "viewRelatedTooltip": "Visualize rastreamentos e métricas relacionados"
   },
   "menu": {
     "home": "Início",
@@ -1639,5 +1641,17 @@
     "tabLabel": "Erros",
     "errorSpikePeriod": "Período de pico de erro:",
     "errorsGreaterThan": "Erros >="
+  },
+  "correlation": {
+    "title": "Métricas correlacionadas - {service}",
+    "loading": "Carregando métricas correlacionadas...",
+    "loadingMetrics": "Carregando {count} fluxo (s) métrico (s)",
+    "failedToLoad": "Falha ao carregar o painel de correlação",
+    "retryButton": "Tente novamente",
+    "noMetrics": "Nenhuma métrica disponível para correlação",
+    "matchedDimensions": "Dimensões combinadas",
+    "metricsButton": "{count} Métrica (s)",
+    "metricsTooltip": "Selecione fluxos métricos a serem exibidos",
+    "selectMetrics": "Selecione fluxos métricos"
   }
 }

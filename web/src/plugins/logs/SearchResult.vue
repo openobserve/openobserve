@@ -299,6 +299,7 @@ color="warning" size="xs"></q-icon> Error while
           @expand-row="expandLog"
           @send-to-ai-chat="sendToAiChat"
           @view-trace="redirectToTraces"
+          @show-correlation="openCorrelationFromLog"
         />
       </template>
 
@@ -376,6 +377,7 @@ color="warning" size="xs"></q-icon> Error while
           "
           @sendToAiChat="sendToAiChat"
           @closeTable="closeTable"
+          @show-correlation="openCorrelationFromLog"
         />
       </q-dialog>
 
@@ -406,6 +408,21 @@ color="warning" size="xs"></q-icon> Error while
         @close="closeVolumeAnalysisDashboard"
       />
     </div>
+
+    <!-- Correlation Dashboard -->
+    <TelemetryCorrelationDashboard
+      v-if="showCorrelation && correlationDashboardProps"
+      :service-name="correlationDashboardProps.serviceName"
+      :matched-dimensions="correlationDashboardProps.matchedDimensions"
+      :metric-streams="correlationDashboardProps.metricStreams"
+      :log-streams="correlationDashboardProps.logStreams"
+      :trace-streams="correlationDashboardProps.traceStreams"
+      :source-stream="correlationDashboardProps.sourceStream"
+      :source-type="correlationDashboardProps.sourceType"
+      :available-dimensions="correlationDashboardProps.availableDimensions"
+      :time-range="correlationDashboardProps.timeRange"
+      @close="showCorrelation = false"
+    />
   </div>
 </template>
 
@@ -440,6 +457,9 @@ import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { searchState } from "@/composables/useLogs/searchState";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
+import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
+import type { TelemetryContext } from "@/utils/telemetryCorrelation";
+import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 
 export default defineComponent({
   name: "SearchResult",
@@ -452,6 +472,7 @@ export default defineComponent({
     TenstackTable: defineAsyncComponent(() => import("./TenstackTable.vue")),
     EqualIcon,
     NotEqualIcon,
+    TelemetryCorrelationDashboard,
     PatternStatistics: defineAsyncComponent(
       () => import("./patterns/PatternStatistics.vue"),
     ),
@@ -701,6 +722,12 @@ export default defineComponent({
 
     const searchTableRef: any = ref(null);
 
+    // Correlation dashboard state
+    const showCorrelation = ref(false);
+    const correlationContext = ref<TelemetryContext | null>(null);
+    const correlationDashboardProps = ref<any>(null);
+    const { findRelatedTelemetry } = useServiceCorrelation();
+
     const patternsColumns = [
       {
         accessorKey: "pattern_id",
@@ -826,6 +853,131 @@ export default defineComponent({
     const openLogDetails = (props: any, index: number) => {
       searchObj.meta.showDetailTab = true;
       searchObj.meta.resultGrid.navigation.currentRowIndex = index;
+
+      // Prepare correlation context (but don't open panel automatically)
+      const logData = searchObj.data.queryResults?.hits?.[index];
+      if (logData) {
+        correlationContext.value = {
+          timestamp: logData._timestamp || Date.now() * 1000,
+          fields: logData,
+        };
+      }
+    };
+
+    const openCorrelationPanel = () => {
+      showCorrelation.value = true;
+    };
+
+    const openCorrelationFromLog = async (logData: any) => {
+      console.log("[SearchResult] openCorrelationFromLog called with logData:", logData);
+      console.log("[SearchResult] Current stream:", searchObj.data.stream.selectedStream[0]);
+
+      try {
+        // Set the correlation context from the log data
+        const context: TelemetryContext = {
+          timestamp: logData._timestamp || Date.now() * 1000,
+          fields: logData,
+        };
+        correlationContext.value = context;
+
+        console.log("[SearchResult] Calling findRelatedTelemetry...");
+
+        // Fetch correlation data
+        const result = await findRelatedTelemetry(
+          context,
+          "logs",
+          5, // 5 minute time window
+          searchObj.data.stream.selectedStream[0]
+        );
+
+        console.log("[SearchResult] findRelatedTelemetry result:", result);
+
+        if (!result) {
+          console.warn("[SearchResult] No correlation result returned");
+          $q.notify({
+            type: "warning",
+            message: "No matching service found for correlation",
+            timeout: 3000,
+          });
+          return;
+        }
+
+        if (!result.correlationData) {
+          console.warn("[SearchResult] No correlation data in result");
+          $q.notify({
+            type: "warning",
+            message: "Unable to retrieve correlation data",
+            timeout: 3000,
+          });
+          return;
+        }
+
+        console.log("[SearchResult] Correlation data:", {
+          serviceName: result.correlationData.service_name,
+          metricsCount: result.correlationData.related_streams.metrics.length,
+          tracesCount: result.correlationData.related_streams.traces.length,
+          logsCount: result.correlationData.related_streams.logs.length,
+        });
+
+        // Check if there are any metric streams
+        if (result.correlationData.related_streams.metrics.length === 0) {
+          console.warn("[SearchResult] No metric streams found for correlation");
+          $q.notify({
+            type: "info",
+            message: `No metric streams found for service "${result.correlationData.service_name}"`,
+            timeout: 3000,
+          });
+          return;
+        }
+
+        // Prepare props for the dashboard
+        // Calculate time range: ±5 minutes from log timestamp
+        // context.timestamp is in microseconds - pass microseconds directly (like TracesAnalysisDashboard)
+        const timeWindowMicros = 5 * 60 * 1000000; // 5 minutes in microseconds
+        const startTimeMicros = context.timestamp - timeWindowMicros;
+        let endTimeMicros = context.timestamp + timeWindowMicros;
+
+        // Cap end time to current UTC time (never allow future timestamps)
+        const currentTimeMicros = Date.now() * 1000; // Current time in microseconds
+        if (endTimeMicros > currentTimeMicros) {
+          endTimeMicros = currentTimeMicros;
+        }
+
+        // Check if there are any metrics to show
+        if (!result.correlationData.related_streams.metrics || result.correlationData.related_streams.metrics.length === 0) {
+          $q.notify({
+            type: "info",
+            message: "No correlated metrics found for this service",
+            timeout: 3000,
+          });
+          return;
+        }
+
+        correlationDashboardProps.value = {
+          serviceName: result.correlationData.service_name,
+          matchedDimensions: result.correlationData.matched_dimensions,
+          metricStreams: result.correlationData.related_streams.metrics,
+          logStreams: result.correlationData.related_streams.logs || [],
+          traceStreams: result.correlationData.related_streams.traces || [],
+          sourceStream: searchObj.data.stream.selectedStream[0],
+          sourceType: "logs",
+          availableDimensions: context.fields, // Actual field names from the log record
+          timeRange: {
+            startTime: startTimeMicros,
+            endTime: endTimeMicros,
+          },
+        };
+
+        // Open the correlation dashboard
+        showCorrelation.value = true;
+      } catch (err: any) {
+        console.error("[SearchResult] Error in openCorrelationFromLog:", err);
+        $q.notify({
+          type: "negative",
+          message: `Correlation error: ${err.message || err}`,
+          timeout: 3000,
+        });
+      }
     };
 
     const openPatternDetails = (pattern: any, index: number) => {
@@ -1215,6 +1367,11 @@ export default defineComponent({
       extractConstantsFromPattern,
       openVolumeAnalysisDashboard,
       closeVolumeAnalysisDashboard,
+      showCorrelation,
+      correlationContext,
+      correlationDashboardProps,
+      openCorrelationPanel,
+      openCorrelationFromLog,
     };
   },
   computed: {
@@ -1261,4 +1418,35 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 @import "@/styles/logs/search-result.scss";
+
+/* Correlation Panel Styles */
+.correlation-panel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 3000;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.correlation-panel-container {
+  width: 450px;
+  max-width: 90vw;
+  height: 100vh;
+  background: var(--q-background, #ffffff);
+  box-shadow: -2px 0 12px rgba(0, 0, 0, 0.15);
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
 </style>
