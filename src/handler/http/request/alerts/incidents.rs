@@ -1,0 +1,482 @@
+// Copyright 2025 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+//! HTTP handlers for alert incident management (Enterprise only)
+
+#[cfg(feature = "enterprise")]
+use actix_web::Responder;
+use actix_web::{HttpResponse, get, patch, post, web};
+use serde::{Deserialize, Serialize};
+use utoipa::{IntoParams, ToSchema};
+
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+
+/// Query parameters for listing incidents
+#[derive(Debug, Deserialize, IntoParams, ToSchema)]
+pub struct ListIncidentsQuery {
+    /// Filter by status (open, acknowledged, resolved)
+    #[serde(default)]
+    pub status: Option<String>,
+    /// Maximum number of results
+    #[serde(default = "default_limit")]
+    pub limit: u64,
+    /// Offset for pagination
+    #[serde(default)]
+    pub offset: u64,
+}
+
+fn default_limit() -> u64 {
+    50
+}
+
+/// Request body for updating incident status
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateIncidentStatusRequest {
+    /// New status: open, acknowledged, or resolved
+    pub status: String,
+}
+
+/// Response for list incidents
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ListIncidentsResponse {
+    pub incidents: Vec<config::meta::alerts::incidents::Incident>,
+    pub total: u64,
+}
+
+#[cfg(feature = "enterprise")]
+/// ListIncidents
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "ListIncidents",
+    summary = "List alert incidents",
+    description = "Retrieves a list of correlated alert incidents with optional status filtering and pagination.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ListIncidentsQuery,
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = ListIncidentsResponse),
+        (status = 500, description = "Internal error", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"}))
+    )
+)]
+#[get("/v2/{org_id}/alerts/incidents")]
+pub async fn list_incidents(
+    path: web::Path<String>,
+    query: web::Query<ListIncidentsQuery>,
+) -> HttpResponse {
+    let org_id = path.into_inner();
+
+    match crate::service::alerts::incidents::list_incidents(
+        &org_id,
+        query.status.as_deref(),
+        query.limit,
+        query.offset,
+    )
+    .await
+    {
+        Ok((incidents, total)) => {
+            MetaHttpResponse::json(ListIncidentsResponse { incidents, total })
+        }
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+/// GetIncident
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "GetIncident",
+    summary = "Get incident details",
+    description = "Retrieves detailed information about a specific incident including all correlated alerts.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::alerts::incidents::IncidentWithAlerts),
+        (status = 404, description = "Not found", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"}))
+    )
+)]
+#[get("/v2/{org_id}/alerts/incidents/{incident_id}")]
+pub async fn get_incident(path: web::Path<(String, String)>) -> HttpResponse {
+    let (org_id, incident_id) = path.into_inner();
+
+    match crate::service::alerts::incidents::get_incident_with_alerts(&org_id, &incident_id).await {
+        Ok(Some(incident)) => MetaHttpResponse::json(incident),
+        Ok(None) => MetaHttpResponse::not_found("Incident not found"),
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+/// UpdateIncidentStatus
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "UpdateIncidentStatus",
+    summary = "Update incident status",
+    description = "Updates the status of an incident (open, acknowledged, resolved).",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+    ),
+    request_body(content = UpdateIncidentStatusRequest, description = "New status", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::alerts::incidents::Incident),
+        (status = 404, description = "Not found", content_type = "application/json", body = ()),
+        (status = 400, description = "Invalid status", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
+    )
+)]
+#[patch("/v2/{org_id}/alerts/incidents/{incident_id}/status")]
+pub async fn update_incident_status(
+    path: web::Path<(String, String)>,
+    body: web::Json<UpdateIncidentStatusRequest>,
+) -> HttpResponse {
+    let (org_id, incident_id) = path.into_inner();
+    let status = &body.status;
+
+    // Validate status
+    if !["open", "acknowledged", "resolved"].contains(&status.as_str()) {
+        return MetaHttpResponse::bad_request(
+            "Invalid status. Must be: open, acknowledged, or resolved",
+        );
+    }
+
+    match crate::service::alerts::incidents::update_status(&org_id, &incident_id, status).await {
+        Ok(incident) => MetaHttpResponse::json(incident),
+        Err(e) => {
+            if e.to_string().contains("not found") {
+                MetaHttpResponse::not_found("Incident not found")
+            } else {
+                MetaHttpResponse::internal_error(e)
+            }
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+/// GetIncidentStats
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "GetIncidentStats",
+    summary = "Get incident statistics",
+    description = "Retrieves statistics about incidents including counts by status and severity.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::alerts::incidents::IncidentStats),
+        (status = 500, description = "Internal error", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"}))
+    )
+)]
+#[get("/v2/{org_id}/alerts/incidents/stats")]
+pub async fn get_incident_stats(path: web::Path<String>) -> HttpResponse {
+    let org_id = path.into_inner();
+
+    // Get counts - simple implementation
+    let open_count = match infra::table::alert_incidents::count_open(&org_id).await {
+        Ok(c) => c as i64,
+        Err(e) => return MetaHttpResponse::internal_error(e),
+    };
+
+    let stats = config::meta::alerts::incidents::IncidentStats {
+        total_incidents: 0, // Would need additional query
+        open_incidents: open_count,
+        acknowledged_incidents: 0,
+        resolved_incidents: 0,
+        by_severity: std::collections::HashMap::new(),
+        by_service: std::collections::HashMap::new(),
+        mttr_minutes: None,
+        alerts_per_incident_avg: 0.0,
+    };
+
+    MetaHttpResponse::json(stats)
+}
+
+/// Response for RCA analysis
+#[derive(Debug, Serialize, ToSchema)]
+pub struct RcaResponse {
+    pub rca_content: String,
+}
+
+/// Query parameters for RCA trigger
+#[derive(Debug, Deserialize, IntoParams, ToSchema)]
+pub struct TriggerRcaQuery {
+    /// Use streaming response (default: false)
+    #[serde(default)]
+    pub stream: bool,
+}
+
+#[cfg(feature = "enterprise")]
+/// TriggerIncidentRca
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "TriggerIncidentRca",
+    summary = "Trigger RCA analysis for an incident",
+    description = "Triggers root cause analysis for an incident. Use stream=true query parameter for streaming response, otherwise returns complete result as JSON.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+        TriggerRcaQuery,
+    ),
+    responses(
+        (status = 200, description = "RCA analysis completed or SSE stream", content_type = "application/json", body = RcaResponse),
+        (status = 404, description = "Not found", content_type = "application/json", body = ()),
+        (status = 503, description = "RCA agent unavailable", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
+    )
+)]
+#[post("/v2/{org_id}/alerts/incidents/{incident_id}/rca")]
+pub async fn trigger_incident_rca(
+    path: web::Path<(String, String)>,
+    query: web::Query<TriggerRcaQuery>,
+) -> impl Responder {
+    use o2_enterprise::enterprise::{
+        alerts::{
+            rca_agent::RcaAgentClient,
+            rca_service::{self, IncidentRcaContext},
+        },
+        common::config::get_config as get_o2_config,
+    };
+
+    let (org_id, incident_id) = path.into_inner();
+    let o2_config = get_o2_config();
+
+    // Check if RCA is enabled
+    if !o2_config.incidents.enabled || !o2_config.incidents.rca_enabled {
+        return MetaHttpResponse::bad_request("RCA is not enabled");
+    }
+
+    if o2_config.incidents.rca_agent_url.is_empty() {
+        return HttpResponse::ServiceUnavailable()
+            .json(serde_json::json!({"error": "RCA agent URL is not configured"}));
+    }
+
+    // Get incident with alerts
+    let incident =
+        match crate::service::alerts::incidents::get_incident_with_alerts(&org_id, &incident_id)
+            .await
+        {
+            Ok(Some(i)) => i,
+            Ok(None) => return MetaHttpResponse::not_found("Incident not found"),
+            Err(e) => return MetaHttpResponse::internal_error(e),
+        };
+
+    // Build RCA context
+    let context = IncidentRcaContext {
+        incident_id: incident.incident.id.clone(),
+        org_id: incident.incident.org_id.clone(),
+    };
+
+    // Create RCA agent client
+    let zo_config = config::get_config();
+    let client = match RcaAgentClient::new(
+        &o2_config.incidents.rca_agent_url,
+        &zo_config.auth.root_user_email,
+        &zo_config.auth.root_user_password,
+    ) {
+        Ok(c) => c,
+        Err(e) => {
+            return MetaHttpResponse::internal_error(format!("Failed to create RCA client: {e}"));
+        }
+    };
+
+    // Check agent health
+    if let Err(e) = client.health().await {
+        return HttpResponse::ServiceUnavailable()
+            .json(serde_json::json!({"error": format!("RCA agent not available: {e}")}));
+    }
+
+    // Choose streaming or non-streaming based on query parameter
+    if query.stream {
+        // Start streaming RCA
+        let stream = match rca_service::analyze_incident_stream(client, context).await {
+            Ok(s) => s,
+            Err(e) => {
+                return MetaHttpResponse::internal_error(format!(
+                    "Failed to start RCA stream: {e}"
+                ));
+            }
+        };
+
+        HttpResponse::Ok()
+            .content_type("text/event-stream")
+            .streaming(stream)
+    } else {
+        // Perform RCA analysis (non-streaming)
+        let rca_content = match rca_service::analyze_incident(client, context).await {
+            Ok(content) => content,
+            Err(e) => {
+                return MetaHttpResponse::internal_error(format!("Failed to perform RCA: {e}"));
+            }
+        };
+
+        MetaHttpResponse::json(RcaResponse { rca_content })
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "TriggerIncidentRca",
+    summary = "Trigger RCA analysis for an incident",
+    description = "Triggers root cause analysis for an incident. This endpoint is only available with enterprise features enabled.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+    ),
+    responses(
+        (status = 200, description = "SSE stream", content_type = "text/event-stream"),
+        (status = 403, description = "Enterprise feature", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
+    )
+)]
+#[post("/v2/{org_id}/alerts/incidents/{incident_id}/rca")]
+pub async fn trigger_incident_rca(_path: web::Path<(String, String)>) -> HttpResponse {
+    MetaHttpResponse::forbidden("Not Supported")
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "ListIncidents",
+    summary = "List alert incidents",
+    description = "Retrieves a list of correlated alert incidents. This endpoint is only available with enterprise features enabled.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ListIncidentsQuery,
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = ListIncidentsResponse),
+        (status = 403, description = "Enterprise feature", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"}))
+    )
+)]
+#[get("/v2/{org_id}/alerts/incidents")]
+pub async fn list_incidents(
+    _path: web::Path<String>,
+    _query: web::Query<ListIncidentsQuery>,
+) -> HttpResponse {
+    MetaHttpResponse::forbidden("Not Supported")
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "GetIncident",
+    summary = "Get incident details",
+    description = "Retrieves detailed information about a specific incident. This endpoint is only available with enterprise features enabled.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::alerts::incidents::IncidentWithAlerts),
+        (status = 403, description = "Enterprise feature", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"}))
+    )
+)]
+#[get("/v2/{org_id}/alerts/incidents/{incident_id}")]
+pub async fn get_incident(_path: web::Path<(String, String)>) -> HttpResponse {
+    MetaHttpResponse::forbidden("Not Supported")
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "UpdateIncidentStatus",
+    summary = "Update incident status",
+    description = "Updates the status of an incident. This endpoint is only available with enterprise features enabled.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+    ),
+    request_body(content = UpdateIncidentStatusRequest, description = "New status", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::alerts::incidents::Incident),
+        (status = 403, description = "Enterprise feature", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
+    )
+)]
+#[patch("/v2/{org_id}/alerts/incidents/{incident_id}/status")]
+pub async fn update_incident_status(
+    _path: web::Path<(String, String)>,
+    _body: web::Json<UpdateIncidentStatusRequest>,
+) -> HttpResponse {
+    MetaHttpResponse::forbidden("Not Supported")
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "GetIncidentStats",
+    summary = "Get incident statistics",
+    description = "Retrieves statistics about incidents. This endpoint is only available with enterprise features enabled.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::alerts::incidents::IncidentStats),
+        (status = 403, description = "Enterprise feature", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"}))
+    )
+)]
+#[get("/v2/{org_id}/alerts/incidents/stats")]
+pub async fn get_incident_stats(_path: web::Path<String>) -> HttpResponse {
+    MetaHttpResponse::forbidden("Not Supported")
+}

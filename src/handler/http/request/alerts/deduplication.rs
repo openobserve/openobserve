@@ -19,7 +19,8 @@ use actix_web::{HttpResponse, delete, get, post, put, web};
 #[cfg(feature = "enterprise")]
 use config::meta::alerts::deduplication::{GlobalDeduplicationConfig, SemanticFieldGroup};
 
-// ==================== ENTERPRISE IMPLEMENTATIONS ====================
+#[cfg(feature = "enterprise")]
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 /// Get deduplication configuration for an organization
 #[cfg(feature = "enterprise")]
@@ -44,16 +45,15 @@ pub async fn get_config(org_id: web::Path<String>) -> Result<HttpResponse, actix
 
     match crate::service::alerts::org_config::get_deduplication_config(&org_id).await {
         Ok(Some(config)) => Ok(HttpResponse::Ok().json(config)),
-        Ok(None) => Ok(HttpResponse::Ok().json(GlobalDeduplicationConfig::default_with_presets())),
+        Ok(None) => Ok(MetaHttpResponse::json(
+            GlobalDeduplicationConfig::default_with_presets(),
+        )),
         Err(e) => {
-            log::error!(
-                "Error getting deduplication config for org {}: {}",
-                org_id,
-                e
-            );
-            Ok(HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": format!("Failed to get deduplication config: {}", e)
-            })))
+            log::error!("Error getting deduplication config for org {org_id}: {e}");
+
+            Ok(MetaHttpResponse::internal_error(format!(
+                "Failed to get deduplication config: {e}"
+            )))
         }
     }
 }
@@ -104,18 +104,14 @@ pub async fn set_config(
     let config = config.into_inner();
 
     match crate::service::alerts::org_config::set_deduplication_config(&org_id, &config).await {
-        Ok(()) => Ok(HttpResponse::Ok().json(serde_json::json!({
-            "message": "Deduplication config saved successfully"
-        }))),
+        Ok(()) => Ok(MetaHttpResponse::ok(
+            "Deduplication config saved successfully",
+        )),
         Err(e) => {
-            log::error!(
-                "Error setting deduplication config for org {}: {}",
-                org_id,
-                e
-            );
-            Ok(HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": format!("Failed to set deduplication config: {}", e)
-            })))
+            log::error!("Error setting deduplication config for org {org_id}: {e}");
+            Ok(MetaHttpResponse::internal_error(format!(
+                "Failed to set deduplication config: {e}"
+            )))
         }
     }
 }
@@ -169,14 +165,10 @@ pub async fn delete_config(org_id: web::Path<String>) -> Result<HttpResponse, ac
             "message": "Deduplication config deleted successfully"
         }))),
         Err(e) => {
-            log::error!(
-                "Error deleting deduplication config for org {}: {}",
-                org_id,
-                e
-            );
-            Ok(HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": format!("Failed to delete deduplication config: {}", e)
-            })))
+            log::error!("Error deleting deduplication config for org {org_id}: {e}");
+            Ok(MetaHttpResponse::internal_error(format!(
+                "Failed to delete deduplication config: {e}"
+            )))
         }
     }
 }
@@ -462,10 +454,10 @@ pub async fn save_semantic_groups(
             "total_groups": total_groups
         }))),
         Err(e) => {
-            log::error!("Error saving semantic groups for org {}: {}", org_id, e);
-            Ok(HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": format!("Failed to save semantic groups: {}", e)
-            })))
+            log::error!("Error saving semantic groups for org {org_id}: {e}");
+            Ok(MetaHttpResponse::internal_error(format!(
+                "Failed to save semantic groups: {e}"
+            )))
         }
     }
 }

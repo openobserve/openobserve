@@ -410,6 +410,7 @@ color="warning" size="xs"></q-icon> Error while
       mode="dialog"
       :service-name="correlationDashboardProps.serviceName"
       :matched-dimensions="correlationDashboardProps.matchedDimensions"
+      :additional-dimensions="correlationDashboardProps.additionalDimensions"
       :metric-streams="correlationDashboardProps.metricStreams"
       :log-streams="correlationDashboardProps.logStreams"
       :trace-streams="correlationDashboardProps.traceStreams"
@@ -979,6 +980,7 @@ export default defineComponent({
         correlationDashboardProps.value = {
           serviceName: result.correlationData.service_name,
           matchedDimensions: result.correlationData.matched_dimensions,
+          additionalDimensions: result.correlationData.additional_dimensions || {},
           metricStreams: result.correlationData.related_streams.metrics,
           logStreams: result.correlationData.related_streams.logs || [],
           traceStreams: result.correlationData.related_streams.traces || [],

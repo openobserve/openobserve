@@ -27,6 +27,8 @@ pub mod processor;
 // Re-export aggregator function (used by processor)
 pub use aggregator::write_sql_aggregated_edges;
 pub use api::get_current_topology;
+#[cfg(feature = "enterprise")]
+pub use api::query_edges_from_stream_internal;
 // Re-export enterprise types and functions
 #[cfg(feature = "enterprise")]
 pub use o2_enterprise::enterprise::service_graph::{
