@@ -976,13 +976,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-dialog v-model="confirmAddPerformanceFieldsDialog" persistent>
     <q-card style="min-width: 500px; max-width: 650px">
       <q-card-section class="row items-center q-pb-sm q-pt-md q-px-md">
-        <div class="text-subtitle1 text-weight-medium">Add Search & Index Fields</div>
+        <div class="text-subtitle1 text-weight-medium">Recommended Fields Detected</div>
         <q-space />
       </q-card-section>
 
       <q-card-section class="q-pt-none q-pb-sm q-px-md">
         <div class="text-body2 q-mb-sm" style="color: #666;">
-          These fields are configured for Full Text Search or Secondary Index and will improve query performance.
+          We found some fields with full-text search or secondary indexes that are not included in your schema.
+          These fields improve search and indexing behavior.
+          Do you want to auto-add them?
         </div>
 
         <div v-if="missingPerformanceFieldsByType.fts.length > 0" class="q-mb-sm">
