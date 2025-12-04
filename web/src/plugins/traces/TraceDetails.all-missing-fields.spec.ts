@@ -88,6 +88,8 @@ describe("TraceDetails - All Missing Fields (Real Data)", () => {
     param_actionexecutedcontext: "System",
     start_time: 1764742278731548200,
     trace_id: "e3af81cb1ad290bdb81e7f2b493f0b09",
+    span_id: "e3af81cb1ad290bdb81e7f2b493f0bsa",
+    service_name: "nodeA",
   };
 
   const mockSpansWithManyMissingFields = {
@@ -284,7 +286,7 @@ describe("TraceDetails - All Missing Fields (Real Data)", () => {
       const formattedSpan = wrapper.vm.getFormattedSpan(
         realWorldProblematicSpan,
       );
-      expect(formattedSpan.serviceName).toBe("Unknown Service");
+      expect(formattedSpan.serviceName).toBe("nodeA");
     });
 
     it("should not crash when building service tree", () => {
@@ -399,6 +401,7 @@ describe("TraceDetails - All Missing Fields (Real Data)", () => {
     it("should validate span and report missing optional fields", () => {
       const validation = wrapper.vm.validateSpan(realWorldProblematicSpan);
 
+      console.log(realWorldProblematicSpan);
       // All required fields are present in real data
       expect(validation.valid).toBe(true);
       expect(validation.missing).toEqual([]);

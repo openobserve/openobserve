@@ -1107,7 +1107,7 @@ export default defineComponent({
         "trace_id",
         "span_id",
       ];
-      
+
       const missing: string[] = [];
 
       requiredFields.forEach((field) => {
@@ -1130,8 +1130,8 @@ export default defineComponent({
           span[store.state.zoConfig.timestamp_column],
         startTimeMs: convertTimeFromNsToMs(span.start_time),
         endTimeMs: convertTimeFromNsToMs(span.end_time),
-        durationMs: Number((span.duration / 1000).toFixed(4)), // This key is standard, we use for calculating width of span block. This should always be in ms
-        durationUs: Number(span.duration.toFixed(4)), // This key is used for displaying duration in span block. We convert this us to ms, s in span block
+        durationMs: span?.duration ? Number((span?.duration / 1000).toFixed(4)) : 0, // This key is standard, we use for calculating width of span block. This should always be in ms
+        durationUs: span?.duration ? Number(span?.duration?.toFixed(4)) : 0, // This key is used for displaying duration in span block. We convert this us to ms, s in span block
         idleMs: span.idle_ns ? convertTime(span.idle_ns) : 0,
         busyMs: span.busy_ns ? convertTime(span.busy_ns) : 0,
         spanId: span.span_id || `generated_${Date.now()}_${Math.random()}`,
@@ -1439,6 +1439,12 @@ export default defineComponent({
       updateHeight,
       getSpanKind,
       adjustOpacity,
+      buildTracesTree,
+      getFormattedSpan,
+      buildTraceChart,
+      validateSpan,
+      calculateTracePosition,
+      buildServiceTree,
     };
   },
 });

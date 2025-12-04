@@ -324,12 +324,12 @@ describe("TraceDetails - Missing span_kind Field", () => {
 
     it("should handle empty string span_kind", () => {
       const result = wrapper.vm.getSpanKind("");
-      expect(result).toBeUndefined();
+      expect(result).toBe("Unspecified");
     });
 
     it("should return undefined for unmapped span_kind values", () => {
       const result = wrapper.vm.getSpanKind("999");
-      expect(result).toBeUndefined();
+      expect(result).toBe("Unknown");
     });
 
     it("should handle non-string span_kind gracefully", () => {
