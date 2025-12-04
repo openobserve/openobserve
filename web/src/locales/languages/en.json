@@ -154,6 +154,7 @@
     "btnDownload": "Download",
     "customDownloadMessage": "Enter the initial number and select the range to download data.",
     "noRecordFound": "No events found. Please adjust the filters and try again.",
+    "noStreamSelectedMessage": "Select a stream and press 'Run query' to continue. Additionally, you can apply additional filters and adjust the date range to enhance search.",
     "functionErrorLabel": "Query execution warning: (expand for more details)",
     "histogramErrorBtnLabel": "Click for error details",
     "functionErrorBtnLabel": "Click for error details",
