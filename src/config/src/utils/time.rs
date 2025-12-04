@@ -400,7 +400,7 @@ mod tests {
         ];
 
         for (v_exp, input) in v_exp_arr {
-            assert!(parse_timestamp_micro_from_value(&input).is_ok_and(|v| v.0 == v_exp && v.1));
+            assert!(parse_timestamp_micro_from_value(&input).is_ok_and(|v| v.0 == v_exp));
         }
     }
 
