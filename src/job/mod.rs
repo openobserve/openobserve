@@ -48,6 +48,8 @@ pub(crate) mod pipeline;
 mod pipeline_error_cleanup;
 mod promql;
 mod promql_self_consume;
+#[cfg(feature = "enterprise")]
+mod service_graph;
 mod stats;
 
 pub use file_downloader::{download_from_node, queue_download};
@@ -214,25 +216,23 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("short url cache failed");
 
     // initialize metadata watcher
-    tokio::task::spawn(async move { db::schema::watch().await });
-    tokio::task::spawn(async move { db::functions::watch().await });
-    tokio::task::spawn(async move { db::compact::retention::watch().await });
-    tokio::task::spawn(async move { db::metrics::watch_prom_cluster_leader().await });
-    tokio::task::spawn(async move { db::alerts::templates::watch().await });
-    tokio::task::spawn(async move { db::alerts::destinations::watch().await });
-    tokio::task::spawn(async move { db::alerts::realtime_triggers::watch().await });
-    tokio::task::spawn(async move { db::alerts::alert::watch().await });
-    tokio::task::spawn(async move { db::organization::org_settings_watch().await });
+    tokio::task::spawn(db::schema::watch());
+    tokio::task::spawn(db::functions::watch());
+    tokio::task::spawn(db::compact::retention::watch());
+    tokio::task::spawn(db::metrics::watch_prom_cluster_leader());
+    tokio::task::spawn(db::alerts::templates::watch());
+    tokio::task::spawn(db::alerts::destinations::watch());
+    tokio::task::spawn(db::alerts::realtime_triggers::watch());
+    tokio::task::spawn(db::alerts::alert::watch());
+    tokio::task::spawn(db::organization::org_settings_watch());
     #[cfg(feature = "enterprise")]
-    tokio::task::spawn(
-        async move { o2_enterprise::enterprise::domain_management::db::watch().await },
-    );
+    tokio::task::spawn(o2_enterprise::enterprise::domain_management::db::watch());
     #[cfg(feature = "enterprise")]
-    tokio::task::spawn(async move { db::ai_prompts::watch().await });
+    tokio::task::spawn(db::ai_prompts::watch());
 
     // pipeline not used on compactors
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
-        tokio::task::spawn(async move { db::pipeline::watch().await });
+        tokio::task::spawn(db::pipeline::watch());
     }
 
     #[cfg(feature = "enterprise")]
@@ -303,18 +303,20 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 .expect("load system prompt failed");
         });
     }
-    tokio::task::spawn(async move { files::run().await });
-    tokio::task::spawn(async move { stats::run().await });
-    tokio::task::spawn(async move { compactor::run().await });
-    tokio::task::spawn(async move { flatten_compactor::run().await });
-    tokio::task::spawn(async move { metrics::run().await });
+    tokio::task::spawn(files::run());
+    tokio::task::spawn(stats::run());
+    tokio::task::spawn(compactor::run());
+    tokio::task::spawn(flatten_compactor::run());
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(service_graph::run());
+    tokio::task::spawn(metrics::run());
     let _ = promql::run();
-    tokio::task::spawn(async move { alert_manager::run().await });
+    tokio::task::spawn(alert_manager::run());
     #[cfg(feature = "enterprise")]
-    tokio::task::spawn(async move { alert_grouping::process_expired_batches().await });
-    tokio::task::spawn(async move { file_downloader::run().await });
+    tokio::task::spawn(alert_grouping::process_expired_batches());
+    tokio::task::spawn(file_downloader::run());
     #[cfg(feature = "enterprise")]
-    tokio::task::spawn(async move { pipeline::run().await });
+    tokio::task::spawn(pipeline::run());
     pipeline_error_cleanup::run();
 
     if LOCAL_NODE.is_compactor() {
@@ -329,10 +331,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     #[cfg(feature = "enterprise")]
     {
-        tokio::task::spawn(async move { cipher::run().await });
-        tokio::task::spawn(async move { db::keys::watch().await });
-        tokio::task::spawn(async move { db::re_pattern::watch_patterns().await });
-        tokio::task::spawn(async move { db::re_pattern::watch_pattern_associations().await });
+        tokio::task::spawn(cipher::run());
+        tokio::task::spawn(db::keys::watch());
+        tokio::task::spawn(db::re_pattern::watch_patterns());
+        tokio::task::spawn(db::re_pattern::watch_pattern_associations());
         // we do this call here so the pattern manager gets init-ed at the very start instead at
         // first use helpful for stream settings case, where if not already init-ed, it
         // returns empty array for associations because it is a sync fn and cannot init
@@ -377,7 +379,7 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
             LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role(),
         )
         .await;
-        tokio::task::spawn(async move { db::license::watch().await });
+        tokio::task::spawn(db::license::watch());
     }
 
     if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_alert_manager() {
