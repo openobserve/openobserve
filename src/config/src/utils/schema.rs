@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    borrow::Borrow,
+    borrow::{Borrow, Cow},
     io::{BufRead, Seek},
     sync::Arc,
 };
@@ -275,15 +275,36 @@ pub fn format_partition_key(input: &str) -> String {
 }
 
 // format stream name
-pub fn format_stream_name(stream_name: &str) -> String {
-    let mut stream_name = RE_CORRECT_STREAM_NAME
-        .replace_all(stream_name, "_")
-        .to_string();
-    if crate::get_config().common.format_stream_name_to_lower {
-        stream_name.make_ascii_lowercase();
-    }
+pub fn format_stream_name(stream_name: String) -> String {
+    let replaced = RE_CORRECT_STREAM_NAME.replace_all(&stream_name, "_");
 
-    stream_name
+    // Check if any replacements were made
+    match replaced {
+        Cow::Borrowed(_) => {
+            // No replacements were made - check if lowercasing is needed
+            if crate::get_config().common.format_stream_name_to_lower
+                && stream_name.chars().any(|c| c.is_ascii_uppercase())
+            {
+                // Has uppercase letters - must allocate and lowercase
+                let mut owned = stream_name;
+                owned.make_ascii_lowercase();
+                owned
+            } else {
+                // No changes needed - return original string without reallocation
+                stream_name
+            }
+        }
+        Cow::Owned(mut owned) => {
+            // Replacements were made - check if lowercasing is needed
+            if crate::get_config().common.format_stream_name_to_lower
+                && owned.chars().any(|c| c.is_ascii_uppercase())
+            {
+                // Has uppercase letters - lowercase the already-allocated string
+                owned.make_ascii_lowercase();
+            }
+            owned
+        }
+    }
 }
 
 /// match a source is a needed file or not, return true if needed
@@ -301,6 +322,87 @@ pub fn filter_source_by_partition_key(source: &str, filters: &[(String, Vec<Stri
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_format_stream_name_no_changes() {
+        // Test case: stream name that doesn't need any changes
+        // This should return the original string without reallocation
+
+        // Create a string with a known capacity to help verify the optimization
+        let mut original = String::with_capacity(100);
+        original.push_str("valid_stream_name_123");
+        let original_capacity = original.capacity();
+        let original_len = original.len();
+
+        // Call the function - when no changes are needed, it should return the same String
+        let result = format_stream_name(original);
+
+        // Verify correctness
+        assert_eq!(result, "valid_stream_name_123");
+
+        // Verify that the result has the same capacity (optimization check)
+        // When the optimization works, the function returns the original String,
+        // so the capacity should be preserved
+        // Note: This is a heuristic - if a new String was allocated, it might have
+        // a different capacity. When the optimization works, we return the original
+        // String which preserves its capacity.
+        assert_eq!(
+            result.capacity(),
+            original_capacity,
+            "Optimization check: When no changes are needed, format_stream_name should return the original String (same capacity = no reallocation)"
+        );
+        assert_eq!(result.len(), original_len);
+
+        // Additional check: verify the string content matches exactly
+        assert_eq!(result.as_str(), "valid_stream_name_123");
+    }
+
+    #[test]
+    fn test_format_stream_name_with_replacements() {
+        // Test case: stream name that needs character replacements
+        let original = "stream-name with spaces!".to_string();
+        let result = format_stream_name(original);
+
+        // Should replace invalid characters with underscores
+        assert_eq!(result, "stream_name_with_spaces_");
+    }
+
+    #[test]
+    fn test_format_stream_name_with_lowercasing() {
+        // This test depends on the config setting format_stream_name_to_lower
+        // We'll test both scenarios
+        let original_upper = "ValidStreamName".to_string();
+        let result = format_stream_name(original_upper.clone());
+
+        // The result depends on config, but should be consistent
+        let cfg = crate::get_config();
+        if cfg.common.format_stream_name_to_lower {
+            assert_eq!(result, "validstreamname");
+        } else {
+            // If no lowercasing config, should return original (no replacements needed)
+            assert_eq!(result, original_upper);
+        }
+    }
+
+    #[test]
+    fn test_format_stream_name_combined() {
+        // Test case: stream name that needs both replacements and potentially lowercasing
+        let original = "My-Stream Name!".to_string();
+        let result = format_stream_name(original);
+
+        // Should replace invalid characters
+        assert!(result.contains("_"));
+        assert!(!result.contains("-"));
+        assert!(!result.contains(" "));
+        assert!(!result.contains("!"));
+
+        let cfg = crate::get_config();
+        if cfg.common.format_stream_name_to_lower {
+            assert_eq!(result, "my_stream_name_");
+        } else {
+            assert_eq!(result, "My_Stream_Name_");
+        }
+    }
 
     #[test]
     fn test_matches_by_partition_key_with_str() {

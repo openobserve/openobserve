@@ -533,5 +533,23 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     } catch (error) {
       testLogger.warn('Streaming flip failed', { error: error.message });
     }
+
+    // Clean up screenshots regardless of test pass/fail
+    const fs = require('fs');
+
+    const screenshotsToDelete = [
+      'playwright-tests/Logs/include-menu-debug.png',
+      'playwright-tests/Logs/include-menu-after-click.png'
+    ];
+
+    for (const screenshot of screenshotsToDelete) {
+      try {
+        if (fs.existsSync(screenshot)) {
+          fs.unlinkSync(screenshot);
+        }
+      } catch (error) {
+        // Pass gracefully if deletion fails
+      }
+    }
   });
 });

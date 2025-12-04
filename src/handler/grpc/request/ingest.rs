@@ -56,7 +56,7 @@ impl Ingest for Ingester {
             StreamType::Logs => {
                 let log_ingestion_type = req.ingestion_type.unwrap_or_default();
                 let data = bytes::Bytes::from(in_data.data);
-                match create_log_ingestion_req(log_ingestion_type, &data) {
+                match create_log_ingestion_req(log_ingestion_type, data) {
                     Err(e) => Err(e),
                     Ok(ingestion_req) => crate::service::logs::ingest::ingest(
                         0,
@@ -159,7 +159,7 @@ impl Ingest for Ingester {
                 // Service graph edges - use same pattern as Logs
                 let log_ingestion_type = req.ingestion_type.unwrap_or_default();
                 let data = bytes::Bytes::from(in_data.data);
-                match create_log_ingestion_req(log_ingestion_type, &data) {
+                match create_log_ingestion_req(log_ingestion_type, data) {
                     Err(e) => Err(e),
                     Ok(ingestion_req) => crate::service::logs::ingest::ingest(
                         0,
