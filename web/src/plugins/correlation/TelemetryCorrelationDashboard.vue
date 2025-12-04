@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               no-caps
               color="primary"
               icon="show_chart"
-              :label="t('correlation.metricsButton', { count: selectedMetricStreams.length })"
+              :label="`${selectedMetricStreams.length} of ${uniqueMetricStreams.length} Metric(s)`"
               @click="showMetricSelector = true"
               data-test="metric-selector-button"
             >
