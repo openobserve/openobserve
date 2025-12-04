@@ -900,9 +900,11 @@ async fn merge_files(
             &o2_enterprise::enterprise::common::config::get_config().service_streams;
 
         // Only process in ingester mode (if mode is "compactor", this will be handled during merge)
+        // Skip self-reporting streams from _meta organization to avoid processing internal metrics
         if LOCAL_NODE.is_ingester()
             && service_streams_config.enabled
             && service_streams_config.is_ingester_mode()
+            && org_id != config::META_ORG_ID
             && (stream_type == StreamType::Logs
                 || stream_type == StreamType::Metrics
                 || stream_type == StreamType::Traces)

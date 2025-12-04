@@ -890,8 +890,10 @@ pub async fn merge_files(
     #[cfg(feature = "enterprise")]
     {
         let o2_config = o2_enterprise::enterprise::common::config::get_config();
+        // Skip self-reporting streams from _meta organization to avoid processing internal metrics
         if o2_config.service_streams.enabled
             && o2_config.service_streams.is_compactor_mode()
+            && org_id != config::META_ORG_ID
             && (stream_type == StreamType::Logs
                 || stream_type == StreamType::Metrics
                 || stream_type == StreamType::Traces)
