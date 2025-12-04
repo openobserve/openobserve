@@ -289,6 +289,7 @@ import useNotifications from "@/composables/useNotifications";
 import { useMetricsCorrelationDashboard, type MetricsCorrelationConfig } from "@/composables/useMetricsCorrelationDashboard";
 import type { StreamInfo } from "@/services/service_streams";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+import streamService from "@/services/stream";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue")
@@ -439,6 +440,57 @@ const getDimensionOptions = (key: string, currentValue: string) => {
   return options;
 };
 
+// Fetch metric schemas for all streams in one call
+const fetchMetricSchemas = async (streamNames: string[]) => {
+  try {
+    // Check if we already have schemas in store
+    const cachedMetrics = store.state.streams.metrics || {};
+    const missingStreams = streamNames.filter(name => !cachedMetrics[name]?.metrics_meta);
+
+    if (missingStreams.length === 0) {
+      console.log("[TelemetryCorrelationDashboard] All schemas already cached");
+      return cachedMetrics;
+    }
+
+    console.log("[TelemetryCorrelationDashboard] Fetching schemas for:", missingStreams);
+
+    // Fetch all metric streams with schema in one API call
+    const response = await streamService.nameList(
+      currentOrgIdentifier.value,
+      "metrics",
+      true, // fetchSchema = true
+      -1,
+      -1,
+      "",
+      "",
+      false
+    );
+
+    if (response.data?.list) {
+      // Build a map of stream name to schema data
+      const schemasMap: Record<string, any> = {};
+      for (const stream of response.data.list) {
+        if (stream.name && stream.metrics_meta) {
+          schemasMap[stream.name] = stream;
+        }
+      }
+
+      // Update store with new schemas
+      const updatedMetrics = { ...cachedMetrics, ...schemasMap };
+      store.dispatch("streams/setMetricsStreams", updatedMetrics);
+
+      console.log("[TelemetryCorrelationDashboard] Cached schemas:", schemasMap);
+
+      return updatedMetrics;
+    }
+
+    return cachedMetrics;
+  } catch (err) {
+    console.error("[TelemetryCorrelationDashboard] Error fetching schemas:", err);
+    return store.state.streams.metrics || {};
+  }
+};
+
 // Handle dimension value change
 const onDimensionChange = () => {
   console.log("[TelemetryCorrelationDashboard] Dimension changed:", activeDimensions.value);
@@ -493,6 +545,13 @@ const loadDashboard = async () => {
     loading.value = true;
     error.value = null;
 
+    // Fetch metric schemas for all selected streams
+    let metricSchemas: Record<string, any> = {};
+    if (selectedMetricStreams.value.length > 0) {
+      const streamNames = selectedMetricStreams.value.map(s => s.stream_name);
+      metricSchemas = await fetchMetricSchemas(streamNames);
+    }
+
     const config: MetricsCorrelationConfig = {
       serviceName: props.serviceName,
       matchedDimensions: activeDimensions.value,
@@ -504,6 +563,7 @@ const loadDashboard = async () => {
       sourceStream: props.sourceStream,
       sourceType: props.sourceType,
       availableDimensions: props.availableDimensions,
+      metricSchemas: metricSchemas,
     };
 
     // Generate metrics dashboard JSON (if we have metrics)
