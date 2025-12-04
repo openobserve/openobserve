@@ -1836,6 +1836,15 @@ export default defineComponent({
         });
         return;
       }
+      if(!this.searchObj?.data?.customDownloadQueryObj?.query){
+        this.$q.notify({
+            message: "Please run a query first before downloading.",
+            color: "negative",
+            position: "bottom",
+            timeout: 2000,
+          });
+          return;
+      }
       // const queryReq = this.buildSearch();
       this.searchObj.data.customDownloadQueryObj.query.from =
         initNumber == 0 ? 0 : initNumber - 1;
@@ -1858,7 +1867,7 @@ export default defineComponent({
             this.$q.notify({
               message: "No data found to download.",
               color: "positive",
-              position: "top",
+              position: "bottom",
               timeout: 2000,
             });
           }
@@ -1867,7 +1876,7 @@ export default defineComponent({
           this.$q.notify({
             message: err.message,
             color: "negative",
-            position: "top",
+            position: "bottom",
             timeout: 2000,
           });
         });
@@ -2494,7 +2503,7 @@ export default defineComponent({
         $q.notify({
           message: "No data found to download.",
           color: "positive",
-          position: "top",
+          position: "bottom",
           timeout: 2000,
         });
         return;
