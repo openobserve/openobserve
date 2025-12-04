@@ -28,5 +28,9 @@ test.describe("Stream name casing preservation tests", () => {
       await pm.streamsPage.verifyStreamExploration();
       await pm.streamsPage.goBack();
     }
+
+    // DELIBERATE FAILURE FOR TESTING AUTO-RERUN
+    // TODO: Remove this after testing auto-rerun functionality
+    expect(true).toBe(false);
   });
 }); 
