@@ -123,22 +123,21 @@ impl RumExtraData {
 
             let maxminddb_client = MAXMIND_DB_CLIENT.read().await;
             let geo_info = if let Some(client) = maxminddb_client.as_ref() {
-                if let Ok(Some(city_info)) =
-                    client.city_reader.lookup::<maxminddb::geoip2::City>(ip)
+                if let Some(city_info) = client
+                    .city_reader
+                    .lookup(ip)
+                    .ok()
+                    .and_then(|r| r.decode::<maxminddb::geoip2::City>().ok())
+                    .flatten()
                 {
-                    let country = city_info
-                        .country
-                        .as_ref()
-                        .and_then(|c| c.names.as_ref().and_then(|map| map.get("en").copied()));
-                    let city = city_info
-                        .city
-                        .and_then(|c| c.names.and_then(|map| map.get("en").copied()));
-                    let country_iso_code = city_info.country.and_then(|c| c.iso_code);
+                    let country = city_info.country.names.english;
+                    let city = city_info.city.names.english;
+                    let country_iso_code = city_info.country.iso_code;
                     GeoInfoData {
                         city,
                         country,
                         country_iso_code,
-                        location: city_info.location,
+                        location: Some(city_info.location),
                     }
                 } else {
                     GeoInfoData::default()

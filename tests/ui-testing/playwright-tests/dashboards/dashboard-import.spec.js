@@ -84,18 +84,22 @@ test.describe("dashboard Import testcases", () => {
     // Assert that the title is correctly displayed on the UI
     await expect(page.getByText(`"${title}"`)).toBeVisible();
 
-    // Fetch the title from the JSON data
-    let jsonTitle = await page
-      .getByText("Cloudfront to OpenObserve")
+    // Fetch the title from the JSON data - look for the line containing "title": in the JSON editor
+    const jsonLine = await page
+      .locator('.view-lines .view-line')
+      .filter({ hasText: '"title":' })
+      .first()
       .innerText();
 
-    // need to remove double quote, before comparing
-    jsonTitle = jsonTitle?.substring?.(1, jsonTitle?.length - 1);
+    // Extract the title value from the JSON line (e.g., '"title": "Cloudfront to OpenObserve"')
+    const titleMatch = jsonLine.match(/"title":\s*"([^"]+)"/);
+    let jsonTitle = titleMatch ? titleMatch[1] : "";
 
-    // Normalize: Trim spaces, remove newlines, and replace multiple spaces with a single space
-    const normalizedJsonTitle = jsonTitle.trim().replace(/\s+/g, " ");
+    // Normalize both strings to handle any invisible characters or whitespace differences
+    const normalizedJsonTitle = jsonTitle.trim().replace(/\s+/g, " ").replace(/[\u200B-\u200D\uFEFF]/g, "");
+    const normalizedExpectedTitle = title.trim().replace(/\s+/g, " ").replace(/[\u200B-\u200D\uFEFF]/g, "");
 
-    expect(normalizedJsonTitle).toBe(title);
+    expect(normalizedJsonTitle).toBe(normalizedExpectedTitle);
     await pm.dashboardImport.clickImportButton();
     await waitForDashboardPage(page);
 
@@ -117,15 +121,11 @@ test.describe("dashboard Import testcases", () => {
 
     await pm.dashboardImport.clickImportDashboard();
 
-    await page.locator('[data-test="tab-import_json_url"]').click();
+    await pm.dashboardImport.clickUrlImportTab();
 
-    await page.getByLabel("Add your url").click();
-
-    await page
-      .getByLabel("Add your url")
-      .fill(
-        "https://raw.githubusercontent.com/openobserve/dashboards/refs/heads/main/AWS%20Cloudfront%20Access%20Logs/Cloudfront_to_OpenObserve.dashboard.json"
-      );
+    await page.getByLabel("Add your url").fill(
+      "https://raw.githubusercontent.com/openobserve/dashboards/refs/heads/main/AWS%20Cloudfront%20Access%20Logs/Cloudfront_to_OpenObserve.dashboard.json"
+    );
 
     await expect(
       page.locator(".view-lines").locator(".view-line").filter({ hasText: '"dashboardId": "' })
@@ -162,7 +162,9 @@ test.describe("dashboard Import testcases", () => {
 
     await pm.dashboardImport.uploadDashboardFile(fileContentPath);
 
-    await page.getByText("close").click();
+    const closeIcon = page.locator('.q-file .q-icon').filter({ hasText: 'close' });
+    await closeIcon.waitFor({ state: 'visible', timeout: 5000 });
+    await closeIcon.click();
 
     await expect(page.getByLabel("cloud_uploadDrop your file")).toBeVisible();
 
@@ -366,17 +368,14 @@ test.describe("dashboard Import testcases", () => {
 
     await pm.dashboardImport.clickImportDashboard();
 
-    await page.locator('[data-test="tab-import_json_url"]').click();
-    await page.getByLabel("Add your url").click();
+    await pm.dashboardImport.clickUrlImportTab();
     await page
       .getByLabel("Add your url")
       .fill(
         "https://raw.githubusercontent.com/openobserve/dashboards/refs/heads/main/Azure/Azure%20Loadblancer.dashboard.json"
       );
 
-    await page.waitForTimeout(2000);
-
-    await page.waitForSelector(".view-lines");
+    await page.waitForSelector(".view-lines", { state: "visible", timeout: 10000 });
     await expect(
       page
         .locator(".view-lines")
@@ -392,7 +391,7 @@ test.describe("dashboard Import testcases", () => {
 
     await expect(
       page.getByRole("cell", { name: "Azure Loadblancer" }).first()
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 20000 });
 
     await pm.dashboardImport.deleteImportedDashboard("01", "Azure Loadblancer");
 
@@ -421,17 +420,19 @@ test.describe("dashboard Import testcases", () => {
 
     await pm.dashboardImport.clickImportDashboard();
 
-    await page.locator('[data-test="tab-import_json_url"]').click();
+    await pm.dashboardImport.clickUrlImportTab();
 
-    await page.getByLabel("Add your url").click();
     await page
       .getByLabel("Add your url")
       .fill(
         "https://raw.githubusercontent.com/openobserve/dashboards/refs/heads/main/Kubernetes(kube-prometheus-stack)/Kubernetes%20_%20Compute%20Resources%20_%20Cluster.dashboard.json"
       );
-    await page.waitForTimeout(1000);
 
-    //is used for setting the file to be importedad
+    // Wait for JSON content to load
+    // await page.locator('.view-lines .view-line').first().waitFor({ state: "visible", timeout: 10000 });
+
+    await page.waitForTimeout(5000);
+
     await pm.dashboardImport.clickImportButton();
 
     await waitForDashboardPage(page);
