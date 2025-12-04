@@ -29,6 +29,7 @@ export interface MetricsCorrelationConfig {
   sourceStream?: string; // Original stream being viewed
   sourceType?: string; // Type of source stream
   availableDimensions?: Record<string, string>; // Actual field names (for source stream queries)
+  metricSchemas?: Record<string, any>; // Cached metric schemas with metrics_meta
 }
 
 /**
@@ -88,6 +89,34 @@ export function useMetricsCorrelationDashboard() {
     index: number,
     config: MetricsCorrelationConfig
   ) => {
+    // Get schema information for this metric stream
+    const schema = config.metricSchemas?.[stream.stream_name];
+    const metricsMeta = schema?.metrics_meta;
+    const rawUnit = metricsMeta?.unit || "";
+    const metricType = (metricsMeta?.metric_type || "").toLowerCase();
+
+    console.log(`[useMetricsCorrelationDashboard] Stream: ${stream.stream_name}, Unit: ${rawUnit}, Type: ${metricType}`);
+
+    // Map OpenTelemetry/Prometheus units to dashboard units
+    const unitMapping: Record<string, string> = {
+      "By": "bytes",
+      "s": "seconds",
+      "ms": "milliseconds",
+      "us": "microseconds",
+      "ns": "nanoseconds",
+      "{cpu}": "percentunit", // CPU as percentage
+      "1": "percentunit", // Dimensionless ratio (0-1)
+      "%": "percent",
+    };
+    const unit = unitMapping[rawUnit] || rawUnit || "short";
+
+    // Determine aggregation function based on metric type
+    // Counter: sum to see total increase over time buckets
+    // Gauge: avg or latest value
+    // Histogram/Summary: need special handling
+    const isCounter = metricType === "counter";
+    const aggregationFunc = isCounter ? "sum" : "avg";
+
     // Build WHERE clause from stream filters
     // Quote field names that contain special characters (hyphens, dots, etc.)
     // Note: "_o2_all_" is a special value that the backend recognizes to skip filtering
@@ -104,7 +133,8 @@ export function useMetricsCorrelationDashboard() {
 
     // Time-series SQL query for metrics
     // Note: Time range comes from dashboard defaultDatetimeDuration, not embedded in SQL
-    const query = `SELECT histogram(_timestamp) as x_axis_1, avg(value) as y_axis_1
+    // For counters, we sum the values to see total increase over time buckets
+    const query = `SELECT histogram(_timestamp) as x_axis_1, ${aggregationFunc}(value) as y_axis_1
 FROM "${stream.stream_name}"
 ${whereClause}
 GROUP BY x_axis_1
@@ -118,11 +148,11 @@ ORDER BY x_axis_1`;
       id: `panel_${stream.stream_name}_${index}`,
       type: "line",
       title: stream.stream_name,
-      description: `Time series for ${stream.stream_name}`,
+      description: `Time series for ${stream.stream_name}${metricType ? ` (${metricType})` : ""}`,
       config: {
         show_legends: false,
         legends_position: "bottom",
-        unit: "short",
+        unit: unit,
         unit_custom: "",
         promql_legend: "",
         axis_border_show: true,
