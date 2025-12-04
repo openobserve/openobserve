@@ -64,6 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :model-value="selected"
                 size="20px"
                 @update:model-value="toggleOption(opt.value)"
+                @click.stop
               />
             </q-item-section>
           </q-item>
