@@ -210,7 +210,9 @@
     "anomalyLabel": "异常",
     "includePatternInSearch": "在搜索中加入模式",
     "excludePatternFromSearch": "从搜索中排除模式",
-    "showPatternDetails": "显示详细信息（{变量} 变量，{示例} 示例）"
+    "showPatternDetails": "显示详细信息（{变量} 变量，{示例} 示例）",
+    "viewRelated": "查看相关",
+    "viewRelatedTooltip": "查看相关的追踪和指标"
   },
   "menu": {
     "home": "主页",
@@ -1635,5 +1637,17 @@
     "tabLabel": "错误",
     "errorSpikePeriod": "错误峰值周期：",
     "errorsGreaterThan": "错误 >="
+  },
+  "correlation": {
+    "title": "相关指标-{服务}",
+    "loading": "正在加载相关指标...",
+    "loadingMetrics": "正在加载 {count} 个指标流",
+    "failedToLoad": "加载关联仪表板失败",
+    "retryButton": "重试",
+    "noMetrics": "没有可用于关联的指标",
+    "matchedDimensions": "匹配的尺寸",
+    "metricsButton": "{count} 指标",
+    "metricsTooltip": "选择要显示的指标流",
+    "selectMetrics": "选择指标流"
   }
 }

@@ -891,6 +891,61 @@ async fn merge_files(
     let account = storage::get_account(&new_file_key).unwrap_or_default();
     storage::put(&account, &new_file_key, buf.clone()).await?;
 
+    // Enterprise: Extract service metadata during data processing
+    // This runs BEFORE indexing checks to ensure all stream types are discovered
+    #[cfg(feature = "enterprise")]
+    {
+        use config::cluster::LOCAL_NODE;
+        let service_streams_config =
+            &o2_enterprise::enterprise::common::config::get_config().service_streams;
+
+        // Only process in ingester mode (if mode is "compactor", this will be handled during merge)
+        // Skip self-reporting streams from _meta organization to avoid processing internal metrics
+        if LOCAL_NODE.is_ingester()
+            && service_streams_config.enabled
+            && service_streams_config.is_ingester_mode()
+            && org_id != config::META_ORG_ID
+            && (stream_type == StreamType::Logs
+                || stream_type == StreamType::Metrics
+                || stream_type == StreamType::Traces)
+        {
+            // Check if we should process this file (per-stream-type sampling)
+            let should_process =
+                o2_enterprise::enterprise::service_streams::sampler::should_process_file(
+                    &org_id,
+                    stream_type,
+                    &stream_name,
+                    &new_file_key,
+                );
+
+            if should_process {
+                let buf_clone = buf.clone();
+                let org_id_clone = org_id.clone();
+                let stream_name_clone = stream_name.clone();
+
+                // Queue services for batched processing (non-blocking)
+                tokio::spawn(async move {
+                    if let Err(e) = queue_services_from_parquet(
+                        &org_id_clone,
+                        stream_type,
+                        &stream_name_clone,
+                        &buf_clone,
+                    )
+                    .await
+                    {
+                        log::error!(
+                            "[ServiceStreams] Failed to queue services for {}/{}/{}: {}",
+                            org_id_clone,
+                            stream_type,
+                            stream_name_clone,
+                            e
+                        );
+                    }
+                });
+            }
+        }
+    }
+
     // skip index generation if not enabled or not supported by stream type
     if !cfg.common.inverted_index_enabled || !stream_type.support_index() {
         return Ok((account, new_file_key, new_file_meta, retain_file_list));
@@ -1076,6 +1131,133 @@ async fn extract_patterns_from_parquet(
     metrics::PATTERN_EXTRACTION_TIME
         .with_label_values(&[org_id, "total"])
         .observe(total_duration.as_secs_f64());
+
+    Ok(())
+}
+
+#[cfg(feature = "enterprise")]
+async fn queue_services_from_parquet(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    parquet_data: &[u8],
+) -> Result<(), anyhow::Error> {
+    use std::collections::HashMap;
+
+    let start = std::time::Instant::now();
+
+    // Read parquet data and extract services
+    let parquet_bytes = Bytes::from(parquet_data.to_vec());
+    let (_schema, mut reader) = get_recordbatch_reader_from_bytes(&parquet_bytes).await?;
+
+    let mut all_records = Vec::new();
+
+    // Read all record batches and extract field values
+    use futures::StreamExt;
+    while let Some(batch_result) = reader.next().await {
+        let batch = batch_result?;
+        let num_rows = batch.num_rows();
+        if num_rows == 0 {
+            continue;
+        }
+
+        // Build records for each row
+        for row_idx in 0..num_rows {
+            let mut record = HashMap::new();
+
+            // Extract all string columns
+            for (col_idx, field) in batch.schema().fields().iter().enumerate() {
+                let column = batch.column(col_idx);
+
+                // Only process string columns for service discovery
+                use arrow::array::Array;
+                if let Some(array) = column.as_any().downcast_ref::<arrow::array::StringArray>()
+                    && !array.is_null(row_idx)
+                {
+                    let value = array.value(row_idx);
+                    if !value.is_empty() {
+                        record.insert(
+                            field.name().clone(),
+                            serde_json::Value::String(value.to_string()),
+                        );
+                    }
+                }
+            }
+
+            if !record.is_empty() {
+                all_records.push(record);
+            }
+        }
+    }
+
+    if all_records.is_empty() {
+        return Ok(());
+    }
+
+    // Get semantic field groups (use enterprise defaults for comprehensive field mapping)
+    let semantic_groups =
+        o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file();
+
+    // Create processor (with org_id for cardinality tracking)
+    let processor = o2_enterprise::enterprise::service_streams::processor::StreamProcessor::new(
+        org_id.to_string(),
+        semantic_groups,
+    );
+
+    // Extract services from records (with automatic cardinality protection)
+    let services = processor
+        .process_records(stream_type, stream_name, &all_records)
+        .await;
+
+    // Log if any dimensions were blocked due to high cardinality
+    let blocked = processor.get_blocked_dimensions().await;
+    if !blocked.is_empty() {
+        log::warn!(
+            "[ServiceStreams] Blocked high-cardinality dimensions for {}/{}: {:?}",
+            org_id,
+            stream_name,
+            blocked
+        );
+        // Record blocked dimensions in metrics
+        for (dimension, _count) in &blocked {
+            metrics::SERVICE_STREAMS_HIGH_CARDINALITY_BLOCKED
+                .with_label_values(&[org_id, dimension])
+                .inc();
+        }
+    }
+
+    if services.is_empty() {
+        return Ok(());
+    }
+
+    // Record number of services discovered
+    let service_count = services.len() as u64;
+    metrics::SERVICE_STREAMS_SERVICES_DISCOVERED
+        .with_label_values(&[org_id, &stream_type.to_string()])
+        .inc_by(service_count);
+
+    // Record processing time
+    let duration = start.elapsed();
+    metrics::SERVICE_STREAMS_PROCESSING_TIME
+        .with_label_values(&[org_id])
+        .observe(duration.as_secs_f64());
+
+    // Update dimension cardinality gauge
+    let dimension_stats = processor.get_dimension_stats().await;
+    for (dimension, count) in dimension_stats {
+        metrics::SERVICE_STREAMS_DIMENSION_CARDINALITY
+            .with_label_values(&[org_id, &dimension])
+            .set(count as i64);
+    }
+
+    // Queue services for batched processing (avoids per-file DB writes)
+    o2_enterprise::enterprise::service_streams::batch_processor::queue_services(
+        org_id.to_string(),
+        services,
+    )
+    .await;
+
+    // No bookkeeping needed - sampling is stateless hash-based per stream type
 
     Ok(())
 }
