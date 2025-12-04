@@ -358,6 +358,7 @@ pub async fn check_cache(
                     }),
                     req.query.start_time,
                     req.query.end_time,
+                    histogram_interval,
                     &mut deltas,
                 );
 
@@ -388,9 +389,13 @@ pub async fn check_cache(
                 }
             }
         };
-        multi_resp.deltas = c_resp.deltas.clone();
         multi_resp.has_cached_data = c_resp.has_cached_data;
-        multi_resp.cached_response.push(c_resp);
+        if !c_resp.deltas.is_empty() {
+            multi_resp.deltas = c_resp.deltas.clone();
+        };
+        if c_resp.has_cached_data {
+            multi_resp.cached_response.push(c_resp);
+        }
         multi_resp.took = start.elapsed().as_millis() as usize;
         multi_resp.cache_query_response = true;
         multi_resp.limit = sql.limit as i64;
@@ -523,6 +528,7 @@ pub fn calculate_deltas(
     result_meta: &ResultCacheMeta,
     query_start_time: i64,
     query_end_time: i64,
+    histogram_interval: i64,
     deltas: &mut Vec<QueryDelta>,
 ) {
     if query_start_time == result_meta.start_time && query_end_time == result_meta.end_time {
@@ -535,8 +541,13 @@ pub fn calculate_deltas(
         // for delta start time we need to add 1 microsecond to the end time
         // because we will include the start_time, if we don't add 1 microsecond
         // the start_time will be include in the next search, we will get duplicate data
+        let delta_start_time = if histogram_interval > 0 {
+            result_meta.end_time
+        } else {
+            result_meta.end_time + 1
+        };
         deltas.push(QueryDelta {
-            delta_start_time: result_meta.end_time + 1,
+            delta_start_time,
             delta_end_time: query_end_time,
         });
     }

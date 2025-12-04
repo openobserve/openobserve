@@ -500,9 +500,10 @@ pub async fn process_delta(
     }
 
     log::info!(
-        "[HTTP2_STREAM] Found {} partitions for trace_id: {}",
+        "[HTTP2_STREAM] Found {} partitions for trace_id: {}, partitions: {:?}",
         partitions.len(),
-        trace_id
+        trace_id,
+        &partitions
     );
 
     // for dashboards & histograms, expect for ui
