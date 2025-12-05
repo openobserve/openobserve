@@ -57,17 +57,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-tab
             v-if="serviceStreamsEnabled"
             name="correlated-logs"
-            label="Correlated Logs"
+            :label="t('correlation.correlatedLogs')"
           />
           <q-tab
             v-if="serviceStreamsEnabled"
             name="correlated-metrics"
-            label="Correlated Metrics"
+            :label="t('correlation.correlatedMetrics')"
           />
           <q-tab
             v-if="serviceStreamsEnabled"
             name="correlated-traces"
-            label="Correlated Traces"
+            :label="t('correlation.correlatedTraces')"
           />
           <!-- o2 ai context add button in the detail table -->
           <O2AIContextAddBtn
@@ -316,7 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-else class="tw-flex tw-items-center tw-justify-center tw-h-full tw-py-20">
           <div class="tw-text-center">
             <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw-mb-4" />
-            <div v-else class="tw-text-base tw-text-gray-500">Click to load correlated logs</div>
+            <div v-else class="tw-text-base tw-text-gray-500">{{ t('correlation.clickToLoadLogs') }}</div>
           </div>
         </div>
       </q-tab-panel>
@@ -342,7 +342,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-else class="tw-flex tw-items-center tw-justify-center tw-h-full tw-py-20">
           <div class="tw-text-center">
             <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw-mb-4" />
-            <div v-else class="tw-text-base tw-text-gray-500">Click to load correlated metrics</div>
+            <div v-else class="tw-text-base tw-text-gray-500">{{ t('correlation.clickToLoadMetrics') }}</div>
           </div>
         </div>
       </q-tab-panel>
@@ -368,7 +368,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-else class="tw-flex tw-items-center tw-justify-center tw-h-full tw-py-20">
           <div class="tw-text-center">
             <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw-mb-4" />
-            <div v-else class="tw-text-base tw-text-gray-500">Click to load correlated traces</div>
+            <div v-else class="tw-text-base tw-text-gray-500">{{ t('correlation.clickToLoadTraces') }}</div>
           </div>
         </div>
       </q-tab-panel>
