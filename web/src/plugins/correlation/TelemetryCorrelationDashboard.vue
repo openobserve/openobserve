@@ -56,8 +56,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Matched Dimensions Display -->
       <div class="tw-py-2 tw-px-4 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)]">
         <div class="tw-flex tw-items-center tw-gap-3 tw-flex-wrap">
-          <span class="tw-text-xs tw-font-semibold tw-uppercase tw-opacity-70">
-            DIMENSIONS:
+          <span class="tw-text-xs tw-font-semibold tw-opacity-70">
+            {{ t('correlation.dimensions') }}:
           </span>
           <div
             v-for="(value, key) in activeDimensions"
@@ -91,9 +91,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         indicator-color="primary"
         align="left"
       >
-        <q-tab name="logs" label="Logs" />
-        <q-tab name="metrics" label="Metrics" />
-        <q-tab name="traces" label="Traces" />
+        <q-tab name="logs" :label="t('common.logs')" />
+        <q-tab name="metrics" :label="t('search.metrics')" />
+        <q-tab name="traces" :label="t('menu.traces')" />
       </q-tabs>
 
       <!-- Tab Panels -->
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <q-spinner-hourglass color="primary" size="3.75rem" class="tw-mb-4" />
             <div class="tw-text-base">{{ t('correlation.loading') }}</div>
-            <div class="tw-text-xs tw-text-gray-500 tw-mt-2">Loading logs...</div>
+            <div class="tw-text-xs tw-text-gray-500 tw-mt-2">{{ t('correlation.loadingLogs') }}</div>
           </div>
 
           <!-- Logs Dashboard -->
@@ -131,9 +131,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
           >
             <q-icon name="article" size="3.75rem" color="grey-6" class="tw-mb-4" />
-            <div class="tw-text-base">No correlated logs found</div>
+            <div class="tw-text-base">{{ t('correlation.noLogsFound') }}</div>
             <div class="tw-text-sm tw-text-gray-500 tw-mt-2">
-              Service: {{ serviceName }}
+              {{ t('correlation.service', { service: serviceName }) }}
             </div>
           </div>
         </q-tab-panel>
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               no-caps
               color="primary"
               icon="show_chart"
-              :label="`${selectedMetricStreams.length} of ${uniqueMetricStreams.length} Metric(s)`"
+              :label="t('correlation.metricsSelector', { selected: selectedMetricStreams.length, total: uniqueMetricStreams.length })"
               @click="showMetricSelector = true"
               data-test="metric-selector-button"
             >
@@ -211,9 +211,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw-h-full tw-flex tw-items-center tw-justify-center tw-py-20">
             <div class="tw-text-center">
               <q-icon name="account_tree" size="3.75rem" color="grey-6" class="tw-mb-4" />
-              <div class="tw-text-base">Traces will be implemented here</div>
+              <div class="tw-text-base">{{ t('correlation.tracesPlaceholder') }}</div>
               <div class="tw-text-sm tw-text-gray-500 tw-mt-2">
-                Correlated traces for service: {{ serviceName }}
+                {{ t('correlation.correlatedTracesFor', { service: serviceName }) }}
               </div>
             </div>
           </div>
@@ -227,8 +227,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Matched Dimensions Display -->
     <div class="tw-py-2 tw-px-4 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)]">
       <div class="tw-flex tw-items-center tw-gap-3 tw-flex-wrap">
-        <span class="tw-text-xs tw-font-semibold tw-uppercase tw-opacity-70">
-          DIMENSIONS:
+        <span class="tw-text-xs tw-font-semibold tw-opacity-70">
+          {{ t('correlation.dimensions') }}:
         </span>
         <div
           v-for="(value, key) in activeDimensions"
@@ -300,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw-h-full tw-flex tw-items-center tw-justify-center tw-py-20">
           <div class="tw-text-center">
             <q-icon name="account_tree" size="3.75rem" color="grey-6" class="tw-mb-4" />
-            <div class="tw-text-base">Traces will be implemented here</div>
+            <div class="tw-text-base">{{ t('correlation.tracesPlaceholder') }}</div>
           </div>
         </div>
       </q-tab-panel>
@@ -530,7 +530,7 @@ const getDimensionOptions = (key: string, currentValue: string) => {
   // Create options array, avoiding duplicates
   const options = [
     {
-      label: "All",
+      label: t('correlation.all'),
       value: SELECT_ALL_VALUE,
     },
   ];
