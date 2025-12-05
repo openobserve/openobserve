@@ -846,12 +846,33 @@ export default defineComponent({
       try {
         // update the variables data
         variablesData.value = data;
+
+        // For GLOBAL variables: Only check top-level flag
+        // We allow partial updates so dependent variables (tab/panel) can start loading
+        if (data?.isVariablesLoading === true) {
+          console.log(`Global variables still in loading phase, waiting...`);
+          return;
+        }
+
+        // Global variables phase complete - proceed even if some have null values
+        // This allows the cascade: global finishes → trigger tab → trigger panel
+        console.log(`Global variables update phase complete, processing...`);
+
         if (needsVariablesAutoUpdate) {
           // check if the length is > 0
           if (checkIfVariablesAreLoaded(variablesData.value)) {
             needsVariablesAutoUpdate = false;
           }
-          currentVariablesDataRef.value = { __global: variablesData.value };
+          // IMPORTANT: During initial dashboard load, DO NOT update currentVariablesDataRef
+          // until ALL levels (global + tab + panel) have finished loading
+          // This prevents multiple API calls with partial variable states
+          if (!isInitialDashboardLoad.value) {
+            // Only update after initial load is complete
+            currentVariablesDataRef.value = {
+              ...currentVariablesDataRef.value, // Preserve panel-specific entries
+              __global: variablesData.value
+            };
+          }
         }
 
         // Extract current values from data.values that are GLOBAL level (_isCurrentLevel !== false)
@@ -903,9 +924,24 @@ export default defineComponent({
             } else if (activeTabVariables.value.length === 0) {
               tabVariablesReady.value = true;
               nextTick(() => {
-                visiblePanels.value.forEach((panelId) => {
-                  loadPanelVariablesIfVisible(panelId);
-                });
+                // Check if there are any panel variables
+                const allPanelsWithVariables = panels.value.filter((panel: any) =>
+                  getPanelVariables(panel.id).length > 0
+                );
+
+                if (allPanelsWithVariables.length === 0 && isInitialDashboardLoad.value) {
+                  // No tab variables AND no panel variables - we can update now
+                  console.log('No tab or panel variables exist, updating currentVariablesDataRef with global only');
+                  currentVariablesDataRef.value = {
+                    __global: variablesData.value
+                  };
+                  isInitialDashboardLoad.value = false;
+                } else {
+                  // Panel variables exist, trigger their loading
+                  visiblePanels.value.forEach((panelId) => {
+                    loadPanelVariablesIfVisible(panelId);
+                  });
+                }
               });
             }
           });
@@ -922,6 +958,9 @@ export default defineComponent({
 
     // Track if tab variables are loaded
     const tabVariablesReady = ref(false);
+
+    // Track if this is the very first load of the dashboard (to prevent premature API calls)
+    const isInitialDashboardLoad = ref(true);
 
     // Track last tab values to detect changes
     const lastTabValues = ref<Record<string, any>>({});
@@ -1028,10 +1067,75 @@ export default defineComponent({
       // Mark tab variables as ready and trigger panel loads ONLY on first load
       if (isFirstLoad) {
         tabVariablesReady.value = true;
-        nextTick(() => {
-          visiblePanels.value.forEach((panelId) => {
-            loadPanelVariablesIfVisible(panelId);
+
+        // Update __global with merged global + tab variables for panels without panel-level vars
+        // Build a merged dataset containing both global and tab variables
+        const mergedGlobalAndTabValues: any[] = [];
+
+        // Add all global variables
+        if (variablesData.value?.values) {
+          variablesData.value.values.forEach((v: any) => {
+            if (v._isCurrentLevel !== false) {
+              // This is a global variable
+              const resolvedValue = getContextualVariableValue(v.name, {
+                tabId: selectedTabId.value,
+              });
+              if (resolvedValue !== undefined) {
+                mergedGlobalAndTabValues.push({
+                  ...v,
+                  value: resolvedValue,
+                });
+              }
+            }
           });
+        }
+
+        // Add tab variables
+        if (data?.values) {
+          data.values.forEach((v: any) => {
+            if (v._isCurrentLevel === true) {
+              // This is a tab variable
+              mergedGlobalAndTabValues.push(v);
+            }
+          });
+        }
+
+        // IMPORTANT: During initial dashboard load, DO NOT update currentVariablesDataRef
+        // Wait for panel variables to load as well (if any exist)
+        if (!isInitialDashboardLoad.value) {
+          // Update __global to include both global and tab vars
+          currentVariablesDataRef.value = {
+            ...currentVariablesDataRef.value,
+            __global: {
+              ...variablesData.value,
+              values: mergedGlobalAndTabValues,
+            }
+          };
+        }
+
+        nextTick(() => {
+          // Check if there are any panels with panel-level variables
+          const allPanelsWithVariables = panels.value.filter((panel: any) =>
+            getPanelVariables(panel.id).length > 0
+          );
+
+          if (allPanelsWithVariables.length === 0 && isInitialDashboardLoad.value) {
+            // No panel-level variables exist, so we can update currentVariablesDataRef now
+            console.log('No panel variables exist, updating currentVariablesDataRef with global+tab');
+            currentVariablesDataRef.value = {
+              ...currentVariablesDataRef.value,
+              __global: {
+                ...variablesData.value,
+                values: mergedGlobalAndTabValues,
+              }
+            };
+            isInitialDashboardLoad.value = false;
+          } else {
+            // Panel variables exist, trigger their loading
+            visiblePanels.value.forEach((panelId) => {
+              loadPanelVariablesIfVisible(panelId);
+            });
+          }
         });
       }
     };
@@ -1039,8 +1143,93 @@ export default defineComponent({
     // Track last panel values to detect changes
     const lastPanelValues = ref<Record<string, Record<string, any>>>({});
 
+    // Helper function to build merged variables data for a specific panel
+    // This combines global + tab + panel level variables into a single dataset
+    const buildMergedVariablesDataForPanel = (panelId: string, panelData: any) => {
+      const currentTabId = selectedTabId.value;
+
+      // Get all variable configs for this panel (global + tab + panel)
+      const panelConfig = getPanelVariablesConfig(panelId);
+      const allVariableConfigs = panelConfig.list || [];
+
+      // Build merged values array with all variables resolved for this panel's context
+      const mergedValues: any[] = [];
+
+      allVariableConfigs.forEach((varConfig: any) => {
+        const varName = varConfig.name;
+        const scope = getScopeType(varConfig);
+
+        // Check if this variable's level has been loaded yet
+        let isLevelLoaded = false;
+        if (scope === 'global') {
+          isLevelLoaded = globalVariablesLoaded.value;
+        } else if (scope === 'tabs') {
+          isLevelLoaded = tabVariablesReady.value;
+        } else if (scope === 'panels') {
+          // Panel variables are loaded if we're being called from panelVariablesDataUpdated
+          isLevelLoaded = true;
+        }
+
+        // Skip variables whose level hasn't loaded yet (lazy loading)
+        if (!isLevelLoaded) {
+          return;
+        }
+
+        // Get the contextual value for this variable
+        // Priority: panel-specific > tab-specific > global
+        const resolvedValue = getContextualVariableValue(varName, {
+          panelId: panelId,
+          tabId: currentTabId,
+        });
+
+        // Only include if we have a resolved value that's not null
+        // Null values mean the variable hasn't loaded yet
+        if (resolvedValue !== undefined && resolvedValue !== null) {
+          mergedValues.push({
+            ...varConfig,
+            value: resolvedValue,
+            // Keep track of which level this variable belongs to
+            _isCurrentLevel: varConfig._isCurrentLevel,
+            // Set loading flags to false since we only include loaded variables
+            isLoading: false,
+            isVariableLoadingPending: false,
+            isVariablePartialLoaded: true,
+          });
+        }
+      });
+      console.log('Merged values for panel', {
+        ...panelData,
+        values: JSON.stringify(mergedValues),
+        isVariablesLoading: panelData.isVariablesLoading || false,
+      });
+      // Return merged data structure matching the expected format
+      return {
+        ...panelData,
+        values: mergedValues,
+        isVariablesLoading: panelData.isVariablesLoading || false,
+      };
+    };
+
     // Handler for panel variables data updates
     const panelVariablesDataUpdated = (data: any, panelId: string) => {
+      // CRITICAL: Don't process if variables are still loading
+      // Check both top-level flag AND individual variable states
+      if (data?.isVariablesLoading === true) {
+        console.log(`Panel ${panelId}: Variables still loading (top-level), skipping update`);
+        return;
+      }
+
+      // Also check if any individual variables are still loading or have pending loads
+      const hasLoadingVariables = data?.values?.some((v: any) =>
+        v.isLoading === true ||
+        v.isVariableLoadingPending === true ||
+        (v.value === null && v.type === 'query_values') // Query variables with null values are still loading
+      );
+
+      if (hasLoadingVariables) {
+        console.log(`Panel ${panelId}: Some variables still loading (individual check), skipping update`);
+        return;
+      }
 
       // Extract current panel values (only PANEL level variables with _isCurrentLevel === true)
       const currentPanelValues: Record<string, any> = {};
@@ -1107,8 +1296,67 @@ export default defineComponent({
         // IMPORTANT: Only update currentVariablesDataRef on initial load
         // For subsequent changes, wait for user to click refresh
         if (isFirstLoad) {
-          // This triggers the panel to fetch data with new variable values
-          currentVariablesDataRef.value[panelId] = data;
+          // Build merged variables data for this panel (global + tab + panel)
+          // This ensures the panel receives ALL variables it needs for queries
+          const mergedPanelData = buildMergedVariablesDataForPanel(panelId, data);
+
+          // During initial dashboard load, store the panel data but DON'T trigger panel fetch yet
+          if (isInitialDashboardLoad.value) {
+            // Check if all panels with variables have finished loading
+            const allPanelsWithVariables = panels.value.filter((panel: any) =>
+              getPanelVariables(panel.id).length > 0
+            );
+
+            // Check if this is the last panel to load
+            const loadedPanelCount = Object.keys(lastPanelValues.value).length + 1; // +1 for current panel
+            const allPanelsLoaded = loadedPanelCount >= allPanelsWithVariables.length;
+
+            if (allPanelsLoaded) {
+              // All panels finished loading - now we can update currentVariablesDataRef for ALL panels at once
+              console.log('All variables loaded (global + tab + panel), now updating currentVariablesDataRef');
+
+              // Build merged data for all panels
+              allPanelsWithVariables.forEach((panel: any) => {
+                const panelData = lastPanelValues.value[panel.id] ?
+                  buildMergedVariablesDataForPanel(panel.id, variablesData.value) :
+                  (panel.id === panelId ? mergedPanelData : null);
+
+                if (panelData) {
+                  currentVariablesDataRef.value[panel.id] = panelData;
+                }
+              });
+
+              // Also update __global for panels without panel-level variables
+              const mergedGlobalAndTabValues: any[] = [];
+              if (variablesData.value?.values) {
+                variablesData.value.values.forEach((v: any) => {
+                  const resolvedValue = getContextualVariableValue(v.name, {
+                    tabId: selectedTabId.value,
+                  });
+                  if (resolvedValue !== undefined) {
+                    mergedGlobalAndTabValues.push({
+                      ...v,
+                      value: resolvedValue,
+                    });
+                  }
+                });
+              }
+
+              currentVariablesDataRef.value = {
+                ...currentVariablesDataRef.value,
+                __global: {
+                  ...variablesData.value,
+                  values: mergedGlobalAndTabValues,
+                }
+              };
+
+              // Mark initial load as complete
+              isInitialDashboardLoad.value = false;
+            }
+          } else {
+            // Not initial load - update immediately
+            currentVariablesDataRef.value[panelId] = mergedPanelData;
+          }
         }
         // For non-initial changes: variables are updated in mergedVariablesValues (for URL sync and warning),
         // but currentVariablesDataRef is NOT updated, so panels won't re-fetch until refresh is clicked
@@ -1590,6 +1838,7 @@ export default defineComponent({
         panelVariablesLoaded.value.clear();
         lastTabValues.value = {}; // Reset tab value tracking
         lastPanelValues.value = {}; // Reset panel value tracking
+        isInitialDashboardLoad.value = true; // Treat tab change as new initial load
 
         // If no tab variables, mark as ready immediately
         nextTick(() => {
