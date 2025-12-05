@@ -29,24 +29,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="display: none"
       >
       </span>
-      <VariablesValueSelector
+      <!-- GLOBAL VARIABLES - Always visible at top -->
+      <div
         v-if="currentTimeObj['__global'] || currentTimeObj['__variables']"
-        :variablesConfig="dashboardData?.variables"
-        :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
-        :selectedTimeDate="
-          currentTimeObj['__variables'] || currentTimeObj['__global']
-        "
-        :initialVariableValues="initialVariableValues"
-        @variablesData="variablesDataUpdated"
-        ref="variablesValueSelectorRef"
-      />
-      <TabList
-        v-if="showTabs && selectedTabId !== null"
-        class="q-mt-sm"
-        :dashboardData="dashboardData"
-        :viewOnly="viewOnly"
-        @refresh="refreshDashboard"
-      />
+        class="global-variables-container q-mb-sm"
+      >
+        <VariablesValueSelector
+          key="global-variables"
+          :variablesConfig="globalVariablesConfig"
+          :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
+          :selectedTimeDate="
+            currentTimeObj['__variables'] || currentTimeObj['__global']
+          "
+          :initialVariableValues="initialVariableValues"
+          @variablesData="variablesDataUpdated"
+          ref="variablesValueSelectorRef"
+        />
+      </div>
+      <!-- TABS WITH TAB-LEVEL VARIABLES -->
+      <div v-if="showTabs && selectedTabId !== null" class="tabs-container">
+        <!-- Tab Headers -->
+        <TabList
+          class="q-mt-sm"
+          :dashboardData="dashboardData"
+          :viewOnly="viewOnly"
+          @refresh="refreshDashboard"
+        />
+
+        <!-- Tab-Level Variables (shown below active tab) -->
+        <div
+          v-if="activeTabVariables.length > 0"
+          class="tab-variables-container q-mt-xs q-px-sm q-py-xs"
+          :data-test="`dashboard-tab-${selectedTabId}-variables`"
+        >
+          <VariablesValueSelector
+            :key="`tab-variables-${selectedTabId}`"
+            ref="tabVariablesValueSelectorRef"
+            :variablesConfig="tabVariablesConfig"
+            :showDynamicFilters="false"
+            :selectedTimeDate="
+              currentTimeObj['__variables'] || currentTimeObj['__global']
+            "
+            :initialVariableValues="mergedVariablesWrapper"
+            :lazyLoad="true"
+            @variablesData="tabVariablesDataUpdated"
+          />
+        </div>
+      </div>
       <slot name="before_panels" />
       <div class="displayDiv">
         <div
@@ -113,51 +142,79 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :gs-min-h="getMinimumHeight(item.type)"
             class="grid-stack-item gridBackground"
             :class="store.state.theme == 'dark' ? 'dark' : ''"
+            :data-panel-id="item.id"
           >
             <div class="grid-stack-item-content">
-              <PanelContainer
-                @onDeletePanel="onDeletePanel"
-                @onViewPanel="onViewPanel"
-                :viewOnly="viewOnly"
-                :data="item"
-                :dashboardId="dashboardData.dashboardId"
-                :folderId="folderId"
-                :reportId="reportId"
-                :selectedTimeDate="
-                  currentTimeObj?.[item?.id] || currentTimeObj['__global'] || {}
-                "
-                :shouldRefreshWithoutCache="
-                  shouldRefreshWithoutCacheObj?.[item?.id] || false
-                "
-                :variablesData="
-                  currentVariablesDataRef?.[item?.id] ||
-                  currentVariablesDataRef['__global']
-                "
-                :currentVariablesData="variablesData"
-                :width="getPanelLayout(item, 'w')"
-                :height="getPanelLayout(item, 'h')"
-                :forceLoad="forceLoad"
-                :searchType="searchType"
-                :runId="runId"
-                :tabId="selectedTabId"
-                :tabName="
-                  dashboardData?.tabs?.find(
-                    (tab: any) => tab.tabId === selectedTabId,
-                  )?.name
-                "
-                :dashboardName="dashboardName"
-                :folderName="folderName"
-                :allowAlertCreation="allowAlertCreation"
-                @updated:data-zoom="$emit('updated:data-zoom', $event)"
-                @onMovePanel="onMovePanel"
-                @refreshPanelRequest="refreshPanelRequest"
-                @refresh="refreshDashboard"
-                @update:initial-variable-values="updateInitialVariableValues"
-                @onEditLayout="openEditLayout"
-                @update:runId="updateRunId"
-                @contextmenu="$emit('chart:contextmenu', $event)"
-              >
-              </PanelContainer>
+              <!-- Panel with Panel-Level Variables -->
+              <div class="panel-with-variables">
+                <!-- Original Panel Container -->
+                <PanelContainer
+                  @onDeletePanel="onDeletePanel"
+                  @onViewPanel="onViewPanel"
+                  :viewOnly="viewOnly"
+                  :data="item"
+                  :dashboardId="dashboardData.dashboardId"
+                  :folderId="folderId"
+                  :reportId="reportId"
+                  :selectedTimeDate="
+                    currentTimeObj?.[item?.id] || currentTimeObj['__global'] || {}
+                  "
+                  :shouldRefreshWithoutCache="
+                    shouldRefreshWithoutCacheObj?.[item?.id] || false
+                  "
+                  :variablesData="
+                    currentVariablesDataRef?.[item?.id] ||
+                    currentVariablesDataRef['__global']
+                  "
+                  :currentVariablesData="variablesData"
+                  :width="getPanelLayout(item, 'w')"
+                  :height="getPanelLayout(item, 'h')"
+                  :forceLoad="forceLoad"
+                  :searchType="searchType"
+                  :runId="runId"
+                  :tabId="selectedTabId"
+                  :tabName="
+                    dashboardData?.tabs?.find(
+                      (tab: any) => tab.tabId === selectedTabId,
+                    )?.name
+                  "
+                  :dashboardName="dashboardName"
+                  :folderName="folderName"
+                  :panelVariablesConfig="getPanelVariablesConfig(item.id)"
+                  @updated:data-zoom="$emit('updated:data-zoom', $event)"
+                  @onMovePanel="onMovePanel"
+                  @refreshPanelRequest="refreshPanelRequest"
+                  @refresh="refreshDashboard"
+                  @update:initial-variable-values="updateInitialVariableValues"
+                  @onEditLayout="openEditLayout"
+                  @update:runId="updateRunId"
+                >
+                  <!-- Panel-Level Variables (shown below drag-allow section) -->
+                  <template #panel-variables>
+                    <div
+                      v-if="getPanelVariables(item.id).length > 0"
+                      class="panel-variables-container q-px-xs q-py-xs"
+                      :data-test="`dashboard-panel-${item.id}-variables`"
+                    >
+                      <VariablesValueSelector
+                        :key="`panel-variables-${item.id}`"
+                        :ref="(el) => setPanelVariableRef(el, item.id)"
+                        :variablesConfig="getPanelVariablesConfig(item.id)"
+                        :showDynamicFilters="false"
+                        :selectedTimeDate="
+                          currentTimeObj['__variables'] ||
+                          currentTimeObj['__global']
+                        "
+                        :initialVariableValues="getPanelVariablesWrapper(item.id)"
+                        :lazyLoad="true"
+                        @variablesData="
+                          (data) => panelVariablesDataUpdated(data, item.id)
+                        "
+                      />
+                    </div>
+                  </template>
+                </PanelContainer>
+              </div>
             </div>
           </div>
         </div>
@@ -220,6 +277,7 @@ import { useCustomDebouncer } from "../../utils/dashboard/useCustomDebouncer";
 import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
 import TabList from "@/components/dashboards/tabs/TabList.vue";
+import { getScopeType } from "@/utils/dashboard/variables/variablesScopeUtils";
 import { inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import { useLoading } from "@/composables/useLoading";
@@ -335,6 +393,252 @@ export default defineComponent({
     const variablesData = ref({});
     const currentVariablesDataRef: any = ref({ __global: {} });
 
+    // Shared variables values across all levels for dependency resolution
+    // New structure: {
+    //   variableName: value || [] (for global vars - can be array for multi-select)
+    //   OR
+    //   variableName: [{ tabId, value: value || [] }] (for tab-scoped vars - array of tab values)
+    //   OR
+    //   variableName: [{ panelId, value: value || [] }] (for panel-scoped vars - array of panel values)
+    // }
+    const mergedVariablesValues = ref({});
+
+    // Helper to check if value is a scoped array (tab/panel scoped)
+    const isScopedArray = (value: any): boolean => {
+      if (!Array.isArray(value)) return false;
+      if (value.length === 0) return false;
+      // Check if first element has tabId or panelId property
+      return (
+        typeof value[0] === 'object' &&
+        value[0] !== null &&
+        ('tabId' in value[0] || 'panelId' in value[0])
+      );
+    };
+
+    // Helper to get variable value based on current context (tab/panel)
+    const getContextualVariableValue = (
+      varName: string,
+      context?: { tabId?: string; panelId?: string }
+    ) => {
+      const storedValue = mergedVariablesValues.value[varName];
+
+      if (storedValue === undefined) return undefined;
+
+      // If value is not an array or object, it's a simple global variable (string, number, etc)
+      if (typeof storedValue !== 'object' || storedValue === null) {
+        return storedValue;
+      }
+
+      // Check if it's a scoped array (tab/panel scoped with structure like [{ tabId, value }])
+      if (isScopedArray(storedValue)) {
+        // Priority: panelId > tabId > first available value
+        if (context?.panelId) {
+          const panelEntry = storedValue.find((entry: any) => entry.panelId === context.panelId);
+          if (panelEntry !== undefined) return panelEntry.value;
+        }
+
+        if (context?.tabId) {
+          const tabEntry = storedValue.find((entry: any) => entry.tabId === context.tabId);
+          if (tabEntry !== undefined) return tabEntry.value;
+        }
+
+        // Fallback: return first available value
+        return storedValue.length > 0 ? storedValue[0].value : undefined;
+      }
+
+      // If it's an array but not scoped, it's a global multi-select variable - return as is
+      if (Array.isArray(storedValue)) {
+        return storedValue;
+      }
+
+      // If we reach here, it's some other object - return as is (shouldn't happen)
+      return storedValue;
+    };
+
+    // Wrapper for passing to child components (they expect {value: {...}})
+    // This resolves values based on current tab context
+    // Note: Panel-specific resolution happens in getPanelVariablesWrapper
+    const mergedVariablesWrapper = computed(() => {
+      const resolved: Record<string, any> = {};
+      const currentTabId = selectedTabId.value;
+
+      // Get all variable names and resolve them for current context
+      Object.keys(mergedVariablesValues.value).forEach((varName) => {
+        resolved[varName] = getContextualVariableValue(varName, {
+          tabId: currentTabId,
+        });
+      });
+
+      return { value: resolved };
+    });
+
+    // Helper to get panel-specific variable wrapper
+    const getPanelVariablesWrapper = (panelId: string) => {
+      const resolved: Record<string, any> = {};
+      const currentTabId = selectedTabId.value;
+
+      // Get all variable names and resolve them with panel priority
+      Object.keys(mergedVariablesValues.value).forEach((varName) => {
+        resolved[varName] = getContextualVariableValue(varName, {
+          tabId: currentTabId,
+          panelId: panelId,
+        });
+      });
+
+      return { value: resolved };
+    };
+
+    // ============================================
+    // LEVEL-BASED VARIABLES LOGIC
+    // ============================================
+
+    // Helper to create config with ALL variables for dependency resolution
+    // but only current level visible for UI
+    const createConfigWithAllVariables = (
+      levelVars: any[],
+      allVars: any[],
+      showFilters = false,
+    ) => {
+      // Mark which variables belong to current level (for rendering)
+      const configList = allVars.map((v: any) => ({
+        ...v,
+        _isCurrentLevel: levelVars.some((lv: any) => lv.name === v.name),
+      }));
+
+      return {
+        ...props.dashboardData.variables,
+        list: configList,
+        showDynamicFilters: showFilters,
+        _levelVariables: levelVars, // Keep original level variables
+      };
+    };
+
+    // Filter variables by scope - GLOBAL
+    const globalVariablesConfig = computed(() => {
+      if (!props.dashboardData?.variables?.list) {
+        return { list: [], showDynamicFilters: false };
+      }
+
+      const globalVars = props.dashboardData.variables.list.filter(
+        (v: any) => getScopeType(v) === "global",
+      );
+
+      // For global level, only include global variables in dependency graph
+      return {
+        ...props.dashboardData.variables,
+        list: globalVars,
+      };
+    });
+
+    const tabVariablesConfig = computed(() => {
+      if (!props.dashboardData?.variables?.list || !selectedTabId.value) {
+        return { list: [], showDynamicFilters: false };
+      }
+
+      const allVars = props.dashboardData.variables.list;
+      const globalVars = allVars.filter(
+        (v: any) => getScopeType(v) === "global",
+      );
+      const tabVars = allVars.filter(
+        (v: any) =>
+          getScopeType(v) === "tabs" &&
+          v.tabs &&
+          v.tabs.includes(selectedTabId.value),
+      );
+
+      // Include both global and tab variables for dependency resolution
+      return createConfigWithAllVariables(
+        tabVars,
+        [...globalVars, ...tabVars],
+        false,
+      );
+    });
+
+    const activeTabVariables = computed(() => {
+      // Return only tab-level variables for UI check
+      return tabVariablesConfig.value._levelVariables || [];
+    });
+
+    const getPanelVariablesConfig = (panelId: string) => {
+      if (!props.dashboardData?.variables?.list) {
+        return { list: [], showDynamicFilters: false };
+      }
+
+      const allVars = props.dashboardData.variables.list;
+      const globalVars = allVars.filter(
+        (v: any) => getScopeType(v) === "global",
+      );
+      const tabVars = selectedTabId.value
+        ? allVars.filter(
+            (v: any) =>
+              getScopeType(v) === "tabs" &&
+              v.tabs &&
+              v.tabs.includes(selectedTabId.value),
+          )
+        : [];
+      const panelVars = allVars.filter(
+        (v: any) =>
+          getScopeType(v) === "panels" &&
+          v.panels &&
+          v.panels.includes(panelId),
+      );
+
+      // Include global, tab, and panel variables for full dependency resolution
+      const config = createConfigWithAllVariables(
+        panelVars,
+        [...globalVars, ...tabVars, ...panelVars],
+        false,
+      );
+
+      return config;
+    };
+
+    const getPanelVariables = (panelId: string) => {
+      const config = getPanelVariablesConfig(panelId);
+      return config._levelVariables || [];
+    };
+
+
+    // Track panel visibility
+    const visiblePanels = ref(new Set<string>());
+
+    // Track panel variable selector refs for lazy loading
+    const panelVariableRefs = reactive<Record<string, any>>({});
+    const panelVariablesLoaded = ref(new Set<string>());
+    const tabVariablesValueSelectorRef = ref<any>(null);
+
+    const setPanelVariableRef = (el: any, panelId: string) => {
+      if (el) {
+        panelVariableRefs[panelId] = el;
+      } else {
+        delete panelVariableRefs[panelId];
+      }
+    };
+
+    // Trigger loading for panel variables when panel becomes visible
+    const loadPanelVariablesIfVisible = (panelId: string) => {
+      // Only load if: panel is visible, not already loaded, and tab variables are ready (if tab has variables)
+      const hasTabVariables = activeTabVariables.value.length > 0;
+      const canLoad = !hasTabVariables || tabVariablesReady.value;
+
+
+      if (
+        visiblePanels.value.has(panelId) &&
+        !panelVariablesLoaded.value.has(panelId) &&
+        canLoad
+      ) {
+        const ref = panelVariableRefs[panelId];
+        if (ref && ref.loadAllVariablesData) {
+          ref.loadAllVariablesData(true);
+          panelVariablesLoaded.value.add(panelId);
+        }
+      }
+    };
+
+    // ============================================
+    // END LEVEL-BASED VARIABLES LOGIC
+    // ============================================
+
     // ======= [START] dashboard PrintMode =======
 
     //reactive object for loading state of variablesData and panels
@@ -382,23 +686,115 @@ export default defineComponent({
       },
     );
 
-    watch(
-      () => currentVariablesDataRef.value,
-      () => {
-        if (currentVariablesDataRef.value?.__global) {
-          emit("variablesData", currentVariablesDataRef.value?.__global);
+    // Aggregate all variables from all levels for URL syncing
+    const aggregatedVariablesForUrl = computed(() => {
+      if (!props.dashboardData?.variables?.list) {
+        return { isVariablesLoading: false, values: [] };
+      }
+
+      const allVars = props.dashboardData.variables.list;
+      const aggregatedValues: any[] = [];
+
+      // Add global variables
+      allVars.forEach((varConfig: any) => {
+        const scope = getScopeType(varConfig);
+        const varName = varConfig.name;
+
+        if (scope === 'global') {
+          // Global variable - get value directly (not nested)
+          const value = mergedVariablesValues.value[varName];
+          // Include if value is defined and either:
+          // 1. Not an object (primitive values)
+          // 2. Is null
+          // 3. Is an array (for multi-select variables)
+          // Exclude objects that have tabId or panelId (scoped values)
+          const isValidValue = value !== undefined && (
+            typeof value !== 'object' ||
+            value === null ||
+            (Array.isArray(value) && !value.some((v: any) => v?.tabId || v?.panelId))
+          );
+
+          if (isValidValue) {
+            aggregatedValues.push({
+              ...varConfig,
+              scope: 'global',
+              value,
+              _isCurrentLevel: true,
+            });
+          }
+        } else if (scope === 'tabs') {
+          // Tab variable - collect values for all relevant tabs from nested structure
+          const tabValues: any[] = [];
+          const storedValue = mergedVariablesValues.value[varName];
+
+          // storedValue is an array like [{ tabId: "tab1", value: "val1" }, { tabId: "tab2", value: "val2" }]
+          if (Array.isArray(storedValue)) {
+            storedValue.forEach((entry: any) => {
+              // Verify this entry belongs to a tab defined in varConfig
+              if (entry.tabId && entry.value !== undefined &&
+                  varConfig.tabs && varConfig.tabs.includes(entry.tabId)) {
+                tabValues.push({ tabId: entry.tabId, value: entry.value });
+              }
+            });
+          }
+
+          if (tabValues.length > 0) {
+            aggregatedValues.push({
+              ...varConfig,
+              scope: 'tabs',
+              value: tabValues,
+              _isCurrentLevel: false,
+            });
+          }
+        } else if (scope === 'panels') {
+          // Panel variable - collect values for all relevant panels from nested structure
+          const panelValues: any[] = [];
+          const storedValue = mergedVariablesValues.value[varName];
+
+          // storedValue is an array like [{ panelId: "panel1", value: "val1" }, { panelId: "panel2", value: "val2" }]
+          if (Array.isArray(storedValue)) {
+            storedValue.forEach((entry: any) => {
+              // Verify this entry belongs to a panel defined in varConfig
+              if (entry.panelId && entry.value !== undefined &&
+                  varConfig.panels && varConfig.panels.includes(entry.panelId)) {
+                panelValues.push({ panelId: entry.panelId, value: entry.value });
+              }
+            });
+          }
+
+          if (panelValues.length > 0) {
+            aggregatedValues.push({
+              ...varConfig,
+              scope: 'panels',
+              value: panelValues,
+              _isCurrentLevel: false,
+            });
+          }
         }
+      });
+
+      return {
+        isVariablesLoading: variablesData.value?.isVariablesLoading || false,
+        values: aggregatedValues,
+      };
+    });
+
+    // Emit aggregated variables when they change (for URL syncing and current state)
+    watch(
+      aggregatedVariablesForUrl,
+      (newValue) => {
+        emit("variablesData", newValue);
       },
-      { deep: true },
+      { deep: true, immediate: true },
     );
 
-    watch(
-      () => variablesData.value,
-      () => {
-        emit("refreshedVariablesDataUpdated", variablesData.value);
-      },
-      { deep: true },
-    );
+    // Emit initial refreshed state only once on mount
+    // The parent (ViewDashboard) will handle syncing this when refresh is clicked
+    onMounted(() => {
+      if (aggregatedVariablesForUrl.value) {
+        emit("refreshedVariablesDataUpdated", aggregatedVariablesForUrl.value);
+      }
+    });
 
     const currentQueryTraceIds = computed(() => {
       const traceIds = Object.values(
@@ -442,6 +838,9 @@ export default defineComponent({
 
     let needsVariablesAutoUpdate = true;
 
+    // Track last global values to detect changes
+    const lastGlobalValues = ref<Record<string, any>>({});
+
     const variablesDataUpdated = (data: any) => {
       try {
         // update the variables data
@@ -453,10 +852,297 @@ export default defineComponent({
           }
           currentVariablesDataRef.value = { __global: variablesData.value };
         }
+
+        // Extract current values from data.values that are GLOBAL level (_isCurrentLevel !== false)
+        const currentGlobalValues: Record<string, any> = {};
+        if (data?.values) {
+          data.values.forEach((v: any) => {
+            // Only include global variables (those that are current level in global config)
+            if (v.name && v.value !== undefined && v._isCurrentLevel !== false) {
+              currentGlobalValues[v.name] = v.value;
+            }
+          });
+        }
+
+        // Check if this is first load or if values actually changed
+        const isFirstLoad = !globalVariablesLoaded.value;
+        let hasActualChanges = false;
+
+        if (!isFirstLoad) {
+          // Compare with last values to detect actual changes
+          hasActualChanges = Object.keys(currentGlobalValues).some(
+            (key) =>
+              JSON.stringify(currentGlobalValues[key]) !==
+              JSON.stringify(lastGlobalValues.value[key])
+          );
+        }
+
+        // Update merged state only if values changed or first load
+        if (isFirstLoad || hasActualChanges) {
+          const updatedValues: Record<string, any> = {
+            ...mergedVariablesValues.value,
+            ...currentGlobalValues,
+          };
+          mergedVariablesValues.value = updatedValues;
+          lastGlobalValues.value = { ...currentGlobalValues };
+        } else {
+          return;
+        }
+
+        // Mark global as loaded and trigger tab load ONLY on first load
+        if (isFirstLoad) {
+          globalVariablesLoaded.value = true;
+
+          nextTick(() => {
+            if (
+              tabVariablesValueSelectorRef.value &&
+              activeTabVariables.value.length > 0
+            ) {
+              tabVariablesValueSelectorRef.value.loadAllVariablesData(true);
+            } else if (activeTabVariables.value.length === 0) {
+              tabVariablesReady.value = true;
+              nextTick(() => {
+                visiblePanels.value.forEach((panelId) => {
+                  loadPanelVariablesIfVisible(panelId);
+                });
+              });
+            }
+          });
+        }
+
         return;
       } catch (error) {
         return;
       }
+    };
+
+    // Track if global variables are loaded
+    const globalVariablesLoaded = ref(false);
+
+    // Track if tab variables are loaded
+    const tabVariablesReady = ref(false);
+
+    // Track last tab values to detect changes
+    const lastTabValues = ref<Record<string, any>>({});
+
+    // Handler for tab variables data updates
+    const tabVariablesDataUpdated = (data: any) => {
+      const currentTabId = selectedTabId.value;
+
+      // Extract current tab values (only TAB level variables with _isCurrentLevel === true)
+      const currentTabValues: Record<string, any> = {};
+      if (data?.values) {
+        data.values.forEach((v: any) => {
+          // Only include tab-level variables (those marked as current level)
+          if (v.name && v.value !== undefined && v._isCurrentLevel === true) {
+            currentTabValues[v.name] = v.value;
+          }
+        });
+      }
+
+      // Check if this is first load or if values actually changed
+      const tabKey = `tab_${currentTabId}`;
+      const isFirstLoad = !tabVariablesReady.value;
+      let hasActualChanges = false;
+
+      if (!isFirstLoad) {
+        // Compare with last values to detect actual changes for THIS tab
+        hasActualChanges = Object.keys(currentTabValues).some((key) => {
+          const lastValue = lastTabValues.value[tabKey]?.[key];
+          return JSON.stringify(currentTabValues[key]) !== JSON.stringify(lastValue);
+        });
+      }
+
+      // Update merged state only if values changed or first load
+      if (isFirstLoad || hasActualChanges) {
+        // Store values with tab isolation using array structure
+        Object.keys(currentTabValues).forEach((varName) => {
+          const varValue = currentTabValues[varName]; // Can be string, number, or array (for multi-select)
+
+          // Check if this variable already has a scoped array structure
+          const existingValue = mergedVariablesValues.value[varName];
+
+          if (!existingValue || !isScopedArray(existingValue)) {
+            // Initialize as scoped array if it doesn't exist or isn't already a scoped array
+            mergedVariablesValues.value[varName] = [];
+          }
+
+          // Find if an entry for this tab already exists
+          const existingEntryIndex = mergedVariablesValues.value[varName].findIndex(
+            (entry: any) => entry.tabId === currentTabId
+          );
+
+          // Update or add the entry for this tab
+          if (existingEntryIndex >= 0) {
+            // Update existing entry
+            mergedVariablesValues.value[varName][existingEntryIndex].value = varValue;
+          } else {
+            // Add new entry
+            mergedVariablesValues.value[varName].push({
+              tabId: currentTabId,
+              value: varValue, // Preserve array structure for multi-select
+            });
+          }
+        });
+
+        // Track last values for this tab
+        if (!lastTabValues.value[tabKey]) {
+          lastTabValues.value[tabKey] = {};
+        }
+        lastTabValues.value[tabKey] = { ...currentTabValues };
+
+      } else {
+        // Still mark as ready but don't trigger cascades
+        tabVariablesReady.value = true;
+        return;
+      }
+
+      // Update the main variablesData by merging values arrays intelligently
+      // We need to preserve variables from other contexts (other tabs, panels, global)
+      if (variablesData.value && data?.values) {
+        // Create a map of existing variables by name for quick lookup
+        const existingVariablesMap = new Map(
+          (variablesData.value.values || []).map((v: any) => [v.name, v])
+        );
+
+        // Update or add variables from the current data
+        data.values.forEach((newVar: any) => {
+          existingVariablesMap.set(newVar.name, newVar);
+        });
+
+        // Reconstruct the variablesData with merged values
+        variablesData.value = {
+          ...variablesData.value,
+          ...data,
+          values: Array.from(existingVariablesMap.values()),
+        };
+      } else {
+        // Fallback to simple merge if structure is unexpected
+        variablesData.value = {
+          ...variablesData.value,
+          ...data,
+        };
+      }
+
+      // Mark tab variables as ready and trigger panel loads ONLY on first load
+      if (isFirstLoad) {
+        tabVariablesReady.value = true;
+        nextTick(() => {
+          visiblePanels.value.forEach((panelId) => {
+            loadPanelVariablesIfVisible(panelId);
+          });
+        });
+      }
+    };
+
+    // Track last panel values to detect changes
+    const lastPanelValues = ref<Record<string, Record<string, any>>>({});
+
+    // Handler for panel variables data updates
+    const panelVariablesDataUpdated = (data: any, panelId: string) => {
+
+      // Extract current panel values (only PANEL level variables with _isCurrentLevel === true)
+      const currentPanelValues: Record<string, any> = {};
+      if (data?.values) {
+        data.values.forEach((v: any) => {
+          // Only include panel-level variables (those marked as current level)
+          if (v.name && v.value !== undefined && v._isCurrentLevel === true) {
+            currentPanelValues[v.name] = v.value;
+          }
+        });
+      }
+
+      // Check if this is first load or if values actually changed
+      const isFirstLoad = !lastPanelValues.value[panelId];
+      let hasActualChanges = false;
+
+      if (!isFirstLoad) {
+        // Compare with last values to detect actual changes for THIS panel
+        hasActualChanges = Object.keys(currentPanelValues).some(
+          (key) =>
+            JSON.stringify(currentPanelValues[key]) !==
+            JSON.stringify(lastPanelValues.value[panelId]?.[key])
+        );
+      }
+
+      // Update merged state only if values changed or first load
+      if (isFirstLoad || hasActualChanges) {
+        // Store values with panel isolation using array structure
+        Object.keys(currentPanelValues).forEach((varName) => {
+          const varValue = currentPanelValues[varName]; // Can be string, number, or array (for multi-select)
+
+          // Check if this variable already has a scoped array structure
+          const existingValue = mergedVariablesValues.value[varName];
+
+          if (!existingValue || !isScopedArray(existingValue)) {
+            // Initialize as scoped array if it doesn't exist or isn't already a scoped array
+            mergedVariablesValues.value[varName] = [];
+          }
+
+          // Find if an entry for this panel already exists
+          const existingEntryIndex = mergedVariablesValues.value[varName].findIndex(
+            (entry: any) => entry.panelId === panelId
+          );
+
+          // Update or add the entry for this panel
+          if (existingEntryIndex >= 0) {
+            // Update existing entry
+            mergedVariablesValues.value[varName][existingEntryIndex].value = varValue;
+          } else {
+            // Add new entry
+            mergedVariablesValues.value[varName].push({
+              panelId: panelId,
+              value: varValue, // Preserve array structure for multi-select
+            });
+          }
+        });
+
+        // Track last values for this panel
+        if (!lastPanelValues.value[panelId]) {
+          lastPanelValues.value[panelId] = {};
+        }
+        lastPanelValues.value[panelId] = { ...currentPanelValues };
+
+        // IMPORTANT: Only update currentVariablesDataRef on initial load
+        // For subsequent changes, wait for user to click refresh
+        if (isFirstLoad) {
+          // This triggers the panel to fetch data with new variable values
+          currentVariablesDataRef.value[panelId] = data;
+        }
+        // For non-initial changes: variables are updated in mergedVariablesValues (for URL sync and warning),
+        // but currentVariablesDataRef is NOT updated, so panels won't re-fetch until refresh is clicked
+
+      } else {
+        return;
+      }
+
+      // Update the main variablesData by merging values arrays intelligently
+      // We need to preserve variables from other contexts (other panels, tabs, global)
+      if (variablesData.value && data?.values) {
+        // Create a map of existing variables by name for quick lookup
+        const existingVariablesMap = new Map(
+          (variablesData.value.values || []).map((v: any) => [v.name, v])
+        );
+
+        // Update or add variables from the current data
+        data.values.forEach((newVar: any) => {
+          existingVariablesMap.set(newVar.name, newVar);
+        });
+
+        // Reconstruct the variablesData with merged values
+        variablesData.value = {
+          ...variablesData.value,
+          ...data,
+          values: Array.from(existingVariablesMap.values()),
+        };
+      } else {
+        // Fallback to simple merge if structure is unexpected
+        variablesData.value = {
+          ...variablesData.value,
+          ...data,
+        };
+      }
+
     };
 
     // ======= [END] dashboard PrintMode =======
@@ -566,7 +1252,6 @@ export default defineComponent({
 
       // Handle layout changes (drag/resize) - only update layout data, don't save during operations
       gridStackInstance.on("change", async (event, items) => {
-
         // skip if viewOnly mode
         if (props.viewOnly) {
           return;
@@ -757,6 +1442,53 @@ export default defineComponent({
       await nextTick(); // Wait for DOM to be ready
       initGridStack(); // Initialize the grid system
       await nextTick(); // Wait for grid initialization to complete
+
+      // Setup Intersection Observer for panel visibility tracking
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            const panelId = entry.target.getAttribute("data-panel-id");
+            if (panelId) {
+              if (entry.isIntersecting) {
+                visiblePanels.value.add(panelId);
+                // Trigger lazy loading for panel variables when panel becomes visible
+                nextTick(() => {
+                  loadPanelVariablesIfVisible(panelId);
+                });
+              } else {
+                visiblePanels.value.delete(panelId);
+              }
+            }
+          });
+        },
+        {
+          threshold: 0.1, // Trigger when 10% of panel is visible
+          rootMargin: "50px", // Load slightly before coming into view
+        },
+      );
+
+      // Observe all panels
+      watch(
+        () => panels.value,
+        (newPanels) => {
+          nextTick(() => {
+            newPanels.forEach((panel: any) => {
+              const element = document.querySelector(
+                `[data-panel-id="${panel.id}"]`,
+              );
+              if (element) {
+                observer.observe(element);
+              }
+            });
+          });
+        },
+        { immediate: true },
+      );
+
+      // Cleanup observer on unmount
+      onUnmounted(() => {
+        observer.disconnect();
+      });
     });
 
     // Clean up GridStack instance before component unmounts to prevent memory leaks
@@ -827,6 +1559,53 @@ export default defineComponent({
       emit("openEditLayout", id);
     };
 
+    // Initialize mergedVariablesValues with initialVariableValues from props
+    watch(
+      () => props.initialVariableValues,
+      (newVal) => {
+        if (newVal?.value && Object.keys(newVal.value).length > 0) {
+          mergedVariablesValues.value = { ...newVal.value };
+        }
+      },
+      { immediate: true },
+    );
+
+    // Watch for tab changes - reset state
+    watch(selectedTabId, (newTabId, oldTabId) => {
+      if (newTabId !== oldTabId) {
+
+        // Reset state for new tab
+        tabVariablesReady.value = false;
+        panelVariablesLoaded.value.clear();
+        lastTabValues.value = {}; // Reset tab value tracking
+        lastPanelValues.value = {}; // Reset panel value tracking
+
+        // If no tab variables, mark as ready immediately
+        nextTick(() => {
+          if (activeTabVariables.value.length === 0) {
+            tabVariablesReady.value = true;
+
+            // Trigger panel loads if no tab variables
+            nextTick(() => {
+              visiblePanels.value.forEach((panelId) => {
+                loadPanelVariablesIfVisible(panelId);
+              });
+            });
+          }
+        });
+      }
+    });
+
+    // Initialize tab variables ready state on mount
+    onMounted(() => {
+      nextTick(() => {
+        // If no tab variables on current tab, mark as ready
+        if (activeTabVariables.value.length === 0) {
+          tabVariablesReady.value = true;
+        }
+      });
+    });
+
     return {
       store,
       addPanelData,
@@ -854,6 +1633,23 @@ export default defineComponent({
       currentVariablesDataRef,
       resetGridLayout,
       refreshGridStack,
+      // Level-based variables
+      globalVariablesConfig,
+      tabVariablesConfig,
+      activeTabVariables,
+      getPanelVariablesConfig,
+      getPanelVariables,
+      visiblePanels,
+      tabVariablesDataUpdated,
+      panelVariablesDataUpdated,
+      // Shared variables state
+      mergedVariablesValues,
+      // Panel lazy loading
+      setPanelVariableRef,
+      loadPanelVariablesIfVisible,
+      tabVariablesValueSelectorRef,
+      mergedVariablesWrapper,
+      getPanelVariablesWrapper,
     };
   },
   methods: {
@@ -959,4 +1755,45 @@ export default defineComponent({
 .grid-stack-item-content {
   box-sizing: border-box;
 }
+
+/* ============================================ */
+/* LEVEL-BASED VARIABLES STYLING */
+/* ============================================ */
+
+.global-variables-container {
+  background: rgba(var(--q-primary-rgb), 0.03);
+  border-left: 3px solid var(--q-primary);
+  padding: 8px 12px;
+  border-radius: 4px;
+}
+
+.tabs-container {
+  margin-bottom: 8px;
+}
+
+.tab-variables-container {
+  background: rgba(var(--q-info-rgb), 0.03);
+  border-left: 3px solid var(--q-info);
+  border-radius: 4px;
+  margin-top: 4px;
+}
+
+.panel-with-variables {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.panel-variables-container {
+  background: rgba(var(--q-secondary-rgb), 0.02);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 4px 4px 0 0;
+  font-size: 0.9em;
+
+  .dark & {
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+  }
+}
+
+/* END LEVEL-BASED VARIABLES STYLING */
 </style>
