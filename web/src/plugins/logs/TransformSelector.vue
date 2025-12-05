@@ -244,15 +244,15 @@ const transformsLabel = computed(() => {
     return searchObj.data.selectedTransform.name;
   }
 
-  if (searchObj.meta.logsVisualizeToggle === 'visualize') return "Function selection is not supported for visualization";
+  if (searchObj.meta.logsVisualizeToggle === 'visualize') return t("search.functionSelectionNotSupportedVisualization");
 
-  if (!isActionsEnabled.value) return "Function";
+  if (!isActionsEnabled.value) return t("search.functionLabel");
 
   return searchObj.data.transformType === "action"
-    ? "Action"
+    ? t("search.actionLabel")
     : searchObj.data.transformType === "function"
-      ? "Function"
-      : "Transform";
+      ? t("search.functionLabel")
+      : t("search.transformLabel");
 });
 
 const transformIcon = computed(() => {

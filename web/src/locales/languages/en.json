@@ -268,7 +268,11 @@
     "jobAlreadyScheduled": "Job Already Scheduled , please change some parameters to schedule new job",
     "jobSchedulerRange": "Job Scheduler should be between 1 and 100000",
     "errorAddingJob": "Error while adding job",
-    "selectStreamBeforeScheduling": "Please select a stream before scheduling a job"
+    "selectStreamBeforeScheduling": "Please select a stream before scheduling a job",
+    "functionSelectionNotSupportedVisualization": "Function selection is not supported for visualization",
+    "functionLabel": "Function",
+    "actionLabel": "Action",
+    "transformLabel": "Transform"
   },
   "menu": {
     "home": "Home",
