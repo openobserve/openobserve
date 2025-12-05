@@ -30,6 +30,7 @@ use config::{
 };
 use hashbrown::{HashMap, hash_map::Entry};
 use proto::cluster_rpc;
+use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 
 use crate::{common::meta::ingestion, service};
 
@@ -93,7 +94,9 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
         }
     }
 
-    let mut report_data = vec![];
+    let cfg = get_config();
+    let usage_reporting_mode = &cfg.common.usage_reporting_mode;
+    let mut report_data = Vec::with_capacity(groups.len() + search_events.len());
     for (_, data) in groups {
         let mut usage_data = data.usage_data;
         usage_data.response_time /= data.count as f64;
@@ -102,8 +105,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
 
     // Push all the search events
     report_data.append(&mut search_events);
-    let cfg = get_config();
-    if &cfg.common.usage_reporting_mode != "local"
+    if usage_reporting_mode != "local"
         && !cfg.common.usage_reporting_url.is_empty()
         && !cfg.common.usage_reporting_creds.is_empty()
     {
@@ -113,12 +115,10 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
         } else {
             format!("Basic {}", &cfg.common.usage_reporting_creds)
         };
-        match reqwest::Client::builder()
-            .build()
-            .unwrap()
+        match reqwest::Client::new()
             .post(url)
-            .header("Content-Type", "application/json")
-            .header(reqwest::header::AUTHORIZATION, creds)
+            .header(CONTENT_TYPE, "application/json")
+            .header(AUTHORIZATION, creds)
             .json(&report_data)
             .send()
             .await
@@ -132,7 +132,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                             .await
                             .unwrap_or_else(|_| resp_status.to_string())
                     );
-                    if &cfg.common.usage_reporting_mode != "both" {
+                    if usage_reporting_mode != "both" {
                         // on error in ingesting usage data, push back the data
                         let curr_usages = curr_usages.clone();
                         for usage_data in curr_usages {
@@ -149,11 +149,8 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                 }
             }
             Err(e) => {
-                log::error!(
-                    "[SELF-REPORTING] Error in ingesting usage data to external URL {:?}",
-                    e
-                );
-                if &cfg.common.usage_reporting_mode != "both" {
+                log::error!("[SELF-REPORTING] Error in ingesting usage data to external URL {e:?}");
+                if usage_reporting_mode != "both" {
                     // on error in ingesting usage data, push back the data
                     let curr_usages = curr_usages.clone();
                     for usage_data in curr_usages {
@@ -171,28 +168,31 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
         }
     }
 
-    if &cfg.common.usage_reporting_mode != "remote" {
+    if usage_reporting_mode != "remote" {
         let report_data = report_data
-            .iter_mut()
-            .map(|usage| json::to_value(usage).unwrap())
+            .into_iter()
+            .map(|usage| json::to_value(usage).unwrap_or_default())
             .collect::<Vec<_>>();
         // report usage data
         let usage_stream = StreamParams::new(META_ORG_ID, USAGE_STREAM, StreamType::Logs);
-        if ingest_reporting_data(report_data, usage_stream)
-            .await
-            .is_err()
-            && &cfg.common.usage_reporting_mode != "both"
-        {
-            // on error in ingesting usage data, push back the data
-            for usage_data in curr_usages {
-                if let Err(e) = super::queues::USAGE_QUEUE
-                    .enqueue(ReportingData::Usage(Box::new(usage_data)))
-                    .await
-                {
-                    log::error!(
-                        "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
-                    );
-                }
+        if let Err(e) = ingest_reporting_data(report_data, usage_stream).await {
+            log::error!(
+                "[SELF-REPORTING] Error in ingesting usage data to internal ingestion: {e}"
+            );
+            if cfg.common.usage_reporting_mode != "both" {
+                // on error in ingesting usage data, push back the data
+                tokio::spawn(async move {
+                    for usage_data in curr_usages {
+                        if let Err(e) = super::queues::USAGE_QUEUE
+                            .enqueue(ReportingData::Usage(Box::new(usage_data)))
+                            .await
+                        {
+                            log::error!(
+                                "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
+                            );
+                        }
+                    }
+                });
             }
         }
     }
