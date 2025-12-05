@@ -962,7 +962,13 @@
     "colorPositive": "Positivo (por valor)",
     "colorNegative": "Negativo (por valor)",
     "colorLightToDarkBlue": "Azul claro a escuro (por valor)",
-    "colorPaletteClassicBySeries": "Palette-Classic (por série)"
+    "colorPaletteClassicBySeries": "Palette-Classic (por série)",
+    "drilldown": "Detalhamento",
+    "drilldownTooltip": "Navegue até outro painel ou URL especificado, transferindo todas as variáveis atuais para uma exploração perfeita dos dados.",
+    "colorBySeriesTitle": "Colorir por série",
+    "colorBySeriesTooltip": "Aplique cores às séries para obter uma melhor distinção visual nos gráficos. Personalize as cores de cada série para aprimorar a visualização dos dados.",
+    "editColorBySeries": " Editar cor por série",
+    "applyColorBySeries": " Aplique cores por série"
   },
   "panel": {
     "header": "Painel",

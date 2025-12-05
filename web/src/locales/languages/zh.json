@@ -962,7 +962,13 @@
     "colorPositive": "正值（按价值计算）",
     "colorNegative": "负数（按值计算）",
     "colorLightToDarkBlue": "浅到深蓝色（按值计算）",
-    "colorPaletteClassicBySeries": "Palette-Classic（按系列分类）"
+    "colorPaletteClassicBySeries": "Palette-Classic（按系列分类）",
+    "drilldown": "向下钻取",
+    "drilldownTooltip": "导航到另一个仪表板或指定的 URL，保留所有当前变量，实现无缝数据探索。",
+    "colorBySeriesTitle": "按系列着色",
+    "colorBySeriesTooltip": "对系列应用颜色以更好地区分图表中的视觉效果。为每个系列自定义颜色以增强数据可视化。",
+    "editColorBySeries": " 按系列编辑颜色",
+    "applyColorBySeries": " 按系列应用颜色"
   },
   "panel": {
     "header": "面板",

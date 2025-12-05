@@ -962,7 +962,13 @@
     "colorPositive": "Positief (per waarde)",
     "colorNegative": "Negatief (per waarde)",
     "colorLightToDarkBlue": "Licht tot donkerblauw (per waarde)",
-    "colorPaletteClassicBySeries": "Palette-Classic (per serie)"
+    "colorPaletteClassicBySeries": "Palette-Classic (per serie)",
+    "drilldown": "Inzoomen",
+    "drilldownTooltip": "Navigeer naar een ander dashboard of een andere opgegeven URL, waarbij alle huidige variabelen worden meegenomen voor een naadloze gegevensverkenning.",
+    "colorBySeriesTitle": "Kleur per serie",
+    "colorBySeriesTooltip": "Pas kleuren toe op series voor een beter visueel onderscheid in diagrammen. Pas kleuren aan voor elke serie om de datavisualisatie te verbeteren.",
+    "editColorBySeries": " Kleur per serie bewerken",
+    "applyColorBySeries": " Kleur per serie aanbrengen"
   },
   "panel": {
     "header": "Paneel",

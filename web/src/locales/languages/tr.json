@@ -962,7 +962,13 @@
     "colorPositive": "Pozitif (Değere Göre)",
     "colorNegative": "Negatif (Değere Göre)",
     "colorLightToDarkBlue": "Açık - Koyu Mavi (Değere Göre)",
-    "colorPaletteClassicBySeries": "Palette-Classic (Serilere Göre)"
+    "colorPaletteClassicBySeries": "Palette-Classic (Serilere Göre)",
+    "drilldown": "Detaya inme",
+    "drilldownTooltip": "Sorunsuz veri araştırması için geçerli tüm değişkenleri taşıyan başka bir panoya veya belirtilen URL'ye gidin.",
+    "colorBySeriesTitle": "Serilere göre renk",
+    "colorBySeriesTooltip": "Grafiklerde daha iyi görsel ayrım için serilere renk uygulayın. Veri görselleştirmesini geliştirmek için her seri için renkleri özelleştirin.",
+    "editColorBySeries": " Rengi seriye göre düzenle",
+    "applyColorBySeries": " Serilere göre renk uygulayın"
   },
   "panel": {
     "header": "Panel",

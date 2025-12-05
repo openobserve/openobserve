@@ -962,7 +962,13 @@
     "colorPositive": "양수 (값별)",
     "colorNegative": "음수 (값별)",
     "colorLightToDarkBlue": "밝은 파란색에서 진한 파란색으로 (값별)",
-    "colorPaletteClassicBySeries": "팔레트-클래식 (시리즈별)"
+    "colorPaletteClassicBySeries": "팔레트-클래식 (시리즈별)",
+    "drilldown": "드릴다운",
+    "drilldownTooltip": "원활한 데이터 탐색을 위해 현재 변수를 모두 가져와 다른 대시보드 또는 지정된 URL로 이동합니다.",
+    "colorBySeriesTitle": "시리즈별 색상",
+    "colorBySeriesTooltip": "차트에서 시각적으로 더 잘 구분할 수 있도록 시리즈에 색상을 적용하세요.각 시리즈의 색상을 사용자 지정하여 데이터 시각화를 향상시키세요.",
+    "editColorBySeries": " 시리즈별 색상 편집",
+    "applyColorBySeries": " 시리즈별 색상 적용"
   },
   "panel": {
     "header": "패널",
