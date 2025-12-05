@@ -382,6 +382,18 @@ export class SanityPage {
     }
 
     async createFunctionViaFunctionsPage() {
+        // Generate unique function name with 4-digit alphanumeric suffix
+        const generateSuffix = () => {
+            const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+            let suffix = '';
+            for (let i = 0; i < 4; i++) {
+                suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return suffix;
+        };
+
+        const uniqueFunctionName = `sanitytest_${generateSuffix()}`;
+
         await this.page.locator(this.pipelineMenuItem).click();
         await this.page.waitForLoadState('networkidle', { timeout: 5000 });
         await this.page.waitForTimeout(500);
@@ -395,7 +407,7 @@ export class SanityPage {
 
         await this.page.getByRole(this.createNewFunctionButton.role, { name: this.createNewFunctionButton.name }).click();
         await this.page.getByLabel(this.nameLabel.label).click();
-        await this.page.getByLabel(this.nameLabel.label).fill("sanitytest");
+        await this.page.getByLabel(this.nameLabel.label).fill(uniqueFunctionName);
         
         await this.page.locator(this.vrlFunctionEditor).click();
         await this.page.locator(this.vrlEditorContent).fill("sanity=1");
@@ -407,9 +419,9 @@ export class SanityPage {
         await this.page.locator(this.vrlEditorContent).fill(".sanity=1");
         
         await this.page.getByRole(this.saveButton.role, { name: this.saveButton.name }).click();
-        
+
         await this.page.getByPlaceholder("Search Function").click();
-        await this.page.getByPlaceholder("Search Function").fill("sanity");
+        await this.page.getByPlaceholder("Search Function").fill(uniqueFunctionName);
         await this.page.getByRole("button", { name: "Delete Function" }).click();
         await this.page.locator(this.confirmButton).click();
         await this.page.getByText("Function deleted").click();

@@ -290,7 +290,8 @@
     "commitHash": "Commettre Hash",
     "buildDate": "Date de construction",
     "logoMsg": "L'observabilité est simplifiée.",
-    "buildType": "Plateforme"
+    "buildType": "Plateforme",
+    "manage_license": "Gérer la licence"
   },
   "login": {
     "userid": "ID utilisateur",

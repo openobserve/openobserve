@@ -53,7 +53,7 @@ use crate::{
     service::search::{
         grpc::flight as grpcFlight,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        utils::AsyncDefer,
+        work_group::DeferredLock,
     },
 };
 
@@ -148,7 +148,7 @@ impl FlightService for FlightServiceImpl {
         );
 
         // prepare dataufion context
-        let (ctx, physical_plan, defer, scan_stats) = match result {
+        let (ctx, physical_plan, lock, scan_stats) = match result {
             Ok(v) => v,
             Err(e) => {
                 // clear session data
@@ -215,7 +215,7 @@ impl FlightService for FlightServiceImpl {
         let mut stream = FlightEncoderStreamBuilder::new(write_options, 33554432)
             .with_trace_id(trace_id.to_string())
             .with_is_super(is_super_cluster)
-            .with_defer(defer)
+            .with_defer_lock(lock)
             .with_start(start)
             .with_custom_message(PreCustomMessage::ScanStats(scan_stats))
             .with_custom_message(PreCustomMessage::ScanStatsRef(scan_stats_ref))
@@ -313,7 +313,7 @@ impl FlightService for FlightServiceImpl {
 type PlanResult = (
     datafusion::prelude::SessionContext,
     Arc<dyn datafusion::physical_plan::ExecutionPlan>,
-    Option<AsyncDefer>,
+    Option<DeferredLock>,
     ScanStats,
 );
 
@@ -324,9 +324,9 @@ async fn get_ctx_and_physical_plan(
     req: &FlightSearchRequest,
 ) -> Result<PlanResult, infra::errors::Error> {
     if req.super_cluster_info.is_super_cluster {
-        let (ctx, physical_plan, defer, scan_stats) =
+        let (ctx, physical_plan, lock, scan_stats) =
             crate::service::search::super_cluster::follower::search(trace_id, req).await?;
-        Ok((ctx, physical_plan, Some(defer), scan_stats))
+        Ok((ctx, physical_plan, Some(lock), scan_stats))
     } else {
         let (ctx, physical_plan, scan_stats) = grpcFlight::search(trace_id, req).await?;
         Ok((ctx, physical_plan, None, scan_stats))
