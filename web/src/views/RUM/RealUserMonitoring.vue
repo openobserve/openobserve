@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onActivated, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onActivated, onMounted, ref, watch, onUpdated } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useSession from "@/composables/useSessionReplay";
@@ -194,6 +194,35 @@ onMounted(async () => {
     changeTab(activeTab.value);
 });
 
+onUpdated(async () => {
+  if (routeName.value === "RUM") {
+    const routeNameMapping: { [key: string]: string } = {
+      SessionViewer: "sessions",
+      ErrorTracking: "error_tracking",
+      RumPerformance: "performance",
+      ErrorViewer: "error_tracking",
+      Sessions: "sessions",
+      rumPerformanceSummary: "performance",
+    };
+
+    if (routeNameMapping[routeName.value?.toString() || "placeholder"]) {
+      activeTab.value =
+        routeNameMapping[
+          router.currentRoute.value.name?.toString() || "placeholder"
+        ];
+    } else {
+      activeTab.value = "performance";
+    }
+
+    // This is temporary fix, as we have kept sessionViewer keep-alive as false.
+    // So on routing to sessionViewer, this hook is called triggered and it routes to Session page again
+    const ignoreRoutes = ["SessionViewer", "ErrorViewer"];
+
+    if (!ignoreRoutes.includes(routeName.value as string))
+      changeTab(activeTab.value);
+  }
+});
+
 onActivated(async () => {
   await checkIfRumEnabled();
 });
@@ -264,7 +293,10 @@ const changeTab = (tab: string) => {
   if (tab === "performance") {
     router.push({
       name: "rumPerformanceSummary",
-      query: getQueryParams(performanceState.data.datetime, ""),
+      query: {
+        ...getQueryParams(performanceState.data.datetime, ""),
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
     });
     return;
   }
