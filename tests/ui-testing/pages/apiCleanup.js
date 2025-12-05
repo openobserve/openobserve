@@ -794,10 +794,6 @@ class APICleanup {
     }
 
     /**
-     * Clean up all streams starting with "sanitylogstream_"
-     * Deletes streams like sanitylogstream_61hj, sanitylogstream_abc123, etc.
-     */
-    /**
      * Clean up streams matching specified patterns
      * @param {Array<RegExp>} patterns - Array of regex patterns to match stream names
      * @param {Array<string>} protectedStreams - Array of stream names to never delete (optional)
