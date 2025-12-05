@@ -208,7 +208,7 @@ export default defineComponent({
       //we will also us the quasar's updateInputValue method to clear the input value
       this.$nextTick(() => {
         const indexListSelectField = this.$refs.streamSelect;
-        if (indexListSelectField && indexListSelectField.updateInputValue) {
+        if (indexListSelectField && indexListSelectField.inputValue && indexListSelectField.updateInputValue) {
           indexListSelectField.updateInputValue("");
         }
       });
@@ -225,7 +225,7 @@ export default defineComponent({
       //we will also us the quasar's updateInputValue method to clear the input value
       this.$nextTick(() => {
         const indexListSelectField = this.$refs.streamSelect;
-        if (indexListSelectField && indexListSelectField.updateInputValue) {
+        if (indexListSelectField && indexListSelectField.inputValue && indexListSelectField.updateInputValue) {
           indexListSelectField.updateInputValue("");
         }
       });

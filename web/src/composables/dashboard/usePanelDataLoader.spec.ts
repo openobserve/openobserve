@@ -1599,7 +1599,7 @@ describe("usePanelDataLoader", () => {
         expect(loader.data.value).toBeDefined();
       });
 
-      it("should save current state to cache", async () => {
+      it("should skip cache when forceLoad=true and runCount=0", async () => {
         const panelSchema = createMockPanelSchema();
         const selectedTimeObj = createMockSelectedTimeObj();
         const variablesData = createMockVariablesData();
@@ -1625,7 +1625,123 @@ describe("usePanelDataLoader", () => {
 
         await loader.loadData();
 
+        // With forceLoad=true and runCount=0, cache restore is skipped (line 800)
+        // Cache operations should be 0 since we skip the cache block entirely
+        expect(cacheOperationCount).toBe(0);
+        // Data should still be loaded (not from cache)
+        expect(loader.data.value).toBeDefined();
+      });
+
+      it("should attempt cache restore when forceLoad=false and runCount=0", async () => {
+        const panelSchema = createMockPanelSchema();
+        const selectedTimeObj = createMockSelectedTimeObj();
+        const variablesData = createMockVariablesData();
+
+        mockSearchResults = { hits: [{ test: "data" }], total: 1 };
+
+        // Set mock cache data (note: actual restore may fail due to cache key mismatch,
+        // but we're testing that getPanelCache is called)
+        mockCacheData = {
+          key: {}, // Simplified key - in real code this would be more complex
+          value: {
+            data: [{ test: "cached data" }],
+            metadata: { queries: [] },
+            errorDetail: { message: "", code: "" },
+            resultMetaData: [],
+            isPartialData: false,
+            isOperationCancelled: false,
+            loading: false,
+            annotations: [],
+            lastTriggeredAt: Date.now(),
+          },
+          cacheTimeRange: {
+            start_time: Date.now() - 3600000,
+            end_time: Date.now(),
+          },
+        };
+
+        const loader = usePanelDataLoader(
+          panelSchema,
+          selectedTimeObj,
+          variablesData,
+          ref({ offsetWidth: 1000 }),
+          ref(false), // forceLoad = false
+          ref("dashboards"),
+          ref("test-dashboard"),
+          ref("test-folder"),
+          ref(null),
+          ref(null), // runId
+          ref(null), // tabId
+          ref(null), // tabName
+          ref(null), // searchResponse
+          ref(false), // is_ui_histogram
+        );
+
+        // Start loadData without waiting (it will be pending due to visibility check after cache attempt)
+        const loadPromise = loader.loadData();
+
+        // Give it a moment to attempt cache restore (happens before visibility wait)
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // With forceLoad=false and runCount=0, cache restore is attempted (line 803)
+        // Cache operation count should be > 0 because getPanelCache was called
         expect(cacheOperationCount).toBeGreaterThan(0);
+
+        // Note: The actual cache data restoration may not occur due to cache key mismatch,
+        // but the important thing is that the code path entered the cache restoration logic
+        // (i.e., getPanelCache was called, as verified by cacheOperationCount > 0)
+      });
+
+      it("should skip cache restore on subsequent loads (runCount>0)", async () => {
+        const panelSchema = createMockPanelSchema();
+        const selectedTimeObj = createMockSelectedTimeObj();
+        const variablesData = createMockVariablesData();
+
+        mockSearchResults = { hits: [{ test: "first load" }], total: 1 };
+
+        // Set mock cache data
+        mockCacheData = {
+          data: [{ test: "cached data" }],
+          metadata: { queries: [] },
+          errorDetail: { message: "", code: "" },
+          resultMetaData: [],
+          isPartialData: false,
+          isOperationCancelled: false,
+        };
+
+        const loader = usePanelDataLoader(
+          panelSchema,
+          selectedTimeObj,
+          variablesData,
+          ref({ offsetWidth: 1000 }),
+          ref(true), // forceLoad = true for first load to bypass visibility
+          ref("dashboards"),
+          ref("test-dashboard"),
+          ref("test-folder"),
+          ref(null),
+          ref(null), // runId
+          ref(null), // tabId
+          ref(null), // tabName
+          ref(null), // searchResponse
+          ref(false), // is_ui_histogram
+        );
+
+        // First load (runCount=0) - with forceLoad=true, cache is skipped
+        await loader.loadData();
+        expect(cacheOperationCount).toBe(0);
+        expect(loader.data.value).toBeDefined();
+
+        // Reset cache operation counter
+        cacheOperationCount = 0;
+        mockSearchResults = { hits: [{ test: "second load" }], total: 1 };
+
+        // Second load (runCount>0) - cache restore should be skipped
+        // because condition at line 800 requires runCount == 0
+        await loader.loadData();
+
+        // Cache restore should be skipped on second run (runCount > 0)
+        expect(cacheOperationCount).toBe(0);
+        expect(loader.data.value).toBeDefined();
       });
     });
 

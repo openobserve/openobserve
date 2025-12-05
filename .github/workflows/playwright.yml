@@ -107,7 +107,7 @@ jobs:
       labels: repo-openobserve-standard-8
     # container:
     #   image: mcr.microsoft.com/playwright:v1.50.0-jammy
-    #   options: --user root
+    #   options: --user root 
     strategy:
       matrix:
         include:
@@ -407,44 +407,93 @@ jobs:
               # Use grep to find lines matching our shard folder
               SHARD_TESTS=""
 
-              # Check if the TestDino output contains tests for this shard
+              # Check if the TestDino output contains tests for this shard (case-insensitive)
               # Look for pattern: $ACTUAL_FOLDER/something.spec.js
-              if echo "$EXTRA_PW_FLAGS" | grep -q "$ACTUAL_FOLDER/.*\.spec\.js"; then
+              if echo "$EXTRA_PW_FLAGS" | grep -iq "$ACTUAL_FOLDER/.*\.spec\.js"; then
                 echo "DEBUG: Found test(s) for this shard in TestDino output"
 
                 # IMPORTANT: Based on observation, TestDino returns ONE test at a time
                 # Format: "Folder/file.spec.js -g test name"
                 # Simply check if it starts with our folder and pass it through
 
-                # Extract file path (everything before -g or end of string)
-                TEST_FILE=$(echo "$EXTRA_PW_FLAGS" | grep -oE "$ACTUAL_FOLDER/[^ ]+\.spec\.js" | head -1)
+                # Extract file path (everything before -g or end of string) - case-insensitive
+                TEST_FILE=$(echo "$EXTRA_PW_FLAGS" | grep -ioE "$ACTUAL_FOLDER/[^ ]+\.spec\.js" | head -1)
 
                 if [ -n "$TEST_FILE" ]; then
-                  # Check if file actually starts with our folder (double-check)
-                  if [[ "$TEST_FILE" == "$ACTUAL_FOLDER/"* ]]; then
-                    # Parse out the file path and test name separately for proper quoting
-                    # Extract file path (before -g)
-                    TEST_FILE_PATH=$(echo "$EXTRA_PW_FLAGS" | sed "s/ -g.*//" | sed "s|^|./playwright-tests/|")
+                  # Check if file actually starts with our folder (case-insensitive)
+                  if [[ "${TEST_FILE,,}" == "${ACTUAL_FOLDER,,}/"* ]]; then
+                    # Extract just the filename from the test file path
+                    TEST_FILENAME=$(basename "$TEST_FILE")
 
-                    # Check if there's a -g flag
-                    if echo "$EXTRA_PW_FLAGS" | grep -q " -g "; then
-                      # Extract test name (after -g) and strip any surrounding quotes
-                      TEST_NAME=$(echo "$EXTRA_PW_FLAGS" | sed 's/.*-g //' | sed 's/^"\(.*\)"$/\1/')
+                    # Check if this file is actually in the current shard's run_files list
+                    if echo "$FILE_LIST" | grep -qw "$TEST_FILENAME"; then
+                      # Parse out the file path and test name separately for proper quoting
+                      # Extract file path (before -g)
+                      TEST_FILE_PATH=$(echo "$EXTRA_PW_FLAGS" | sed "s/ -g.*//" | sed "s|^|./playwright-tests/|")
 
-                      echo "DEBUG: File path: $TEST_FILE_PATH"
-                      echo "DEBUG: Test name (unquoted): $TEST_NAME"
-                      echo "::notice::🎯 OPTIMIZED RERUN: Running failed test from this shard"
-                      echo "DEBUG: Final command: npx playwright test \"$TEST_FILE_PATH\" -g \"$TEST_NAME\""
+                      # Check if there's a -g flag
+                      if echo "$EXTRA_PW_FLAGS" | grep -q " -g "; then
+                        # Extract test name (after -g) and strip any surrounding quotes
+                        TEST_NAME=$(echo "$EXTRA_PW_FLAGS" | sed 's/.*-g //' | sed 's/^"\(.*\)"$/\1/')
 
-                      # Properly quote the test name to handle spaces and special chars
-                      npx playwright test "$TEST_FILE_PATH" -g "$TEST_NAME"
+                        echo "DEBUG: File path: $TEST_FILE_PATH"
+                        echo "DEBUG: Test name (unquoted): $TEST_NAME"
+                        echo "::notice::🎯 OPTIMIZED RERUN: Running failed test from this shard"
+                        echo "DEBUG: Final command: npx playwright test \"$TEST_FILE_PATH\" -g \"$TEST_NAME\""
+
+                        # Properly quote the test name to handle spaces and special chars
+                        npx playwright test "$TEST_FILE_PATH" -g "$TEST_NAME"
+                      else
+                        # No -g flag, just run the file
+                        echo "DEBUG: File path: $TEST_FILE_PATH (no -g flag)"
+                        echo "::notice::🎯 OPTIMIZED RERUN: Running failed test file from this shard"
+                        echo "DEBUG: Final command: npx playwright test \"$TEST_FILE_PATH\""
+
+                        npx playwright test "$TEST_FILE_PATH"
+                      fi
                     else
-                      # No -g flag, just run the file
-                      echo "DEBUG: File path: $TEST_FILE_PATH (no -g flag)"
-                      echo "::notice::🎯 OPTIMIZED RERUN: Running failed test file from this shard"
-                      echo "DEBUG: Final command: npx playwright test \"$TEST_FILE_PATH\""
+                      echo "::notice::⏭️ Test file '$TEST_FILENAME' not in this shard's run_files list."
+                      echo "::notice::Checking if this shard was cancelled/abruptly ended in previous attempt..."
 
-                      npx playwright test "$TEST_FILE_PATH"
+                      # Check the status of this matrix job in the previous attempt
+                      PREV_ATTEMPT=$((${{ github.run_attempt }} - 1))
+
+                      if [ "$PREV_ATTEMPT" -ge 1 ]; then
+                        JOB_NAME="e2e / ${{ matrix.testfolder }}"
+
+                        API_RESPONSE=$(curl -s -H "Authorization: token $GH_TOKEN" \
+                          -H "Accept: application/vnd.github.v3+json" \
+                          "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/$PREV_ATTEMPT/jobs" 2>/dev/null)
+
+                        if [ $? -eq 0 ] && [ -n "$API_RESPONSE" ]; then
+                          PREV_JOB_STATUS=$(echo "$API_RESPONSE" | jq -r ".jobs[] | select(.name == \"$JOB_NAME\") | .conclusion" 2>/dev/null)
+
+                          if [ "$PREV_JOB_STATUS" = "cancelled" ] || [ "$PREV_JOB_STATUS" = "null" ] || [ -z "$PREV_JOB_STATUS" ]; then
+                            echo "::warning::⚠️ Previous shard was cancelled/abruptly ended - running FULL test suite"
+                            npx playwright test $FILE_PATHS
+                            exit $?
+                          elif [ "$PREV_JOB_STATUS" = "success" ]; then
+                            echo "::notice::✅ Previous shard completed successfully - no tests to rerun"
+                            exit 0
+                          elif [ "$PREV_JOB_STATUS" = "failure" ]; then
+                            echo "::warning::⚠️ Previous shard failed but TestDino has no failures recorded - running FULL test suite"
+                            npx playwright test $FILE_PATHS
+                            exit $?
+                          else
+                            echo "::warning::⚠️ Unknown job status - running FULL test suite for safety"
+                            npx playwright test $FILE_PATHS
+                            exit $?
+                          fi
+                        else
+                          echo "::error::Failed to fetch job status from GitHub API - running FULL test suite"
+                          npx playwright test $FILE_PATHS
+                          exit $?
+                        fi
+                      else
+                        echo "::notice::✅ This is the first run, no previous attempt to check"
+                        echo "::notice::No failed tests to rerun. Exiting successfully."
+                        exit 0
+                      fi
                     fi
                   else
                     echo "::notice::⏭️ Test file doesn't match shard folder exactly. Skipping."
@@ -485,6 +534,7 @@ jobs:
                       echo "::warning::Treating as FAILED - running FULL test suite for this shard"
                       echo "DEBUG: Running all matrix tests: npx playwright test $FILE_PATHS"
                       npx playwright test $FILE_PATHS
+                      exit $?
                     elif [ "$PREV_JOB_STATUS" = "success" ]; then
                       echo "::notice::✅ Previous shard completed successfully - all tests passed"
                       echo "::notice::No failed tests to rerun. Exiting successfully."
@@ -494,17 +544,20 @@ jobs:
                       echo "::warning::This shouldn't happen - running FULL test suite for safety"
                       echo "DEBUG: Running all matrix tests: npx playwright test $FILE_PATHS"
                       npx playwright test $FILE_PATHS
+                      exit $?
                     else
                       echo "::warning::⚠️ Unknown job status: $PREV_JOB_STATUS"
                       echo "::warning::Running FULL test suite for safety"
                       echo "DEBUG: Running all matrix tests: npx playwright test $FILE_PATHS"
                       npx playwright test $FILE_PATHS
+                      exit $?
                     fi
                   else
                     echo "::error::Failed to fetch job status from GitHub API"
                     echo "::warning::Falling back to running FULL test suite for safety"
                     echo "DEBUG: Running all matrix tests: npx playwright test $FILE_PATHS"
                     npx playwright test $FILE_PATHS
+                    exit $?
                   fi
                 else
                   echo "::notice::✅ This is the first run, no previous attempt to check"
@@ -575,10 +628,22 @@ jobs:
 
       - name: Download blob reports from GitHub Actions Artifacts
         uses: actions/download-artifact@v4
+        continue-on-error: true
+        id: download_blobs
         with:
           path: tests/ui-testing/all-blob-reports
           pattern: blob-report-*-attempt-${{ github.run_attempt }}
           merge-multiple: true
+
+      - name: Check if any artifacts were downloaded
+        run: |
+          if [ -d "tests/ui-testing/all-blob-reports" ] && [ "$(ls -A tests/ui-testing/all-blob-reports)" ]; then
+            echo "✅ Artifacts downloaded successfully"
+            ls -la tests/ui-testing/all-blob-reports
+          else
+            echo "⚠️ No artifacts found or download failed completely"
+            # Don't fail here - let the Merge Reports step handle this
+          fi
 
       - name: Merge Reports
         env:
@@ -610,7 +675,8 @@ jobs:
               echo "::notice::This is VALID behavior for optimized reruns"
               echo "::notice::Creating empty report structure for downstream jobs"
               mkdir -p playwright-results/html-report
-              echo '{"config":{},"suites":[],"errors":[]}' > playwright-results/report.json
+              # Add stats object to make report compatible with TestDino
+              echo '{"config":{},"suites":[],"errors":[],"stats":{"startTime":'$(date +%s000)',"duration":0,"expected":0,"unexpected":0,"flaky":0,"skipped":0}}' > playwright-results/report.json
               echo "<html><body><h1>No tests executed - all shards skipped</h1><p>All test shards exited early because tests had already passed in a previous attempt.</p></body></html>" > playwright-results/html-report/index.html
               echo "::endgroup::"
               exit 0

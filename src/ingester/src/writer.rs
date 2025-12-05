@@ -334,13 +334,9 @@ impl Writer {
 
         // Spawn consumer tasks on the shared WAL runtime, or use the default runtime
         if let Some(rt) = WAL_RUNTIME.as_ref() {
-            rt.spawn(async move {
-                Self::consume_loop(writer, rx, idx).await;
-            });
+            rt.spawn(Self::consume_loop(writer, rx, idx));
         } else {
-            tokio::spawn(async move {
-                Self::consume_loop(writer, rx, idx).await;
-            });
+            tokio::spawn(Self::consume_loop(writer, rx, idx));
         }
 
         writer_clone

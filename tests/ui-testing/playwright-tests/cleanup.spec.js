@@ -15,14 +15,15 @@ test.describe("Pre-Test Cleanup", () => {
 
     const pm = new PageManager(page);
 
-    // Run complete cascade cleanup
-    // This will delete:
-    // 1. All destinations starting with 'auto_playwright'
-    // 2. All alerts blocking those destinations
-    // 3. All folders containing those alerts
-    // 4. All templates linked to those destinations
-    // 5. All remaining folders starting with 'auto_'
-    await pm.apiCleanup.completeCascadeCleanup('auto_playwright');
+    // Run complete cascade cleanup for alert destinations, templates, and folders
+    await pm.apiCleanup.completeCascadeCleanup(
+      // Destination prefixes to clean up
+      ['auto_', 'newdest_', 'sanitydest-'],
+      // Template prefixes to clean up
+      ['auto_email_template_', 'auto_webhook_template_', 'auto_playwright_template_', 'auto_url_webhook_template_', 'sanitytemp-', 'newtemp_'],
+      // Folder prefixes to clean up
+      ['auto_']
+    );
 
     // Clean up all reports owned by automation user
     await pm.apiCleanup.cleanupReports();
@@ -33,17 +34,38 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up all pipelines for e2e_automate streams
     await pm.apiCleanup.cleanupPipelines();
 
-    // Clean up all pipeline destinations matching pattern "destination" + 2-3 digits
-    await pm.apiCleanup.cleanupPipelineDestinations();
+    // Clean up pipeline destinations matching test patterns
+    await pm.apiCleanup.cleanupPipelineDestinations([
+      /^destination\d{2,3}$/  // destination12, destination123, etc.
+    ]);
 
-    // Clean up all functions matching pattern "Pipeline" + 3 digits
-    await pm.apiCleanup.cleanupFunctions();
+    // Clean up functions matching test patterns
+    await pm.apiCleanup.cleanupFunctions([
+      /^Pipeline\d{1,3}$/,           // Pipeline1, Pipeline12, Pipeline123
+      /^first\d{1,3}$/,              // first0, first1, first99
+      /^second\d{1,3}$/,             // second0, second1, second99
+      /^sanitytest_/,                // sanitytest_a3f2, etc.
+      /^e2eautomatefunctions_/       // e2eautomatefunctions_x9y2, etc.
+    ]);
 
-    // Clean up all enrichment tables matching pattern "protocols_" + UUID + "_csv"
-    await pm.apiCleanup.cleanupEnrichmentTables();
+    // Clean up enrichment tables matching test patterns
+    await pm.apiCleanup.cleanupEnrichmentTables([
+      /^protocols_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/  // protocols_<uuid>_csv
+    ]);
 
-    // Clean up all streams starting with "sanitylogstream_"
-    await pm.apiCleanup.cleanupStreams();
+    // Clean up streams matching test patterns
+    await pm.apiCleanup.cleanupStreams(
+      [
+        /^sanitylogstream_/,           // sanitylogstream_61hj, etc.
+        /^test\d+$/,                   // test1, test2, test3, etc.
+        /^stress_test/,                // stress_test*, stress_test123, etc.
+        /^sdr_/,                       // sdr_* (SDR test streams)
+        /^e2e_join_/,                  // e2e_join_* (UNION test streams)
+        /^[a-z]{8,9}$/                 // Random 8-9 char lowercase strings
+      ],
+      // Protected streams to never delete
+      ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate']
+    );
 
     // Clean up all service accounts matching pattern "email*@gmail.com"
     await pm.apiCleanup.cleanupServiceAccounts();
@@ -56,6 +78,12 @@ test.describe("Pre-Test Cleanup", () => {
 
     // Clean up custom logo from _meta organization
     await pm.apiCleanup.cleanupLogo();
+
+    // Clean up all search jobs
+    await pm.apiCleanup.cleanupSearchJobs();
+
+    // Clean up saved views matching test patterns
+    await pm.apiCleanup.cleanupSavedViews();
 
     testLogger.info('Pre-test cleanup completed successfully');
   });
