@@ -534,10 +534,14 @@ class APICleanup {
             // 1. "Pipeline" followed by 1-3 digits
             // 2. "first" followed by 1-3 digits
             // 3. "second" followed by 1-3 digits
+            // 4. "sanitytest_" followed by any characters (from createFunctionViaFunctionsPage)
+            // 5. "e2eautomatefunctions_" followed by any characters (from createAndDeleteFunction)
             const patterns = [
                 /^Pipeline\d{1,3}$/,
                 /^first\d{1,3}$/,
-                /^second\d{1,3}$/
+                /^second\d{1,3}$/,
+                /^sanitytest_/,
+                /^e2eautomatefunctions_/
             ];
             const matchingFunctions = functions.filter(f =>
                 patterns.some(pattern => pattern.test(f.name))
