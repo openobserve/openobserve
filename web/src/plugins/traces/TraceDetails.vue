@@ -973,6 +973,7 @@ export default defineComponent({
           parentSpan.spans.push(span);
         }
       }
+      
 
       // Purposely converting to microseconds to avoid floating point precision issues
       // In updateChart method, we are using start and end time to set the time range of trace
