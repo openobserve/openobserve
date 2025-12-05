@@ -23,12 +23,17 @@ use actix_web::{
 use config::{meta::user::UserRole, utils::rand::generate_random_string};
 use hashbrown::HashMap;
 
+#[cfg(feature = "enterprise")]
+use crate::handler::http::request::search::utils::check_resource_permissions;
 use crate::{
     common::{
         meta::{
             self,
             http::HttpResponse as MetaHttpResponse,
-            service_account::{APIToken, ServiceAccountRequest, UpdateServiceAccountRequest},
+            service_account::{
+                APIToken, ServiceAccountBulkDeleteRequest, ServiceAccountBulkDeleteResponse,
+                ServiceAccountRequest, UpdateServiceAccountRequest,
+            },
             user::{UpdateUser, UserRequest, UserUpdateMode},
         },
         utils::auth::UserEmail,
@@ -272,6 +277,86 @@ pub async fn delete(
     let (org_id, email_id) = path.into_inner();
     let initiator_id = user_email.user_id;
     users::remove_user_from_org(&org_id, &email_id, &initiator_id).await
+}
+
+/// RemoveServiceAccountBulk
+#[utoipa::path(
+    context_path = "/api",
+    tag = "ServiceAccounts",
+    operation_id = "RemoveServiceAccountBulk",
+    summary = "Delete nultiple service account",
+    description = "Permanently removes multiple service accounts from the organization. This action immediately invalidates the associated API token and revokes all access permissions for the service account. Use this when decommissioning automated systems or cleaning up unused accounts. This operation cannot be undone.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = ServiceAccountBulkDeleteRequest, description = "emails of accounts to be deleted", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = ServiceAccountBulkDeleteResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "delete"}))
+    )
+)]
+#[delete("/{org_id}/service_accounts/bulk")]
+pub async fn delete_bulk(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    req: web::Json<ServiceAccountBulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+    let req = req.into_inner();
+    let initiator_id = user_email.user_id;
+
+    #[cfg(feature = "enterprise")]
+    for email in &req.ids {
+        if let Some(res) = check_resource_permissions(
+            &org_id,
+            &initiator_id,
+            "service_accounts",
+            email,
+            "DELETE",
+            "",
+        )
+        .await
+        {
+            return Ok(res);
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
+    for email in req.ids {
+        match users::remove_user_from_org(&org_id, &email, &initiator_id).await {
+            Ok(v) => {
+                if v.status().is_success() {
+                    successful.push(email);
+                } else {
+                    log::error!(
+                        "error in deleting service account {org_id}/{email} : {:?}",
+                        v.status().canonical_reason()
+                    );
+                    unsuccessful.push(email);
+                    err = v.status().canonical_reason().map(|v| v.to_string());
+                }
+            }
+            Err(e) => {
+                log::error!("error in deleting service account {org_id}/{email} : {e}");
+                unsuccessful.push(email);
+                err = Some(e.to_string());
+            }
+        }
+    }
+
+    Ok(MetaHttpResponse::json(ServiceAccountBulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    }))
 }
 
 /// GetAPIToken

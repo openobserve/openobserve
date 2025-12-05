@@ -13,7 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpRequest, HttpResponse, delete, get, http::StatusCode, patch, post, put, web};
+use actix_web::{
+    HttpRequest, HttpResponse, delete, get,
+    http::StatusCode,
+    patch, post, put,
+    web::{self, Query},
+};
 use config::meta::{
     alerts::alert::Alert as MetaAlert,
     triggers::{Trigger, TriggerModule},
@@ -30,12 +35,12 @@ use crate::{
         extractors::Headers,
         models::alerts::{
             requests::{
-                AlertBulkEnableRequest, CreateAlertRequestBody, EnableAlertQuery, ListAlertsQuery,
-                MoveAlertsRequestBody, UpdateAlertRequestBody,
+                AlertBulkDeleteRequest, AlertBulkEnableRequest, CreateAlertRequestBody,
+                EnableAlertQuery, ListAlertsQuery, MoveAlertsRequestBody, UpdateAlertRequestBody,
             },
             responses::{
-                AlertBulkEnableResponse, EnableAlertResponseBody, GetAlertResponseBody,
-                ListAlertsResponseBody,
+                AlertBulkDeleteResponse, AlertBulkEnableResponse, EnableAlertResponseBody,
+                GetAlertResponseBody, ListAlertsResponseBody,
             },
         },
         request::dashboards::{get_folder, is_overwrite},
@@ -304,6 +309,81 @@ async fn delete_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
     }
 }
 
+/// DeleteAlertBulk
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "DeleteAlertBulk",
+    summary = "Delete multiple alerts",
+    description = "Permanently removes multiple alerts and all their configurations including conditions, triggers, and notification settings. This action cannot be undone and will stop all monitoring and notifications for the deleted alerts.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization id"),
+    ),
+    request_body(content = AlertBulkDeleteRequest, description = "Alert ids", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = AlertBulkDeleteResponse),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "delete"}))
+    )
+)]
+#[delete("/v2/{org_id}/alerts/bulk")]
+async fn delete_alert_bulk(
+    path: web::Path<String>,
+    Query(query): Query<HashMap<String, String>>,
+    Headers(user_email): Headers<UserEmail>,
+    req: web::Json<AlertBulkDeleteRequest>,
+) -> HttpResponse {
+    let org_id = path.into_inner();
+    let req = req.into_inner();
+    let _user_id = user_email.user_id;
+    let folder_id = crate::common::utils::http::get_folder(&query);
+
+    #[cfg(feature = "enterprise")]
+    for id in &req.ids {
+        if let Some(res) = check_resource_permissions(
+            &org_id,
+            &_user_id,
+            "alerts",
+            &id.to_string(),
+            "DELETE",
+            &folder_id,
+        )
+        .await
+        {
+            return res;
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    for id in req.ids {
+        match alert::delete_by_id(client, &org_id, id.clone()).await {
+            Ok(_) => {
+                successful.push(id);
+            }
+            Err(e) => {
+                log::error!("error deleting alert {org_id}/{id} : {e}");
+                unsuccessful.push(id);
+                err = Some(e.to_string())
+            }
+        }
+    }
+
+    MetaHttpResponse::json(AlertBulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    })
+}
+
 /// ListAlerts
 #[utoipa::path(
     context_path = "/api",
@@ -457,7 +537,8 @@ async fn enable_alert_bulk(
 
         for id in &req.ids {
             if let Some(res) =
-                check_resource_permissions(&org_id, user_id, "alerts", &id.to_string(), "PUT").await
+                check_resource_permissions(&org_id, user_id, "alerts", &id.to_string(), "PUT", "")
+                    .await
             {
                 return res;
             }

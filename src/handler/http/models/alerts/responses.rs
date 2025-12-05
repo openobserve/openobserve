@@ -115,3 +115,12 @@ pub struct AlertBulkEnableResponse {
     pub unsuccessful: Vec<Ksuid>,
     pub err: Option<String>,
 }
+
+#[derive(Default, Serialize, ToSchema)]
+pub struct AlertBulkDeleteResponse {
+    #[schema(value_type = Vec<String>)]
+    pub successful: Vec<Ksuid>,
+    #[schema(value_type = Vec<String>)]
+    pub unsuccessful: Vec<Ksuid>,
+    pub err: Option<String>,
+}
