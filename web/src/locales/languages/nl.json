@@ -383,7 +383,10 @@
     "active_lbl": "Actief",
     "inactive_lbl": "Inactief",
     "community_msg": "Word lid van onze levendige gemeenschap van ontwikkelaars en gebruikers die bouwen aan de toekomst van observabiliteit.",
-    "community_lbl": "Gemeenschap"
+    "community_lbl": "Gemeenschap",
+    "loading_license_info": "Licentie-informatie wordt geladen...",
+    "installation_id_lbl": "Installatie-ID",
+    "expired_lbl": "Vervallen"
   },
   "login": {
     "userid": "Gebruikers-ID",

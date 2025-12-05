@@ -383,7 +383,10 @@
     "active_lbl": "活跃",
     "inactive_lbl": "不活跃",
     "community_msg": "加入我们充满活力的开发人员和用户社区，共建可观测性的未来。",
-    "community_lbl": "社区"
+    "community_lbl": "社区",
+    "loading_license_info": "正在加载许可证信息...",
+    "installation_id_lbl": "安装 ID",
+    "expired_lbl": "已过期"
   },
   "login": {
     "userid": "账号",

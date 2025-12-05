@@ -383,7 +383,10 @@
     "active_lbl": "Aktiv",
     "inactive_lbl": "Inaktiv",
     "community_msg": "Treten Sie unserer dynamischen Community von Entwicklern und Benutzern bei, die die Zukunft der Observability mitgestalten.",
-    "community_lbl": "Gemeinschaft"
+    "community_lbl": "Gemeinschaft",
+    "loading_license_info": "Lizenzinformationen werden geladen...",
+    "installation_id_lbl": "Installations-ID",
+    "expired_lbl": "Abgelaufen"
   },
   "login": {
     "userid": "Benutzer-ID",

@@ -383,7 +383,10 @@
     "active_lbl": "アクティブ",
     "inactive_lbl": "非アクティブ",
     "community_msg": "オブザーバビリティの未来を築く開発者とユーザーの活気に満ちたコミュニティに参加してください。",
-    "community_lbl": "コミュニティ"
+    "community_lbl": "コミュニティ",
+    "loading_license_info": "ライセンス情報を読み込んでいます...",
+    "installation_id_lbl": "インストール ID",
+    "expired_lbl": "期限切れ"
   },
   "login": {
     "userid": "ユーザーID",

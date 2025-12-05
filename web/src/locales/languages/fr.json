@@ -383,7 +383,10 @@
     "active_lbl": "Actif",
     "inactive_lbl": "Inactif",
     "community_msg": "Rejoignez notre communauté dynamique de développeurs et d'utilisateurs qui façonnent le futur de l'observabilité.",
-    "community_lbl": "Communauté"
+    "community_lbl": "Communauté",
+    "loading_license_info": "Chargement des informations de licence...",
+    "installation_id_lbl": "ID d'installation",
+    "expired_lbl": "Expiré"
   },
   "login": {
     "userid": "ID utilisateur",

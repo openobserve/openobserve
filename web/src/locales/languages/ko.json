@@ -383,7 +383,10 @@
     "active_lbl": "액티브",
     "inactive_lbl": "비활성",
     "community_msg": "옵저버빌리티의 미래를 만들어가는 활발한 개발자 및 사용자 커뮤니티에 참여하세요.",
-    "community_lbl": "커뮤니티"
+    "community_lbl": "커뮤니티",
+    "loading_license_info": "라이선스 정보 로드 중...",
+    "installation_id_lbl": "설치 ID",
+    "expired_lbl": "만료"
   },
   "login": {
     "userid": "사용자 ID",

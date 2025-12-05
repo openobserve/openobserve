@@ -383,7 +383,10 @@
     "active_lbl": "Aktif",
     "inactive_lbl": "Etkin Olmayan",
     "community_msg": "Gözlemlenebilirliğin geleceğini oluşturan canlı geliştiriciler ve kullanıcılar topluluğumuza katılın.",
-    "community_lbl": "Topluluk"
+    "community_lbl": "Topluluk",
+    "loading_license_info": "Lisans bilgileri yükleniyor...",
+    "installation_id_lbl": "Kurulum Kimliği",
+    "expired_lbl": "Süresi doldu"
   },
   "login": {
     "userid": "Kullanıcı Kimliği",
