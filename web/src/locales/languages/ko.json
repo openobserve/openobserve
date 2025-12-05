@@ -290,7 +290,8 @@
     "commitHash": "커밋 해시",
     "buildDate": "빌드 날짜",
     "logoMsg": "단순화된 옵저버빌리티.",
-    "buildType": "플랫폼"
+    "buildType": "플랫폼",
+    "manage_license": "라이선스 관리"
   },
   "login": {
     "userid": "사용자 ID",

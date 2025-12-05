@@ -290,7 +290,8 @@
     "commitHash": "Hash de commit",
     "buildDate": "Fecha de compilación",
     "logoMsg": "Observabilidad simplificada.",
-    "buildType": "Plataforma"
+    "buildType": "Plataforma",
+    "manage_license": "Administrar licencia"
   },
   "login": {
     "userid": "ID de usuario",

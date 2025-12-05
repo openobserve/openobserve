@@ -290,7 +290,8 @@
     "commitHash": "コミットハッシュ",
     "buildDate": "ビルド日",
     "logoMsg": "オブザーバビリティをもっとシンプルに。",
-    "buildType": "プラットフォーム"
+    "buildType": "プラットフォーム",
+    "manage_license": "ライセンスを管理"
   },
   "login": {
     "userid": "ユーザーID",

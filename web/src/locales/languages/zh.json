@@ -290,7 +290,8 @@
     "commitHash": "提交ID",
     "buildDate": "编译时间",
     "logoMsg": "让应用观测更简单",
-    "buildType": "平台"
+    "buildType": "平台",
+    "manage_license": "管理许可证"
   },
   "login": {
     "userid": "账号",
