@@ -391,7 +391,6 @@ const useStreams = () => {
     if (streamType === "all") {
       isStreamFetched = store.state.streams.areAllStreamsFetched;
     } else {
-      isStreamFetched = !!streamsCache[streamType].value?.list;
       isStreamFetched = !!streamsCache[streamType]?.value?.list;
     }
 
