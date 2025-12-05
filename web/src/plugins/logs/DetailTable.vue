@@ -53,16 +53,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="table"
             :label="t('common.table')"
           />
-          <!-- Correlation Tabs (always visible) -->
+          <!-- Correlation Tabs (only visible when service streams enabled) -->
           <q-tab
+            v-if="serviceStreamsEnabled"
             name="correlated-logs"
             label="Correlated Logs"
           />
           <q-tab
+            v-if="serviceStreamsEnabled"
             name="correlated-metrics"
             label="Correlated Metrics"
           />
           <q-tab
+            v-if="serviceStreamsEnabled"
             name="correlated-traces"
             label="Correlated Traces"
           />
@@ -594,6 +597,11 @@ export default defineComponent({
       return extractStatusFromLog(rowData.value).color;
     });
 
+    // Check if service streams feature is enabled
+    const serviceStreamsEnabled = computed(() => {
+      return store.state.zoConfig.service_streams_enabled !== false;
+    });
+
     onBeforeMount(() => {
       if (window.localStorage.getItem("wrap-log-details") === null) {
         window.localStorage.setItem("wrap-log-details", "true");
@@ -691,6 +699,7 @@ export default defineComponent({
       tableColumns,
       tableRows,
       tablePagination,
+      serviceStreamsEnabled,
     };
   },
   async created() {
