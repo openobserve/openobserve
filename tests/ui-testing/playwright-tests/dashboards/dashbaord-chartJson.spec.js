@@ -1,6 +1,6 @@
 import { test, expect } from "../baseFixtures.js";
 import { login } from "./utils/dashLogin.js";
-import { ingestionForKubernetes } from "./utils/dashIngestion.js";
+import { ingestionForDashboardChartJson } from "./utils/dashIngestion.js";
 
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/dashboard-time";
@@ -19,7 +19,7 @@ test.describe("dashboard UI testcases", () => {
     testLogger.debug("Test setup - beforeEach hook executing");
     await login(page);
     await page.waitForTimeout(1000);
-    await ingestionForKubernetes(page);
+    await ingestionForDashboardChartJson(page);
     await page.waitForTimeout(2000);
   });
 
