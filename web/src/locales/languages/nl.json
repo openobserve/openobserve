@@ -268,7 +268,11 @@
     "jobAlreadyScheduled": "Opdracht is al gepland, wijzig alstublieft enkele parameters om een nieuwe taak in te plannen",
     "jobSchedulerRange": "De taakplanner moet tussen 1 en 100.000 liggen",
     "errorAddingJob": "Fout bij het toevoegen van een taak",
-    "selectStreamBeforeScheduling": "Selecteer een stream voordat je een opdracht plant"
+    "selectStreamBeforeScheduling": "Selecteer een stream voordat je een opdracht plant",
+    "functionSelectionNotSupportedVisualization": "Functieselectie wordt niet ondersteund voor visualisatie",
+    "functionLabel": "Functie",
+    "actionLabel": "Actie",
+    "transformLabel": "Transformeren"
   },
   "menu": {
     "home": "Home",

@@ -268,7 +268,11 @@
     "jobAlreadyScheduled": "ジョブはすでにスケジュールされています。新しいジョブをスケジュールするには、いくつかのパラメータを変更してください",
     "jobSchedulerRange": "ジョブスケジューラは1から100,000の間でなければなりません",
     "errorAddingJob": "ジョブの追加中にエラーが発生しました",
-    "selectStreamBeforeScheduling": "ジョブをスケジュールする前にストリームを選択してください"
+    "selectStreamBeforeScheduling": "ジョブをスケジュールする前にストリームを選択してください",
+    "functionSelectionNotSupportedVisualization": "関数選択はビジュアライゼーションではサポートされていません",
+    "functionLabel": "ファンクション",
+    "actionLabel": "アクション",
+    "transformLabel": "トランスフォーム"
   },
   "menu": {
     "home": "ホーム",

@@ -268,7 +268,11 @@
     "jobAlreadyScheduled": "작업이 이미 예약되었습니다. 일부 매개 변수를 변경하여 새 작업을 예약하십시오.",
     "jobSchedulerRange": "작업 스케줄러는 1에서 100000 사이여야 합니다.",
     "errorAddingJob": "작업을 추가하는 중 오류가 발생했습니다.",
-    "selectStreamBeforeScheduling": "작업을 예약하기 전에 스트림을 선택하십시오."
+    "selectStreamBeforeScheduling": "작업을 예약하기 전에 스트림을 선택하십시오.",
+    "functionSelectionNotSupportedVisualization": "시각화에는 함수 선택이 지원되지 않습니다.",
+    "functionLabel": "기능",
+    "actionLabel": "액션",
+    "transformLabel": "트랜스폼"
   },
   "menu": {
     "home": "홈",

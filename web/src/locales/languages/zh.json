@@ -268,7 +268,11 @@
     "jobAlreadyScheduled": "已安排作业，请更改一些参数以安排新作业",
     "jobSchedulerRange": "作业调度器应介于 1 到 100000 之间",
     "errorAddingJob": "添加任务时出错",
-    "selectStreamBeforeScheduling": "请在安排任务之前选择一个直播"
+    "selectStreamBeforeScheduling": "请在安排任务之前选择一个直播",
+    "functionSelectionNotSupportedVisualization": "可视化不支持函数选择",
+    "functionLabel": "函数",
+    "actionLabel": "行动",
+    "transformLabel": "转型"
   },
   "menu": {
     "home": "主页",

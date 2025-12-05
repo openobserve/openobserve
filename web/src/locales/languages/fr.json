@@ -268,7 +268,11 @@
     "jobAlreadyScheduled": "Tâche déjà planifiée, veuillez modifier certains paramètres pour planifier une nouvelle tâche",
     "jobSchedulerRange": "Le planificateur de tâches doit être compris entre 1 et 100 000",
     "errorAddingJob": "Erreur lors de l'ajout d'une tâche",
-    "selectStreamBeforeScheduling": "Veuillez sélectionner un flux avant de planifier une tâche"
+    "selectStreamBeforeScheduling": "Veuillez sélectionner un flux avant de planifier une tâche",
+    "functionSelectionNotSupportedVisualization": "La sélection de fonctions n'est pas prise en charge pour la visualisation",
+    "functionLabel": "Fonction",
+    "actionLabel": "Action",
+    "transformLabel": "Transformez"
   },
   "menu": {
     "home": "Accueil",

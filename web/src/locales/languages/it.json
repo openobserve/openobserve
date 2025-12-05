@@ -268,7 +268,11 @@
     "jobAlreadyScheduled": "Lavoro già programmato, modifica alcuni parametri per pianificare un nuovo lavoro",
     "jobSchedulerRange": "Job Scheduler deve essere compreso tra 1 e 100000",
     "errorAddingJob": "Errore durante l'aggiunta del lavoro",
-    "selectStreamBeforeScheduling": "Seleziona uno stream prima di programmare un lavoro"
+    "selectStreamBeforeScheduling": "Seleziona uno stream prima di programmare un lavoro",
+    "functionSelectionNotSupportedVisualization": "La selezione delle funzioni non è supportata per la visualizzazione",
+    "functionLabel": "Funzione",
+    "actionLabel": "Azione",
+    "transformLabel": "Trasforma"
   },
   "menu": {
     "home": "Home",

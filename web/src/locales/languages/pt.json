@@ -268,7 +268,11 @@
     "jobAlreadyScheduled": "Trabalho já agendado, altere alguns parâmetros para agendar um novo trabalho",
     "jobSchedulerRange": "O agendador de tarefas deve estar entre 1 e 100.000",
     "errorAddingJob": "Erro ao adicionar trabalho",
-    "selectStreamBeforeScheduling": "Selecione um stream antes de agendar um trabalho"
+    "selectStreamBeforeScheduling": "Selecione um stream antes de agendar um trabalho",
+    "functionSelectionNotSupportedVisualization": "A seleção de funções não é suportada para visualização",
+    "functionLabel": "Função",
+    "actionLabel": "Ação",
+    "transformLabel": "Transformar"
   },
   "menu": {
     "home": "Início",

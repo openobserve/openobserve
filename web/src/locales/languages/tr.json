@@ -268,7 +268,11 @@
     "jobAlreadyScheduled": "İş Zaten Planlandı, lütfen yeni işi planlamak için bazı parametreleri değiştirin",
     "jobSchedulerRange": "İş Zamanlayıcı 1 ile 100000 arasında olmalıdır",
     "errorAddingJob": "İş eklerken hata oluştu",
-    "selectStreamBeforeScheduling": "Lütfen bir iş planlamadan önce bir akış seçin"
+    "selectStreamBeforeScheduling": "Lütfen bir iş planlamadan önce bir akış seçin",
+    "functionSelectionNotSupportedVisualization": "İşlev seçimi görselleştirme için desteklenmiyor",
+    "functionLabel": "Fonksiyon",
+    "actionLabel": "Eylem",
+    "transformLabel": "Dönüştürün"
   },
   "menu": {
     "home": "Ana Sayfa",

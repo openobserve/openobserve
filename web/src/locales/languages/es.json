@@ -268,7 +268,11 @@
     "jobAlreadyScheduled": "El trabajo ya está programado, cambie algunos parámetros para programar un nuevo trabajo",
     "jobSchedulerRange": "El programador de tareas debe estar entre 1 y 100000",
     "errorAddingJob": "Error al agregar el trabajo",
-    "selectStreamBeforeScheduling": "Seleccione una transmisión antes de programar un trabajo"
+    "selectStreamBeforeScheduling": "Seleccione una transmisión antes de programar un trabajo",
+    "functionSelectionNotSupportedVisualization": "No se admite la selección de funciones para la visualización",
+    "functionLabel": "Función",
+    "actionLabel": "Acción",
+    "transformLabel": "Transformar"
   },
   "menu": {
     "home": "Inicio",
