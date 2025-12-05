@@ -108,7 +108,7 @@ export function useLogsHighlighter() {
         ...batchUpdates,
       };
 
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 50));
     }
     return processedResults.value;
   }
