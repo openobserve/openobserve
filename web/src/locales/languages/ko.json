@@ -1112,7 +1112,9 @@
         "dashboardConfig": "대시보드 구성 로드 중...",
         "refreshing": "대시보드 새로 고침 중..."
       }
-    }
+    },
+    "triggerAlert": "트리거",
+    "alertTriggeredSuccess": "경고가 성공적으로 트리거됨"
   },
   "alert_templates": {
     "header": "템플릿",

@@ -1112,7 +1112,9 @@
         "dashboardConfig": "Dashboard-Konfiguration wird geladen...",
         "refreshing": "Das Dashboard wird aktualisiert..."
       }
-    }
+    },
+    "triggerAlert": "Auslösen",
+    "alertTriggeredSuccess": "Warnung wurde erfolgreich ausgelöst"
   },
   "alert_templates": {
     "header": "Vorlagen",

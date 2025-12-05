@@ -1112,7 +1112,9 @@
         "dashboardConfig": "Caricamento della configurazione del dashboard...",
         "refreshing": "Aggiornamento del pannello di controllo..."
       }
-    }
+    },
+    "triggerAlert": "Trigger",
+    "alertTriggeredSuccess": "Avviso attivato con successo"
   },
   "alert_templates": {
     "header": "Modelli",

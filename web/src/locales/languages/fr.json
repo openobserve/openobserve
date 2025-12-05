@@ -1112,7 +1112,9 @@
         "dashboardConfig": "Charger la configuration du tableau de bord...",
         "refreshing": "Tableau de bord rafraîchissant..."
       }
-    }
+    },
+    "triggerAlert": "Gâchette",
+    "alertTriggeredSuccess": "Alerte déclenchée avec succès"
   },
   "alert_templates": {
     "header": "Modèles",

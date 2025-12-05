@@ -1112,7 +1112,9 @@
         "dashboardConfig": "Dashboardconfiguratie wordt geladen...",
         "refreshing": "Verfrissend dashboard..."
       }
-    }
+    },
+    "triggerAlert": "Trigger",
+    "alertTriggeredSuccess": "Waarschuwing succesvol geactiveerd"
   },
   "alert_templates": {
     "header": "Sjablonen",

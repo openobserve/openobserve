@@ -1108,7 +1108,9 @@
         "dashboardConfig": "正在加载仪表板配置...",
         "refreshing": "正在刷新仪表板..."
       }
-    }
+    },
+    "triggerAlert": "触发器",
+    "alertTriggeredSuccess": "警报成功触发"
   },
   "alert_templates": {
     "header": "模板",
