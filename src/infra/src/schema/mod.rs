@@ -328,6 +328,8 @@ pub fn unwrap_partition_time_level(
             StreamType::Traces => {
                 PartitionTimeLevel::from(cfg.limit.traces_file_retention.as_str())
             }
+            // for file list dump streams, we want to compact by day
+            StreamType::Filelist => PartitionTimeLevel::Daily,
             _ => PartitionTimeLevel::default(),
         }
     }
