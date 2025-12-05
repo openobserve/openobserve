@@ -267,7 +267,10 @@ name="warning" class="q-mr-xs" />
                   ?.isExpandedRow
               "
               class="tw-absolute tw-left-0 tw-inset-y-0 tw-w-1 tw-z-10"
-            ></div>
+              :style="{
+                backgroundColor: getRowStatusColor(tableRows[virtualRow.index]),
+              }"
+            />
             <td
               v-if="
                 (formattedRows[virtualRow.index]?.original as any)

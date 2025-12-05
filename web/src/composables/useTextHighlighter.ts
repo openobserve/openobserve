@@ -105,6 +105,7 @@ export function useTextHighlighter() {
     const escapedKeywords = keywords.map((k) =>
       k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
     );
+
     const pattern = new RegExp(`(${escapedKeywords.join("|")})`, "gi");
 
     // Split by pattern but keep the delimiters
@@ -208,17 +209,42 @@ export function useTextHighlighter() {
 
       // Start of quoted string: " or '
       if (!inQuotes && !inBrackets && (char === '"' || char === "'")) {
-        // Save any accumulated content before quote
-        if (current.trim()) {
-          tokens.push({ content: current.trim(), type: "token" });
+        const prevChar = i > 0 ? text[i - 1] : "";
+        const nextChar = i + 1 < text.length ? text[i + 1] : "";
+
+        // Check if this looks like an apostrophe/quote within a word or measurement
+        // Cases to handle:
+        // 1. Between alphanumeric chars: it's, 5'10, L'Oreal
+        // 2. After alphanumeric + followed by whitespace/end: measurements like 5'10"
+        // 3. Standalone apostrophes with whitespace on both sides: ' ' (should be treated as literal char)
+        const isBetweenAlphanumeric =
+          /[a-zA-Z0-9]/.test(prevChar) && /[a-zA-Z0-9]/.test(nextChar);
+        const isTrailingMeasurement =
+          /[a-zA-Z0-9]/.test(prevChar) &&
+          (/\s/.test(nextChar) || nextChar === "");
+        const isStandaloneQuote = /\s/.test(prevChar) && /\s/.test(nextChar); // Both sides are whitespace
+
+        if (
+          isBetweenAlphanumeric ||
+          isTrailingMeasurement ||
+          isStandaloneQuote
+        ) {
+          // This is an apostrophe/quote within text, treat as regular character
+          current += char;
+        } else {
+          // This is a real opening quote
+          // Save any accumulated content before quote
+          if (current.trim()) {
+            tokens.push({ content: current.trim(), type: "token" });
+          }
+          if (current !== current.trim()) {
+            tokens.push({ content: " ", type: "whitespace" });
+          }
+          current = "";
+          inQuotes = true;
+          quoteChar = char;
+          current += char; // Include opening quote
         }
-        if (current !== current.trim()) {
-          tokens.push({ content: " ", type: "whitespace" });
-        }
-        current = "";
-        inQuotes = true;
-        quoteChar = char;
-        current += char; // Include opening quote
       }
       // Start of bracketed content: [
       else if (!inQuotes && !inBrackets && char === "[") {
@@ -235,11 +261,24 @@ export function useTextHighlighter() {
       }
       // End of quoted string: matching quote
       else if (inQuotes && char === quoteChar) {
-        current += char; // Include closing quote
-        tokens.push({ content: current, type: "quoted" });
-        current = "";
-        inQuotes = false;
-        quoteChar = "";
+        const prevChar = i > 0 ? text[i - 1] : "";
+        const nextChar = i + 1 < text.length ? text[i + 1] : "";
+
+        // An apostrophe within a word has alphanumeric chars before AND after it
+        const isApostrophe =
+          /[a-zA-Z0-9]/.test(prevChar) && /[a-zA-Z0-9]/.test(nextChar);
+
+        if (isApostrophe) {
+          // This is an apostrophe within a word/measurement, not a closing quote
+          current += char;
+        } else {
+          // This is a closing quote
+          current += char; // Include closing quote
+          tokens.push({ content: current, type: "quoted" });
+          current = "";
+          inQuotes = false;
+          quoteChar = "";
+        }
       }
       // End of bracketed content: ]
       else if (inBrackets && char === "]") {

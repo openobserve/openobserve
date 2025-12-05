@@ -424,7 +424,7 @@ export function useLogsHighlighter() {
       // VALUES: Colored based on type + highlighted if matches search
       if (value === null) {
         parts.push(
-          createStyledSpanWithClasses("null", "null", queryString, showQuotes),
+          createStyledSpanWithClasses("null", "null", queryString, false),
         );
       } else if (typeof value === "boolean") {
         parts.push(
@@ -432,7 +432,7 @@ export function useLogsHighlighter() {
             String(value),
             "boolean",
             queryString,
-            showQuotes,
+            false,
           ),
         );
       } else if (typeof value === "number") {
@@ -442,28 +442,27 @@ export function useLogsHighlighter() {
             String(value),
             numType,
             queryString,
-            numType !== "timestamp",
+            false,
           ),
         );
       } else if (typeof value === "string") {
         // STRING VALUES: Detect semantic type and use appropriate class
         if (isLogLineWithMixedContent(value)) {
-          // Mixed content processing (HTTP logs with IPs, URLs, etc.)
-          // For now, use simplified processing to reduce complexity
+          // Always pass showQuotes to ensure consistent quote handling
           const processedLine = processTextWithHighlights(
             value,
             queryString,
-            currentColors,
-            false,
+            currentColors.value,
+            showQuotes,
           );
-          parts.push(showQuotes ? `"${processedLine}"` : processedLine);
+          parts.push(processedLine);
         } else {
           // Regular string processing with semantic detection
           parts.push(
             processTextWithHighlights(
               value,
               queryString,
-              currentColors,
+              currentColors.value,
               showQuotes,
             ),
           );
@@ -571,7 +570,7 @@ export function useLogsHighlighter() {
             dataStr,
             currentColors.numberValue,
             queryString,
-            showQuotes,
+            false,
           );
         }
       } else if (typeof data === "boolean") {
@@ -579,14 +578,14 @@ export function useLogsHighlighter() {
           String(data),
           currentColors.booleanValue,
           queryString,
-          showQuotes,
+          false,
         );
       } else if (data === null) {
         return createStyledSpan(
           "null",
           currentColors.nullValue,
           queryString,
-          showQuotes,
+          false,
         );
       } else {
         return processTextWithHighlights(
