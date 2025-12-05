@@ -1684,7 +1684,9 @@
     "get_history": "Geçmişi Al",
     "executed_at": "İdam Edildi",
     "sql_query": "SQL Sorgu",
-    "resuls": "Sonuçlar"
+    "resuls": "Sonuçlar",
+    "wrapText": "Metni Sarma",
+    "delayMessage": "Arama Geçmişi şu şekilde gecikebilir"
   },
   "search_scheduler_job": {
     "title": "İş Zamanlayıcı Ara",

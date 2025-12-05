@@ -1684,7 +1684,9 @@
     "get_history": "Obtenha o histórico",
     "executed_at": "Executado em",
     "sql_query": "Consulta SQL",
-    "resuls": "Resultados"
+    "resuls": "Resultados",
+    "wrapText": "Quebrar texto",
+    "delayMessage": "O histórico de pesquisa pode ser atrasado em"
   },
   "search_scheduler_job": {
     "title": "Agendador de tarefas de pesquisa",

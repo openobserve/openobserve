@@ -1677,7 +1677,9 @@
     "get_history": "履歴を取得",
     "executed_at": "実行日",
     "sql_query": "SQL クエリー",
-    "resuls": "結果"
+    "resuls": "結果",
+    "wrapText": "テキストを折り返す",
+    "delayMessage": "検索履歴は次の理由で遅延する可能性があります"
   },
   "search_scheduler_job": {
     "title": "ジョブスケジューラを検索する",

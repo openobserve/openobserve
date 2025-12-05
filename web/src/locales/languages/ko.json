@@ -1684,7 +1684,9 @@
     "get_history": "기록 가져오기",
     "executed_at": "실행 날짜",
     "sql_query": "SQL 쿼리",
-    "resuls": "결과"
+    "resuls": "결과",
+    "wrapText": "줄 바꿈 텍스트",
+    "delayMessage": "검색 기록이 다음과 같이 지연될 수 있습니다."
   },
   "search_scheduler_job": {
     "title": "작업 스케줄러 검색",

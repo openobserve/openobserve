@@ -1684,7 +1684,9 @@
     "get_history": "Obtenir l'historique",
     "executed_at": "Exécuté à",
     "sql_query": "Requête SQL",
-    "resuls": "Résultats"
+    "resuls": "Résultats",
+    "wrapText": "Envelopper le texte",
+    "delayMessage": "L'historique des recherches peut être retardé par"
   },
   "search_scheduler_job": {
     "title": "Rechercher un planificateur de tâches",

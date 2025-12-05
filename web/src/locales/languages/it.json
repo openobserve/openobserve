@@ -1684,7 +1684,9 @@
     "get_history": "Ottieni la cronologia",
     "executed_at": "Eseguito a",
     "sql_query": "Interrogazione SQL",
-    "resuls": "Risultati"
+    "resuls": "Risultati",
+    "wrapText": "Avvolgi testo",
+    "delayMessage": "La cronologia delle ricerche potrebbe essere ritardata"
   },
   "search_scheduler_job": {
     "title": "Cerca Job Scheduler",

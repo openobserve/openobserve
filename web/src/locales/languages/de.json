@@ -1684,7 +1684,9 @@
     "get_history": "Verlauf abrufen",
     "executed_at": "Ausgeführt am",
     "sql_query": "SQL-Abfrage",
-    "resuls": "Ergebnisse"
+    "resuls": "Ergebnisse",
+    "wrapText": "Text umbrechen",
+    "delayMessage": "Der Suchverlauf könnte sich verzögern um"
   },
   "search_scheduler_job": {
     "title": "Job Scheduler durchsuchen",

@@ -1680,7 +1680,9 @@
     "get_history": "获取历史记录",
     "executed_at": "处决于",
     "sql_query": "SQL 查询",
-    "resuls": "结果"
+    "resuls": "结果",
+    "wrapText": "换行文本",
+    "delayMessage": "搜索历史记录可能会延迟"
   },
   "search_scheduler_job": {
     "title": "搜索任务调度器",

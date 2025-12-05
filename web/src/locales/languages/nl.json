@@ -1684,7 +1684,9 @@
     "get_history": "Geschiedenis ophalen",
     "executed_at": "Uitgevoerd op",
     "sql_query": "SQL-zoekopdracht",
-    "resuls": "Resultaten"
+    "resuls": "Resultaten",
+    "wrapText": "Tekst omwikkelen",
+    "delayMessage": "De zoekgeschiedenis kan worden vertraagd door"
   },
   "search_scheduler_job": {
     "title": "Zoek Job Scheduler",
