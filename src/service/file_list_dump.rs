@@ -212,7 +212,7 @@ pub async fn query(
     id_hint: Option<i64>,
 ) -> Result<Vec<FileRecord>, errors::Error> {
     let cfg = get_config();
-    if !cfg.common.file_list_dump_enabled {
+    if !cfg.compact.file_list_dump_enabled {
         return Ok(vec![]);
     }
 
@@ -381,7 +381,7 @@ pub async fn delete_in_time_range(
 
 // we never store deleted file in dump, so we never have to consider deleted in this
 pub async fn stats(time_range: (i64, i64)) -> Result<Vec<(String, StreamStats)>, errors::Error> {
-    if !get_config().common.file_list_dump_enabled {
+    if !get_config().compact.file_list_dump_enabled {
         return Ok(vec![]);
     }
 
@@ -413,12 +413,6 @@ async fn stats_inner(
     time_range: (i64, i64),
 ) -> Result<Vec<(String, StreamStats)>, errors::Error> {
     let cfg = get_config();
-
-    // in case of dual write, we have no way of de-duping with ids for stats.
-    // so we simply do not consider dumped files when dual-write is enabled.
-    if cfg.common.file_list_dump_dual_write {
-        return Ok(vec![]);
-    }
 
     let stream_key = format!(
         "{org_id}/{}/{org_id}_{stream_type}_{stream_name}",
@@ -459,26 +453,20 @@ WHERE {field} = '{value}'
     let fake_trace_id = format!("stats_on_dump-{task_id}");
     let mut stats_map = HashMap::new();
     log::info!(
-        "[O2::FILE_DUMP::STATS] total dump file count : {}, chunk size : {}",
+        "[O2::FILE_DUMP::STATS] total dump file count: {}",
         dump_files.len(),
-        cfg.common.file_list_dump_stats_chunk
     );
 
-    for (ctr, chunk) in dump_files
-        .chunks(cfg.common.file_list_dump_stats_chunk)
-        .enumerate()
-    {
-        let t = exec(&fake_trace_id, cfg.limit.cpu_num, chunk.to_vec(), &sql).await?;
-        let ret = t
-            .into_iter()
-            .flat_map(record_batch_to_stats)
-            .collect::<Vec<_>>();
-        for (stream, stats) in ret {
-            let entry = stats_map.entry(stream).or_insert(StreamStats::default());
-            *entry = &*entry + &stats;
-        }
-        log::info!("[O2::FILE_DUMP::STATS] chunk {ctr} done");
+    let t = exec(&fake_trace_id, cfg.limit.cpu_num, dump_files, &sql).await?;
+    let ret = t
+        .into_iter()
+        .flat_map(record_batch_to_stats)
+        .collect::<Vec<_>>();
+    for (stream, stats) in ret {
+        let entry = stats_map.entry(stream).or_insert(StreamStats::default());
+        *entry = &*entry + &stats;
     }
+
     let ret = stats_map.into_iter().collect();
     Ok(ret)
 }

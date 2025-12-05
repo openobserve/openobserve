@@ -118,7 +118,7 @@ impl super::FileList for MysqlFileList {
         let meta = &dump_file.meta;
         let now_ts = now_micros();
         DB_QUERY_NUMS
-            .with_label_values(&["insert", "file_list", ""])
+            .with_label_values(&["insert", "file_list"])
             .inc();
         if let Err(e) =  sqlx::query(r#"INSERT IGNORE INTO file_list (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"#)
@@ -145,7 +145,7 @@ impl super::FileList for MysqlFileList {
             return Err(e.into());
         }
 
-        for chunk in dumped_ids.chunks(get_config().limit.file_list_id_batch_size) {
+        for chunk in dumped_ids.chunks(get_config().compact.file_list_deleted_batch_size) {
             if chunk.is_empty() {
                 continue;
             }
@@ -156,7 +156,7 @@ impl super::FileList for MysqlFileList {
                 .join(",");
             let query_str = format!("DELETE FROM file_list WHERE id IN ({ids})");
             DB_QUERY_NUMS
-                .with_label_values(&["delete_by_ids", "file_list", ""])
+                .with_label_values(&["delete_by_ids", "file_list"])
                 .inc();
             let start = std::time::Instant::now();
             let res = sqlx::query(&query_str).execute(&mut *tx).await;
@@ -486,7 +486,7 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
         let mut ret = Vec::new();
         let pool = CLIENT_RO.clone();
 
-        for chunk in ids.chunks(get_config().limit.file_list_id_batch_size) {
+        for chunk in ids.chunks(get_config().compact.file_list_deleted_batch_size) {
             if chunk.is_empty() {
                 continue;
             }
@@ -535,7 +535,7 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
 
         let day_partitions = if time_end - time_start <= DAY_MICRO_SECS
             || time_end - time_start > DAY_MICRO_SECS * 30
-            || !get_config().limit.file_list_multi_thread
+            || !get_config().compact.file_list_multi_thread
         {
             vec![(time_start, time_end)]
         } else {
@@ -1509,7 +1509,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
     }
 
     async fn set_job_done(&self, ids: &[i64]) -> Result<()> {
-        let config = get_config();
+        let cfg = get_config();
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
             .with_label_values(&["update", "file_list_jobs"])
@@ -1526,7 +1526,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
         sqlx::query(&sql)
             .bind(super::FileListJobStatus::Done)
             .bind(config::utils::time::now_micros())
-            .bind(!config.common.file_list_dump_enabled)
+            .bind(!cfg.compact.file_list_dump_enabled)
             .execute(&pool)
             .await?;
         Ok(())
@@ -1640,7 +1640,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
 
         let day_partitions = if time_end - time_start <= DAY_MICRO_SECS
             || time_end - time_start > DAY_MICRO_SECS * 30
-            || !get_config().limit.file_list_multi_thread
+            || !get_config().compact.file_list_multi_thread
         {
             vec![(time_start, time_end)]
         } else {
@@ -1699,7 +1699,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
         let pool = CLIENT_RO.clone();
 
         DB_QUERY_NUMS
-            .with_label_values(&["select", "file_list_jobs", ""])
+            .with_label_values(&["select", "file_list_jobs"])
             .inc();
         let ret = sqlx::query_as::<_, (i64,String, String, i64)>(
             r#"SELECT id, org, stream, offsets FROM file_list_jobs WHERE status = ? AND dumped = ? limit 1000"#,
@@ -1720,7 +1720,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
     async fn set_job_dumped_status(&self, id: i64, dumped: bool) -> Result<()> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["update", "file_list_jobs", ""])
+            .with_label_values(&["update", "file_list_jobs"])
             .inc();
         sqlx::query(r#"UPDATE file_list_jobs SET dumped = ? WHERE id = ?;"#)
             .bind(dumped)

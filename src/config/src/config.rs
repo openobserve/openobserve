@@ -1201,26 +1201,6 @@ pub struct Common {
         help = "Report alert/report triggers to the originating organization in addition to _meta org"
     )]
     pub usage_report_to_own_org: bool,
-    #[env_config(name = "ZO_FILE_LIST_DUMP_ENABLED", default = false)]
-    pub file_list_dump_enabled: bool,
-    #[env_config(
-        name = "ZO_FILE_LIST_DUMP_MIN_FILES",
-        default = 5,
-        help = "minimum number of files to craete a dump from"
-    )]
-    pub file_list_dump_min_files: usize,
-    #[env_config(
-        name = "ZO_FILE_LIST_DUMP_STATS_CHUNK_SIZE",
-        default = 100,
-        help = "chunk size to use when calculating stats from dumped files"
-    )]
-    pub file_list_dump_stats_chunk: usize,
-    #[env_config(name = "ZO_FILE_LIST_DUMP_DUAL_WRITE", default = true)]
-    pub file_list_dump_dual_write: bool,
-    #[env_config(name = "ZO_FILE_LIST_DUMP_MIN_HOUR", default = 2)]
-    pub file_list_dump_min_hour: usize,
-    #[env_config(name = "ZO_FILE_LIST_DUMP_DEBUG_CHECK", default = true)]
-    pub file_list_dump_debug_check: bool,
     #[env_config(
         name = "ZO_USE_STREAM_SETTINGS_FOR_PARTITIONS_ENABLED",
         default = false,
@@ -1529,18 +1509,6 @@ pub struct Limit {
         help = "timeout of transaction lock"
     )] // seconds
     pub meta_transaction_lock_timeout: usize,
-    #[env_config(
-        name = "ZO_FILE_LIST_ID_BATCH_SIZE",
-        default = 5000,
-        help = "batch size of file list query"
-    )]
-    pub file_list_id_batch_size: usize,
-    #[env_config(
-        name = "ZO_FILE_LIST_MULTI_THREAD",
-        default = false,
-        help = "use multi thread for file list query"
-    )]
-    pub file_list_multi_thread: bool,
     #[env_config(name = "ZO_DISTINCT_VALUES_INTERVAL", default = 10)] // seconds
     pub distinct_values_interval: u64,
     #[env_config(name = "ZO_DISTINCT_VALUES_HOURLY", default = false)]
@@ -1679,10 +1647,24 @@ pub struct Compact {
     #[env_config(name = "ZO_COMPACT_BLOCKED_ORGS", default = "")] // use comma to split
     pub blocked_orgs: String,
     #[env_config(name = "ZO_COMPACT_FILE_LIST_DELETED_MODE", default = "deleted")]
+    #[env_config(
+        name = "ZO_COMPACT_FILE_LIST_DELETED_BATCH_SIZE",
+        default = 1000,
+        help = "batch size of file list deleted query"
+    )]
+    pub file_list_deleted_batch_size: usize,
+    #[env_config(
+        name = "ZO_COMPACT_FILE_LIST_MULTI_THREAD",
+        default = false,
+        help = "use multi thread for file list query"
+    )]
+    pub file_list_multi_thread: bool,
+    #[env_config(name = "ZO_COMPACT_FILE_LIST_DUMP_ENABLED", default = false)]
+    pub file_list_dump_enabled: bool,
+    #[env_config(name = "ZO_COMPACT_FILE_LIST_DUMP_MIN_HOUR", default = 2)]
+    pub file_list_dump_min_hour: usize,
     // "history" "deleted" "none"
     pub file_list_deleted_mode: String,
-    #[env_config(name = "ZO_COMPACT_FILE_LIST_DELETED_BATCH_SIZE", default = 1000)]
-    pub file_list_deleted_batch_size: usize,
     #[env_config(
         name = "ZO_COMPACT_BATCH_SIZE",
         default = 0,
@@ -2383,10 +2365,6 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.limit.sql_db_connections_max =
         max(REQUIRED_DB_CONNECTIONS, cfg.limit.sql_db_connections_max);
 
-    if cfg.limit.file_list_id_batch_size == 0 {
-        cfg.limit.file_list_id_batch_size = 5000;
-    }
-
     if cfg.limit.consistent_hash_vnodes < 1 {
         cfg.limit.consistent_hash_vnodes = 1000;
     }
@@ -2575,17 +2553,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         && cfg.common.feature_broadcast_join_left_side_max_size == 0
     {
         cfg.common.feature_broadcast_join_left_side_max_size = 10; // 10 MB
-    }
-
-    // debug check is useful only when dual write is enabled. Otherwise it will raise error
-    // incorrectly each time
-    cfg.common.file_list_dump_debug_check =
-        cfg.common.file_list_dump_dual_write && cfg.common.file_list_dump_debug_check;
-
-    // for dump at min, we can allow 1 file
-    cfg.common.file_list_dump_min_files = cfg.common.file_list_dump_min_files.max(1);
-    if cfg.common.file_list_dump_stats_chunk < 1 {
-        cfg.common.file_list_dump_stats_chunk = 100;
     }
 
     if cfg.common.default_hec_stream.is_empty() {
@@ -2938,6 +2905,10 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.compact.old_data_min_files < 1 {
         cfg.compact.old_data_min_files = 10;
+    }
+
+    if cfg.compact.file_list_deleted_batch_size == 0 {
+        cfg.compact.file_list_deleted_batch_size = 1000;
     }
 
     if cfg.compact.batch_size < 1 {

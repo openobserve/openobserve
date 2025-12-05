@@ -47,7 +47,6 @@ pub async fn query(
     time_min: i64,
     time_max: i64,
 ) -> Result<Vec<FileKey>> {
-    let cfg = get_config();
     let mut files = file_list::query(
         org_id,
         stream_type,
@@ -66,37 +65,8 @@ pub async fn query(
         None,
     )
     .await?;
-    if cfg.common.file_list_dump_enabled && cfg.common.file_list_dump_debug_check {
-        let dumped_file_names = dumped_files
-            .iter()
-            .map(|f| "files/".to_string() + &f.stream + "/" + &f.date + "/" + &f.file)
-            .collect::<HashSet<_>>();
-        let missing_files: usize = files
-            .iter()
-            .map(|f| {
-                if dumped_file_names.contains(&f.key) {
-                    0
-                } else {
-                    1
-                }
-            })
-            .sum();
-        if missing_files > 0 {
-            log::info!(
-                "[trace_id: {trace_id}] dump was missing {missing_files} files present in db"
-            );
-        }
-    }
 
-    if !cfg.common.file_list_dump_dual_write {
-        // we only consider these files in case of dual write disabled,
-        // because with dual write there are some edge cases which cannot be sovled even with id
-        // de-dup so the data gets counted twice.
-        for file in dumped_files.iter() {
-            files.push(file.into())
-        }
-    }
-
+    files.extend(dumped_files.iter().map(|f| f.into()));
     files.par_sort_unstable_by(|a, b| a.key.cmp(&b.key));
     files.dedup_by(|a, b| a.key == b.key);
     Ok(files)
@@ -230,20 +200,6 @@ pub async fn query_by_ids(
         .map(|r| r.into())
         .collect();
 
-    if cfg.common.file_list_dump_enabled && cfg.common.file_list_dump_debug_check {
-        let dump_ids = dumped_files.iter().map(|f| f.id).collect::<HashSet<_>>();
-        let db_ids = db_files.iter().map(|f| f.id).collect::<Vec<_>>();
-        let missing_files: usize = db_ids
-            .iter()
-            .map(|id| if dump_ids.contains(id) { 0 } else { 1 })
-            .sum();
-        if missing_files > 0 {
-            log::info!(
-                "[trace_id: {trace_id}] dump was missing {missing_files} files present in db"
-            );
-        }
-    }
-
     // 3. set the local cache
     if !cfg.common.local_mode {
         let db_files = db_files.clone();
@@ -251,15 +207,13 @@ pub async fn query_by_ids(
         let trace_id = trace_id.to_string();
         tokio::task::spawn(async move {
             let start = std::time::Instant::now();
-            let cfg = get_config();
             if let Err(e) = file_list::LOCAL_CACHE.batch_add_with_id(&db_files).await {
                 log::error!("[trace_id {trace_id}] file_list set cache failed for db files: {e}");
             }
 
-            if !cfg.common.file_list_dump_dual_write
-                && let Err(e) = file_list::LOCAL_CACHE
-                    .batch_add_with_id(&dumped_files)
-                    .await
+            if let Err(e) = file_list::LOCAL_CACHE
+                .batch_add_with_id(&dumped_files)
+                .await
             {
                 log::error!(
                     "[trace_id {trace_id}] file_list set cache failed for dumped files: {e:?}"
@@ -288,9 +242,7 @@ pub async fn query_by_ids(
 
     // 4. merge the results
     files.extend(db_files);
-    if !cfg.common.file_list_dump_dual_write {
-        files.extend(dumped_files);
-    }
+    files.extend(dumped_files);
     files.par_sort_unstable_by(|a, b| a.key.cmp(&b.key));
     files.dedup_by(|a, b| a.key == b.key);
     Ok(files)
@@ -308,7 +260,6 @@ pub async fn query_ids(
     stream_name: &str,
     time_range: Option<(i64, i64)>,
 ) -> Result<Vec<file_list::FileId>> {
-    let cfg = get_config();
     let mut files = file_list::query_ids(org_id, stream_type, stream_name, time_range).await?;
     let dumped_files = super::file_list_dump::get_ids_in_range(
         trace_id,
@@ -320,22 +271,7 @@ pub async fn query_ids(
     )
     .await
     .unwrap();
-    if cfg.common.file_list_dump_enabled && cfg.common.file_list_dump_debug_check {
-        let dump_ids = dumped_files.iter().map(|f| f.id).collect::<HashSet<_>>();
-        let db_ids = files.iter().map(|f| f.id).collect::<Vec<_>>();
-        let missing_files: usize = db_ids
-            .iter()
-            .map(|id| if dump_ids.contains(id) { 0 } else { 1 })
-            .sum();
-        if missing_files > 0 {
-            log::info!(
-                "[trace_id: {trace_id}] dump was missing {missing_files} files present in db"
-            );
-        }
-    }
-    if !cfg.common.file_list_dump_dual_write {
-        files.extend(dumped_files);
-    }
+    files.extend(dumped_files);
     files.par_sort_unstable_by(|a, b| a.id.cmp(&b.id));
     files.dedup_by(|a, b| a.id == b.id);
     Ok(files)

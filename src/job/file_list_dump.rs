@@ -154,13 +154,13 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    let config = get_config();
-    if !config.common.file_list_dump_enabled {
+    let cfg = get_config();
+    if !cfg.compact.file_list_dump_enabled {
         return Ok(());
     }
 
     // spawn threads which will do the actual dumping
-    for _ in 0..config.limit.file_merge_thread_num {
+    for _ in 0..cfg.limit.file_merge_thread_num {
         let rx = FILE_LIST_DUMP_CHANNEL.receiver.clone();
         tokio::spawn(async move {
             loop {
@@ -181,7 +181,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         });
     }
 
-    let interval: u64 = std::cmp::max(config.compact.interval as i64, DUMP_JOB_MIN_INTERVAL)
+    let interval: u64 = std::cmp::max(cfg.compact.interval as i64, DUMP_JOB_MIN_INTERVAL)
         .try_into()
         .unwrap();
 
@@ -196,7 +196,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
         let pending = infra::file_list::get_pending_dump_jobs().await?;
         let threshold_hour = Utc::now().timestamp_micros()
-            - (config.common.file_list_dump_min_hour as i64 * hour_micros(1));
+            - (cfg.compact.file_list_dump_min_hour as i64 * hour_micros(1));
 
         let ongoing = ONGOING_JOB_IDS.read().await;
         let pending = pending
@@ -233,7 +233,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
 }
 
 async fn dump(job_id: i64, org: &str, stream: &str, offset: i64) -> Result<(), anyhow::Error> {
-    let cfg = get_config();
     let start = offset;
     let end = offset + hour_micros(1);
 
@@ -255,12 +254,7 @@ async fn dump(job_id: i64, org: &str, stream: &str, offset: i64) -> Result<(), a
         return Ok(());
     }
     let files = infra::file_list::get_entries_in_range(org, Some(stream), start, end, None).await?;
-    // skip dump if number of files in the time range is < min_files config
-    if files.len() < cfg.common.file_list_dump_min_files {
-        log::info!(
-            "skipping file list dump for start : {start} end: {end} as only {} files found",
-            files.len()
-        );
+    if files.is_empty() {
         if let Err(e) = infra::file_list::set_job_dumped_status(job_id, true).await {
             log::error!("error in setting dumped = true for job with id {job_id}, error : {e}");
         }
@@ -390,16 +384,10 @@ async fn generate_dump(
         return Ok(());
     }
 
-    let config = get_config();
     let batch_size = files.len();
 
-    // if dual write is not enabled, we will remove the records
-    // else keep them
-    let ids: Vec<i64> = if !config.common.file_list_dump_dual_write {
-        files.iter().map(|r| r.id).collect()
-    } else {
-        vec![]
-    };
+    // will remove the records
+    let ids: Vec<i64> = files.iter().map(|r| r.id).collect();
 
     let mut buf = Vec::new();
     let mut writer = get_writer(FILE_LIST_SCHEMA.clone(), &mut buf)?;

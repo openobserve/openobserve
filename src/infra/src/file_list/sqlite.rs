@@ -143,7 +143,7 @@ impl super::FileList for SqliteFileList {
             return Err(e.into());
         }
 
-        for chunk in dumped_ids.chunks(get_config().limit.file_list_id_batch_size) {
+        for chunk in dumped_ids.chunks(get_config().compact.file_list_deleted_batch_size) {
             if chunk.is_empty() {
                 continue;
             }
@@ -443,7 +443,7 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
         let mut ret = Vec::new();
         let pool = CLIENT_RO.clone();
 
-        for chunk in ids.chunks(get_config().limit.file_list_id_batch_size) {
+        for chunk in ids.chunks(get_config().compact.file_list_deleted_batch_size) {
             if chunk.is_empty() {
                 continue;
             }
@@ -483,7 +483,7 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
 
         let day_partitions = if time_end - time_start <= DAY_MICRO_SECS
             || time_end - time_start > DAY_MICRO_SECS * 30
-            || !get_config().limit.file_list_multi_thread
+            || !get_config().compact.file_list_multi_thread
         {
             vec![(time_start, time_end)]
         } else {
@@ -1163,7 +1163,7 @@ SELECT stream, max(id) as id, COUNT(*) AS num
     }
 
     async fn set_job_done(&self, ids: &[i64]) -> Result<()> {
-        let config = get_config();
+        let cfg = get_config();
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
         let sql = format!(
@@ -1178,7 +1178,7 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         sqlx::query(&sql)
             .bind(super::FileListJobStatus::Done)
             .bind(config::utils::time::now_micros())
-            .bind(!config.common.file_list_dump_enabled)
+            .bind(!cfg.compact.file_list_dump_enabled)
             .execute(&*client)
             .await?;
         Ok(())
@@ -1283,7 +1283,7 @@ SELECT stream, max(id) as id, COUNT(*) AS num
 
         let day_partitions = if time_end - time_start <= DAY_MICRO_SECS
             || time_end - time_start > DAY_MICRO_SECS * 30
-            || !get_config().limit.file_list_multi_thread
+            || !get_config().compact.file_list_multi_thread
         {
             vec![(time_start, time_end)]
         } else {
