@@ -94,7 +94,7 @@ const ingestionForMaps = async (page, streamName = "geojson") => {
 };
 
 // Ingestion function for Dashboard Chart JSON data
-const ingestionForKubernetes = async (page, streamName = "kubernetes") => {
+const ingestionForDashboardChartJson = async (page, streamName = "kubernetes") => {
   if (!process.env["ORGNAME"] || !process.env["INGESTION_URL"]) {
     throw new Error("Required environment variables are not set");
   }
@@ -130,4 +130,4 @@ const ingestionForKubernetes = async (page, streamName = "kubernetes") => {
 };
 
 // Export only the required functions
-export { ingestionForMaps, ingestionForKubernetes, getAuthToken, removeUTFCharacters };
+export { ingestionForMaps, ingestionForDashboardChartJson, getAuthToken, removeUTFCharacters };
