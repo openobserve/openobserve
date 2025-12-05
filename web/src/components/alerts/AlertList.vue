@@ -382,6 +382,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   </q-item-section>
                                   <q-item-section>Export</q-item-section>
                                 </q-item>
+                                <q-separator />
+                                <q-item
+                                  class="flex items-center justify-center"
+                                  clickable
+                                  v-close-popup
+                                  @click="triggerAlert(props.row)"
+                                >
+                                  <q-item-section dense avatar>
+                                     <q-icon size="16px" :name="symOutlinedSoundSampler" />
+                                  </q-item-section>
+                                  <q-item-section>{{
+                                    t("alerts.triggerAlert")
+                                  }}</q-item-section>
+                                </q-item>
                               </q-list>
                             </q-menu>
                           </q-btn>
@@ -881,6 +895,7 @@ import { nextTick } from "vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
+import { symOutlinedSoundSampler } from "@quasar/extras/material-symbols-outlined";
 // import alertList from "./alerts";
 
 export default defineComponent({
@@ -2105,6 +2120,28 @@ export default defineComponent({
         console.error("Alert not found for UUID:", row.uuid);
       }
     };
+
+    const triggerAlert = async (row: any) => {
+      try {
+        await alertsService.trigger_alert(
+          store.state.selectedOrganization.identifier,
+          row.alert_id,
+          row.folder_id
+        );
+        $q.notify({
+          type: "positive",
+          message: t("alerts.alertTriggeredSuccess"),
+          timeout: 2000,
+        });
+      } catch (error: any) {
+        $q.notify({
+          type: "negative",
+          message: error?.response?.data?.message || "Failed to trigger alert",
+          timeout: 2000,
+        });
+      }
+    };
+
     const updateActiveFolderId = async (newVal: any) => {
       //this is the condition we kept because when we we click on the any folder that is there in the the row when we do search across folders
       //at that time if it is the same folder it wont trigger the watch and it will show the alerts of the filtered only 
@@ -2523,6 +2560,7 @@ export default defineComponent({
       goToAlertHistory,
       getTemplates,
       exportAlert,
+      triggerAlert,
       updateActiveFolderId,
       activeFolderId,
       editAlert,
@@ -2568,6 +2606,7 @@ export default defineComponent({
       transformToExpression,
       filterAlertsByQuery,
       bulkToggleAlerts,
+      symOutlinedSoundSampler
     };
   },
 });
