@@ -9,6 +9,8 @@
     "datetimeMessage": "* You can choose multiple dates",
     "datetimeRelative": "RELATIVE",
     "datetimeAbsolute": "ABSOLUTE",
+    "relative": "Relative",
+    "absolute": "Absolute",
     "move": "Move",
     "legend": "Legend",
     "weight": "Weight",
