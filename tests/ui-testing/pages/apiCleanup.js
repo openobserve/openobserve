@@ -531,13 +531,13 @@ class APICleanup {
             testLogger.info('Fetched functions', { total: functions.length });
 
             // Filter functions matching patterns:
-            // 1. "Pipeline" followed by 2 or 3 digits
-            // 2. "first" followed by 2 or 3 digits
-            // 3. "second" followed by 2 or 3 digits
+            // 1. "Pipeline" followed by 1-3 digits
+            // 2. "first" followed by 1-3 digits
+            // 3. "second" followed by 1-3 digits
             const patterns = [
-                /^Pipeline\d{2,3}$/,
-                /^first\d{2,3}$/,
-                /^second\d{2,3}$/
+                /^Pipeline\d{1,3}$/,
+                /^first\d{1,3}$/,
+                /^second\d{1,3}$/
             ];
             const matchingFunctions = functions.filter(f =>
                 patterns.some(pattern => pattern.test(f.name))
@@ -1585,10 +1585,10 @@ class APICleanup {
         testLogger.info('Starting complete cascade cleanup', { prefix });
 
         try {
-            // Step 1: Fetch all destinations and filter by prefix (including newdest_ and sanitydest-)
+            // Step 1: Fetch all destinations and filter by prefix (including auto_, newdest_ and sanitydest-)
             const { destinations, templateToDestinations } = await this.fetchDestinationsWithTemplateMapping();
             const matchingDestinations = destinations.filter(d =>
-                d.name.startsWith(prefix) ||
+                d.name.startsWith('auto_') ||
                 d.name.startsWith('newdest_') ||
                 d.name.startsWith('sanitydest-')
             );
@@ -1780,8 +1780,8 @@ class APICleanup {
                 }
             }
 
-            // Step 9b: Delete all auto_email_template_*, auto_webhook_template_*, sanitytemp-*, and newtemp_* templates
-            testLogger.info('Cleaning up auto_email, auto_webhook, sanitytemp, and newtemp templates');
+            // Step 9b: Delete all auto_email_template_*, auto_webhook_template_*, auto_playwright_template_*, sanitytemp-*, and newtemp_* templates
+            testLogger.info('Cleaning up auto_email, auto_webhook, auto_playwright, sanitytemp, and newtemp templates');
 
             const allTemplatesResponse = await fetch(`${this.baseUrl}/api/${this.org}/alerts/templates?page_num=1&page_size=100000&sort_by=name&desc=false`, {
                 method: 'GET',
@@ -1796,6 +1796,8 @@ class APICleanup {
                 const autoTemplates = allTemplates.filter(t =>
                     t.name.startsWith('auto_email_template_') ||
                     t.name.startsWith('auto_webhook_template_') ||
+                    t.name.startsWith('auto_playwright_template_') ||
+                    t.name.startsWith('auto_url_webhook_template_') ||
                     t.name.startsWith('sanitytemp-') ||
                     t.name.startsWith('newtemp_')
                 );
