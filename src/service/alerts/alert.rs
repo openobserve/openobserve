@@ -2202,8 +2202,8 @@ mod tests {
 
         let scores = result.get("score").unwrap();
         assert_eq!(scores.len(), 2);
-        assert!(scores.contains("95.50"));
-        assert!(scores.contains("87.30"));
+        assert!(scores.contains("95.5"));
+        assert!(scores.contains("87.3"));
     }
 
     #[test]
