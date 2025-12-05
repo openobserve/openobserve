@@ -47,7 +47,7 @@ codegen-units = 4
 
 [dependencies]
 actix-cors = "0.7"
-actix-http = "3.9"
+actix-http = "3.11.2"
 actix-multipart = { version = "0.7", features = ["derive"] }
 actix-web.workspace = true
 actix-web-httpauth = "0.8"
@@ -225,8 +225,8 @@ proto = { path = "src/proto" }
 report_server = { path = "src/report_server" }
 aes-siv = "0.7.0"
 ahash = { version = "0.8", features = ["serde"] }
-actix-web = { version = "4.9", features = ["rustls-0_23"] }
-actix-tls = { version = "3.4", features = [
+actix-web = { version = "4.12", features = ["rustls-0_23"] }
+actix-tls = { version = "3.5", features = [
     "connect",
     "uri",
     "rustls-0_23-native-roots",
