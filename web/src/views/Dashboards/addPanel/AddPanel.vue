@@ -299,6 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="layout-panel-container col">
                     <DashboardQueryBuilder
                       :dashboardData="currentDashboardData.data"
+                      @custom-chart-template-selected="handleCustomChartTemplateSelected"
                     />
                     <q-separator />
                     <VariablesValueSelector
@@ -599,10 +600,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="row card-container"
                 style="height: calc(100vh - 99px); overflow-y: auto"
               >
-                <div class="col scroll" style="height: 100%">
-                  <div
-                    class="layout-panel-container tw-h-[calc(100vh-200px)] col"
-                  >
+                <div class="col scroll" style="height: 100%; display: flex; flex-direction: column;">
+                  <!-- Custom Chart Type Selector -->
+                  <div class="q-pa-md layout-panel-container tw-h-[calc(100vh-200px)] col" style="border: 1px solid rgba(0, 0, 0, 0.12); border-radius: 4px; background-color: rgba(0, 0, 0, 0.02); margin-bottom: 12px; flex-shrink: 0;">
+                    <div class="text-subtitle2 q-mb-md" style="font-weight: 600;">
+                      {{ t("panel.customChartTypeSelector") }}
+                      <q-icon name="info_outline" class="q-ml-xs" size="xs">
+                        <q-tooltip>
+                          {{ t("panel.customChartTypeSelectorHint") }}
+                        </q-tooltip>
+                      </q-icon>
+                    </div>
+                    <q-btn
+                      unelevated
+                      color="primary"
+                      icon="bar_chart"
+                      :label="t('panel.selectChartType')"
+                      @click="openCustomChartTypeSelector"
+                      data-test="custom-chart-type-selector-btn"
+                      class="q-mb-sm"
+                      no-caps
+                    />
+                    <div v-if="selectedCustomChartType" class="q-mt-md">
+                      <div class="text-caption text-grey-7">Selected Chart Type:</div>
+                      <div class="text-body2 text-weight-medium">{{ selectedCustomChartType.label }}</div>
+                    </div>
+
+                    <!-- Custom Chart Type Selector Dialog -->
+                    <q-dialog v-model="showCustomChartTypeSelector">
+                      <CustomChartTypeSelector
+                        @select="handleChartTypeSelection"
+                        @close="showCustomChartTypeSelector = false"
+                      />
+                    </q-dialog>
+                  </div>
+                  <div style="height: 500px; flex-shrink: 0;">
                     <q-splitter
                       class="query-editor-splitter"
                       v-model="splitterModel"
@@ -705,6 +737,7 @@ import {
 import PanelSidebar from "../../../components/dashboards/addPanel/PanelSidebar.vue";
 import ChartSelection from "../../../components/dashboards/addPanel/ChartSelection.vue";
 import FieldList from "../../../components/dashboards/addPanel/FieldList.vue";
+import CustomChartTypeSelector from "../../../components/dashboards/addPanel/CustomChartTypeSelector.vue";
 
 import { useI18n } from "vue-i18n";
 import {
@@ -732,6 +765,7 @@ import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import useAiChat from "@/composables/useAiChat";
 import useStreams from "@/composables/useStreams";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
+import { customChartTemplates } from "@/components/dashboards/addPanel/customChartTemplates";
 import {
   createDashboardsContextProvider,
   contextRegistry,
@@ -777,6 +811,7 @@ export default defineComponent({
     VariablesValueSelector,
     PanelSchemaRenderer,
     RelativeTime,
+    CustomChartTypeSelector,
     DashboardQueryEditor: defineAsyncComponent(
       () => import("@/components/dashboards/addPanel/DashboardQueryEditor.vue"),
     ),
@@ -819,6 +854,29 @@ export default defineComponent({
     const { getStream } = useStreams();
     const seriesData = ref([]);
     const shouldRefreshWithoutCache = ref(false);
+
+    // Custom Chart Type Selector
+    const selectedCustomChartType = ref(null);
+    const showCustomChartTypeSelector = ref(false);
+
+    const openCustomChartTypeSelector = () => {
+      showCustomChartTypeSelector.value = true;
+    };
+
+    const handleChartTypeSelection = (chart: any) => {
+      selectedCustomChartType.value = chart;
+      const template = customChartTemplates[chart.value];
+      if (template) {
+        // Keep the default commented instructions and only replace the option code
+        const defaultComments = `// To know more about ECharts , 
+// visit: https://echarts.apache.org/examples/en/index.html 
+// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple 
+// Define your ECharts 'option' here. 
+// 'data' variable is available for use and contains the response data from the search result and it is an array.
+`;
+        dashboardPanelData.data.customChartContent = defaultComments + template;
+      }
+    };
 
     const seriesDataUpdate = (data: any) => {
       seriesData.value = data;
@@ -1497,6 +1555,14 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     };
 
+    // Handler for custom chart template selection
+    const handleCustomChartTemplateSelected = (templateCode: string) => {
+      // Update the custom chart content with the selected template
+      dashboardPanelData.data.customChartContent = templateCode;
+    };
+
+
+
     watch(
       () => dashboardPanelData.layout.splitter,
       (newVal) => {
@@ -1942,6 +2008,11 @@ export default defineComponent({
       savePanelChangesToDashboard,
       runQuery,
       layoutSplitterUpdated,
+      handleCustomChartTemplateSelected,
+      selectedCustomChartType,
+      showCustomChartTypeSelector,
+      openCustomChartTypeSelector,
+      handleChartTypeSelection,
       expandedSplitterHeight,
       querySplitterUpdated,
       currentDashboard,
