@@ -86,7 +86,9 @@
     "contactUs": "联系我们",
     "addFolder": "添加文件夹",
     "status": "状态",
-    "cancel": "取消"
+    "cancel": "取消",
+    "relative": "相对的",
+    "absolute": "绝对"
   },
   "search": {
     "selectIndex": "选择数据流",

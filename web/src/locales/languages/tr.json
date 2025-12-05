@@ -86,7 +86,9 @@
     "contactUs": "Bize Ulaşın",
     "addFolder": "Klasör Ekle",
     "status": "Durum",
-    "cancel": "İptal"
+    "cancel": "İptal",
+    "relative": "Göreceli",
+    "absolute": "Mutlak"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
