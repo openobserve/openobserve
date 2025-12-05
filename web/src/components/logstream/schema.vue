@@ -973,6 +973,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:cancel="confirmDeleteDatesDialog = false"
     v-model="confirmDeleteDatesDialog"
   />
+  <PerformanceFieldsDialog
+    v-model="confirmAddPerformanceFieldsDialog"
+    :missing-fields="missingPerformanceFields"
+    @add-fields="addPerformanceFields"
+    @skip="skipPerformanceFields"
+    @remove-field="removeFieldFromList"
+  />
 </template>
 
 <script lang="ts">
@@ -1015,6 +1022,7 @@ import {
 import DateTime from "@/components/DateTime.vue";
 
 import AssociatedRegexPatterns from "./AssociatedRegexPatterns.vue";
+import PerformanceFieldsDialog from "./PerformanceFieldsDialog.vue";
 
 const defaultValue: any = () => {
   return {
@@ -1042,6 +1050,7 @@ export default defineComponent({
     QTablePagination,
     DateTime,
     AssociatedRegexPatterns,
+    PerformanceFieldsDialog,
   },
   setup({ modelValue }) {
     type PatternAssociation = {
@@ -1064,6 +1073,9 @@ export default defineComponent({
     const flattenLevel = ref(null);
     const confirmQueryModeChangeDialog = ref(false);
     const confirmDeleteDatesDialog = ref(false);
+    const confirmAddPerformanceFieldsDialog = ref(false);
+    const missingPerformanceFields = ref([]);
+    const pendingSelectedFields = ref([]);
     const formDirtyFlag = ref(false);
     const loadingState = ref(true);
     const rowsPerPage = ref(20);
@@ -1897,13 +1909,143 @@ export default defineComponent({
       activeMainTab.value = tab;
     };
 
+    // Function to get missing FTS and Secondary Index fields
+    const getMissingPerformanceFields = (selectedFieldsSet) => {
+      const missingFields = [];
+      const currentSchema = indexData.value.schema;
+      const currentSchemaFieldNames = new Set(currentSchema.map(field => field.name));
+
+      // Get FTS fields from settings
+      const ftsFieldsFromSettings = new Set();
+      currentSchema.forEach((field) => {
+        if (field.index_type?.includes("fullTextSearchKey")) {
+          ftsFieldsFromSettings.add(field.name);
+        }
+      });
+
+      // Get Secondary Index fields from settings
+      const secondaryIndexFieldsFromSettings = new Set();
+      currentSchema.forEach((field) => {
+        if (field.index_type?.includes("secondaryIndexKey")) {
+          secondaryIndexFieldsFromSettings.add(field.name);
+        }
+      });
+
+      // Get default FTS keys from BE config (only if they exist in schema)
+      // iterate over all the be default fts keys and check if they pressent in currentschemafieldnames if they are there
+      // we should add them to ftsfields from settings
+      const defaultFtsKeys = store.state.zoConfig.default_fts_keys || [];
+      defaultFtsKeys.forEach((key) => {
+        if (currentSchemaFieldNames.has(key)) {
+          ftsFieldsFromSettings.add(key);
+        }
+      });
+
+      // Get default Secondary Index keys from BE config (only if they exist in schema)
+          // iterate over all the be default secondary keys and check if they pressent in currentschemafieldnames if they are there
+      // we should add them to secondarykeys from settings
+      const defaultSecondaryIndexKeys = store.state.zoConfig.default_secondary_index_fields || [];
+      defaultSecondaryIndexKeys.forEach((key) => {
+        if (currentSchemaFieldNames.has(key)) {
+          secondaryIndexFieldsFromSettings.add(key);
+        }
+      });
+
+      // Check which FTS fields are missing from selected fields
+      ftsFieldsFromSettings.forEach((field) => {
+        if (!selectedFieldsSet.has(field)) {
+          missingFields.push({
+            name: field,
+            type: "Full Text Search"
+          });
+        }
+      });
+
+      // Check which Secondary Index fields are missing from selected fields
+      secondaryIndexFieldsFromSettings.forEach((field) => {
+        if (!selectedFieldsSet.has(field)) {
+          missingFields.push({
+            name: field,
+            type: "Secondary Index"
+          });
+        }
+      });
+
+      return missingFields;
+    };
+
+    // Function to handle Add fields click on performance fields dialog
+    const addPerformanceFields = () => {
+      confirmAddPerformanceFieldsDialog.value = false;
+
+      // Add missing performance fields to the selected fields
+      const combinedFieldsSet = new Set([
+        ...pendingSelectedFields.value,
+        ...missingPerformanceFields.value.map(f => f.name)
+      ]);
+
+      // Proceed with adding fields
+      proceedWithAddingFields(combinedFieldsSet);
+
+      // Clear temporary variables
+      missingPerformanceFields.value = [];
+      pendingSelectedFields.value = [];
+    };
+
+    // Function to handle Cancel/No click on performance fields dialog
+    const skipPerformanceFields = () => {
+      confirmAddPerformanceFieldsDialog.value = false;
+
+      // Proceed without adding missing performance fields
+      proceedWithAddingFields(new Set(pendingSelectedFields.value));
+
+      // Clear temporary variables
+      missingPerformanceFields.value = [];
+      pendingSelectedFields.value = [];
+    };
+
+    // Function to remove a specific field from the missing fields list
+    const removeFieldFromList = (type: 'fts' | 'secondaryIndex', fieldName: string) => {
+      // Remove from missingPerformanceFields
+      missingPerformanceFields.value = missingPerformanceFields.value.filter(
+        field => field.name !== fieldName
+      );
+
+      // If no more fields left, close the dialog and proceed
+      if (missingPerformanceFields.value.length === 0) {
+        confirmAddPerformanceFieldsDialog.value = false;
+        proceedWithAddingFields(new Set(pendingSelectedFields.value));
+        pendingSelectedFields.value = [];
+      }
+    };
+
+    // Function to proceed with adding fields
+    const proceedWithAddingFields = (selectedFieldsSet) => {
+      markFormDirty();
+
+      if (selectedFieldsSet.has(allFieldsName.value))
+        selectedFieldsSet.delete(allFieldsName.value);
+
+      if (selectedFieldsSet.has(store.state.zoConfig.timestamp_column))
+        selectedFieldsSet.delete(store.state.zoConfig.timestamp_column);
+
+      indexData.value.defined_schema_fields = [
+        ...new Set([
+          ...indexData.value.defined_schema_fields,
+          ...selectedFieldsSet,
+        ]),
+      ];
+
+      selectedFields.value = [];
+    };
+
     const updateDefinedSchemaFields = () => {
       const selectedFieldsSet = new Set(
         selectedFields.value.map((field) => field.name),
       );
 
       //  Check max limit when adding fields
-      //  We need to check store.state.zoConfig.user_defined_schema_max_fields this config value before adding to UDS 
+      //  We need to check store.state.zoConfig.user_defined_schema_max_fields this config value before adding to UDS
       //  Because it should not exceed this value
       if (activeTab.value !== "schemaFields") {
         const maxFieldsLength = store.state.zoConfig?.user_defined_schema_max_fields;
@@ -1918,6 +2060,22 @@ export default defineComponent({
           });
           selectedFields.value = [];
           return;
+        }
+
+        // Check if UDS is being enabled for the first time (no existing defined_schema_fields)
+        // and if there are any missing FTS or Secondary Index fields
+        if (currentDefinedSchemaLength === 0) {
+          const missing = getMissingPerformanceFields(selectedFieldsSet);
+
+          if (missing.length > 0) {
+            // Store the pending fields and missing fields
+            pendingSelectedFields.value = Array.from(selectedFieldsSet);
+            missingPerformanceFields.value = missing;
+
+            // Show the confirmation dialog
+            confirmAddPerformanceFieldsDialog.value = true;
+            return; // Don't proceed yet, wait for user response
+          }
         }
       };
 
@@ -2253,6 +2411,14 @@ export default defineComponent({
       formatSizeFromMB,
       confirmQueryModeChangeDialog,
       confirmDeleteDatesDialog,
+      confirmAddPerformanceFieldsDialog,
+      missingPerformanceFields,
+      pendingSelectedFields,
+      getMissingPerformanceFields,
+      addPerformanceFields,
+      skipPerformanceFields,
+      removeFieldFromList,
+      proceedWithAddingFields,
       deleteFields,
       markFormDirty,
       formDirtyFlag,
