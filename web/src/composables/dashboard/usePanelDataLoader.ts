@@ -1113,6 +1113,9 @@ export const usePanelDataLoader = (
           state.isPartialData = false;
         }
       } else {
+    console.log("inside search api");
+        if(variablesData.value?.values.length === 0){
+          return}
         // copy of current abortController
         // which is used to check whether the current query has been aborted
         const abortControllerRef = abortController;
@@ -2089,6 +2092,8 @@ export const usePanelDataLoader = (
     });
 
   const ifPanelVariablesCompletedLoading = () => {
+    console.log("variablesData", JSON.stringify(variablesData.value));
+
     // STEP 1: Check if there are any dynamic variables that are still loading
     log("Step1: checking if dynamic variables are loading, starting...");
     const newDynamicVariablesData = getDynamicVariablesData();
