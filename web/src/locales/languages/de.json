@@ -273,7 +273,8 @@
     "functionLabel": "Funktion",
     "actionLabel": "Aktion",
     "transformLabel": "Verwandeln",
-    "addToDashboard": "Zum Dashboard hinzufügen"
+    "addToDashboard": "Zum Dashboard hinzufügen",
+    "selectStream": "Wählen Sie Stream"
   },
   "menu": {
     "home": "Startseite",

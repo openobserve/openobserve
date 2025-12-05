@@ -273,7 +273,8 @@
     "functionLabel": "Functie",
     "actionLabel": "Actie",
     "transformLabel": "Transformeren",
-    "addToDashboard": "Aan dashboard toevoegen"
+    "addToDashboard": "Aan dashboard toevoegen",
+    "selectStream": "Selecteer Stream"
   },
   "menu": {
     "home": "Home",

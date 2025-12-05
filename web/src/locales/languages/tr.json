@@ -273,7 +273,8 @@
     "functionLabel": "Fonksiyon",
     "actionLabel": "Eylem",
     "transformLabel": "Dönüştürün",
-    "addToDashboard": "Kontrol Paneline Ekle"
+    "addToDashboard": "Kontrol Paneline Ekle",
+    "selectStream": "Akışı Seç"
   },
   "menu": {
     "home": "Ana Sayfa",

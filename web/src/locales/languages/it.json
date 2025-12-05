@@ -273,7 +273,8 @@
     "functionLabel": "Funzione",
     "actionLabel": "Azione",
     "transformLabel": "Trasforma",
-    "addToDashboard": "Aggiungi al pannello di controllo"
+    "addToDashboard": "Aggiungi al pannello di controllo",
+    "selectStream": "Seleziona Stream"
   },
   "menu": {
     "home": "Home",

@@ -273,7 +273,8 @@
     "functionLabel": "ファンクション",
     "actionLabel": "アクション",
     "transformLabel": "トランスフォーム",
-    "addToDashboard": "ダッシュボードに追加"
+    "addToDashboard": "ダッシュボードに追加",
+    "selectStream": "[ストリーム] を選択"
   },
   "menu": {
     "home": "ホーム",
