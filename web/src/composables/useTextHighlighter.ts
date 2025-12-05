@@ -654,7 +654,7 @@ export function useTextHighlighter() {
 
     // Add opening quote if requested
     if (showQuotes) {
-      result += `<span style="color: ${colors.stringValue};">&quot;</span>`;
+      result += `<span class="log-string">&quot;</span>`;
     }
 
     // Process each segment individually to preserve semantic colorization
@@ -668,8 +668,8 @@ export function useTextHighlighter() {
       if (segment.type === "bracketed") {
         const innerContent = segment.content.slice(1, -1); // Remove brackets temporarily for colorization
         const semanticType = detectSemanticType(innerContent);
-        const semanticColor = getColorForType(semanticType, colors) || colors.stringValue;
-        return `<span style="color: #9ca3af;">[</span><span style="color: ${semanticColor};">${escapeHtml(innerContent)}</span><span style="color: #9ca3af;">]</span>`;
+        const semanticClass = getSemanticCSSClass(semanticType);
+        return `<span class="log-object-brace">[</span><span class="${semanticClass}">${escapeHtml(innerContent)}</span><span class="log-object-brace">]</span>`;
       }
 
       // For quoted content (quotes are part of the raw data), preserve quotes and treat as string
@@ -684,15 +684,15 @@ export function useTextHighlighter() {
           const content = escapeHtml(part.text);
           if (part.isHighlighted) {
             // Highlighted keywords get yellow background
-            return `<span style="background-color: rgb(255, 213, 0); color: black;">${content}</span>`;
+            return `<span class="log-highlighted">${content}</span>`;
           } else {
             // Everything else inside quotes stays as string color
-            return `<span style="color: ${colors.stringValue};">${content}</span>`;
+            return `<span class="log-string">${content}</span>`;
           }
         }).join('');
 
         // Wrap with quotes (these are the data quotes, not display quotes)
-        return `<span style="color: ${colors.stringValue};">${escapeHtml(quoteChar)}</span>${processedContent}<span style="color: ${colors.stringValue};">${escapeHtml(quoteChar)}</span>`;
+        return `<span class="log-string">${escapeHtml(quoteChar)}</span>${processedContent}<span class="log-string">${escapeHtml(quoteChar)}</span>`;
       }
 
       // For regular tokens, split by keywords and apply semantic colors
@@ -701,19 +701,19 @@ export function useTextHighlighter() {
         const content = escapeHtml(part.text);
         if (part.isHighlighted) {
           // Highlighted keywords get yellow background
-          return `<span style="background-color: rgb(255, 213, 0); color: black;">${content}</span>`;
+          return `<span class="log-highlighted">${content}</span>`;
         } else {
           // Apply semantic colorization based on content type
           const semanticType = detectSemanticType(part.text);
-          const semanticColor = getColorForType(semanticType, colors) || colors.stringValue;
-          return `<span style="color: ${semanticColor};">${content}</span>`;
+          const semanticClass = getSemanticCSSClass(semanticType);
+          return `<span class="${semanticClass}">${content}</span>`;
         }
       }).join('');
     }).join('');
 
     // Add closing quote if requested
     if (showQuotes) {
-      result += `<span style="color: ${colors.stringValue};">&quot;</span>`;
+      result += `<span class="log-string">&quot;</span>`;
     }
 
     return result;

@@ -240,7 +240,7 @@ describe("useTextHighlighter", () => {
       expect(result).toContain("hello");
       expect(result).toContain("world");
       // Brackets should be styled with gray color
-      expect(result).toContain("#9ca3af");
+      expect(result).toContain("log-object-brace");
     });
   });
 
@@ -416,7 +416,7 @@ describe("useTextHighlighter", () => {
         "",
         mockColors,
       );
-      expect(result).toContain("color: #047857");
+      expect(result).toContain("log-string");
       // New behavior: text is tokenized into separate spans
       expect(result).toContain("normal");
       expect(result).toContain("text");
