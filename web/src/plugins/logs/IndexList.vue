@@ -1075,7 +1075,7 @@ export default defineComponent({
 
     const placeHolderText = computed(() => {
       return searchObj.data.stream?.selectedStream?.length === 0
-        ? "Select Stream"
+        ? t("search.selectStream")
         : "";
     });
 

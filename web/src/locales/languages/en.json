@@ -273,7 +273,8 @@
     "functionLabel": "Function",
     "actionLabel": "Action",
     "transformLabel": "Transform",
-    "addToDashboard": "Add To Dashboard"
+    "addToDashboard": "Add To Dashboard",
+    "selectStream": "Select Stream"
   },
   "menu": {
     "home": "Home",
