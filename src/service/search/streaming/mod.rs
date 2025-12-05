@@ -81,7 +81,7 @@ pub async fn process_search_stream_request(
     is_multi_stream_search: bool,
     extract_patterns: bool,
 ) {
-    log::debug!(
+    log::info!(
         "[HTTP2_STREAM trace_id {trace_id}] Received HTTP/2 stream request for org_id: {org_id}",
     );
 
@@ -294,10 +294,7 @@ pub async fn process_search_stream_request(
             // set max_query_range to `end_time - start_time` as hour if it is 0, to ensure
             // unlimited query range for cache only search
             let remaining_query_range = if max_query_range == 0 {
-                std::cmp::max(
-                    1,
-                    (req.query.end_time - req.query.start_time) / hour_micros(1),
-                )
+                (req.query.end_time - req.query.start_time) / hour_micros(1) + 1
             } else {
                 max_query_range
             }; // hours
@@ -460,6 +457,10 @@ pub async fn process_search_stream_request(
                 return;
             }
         }
+        log::info!(
+            "[HTTP2_STREAM trace_id {trace_id}] search is done, took: {} ms",
+            start.elapsed().as_millis()
+        );
         // Step 3: Write to results cache
         // cache only if from is 0 and is not an aggregate_query
         if req.query.from == 0
