@@ -292,6 +292,9 @@ name="warning" class="q-mr-xs" />
                 @view-trace="
                   viewTrace(formattedRows[virtualRow.index]?.original)
                 "
+                @show-correlation="
+                  showCorrelation(formattedRows[virtualRow.index]?.original)
+                "
                 :streamName="jsonpreviewStreamName"
                 @send-to-ai-chat="sendToAiChat"
               />
@@ -495,6 +498,7 @@ const emits = defineEmits([
   "expandRow",
   "view-trace",
   "sendToAiChat",
+  "show-correlation",
 ]);
 
 const sorting = ref<SortingState>([]);
@@ -891,6 +895,11 @@ const handleCellMouseLeave = () => {
 const viewTrace = (row: any) => {
   emits("view-trace", row);
 };
+
+const showCorrelation = (row: any) => {
+  emits("show-correlation", row);
+};
+
 const sendToAiChat = (value: any, isEntireRow: boolean = false) => {
   if (isEntireRow) {
     //here we will get the original value of the row

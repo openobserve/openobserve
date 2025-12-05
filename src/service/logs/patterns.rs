@@ -65,7 +65,7 @@ pub async fn ingest_patterns(
     let bytes = bytes::Bytes::from(json_string);
 
     // Use direct log ingestion (we're on ingester nodes)
-    let req = IngestionRequest::JSON(&bytes);
+    let req = IngestionRequest::JSON(bytes);
     match super::ingest::ingest(0, org_id, &pattern_stream_name, req, "", None, false).await {
         Ok(resp) if resp.code == 200 => {
             log::debug!(
