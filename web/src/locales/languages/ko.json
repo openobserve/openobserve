@@ -272,7 +272,8 @@
     "functionSelectionNotSupportedVisualization": "시각화에는 함수 선택이 지원되지 않습니다.",
     "functionLabel": "기능",
     "actionLabel": "액션",
-    "transformLabel": "트랜스폼"
+    "transformLabel": "트랜스폼",
+    "addToDashboard": "대시보드에 추가"
   },
   "menu": {
     "home": "홈",

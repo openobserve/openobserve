@@ -272,7 +272,8 @@
     "functionSelectionNotSupportedVisualization": "İşlev seçimi görselleştirme için desteklenmiyor",
     "functionLabel": "Fonksiyon",
     "actionLabel": "Eylem",
-    "transformLabel": "Dönüştürün"
+    "transformLabel": "Dönüştürün",
+    "addToDashboard": "Kontrol Paneline Ekle"
   },
   "menu": {
     "home": "Ana Sayfa",

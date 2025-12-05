@@ -272,7 +272,8 @@
     "functionSelectionNotSupportedVisualization": "可视化不支持函数选择",
     "functionLabel": "函数",
     "actionLabel": "行动",
-    "transformLabel": "转型"
+    "transformLabel": "转型",
+    "addToDashboard": "添加到控制面板"
   },
   "menu": {
     "home": "主页",

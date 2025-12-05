@@ -272,7 +272,8 @@
     "functionSelectionNotSupportedVisualization": "関数選択はビジュアライゼーションではサポートされていません",
     "functionLabel": "ファンクション",
     "actionLabel": "アクション",
-    "transformLabel": "トランスフォーム"
+    "transformLabel": "トランスフォーム",
+    "addToDashboard": "ダッシュボードに追加"
   },
   "menu": {
     "home": "ホーム",

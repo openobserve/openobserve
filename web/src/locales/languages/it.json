@@ -272,7 +272,8 @@
     "functionSelectionNotSupportedVisualization": "La selezione delle funzioni non è supportata per la visualizzazione",
     "functionLabel": "Funzione",
     "actionLabel": "Azione",
-    "transformLabel": "Trasforma"
+    "transformLabel": "Trasforma",
+    "addToDashboard": "Aggiungi al pannello di controllo"
   },
   "menu": {
     "home": "Home",

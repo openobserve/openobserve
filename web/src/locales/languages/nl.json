@@ -272,7 +272,8 @@
     "functionSelectionNotSupportedVisualization": "Functieselectie wordt niet ondersteund voor visualisatie",
     "functionLabel": "Functie",
     "actionLabel": "Actie",
-    "transformLabel": "Transformeren"
+    "transformLabel": "Transformeren",
+    "addToDashboard": "Aan dashboard toevoegen"
   },
   "menu": {
     "home": "Home",
