@@ -8,7 +8,7 @@
 
 import { useTextHighlighter } from "@/composables/useTextHighlighter";
 import { getThemeColors } from "@/utils/logs/keyValueParser";
-import { computed, ref, watch } from "vue";
+import { computed, ref, watch, onBeforeUnmount } from "vue";
 import { useStore } from "vuex";
 import { searchState } from "@/composables/useLogs/searchState";
 
@@ -18,6 +18,34 @@ export function useLogsHighlighter() {
   const store = useStore();
   const currentColors = ref(getThemeColors(store.state.theme === "dark"));
   const { searchObj } = searchState();
+
+  // Track active processing to prevent memory leaks
+  let abortController: AbortController | null = null;
+  let pendingTimeouts: NodeJS.Timeout[] = [];
+
+  // Cleanup function to clear pending timeouts and abort processing
+  const cleanup = () => {
+    // Clear all pending timeouts
+    pendingTimeouts.forEach((timeoutId) => clearTimeout(timeoutId));
+    pendingTimeouts = [];
+
+    // Abort any in-flight processing
+    if (abortController) {
+      abortController.abort();
+      abortController = null;
+    }
+  };
+
+  // Cleanup on component unmount (if used in a component context)
+  // Note: This only works if called within a component setup
+  try {
+    onBeforeUnmount(() => {
+      cleanup();
+    });
+  } catch (e) {
+    // onBeforeUnmount not available (not in component context)
+    // This is fine - cleanup will still happen on abort
+  }
 
   watch(
     () => store.state.theme,
@@ -37,6 +65,7 @@ export function useLogsHighlighter() {
   /**
    * Process hits array in chunks to avoid blocking the main thread
    * Returns a Map with cache keys and processed HTML
+   * Includes abort mechanism to prevent memory leaks
    */
   async function processHitsInChunks(
     hits: any[],
@@ -46,6 +75,13 @@ export function useLogsHighlighter() {
     chunkSize: number = 50,
     selectedStreamFtsKeys: string[] = [],
   ): Promise<{ [key: string]: string }> {
+    // Abort any previous processing before starting new one
+    cleanup();
+
+    // Create new abort controller for this processing session
+    abortController = new AbortController();
+    const signal = abortController.signal;
+
     if (clearCache) {
       processedResults.value = {};
     }
@@ -61,6 +97,11 @@ export function useLogsHighlighter() {
 
     // Process each chunk with await to prevent blocking
     for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+      // Check if processing was aborted
+      if (signal.aborted) {
+        return processedResults.value;
+      }
+
       const chunk = chunks[chunkIndex];
       const batchUpdates: { [key: string]: string } = {};
 
@@ -108,12 +149,47 @@ export function useLogsHighlighter() {
         ...batchUpdates,
       };
 
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      // Yield control back to event loop with tracked timeout
+      // This prevents blocking the UI thread
+      await new Promise<void>((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          // Remove from pending list when executed
+          const index = pendingTimeouts.indexOf(timeoutId);
+          if (index > -1) {
+            pendingTimeouts.splice(index, 1);
+          }
+
+          // Check if aborted before resolving
+          if (signal.aborted) {
+            reject(new Error("Processing aborted"));
+          } else {
+            resolve();
+          }
+        }, 50);
+
+        // Track this timeout for cleanup
+        pendingTimeouts.push(timeoutId);
+
+        // Handle abort signal
+        signal.addEventListener("abort", () => {
+          clearTimeout(timeoutId);
+          const index = pendingTimeouts.indexOf(timeoutId);
+          if (index > -1) {
+            pendingTimeouts.splice(index, 1);
+          }
+          reject(new Error("Processing aborted"));
+        });
+      }).catch(() => {
+        // Silently handle abort errors
+        // Processing was intentionally cancelled
+      });
     }
     return processedResults.value;
   }
 
   const clearCache = () => {
+    // Also cleanup pending operations when clearing cache
+    cleanup();
     processedResults.value = {};
   };
 
@@ -625,5 +701,6 @@ export function useLogsHighlighter() {
     clearCache,
     processedResults,
     detectSemanticType,
+    cleanup, // Expose cleanup for manual cleanup if needed
   };
 }
