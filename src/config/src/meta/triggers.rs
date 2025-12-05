@@ -125,16 +125,15 @@ pub struct BackfillJob {
     pub deletion_job_id: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum DeletionStatus {
+    #[default]
+    NotRequired,
     Pending,
     InProgress,
     Completed,
-    #[serde(untagged)]
     Failed(String),
-    #[default]
-    NotRequired,
 }
 
 impl ScheduledTriggerData {

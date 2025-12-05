@@ -22,6 +22,7 @@ use config::{
     meta::{
         alerts::TriggerCondition,
         dashboards::reports::ReportFrequencyType,
+        pipeline::components::NodeData,
         self_reporting::{
             error::{ErrorData, ErrorSource, PipelineError},
             usage::{TriggerData, TriggerDataStatus, TriggerDataType},
@@ -382,6 +383,7 @@ async fn handle_alert_triggers(
             period_end_time: None,
             tolerance: 0,
             last_satisfied_at: None,
+            backfill_job: None,
         }
     };
 
@@ -1969,6 +1971,7 @@ async fn handle_derived_stream_triggers(
             period_end_time: Some(start_time),
             tolerance: 0,
             last_satisfied_at: None,
+            backfill_job: None,
         })
         .unwrap();
     }
@@ -2078,9 +2081,8 @@ async fn handle_backfill_triggers(
     trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
     use config::meta::{
-        pipeline::{NodeData, PipelineSource},
-        stream::StreamParams,
-        triggers::{BackfillJob, DeletionStatus, ScheduledTriggerData},
+        pipeline::components::PipelineSource,
+        triggers::{DeletionStatus, ScheduledTriggerData},
     };
 
     let (_, max_retries) = get_scheduler_max_retries();
@@ -2090,7 +2092,7 @@ async fn handle_backfill_triggers(
     );
 
     let now = Utc::now().timestamp_micros();
-    let source_node = LOCAL_NODE.name.clone();
+    let _source_node = LOCAL_NODE.name.clone();
 
     // 1. Parse backfill job data from trigger.data
     let trigger_data = match ScheduledTriggerData::from_json_string(&trigger.data) {
@@ -2114,11 +2116,8 @@ async fn handle_backfill_triggers(
     };
 
     // 2. Fetch the source pipeline configuration
-    let pipeline = match crate::service::db::pipeline::get_by_id(
-        &trigger.org,
-        &backfill_job.source_pipeline_id,
-    )
-    .await
+    let pipeline = match crate::service::db::pipeline::get_by_id(&backfill_job.source_pipeline_id)
+        .await
     {
         Ok(pipeline) => pipeline,
         Err(e) => {
@@ -2408,31 +2407,37 @@ async fn handle_backfill_triggers(
         }
     };
 
-    if let Err(e) = executable_pipeline.process_batch(results.data).await {
-        log::error!(
-            "[BACKFILL trace_id {trace_id}] Failed to process batch: {e}"
-        );
-        if trigger.retries + 1 >= max_retries {
-            let _ = db::scheduler::delete(
-                &trigger.org,
-                db::scheduler::TriggerModule::Backfill,
-                &trigger.module_key,
-            )
-            .await;
-        } else {
-            let _ = db::scheduler::update_status(
-                &trigger.org,
-                db::scheduler::TriggerModule::Backfill,
-                &trigger.module_key,
-                db::scheduler::TriggerStatus::Waiting,
-                trigger.retries + 1,
-                None,
-                true,
-                trace_id,
-            )
-            .await;
+    if let Some(data) = results.data {
+        let records: Vec<json::Value> = data.into_iter().map(json::Value::Object).collect();
+        if let Err(e) = executable_pipeline
+            .process_batch(&trigger.org, records, None)
+            .await
+        {
+            log::error!(
+                "[BACKFILL trace_id {trace_id}] Failed to process batch: {e}"
+            );
+            if trigger.retries + 1 >= max_retries {
+                let _ = db::scheduler::delete(
+                    &trigger.org,
+                    db::scheduler::TriggerModule::Backfill,
+                    &trigger.module_key,
+                )
+                .await;
+            } else {
+                let _ = db::scheduler::update_status(
+                    &trigger.org,
+                    db::scheduler::TriggerModule::Backfill,
+                    &trigger.module_key,
+                    db::scheduler::TriggerStatus::Waiting,
+                    trigger.retries + 1,
+                    None,
+                    true,
+                    trace_id,
+                )
+                .await;
+            }
+            return Err(anyhow::anyhow!("Failed to process batch: {}", e));
         }
-        return Err(anyhow::anyhow!("Failed to process batch: {}", e));
     }
 
     // 8. Update progress or complete
@@ -2542,7 +2547,7 @@ async fn initiate_stream_deletion(
     let job = infra::table::compactor_manual_jobs::CompactorManualJob {
         id: config::ider::uuid(),
         key: key.clone(),
-        status: infra::table::compactor_manual_jobs::CompactorManualJobStatus::Pending,
+        status: infra::table::compactor_manual_jobs::Status::Pending,
         created_at: Utc::now().timestamp_micros(),
         ended_at: 0,
     };
@@ -2555,7 +2560,12 @@ async fn initiate_stream_deletion(
 /// Helper function to check deletion job status
 async fn check_deletion_status(job_id: &str) -> Result<String, anyhow::Error> {
     let job = crate::service::db::compact::compactor_manual_jobs::get_job(job_id).await?;
-    Ok(format!("{:?}", job.status).to_lowercase())
+    let status_str = match job.status {
+        infra::table::compactor_manual_jobs::Status::Pending => "pending",
+        infra::table::compactor_manual_jobs::Status::Running => "running",
+        infra::table::compactor_manual_jobs::Status::Completed => "completed",
+    };
+    Ok(status_str.to_string())
 }
 
 #[cfg(test)]

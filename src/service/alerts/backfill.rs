@@ -16,16 +16,14 @@
 use chrono::Utc;
 use config::{
     ider,
-    meta::{
-        pipeline::PipelineSource,
-        triggers::{BackfillJob, DeletionStatus, ScheduledTriggerData, TriggerModule},
-    },
+    meta::triggers::{BackfillJob, DeletionStatus, ScheduledTriggerData, TriggerModule},
 };
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::service::db;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct BackfillJobStatus {
     pub job_id: String,
     pub pipeline_id: String,
@@ -57,7 +55,7 @@ pub async fn create_backfill_job(
     delete_before_backfill: bool,
 ) -> Result<String, anyhow::Error> {
     // 1. Validate pipeline exists and is scheduled
-    let pipeline = crate::service::db::pipeline::get_by_id(org_id, pipeline_id).await?;
+    let pipeline = crate::service::db::pipeline::get_by_id(pipeline_id).await?;
 
     if !pipeline.source.is_scheduled() {
         return Err(anyhow::anyhow!("Pipeline is not a scheduled pipeline"));
@@ -142,7 +140,9 @@ pub async fn list_backfill_jobs(org_id: &str) -> Result<Vec<BackfillJobStatus>, 
         if let Some(backfill_job) = trigger_data.backfill_job {
             // Get pipeline name
             let pipeline_name =
-                match crate::service::db::pipeline::get_by_id(org_id, &backfill_job.source_pipeline_id).await {
+                match crate::service::db::pipeline::get_by_id(&backfill_job.source_pipeline_id)
+                    .await
+                {
                     Ok(pipeline) => Some(pipeline.name),
                     Err(_) => None,
                 };
@@ -225,15 +225,13 @@ pub async fn get_backfill_job(
         if trigger.module_key.ends_with(job_id) {
             let trigger_data = ScheduledTriggerData::from_json_string(&trigger.data)?;
             if let Some(backfill_job) = trigger_data.backfill_job {
-                let pipeline_name = match crate::service::db::pipeline::get_by_id(
-                    org_id,
-                    &backfill_job.source_pipeline_id,
-                )
-                .await
-                {
-                    Ok(pipeline) => Some(pipeline.name),
-                    Err(_) => None,
-                };
+                let pipeline_name =
+                    match crate::service::db::pipeline::get_by_id(&backfill_job.source_pipeline_id)
+                        .await
+                    {
+                        Ok(pipeline) => Some(pipeline.name),
+                        Err(_) => None,
+                    };
 
                 let progress_percent = if backfill_job.delete_before_backfill {
                     match &backfill_job.deletion_status {

@@ -14,18 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::{delete, get, post, web, HttpResponse};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::{
-    common::{
-        meta::http::HttpResponse as MetaHttpResponse,
-        utils::http::{get_stream_type_from_request, parse_timestamp},
-    },
-    service::alerts::backfill,
+    common::meta::http::HttpResponse as MetaHttpResponse, service::alerts::backfill,
 };
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct BackfillRequest {
     #[serde(with = "timestamp_format")]
     pub start_time: i64,
@@ -40,7 +36,7 @@ pub struct BackfillRequest {
 }
 
 mod timestamp_format {
-    use chrono::{DateTime, NaiveDateTime, Utc};
+    use chrono::DateTime;
     use serde::{self, Deserialize, Deserializer, Serializer};
 
     pub fn serialize<S>(timestamp: &i64, serializer: S) -> Result<S::Ok, S::Error>
@@ -80,7 +76,7 @@ mod timestamp_format {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct BackfillResponse {
     pub job_id: String,
     pub message: String,
