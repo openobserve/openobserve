@@ -1776,43 +1776,43 @@ class APICleanup {
                 testLogger.info('Found folders to clean up', { total: matchingFolders.length });
 
                 for (const folder of matchingFolders) {
-                // First, delete all alerts in the folder
-                const alerts = await this.fetchAlertsInFolder(folder.folderId);
+                    // First, delete all alerts in the folder
+                    const alerts = await this.fetchAlertsInFolder(folder.folderId);
 
-                if (alerts.length > 0) {
-                    testLogger.info('Deleting alerts in folder before folder deletion', {
-                        folderId: folder.folderId,
-                        folderName: folder.name,
-                        alertCount: alerts.length
-                    });
+                    if (alerts.length > 0) {
+                        testLogger.info('Deleting alerts in folder before folder deletion', {
+                            folderId: folder.folderId,
+                            folderName: folder.name,
+                            alertCount: alerts.length
+                        });
 
-                    for (const alert of alerts) {
-                        const alertDeleteResult = await this.deleteAlert(alert.alert_id, folder.folderId);
-                        if (alertDeleteResult.code === 200) {
-                            testLogger.debug('Deleted alert', { alertId: alert.alert_id, name: alert.name });
-                        } else {
-                            testLogger.warn('Failed to delete alert', {
-                                alertId: alert.alert_id,
-                                name: alert.name,
-                                result: alertDeleteResult
-                            });
+                        for (const alert of alerts) {
+                            const alertDeleteResult = await this.deleteAlert(alert.alert_id, folder.folderId);
+                            if (alertDeleteResult.code === 200) {
+                                testLogger.debug('Deleted alert', { alertId: alert.alert_id, name: alert.name });
+                            } else {
+                                testLogger.warn('Failed to delete alert', {
+                                    alertId: alert.alert_id,
+                                    name: alert.name,
+                                    result: alertDeleteResult
+                                });
+                            }
                         }
                     }
-                }
 
-                // Then delete the folder
-                const folderDeleteResult = await this.deleteFolder(folder.folderId);
+                    // Then delete the folder
+                    const folderDeleteResult = await this.deleteFolder(folder.folderId);
 
-                // Handle both JSON and plain text responses
-                if (folderDeleteResult.code === 200 || folderDeleteResult.message?.includes('Folder deleted')) {
-                    testLogger.info('Deleted folder', { folderId: folder.folderId, name: folder.name });
-                } else {
-                    testLogger.warn('Failed to delete folder', {
-                        folderId: folder.folderId,
-                        name: folder.name,
-                        result: folderDeleteResult
-                    });
-                }
+                    // Handle both JSON and plain text responses
+                    if (folderDeleteResult.code === 200 || folderDeleteResult.message?.includes('Folder deleted')) {
+                        testLogger.info('Deleted folder', { folderId: folder.folderId, name: folder.name });
+                    } else {
+                        testLogger.warn('Failed to delete folder', {
+                            folderId: folder.folderId,
+                            name: folder.name,
+                            result: folderDeleteResult
+                        });
+                    }
                 }
             }
 
