@@ -1840,6 +1840,20 @@
     "matchedDimensions": "Op elkaar afgestemde afmetingen",
     "metricsButton": "{count} Metriek (en)",
     "metricsTooltip": "Selecteer metrische streams om weer te geven",
-    "selectMetrics": "Selecteer Metric Streams"
+    "selectMetrics": "Selecteer Metric Streams",
+    "correlatedLogs": "Gecorreleerde logboeken",
+    "correlatedMetrics": "Gecorreleerde statistieken",
+    "correlatedTraces": "Gecorreleerde sporen",
+    "clickToLoadLogs": "Klik om gecorreleerde logboeken te laden",
+    "clickToLoadMetrics": "Klik om gecorreleerde statistieken te laden",
+    "clickToLoadTraces": "Klik om gecorreleerde sporen te laden",
+    "loadingLogs": "Logboeken worden geladen...",
+    "noLogsFound": "Geen gecorreleerde logboeken gevonden",
+    "service": "Dienst: {service}",
+    "tracesPlaceholder": "Traces zullen hier worden geïmplementeerd",
+    "correlatedTracesFor": "Gecorreleerde sporen voor service: {service}",
+    "metricsSelector": "{geselecteerd} van {total} Metriek (en)",
+    "dimensions": "Filters",
+    "all": "Alles"
   }
 }

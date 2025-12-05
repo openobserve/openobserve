@@ -1840,6 +1840,20 @@
     "matchedDimensions": "Abgestimmte Abmessungen",
     "metricsButton": "{count} Metrik (en)",
     "metricsTooltip": "Wählen Sie die anzuzeigenden Metrik-Streams aus",
-    "selectMetrics": "Wählen Sie Metric Streams"
+    "selectMetrics": "Wählen Sie Metric Streams",
+    "correlatedLogs": "Korrelierte Protokolle",
+    "correlatedMetrics": "Korrelierte Metriken",
+    "correlatedTraces": "Korrelierte Spuren",
+    "clickToLoadLogs": "Klicken Sie hier, um korrelierte Protokolle zu laden",
+    "clickToLoadMetrics": "Klicken Sie hier, um korrelierte Metriken zu laden",
+    "clickToLoadTraces": "Klicken Sie hier, um korrelierte Traces zu laden",
+    "loadingLogs": "Logs werden geladen...",
+    "noLogsFound": "Keine korrelierten Protokolle gefunden",
+    "service": "Dienst: {service}",
+    "tracesPlaceholder": "Traces werden hier implementiert",
+    "correlatedTracesFor": "Korrelierte Traces für Service: {service}",
+    "metricsSelector": "{ausgewählt} von {total} Metrik (en)",
+    "dimensions": "Filter",
+    "all": "Alle"
   }
 }

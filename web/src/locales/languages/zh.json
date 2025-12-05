@@ -1836,6 +1836,20 @@
     "matchedDimensions": "匹配的尺寸",
     "metricsButton": "{count} 指标",
     "metricsTooltip": "选择要显示的指标流",
-    "selectMetrics": "选择指标流"
+    "selectMetrics": "选择指标流",
+    "correlatedLogs": "关联日志",
+    "correlatedMetrics": "相关指标",
+    "correlatedTraces": "相关痕迹",
+    "clickToLoadLogs": "点击加载相关日志",
+    "clickToLoadMetrics": "点击加载相关指标",
+    "clickToLoadTraces": "点击加载相关跟踪",
+    "loadingLogs": "正在加载日志...",
+    "noLogsFound": "未找到相关的日志",
+    "service": "服务：{服务}",
+    "tracesPlaceholder": "跟踪将在此处实现",
+    "correlatedTracesFor": "服务的相关跟踪：{service}",
+    "metricsSelector": "{总计} 个指标中的 {已选择}",
+    "dimensions": "过滤器",
+    "all": "全部"
   }
 }

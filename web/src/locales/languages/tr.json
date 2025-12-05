@@ -1840,6 +1840,20 @@
     "matchedDimensions": "Eşleşen Boyutlar",
     "metricsButton": "{count} Metrik (ler)",
     "metricsTooltip": "Görüntülenecek metrik akışları seçin",
-    "selectMetrics": "Metrik Akışları Seçin"
+    "selectMetrics": "Metrik Akışları Seçin",
+    "correlatedLogs": "İlişkili Günlükler",
+    "correlatedMetrics": "İlişkili Metrikler",
+    "correlatedTraces": "İlişkili İzler",
+    "clickToLoadLogs": "İlişkili günlükleri yüklemek için tıklayın",
+    "clickToLoadMetrics": "İlişkili metrikleri yüklemek için tıklayın",
+    "clickToLoadTraces": "İlişkili izleri yüklemek için tıklayın",
+    "loadingLogs": "Günlükler yükleniyor...",
+    "noLogsFound": "İlişkili günlükler bulunamadı",
+    "service": "Hizmet: {servis}",
+    "tracesPlaceholder": "İzler burada uygulanacak",
+    "correlatedTracesFor": "Hizmet için ilişkili izler: {service}",
+    "metricsSelector": "{toplam} metrik (ler) den {seçilmiş}",
+    "dimensions": "Filtreler",
+    "all": "Hepsi"
   }
 }

@@ -1840,6 +1840,20 @@
     "matchedDimensions": "Dimensiones coincidentes",
     "metricsButton": "{count} Métricas",
     "metricsTooltip": "Seleccione los flujos métricos que desea mostrar",
-    "selectMetrics": "Seleccione Metric Streams"
+    "selectMetrics": "Seleccione Metric Streams",
+    "correlatedLogs": "Registros correlacionados",
+    "correlatedMetrics": "Métricas correlacionadas",
+    "correlatedTraces": "Rastros correlacionados",
+    "clickToLoadLogs": "Haga clic para cargar los registros correlacionados",
+    "clickToLoadMetrics": "Haga clic para cargar métricas correlacionadas",
+    "clickToLoadTraces": "Haga clic para cargar trazas correlacionadas",
+    "loadingLogs": "Cargando registros...",
+    "noLogsFound": "No se han encontrado registros correlacionados",
+    "service": "Servicio: {service}",
+    "tracesPlaceholder": "Los rastros se implementarán aquí",
+    "correlatedTracesFor": "Rastros correlacionados para el servicio: {service}",
+    "metricsSelector": "{seleccionado} de {total} métricas",
+    "dimensions": "Filtros",
+    "all": "Todas"
   }
 }

@@ -1840,6 +1840,20 @@
     "matchedDimensions": "일치하는 치수",
     "metricsButton": "{개수} 지표",
     "metricsTooltip": "표시할 지표 스트림 선택",
-    "selectMetrics": "지표 스트림 선택"
+    "selectMetrics": "지표 스트림 선택",
+    "correlatedLogs": "상관관계가 있는 로그",
+    "correlatedMetrics": "상관관계가 있는 지표",
+    "correlatedTraces": "상관관계가 있는 트레이스",
+    "clickToLoadLogs": "상호 관련된 로그를 로드하려면 클릭하십시오.",
+    "clickToLoadMetrics": "상관관계가 있는 지표를 로드하려면 클릭하십시오.",
+    "clickToLoadTraces": "상관관계가 있는 트레이스를 로드하려면 클릭하십시오.",
+    "loadingLogs": "로그 로드 중...",
+    "noLogsFound": "상관관계가 있는 로그를 찾을 수 없습니다.",
+    "service": "서비스: {서비스}",
+    "tracesPlaceholder": "여기에서 추적이 구현됩니다.",
+    "correlatedTracesFor": "서비스에 대한 상관관계가 있는 트레이스: {service}",
+    "metricsSelector": "{총} 개 지표 중 {선택된} 개",
+    "dimensions": "필터",
+    "all": "모두"
   }
 }

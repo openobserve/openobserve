@@ -1833,6 +1833,20 @@
     "matchedDimensions": "寸法を合わせたもの",
     "metricsButton": "{カウント} メトリックス",
     "metricsTooltip": "表示するメトリックスストリームを選択",
-    "selectMetrics": "メトリックスストリームの選択"
+    "selectMetrics": "メトリックスストリームの選択",
+    "correlatedLogs": "相関ログ",
+    "correlatedMetrics": "相関指標",
+    "correlatedTraces": "相関トレース",
+    "clickToLoadLogs": "クリックして相関ログを読み込む",
+    "clickToLoadMetrics": "クリックして相関指標を読み込む",
+    "clickToLoadTraces": "クリックして相関トレースを読み込む",
+    "loadingLogs": "ログをロード中...",
+    "noLogsFound": "相関ログが見つかりません",
+    "service": "サービス:{サービス}",
+    "tracesPlaceholder": "トレースはここに実装されます",
+    "correlatedTracesFor": "サービスの相関トレース:{service}",
+    "metricsSelector": "{合計} 個のメトリックの {選択済み}",
+    "dimensions": "フィルター",
+    "all": "[すべて]"
   }
 }
