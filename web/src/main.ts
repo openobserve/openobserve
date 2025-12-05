@@ -92,6 +92,7 @@ const getConfig = async () => {
         trackUserInteractions: true,
         apiVersion: options.apiVersion,
         insecureHTTP: options.insecureHTTP,
+        defaultPrivacyLevel: "allow",
       });
 
       openobserveLogs.init({
@@ -106,7 +107,7 @@ const getConfig = async () => {
         apiVersion: options.apiVersion,
       });
 
-      openobserveRum.startSessionReplayRecording();
+      openobserveRum.startSessionReplayRecording({ force: true });
     }
   });
 };
