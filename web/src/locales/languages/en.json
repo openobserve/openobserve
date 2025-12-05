@@ -1719,7 +1719,9 @@
     "get_history": "Get History",
     "executed_at":"Executed At",
     "sql_query":"SQL Query",
-    "resuls":"Results"
+    "resuls":"Results",
+    "wrapText": "Wrap Text",
+    "delayMessage": "Search History might be delayed by"
   },
   "correlation": {
     "title": "Correlated Metrics - {service}",
