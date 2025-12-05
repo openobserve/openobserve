@@ -15,18 +15,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <!-- Dialog Mode -->
   <q-dialog
+    v-if="props.mode === 'dialog'"
     v-model="isOpen"
     position="right"
     full-height
-    :maximized="false"
+    maximized
     transition-show="slide-left"
     transition-hide="slide-right"
     @hide="onClose"
   >
     <q-card class="correlation-dashboard-card">
       <!-- Header -->
-      <q-card-section class="correlation-header tw-flex tw-items-center tw-justify-between tw-py-3 tw-px-4 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)]">
+      <q-card-section v-if="!isEmbeddedTabs" class="correlation-header tw-flex tw-items-center tw-justify-between tw-py-3 tw-px-4 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)]">
         <div class="tw-flex tw-items-center tw-gap-3">
           <q-icon name="link" size="md" color="primary" />
           <div class="tw-flex tw-flex-col tw-gap-0">
@@ -52,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <!-- Matched Dimensions Display -->
-      <q-card-section class="tw-py-2 tw-px-4 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)]">
+      <div class="tw-py-2 tw-px-4 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)]">
         <div class="tw-flex tw-items-center tw-gap-3 tw-flex-wrap">
           <span class="tw-text-xs tw-font-semibold tw-uppercase tw-opacity-70">
             DIMENSIONS:
@@ -77,10 +79,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </div>
-      </q-card-section>
+      </div>
 
-      <!-- Tabs -->
+      <!-- Tabs (only in dialog mode, hidden in embedded-tabs mode) -->
       <q-tabs
+        v-if="!isEmbeddedTabs"
         v-model="activeTab"
         dense
         class="tw-px-4 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)]"
@@ -219,6 +222,91 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-card>
   </q-dialog>
 
+  <!-- Embedded Tabs Mode -->
+  <div v-else class="correlation-dashboard-embedded">
+    <!-- Matched Dimensions Display -->
+    <div class="tw-py-2 tw-px-4 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)]">
+      <div class="tw-flex tw-items-center tw-gap-3 tw-flex-wrap">
+        <span class="tw-text-xs tw-font-semibold tw-uppercase tw-opacity-70">
+          DIMENSIONS:
+        </span>
+        <div
+          v-for="(value, key) in activeDimensions"
+          :key="key"
+          class="tw-flex tw-items-center tw-gap-2"
+        >
+          <span class="tw-text-xs tw-font-semibold">{{ key }}:</span>
+          <q-select
+            v-model="activeDimensions[key]"
+            :options="getDimensionOptions(key, value)"
+            dense
+            outlined
+            emit-value
+            map-options
+            @update:model-value="onDimensionChange"
+            class="dimension-dropdown"
+            borderless
+            style="min-width: 120px"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab Panels (no tabs in embedded mode, controlled by parent) -->
+    <q-tab-panels
+      v-model="activeTab"
+      animated
+      class="correlation-content tw-flex-1 tw-overflow-auto"
+    >
+      <q-tab-panel name="logs" class="tw-p-0">
+        <RenderDashboardCharts
+          v-if="logsDashboardData"
+          :key="logsDashboardRenderKey"
+          :dashboardData="logsDashboardData"
+          :currentTimeObj="currentTimeObj"
+          :viewOnly="true"
+          :allowAlertCreation="false"
+          searchType="dashboards"
+        />
+      </q-tab-panel>
+
+      <q-tab-panel name="metrics" class="tw-p-0">
+        <div class="tw-p-3 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-end">
+          <q-btn
+            outline
+            dense
+            no-caps
+            color="primary"
+            icon="show_chart"
+            :label="`${selectedMetricStreams.length} of ${uniqueMetricStreams.length} Metric(s)`"
+            @click="showMetricSelector = true"
+          >
+            <q-tooltip>{{ t('correlation.metricsTooltip') }}</q-tooltip>
+          </q-btn>
+        </div>
+
+        <RenderDashboardCharts
+          v-if="dashboardData"
+          :key="dashboardRenderKey"
+          :dashboardData="dashboardData"
+          :currentTimeObj="currentTimeObj"
+          :viewOnly="true"
+          :allowAlertCreation="false"
+          searchType="dashboards"
+        />
+      </q-tab-panel>
+
+      <q-tab-panel name="traces" class="tw-p-0">
+        <div class="tw-h-full tw-flex tw-items-center tw-justify-center tw-py-20">
+          <div class="tw-text-center">
+            <q-icon name="account_tree" size="3.75rem" color="grey-6" class="tw-mb-4" />
+            <div class="tw-text-base">Traces will be implemented here</div>
+          </div>
+        </div>
+      </q-tab-panel>
+    </q-tab-panels>
+  </div>
+
   <!-- Metric Stream Selector Dialog -->
   <q-dialog v-model="showMetricSelector">
     <q-card class="metric-selector-dialog">
@@ -310,9 +398,14 @@ interface Props {
   sourceStream?: string; // The original stream user was viewing (e.g., logs stream)
   sourceType?: string; // The type of source stream (logs/metrics/traces)
   availableDimensions?: Record<string, string>; // Actual field names from source (for fallback queries)
+  mode?: 'dialog' | 'embedded-tabs'; // Render mode: 'dialog' = full dialog, 'embedded-tabs' = just tabs content for DetailTable
+  externalActiveTab?: string; // For embedded-tabs mode, allows parent to control active tab
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  mode: 'dialog',
+  externalActiveTab: 'logs',
+});
 
 const emit = defineEmits<{
   (e: "close"): void;
@@ -322,6 +415,9 @@ const { showErrorNotification } = useNotifications();
 const store = useStore();
 const { t } = useI18n();
 const { generateDashboard, generateLogsDashboard } = useMetricsCorrelationDashboard();
+
+// Check if embedded tabs mode
+const isEmbeddedTabs = computed(() => props.mode === 'embedded-tabs');
 
 // Provide selectedTabId for RenderDashboardCharts to use
 const selectedTabId = computed(() => {
@@ -339,7 +435,17 @@ const dashboardRenderKey = ref(0);
 const logsDashboardRenderKey = ref(0);
 const showMetricSelector = ref(false);
 const metricSearchText = ref("");
-const activeTab = ref("logs"); // Default to logs tab
+
+// Use external tab control in embedded mode, otherwise manage internally
+const activeTab = computed({
+  get: () => isEmbeddedTabs.value ? props.externalActiveTab : internalActiveTab.value,
+  set: (val) => {
+    if (!isEmbeddedTabs.value) {
+      internalActiveTab.value = val;
+    }
+  }
+});
+const internalActiveTab = ref("logs");
 
 // Active dimensions that can be removed
 const activeDimensions = ref<Record<string, string>>({ ...props.matchedDimensions });
@@ -598,6 +704,9 @@ const loadDashboard = async () => {
 };
 
 const onClose = () => {
+  if (props.mode === 'dialog') {
+    isOpen.value = false;
+  }
   emit("close");
 };
 
@@ -626,6 +735,7 @@ const formatTimeRange = (range: TimeRange) => {
 watch(
   () => isOpen.value,
   (newVal) => {
+    console.log("[TelemetryCorrelationDashboard] isOpen changed:", newVal, "mode:", props.mode);
     if (newVal) {
       loadDashboard();
     }
@@ -703,6 +813,28 @@ watch(
   }
 }
 
+// Embedded mode styling
+.correlation-dashboard-embedded {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: #ffffff !important;
+
+  .correlation-header {
+    flex-shrink: 0;
+    background: #ffffff !important;
+    z-index: 1;
+  }
+
+  .correlation-content {
+    flex: 1;
+    overflow: auto;
+    min-height: 0;
+    background: #f5f5f5 !important;
+  }
+}
+
 // Dimension dropdown styling
 .dimension-dropdown {
   :deep(.q-field__control) {
@@ -722,6 +854,18 @@ watch(
 
 // Dark mode support
 body.body--dark {
+  .correlation-dashboard-embedded {
+    background: #1e1e1e !important;
+
+    .correlation-header {
+      background: #1e1e1e !important;
+    }
+
+    .correlation-content {
+      background: #2a2a2a !important;
+    }
+  }
+
   .correlation-dashboard-card {
     background: #1e1e1e !important;
 
