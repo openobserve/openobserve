@@ -505,9 +505,9 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
         );
         let pool = CLIENT.clone();
         sqlx::query(&sql)
-            .bind(TriggerModule::Alert)
-            .bind(alert_max_time)
+            .bind(TriggerModule::Report)
             .bind(report_max_time)
+            .bind(alert_max_time)
             .execute(&pool)
             .await?;
 
@@ -664,9 +664,9 @@ WHERE id IN ({});",
         if let Err(e) = sqlx::query(&query)
             .bind(TriggerStatus::Processing)
             .bind(now)
-            .bind(TriggerModule::Alert)
-            .bind(alert_max_time)
+            .bind(TriggerModule::Report)
             .bind(report_max_time)
+            .bind(alert_max_time)
             .execute(&mut *tx)
             .await
         {
