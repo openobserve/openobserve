@@ -217,8 +217,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <tr>
                         <td class="tw-font-semibold">Status</td>
                         <td>
-                          <q-badge :color="licenseData.license.active ? 'green' : 'red'">
-                            {{ licenseData.license.active ? 'Active' : 'Inactive' }}
+                          <q-badge :color="licenseData?.expired ? 'red' : 'green'">
+                            {{ licenseData?.expired ? 'Expired' : 'Active' }}
                           </q-badge>
                         </td>
                       </tr>
@@ -228,14 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </tr>
                       <tr>
                         <td class="tw-font-semibold">Expires At</td>
-                        <td>
-                          <div class="tw-flex tw-items-center tw-justify-start tw-gap-4">
-                            <span>{{ formatLicenseDate(licenseData.license.expires_at) }}</span>
-                            <q-badge v-if="licenseData?.expired" color="red">
-                              Expired
-                            </q-badge>
-                          </div>
-                        </td>
+                        <td>{{ formatLicenseDate(licenseData.license.expires_at) }}</td>
                       </tr>
                     </tbody>
                   </q-markup-table>
