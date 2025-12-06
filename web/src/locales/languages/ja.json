@@ -1122,7 +1122,9 @@
         "dashboardConfig": "ダッシュボードの設定をロード中...",
         "refreshing": "ダッシュボードを更新中..."
       }
-    }
+    },
+    "triggerAlert": "トリガー",
+    "alertTriggeredSuccess": "アラートは正常にトリガーされました"
   },
   "alert_templates": {
     "header": "テンプレート",

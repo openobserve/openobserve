@@ -1112,7 +1112,9 @@
         "dashboardConfig": "Cargando la configuración del panel...",
         "refreshing": "Actualizando el tablero..."
       }
-    }
+    },
+    "triggerAlert": "Activar",
+    "alertTriggeredSuccess": "La alerta se activó correctamente"
   },
   "alert_templates": {
     "header": "Plantillas",

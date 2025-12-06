@@ -1112,7 +1112,9 @@
         "dashboardConfig": "Kontrol paneli yapılandırması yükleniyor...",
         "refreshing": "Kontrol paneli yenileniyor..."
       }
-    }
+    },
+    "triggerAlert": "Tetikleyici",
+    "alertTriggeredSuccess": "Uyarı başarıyla tetiklendi"
   },
   "alert_templates": {
     "header": "Şablonlar",

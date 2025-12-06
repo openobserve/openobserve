@@ -1118,6 +1118,8 @@
     "actions": "Actions",
     "cancel": "Cancel",
     "delete": "Delete",
+    "triggerAlert": "Trigger",
+    "alertTriggeredSuccess": "Alert triggered successfully",
     "column": "Column",
     "alertType": "Alert Type",
     "streamType": "Stream Type",
