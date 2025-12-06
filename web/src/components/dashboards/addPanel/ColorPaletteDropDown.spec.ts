@@ -58,6 +58,36 @@ vi.mock("vuex", () => ({
   useStore: () => mockStore,
 }));
 
+// Mock vue-i18n
+vi.mock("vue-i18n", () => ({
+  useI18n: () => ({
+    t: (key: string) => {
+      const translations: Record<string, string> = {
+        "dashboard.colorPalette": "Color palette",
+        "dashboard.colorSeriesBy": "Color series by:",
+        "dashboard.colorBySeries": "<b>By Series</b>",
+        "dashboard.colorDefaultPaletteBySeries": "Default Palette (By Series)",
+        "dashboard.colorDefaultPaletteBySeriesSubLabel": "Series with the same name will use the same color",
+        "dashboard.colorPaletteClassic": "Palette-Classic",
+        "dashboard.colorPaletteClassicSubLabel": "A random color will be used for each series, regardless of its name",
+        "dashboard.colorSingleColor": "Single Color",
+        "dashboard.colorSingleColorSubLabel": "Set a specific color to all series",
+        "dashboard.colorShadesOfSpecificColor": "Shades Of Specific Color",
+        "dashboard.colorShadesOfSpecificColorSubLabel": "Different shades of specific color",
+        "dashboard.colorByValue": "<b>By Value</b>",
+        "dashboard.colorGreenYellowRed": "Green-Yellow-Red (By Value)",
+        "dashboard.colorRedYellowGreen": "Red-Yellow-Green (By Value)",
+        "dashboard.colorTemperature": "Temperature (By Value)",
+        "dashboard.colorPositive": "Positive (By Value)",
+        "dashboard.colorNegative": "Negative (By Value)",
+        "dashboard.colorLightToDarkBlue": "Light To Dark Blue (By Value)",
+        "dashboard.colorPaletteClassicBySeries": "Palette-Classic (By Series)",
+      };
+      return translations[key] || key;
+    },
+  }),
+}));
+
 describe("ColorPaletteDropDown", () => {
   let wrapper: VueWrapper;
 

@@ -1141,11 +1141,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="logs-search-no-stream-selected-text"
                       class="text-center col-10 q-mx-none"
                     >
-                      <q-icon name="info" color="primary"
-                  size="md" /> Select a
-                      stream and press 'Run query' to continue. Additionally,
-                      you can apply additional filters and adjust the date range
-                      to enhance search.
+                      <q-icon name="info" color="primary" size="md" />
+                      {{ t("search.noStreamSelectedMessage") }}
                     </h6>
                     <h6
                       v-else-if="notificationMsgValue != ''"
