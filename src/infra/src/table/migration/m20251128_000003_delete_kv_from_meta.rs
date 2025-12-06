@@ -45,7 +45,7 @@ impl MigrationTrait for Migration {
     }
 
     async fn down(&self, _: &SchemaManager) -> Result<(), DbErr> {
-        // The deletion of KV data from the meta table is not reversable.
+        // The deletion of KV data from the meta table is not reversible.
         Ok(())
     }
 }

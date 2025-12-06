@@ -20,6 +20,9 @@ use bytes::Bytes;
 use crate::{common::infra::config::KVS, service::db};
 
 fn mk_cache_key(org_id: &str, key: &str) -> String {
+    // NOTE: This assumes org_id does not contain '/' character.
+    // org_id is typically a simple identifier (e.g., "default", "o2_pkce_state")
+    // and should not contain slashes. If org_id contains '/', parsing will fail.
     format!("{org_id}/{key}")
 }
 
@@ -40,8 +43,16 @@ pub async fn get(org_id: &str, key: &str) -> Result<Bytes, anyhow::Error> {
 }
 
 pub async fn set(org_id: &str, key: &str, val: Bytes) -> Result<(), anyhow::Error> {
+    // Validate that org_id doesn't contain '/' to prevent parsing issues
+    if org_id.contains('/') {
+        return Err(anyhow::anyhow!("org_id cannot contain '/' character"));
+    }
+
     let cache_key = mk_cache_key(org_id, key);
-    let value_str = String::from_utf8_lossy(&val).to_string();
+    // Convert bytes to string, ensuring valid UTF-8
+    // This will fail if the data is binary/not valid UTF-8
+    let value_str = String::from_utf8(val.to_vec())
+        .map_err(|e| anyhow::anyhow!("KV value must be valid UTF-8: {}", e))?;
 
     // Send to super cluster first (if enabled)
     #[cfg(feature = "enterprise")]

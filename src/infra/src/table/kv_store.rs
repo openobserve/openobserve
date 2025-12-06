@@ -37,9 +37,11 @@ pub async fn get(org_id: &str, key: &str) -> Result<Option<Model>, errors::Error
 
 /// Sets a KV value (upsert: insert or update)
 pub async fn set(org_id: &str, key: &str, value: &str) -> Result<(), errors::Error> {
+    // Get client first, then acquire lock to prevent deadlock
+    // (get_or_init may internally acquire locks during connection)
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     // make sure only one client is writing to the database (only for sqlite)
     let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = chrono::Utc::now().timestamp_micros();
 
     let active_model = ActiveModel {
@@ -65,9 +67,11 @@ pub async fn set(org_id: &str, key: &str, value: &str) -> Result<(), errors::Err
 
 /// Deletes a KV entry by org_id and key
 pub async fn delete(org_id: &str, key: &str) -> Result<(), errors::Error> {
+    // Get client first, then acquire lock to prevent deadlock
+    // (get_or_init may internally acquire locks during connection)
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     // make sure only one client is writing to the database (only for sqlite)
     let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::delete_many()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Key.eq(key))
