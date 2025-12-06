@@ -12,6 +12,7 @@ pub mod destinations;
 pub mod distinct_value_fields;
 pub mod enrichment_tables;
 pub mod folders;
+pub mod kv_store;
 pub mod org_users;
 pub mod organizations;
 pub mod pipeline_last_errors;
