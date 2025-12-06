@@ -2,6 +2,48 @@ export default class DashboardFilter {
   constructor(page) {
     this.page = page;
   }
+
+  /**
+   * Helper method to select a field from the StreamFieldSelect dropdown
+   * @param {string} fieldName - The field name to select
+   * @param {object} dropdownLocator - The locator for the field dropdown
+   */
+  async selectFieldFromDropdown(fieldName, dropdownLocator) {
+    await dropdownLocator.click();
+
+    // Find the input element within the StreamFieldSelect component
+    const inputField = dropdownLocator.locator('input[aria-label="Select Field"]');
+    await inputField.waitFor({ state: "visible" });
+    await inputField.fill(fieldName);
+
+    // Wait for the dropdown menu to appear - use .last() to get the most recent menu
+    const dropdownMenu = this.page.locator('.q-menu[role="listbox"]').last();
+    await dropdownMenu.waitFor({ state: "visible", timeout: 5000 });
+
+    // Wait for options to be filtered
+    await this.page.waitForTimeout(500);
+
+    // First, ensure expansion items are expanded
+    const expansionItems = dropdownMenu.locator('.q-expansion-item');
+    const expansionCount = await expansionItems.count();
+
+    for (let i = 0; i < expansionCount; i++) {
+      const expansion = expansionItems.nth(i);
+      const isExpanded = await expansion.evaluate(el => el.classList.contains('q-expansion-item--expanded'));
+
+      if (!isExpanded) {
+        await expansion.click();
+        await this.page.waitForTimeout(500);
+      }
+    }
+
+    // Wait a bit more for expansion animation to complete
+    await this.page.waitForTimeout(500);
+
+    // Now find and click the field item - use getByText which is more reliable
+    await dropdownMenu.getByText(fieldName, { exact: true }).click();
+  }
+
   // Add filter condition
 
   async addFilterCondition(
@@ -13,13 +55,30 @@ export default class DashboardFilter {
   ) {
     const idx = String(index);
 
-    // Step 1: Click on the initial field name if provided
-    if (initialFieldName) {
-      await this.page
-        .locator(
-          `[data-test="dashboard-add-condition-label-${idx}-${initialFieldName}"]`
-        )
-        .click();
+    // Step 1: Click on the filter condition button
+    // The label might have changed from previous edits, so we use a more flexible selector
+    if (initialFieldName || newFieldName || operator || value) {
+      // Try to find by the exact label first (for new filters)
+      const exactLabelButton = this.page.locator(
+        `[data-test="dashboard-add-condition-label-${idx}-${initialFieldName}"]`
+      );
+
+      const buttonExists = await exactLabelButton.count() > 0;
+
+      if (buttonExists) {
+        await exactLabelButton.click();
+      } else {
+        // If exact label doesn't exist, find the button by index using a partial match
+        // This handles cases where the label has changed due to previous edits
+        const allFilterButtons = this.page.locator(`[data-test^="dashboard-add-condition-label-${idx}-"]`);
+        const buttonCount = await allFilterButtons.count();
+
+        if (buttonCount > 0) {
+          await allFilterButtons.first().click();
+        } else {
+          throw new Error(`Could not find filter condition button at index ${idx}`);
+        }
+      }
     }
 
     // Step 2: Select the new field from dropdown
@@ -27,12 +86,7 @@ export default class DashboardFilter {
       const fieldDropdown = this.page.locator(
         `[data-test="dashboard-add-condition-column-${idx}}"]`
       );
-      await fieldDropdown.click();
-      await fieldDropdown.fill(newFieldName);
-      await this.page
-        .getByRole("option", { name: newFieldName, exact: true })
-        .first()
-        .click();
+      await this.selectFieldFromDropdown(newFieldName, fieldDropdown);
     }
 
     // Step 3: Open the condition selector
@@ -266,15 +320,7 @@ export default class DashboardFilter {
         ? allColumnLocators.first()
         : allColumnLocators.last();
 
-    await columnLocator.click();
-    await columnLocator.fill(newFieldName);
-
-    // Wait for dropdown to appear after filling the value
-    // await this.page
-    //   .locator('div.q-menu[role="listbox"]')
-    //   .waitFor({ state: "visible", timeout: 5000 });
-    await columnLocator.press("ArrowDown");
-    await columnLocator.press("Enter");
+    await this.selectFieldFromDropdown(newFieldName, columnLocator);
   }
 
   // New robust function for nested group filter conditions
@@ -347,12 +393,6 @@ export default class DashboardFilter {
     const columnLocator = count === 1 ? allColumnLocators.first() : allColumnLocators.last();
 
     await columnLocator.waitFor({ state: "visible", timeout: 5000 });
-    await columnLocator.click();
-    await columnLocator.fill(fieldName);
-
-    // Wait for dropdown options to be available
-    await this.page.locator('.q-menu[role="listbox"]').last().waitFor({ state: "visible", timeout: 3000 }).catch(() => {});
-    await columnLocator.press("ArrowDown");
-    await columnLocator.press("Enter");
+    await this.selectFieldFromDropdown(fieldName, columnLocator);
   }
 }

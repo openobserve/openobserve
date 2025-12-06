@@ -1,5 +1,5 @@
 <template>
-  <q-select
+  <!-- <q-select
     v-if="groupIndex !== 0"
     v-model="group.logicalOperator"
     dense
@@ -10,7 +10,7 @@
     @update:model-value="emitLogicalOperatorChange"
     class="condition-logical-operator"
     data-test="dashboard-add-group-logical-operator"
-  />
+  /> -->
   <div class="group" :style="`--group-index: ${groupNestedIndex}`">
     <div class="group-conditions">
       <div
@@ -222,27 +222,5 @@ export default defineComponent({
   height: 20px;
   width: 20px;
   margin-right: 5px;
-}
-
-.condition-logical-operator {
-  width: 55px;
-}
-
-:deep(.condition-logical-operator .q-field__control) {
-  min-height: 23px !important;
-  height: 23px !important;
-  padding: 0px 0px 0px 5px !important;
-}
-
-:deep(.condition-logical-operator .q-field__native) {
-  min-height: 23px !important;
-  height: 23px !important;
-  padding: 0px 0px 0px 0px !important;
-}
-
-:deep(.condition-logical-operator .q-field__append) {
-  min-height: 23px !important;
-  height: 23px !important;
-  padding: 0px 0px 0px 0px !important;
 }
 </style>

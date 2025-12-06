@@ -18,6 +18,7 @@ use config::meta::{
         Dashboard, ListDashboardsParams, v1::Dashboard as DashboardV1,
         v2::Dashboard as DashboardV2, v3::Dashboard as DashboardV3, v4::Dashboard as DashboardV4,
         v5::Dashboard as DashboardV5, v6::Dashboard as DashboardV6, v7::Dashboard as DashboardV7,
+        v8::Dashboard as DashboardV8,
     },
     folder::{Folder, FolderType},
 };
@@ -44,7 +45,7 @@ impl TryFrom<dashboards::Model> for Dashboard {
 
     fn try_from(mut value: dashboards::Model) -> Result<Self, Self::Error> {
         if let Some(obj) = value.data.as_object_mut() {
-            // The domain model JSON deserialization logic for v1-v7 expects
+            // The domain model JSON deserialization logic for v1-v8 expects
             // some or all these fields to be present in the JSON even though we
             // store them in DB columns. Therefore we add these values back into
             // the JSON object so that deserializing the JSON can succeed.
@@ -93,6 +94,11 @@ impl TryFrom<dashboards::Model> for Dashboard {
             }
             7 => {
                 let inner: DashboardV7 = serde_json::from_value(value.data)?;
+                let dash = inner.into();
+                Ok(dash)
+            }
+            8 => {
+                let inner: DashboardV8 = serde_json::from_value(value.data)?;
                 let dash = inner.into();
                 Ok(dash)
             }
@@ -498,6 +504,11 @@ fn inner_data_as_json(dashboard: Dashboard) -> Result<JsonValue, errors::Error> 
         Dashboard {
             version: 7,
             v7: Some(inner),
+            ..
+        } => serde_json::to_value(inner).map_err(errors::Error::SerdeJsonError),
+        Dashboard {
+            version: 8,
+            v8: Some(inner),
             ..
         } => serde_json::to_value(inner).map_err(errors::Error::SerdeJsonError),
         Dashboard { version: v, .. } => Err(errors::PutDashboardError::MissingInnerData(v).into()),

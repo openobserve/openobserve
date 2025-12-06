@@ -207,7 +207,7 @@ export default defineComponent({
             name: "",
             panels: [],
           };
-          await addTabForm.value.resetValidation();
+          await addTabForm.value?.resetValidation();
         } catch (error: any) {
           if (error?.response?.status === 409) {
             showConfictErrorNotificationWithRefreshBtn(

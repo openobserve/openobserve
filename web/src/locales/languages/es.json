@@ -1032,7 +1032,15 @@
     "panelDuplicatedSuccessfully": "El panel se duplicó correctamente",
     "panelDuplicationFailed": "Falló la duplicación del panel",
     "mapname": "Nombre",
-    "mapvalue": "Valor"
+    "mapvalue": "Valor",
+    "joins": "Se une",
+    "addJoin": "Agregar unirse",
+    "removeJoin": "Eliminar Join",
+    "leftJoin": "Unirse a la izquierda",
+    "innerJoin": "Inner Join",
+    "rightJoin": "Únete a la derecha",
+    "addClause": "Agregar cláusula",
+    "removeClause": "Eliminar cláusula"
   },
   "home": {
     "streams": "Transmisiones",

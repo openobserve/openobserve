@@ -164,7 +164,7 @@ describe("DashboardFiltersOption", () => {
         expect(currentQuery.fields.filter.conditions).toHaveLength(1);
         expect(currentQuery.fields.filter.conditions[0]).toEqual({
           type: "list",
-          column: "field1",
+          column: { field: "field1", streamAlias: undefined },
           filterType: "condition",
           operator: null,
           value: null,
@@ -183,7 +183,7 @@ describe("DashboardFiltersOption", () => {
           conditions: [
             {
               type: "list",
-              column: "field1",
+              column: { field: "field1", streamAlias: undefined },
               filterType: "condition",
               operator: null,
               value: null,
@@ -209,7 +209,7 @@ describe("DashboardFiltersOption", () => {
         expect(mockGroup.conditions).toHaveLength(1);
         expect(mockGroup.conditions[0]).toEqual({
           type: "list",
-          column: "field1",
+          column: { field: "field1", streamAlias: undefined },
           filterType: "condition",
           operator: null,
           value: null,
@@ -232,7 +232,7 @@ describe("DashboardFiltersOption", () => {
           conditions: [
             {
               type: "list",
-              column: "field1",
+              column: { field: "field1", streamAlias: undefined },
               filterType: "condition",
               operator: null,
               value: null,

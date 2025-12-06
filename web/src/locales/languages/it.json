@@ -1032,7 +1032,15 @@
     "panelDuplicatedSuccessfully": "Pannello duplicato con successo",
     "panelDuplicationFailed": "Duplicazione del pannello non riuscita",
     "mapname": "Nome",
-    "mapvalue": "Valore"
+    "mapvalue": "Valore",
+    "joins": "Si unisce",
+    "addJoin": "Aggiungi Unisciti",
+    "removeJoin": "Rimuovi Join",
+    "leftJoin": "Unisciti a sinistra",
+    "innerJoin": "Inner Join",
+    "rightJoin": "Unisciti a destra",
+    "addClause": "Aggiungi clausola",
+    "removeClause": "Rimuovi clausola"
   },
   "home": {
     "streams": "Stream",

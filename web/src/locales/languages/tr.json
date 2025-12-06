@@ -1032,7 +1032,15 @@
     "panelDuplicatedSuccessfully": "Panel Başarıyla Çoğaltıldı",
     "panelDuplicationFailed": "Panel çoğaltma başarısız oldu",
     "mapname": "İsim",
-    "mapvalue": "Değer"
+    "mapvalue": "Değer",
+    "joins": "Katılır",
+    "addJoin": "Katıl Ekle",
+    "removeJoin": "Katılmayı Kaldır",
+    "leftJoin": "Sol Katılım",
+    "innerJoin": "İç Katılım",
+    "rightJoin": "Sağ Katıl",
+    "addClause": "Madde Ekle",
+    "removeClause": "Maddeyi Kaldır"
   },
   "home": {
     "streams": "Akışlar",
