@@ -552,7 +552,6 @@ export default defineComponent({
       updateFiles,
       updateJsonStr,
       updateJsonArray,
-      translatedTabs,
       contentStyle,
       splitterStyle,
       outputContainerStyle,

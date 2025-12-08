@@ -1685,6 +1685,7 @@
     "advancedSetup": "Advanced Setup",
     "descriptionPlaceholder": "Type something",
     "rowTemplateTooltip": "Row Template is used to format the alert message.",
+    "rowTemplate":"Row Template",
     "templateType": "Template Type",
     "editAlertJson": "Edit Alert JSON",
     "allFolders": "All Folders",
