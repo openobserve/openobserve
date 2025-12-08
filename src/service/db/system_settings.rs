@@ -159,7 +159,7 @@ pub async fn delete_org_settings(org_id: &str) -> Result<u64> {
     let mut cache = SYSTEM_SETTINGS.write().await;
     let keys_to_remove: Vec<String> = cache
         .iter()
-        .filter(|(k, _)| k.contains(&format!(":{}:", org_id)))
+        .filter(|(k, _)| k.split(':').nth(1) == Some(org_id))
         .map(|(k, _)| k.clone())
         .collect();
     for key in keys_to_remove {
