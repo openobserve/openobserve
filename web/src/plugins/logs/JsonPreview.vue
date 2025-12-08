@@ -286,7 +286,11 @@ size="lg" color="primary" />
           </q-list>
         </q-btn-dropdown>
 
-        <span class="q-pl-xs" :data-test="`log-expand-detail-key-${key}`">
+        <span
+          class="q-pl-xs"
+          :data-test="`log-expand-detail-key-${key}`"
+          :class="store.state.theme === 'dark' ? 'dark' : ''"
+        >
           <LogsHighLighting
             :data="{ [key]: value[key] }"
             :show-braces="false"
