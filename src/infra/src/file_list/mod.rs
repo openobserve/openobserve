@@ -77,7 +77,7 @@ pub trait FileList: Sync + Send + 'static {
         stream_type: StreamType,
         stream_name: &str,
         time_level: PartitionTimeLevel,
-        time_range: Option<(i64, i64)>,
+        time_range: (i64, i64),
         flattened: Option<bool>,
     ) -> Result<Vec<FileKey>>;
     async fn query_for_merge(
@@ -85,15 +85,26 @@ pub trait FileList: Sync + Send + 'static {
         org_id: &str,
         stream_type: StreamType,
         stream_name: &str,
-        date_range: Option<(String, String)>,
+        date_range: (String, String),
     ) -> Result<Vec<FileKey>>;
+    async fn query_for_dump(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        time_range: (i64, i64),
+    ) -> Result<Vec<FileRecord>>;
+    async fn query_for_dump_by_updated_at(
+        &self, 
+        time_range: (i64, i64),
+    ) -> Result<Vec<FileRecord>>;
     async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<FileKey>>;
     async fn query_ids(
         &self,
         org_id: &str,
         stream_type: StreamType,
         stream_name: &str,
-        time_range: Option<(i64, i64)>,
+        time_range: (i64, i64),
     ) -> Result<Vec<FileId>>;
     async fn query_ids_by_files(&self, files: &[FileKey]) -> Result<stdHashMap<String, i64>>;
     async fn query_old_data_hours(
@@ -101,7 +112,7 @@ pub trait FileList: Sync + Send + 'static {
         org_id: &str,
         stream_type: StreamType,
         stream_name: &str,
-        time_range: Option<(i64, i64)>,
+        time_range: (i64, i64),
     ) -> Result<Vec<String>>;
     async fn query_deleted(
         &self,
@@ -165,16 +176,12 @@ pub trait FileList: Sync + Send + 'static {
     async fn update_running_jobs(&self, ids: &[i64]) -> Result<()>;
     async fn check_running_jobs(&self, before_date: i64) -> Result<()>;
     async fn clean_done_jobs(&self, before_date: i64) -> Result<()>;
-    async fn get_entries_in_range(
+    async fn get_pending_dump_jobs(
         &self,
-        org: &str,
-        stream: Option<&str>,
-        start_time: i64,
-        end_time: i64,
-        min_updated_at: Option<i64>,
-    ) -> Result<Vec<FileRecord>>;
-    async fn get_pending_dump_jobs(&self) -> Result<Vec<(i64, String, String, i64)>>;
-    async fn set_job_dumped_status(&self, id: i64, dumped: bool) -> Result<()>;
+        node: &str,
+        limit: i64,
+    ) -> Result<Vec<(i64, String, i64)>>;
+    async fn set_job_dumped_status(&self, ids: &[i64], dumped: bool) -> Result<()>;
 }
 
 pub async fn create_table() -> Result<()> {
@@ -266,7 +273,7 @@ pub async fn query(
     stream_type: StreamType,
     stream_name: &str,
     time_level: PartitionTimeLevel,
-    time_range: Option<(i64, i64)>,
+    time_range: (i64, i64),
     flattened: Option<bool>,
 ) -> Result<Vec<FileKey>> {
     validate_time_range(time_range)?;
@@ -288,11 +295,33 @@ pub async fn query_for_merge(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    date_range: Option<(String, String)>,
+    date_range: (String, String),
 ) -> Result<Vec<FileKey>> {
     CLIENT
         .query_for_merge(org_id, stream_type, stream_name, date_range)
         .await
+}
+
+#[inline]
+#[tracing::instrument(name = "infra:file_list:db:query_for_dump")]
+pub async fn query_for_dump(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    time_range: (i64, i64),
+) -> Result<Vec<FileRecord>> {
+    validate_time_range(time_range)?;
+    CLIENT
+        .query_for_dump(org_id, stream_type, stream_name, time_range)
+        .await
+}
+
+#[inline]
+#[tracing::instrument(name = "infra:file_list:db:query_for_dump_by_updated_at")]
+pub async fn query_for_dump_by_updated_at(
+    time_range: (i64, i64),
+) -> Result<Vec<FileRecord>> {
+    CLIENT.query_for_dump_by_updated_at(time_range).await
 }
 
 #[inline]
@@ -307,7 +336,7 @@ pub async fn query_ids(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    time_range: Option<(i64, i64)>,
+    time_range: (i64, i64),
 ) -> Result<Vec<FileId>> {
     validate_time_range(time_range)?;
     CLIENT
@@ -327,7 +356,7 @@ pub async fn query_old_data_hours(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    time_range: Option<(i64, i64)>,
+    time_range: (i64, i64),
 ) -> Result<Vec<String>> {
     validate_time_range(time_range)?;
     CLIENT
@@ -479,26 +508,13 @@ pub async fn clean_done_jobs(before_date: i64) -> Result<()> {
 }
 
 #[inline]
-pub async fn get_entries_in_range(
-    org: &str,
-    stream: Option<&str>,
-    start_time: i64,
-    end_time: i64,
-    min_updated_at: Option<i64>,
-) -> Result<Vec<FileRecord>> {
-    CLIENT
-        .get_entries_in_range(org, stream, start_time, end_time, min_updated_at)
-        .await
+pub async fn get_pending_dump_jobs(node: &str, limit: i64) -> Result<Vec<(i64, String, i64)>> {
+    CLIENT.get_pending_dump_jobs(node, limit).await
 }
 
 #[inline]
-pub async fn get_pending_dump_jobs() -> Result<Vec<(i64, String, String, i64)>> {
-    CLIENT.get_pending_dump_jobs().await
-}
-
-#[inline]
-pub async fn set_job_dumped_status(id: i64, dumped: bool) -> Result<()> {
-    CLIENT.set_job_dumped_status(id, dumped).await
+pub async fn set_job_dumped_status(ids: &[i64], dumped: bool) -> Result<()> {
+    CLIENT.set_job_dumped_status(ids, dumped).await
 }
 
 pub async fn local_cache_gc() -> Result<()> {
@@ -525,10 +541,10 @@ pub async fn local_cache_gc() -> Result<()> {
     Ok(())
 }
 
-fn validate_time_range(time_range: Option<(i64, i64)>) -> Result<()> {
-    if let Some((start, end)) = time_range
-        && (start > end || start == 0 || end == 0)
-    {
+#[inline]
+fn validate_time_range(time_range: (i64, i64)) -> Result<()> {
+    let (start, end) = time_range;
+    if start > end || start == 0 || end == 0 {
         return Err(Error::Message("[file_list] invalid time range".to_string()));
     }
     Ok(())

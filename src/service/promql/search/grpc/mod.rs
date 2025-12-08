@@ -391,8 +391,8 @@ async fn get_max_file_list(
         let stream_file_list = crate::service::file_list::query(
             trace_id,
             org_id,
-            &stream_name,
             StreamType::Metrics,
+            &stream_name,
             PartitionTimeLevel::default(),
             start,
             end,

@@ -101,7 +101,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
         &sql.org_id,
         sql.stream_type,
         &sql.stream_names,
-        sql.time_range,
+        sql.time_range.unwrap_or((0, 0)),
     )
     .await?;
     let file_id_list_vec = file_id_list.values().flatten().collect::<Vec<_>>();
@@ -684,11 +684,10 @@ pub async fn get_file_id_lists(
     org_id: &str,
     stream_type: StreamType,
     stream_names: &[TableReference],
-    time_range: Option<(i64, i64)>,
+    mut time_range: (i64, i64),
 ) -> Result<HashMap<TableReference, Vec<FileId>>> {
     let mut file_lists = HashMap::with_capacity(stream_names.len());
     for stream in stream_names {
-        let mut time_range = time_range;
         let name = stream.stream_name();
         let stream_type = stream.get_stream_type(stream_type);
         // if stream is enrich, rewrite the time_range
@@ -697,7 +696,7 @@ pub async fn get_file_id_lists(
         {
             let start = enrichment_table::get_start_time(org_id, &name).await;
             let end = now_micros();
-            time_range = Some((start, end));
+            time_range = (start, end);
         }
         // get file list
         let file_id_list =

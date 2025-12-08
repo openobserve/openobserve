@@ -1647,6 +1647,7 @@ pub struct Compact {
     #[env_config(name = "ZO_COMPACT_BLOCKED_ORGS", default = "")] // use comma to split
     pub blocked_orgs: String,
     #[env_config(name = "ZO_COMPACT_FILE_LIST_DELETED_MODE", default = "deleted")]
+    pub file_list_deleted_mode: String, // "history" "deleted" "none"
     #[env_config(
         name = "ZO_COMPACT_FILE_LIST_DELETED_BATCH_SIZE",
         default = 1000,
@@ -1661,10 +1662,6 @@ pub struct Compact {
     pub file_list_multi_thread: bool,
     #[env_config(name = "ZO_COMPACT_FILE_LIST_DUMP_ENABLED", default = false)]
     pub file_list_dump_enabled: bool,
-    #[env_config(name = "ZO_COMPACT_FILE_LIST_DUMP_MIN_HOUR", default = 2)]
-    pub file_list_dump_min_hour: usize,
-    // "history" "deleted" "none"
-    pub file_list_deleted_mode: String,
     #[env_config(
         name = "ZO_COMPACT_BATCH_SIZE",
         default = 0,

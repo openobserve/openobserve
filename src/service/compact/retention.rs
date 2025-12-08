@@ -303,7 +303,7 @@ pub async fn delete_all(
 
     // delete from file list
     delete_from_file_list(org_id, stream_type, stream_name, (start_time, end_time)).await?;
-    super::super::file_list_dump::delete_all_for_stream(org_id, stream_type, stream_name).await?;
+    super::super::file_list_dump::delete_all(org_id, stream_type, stream_name).await?;
     log::info!("deleted file list for: {org_id}/{stream_type}/{stream_name}/all");
 
     // mark delete done
@@ -402,14 +402,17 @@ pub async fn delete_by_date(
             log::error!("[COMPACTOR] delete_by_date delete_from_file_list failed: {e}");
             e
         })?;
-
-    super::super::file_list_dump::delete_in_time_range(
+    super::super::file_list_dump::delete_by_date(
         org_id,
         stream_type,
         stream_name,
         (date_start.timestamp_micros(), date_end.timestamp_micros()),
     )
-    .await?;
+    .await
+    .map_err(|e| {
+        log::error!("[COMPACTOR] delete_by_date delete_file_list_dump failed: {e}");
+        e
+    })?;
 
     // archive old schema versions
     let mut schema_versions =
@@ -464,8 +467,8 @@ pub async fn delete_from_file_list(
     let files = file_list::query(
         &fake_trace_id,
         org_id,
-        stream_name,
         stream_type,
+        stream_name,
         PartitionTimeLevel::Unset,
         time_range.0,
         time_range.1,

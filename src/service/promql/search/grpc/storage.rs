@@ -265,8 +265,8 @@ async fn get_file_list(
     let results = match file_list::query(
         trace_id,
         org_id,
-        stream_name,
         StreamType::Metrics,
+        stream_name,
         time_level,
         time_min,
         time_max,

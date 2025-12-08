@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use chrono::Utc;
 use config::{
     cluster::LOCAL_NODE,
     get_config,
@@ -41,8 +40,8 @@ use crate::service::{
 pub async fn query(
     trace_id: &str,
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
     time_level: PartitionTimeLevel,
     time_min: i64,
     time_max: i64,
@@ -52,17 +51,16 @@ pub async fn query(
         stream_type,
         stream_name,
         time_level,
-        Some((time_min, time_max)),
+        (time_min, time_max),
         None,
     )
     .await?;
     let dumped_files = file_list_dump::query(
         trace_id,
         org_id,
-        stream_name,
         stream_type,
+        stream_name,
         (time_min, time_max),
-        None,
     )
     .await?;
 
@@ -83,8 +81,8 @@ pub async fn query(
 )]
 pub async fn query_for_merge(
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
     date_start: &str,
     date_end: &str,
 ) -> Result<Vec<FileKey>> {
@@ -92,7 +90,7 @@ pub async fn query_for_merge(
         org_id,
         stream_type,
         stream_name,
-        Some((date_start.to_string(), date_end.to_string())),
+        (date_start.to_string(), date_end.to_string()),
     )
     .await?;
     // we don't need to query from dump here, because
@@ -105,9 +103,9 @@ pub async fn query_for_merge(
 pub async fn query_by_ids(
     trace_id: &str,
     ids: &[i64],
-    org: &str,
+    org_id: &str,
     stream_type: StreamType,
-    stream: &str,
+    stream_name: &str,
     time_range: Option<(i64, i64)>,
 ) -> Result<Vec<FileKey>> {
     let cfg = get_config();
@@ -182,15 +180,12 @@ pub async fn query_by_ids(
     );
 
     // query from file_list_dump
-    // we use the min(id) as id hint because that automatically filter outs any dump files
-    // which cannot have the ids we are looking for
     let dumped_files = file_list_dump::query(
         trace_id,
-        org,
-        stream,
+        org_id,
         stream_type,
-        time_range.unwrap_or((0, Utc::now().timestamp_micros())),
-        ids.iter().min().copied(),
+        stream_name,
+        time_range.unwrap_or((0, 0)),
     )
     .await?;
 
@@ -258,19 +253,12 @@ pub async fn query_ids(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    time_range: Option<(i64, i64)>,
+    time_range: (i64, i64),
 ) -> Result<Vec<file_list::FileId>> {
     let mut files = file_list::query_ids(org_id, stream_type, stream_name, time_range).await?;
-    let dumped_files = super::file_list_dump::get_ids_in_range(
-        trace_id,
-        org_id,
-        stream_name,
-        stream_type,
-        time_range
-            .ok_or_else(|| infra::errors::Error::Message("time_range is required".to_string()))?,
-    )
-    .await
-    .unwrap();
+    let dumped_files =
+        super::file_list_dump::query_ids(trace_id, org_id, stream_type, stream_name, time_range)
+            .await?;
     files.extend(dumped_files);
     files.par_sort_unstable_by(|a, b| a.id.cmp(&b.id));
     files.dedup_by(|a, b| a.id == b.id);

@@ -247,7 +247,7 @@ pub async fn generate_old_data_job_by_stream(
         org_id,
         stream_type,
         stream_name,
-        Some((start_time, end_time - 1)),
+        (start_time, end_time - 1),
     )
     .await?;
 
@@ -436,7 +436,7 @@ pub async fn merge_by_stream(
     let (date_start, date_end) = if partition_time_level == PartitionTimeLevel::Daily {
         (
             offset_time.format("%Y/%m/%d/00").to_string(),
-            offset_time.format("%Y/%m/%d/23").to_string(),
+            offset_time.format("%Y/%m/%d/%H").to_string(),
         )
     } else {
         (
@@ -445,7 +445,7 @@ pub async fn merge_by_stream(
         )
     };
     let files =
-        file_list::query_for_merge(org_id, stream_name, stream_type, &date_start, &date_end)
+        file_list::query_for_merge(org_id, stream_type, stream_name, &date_start, &date_end)
             .await
             .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
 
