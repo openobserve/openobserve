@@ -31,6 +31,7 @@ export interface PayloadFormData {
   stream_type: string;
   row_template?: string;
   row_template_type?: string;
+  footer_template?: string;
   uuid?: string;
   updatedAt?: string;
   createdAt?: string;

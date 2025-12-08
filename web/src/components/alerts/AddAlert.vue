@@ -377,12 +377,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               </q-input>
               </div>
+
+              <!-- Footer Template Section -->
+              <div class="alert-row-template-field q-py-sm">
+                <div class="flex justify-between q-py-xs items-center">
+                  <div class="flex items-center">
+                    <span class="text-caption q-mr-sm font-weight-bold"
+                      >Footer Template (Optional):</span
+                    >
+                    <q-btn
+                      size="sm"
+                      padding="xs"
+                      icon="info"
+                      round
+                      dense
+                      flat
+                      color="grey-6"
+                      data-test="add-alert-footer-template-info-btn"
+                    >
+                      <q-tooltip>
+                        Footer Template is appended once at the end of the alert message, not per row. Use it to add instructions, runbook links, or additional context.
+                      </q-tooltip>
+                    </q-btn>
+                  </div>
+                </div>
+                <q-input
+                  data-test="add-alert-footer-input-textarea"
+                  v-model="formData.footer_template"
+                  color="input-border"
+                  bg-color="input-bg"
+                  class="footer-template-input"
+                  :class="store.state.theme === 'dark' ? 'dark-mode-row-template' : 'light-mode-row-template'"
+                  stack-label
+                  outlined
+                  filled
+                  dense
+                  tabindex="0"
+                  style="width: 100%; resize: none;"
+                  type="textarea"
+                  placeholder="Example: For more information, see: https://runbook.example.com/{alert_name}"
+                  rows="3"
+                >
+                </q-input>
+              </div>
             </div>
             </div>
 
             </div>
             </div>
-            
+
              </div>
 
 
@@ -589,6 +632,7 @@ const defaultValue: any = () => {
     description: "",
     row_template: "",
     row_template_type: "String",
+    footer_template: "",
     lastTriggeredAt: 0,
     createdAt: "",
     updatedAt: "",
