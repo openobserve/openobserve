@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -270,36 +270,13 @@ const statusOptions = ["running", "completed", "failed", "pending", "canceled"];
 const pipelineOptions = ref<any[]>([]);
 const allPipelineOptions = ref<any[]>([]);
 
-// Auto-refresh interval
-let refreshInterval: any = null;
-
 onMounted(() => {
   loadJobs();
   loadPipelineOptions();
-  startAutoRefresh();
 });
 
-onUnmounted(() => {
-  stopAutoRefresh();
-});
-
-const startAutoRefresh = () => {
-  // Refresh every 10 seconds
-  refreshInterval = setInterval(() => {
-    if (!showDetailsDialog.value) {
-      loadJobs(false);
-    }
-  }, 10000);
-};
-
-const stopAutoRefresh = () => {
-  if (refreshInterval) {
-    clearInterval(refreshInterval);
-  }
-};
-
-const loadJobs = async (showLoading = true) => {
-  if (showLoading) loading.value = true;
+const loadJobs = async () => {
+  loading.value = true;
 
   try {
     const response = await backfillService.listBackfillJobs({
@@ -315,7 +292,7 @@ const loadJobs = async (showLoading = true) => {
       timeout: 3000,
     });
   } finally {
-    if (showLoading) loading.value = false;
+    loading.value = false;
   }
 };
 

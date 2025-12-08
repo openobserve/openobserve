@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub use config::meta::triggers::{Trigger, TriggerModule, TriggerStatus};
+pub use config::meta::triggers::{Trigger, TriggerModule, TriggerStatus, TriggerWithCreatedAt};
 pub use infra::scheduler::TRIGGERS_KEY;
 use infra::{
     errors::Result,
@@ -149,6 +149,14 @@ pub async fn list(module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
 #[inline]
 pub async fn list_by_org(org: &str, module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
     infra_scheduler::list_by_org(org, module).await
+}
+
+#[inline]
+pub async fn list_by_org_with_created_at(
+    org: &str,
+    module: Option<TriggerModule>,
+) -> Result<Vec<TriggerWithCreatedAt>> {
+    infra_scheduler::list_by_org_with_created_at(org, module).await
 }
 
 #[inline]

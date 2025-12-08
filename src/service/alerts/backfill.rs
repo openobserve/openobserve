@@ -132,7 +132,8 @@ pub async fn create_backfill_job(
 }
 
 pub async fn list_backfill_jobs(org_id: &str) -> Result<Vec<BackfillJobStatus>, anyhow::Error> {
-    let triggers = db::scheduler::list_by_org(org_id, Some(TriggerModule::Backfill)).await?;
+    let triggers =
+        db::scheduler::list_by_org_with_created_at(org_id, Some(TriggerModule::Backfill)).await?;
 
     let mut jobs = Vec::new();
     for trigger in triggers {
@@ -204,7 +205,7 @@ pub async fn list_backfill_jobs(org_id: &str) -> Result<Vec<BackfillJobStatus>, 
                 status: format!("{:?}", trigger.status).to_lowercase(),
                 deletion_status: Some(backfill_job.deletion_status.clone()),
                 deletion_job_id: backfill_job.deletion_job_id.clone(),
-                created_at: trigger.start_time,
+                created_at: trigger.created_at,
                 chunks_completed: Some(chunks_completed),
                 chunks_total: Some(chunks_total),
             });

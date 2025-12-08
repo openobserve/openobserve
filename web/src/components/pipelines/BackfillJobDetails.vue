@@ -212,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted } from "vue";
+import { ref, computed, watch } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import backfillService, { type BackfillJob } from "../../services/backfill";
@@ -242,15 +242,11 @@ const show = computed({
 const loading = ref(false);
 const job = ref<BackfillJob | null>(null);
 
-// Auto-refresh interval
-let refreshInterval: any = null;
-
 watch(
   () => props.jobId,
   (newJobId) => {
     if (newJobId && props.modelValue) {
       loadJobDetails();
-      startAutoRefresh();
     }
   },
   { immediate: true }
@@ -261,36 +257,12 @@ watch(
   (newValue) => {
     if (newValue && props.jobId) {
       loadJobDetails();
-      startAutoRefresh();
-    } else {
-      stopAutoRefresh();
     }
   }
 );
 
-onUnmounted(() => {
-  stopAutoRefresh();
-});
-
-const startAutoRefresh = () => {
-  stopAutoRefresh();
-  // Refresh every 5 seconds for active jobs
-  if (job.value && ["running", "pending"].includes(job.value.status)) {
-    refreshInterval = setInterval(() => {
-      loadJobDetails(false);
-    }, 5000);
-  }
-};
-
-const stopAutoRefresh = () => {
-  if (refreshInterval) {
-    clearInterval(refreshInterval);
-    refreshInterval = null;
-  }
-};
-
-const loadJobDetails = async (showLoading = true) => {
-  if (showLoading) loading.value = true;
+const loadJobDetails = async () => {
+  loading.value = true;
 
   try {
     const response = await backfillService.getBackfillJob({
@@ -298,18 +270,11 @@ const loadJobDetails = async (showLoading = true) => {
       job_id: props.jobId,
     });
     job.value = response;
-
-    // Update auto-refresh based on job status
-    if (!["running", "pending"].includes(response.status)) {
-      stopAutoRefresh();
-    } else if (!refreshInterval) {
-      startAutoRefresh();
-    }
   } catch (error: any) {
     console.error("Error loading backfill job details:", error);
     job.value = null;
   } finally {
-    if (showLoading) loading.value = false;
+    loading.value = false;
   }
 };
 
