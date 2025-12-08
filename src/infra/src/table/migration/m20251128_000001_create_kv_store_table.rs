@@ -15,8 +15,6 @@
 
 use sea_orm_migration::prelude::*;
 
-use super::get_text_type;
-
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
@@ -37,17 +35,12 @@ impl MigrationTrait for Migration {
 
 /// Statement to create kv_store table.
 fn create_table_stmt() -> TableCreateStatement {
-    let text_type = get_text_type();
     Table::create()
         .table(KvStore::Table)
         .if_not_exists()
         .col(ColumnDef::new(KvStore::OrgId).string_len(256).not_null())
         .col(ColumnDef::new(KvStore::Key).string_len(256).not_null())
-        .col(
-            ColumnDef::new(KvStore::Value)
-                .custom(Alias::new(&text_type))
-                .not_null(),
-        )
+        .col(ColumnDef::new(KvStore::Value).binary().not_null())
         .col(ColumnDef::new(KvStore::CreatedAt).big_integer().not_null())
         .col(ColumnDef::new(KvStore::UpdatedAt).big_integer().not_null())
         .primary_key(Index::create().col(KvStore::OrgId).col(KvStore::Key))

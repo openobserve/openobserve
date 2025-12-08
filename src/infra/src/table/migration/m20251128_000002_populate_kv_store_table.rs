@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use base64::Engine;
 use sea_orm::{
     ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
 };
@@ -41,18 +40,15 @@ impl MigrationTrait for Migration {
                     // In meta table:
                     // - key1 is org_id (or 'o2_pkce_state' for PKCE)
                     // - key2 is the actual key
-                    // - value is the stored value (UTF-8 text)
+                    // - value is the stored value (UTF-8 text stored as String)
                     // - start_dt is the creation timestamp
                     //
-                    // The new kv_store table stores values as base64-encoded strings
-                    // to support arbitrary binary data. Convert existing text data to base64.
-                    let encoded_value =
-                        base64::engine::general_purpose::STANDARD.encode(meta.value.as_bytes());
-
+                    // The new kv_store table stores values as binary Vec<u8>
+                    // to support arbitrary binary data. Convert existing text to bytes.
                     kv_store::ActiveModel {
                         org_id: Set(meta.key1),
                         key: Set(meta.key2),
-                        value: Set(encoded_value),
+                        value: Set(meta.value.into_bytes()),
                         created_at: Set(meta.start_dt),
                         updated_at: Set(meta.start_dt), // Use same as created_at for migrated data
                     }
@@ -116,8 +112,7 @@ mod kv_store {
         pub org_id: String,
         #[sea_orm(primary_key, auto_increment = false)]
         pub key: String,
-        #[sea_orm(column_type = "Text")]
-        pub value: String,
+        pub value: Vec<u8>,
         pub created_at: i64,
         pub updated_at: i64,
     }

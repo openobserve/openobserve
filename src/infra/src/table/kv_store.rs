@@ -36,7 +36,7 @@ pub async fn get(org_id: &str, key: &str) -> Result<Option<Model>, errors::Error
 }
 
 /// Sets a KV value (upsert: insert or update)
-pub async fn set(org_id: &str, key: &str, value: &str) -> Result<(), errors::Error> {
+pub async fn set(org_id: &str, key: &str, value: &[u8]) -> Result<(), errors::Error> {
     // Get client first, then acquire lock to prevent deadlock
     // (get_or_init may internally acquire locks during connection)
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
@@ -47,7 +47,7 @@ pub async fn set(org_id: &str, key: &str, value: &str) -> Result<(), errors::Err
     let active_model = ActiveModel {
         org_id: Set(org_id.to_string()),
         key: Set(key.to_string()),
-        value: Set(value.to_string()),
+        value: Set(value.to_vec()),
         created_at: Set(now),
         updated_at: Set(now),
     };

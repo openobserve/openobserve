@@ -24,8 +24,7 @@ pub struct Model {
     pub org_id: String,
     #[sea_orm(primary_key, auto_increment = false)]
     pub key: String,
-    #[sea_orm(column_type = "Text")]
-    pub value: String,
+    pub value: Vec<u8>,
     pub created_at: i64,
     pub updated_at: i64,
 }
