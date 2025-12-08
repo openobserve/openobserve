@@ -76,6 +76,9 @@ mod m20251118_000002_create_sessions_table;
 mod m20251118_000003_delete_meta_sessions;
 mod m20251126_100001_create_service_streams_table;
 mod m20251126_100002_create_service_streams_dimensions_table;
+mod m20251128_000001_create_kv_store_table;
+mod m20251128_000002_populate_kv_store_table;
+mod m20251128_000003_delete_kv_from_meta;
 
 pub struct Migrator;
 
@@ -141,6 +144,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20251118_000003_delete_meta_sessions::Migration),
             Box::new(m20251126_100001_create_service_streams_table::Migration),
             Box::new(m20251126_100002_create_service_streams_dimensions_table::Migration),
+            Box::new(m20251128_000001_create_kv_store_table::Migration),
+            Box::new(m20251128_000002_populate_kv_store_table::Migration),
+            Box::new(m20251128_000003_delete_kv_from_meta::Migration),
         ]
     }
 }
