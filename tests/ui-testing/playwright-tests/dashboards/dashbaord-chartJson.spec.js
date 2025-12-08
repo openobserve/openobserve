@@ -75,11 +75,11 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-x-item-dns_records"]').click();
     await page.getByRole('checkbox', { name: 'Render Data as JSON / Array' }).click();
 
-    // Set date-time and timezone for gauge chart
+    // Set date-time and timezone for table chart
     await pm.dateTimeHelper.setRelativeTimeRange("6-w");
     await pm.dashboardPanelActions.applyDashboardBtn();
 
-    // Verify the gauge chart is visible
+    // Verify the table chart is visible
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Verify JSON data is rendered in the table
