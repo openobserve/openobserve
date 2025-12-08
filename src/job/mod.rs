@@ -220,6 +220,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::functions::watch());
     tokio::task::spawn(db::compact::retention::watch());
     tokio::task::spawn(db::metrics::watch_prom_cluster_leader());
+    tokio::task::spawn(db::system_settings::watch());
     tokio::task::spawn(db::alerts::templates::watch());
     tokio::task::spawn(db::alerts::destinations::watch());
     tokio::task::spawn(db::alerts::realtime_triggers::watch());
@@ -260,6 +261,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::metrics::cache_prom_cluster_leader()
         .await
         .expect("prom cluster leader cache failed");
+
+    // cache system settings (FQN priority, etc.)
+    db::system_settings::cache()
+        .await
+        .expect("system settings cache failed");
 
     // cache alerts
     db::alerts::templates::cache()

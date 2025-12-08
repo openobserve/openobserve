@@ -17,11 +17,17 @@
 //!
 //! Provides cached access to system settings with multi-level resolution.
 //! Cache is populated on startup and updated on write operations.
+//! Watch mechanism ensures cache is synchronized across cluster nodes.
+
+use std::sync::Arc;
 
 use config::meta::system_settings::{SettingScope, SystemSetting};
 use infra::{errors::Result, table::system_settings as db};
 
 use crate::common::infra::config::SYSTEM_SETTINGS;
+
+/// Watcher prefix for system settings events
+const SYSTEM_SETTINGS_WATCHER_PREFIX: &str = "/system_settings/";
 
 /// Generate a cache key for a system setting
 fn cache_key(
@@ -116,7 +122,7 @@ pub async fn set(setting: &SystemSetting) -> Result<SystemSetting> {
         .await
         .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
 
-    // Update cache
+    // Update local cache
     let cache_k = cache_key(
         &result.scope,
         result.org_id.as_deref(),
@@ -126,7 +132,13 @@ pub async fn set(setting: &SystemSetting) -> Result<SystemSetting> {
     SYSTEM_SETTINGS
         .write()
         .await
-        .insert(cache_k, result.clone());
+        .insert(cache_k.clone(), result.clone());
+
+    // Emit event to update cache on other cluster nodes
+    let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, cache_k);
+    if let Err(e) = infra::coordinator::system_settings::emit_put_event(&event_key).await {
+        log::error!("Failed to emit system settings put event: {}", e);
+    }
 
     Ok(result)
 }
@@ -142,9 +154,15 @@ pub async fn delete(
         .await
         .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
 
-    // Remove from cache
+    // Remove from local cache
     let cache_k = cache_key(scope, org_id, user_id, key);
     SYSTEM_SETTINGS.write().await.remove(&cache_k);
+
+    // Emit event to update cache on other cluster nodes
+    let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, cache_k);
+    if let Err(e) = infra::coordinator::system_settings::emit_delete_event(&event_key).await {
+        log::error!("Failed to emit system settings delete event: {}", e);
+    }
 
     Ok(result)
 }
@@ -155,15 +173,20 @@ pub async fn delete_org_settings(org_id: &str) -> Result<u64> {
         .await
         .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
 
-    // Clear org settings from cache
+    // Clear org settings from cache and emit events for each deleted key
     let mut cache = SYSTEM_SETTINGS.write().await;
     let keys_to_remove: Vec<String> = cache
         .iter()
         .filter(|(k, _)| k.split(':').nth(1) == Some(org_id))
         .map(|(k, _)| k.clone())
         .collect();
-    for key in keys_to_remove {
-        cache.remove(&key);
+    for key in &keys_to_remove {
+        cache.remove(key);
+        // Emit event to update cache on other cluster nodes
+        let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, key);
+        if let Err(e) = infra::coordinator::system_settings::emit_delete_event(&event_key).await {
+            log::error!("Failed to emit system settings delete event for {}: {}", key, e);
+        }
     }
 
     Ok(result)
@@ -175,7 +198,7 @@ pub async fn delete_user_settings(org_id: &str, user_id: &str) -> Result<u64> {
         .await
         .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
 
-    // Clear user settings from cache
+    // Clear user settings from cache and emit events for each deleted key
     let mut cache = SYSTEM_SETTINGS.write().await;
     let keys_to_remove: Vec<String> = cache
         .iter()
@@ -185,8 +208,13 @@ pub async fn delete_user_settings(org_id: &str, user_id: &str) -> Result<u64> {
         })
         .map(|(k, _)| k.clone())
         .collect();
-    for key in keys_to_remove {
-        cache.remove(&key);
+    for key in &keys_to_remove {
+        cache.remove(key);
+        // Emit event to update cache on other cluster nodes
+        let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, key);
+        if let Err(e) = infra::coordinator::system_settings::emit_delete_event(&event_key).await {
+            log::error!("Failed to emit system settings delete event for {}: {}", key, e);
+        }
     }
 
     Ok(result)
@@ -209,6 +237,91 @@ pub async fn cache() -> Result<()> {
         cache.insert(cache_k, setting);
     }
     log::info!("System settings cached");
+    Ok(())
+}
+
+/// Watch for system settings changes from other cluster nodes
+pub async fn watch() -> Result<()> {
+    let cluster_coordinator = super::get_coordinator().await;
+    let mut events = cluster_coordinator
+        .watch(SYSTEM_SETTINGS_WATCHER_PREFIX)
+        .await
+        .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+    let events = Arc::get_mut(&mut events).unwrap();
+    log::info!("Start watching system settings");
+    loop {
+        let ev = match events.recv().await {
+            Some(ev) => ev,
+            None => {
+                log::error!("watch_system_settings: event channel closed");
+                break;
+            }
+        };
+        match ev {
+            super::Event::Put(ev) => {
+                let cache_k = match ev.key.strip_prefix(SYSTEM_SETTINGS_WATCHER_PREFIX) {
+                    Some(k) => k,
+                    None => {
+                        log::error!("Invalid system settings event key: {}", ev.key);
+                        continue;
+                    }
+                };
+                // Parse cache key: scope:org:user:key
+                let parts: Vec<&str> = cache_k.split(':').collect();
+                if parts.len() != 4 {
+                    log::error!("Invalid cache key format: {}", cache_k);
+                    continue;
+                }
+                let scope = match parts[0].parse::<SettingScope>() {
+                    Ok(s) => s,
+                    Err(e) => {
+                        log::error!("Invalid scope in cache key: {} - {}", parts[0], e);
+                        continue;
+                    }
+                };
+                let org_id = if parts[1] == "_" {
+                    None
+                } else {
+                    Some(parts[1])
+                };
+                let user_id = if parts[2] == "_" {
+                    None
+                } else {
+                    Some(parts[2])
+                };
+                let key = parts[3];
+
+                // Fetch from database and update cache
+                match db::get(&scope, org_id, user_id, key).await {
+                    Ok(Some(setting)) => {
+                        SYSTEM_SETTINGS
+                            .write()
+                            .await
+                            .insert(cache_k.to_string(), setting);
+                        log::debug!("Updated system setting in cache: {}", cache_k);
+                    }
+                    Ok(None) => {
+                        log::warn!("System setting not found in db: {}", cache_k);
+                    }
+                    Err(e) => {
+                        log::error!("Error fetching system setting from db: {}", e);
+                    }
+                }
+            }
+            super::Event::Delete(ev) => {
+                let cache_k = match ev.key.strip_prefix(SYSTEM_SETTINGS_WATCHER_PREFIX) {
+                    Some(k) => k,
+                    None => {
+                        log::error!("Invalid system settings delete event key: {}", ev.key);
+                        continue;
+                    }
+                };
+                SYSTEM_SETTINGS.write().await.remove(cache_k);
+                log::debug!("Removed system setting from cache: {}", cache_k);
+            }
+            super::Event::Empty => {}
+        }
+    }
     Ok(())
 }
 

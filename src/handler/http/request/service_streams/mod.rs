@@ -139,11 +139,16 @@ pub async fn correlate_streams(
 
     #[cfg(feature = "enterprise")]
     {
+        // Get FQN priority from DB/cache (org-level setting or system default)
+        let fqn_priority =
+            crate::service::db::system_settings::get_fqn_priority_dimensions(&org_id).await;
+
         match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::correlate(
             &org_id,
             &req.source_stream,
             &req.source_type,
             &req.available_dimensions,
+            &fqn_priority,
         )
         .await
         {
@@ -221,7 +226,11 @@ pub async fn get_services_grouped(
 
     #[cfg(feature = "enterprise")]
     {
-        match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::list_grouped_by_fqn(&org_id)
+        // Get FQN priority from DB/cache (org-level setting or system default)
+        let fqn_priority =
+            crate::service::db::system_settings::get_fqn_priority_dimensions(&org_id).await;
+
+        match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::list_grouped_by_fqn(&org_id, &fqn_priority)
             .await
         {
             Ok(response) => Ok(MetaHttpResponse::json(response)),

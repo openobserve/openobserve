@@ -1373,9 +1373,15 @@ async fn process_single_parquet_buffer(
     // Create processor with enterprise semantic groups for comprehensive field mapping
     let semantic_groups =
         o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file();
+
+    // Get FQN priority from DB/cache (org-level setting or system default)
+    let fqn_priority =
+        crate::service::db::system_settings::get_fqn_priority_dimensions(org_id).await;
+
     let processor = o2_enterprise::enterprise::service_streams::processor::StreamProcessor::new(
         org_id.to_string(),
         semantic_groups,
+        fqn_priority,
     );
 
     // Process records and extract services
