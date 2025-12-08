@@ -2226,6 +2226,7 @@ async fn handle_backfill_triggers(
                         db::scheduler::update_trigger(
                             db::scheduler::Trigger {
                                 next_run_at,
+                                status: db::scheduler::TriggerStatus::Waiting,
                                 data: updated_trigger_data.to_json_string(),
                                 ..trigger
                             },
@@ -2305,6 +2306,7 @@ async fn handle_backfill_triggers(
                             db::scheduler::update_trigger(
                                 db::scheduler::Trigger {
                                     next_run_at,
+                                    status: db::scheduler::TriggerStatus::Waiting,
                                     ..trigger
                                 },
                                 true,
@@ -2468,6 +2470,7 @@ async fn handle_backfill_triggers(
         db::scheduler::update_trigger(
             db::scheduler::Trigger {
                 next_run_at,
+                status: db::scheduler::TriggerStatus::Waiting,
                 data: updated_trigger_data.to_json_string(),
                 retries: 0, // Reset retries on successful chunk
                 ..trigger
