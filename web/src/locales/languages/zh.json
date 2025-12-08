@@ -1718,7 +1718,7 @@
     "errorSavingDomainSettings": "保存域名设置时出错",
     "noDomainMessage": "未配置任何域。在上方添加域名以限制访问权限。",
     "license": "执照",
-      "regexNameRequired": "* 姓名为必填项",
+    "regexNameRequired": "* 姓名为必填项",
     "regexNamePlaceholder": "例如。内部密码",
     "regexDescriptionPlaceholder": "描述你的模式以帮助用户理解",
     "regexPatternLabel": "正则表达式模式",

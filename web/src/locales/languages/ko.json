@@ -1722,7 +1722,7 @@
     "errorSavingDomainSettings": "도메인 설정을 저장하는 중 오류 발생",
     "noDomainMessage": "도메인이 구성되지 않았습니다.위에 도메인을 추가하여 액세스를 제한하세요.",
     "license": "라이선스",
-      "regexNameRequired": "* 이름 필수",
+    "regexNameRequired": "* 이름 필수",
     "regexNamePlaceholder": "예:.내부 비밀번호",
     "regexDescriptionPlaceholder": "사용자의 이해를 돕기 위해 패턴을 설명하세요",
     "regexPatternLabel": "정규식 패턴",

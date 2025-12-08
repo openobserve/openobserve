@@ -1736,7 +1736,7 @@
     "errorSavingDomainSettings": "ドメイン設定を保存中にエラーが発生しました",
     "noDomainMessage": "ドメインが設定されていません。上記にドメインを追加してアクセスを制限してください。",
     "license": "ライセンス",
-      "regexNameRequired": "* 名前が必要です",
+    "regexNameRequired": "* 名前が必要です",
     "regexNamePlaceholder": "例えば。内部パスワード",
     "regexDescriptionPlaceholder": "ユーザーが理解しやすいように、パターンを説明してください",
     "regexPatternLabel": "正規表現パターン",

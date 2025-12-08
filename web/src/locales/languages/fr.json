@@ -1722,7 +1722,7 @@
     "errorSavingDomainSettings": "Erreur lors de l'enregistrement des paramètres du domaine",
     "noDomainMessage": "Aucun domaine n'a été configuré. Ajoutez des domaines ci-dessus pour restreindre l'accès.",
     "license": "Licence",
-        "regexNameRequired": "* Le nom est obligatoire",
+    "regexNameRequired": "* Le nom est obligatoire",
     "regexNamePlaceholder": "Par exemple. Mots de passe internes",
     "regexDescriptionPlaceholder": "Décrivez votre modèle pour aider les utilisateurs à comprendre",
     "regexPatternLabel": "Motif Regex",

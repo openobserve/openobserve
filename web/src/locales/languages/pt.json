@@ -1722,7 +1722,7 @@
     "errorSavingDomainSettings": "Erro ao salvar as configurações do domínio",
     "noDomainMessage": "Nenhum domínio configurado. Adicione domínios acima para restringir o acesso.",
     "license": "Licença",
-     "regexNameRequired": "* O nome é obrigatório",
+    "regexNameRequired": "* O nome é obrigatório",
     "regexNamePlaceholder": "Ex. Senhas internas",
     "regexDescriptionPlaceholder": "Descreva seu padrão para ajudar os usuários a entender",
     "regexPatternLabel": "Padrão Regex",

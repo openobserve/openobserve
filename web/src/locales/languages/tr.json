@@ -1722,7 +1722,7 @@
     "errorSavingDomainSettings": "Etki alanı ayarlarını kaydederken hata oluştu",
     "noDomainMessage": "Yapılandırılmış etki alanı yok. Erişimi kısıtlamak için yukarıya alan adlarını ekleyin.",
     "license": "Lisans",
-      "regexNameRequired": "* İsim zorunludur",
+    "regexNameRequired": "* İsim zorunludur",
     "regexNamePlaceholder": "Örneğin. Dahili Parolalar",
     "regexDescriptionPlaceholder": "Kullanıcıların anlamasına yardımcı olmak için modelinizi tanımlayın",
     "regexPatternLabel": "Regex Desen",

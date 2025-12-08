@@ -1722,7 +1722,7 @@
     "errorSavingDomainSettings": "Fout bij opslaan van domeininstellingen",
     "noDomainMessage": "Geen domeinen geconfigureerd. Voeg hierboven domeinen toe om de toegang te beperken.",
     "license": "Licentie",
-      "regexNameRequired": "* Naam is verplicht",
+    "regexNameRequired": "* Naam is verplicht",
     "regexNamePlaceholder": "Bijv. Interne wachtwoorden",
     "regexDescriptionPlaceholder": "Beschrijf je patroon om gebruikers te helpen het te begrijpen",
     "regexPatternLabel": "Regex-patroon",
