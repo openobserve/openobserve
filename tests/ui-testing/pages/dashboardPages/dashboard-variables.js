@@ -59,10 +59,25 @@ export default class DashboardVariables {
 
     // Select Field
     const fieldSelect = await this.page.locator('[data-test="dashboard-variable-field-select"]');
-    await fieldSelect.click();
-    await this.page.keyboard.type(field);
 
-    
+    // Click to open dropdown and focus
+    await fieldSelect.click();
+    await this.page.waitForTimeout(300);
+
+    // Click again to ensure dropdown is open (sometimes first click doesn't work)
+    await fieldSelect.click();
+    await this.page.waitForTimeout(500);
+
+    // Type the field name to filter suggestions
+    await fieldSelect.fill(field);
+
+    // Wait a bit for autocomplete to trigger
+    await this.page.waitForTimeout(1000);
+
+    // Alternatively, try using keyboard to open dropdown if fill doesn't work
+    await fieldSelect.press('ArrowDown');
+    await this.page.waitForTimeout(500);
+
     // Wait for dropdown to have options available
     await this.page.waitForFunction(
         () => {
