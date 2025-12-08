@@ -756,7 +756,9 @@
     "maxFieldsExceeded": "Kan geen velden toevoegen. Het maximum aantal toegestane velden in het door de gebruiker gedefinieerde schema is {MaxFields}. Huidig: {current}, probeert toe te voegen: {probeert} toe te voegen.",
     "queryEditor": "Query-editor:",
     "exportFilename": "logs-data.csv",
-    "nullValue": "nul"
+    "nullValue": "nul",
+    "addFieldsDialog": "Veld (en) toevoegen",
+    "enableDistinctValues": "Onderscheidende waarden inschakelen"
   },
   "function": {
     "header": "Functies",
@@ -2123,7 +2125,14 @@
       "imported": "Pijplijn (en) succesvol geïmporteerd",
       "created": "Pipeline succesvol aangemaakt",
       "deleted": "De pijplijn is succesvol verwijderd"
-    }
+    },
+    "errorValidations": "Validaties van fouten",
+    "remoteDestination": "Bestemming op afstand",
+    "sqlQuery": "SQL-zoekopdracht",
+    "organizationId": "ID van de organisatie",
+    "functionName": "'Functienaam'",
+    "timezone": "Tijdzone",
+    "pipelineCreation": "Creatie van pijpleidingen"
   },
   "reports": {
     "header": "Rapporten",

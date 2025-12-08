@@ -756,7 +756,9 @@
     "maxFieldsExceeded": "필드를 추가할 수 없습니다.사용자 정의 스키마에서 허용되는 최대 필드는 {maxFields} 입니다.현재: {current}, 추가 시도 중: {시도 중}.",
     "queryEditor": "쿼리 편집기:",
     "exportFilename": "logs-data.csv",
-    "nullValue": "무효"
+    "nullValue": "무효",
+    "addFieldsDialog": "필드 추가",
+    "enableDistinctValues": "고유 값 활성화"
   },
   "function": {
     "header": "함수",
@@ -2123,7 +2125,14 @@
       "imported": "파이프라인을 성공적으로 가져왔습니다.",
       "created": "파이프라인이 성공적으로 생성됨",
       "deleted": "파이프라인이 성공적으로 삭제됨"
-    }
+    },
+    "errorValidations": "오류 검증",
+    "remoteDestination": "원격 목적지",
+    "sqlQuery": "SQL 쿼리",
+    "organizationId": "조직 아이디",
+    "functionName": "함수 이름'",
+    "timezone": "타임존",
+    "pipelineCreation": "파이프라인 생성"
   },
   "reports": {
     "header": "보고서",

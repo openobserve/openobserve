@@ -756,7 +756,9 @@
     "maxFieldsExceeded": "Felder können nicht hinzugefügt werden. Die maximal zulässige Anzahl an Feldern im benutzerdefinierten Schema ist {MaxFields}. Aktuell: {current}, Versuch zum Hinzufügen: {versuch}.",
     "queryEditor": "Abfrage-Editor:",
     "exportFilename": "logs-data.csv",
-    "nullValue": "null"
+    "nullValue": "null",
+    "addFieldsDialog": "Feld (er) hinzufügen",
+    "enableDistinctValues": "Eindeutige Werte aktivieren"
   },
   "function": {
     "header": "Funktionen",
@@ -2123,7 +2125,14 @@
       "imported": "Pipeline (n) wurde (n) erfolgreich importiert",
       "created": "Pipeline wurde erfolgreich erstellt",
       "deleted": "Pipeline wurde erfolgreich gelöscht"
-    }
+    },
+    "errorValidations": "Fehlervalidierungen",
+    "remoteDestination": "Entferntes Ziel",
+    "sqlQuery": "SQL-Abfrage",
+    "organizationId": "ID der Organisation",
+    "functionName": "Name der Funktion",
+    "timezone": "Zeitzone",
+    "pipelineCreation": "Pipeline-Erstellung"
   },
   "reports": {
     "header": "Berichte",

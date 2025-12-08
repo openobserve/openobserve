@@ -773,7 +773,9 @@
     "maxFieldsExceeded": "フィールドを追加できません。ユーザー定義スキーマの最大許容フィールド数は {maxFields} です。現在:{current}、追加しようとしています:{試行}。",
     "queryEditor": "クエリーエディター:",
     "exportFilename": "logs-data.csv",
-    "nullValue": "ゼロ"
+    "nullValue": "ゼロ",
+    "addFieldsDialog": "フィールドを追加",
+    "enableDistinctValues": "個別値を有効にする"
   },
   "function": {
     "header": "関数",
@@ -2137,7 +2139,14 @@
       "imported": "パイプラインは正常にインポートされました",
       "created": "パイプラインは正常に作成されました",
       "deleted": "パイプラインは正常に削除されました"
-    }
+    },
+    "errorValidations": "エラー検証",
+    "remoteDestination": "リモート送信先",
+    "sqlQuery": "SQL クエリー",
+    "organizationId": "組織 ID",
+    "functionName": "関数名'",
+    "timezone": "タイムゾーン",
+    "pipelineCreation": "パイプライン作成"
   },
   "reports": {
     "header": "レポート",

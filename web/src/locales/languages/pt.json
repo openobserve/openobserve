@@ -756,7 +756,9 @@
     "maxFieldsExceeded": "Não é possível adicionar campos. O máximo de campos permitidos no esquema definido pelo usuário é {maxFields}. Atual: {atual}, Tentando adicionar: {tentativa}.",
     "queryEditor": "Editor de consultas:",
     "exportFilename": "logs-data.csv",
-    "nullValue": "nulo"
+    "nullValue": "nulo",
+    "addFieldsDialog": "Adicionar campo (s)",
+    "enableDistinctValues": "Habilitar valores distintos"
   },
   "function": {
     "header": "Funções",
@@ -2123,7 +2125,14 @@
       "imported": "Pipeline (s) importado (s) com sucesso",
       "created": "Pipeline criado com sucesso",
       "deleted": "Pipeline excluído com sucesso"
-    }
+    },
+    "errorValidations": "Validações de erro",
+    "remoteDestination": "Destino remoto",
+    "sqlQuery": "Consulta SQL",
+    "organizationId": "ID da organização",
+    "functionName": "Nome da função'",
+    "timezone": "Fuso horário",
+    "pipelineCreation": "Criação de pipeline"
   },
   "reports": {
     "header": "Relatórios",

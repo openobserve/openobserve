@@ -756,7 +756,9 @@
     "maxFieldsExceeded": "无法添加字段。用户定义架构中允许的最大字段为 {maxFields}。当前：{当前}，正在尝试添加：{正在尝试}。",
     "queryEditor": "查询编辑器：",
     "exportFilename": "logs-data.csv",
-    "nullValue": "空的"
+    "nullValue": "空的",
+    "addFieldsDialog": "添加字段",
+    "enableDistinctValues": "启用不同的值"
   },
   "function": {
     "header": "函数",
@@ -2119,7 +2121,14 @@
       "imported": "已成功导入管道",
       "created": "已成功创建管道",
       "deleted": "已成功删除管道"
-    }
+    },
+    "errorValidations": "错误验证",
+    "remoteDestination": "远程目的地",
+    "sqlQuery": "SQL 查询",
+    "organizationId": "组织编号",
+    "functionName": "函数名称'",
+    "timezone": "时区",
+    "pipelineCreation": "管道创建"
   },
   "reports": {
     "header": "报表",

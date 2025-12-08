@@ -756,7 +756,9 @@
     "maxFieldsExceeded": "Alanlar eklenemiyor. Kullanıcı Tanımlı Şemada izin verilen maksimum alanlar {maxFields} 'dir. Geçerli: {current}, Eklemeye çalışılıyor: {}.",
     "queryEditor": "Sorgu Editörü:",
     "exportFilename": "logs-data.csv dosyası",
-    "nullValue": "sıfır"
+    "nullValue": "sıfır",
+    "addFieldsDialog": "Alan (lar) Ekle",
+    "enableDistinctValues": "Farklı Değerleri Etkinleştir"
   },
   "function": {
     "header": "Fonksiyonlar",
@@ -2123,7 +2125,14 @@
       "imported": "Boru hattı (ler) başarıyla içe aktarıldı",
       "created": "Boru hattı başarıyla oluşturuldu",
       "deleted": "Boru hattı başarıyla silindi"
-    }
+    },
+    "errorValidations": "Hata Doğrulamaları",
+    "remoteDestination": "Uzak Hedef",
+    "sqlQuery": "SQL Sorgu",
+    "organizationId": "Kuruluş Kimliği",
+    "functionName": "İşlev Adı'",
+    "timezone": "Saat dilimi",
+    "pipelineCreation": "Boru Hattı Oluşturma"
   },
   "reports": {
     "header": "Raporlar",

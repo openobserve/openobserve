@@ -757,7 +757,9 @@
     "maxFieldsExceeded": "No se pueden agregar campos. El número máximo de campos permitidos en el esquema definido por el usuario es {maxFields}. Actual: {current}, intentando añadir: {tentando}.",
     "queryEditor": "Editor de consultas:",
     "exportFilename": "logs-data.csv",
-    "nullValue": "nulo"
+    "nullValue": "nulo",
+    "addFieldsDialog": "Agregar campo (s)",
+    "enableDistinctValues": "Habilitar valores distintos"
   },
   "function": {
     "header": "Funciones",
@@ -2123,7 +2125,14 @@
       "imported": "Los oleoductos se importaron correctamente",
       "created": "La canalización se creó correctamente",
       "deleted": "La canalización se eliminó correctamente"
-    }
+    },
+    "errorValidations": "Validaciones de errores",
+    "remoteDestination": "Destino remoto",
+    "sqlQuery": "Consulta SQL",
+    "organizationId": "ID de la organización",
+    "functionName": "Nombre de la función'",
+    "timezone": "Zona horaria",
+    "pipelineCreation": "Creación de oleoductos"
   },
   "reports": {
     "header": "Informes",
