@@ -322,6 +322,7 @@ fn convert_matchers_to_index_condition(
         }
         let condition = match &mat.op {
             MatchOp::Equal => Condition::Equal(mat.name.clone(), mat.value.clone()),
+            MatchOp::NotEqual => Condition::NotEqual(mat.name.clone(), mat.value.clone()),
             MatchOp::Re(regex) => Condition::Regex(mat.name.clone(), regex.to_string()),
             _ => {
                 is_full_convert = false;
