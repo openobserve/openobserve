@@ -129,11 +129,6 @@ async fn create(
         data.claim_parser_function = claim_parser_function;
     }
 
-    if let Some(fqn_priority_dimensions) = settings.fqn_priority_dimensions {
-        field_found = true;
-        data.fqn_priority_dimensions = fqn_priority_dimensions;
-    }
-
     if !field_found {
         return Ok(MetaHttpResponse::bad_request("No valid field found"));
     }

@@ -228,6 +228,46 @@ pub async fn invalidate_all_cache() {
     SYSTEM_SETTINGS.write().await.clear();
 }
 
+/// Get FQN priority dimensions for an organization
+///
+/// Resolution order:
+/// 1. Check settings v2 for org-level setting
+/// 2. Fall back to system defaults from O2_FQN_PRIORITY_DIMENSIONS env var
+///
+/// Returns empty vec for OSS builds if env var is not set.
+pub async fn get_fqn_priority_dimensions(org_id: &str) -> Vec<String> {
+    use config::meta::system_settings::keys::FQN_PRIORITY_DIMENSIONS;
+
+    // Try to get from settings v2 (org level)
+    if let Ok(Some(setting)) = get_resolved(Some(org_id), None, FQN_PRIORITY_DIMENSIONS).await
+        && let Ok(dims) = serde_json::from_value::<Vec<String>>(setting.setting_value)
+        && !dims.is_empty()
+    {
+        return dims;
+    }
+
+    // Fall back to system defaults
+    get_default_fqn_priority_dimensions()
+}
+
+/// Get the default FQN priority dimensions from config
+///
+/// For enterprise builds, uses O2_FQN_PRIORITY_DIMENSIONS env var.
+/// For OSS builds, returns empty vec.
+pub fn get_default_fqn_priority_dimensions() -> Vec<String> {
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+        get_o2_config()
+            .service_streams
+            .get_fqn_priority_dimensions()
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        vec![]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

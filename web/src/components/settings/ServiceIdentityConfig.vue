@@ -116,8 +116,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-badge>
           </q-item-section>
           <q-item-section>
-            <q-item-label class="tw-font-mono">{{ dim }}</q-item-label>
-            <q-item-label caption>{{ getDimensionDescription(dim) }}</q-item-label>
+            <q-item-label class="tw-font-medium">{{ getDimensionDisplay(dim) }}</q-item-label>
+            <q-item-label caption class="tw-font-mono tw-text-xs">{{ dim }}</q-item-label>
           </q-item-section>
           <q-item-section side>
             <div class="tw-flex tw-gap-1">
@@ -162,29 +162,87 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-item>
       </q-list>
 
-      <!-- Add new dimension -->
-      <div class="tw-mt-3 tw-flex tw-gap-2">
-        <q-select
-          v-model="newFqnDimension"
-          :options="availableFqnDimensions"
-          dense
-          filled
-          :label="t('settings.correlation.addDimensionLabel')"
-          class="tw-flex-1"
-          emit-value
-          map-options
-          :option-label="opt => typeof opt === 'string' ? opt : opt.label"
-        />
-        <q-btn
-          flat
-          dense
-          icon="add"
-          color="primary"
-          :disable="!newFqnDimension"
-          @click="addFqnDimension"
-        >
-          <q-tooltip>{{ t("settings.correlation.addDimensionLabel") }}</q-tooltip>
-        </q-btn>
+      <!-- Add new dimension from semantic groups - Two step: 1) Select group 2) Select field -->
+      <div class="tw-mt-3">
+        <div class="tw-text-sm tw-text-gray-600 dark:tw-text-gray-400 tw-mb-2">
+          {{ t("settings.correlation.addDimensionHint") }}
+        </div>
+        <div class="tw-flex tw-gap-2 tw-items-end">
+          <!-- Step 1: Select Semantic Group -->
+          <q-select
+            v-model="selectedSemanticGroup"
+            :options="availableSemanticGroups"
+            dense
+            filled
+            :label="t('settings.correlation.selectSemanticGroup')"
+            class="tw-flex-1"
+            emit-value
+            map-options
+            clearable
+            :disable="availableSemanticGroups.length === 0"
+          >
+            <template v-slot:option="scope">
+              <q-item v-bind="scope.itemProps">
+                <q-item-section>
+                  <q-item-label>{{ scope.opt.label }}</q-item-label>
+                  <q-item-label caption class="tw-text-xs">
+                    {{ scope.opt.fieldCount }} {{ t("settings.correlation.fieldsAvailable") }}
+                  </q-item-label>
+                </q-item-section>
+              </q-item>
+            </template>
+            <template v-slot:no-option>
+              <q-item>
+                <q-item-section class="text-grey">
+                  {{ t("settings.correlation.noSemanticGroupsAvailable") }}
+                </q-item-section>
+              </q-item>
+            </template>
+          </q-select>
+
+          <!-- Step 2: Select Field from Group -->
+          <q-select
+            v-model="newFqnDimension"
+            :options="availableFieldsFromGroup"
+            dense
+            filled
+            :label="t('settings.correlation.selectField')"
+            class="tw-flex-1"
+            emit-value
+            map-options
+            clearable
+            :disable="!selectedSemanticGroup || availableFieldsFromGroup.length === 0"
+          >
+            <template v-slot:option="scope">
+              <q-item v-bind="scope.itemProps">
+                <q-item-section>
+                  <q-item-label class="tw-font-mono">{{ scope.opt.label }}</q-item-label>
+                </q-item-section>
+              </q-item>
+            </template>
+            <template v-slot:no-option>
+              <q-item>
+                <q-item-section class="text-grey">
+                  {{ selectedSemanticGroup ? t("settings.correlation.allFieldsAdded") : t("settings.correlation.selectGroupFirst") }}
+                </q-item-section>
+              </q-item>
+            </template>
+          </q-select>
+
+          <q-btn
+            flat
+            dense
+            icon="add"
+            color="primary"
+            :disable="!newFqnDimension"
+            @click="addFqnDimension"
+          >
+            <q-tooltip>{{ t("settings.correlation.addDimensionLabel") }}</q-tooltip>
+          </q-btn>
+        </div>
+      </div>
+      <div v-if="availableSemanticGroups.length === 0 && localSemanticGroups.length === 0" class="tw-mt-2 tw-text-sm tw-text-amber-600 dark:tw-text-amber-400">
+        {{ t("settings.correlation.noSemanticGroupsConfigured") }}
       </div>
     </div>
 
@@ -241,7 +299,7 @@ import { useI18n } from "vue-i18n";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
 import alertsService from "@/services/alerts";
-import organizationsService from "@/services/organizations";
+import settingsService from "@/services/settings";
 
 const store = useStore();
 const $q = useQuasar();
@@ -267,24 +325,6 @@ interface OrganizationDeduplicationConfig {
 // Default FQN priority dimensions - empty by default, uses O2_FQN_PRIORITY_DIMENSIONS env var
 const DEFAULT_FQN_PRIORITY: string[] = [];
 
-// All available dimensions that can be used for FQN priority
-const ALL_FQN_DIMENSIONS = [
-  { label: "K8s Deployment", value: "k8s-deployment", description: "Kubernetes Deployment name" },
-  { label: "K8s StatefulSet", value: "k8s-statefulset", description: "Kubernetes StatefulSet name" },
-  { label: "K8s DaemonSet", value: "k8s-daemonset", description: "Kubernetes DaemonSet name" },
-  { label: "K8s Job", value: "k8s-job", description: "Kubernetes Job name" },
-  { label: "K8s ReplicaSet", value: "k8s-replicaset", description: "Kubernetes ReplicaSet name" },
-  { label: "K8s Namespace", value: "k8s-namespace", description: "Kubernetes Namespace" },
-  { label: "AWS ECS Task", value: "aws-ecs-task", description: "AWS ECS Task family" },
-  { label: "FaaS Name", value: "faas-name", description: "Lambda, Cloud Functions, etc." },
-  { label: "GCP Cloud Run", value: "gcp-cloud-run", description: "Google Cloud Run service" },
-  { label: "Azure Cloud Role", value: "azure-cloud-role", description: "Azure Cloud role name" },
-  { label: "Process Name", value: "process-name", description: "Bare metal process name" },
-  { label: "Service", value: "service", description: "OpenTelemetry service.name" },
-  { label: "Host", value: "host", description: "Host/Node name" },
-  { label: "Environment", value: "environment", description: "Deployment environment" },
-];
-
 interface Props {
   orgId: string;
   config?: OrganizationDeduplicationConfig | null;
@@ -302,6 +342,7 @@ const emit = defineEmits<{
 const saving = ref(false);
 const localFqnPriority = ref<string[]>([...DEFAULT_FQN_PRIORITY]);
 const localSemanticGroups = ref<SemanticFieldGroup[]>([]);
+const selectedSemanticGroup = ref<string | null>(null);
 const newFqnDimension = ref<string | null>(null);
 
 // Full config for saving
@@ -314,35 +355,93 @@ const localConfig = ref<OrganizationDeduplicationConfig>({
   fqn_priority_dimensions: props.config?.fqn_priority_dimensions ?? [...DEFAULT_FQN_PRIORITY],
 });
 
-// Computed: available dimensions not already in the priority list
-const availableFqnDimensions = computed(() => {
-  return ALL_FQN_DIMENSIONS.filter(d => !localFqnPriority.value.includes(d.value));
+// Reserved IDs that should not be used as semantic groups
+// service-fqn is the OUTPUT of correlation, not an input dimension
+const RESERVED_GROUP_IDS = ['service-fqn', 'servicefqn', 'fqn'];
+
+// Computed: Get all semantic groups for the first dropdown
+// Shows groups that have at least one field not yet in the priority list
+const availableSemanticGroups = computed(() => {
+  const semanticGroups = localSemanticGroups.value.length > 0
+    ? localSemanticGroups.value
+    : localConfig.value.semantic_field_groups || [];
+
+  return semanticGroups
+    .filter(group => {
+      // Exclude reserved/computed fields like service-fqn (it's the output, not an input)
+      if (RESERVED_GROUP_IDS.includes(group.id?.toLowerCase())) {
+        return false;
+      }
+      // Check if this group has any fields not already in the priority list
+      const availableFields = group.fields?.filter(field => !localFqnPriority.value.includes(field)) || [];
+      return availableFields.length > 0;
+    })
+    .map(group => ({
+      label: group.display || group.id,
+      value: group.id,
+      fieldCount: (group.fields?.filter(field => !localFqnPriority.value.includes(field)) || []).length
+    }));
 });
 
-// Get description for a dimension using i18n
-const getDimensionDescription = (dim: string): string => {
-  const descriptionMap: Record<string, string> = {
-    "k8s-deployment": t("settings.correlation.k8sDeployment"),
-    "k8s-statefulset": t("settings.correlation.k8sStatefulSet"),
-    "k8s-daemonset": t("settings.correlation.k8sDaemonSet"),
-    "k8s-job": t("settings.correlation.k8sJob"),
-    "k8s-replicaset": t("settings.correlation.k8sReplicaSet"),
-    "k8s-namespace": t("settings.correlation.k8sNamespace"),
-    "aws-ecs-task": t("settings.correlation.awsEcsTask"),
-    "faas-name": t("settings.correlation.faasName"),
-    "gcp-cloud-run": t("settings.correlation.gcpCloudRun"),
-    "azure-cloud-role": t("settings.correlation.azureCloudRole"),
-    "process-name": t("settings.correlation.processName"),
-    "service": t("settings.correlation.serviceDim"),
-    "host": t("settings.correlation.host"),
-    "environment": t("settings.correlation.environment"),
-  };
-  return descriptionMap[dim] || "";
+// Computed: Get fields from the selected semantic group that aren't already in priority list
+const availableFieldsFromGroup = computed(() => {
+  if (!selectedSemanticGroup.value) return [];
+
+  const semanticGroups = localSemanticGroups.value.length > 0
+    ? localSemanticGroups.value
+    : localConfig.value.semantic_field_groups || [];
+
+  const group = semanticGroups.find(g => g.id === selectedSemanticGroup.value);
+  if (!group?.fields) return [];
+
+  // Filter out reserved IDs and fields already in the priority list
+  return group.fields
+    .filter(field => {
+      // Exclude reserved/computed field names
+      if (RESERVED_GROUP_IDS.includes(field?.toLowerCase())) {
+        return false;
+      }
+      return !localFqnPriority.value.includes(field);
+    })
+    .map(field => ({
+      label: field,
+      value: field
+    }));
+});
+
+// Get display name for a dimension - check semantic groups first, then format the ID
+const getDimensionDisplay = (dimId: string): string => {
+  const semanticGroups = localSemanticGroups.value.length > 0
+    ? localSemanticGroups.value
+    : localConfig.value.semantic_field_groups;
+  const group = semanticGroups.find(g => g.id === dimId);
+  if (group?.display) {
+    return group.display;
+  }
+  // Format the dimension ID as a display name (e.g., "k8s-deployment" -> "K8s Deployment")
+  return dimId
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
+// Get fields for a dimension from semantic groups (for description)
+const getFieldsForDimension = (dimId: string): string => {
+  const semanticGroups = localSemanticGroups.value.length > 0
+    ? localSemanticGroups.value
+    : localConfig.value.semantic_field_groups;
+  const group = semanticGroups.find(g => g.id === dimId);
+  if (group?.fields?.length) {
+    return group.fields.slice(0, 3).join(", ") + (group.fields.length > 3 ? "..." : "");
+  }
+  return "";
 };
 
 const handleSemanticGroupsUpdate = (groups: SemanticFieldGroup[]) => {
-  localConfig.value.semantic_field_groups = groups;
-  localSemanticGroups.value = groups;
+  // Filter out reserved IDs like service-fqn (it's the output, not an input)
+  const filteredGroups = groups.filter(g => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()));
+  localConfig.value.semantic_field_groups = filteredGroups;
+  localSemanticGroups.value = filteredGroups;
 };
 
 // FQN Priority dimension management
@@ -368,10 +467,16 @@ const addFqnDimension = () => {
   if (!newFqnDimension.value) return;
   localFqnPriority.value.push(newFqnDimension.value);
   newFqnDimension.value = null;
+  // Clear group selection if no more fields available from this group
+  if (availableFieldsFromGroup.value.length === 0) {
+    selectedSemanticGroup.value = null;
+  }
 };
 
 const resetFqnPriority = () => {
-  localFqnPriority.value = [...DEFAULT_FQN_PRIORITY];
+  // Reset to backend defaults from O2_FQN_PRIORITY_DIMENSIONS
+  const backendDefaults = store.state.zoConfig?.fqn_priority_dimensions || [];
+  localFqnPriority.value = [...backendDefaults];
 };
 
 const saveSettings = async () => {
@@ -381,10 +486,13 @@ const saveSettings = async () => {
     localConfig.value.fqn_priority_dimensions = localFqnPriority.value;
     localConfig.value.semantic_field_groups = localSemanticGroups.value;
 
-    // Save FQN priority dimensions to organization settings API
-    await organizationsService.post_organization_settings(
+    // Save FQN priority dimensions using settings v2 API (org-level setting)
+    await settingsService.setOrgSetting(
       props.orgId,
-      { fqn_priority_dimensions: localFqnPriority.value }
+      "fqn_priority_dimensions",
+      localFqnPriority.value,
+      "correlation",
+      "FQN priority dimensions for service correlation"
     );
 
     // Also save semantic field groups to deduplication config API
@@ -414,19 +522,25 @@ const saveSettings = async () => {
 
 // Fetch config on mount if not provided
 const loadConfig = async () => {
+  // Get backend defaults for FQN priority dimensions
+  const backendDefaults = store.state.zoConfig?.fqn_priority_dimensions || [];
+
   if (!props.config) {
     try {
-      // First, try to load FQN priority from organization settings API
-      let fqnPriorityFromOrgSettings: string[] | null = null;
+      // First, try to load FQN priority from settings v2 API
+      let fqnPriorityFromSettings: string[] | null = null;
       try {
-        const orgSettingsResponse = await organizationsService.get_organization_settings(props.orgId);
-        const orgSettings = orgSettingsResponse.data?.data;
-        console.log("ServiceIdentityConfig: Loaded org settings:", orgSettings);
-        if (orgSettings?.fqn_priority_dimensions?.length > 0) {
-          fqnPriorityFromOrgSettings = orgSettings.fqn_priority_dimensions;
+        const settingResponse = await settingsService.getSetting(props.orgId, "fqn_priority_dimensions");
+        const setting = settingResponse.data;
+        console.log("ServiceIdentityConfig: Loaded FQN setting from v2 API:", setting);
+        if (setting?.setting_value && Array.isArray(setting.setting_value) && setting.setting_value.length > 0) {
+          fqnPriorityFromSettings = setting.setting_value;
         }
-      } catch (orgError) {
-        console.log("ServiceIdentityConfig: No org settings, using defaults");
+      } catch (settingError: any) {
+        // 404 means setting not found, which is fine - use defaults
+        if (settingError?.response?.status !== 404) {
+          console.log("ServiceIdentityConfig: Error loading settings v2, using defaults:", settingError);
+        }
       }
 
       // Load deduplication config for semantic field groups
@@ -434,28 +548,32 @@ const loadConfig = async () => {
       const config = response.data;
       console.log("ServiceIdentityConfig: Loaded dedup config:", config);
 
-      // Use org settings FQN priority if available, otherwise use dedup config or defaults
-      const fqnPriority = fqnPriorityFromOrgSettings ??
-                          config.fqn_priority_dimensions ??
-                          [...DEFAULT_FQN_PRIORITY];
+      // Use settings v2 FQN priority if available, otherwise use backend defaults
+      const fqnPriority = fqnPriorityFromSettings ?? [...backendDefaults];
+
+      // Filter out reserved IDs like service-fqn (it's the output, not an input)
+      const filteredSemanticGroups = (config.semantic_field_groups ?? [])
+        .filter((g: SemanticFieldGroup) => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()));
 
       localConfig.value = {
         enabled: config.enabled ?? true,
         alert_dedup_enabled: config.alert_dedup_enabled ?? true,
         alert_fingerprint_groups: config.alert_fingerprint_groups ?? [],
         time_window_minutes: config.time_window_minutes ?? undefined,
-        semantic_field_groups: config.semantic_field_groups ?? [],
+        semantic_field_groups: filteredSemanticGroups,
         fqn_priority_dimensions: fqnPriority,
       };
       localFqnPriority.value = fqnPriority;
-      localSemanticGroups.value = config.semantic_field_groups ?? [];
+      localSemanticGroups.value = filteredSemanticGroups;
     } catch (error) {
       console.log("ServiceIdentityConfig: No existing config, loading defaults", error);
 
       // Load default semantic groups from backend
       try {
         const semanticGroupsResponse = await alertsService.getSemanticGroups(props.orgId);
-        const defaultGroups = semanticGroupsResponse.data;
+        // Filter out reserved IDs like service-fqn (it's the output, not an input)
+        const defaultGroups = (semanticGroupsResponse.data ?? [])
+          .filter((g: SemanticFieldGroup) => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()));
         console.log(`Loaded ${defaultGroups.length} default semantic groups`);
 
         localConfig.value = {
@@ -464,19 +582,22 @@ const loadConfig = async () => {
           alert_fingerprint_groups: [],
           time_window_minutes: undefined,
           semantic_field_groups: defaultGroups,
-          fqn_priority_dimensions: [...DEFAULT_FQN_PRIORITY],
+          fqn_priority_dimensions: [...backendDefaults],
         };
-        localFqnPriority.value = [...DEFAULT_FQN_PRIORITY];
+        localFqnPriority.value = [...backendDefaults];
         localSemanticGroups.value = defaultGroups;
       } catch (semanticError) {
         console.error("Failed to load default semantic groups:", semanticError);
+        localFqnPriority.value = [...backendDefaults];
         localSemanticGroups.value = [];
       }
     }
   } else {
     console.log("ServiceIdentityConfig: Using config from props:", props.config);
-    localFqnPriority.value = props.config.fqn_priority_dimensions ?? [...DEFAULT_FQN_PRIORITY];
-    localSemanticGroups.value = props.config.semantic_field_groups ?? [];
+    localFqnPriority.value = props.config.fqn_priority_dimensions ?? [...backendDefaults];
+    // Filter out reserved IDs like service-fqn (it's the output, not an input)
+    localSemanticGroups.value = (props.config.semantic_field_groups ?? [])
+      .filter(g => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()));
   }
 };
 
@@ -488,17 +609,21 @@ watch(
   () => props.config,
   (newVal) => {
     if (newVal) {
+      const backendDefaults = store.state.zoConfig?.fqn_priority_dimensions || [];
       console.log("ServiceIdentityConfig: Config changed from props:", newVal);
+      // Filter out reserved IDs like service-fqn (it's the output, not an input)
+      const filteredSemanticGroups = (newVal.semantic_field_groups ?? [])
+        .filter(g => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()));
       localConfig.value = {
         enabled: newVal.enabled ?? true,
         alert_dedup_enabled: newVal.alert_dedup_enabled ?? true,
         alert_fingerprint_groups: newVal.alert_fingerprint_groups ?? [],
         time_window_minutes: newVal.time_window_minutes ?? undefined,
-        semantic_field_groups: newVal.semantic_field_groups ?? [],
-        fqn_priority_dimensions: newVal.fqn_priority_dimensions ?? [...DEFAULT_FQN_PRIORITY],
+        semantic_field_groups: filteredSemanticGroups,
+        fqn_priority_dimensions: newVal.fqn_priority_dimensions ?? [...backendDefaults],
       };
-      localFqnPriority.value = newVal.fqn_priority_dimensions ?? [...DEFAULT_FQN_PRIORITY];
-      localSemanticGroups.value = newVal.semantic_field_groups ?? [];
+      localFqnPriority.value = newVal.fqn_priority_dimensions ?? [...backendDefaults];
+      localSemanticGroups.value = filteredSemanticGroups;
     }
   },
   { deep: true, immediate: true },

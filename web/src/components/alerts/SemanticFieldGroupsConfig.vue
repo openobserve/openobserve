@@ -144,6 +144,10 @@ interface SemanticGroup {
   normalize: boolean;
 }
 
+// Reserved IDs that should not be used as semantic groups
+// service-fqn is the OUTPUT of correlation, not an input dimension
+const RESERVED_GROUP_IDS = ['service-fqn', 'servicefqn', 'fqn'];
+
 interface Props {
   semanticFieldGroups?: SemanticGroup[];
   fingerprintFields?: string[];
@@ -161,7 +165,10 @@ const emit = defineEmits<{
   (e: "update:fingerprintFields", fields: string[]): void;
 }>();
 
-const localGroups = ref<SemanticGroup[]>([...props.semanticFieldGroups]);
+// Filter out reserved IDs like service-fqn (it's the output, not an input)
+const localGroups = ref<SemanticGroup[]>(
+  props.semanticFieldGroups.filter(g => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()))
+);
 const localFingerprintFields = ref<string[]>([...props.fingerprintFields]);
 const selectedPreset = ref<string | null>(null);
 const availableSemanticGroups = ref<SemanticGroup[]>([]);
@@ -171,7 +178,8 @@ const loadingPresets = ref(false);
 watch(
   () => props.semanticFieldGroups,
   (newGroups) => {
-    localGroups.value = [...newGroups];
+    // Filter out reserved IDs like service-fqn (it's the output, not an input)
+    localGroups.value = newGroups.filter(g => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()));
   },
   { deep: true },
 );
@@ -223,7 +231,9 @@ const loadSemanticGroups = async () => {
   try {
     const orgId = store.state.selectedOrganization.identifier;
     const response = await alertsService.getSemanticGroups(orgId);
-    availableSemanticGroups.value = response.data;
+    // Filter out reserved IDs like service-fqn (it's the output, not an input)
+    availableSemanticGroups.value = (response.data ?? [])
+      .filter((g: SemanticGroup) => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()));
     console.log(`Loaded ${availableSemanticGroups.value.length} semantic groups from backend`);
   } catch (error) {
     console.error("Failed to load semantic groups:", error);

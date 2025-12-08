@@ -794,7 +794,8 @@ describe("DetailTable Component", () => {
       "view-trace",
       "sendToAiChat",
       "closeTable",
-      "show-correlation"
+      "show-correlation",
+      "load-correlation"
     ];
     expect(componentOptions.emits).toEqual(expectedEmits);
   });
