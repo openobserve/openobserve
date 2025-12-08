@@ -694,7 +694,8 @@ describe('SettingsIndex.vue', () => {
 
       wrapper.vm.controlManagementTabs();
 
-      expect(wrapper.vm.storePreviousStoreModel).toBe(-100);
+      // Negative values should not be saved, keeps default 250
+      expect(wrapper.vm.storePreviousStoreModel).toBe(250);
       expect(wrapper.vm.splitterModel).toBe(0);
     });
 

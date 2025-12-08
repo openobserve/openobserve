@@ -356,6 +356,10 @@ export default defineComponent({
     });
     const controlManagementTabs = () => {
       if(showManagementTabs.value){
+        // Save current position before collapsing only if >= 10px
+        if (splitterModel.value >= 10) {
+          storePreviousStoreModel.value = splitterModel.value;
+        }
         splitterModel.value = 0;
         showManagementTabs.value = false;
       }
