@@ -87,8 +87,10 @@ test.describe("dashboard streaming testcases", () => {
     );
 
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardPanelActions.waitForChartToRender();
+
+    // await waitForDateTimeButtonToBeEnabled(page);
+    // await pm.dashboardTimeRefresh.setRelative("6", "w");
 
     const variableInput = page.getByLabel("variablename", {
       exact: true,
