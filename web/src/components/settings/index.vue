@@ -254,6 +254,7 @@ import {
   onUpdated,
   watch,
   computed,
+  nextTick,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -336,17 +337,30 @@ export default defineComponent({
     onUpdated(() => {
       handleSettingsRouting();
     });
+
     const showManagementTabs = ref(true);
+
+    // Watch splitterModel to validate during dragging
+    watch(splitterModel, (newValue, oldValue) => {
+      if (newValue >= 10) {
+        // Save valid position when >= 10px
+        storePreviousStoreModel.value = newValue;
+        showManagementTabs.value = true;
+      } else if (newValue > 0 && newValue < 10 && oldValue !== (storePreviousStoreModel.value || 250)) {
+        // If dragged to less than 10px, snap back to last valid position
+        splitterModel.value = storePreviousStoreModel.value || 250;
+        showManagementTabs.value = true;
+      } else if (newValue === 0) {
+        showManagementTabs.value = false;
+      }
+    });
     const controlManagementTabs = () => {
       if(showManagementTabs.value){
-        const prevVal = splitterModel.value;
-        storePreviousStoreModel.value = prevVal;
         splitterModel.value = 0;
         showManagementTabs.value = false;
       }
       else{
         splitterModel.value = storePreviousStoreModel.value || 250;
-        
         showManagementTabs.value = true;
       }
     }

@@ -130,6 +130,21 @@ export default defineComponent({
 
     const showSidebar = ref(true);
 
+    // Watch splitterModel to validate during dragging
+    watch(splitterModel, (newValue, oldValue) => {
+      if (newValue >= 10) {
+        // Save valid position when >= 10px
+        lastSplitterPosition.value = newValue;
+        showSidebar.value = true;
+      } else if (newValue > 0 && newValue < 10 && oldValue !== lastSplitterPosition.value) {
+        // If dragged to less than 10px, snap back to last valid position
+        splitterModel.value = lastSplitterPosition.value;
+        showSidebar.value = true;
+      } else if (newValue === 0) {
+        showSidebar.value = false;
+      }
+    });
+
     watch(
       () => router.currentRoute.value,
       (currentRoute: any) => {
@@ -156,7 +171,6 @@ export default defineComponent({
     });
 
     const collapseSidebar = () => {
-      if (showSidebar.value) lastSplitterPosition.value = splitterModel.value;
       showSidebar.value = !showSidebar.value;
       splitterModel.value = showSidebar.value ? lastSplitterPosition.value : 0;
     };
