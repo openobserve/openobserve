@@ -179,7 +179,10 @@ pub async fn delete_user_settings(org_id: &str, user_id: &str) -> Result<u64> {
     let mut cache = SYSTEM_SETTINGS.write().await;
     let keys_to_remove: Vec<String> = cache
         .iter()
-        .filter(|(k, _)| k.contains(&format!(":{}:{}:", org_id, user_id)))
+        .filter(|(k, _)| {
+            let parts: Vec<&str> = k.split(':').collect();
+            parts.len() >= 3 && parts[1] == org_id && parts[2] == user_id
+        })
         .map(|(k, _)| k.clone())
         .collect();
     for key in keys_to_remove {
