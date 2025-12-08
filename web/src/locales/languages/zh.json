@@ -1574,7 +1574,8 @@
     "useAlertPeriodPlaceholder": "默认使用警报周期",
     "norm": "规范",
     "normalized": "标准化",
-    "notNormalized": "未标准化"
+    "notNormalized": "未标准化",
+    "rowTemplate": "行模板"
   },
   "alert_templates": {
     "header": "模板",

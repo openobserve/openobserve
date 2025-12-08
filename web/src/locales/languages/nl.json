@@ -1578,7 +1578,8 @@
     "useAlertPeriodPlaceholder": "Gebruik standaard de waarschuwingsperiode",
     "norm": "norm",
     "normalized": "Genormaliseerd",
-    "notNormalized": "Niet genormaliseerd"
+    "notNormalized": "Niet genormaliseerd",
+    "rowTemplate": "Sjabloon voor rijen"
   },
   "alert_templates": {
     "header": "Sjablonen",

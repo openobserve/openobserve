@@ -1578,7 +1578,8 @@
     "useAlertPeriodPlaceholder": "Varsayılan olarak uyarı süresini kullan",
     "norm": "kural",
     "normalized": "Normalleştirilmiş",
-    "notNormalized": "Normalleştirilmemiş"
+    "notNormalized": "Normalleştirilmemiş",
+    "rowTemplate": "Satır Şablonu"
   },
   "alert_templates": {
     "header": "Şablonlar",

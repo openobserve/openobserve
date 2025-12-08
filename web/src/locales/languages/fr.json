@@ -1578,7 +1578,8 @@
     "useAlertPeriodPlaceholder": "Utiliser la période d'alerte par défaut",
     "norm": "norme",
     "normalized": "Normalisé",
-    "notNormalized": "Non normalisé"
+    "notNormalized": "Non normalisé",
+    "rowTemplate": "Modèle de ligne"
   },
   "alert_templates": {
     "header": "Modèles",

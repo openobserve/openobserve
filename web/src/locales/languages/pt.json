@@ -1578,7 +1578,8 @@
     "useAlertPeriodPlaceholder": "Use o período de alerta por padrão",
     "norm": "modelo",
     "normalized": "Normalizado",
-    "notNormalized": "Não normalizado"
+    "notNormalized": "Não normalizado",
+    "rowTemplate": "Modelo de linha"
   },
   "alert_templates": {
     "header": "Modelos",

@@ -1578,7 +1578,8 @@
     "useAlertPeriodPlaceholder": "Usa el período de alerta de forma predeterminada",
     "norm": "norma",
     "normalized": "Normalizado",
-    "notNormalized": "No normalizado"
+    "notNormalized": "No normalizado",
+    "rowTemplate": "Plantilla de fila"
   },
   "alert_templates": {
     "header": "Plantillas",

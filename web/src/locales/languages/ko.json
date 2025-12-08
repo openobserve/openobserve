@@ -1578,7 +1578,8 @@
     "useAlertPeriodPlaceholder": "기본적으로 알림 기간 사용",
     "norm": "규범",
     "normalized": "정규화됨",
-    "notNormalized": "정규화되지 않음"
+    "notNormalized": "정규화되지 않음",
+    "rowTemplate": "행 템플릿"
   },
   "alert_templates": {
     "header": "템플릿",

@@ -1588,7 +1588,8 @@
     "useAlertPeriodPlaceholder": "アラート期間をデフォルトで使用",
     "norm": "規範",
     "normalized": "正規化",
-    "notNormalized": "正規化されていません"
+    "notNormalized": "正規化されていません",
+    "rowTemplate": "行テンプレート"
   },
   "alert_templates": {
     "header": "テンプレート",

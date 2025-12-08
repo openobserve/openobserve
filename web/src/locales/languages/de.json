@@ -1578,7 +1578,8 @@
     "useAlertPeriodPlaceholder": "Standardmäßig den Warnungszeitraum verwenden",
     "norm": "Norm",
     "normalized": "Normalisiert",
-    "notNormalized": "Nicht normalisiert"
+    "notNormalized": "Nicht normalisiert",
+    "rowTemplate": "Zeilenvorlage"
   },
   "alert_templates": {
     "header": "Vorlagen",
