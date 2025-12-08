@@ -984,7 +984,7 @@ async fn send_notification(
         )
     };
     let is_email = matches!(dest_type, DestinationType::Email(_));
-    let msg: String = process_dest_template(
+    let mut msg: String = process_dest_template(
         &org_name,
         &template.body,
         alert,
@@ -998,6 +998,58 @@ async fn send_notification(
         },
     )
     .await;
+
+    // Process and append footer template if present
+    if !alert.footer_template.is_empty() {
+        // Calculate alert start and end times for footer template
+        let mut vars = HashMap::with_capacity(rows.len());
+        for row in rows.iter() {
+            for (key, value) in row.iter() {
+                let value = if value.is_string() {
+                    value.as_str().unwrap_or_default().to_string()
+                } else if value.is_f64() {
+                    value.as_f64().unwrap_or_default().to_string()
+                } else {
+                    value.to_string()
+                };
+                let entry = vars.entry(key.to_string()).or_insert_with(HashSet::new);
+                entry.insert(value);
+            }
+        }
+
+        let use_given_time = alert
+            .query_condition
+            .multi_time_range
+            .as_ref()
+            .is_some_and(|tr| !tr.is_empty());
+        let (alert_start_time, alert_end_time) = get_alert_start_end_time(
+            &vars,
+            alert.trigger_condition.period,
+            rows_end_time,
+            start_time,
+            use_given_time,
+        );
+
+        let footer = process_footer_template(
+            &org_name,
+            &alert.footer_template,
+            alert,
+            rows.len(),
+            alert_start_time,
+            alert_end_time,
+            is_email,
+        );
+
+        if !footer.is_empty() {
+            // Add a separator and append the footer
+            if is_email {
+                msg.push_str("\n<br/>\n");
+            } else {
+                msg.push_str("\n\n");
+            }
+            msg.push_str(&footer);
+        }
+    }
 
     let email_subject = if let TemplateType::Email { title } = &template.template_type {
         process_dest_template(
@@ -1301,6 +1353,80 @@ fn process_row_template(
     }
 
     rows_tpl
+}
+
+fn process_footer_template(
+    org_name: &str,
+    tpl: &String,
+    alert: &Alert,
+    alert_count: usize,
+    alert_start_time: i64,
+    alert_end_time: i64,
+    is_email: bool,
+) -> String {
+    if tpl.is_empty() {
+        return String::new();
+    }
+
+    let alert_type = if alert.is_real_time {
+        "realtime"
+    } else {
+        "scheduled"
+    };
+
+    let alert_start_time_str = if alert_start_time > 0 {
+        Local
+            .timestamp_nanos(alert_start_time * 1000)
+            .format("%Y-%m-%dT%H:%M:%S")
+            .to_string()
+    } else {
+        String::from("N/A")
+    };
+    let alert_end_time_str = if alert_end_time > 0 {
+        Local
+            .timestamp_nanos(alert_end_time * 1000)
+            .format("%Y-%m-%dT%H:%M:%S")
+            .to_string()
+    } else {
+        String::from("N/A")
+    };
+
+    let mut resp = tpl
+        .replace("{org_name}", org_name)
+        .replace("{stream_type}", alert.stream_type.as_str())
+        .replace("{stream_name}", &alert.stream_name)
+        .replace("{alert_name}", &alert.name)
+        .replace("{alert_type}", alert_type)
+        .replace(
+            "{alert_period}",
+            &alert.trigger_condition.period.to_string(),
+        )
+        .replace(
+            "{alert_operator}",
+            &alert.trigger_condition.operator.to_string(),
+        )
+        .replace(
+            "{alert_threshold}",
+            &alert.trigger_condition.threshold.to_string(),
+        )
+        .replace("{alert_count}", &alert_count.to_string())
+        .replace("{alert_start_time}", &alert_start_time_str)
+        .replace("{alert_end_time}", &alert_end_time_str)
+        .replace("{alert_description}", &alert.description);
+
+    if let Some(condition) = &alert.query_condition.promql_condition {
+        resp = resp
+            .replace("{alert_promql_operator}", &condition.operator.to_string())
+            .replace("{alert_promql_value}", &condition.value.to_string());
+    }
+
+    if let Some(attrs) = &alert.context_attributes {
+        for (key, value) in attrs.iter() {
+            process_variable_replace(&mut resp, key, &VarValue::Str(value), is_email);
+        }
+    }
+
+    resp
 }
 
 struct ProcessTemplateOptions {

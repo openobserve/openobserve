@@ -64,6 +64,8 @@ pub struct Alert {
     #[serde(default)]
     pub row_template_type: RowTemplateType,
     #[serde(default)]
+    pub footer_template: String,
+    #[serde(default)]
     pub description: String,
     #[serde(default)]
     pub enabled: bool,
@@ -111,6 +113,7 @@ impl Default for Alert {
             context_attributes: None,
             row_template: "".to_string(),
             row_template_type: RowTemplateType::default(),
+            footer_template: "".to_string(),
             description: "".to_string(),
             enabled: false,
             tz_offset: 0, // UTC

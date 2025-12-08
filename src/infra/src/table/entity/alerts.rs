@@ -17,6 +17,7 @@ pub struct Model {
     pub context_attributes: Option<Json>,
     pub row_template: Option<String>,
     pub row_template_type: i16,
+    pub footer_template: Option<String>,
     pub description: Option<String>,
     pub enabled: bool,
     pub tz_offset: i32,
