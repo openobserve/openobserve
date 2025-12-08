@@ -135,6 +135,18 @@ pub async fn save(
     let org_id = org_id.into_inner();
     let initiator_id = user_email.user_id;
     let service_account = service_account.into_inner();
+
+    // In cloud build, inherit is_external from the initiator (SSO user)
+    #[cfg(feature = "cloud")]
+    let is_external = {
+        match crate::service::db::user::get(Some(&org_id), &initiator_id).await {
+            Ok(Some(initiator)) => initiator.is_external,
+            _ => false, // Fallback to false if user not found
+        }
+    };
+    #[cfg(not(feature = "cloud"))]
+    let is_external = false;
+
     let user = UserRequest {
         email: service_account.email.trim().to_string(),
         first_name: service_account.first_name.trim().to_string(),
@@ -144,7 +156,7 @@ pub async fn save(
             base_role: UserRole::ServiceAccount,
             custom_role: None,
         },
-        is_external: false,
+        is_external,
         token: None,
     };
 

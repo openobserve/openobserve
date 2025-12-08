@@ -988,6 +988,7 @@ pub async fn remove_user_from_org(
                 if !user.organizations.is_empty() {
                     let orgs = &mut user.organizations;
                     if orgs.len() == 1 {
+                        #[cfg(not(feature = "cloud"))]
                         if orgs[0].role.eq(&UserRole::ServiceAccount) && user.is_external {
                             return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
                                 http::StatusCode::FORBIDDEN,
@@ -1021,6 +1022,7 @@ pub async fn remove_user_from_org(
                         let mut is_service_account = false;
                         #[cfg(feature = "enterprise")]
                         for org in orgs.iter() {
+                            #[cfg(not(feature = "cloud"))]
                             if org.role.eq(&UserRole::ServiceAccount) && user.is_external {
                                 return Ok(HttpResponse::Forbidden().json(
                                     MetaHttpResponse::error(

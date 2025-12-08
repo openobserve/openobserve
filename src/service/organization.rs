@@ -144,6 +144,7 @@ pub async fn get_passcode(
     let Ok(Some(user)) = db::user::get(org_id, user_id).await else {
         return Err(anyhow::Error::msg("User not found"));
     };
+    #[cfg(not(feature = "cloud"))]
     if user.role.eq(&UserRole::ServiceAccount) && user.is_external {
         return Err(anyhow::Error::msg(
             "Not allowed for external service accounts",
@@ -216,7 +217,9 @@ async fn update_passcode_inner(
         if orgs.is_empty() {
             return Err(anyhow::Error::msg("User not found"));
         }
+        #[allow(unused_variables)]
         let org_to_update = orgs[0];
+        #[cfg(not(feature = "cloud"))]
         if org_to_update.role.eq(&UserRole::ServiceAccount) && db_user.is_external {
             return Err(anyhow::Error::msg(
                 "Not allowed for external service accounts",
@@ -774,5 +777,224 @@ mod tests {
 
         let resp = update_passcode(Some(org_id), user_id).await.unwrap();
         assert_ne!(resp.passcode, passcode);
+    }
+
+    // Test for external ServiceAccount restrictions based on feature flags
+    #[tokio::test]
+    #[ignore]
+    async fn test_external_service_account_passcode() {
+        let org_id = "default";
+        let service_account_email = "api-bot@example.com";
+        let init_user = "root@example.com";
+        let pwd = "Complexpass#123";
+
+        infra_db::create_table().await.unwrap();
+        infra_table::create_user_tables().await.unwrap();
+        check_and_create_org_without_ofga(org_id).await.unwrap();
+
+        // Create root user
+        users::create_root_user_if_not_exists(
+            org_id,
+            UserRequest {
+                email: init_user.to_string(),
+                password: pwd.to_string(),
+                role: crate::common::meta::user::UserOrgRole {
+                    base_role: config::meta::user::UserRole::Root,
+                    custom_role: None,
+                },
+                first_name: "root".to_owned(),
+                last_name: "".to_owned(),
+                is_external: false,
+                token: None,
+            },
+        )
+        .await
+        .unwrap();
+
+        // Create external ServiceAccount (simulating SSO-created ServiceAccount)
+        let resp = users::post_user(
+            org_id,
+            UserRequest {
+                email: service_account_email.to_string(),
+                password: config::utils::rand::generate_random_string(16),
+                role: crate::common::meta::user::UserOrgRole {
+                    base_role: config::meta::user::UserRole::ServiceAccount,
+                    custom_role: None,
+                },
+                first_name: "API".to_owned(),
+                last_name: "Bot".to_owned(),
+                is_external: true, // External ServiceAccount
+                token: None,
+            },
+            init_user,
+        )
+        .await;
+        assert!(resp.is_ok());
+
+        // Test get_passcode behavior
+        let passcode_result = get_passcode(Some(org_id), service_account_email).await;
+
+        #[cfg(feature = "cloud")]
+        {
+            // In cloud build, external ServiceAccounts should be allowed
+            assert!(passcode_result.is_ok(),
+                "Cloud build: External ServiceAccount should be able to get passcode");
+            let passcode = passcode_result.unwrap();
+            assert!(!passcode.passcode.is_empty());
+        }
+
+        #[cfg(not(feature = "cloud"))]
+        {
+            // In non-cloud build, external ServiceAccounts should be blocked
+            assert!(passcode_result.is_err(),
+                "Non-cloud build: External ServiceAccount should be blocked from getting passcode");
+            assert_eq!(
+                passcode_result.unwrap_err().to_string(),
+                "Not allowed for external service accounts"
+            );
+        }
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_external_service_account_token_rotation() {
+        let org_id = "default";
+        let service_account_email = "api-rotation@example.com";
+        let init_user = "root@example.com";
+        let pwd = "Complexpass#123";
+
+        infra_db::create_table().await.unwrap();
+        infra_table::create_user_tables().await.unwrap();
+        check_and_create_org_without_ofga(org_id).await.unwrap();
+
+        users::create_root_user_if_not_exists(
+            org_id,
+            UserRequest {
+                email: init_user.to_string(),
+                password: pwd.to_string(),
+                role: crate::common::meta::user::UserOrgRole {
+                    base_role: config::meta::user::UserRole::Root,
+                    custom_role: None,
+                },
+                first_name: "root".to_owned(),
+                last_name: "".to_owned(),
+                is_external: false,
+                token: None,
+            },
+        )
+        .await
+        .unwrap();
+
+        // Create external ServiceAccount
+        users::post_user(
+            org_id,
+            UserRequest {
+                email: service_account_email.to_string(),
+                password: config::utils::rand::generate_random_string(16),
+                role: crate::common::meta::user::UserOrgRole {
+                    base_role: config::meta::user::UserRole::ServiceAccount,
+                    custom_role: None,
+                },
+                first_name: "API".to_owned(),
+                last_name: "Rotation".to_owned(),
+                is_external: true,
+                token: None,
+            },
+            init_user,
+        )
+        .await
+        .unwrap();
+
+        // Test update_passcode behavior
+        let rotation_result = update_passcode(Some(org_id), service_account_email).await;
+
+        #[cfg(feature = "cloud")]
+        {
+            // In cloud build, token rotation should be allowed
+            assert!(rotation_result.is_ok(),
+                "Cloud build: External ServiceAccount should be able to rotate token");
+            let new_passcode = rotation_result.unwrap();
+            assert!(!new_passcode.passcode.is_empty());
+        }
+
+        #[cfg(not(feature = "cloud"))]
+        {
+            // In non-cloud build, token rotation should be blocked
+            assert!(rotation_result.is_err(),
+                "Non-cloud build: External ServiceAccount should be blocked from rotating token");
+            assert_eq!(
+                rotation_result.unwrap_err().to_string(),
+                "Not allowed for external service accounts"
+            );
+        }
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_native_service_account_always_works() {
+        // Test that native ServiceAccounts work in both cloud and non-cloud builds
+        let org_id = "default";
+        let service_account_email = "native-api@example.com";
+        let init_user = "root@example.com";
+        let pwd = "Complexpass#123";
+
+        infra_db::create_table().await.unwrap();
+        infra_table::create_user_tables().await.unwrap();
+        check_and_create_org_without_ofga(org_id).await.unwrap();
+
+        users::create_root_user_if_not_exists(
+            org_id,
+            UserRequest {
+                email: init_user.to_string(),
+                password: pwd.to_string(),
+                role: crate::common::meta::user::UserOrgRole {
+                    base_role: config::meta::user::UserRole::Root,
+                    custom_role: None,
+                },
+                first_name: "root".to_owned(),
+                last_name: "".to_owned(),
+                is_external: false,
+                token: None,
+            },
+        )
+        .await
+        .unwrap();
+
+        // Create native ServiceAccount (is_external: false)
+        users::post_user(
+            org_id,
+            UserRequest {
+                email: service_account_email.to_string(),
+                password: config::utils::rand::generate_random_string(16),
+                role: crate::common::meta::user::UserOrgRole {
+                    base_role: config::meta::user::UserRole::ServiceAccount,
+                    custom_role: None,
+                },
+                first_name: "Native".to_owned(),
+                last_name: "API".to_owned(),
+                is_external: false, // Native ServiceAccount
+                token: None,
+            },
+            init_user,
+        )
+        .await
+        .unwrap();
+
+        // Native ServiceAccounts should work in both cloud and non-cloud builds
+        let passcode_result = get_passcode(Some(org_id), service_account_email).await;
+        assert!(passcode_result.is_ok(),
+            "Native ServiceAccount should work in both cloud and non-cloud builds");
+
+        let passcode = passcode_result.unwrap();
+        assert!(!passcode.passcode.is_empty());
+
+        // Token rotation should also work
+        let rotation_result = update_passcode(Some(org_id), service_account_email).await;
+        assert!(rotation_result.is_ok(),
+            "Native ServiceAccount token rotation should work in both builds");
+
+        let new_passcode = rotation_result.unwrap();
+        assert_ne!(new_passcode.passcode, passcode.passcode,
+            "Token should be different after rotation");
     }
 }
