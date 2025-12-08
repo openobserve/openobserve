@@ -927,8 +927,22 @@ export default defineComponent({
 
       const formattedSpanMap: any = {};
 
-      spanList.value.forEach((spanData: any) => {
-        formattedSpanMap[spanData.span_id] = getFormattedSpan(spanData);
+      spanList.value.forEach((spanData: any, idx: number) => {
+        // Validate span data before processing
+        const validation = validateSpan(spanData);
+        if (!validation.valid) {
+          console.warn(
+            `Span has missing required fields: ${validation.missing.join(", ")}. Span data:`,
+            spanData,
+          );
+        }
+
+        const formattedSpan = getFormattedSpan(spanData);
+        const spanId =
+          spanData.span_id ||
+          formattedSpan.spanId ||
+          `span_${idx}_${Date.now()}`;
+        formattedSpanMap[spanId] = formattedSpan;
       });
 
       for (let i = 0; i < spanList.value.length; i++) {
@@ -959,6 +973,7 @@ export default defineComponent({
           parentSpan.spans.push(span);
         }
       }
+      
 
       // Purposely converting to microseconds to avoid floating point precision issues
       // In updateChart method, we are using start and end time to set the time range of trace
@@ -1083,24 +1098,50 @@ export default defineComponent({
       );
     };
 
+    // Validate required span fields
+    const validateSpan = (span: any): { valid: boolean; missing: string[] } => {
+      const requiredFields = [
+        "start_time",
+        "end_time",
+        "duration",
+        "operation_name",
+        "service_name",
+        "trace_id",
+        "span_id",
+      ];
+
+      const missing: string[] = [];
+
+      requiredFields.forEach((field) => {
+        if (span[field] === undefined || span[field] === null) {
+          missing.push(field);
+        }
+      });
+
+      return {
+        valid: missing.length === 0,
+        missing,
+      };
+    };
+
     // Convert span object to required format
     // Converting ns to ms
     const getFormattedSpan = (span: any) => {
       return {
         [store.state.zoConfig.timestamp_column]:
           span[store.state.zoConfig.timestamp_column],
-        startTimeUs: convertTimeFromNsToUs(span.start_time),
-        endTimeUs: convertTimeFromNsToUs(span.end_time),
-        durationMs: Number((span.duration / 1000).toFixed(4)), // This key is standard, we use for calculating width of span block. This should always be in ms
-        durationUs: Number(span.duration.toFixed(4)), // This key is used for displaying duration in span block. We convert this us to ms, s in span block
-        idleMs: convertTime(span.idle_ns),
-        busyMs: convertTime(span.busy_ns),
-        spanId: span.span_id,
-        operationName: span.operation_name,
-        serviceName: span.service_name,
-        spanStatus: span.span_status,
-        spanKind: getSpanKind(span.span_kind.toString()),
-        parentId: span.reference_parent_span_id,
+        startTimeMs: convertTimeFromNsToMs(span.start_time),
+        endTimeMs: convertTimeFromNsToMs(span.end_time),
+        durationMs: span?.duration ? Number((span?.duration / 1000).toFixed(4)) : 0, // This key is standard, we use for calculating width of span block. This should always be in ms
+        durationUs: span?.duration ? Number(span?.duration?.toFixed(4)) : 0, // This key is used for displaying duration in span block. We convert this us to ms, s in span block
+        idleMs: span.idle_ns ? convertTime(span.idle_ns) : 0,
+        busyMs: span.busy_ns ? convertTime(span.busy_ns) : 0,
+        spanId: span.span_id || `generated_${Date.now()}_${Math.random()}`,
+        operationName: span.operation_name || "Unknown Operation",
+        serviceName: span.service_name || "Unknown Service",
+        spanStatus: span.span_status || "UNSET",
+        spanKind: getSpanKind(span.span_kind),
+        parentId: span.reference_parent_span_id || "",
         spans: [],
         index: 0,
         style: {
@@ -1127,15 +1168,24 @@ export default defineComponent({
       return date.getTime();
     };
 
-    const getSpanKind = (spanKind: string) => {
+    const getSpanKind = (spanKind: string | null | undefined): string => {
+      // Handle missing or invalid span_kind
+      if (spanKind === null || spanKind === undefined || spanKind === "") {
+        return "Unspecified";
+      }
+
+      const kindStr = String(spanKind);
+
       const spanKindMapping: { [key: string]: string } = {
+        "0": "Unspecified",
         "1": "Client",
         "2": "Server",
         "3": "Producer",
         "4": "Consumer",
         "5": "Internal",
       };
-      return spanKindMapping[spanKind];
+
+      return spanKindMapping[kindStr] || "Unknown";
     };
 
     const closeSidebar = () => {
@@ -1391,6 +1441,12 @@ export default defineComponent({
       updateHeight,
       getSpanKind,
       adjustOpacity,
+      buildTracesTree,
+      getFormattedSpan,
+      buildTraceChart,
+      validateSpan,
+      calculateTracePosition,
+      buildServiceTree,
     };
   },
 });
