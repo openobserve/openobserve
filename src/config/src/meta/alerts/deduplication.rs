@@ -399,6 +399,22 @@ pub struct GlobalDeduplicationConfig {
     /// Can be overridden per-alert.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time_window_minutes: Option<i64>,
+
+    /// FQN (Fully Qualified Name) priority dimensions for service correlation
+    ///
+    /// Defines which semantic dimensions are used to derive the service-fqn,
+    /// in priority order. The first dimension with a value wins.
+    ///
+    /// Default priority (if empty):
+    /// 1. k8s-deployment, k8s-statefulset, k8s-daemonset, k8s-job (K8s workloads)
+    /// 2. aws-ecs-task, faas-name, gcp-cloud-run, azure-cloud-role (Cloud workloads)
+    /// 3. process-name (Bare metal)
+    /// 4. service (Fallback)
+    ///
+    /// Example custom priority: ["k8s-deployment", "aws-ecs-task", "service"]
+    /// This would skip statefulset/daemonset and use deployment directly.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fqn_priority_dimensions: Vec<String>,
 }
 
 /// Per-alert deduplication configuration (from main branch)
@@ -600,7 +616,33 @@ impl GlobalDeduplicationConfig {
             alert_dedup_enabled: false,
             alert_fingerprint_groups: vec![],
             time_window_minutes: None,
+            fqn_priority_dimensions: Self::default_fqn_priority(),
         }
+    }
+
+    /// Get default FQN priority dimensions
+    ///
+    /// This defines the order in which dimensions are checked to derive service-fqn.
+    /// The first dimension with a value wins.
+    pub fn default_fqn_priority() -> Vec<String> {
+        vec![
+            // K8s workloads (most specific for K8s)
+            "k8s-deployment".to_string(),
+            "k8s-statefulset".to_string(),
+            "k8s-daemonset".to_string(),
+            "k8s-job".to_string(),
+            // AWS workloads
+            "aws-ecs-task".to_string(),
+            "faas-name".to_string(),
+            // GCP workloads
+            "gcp-cloud-run".to_string(),
+            // Azure workloads
+            "azure-cloud-role".to_string(),
+            // Bare metal
+            "process-name".to_string(),
+            // Fallback
+            "service".to_string(),
+        ]
     }
 
     /// Map a field name to its semantic group ID

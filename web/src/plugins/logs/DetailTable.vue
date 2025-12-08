@@ -309,6 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :source-stream="correlationProps.sourceStream"
           :source-type="correlationProps.sourceType"
           :available-dimensions="correlationProps.availableDimensions"
+          :fts-fields="correlationProps.ftsFields"
           :time-range="correlationProps.timeRange"
           @close="tab = 'json'"
         />
@@ -335,6 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :source-stream="correlationProps.sourceStream"
           :source-type="correlationProps.sourceType"
           :available-dimensions="correlationProps.availableDimensions"
+          :fts-fields="correlationProps.ftsFields"
           :time-range="correlationProps.timeRange"
           @close="tab = 'json'"
         />
@@ -361,6 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :source-stream="correlationProps.sourceStream"
           :source-type="correlationProps.sourceType"
           :available-dimensions="correlationProps.availableDimensions"
+          :fts-fields="correlationProps.ftsFields"
           :time-range="correlationProps.timeRange"
           @close="tab = 'json'"
         />

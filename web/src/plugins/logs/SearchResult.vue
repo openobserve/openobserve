@@ -423,6 +423,7 @@ color="warning" size="xs"></q-icon> Error while
       :source-stream="correlationDashboardProps.sourceStream"
       :source-type="correlationDashboardProps.sourceType"
       :available-dimensions="correlationDashboardProps.availableDimensions"
+      :fts-fields="correlationDashboardProps.ftsFields"
       :time-range="correlationDashboardProps.timeRange"
       @close="showCorrelation = false"
     />
@@ -971,6 +972,11 @@ export default defineComponent({
           return;
         }
 
+        // Extract FTS fields from stream settings
+        const ftsFields = searchObj.data.stream.selectedStreamFields
+          ?.filter((field: any) => field.ftsKey === true)
+          .map((field: any) => field.name) || [];
+
         correlationDashboardProps.value = {
           serviceName: result.correlationData.service_name,
           matchedDimensions: result.correlationData.matched_dimensions,
@@ -980,6 +986,7 @@ export default defineComponent({
           sourceStream: searchObj.data.stream.selectedStream[0],
           sourceType: "logs",
           availableDimensions: context.fields, // Actual field names from the log record
+          ftsFields: ftsFields, // Full text search fields for trace_id extraction from log body
           timeRange: {
             startTime: startTimeMicros,
             endTime: endTimeMicros,

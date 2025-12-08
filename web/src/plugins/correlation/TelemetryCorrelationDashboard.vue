@@ -208,13 +208,195 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Traces Tab Panel -->
         <q-tab-panel name="traces" class="tw-p-0">
-          <div class="tw-h-full tw-flex tw-items-center tw-justify-center tw-py-20">
-            <div class="tw-text-center">
-              <q-icon name="account_tree" size="3.75rem" color="grey-6" class="tw-mb-4" />
-              <div class="tw-text-base">{{ t('correlation.tracesPlaceholder') }}</div>
-              <div class="tw-text-sm tw-text-gray-500 tw-mt-2">
-                {{ t('correlation.correlatedTracesFor', { service: serviceName }) }}
+          <!-- Loading State -->
+          <div
+            v-if="tracesLoading"
+            class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
+          >
+            <q-spinner-hourglass color="primary" size="3.75rem" class="tw-mb-4" />
+            <div class="tw-text-base">{{ t('correlation.loadingTraces') }}</div>
+          </div>
+
+          <!-- Error State -->
+          <div
+            v-else-if="tracesError"
+            class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
+          >
+            <q-icon name="error_outline" size="3.75rem" color="negative" class="tw-mb-4" />
+            <div class="tw-text-base tw-mb-2">{{ t('correlation.tracesError') }}</div>
+            <div class="tw-text-sm tw-text-gray-500">{{ tracesError }}</div>
+            <q-btn
+              outline
+              color="primary"
+              :label="t('correlation.retryButton')"
+              class="tw-mt-4"
+              @click="loadCorrelatedTraces"
+            />
+          </div>
+
+          <!-- Direct Trace Correlation - Full Span List -->
+          <div v-else-if="traceCorrelationMode === 'direct' && traceSpanList.length > 0" class="tw-h-full">
+            <!-- Trace Header -->
+            <div class="tw-p-3 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-bg-white">
+              <div class="tw-flex tw-items-center tw-gap-3">
+                <q-icon name="link" color="positive" size="1.25rem" />
+                <div class="tw-flex tw-flex-col">
+                  <span class="tw-text-sm tw-font-semibold">{{ t('correlation.directTraceMatch') }}</span>
+                  <span class="tw-text-xs tw-text-gray-500 tw-font-mono">{{ extractedTraceId }}</span>
+                </div>
+                <q-chip dense color="primary" text-color="white" class="tw-ml-auto">
+                  {{ traceSpanList.length }} {{ t('correlation.spans') }}
+                </q-chip>
               </div>
+            </div>
+
+            <!-- Span Table -->
+            <div class="tw-p-3 tw-overflow-auto" style="max-height: calc(100% - 4rem)">
+              <q-table
+                :rows="traceSpanList"
+                :columns="spanTableColumns"
+                row-key="span_id"
+                flat
+                dense
+                :rows-per-page-options="[0]"
+                class="trace-span-table"
+              >
+                <template v-slot:body-cell-service_name="props">
+                  <q-td :props="props">
+                    <div class="tw-flex tw-items-center tw-gap-2">
+                      <div
+                        class="tw-w-2 tw-h-2 tw-rounded-full"
+                        :style="{ backgroundColor: getServiceColor(props.row.service_name) }"
+                      />
+                      <span class="tw-font-mono tw-text-xs">{{ props.row.service_name }}</span>
+                    </div>
+                  </q-td>
+                </template>
+                <template v-slot:body-cell-operation_name="props">
+                  <q-td :props="props">
+                    <span class="tw-font-mono tw-text-xs">{{ props.row.operation_name }}</span>
+                  </q-td>
+                </template>
+                <template v-slot:body-cell-duration="props">
+                  <q-td :props="props">
+                    <span class="tw-font-mono tw-text-xs">{{ formatDuration(props.row.duration || 0) }}</span>
+                  </q-td>
+                </template>
+                <template v-slot:body-cell-span_status="props">
+                  <q-td :props="props">
+                    <q-badge
+                      :color="props.row.span_status === 'ERROR' ? 'negative' : 'positive'"
+                      :label="props.row.span_status || 'OK'"
+                    />
+                  </q-td>
+                </template>
+                <template v-slot:body-cell-start_time="props">
+                  <q-td :props="props">
+                    <span class="tw-font-mono tw-text-xs">{{ formatTimestamp(props.row.start_time) }}</span>
+                  </q-td>
+                </template>
+              </q-table>
+            </div>
+          </div>
+
+          <!-- Dimension-based Correlation - Traces List -->
+          <div v-else-if="traceCorrelationMode === 'dimension-based' && tracesForDimensions.length > 0" class="tw-h-full">
+            <!-- Header -->
+            <div class="tw-p-3 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-bg-white">
+              <div class="tw-flex tw-items-center tw-gap-3">
+                <q-icon name="hub" color="primary" size="1.25rem" />
+                <div class="tw-flex tw-flex-col">
+                  <span class="tw-text-sm tw-font-semibold">{{ t('correlation.dimensionBasedCorrelation') }}</span>
+                  <span class="tw-text-xs tw-text-gray-500">{{ t('correlation.tracesFromService', { service: serviceName }) }}</span>
+                </div>
+                <q-chip dense color="primary" text-color="white" class="tw-ml-auto">
+                  {{ tracesForDimensions.length }} {{ t('menu.traces') }}
+                </q-chip>
+              </div>
+            </div>
+
+            <!-- Traces Table -->
+            <div class="tw-p-3 tw-overflow-auto" style="max-height: calc(100% - 4rem)">
+              <q-table
+                :rows="tracesForDimensions"
+                :columns="traceListColumns"
+                row-key="trace_id"
+                flat
+                dense
+                :rows-per-page-options="[0]"
+                class="trace-list-table"
+              >
+                <template v-slot:body-cell-trace_id="props">
+                  <q-td :props="props">
+                    <span class="tw-font-mono tw-text-xs tw-text-primary tw-cursor-pointer hover:tw-underline">
+                      {{ props.row.trace_id?.substring(0, 16) }}...
+                    </span>
+                  </q-td>
+                </template>
+                <template v-slot:body-cell-service_name="props">
+                  <q-td :props="props">
+                    <span class="tw-font-mono tw-text-xs">
+                      {{ Array.isArray(props.row.service_name) ? props.row.service_name.map((s: any) => s.service_name).join(', ') : props.row.service_name }}
+                    </span>
+                  </q-td>
+                </template>
+                <template v-slot:body-cell-operation_name="props">
+                  <q-td :props="props">
+                    <span class="tw-font-mono tw-text-xs">
+                      {{ Array.isArray(props.row.operation_name) ? props.row.operation_name[0] : props.row.operation_name }}
+                    </span>
+                  </q-td>
+                </template>
+                <template v-slot:body-cell-duration="props">
+                  <q-td :props="props">
+                    <span class="tw-font-mono tw-text-xs">{{ formatDuration(props.row.duration || 0) }}</span>
+                  </q-td>
+                </template>
+                <template v-slot:body-cell-spans="props">
+                  <q-td :props="props">
+                    <span class="tw-font-mono tw-text-xs">
+                      {{ Array.isArray(props.row.spans) ? props.row.spans[0] : props.row.spans }}
+                    </span>
+                  </q-td>
+                </template>
+                <template v-slot:body-cell-errors="props">
+                  <q-td :props="props">
+                    <q-badge
+                      :color="(Array.isArray(props.row.spans) ? props.row.spans[1] : 0) > 0 ? 'negative' : 'grey'"
+                      :label="Array.isArray(props.row.spans) ? props.row.spans[1] : 0"
+                    />
+                  </q-td>
+                </template>
+                <template v-slot:body-cell-start_time="props">
+                  <q-td :props="props">
+                    <span class="tw-font-mono tw-text-xs">{{ formatTimestamp(props.row.start_time) }}</span>
+                  </q-td>
+                </template>
+              </q-table>
+            </div>
+          </div>
+
+          <!-- No Traces Found State -->
+          <div
+            v-else-if="traceCorrelationMode !== null"
+            class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
+          >
+            <q-icon name="search_off" size="3.75rem" color="grey-6" class="tw-mb-4" />
+            <div class="tw-text-base">{{ t('correlation.noTracesFound') }}</div>
+            <div class="tw-text-sm tw-text-gray-500 tw-mt-2">
+              {{ t('correlation.noTracesDescription', { service: serviceName }) }}
+            </div>
+          </div>
+
+          <!-- Initial State (waiting for tab to be shown) -->
+          <div
+            v-else
+            class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
+          >
+            <q-icon name="account_tree" size="3.75rem" color="grey-6" class="tw-mb-4" />
+            <div class="tw-text-base">{{ t('correlation.correlatedTraces') }}</div>
+            <div class="tw-text-sm tw-text-gray-500 tw-mt-2">
+              {{ t('correlation.correlatedTracesFor', { service: serviceName }) }}
             </div>
           </div>
         </q-tab-panel>
@@ -297,12 +479,197 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-tab-panel>
 
       <q-tab-panel name="traces" class="tw-p-0">
-        <div class="tw-h-full tw-flex tw-items-center tw-justify-center tw-py-20">
-          <div class="tw-text-center">
-            <q-icon name="account_tree" size="3.75rem" color="grey-6" class="tw-mb-4" />
-            <div class="tw-text-base">{{ t('correlation.tracesPlaceholder') }}</div>
+          <!-- Loading State -->
+          <div
+            v-if="tracesLoading"
+            class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
+          >
+            <q-spinner-hourglass color="primary" size="3.75rem" class="tw-mb-4" />
+            <div class="tw-text-base">{{ t('correlation.loadingTraces') }}</div>
           </div>
-        </div>
+
+          <!-- Error State -->
+          <div
+            v-else-if="tracesError"
+            class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
+          >
+            <q-icon name="error_outline" size="3.75rem" color="negative" class="tw-mb-4" />
+            <div class="tw-text-base tw-mb-2">{{ t('correlation.tracesError') }}</div>
+            <div class="tw-text-sm tw-text-gray-500">{{ tracesError }}</div>
+            <q-btn
+              outline
+              color="primary"
+              :label="t('correlation.retryButton')"
+              class="tw-mt-4"
+              @click="loadCorrelatedTraces"
+            />
+          </div>
+
+          <!-- Direct Trace Correlation - Full Span List -->
+          <div v-else-if="traceCorrelationMode === 'direct' && traceSpanList.length > 0" class="tw-h-full">
+            <!-- Trace Header -->
+            <div class="tw-p-3 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-bg-white">
+              <div class="tw-flex tw-items-center tw-gap-3">
+                <q-icon name="link" color="positive" size="1.25rem" />
+                <div class="tw-flex tw-flex-col">
+                  <span class="tw-text-sm tw-font-semibold">{{ t('correlation.directTraceMatch') }}</span>
+                  <span class="tw-text-xs tw-text-gray-500 tw-font-mono">{{ extractedTraceId }}</span>
+                </div>
+                <q-chip dense color="primary" text-color="white" class="tw-ml-auto">
+                  {{ traceSpanList.length }} {{ t('correlation.spans') }}
+                </q-chip>
+              </div>
+            </div>
+
+            <!-- Span Table -->
+            <div class="tw-p-3 tw-overflow-auto" style="max-height: calc(100% - 4rem)">
+              <q-table
+                :rows="traceSpanList"
+                :columns="spanTableColumns"
+                row-key="span_id"
+                flat
+                dense
+                :rows-per-page-options="[0]"
+                class="trace-span-table"
+              >
+                <template v-slot:body-cell-service_name="props">
+                  <q-td :props="props">
+                    <div class="tw-flex tw-items-center tw-gap-2">
+                      <div
+                        class="tw-w-2 tw-h-2 tw-rounded-full"
+                        :style="{ backgroundColor: getServiceColor(props.row.service_name) }"
+                      />
+                      <span class="tw-font-mono tw-text-xs">{{ props.row.service_name }}</span>
+                    </div>
+                  </q-td>
+                </template>
+                <template v-slot:body-cell-operation_name="props">
+                  <q-td :props="props">
+                    <span class="tw-font-mono tw-text-xs">{{ props.row.operation_name }}</span>
+                  </q-td>
+                </template>
+                <template v-slot:body-cell-duration="props">
+                  <q-td :props="props">
+                    <span class="tw-font-mono tw-text-xs">{{ formatDuration(props.row.duration || 0) }}</span>
+                  </q-td>
+                </template>
+                <template v-slot:body-cell-span_status="props">
+                  <q-td :props="props">
+                    <q-badge
+                      :color="props.row.span_status === 'ERROR' ? 'negative' : 'positive'"
+                      :label="props.row.span_status || 'OK'"
+                    />
+                  </q-td>
+                </template>
+                <template v-slot:body-cell-start_time="props">
+                  <q-td :props="props">
+                    <span class="tw-font-mono tw-text-xs">{{ formatTimestamp(props.row.start_time) }}</span>
+                  </q-td>
+                </template>
+              </q-table>
+            </div>
+          </div>
+
+          <!-- Dimension-based Correlation - Traces List -->
+          <div v-else-if="traceCorrelationMode === 'dimension-based' && tracesForDimensions.length > 0" class="tw-h-full">
+            <!-- Header -->
+            <div class="tw-p-3 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-bg-white">
+              <div class="tw-flex tw-items-center tw-gap-3">
+                <q-icon name="hub" color="primary" size="1.25rem" />
+                <div class="tw-flex tw-flex-col">
+                  <span class="tw-text-sm tw-font-semibold">{{ t('correlation.dimensionBasedCorrelation') }}</span>
+                  <span class="tw-text-xs tw-text-gray-500">{{ t('correlation.tracesFromService', { service: serviceName }) }}</span>
+                </div>
+                <q-chip dense color="primary" text-color="white" class="tw-ml-auto">
+                  {{ tracesForDimensions.length }} {{ t('menu.traces') }}
+                </q-chip>
+              </div>
+            </div>
+
+            <!-- Traces Table -->
+            <div class="tw-p-3 tw-overflow-auto" style="max-height: calc(100% - 4rem)">
+              <q-table
+                :rows="tracesForDimensions"
+                :columns="traceListColumns"
+                row-key="trace_id"
+                flat
+                dense
+                :rows-per-page-options="[0]"
+                class="trace-list-table"
+              >
+                <template v-slot:body-cell-trace_id="props">
+                  <q-td :props="props">
+                    <span class="tw-font-mono tw-text-xs tw-text-primary tw-cursor-pointer hover:tw-underline">
+                      {{ props.row.trace_id?.substring(0, 16) }}...
+                    </span>
+                  </q-td>
+                </template>
+                <template v-slot:body-cell-service_name="props">
+                  <q-td :props="props">
+                    <span class="tw-font-mono tw-text-xs">
+                      {{ Array.isArray(props.row.service_name) ? props.row.service_name.map((s: any) => s.service_name).join(', ') : props.row.service_name }}
+                    </span>
+                  </q-td>
+                </template>
+                <template v-slot:body-cell-operation_name="props">
+                  <q-td :props="props">
+                    <span class="tw-font-mono tw-text-xs">
+                      {{ Array.isArray(props.row.operation_name) ? props.row.operation_name[0] : props.row.operation_name }}
+                    </span>
+                  </q-td>
+                </template>
+                <template v-slot:body-cell-duration="props">
+                  <q-td :props="props">
+                    <span class="tw-font-mono tw-text-xs">{{ formatDuration(props.row.duration || 0) }}</span>
+                  </q-td>
+                </template>
+                <template v-slot:body-cell-spans="props">
+                  <q-td :props="props">
+                    <span class="tw-font-mono tw-text-xs">
+                      {{ Array.isArray(props.row.spans) ? props.row.spans[0] : props.row.spans }}
+                    </span>
+                  </q-td>
+                </template>
+                <template v-slot:body-cell-errors="props">
+                  <q-td :props="props">
+                    <q-badge
+                      :color="(Array.isArray(props.row.spans) ? props.row.spans[1] : 0) > 0 ? 'negative' : 'grey'"
+                      :label="Array.isArray(props.row.spans) ? props.row.spans[1] : 0"
+                    />
+                  </q-td>
+                </template>
+                <template v-slot:body-cell-start_time="props">
+                  <q-td :props="props">
+                    <span class="tw-font-mono tw-text-xs">{{ formatTimestamp(props.row.start_time) }}</span>
+                  </q-td>
+                </template>
+              </q-table>
+            </div>
+          </div>
+
+          <!-- No Traces Found State -->
+          <div
+            v-else-if="traceCorrelationMode !== null"
+            class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
+          >
+            <q-icon name="search_off" size="3.75rem" color="grey-6" class="tw-mb-4" />
+            <div class="tw-text-base">{{ t('correlation.noTracesFound') }}</div>
+            <div class="tw-text-sm tw-text-gray-500 tw-mt-2">
+              {{ t('correlation.noTracesDescription', { service: serviceName }) }}
+            </div>
+          </div>
+
+          <!-- Initial State (waiting for tab to be shown) -->
+          <div
+            v-else
+            class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
+          >
+            <q-icon name="account_tree" size="3.75rem" color="grey-6" class="tw-mb-4" />
+            <div class="tw-text-base">{{ t('correlation.correlatedTraces') }}</div>
+            <div class="tw-text-sm tw-text-gray-500 tw-mt-2">
+              {{ t('correlation.correlatedTracesFor', { service: serviceName }) }}
+            </div>
+          </div>
       </q-tab-panel>
     </q-tab-panels>
   </div>
@@ -378,6 +745,8 @@ import { useMetricsCorrelationDashboard, type MetricsCorrelationConfig } from "@
 import type { StreamInfo } from "@/services/service_streams";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import streamService from "@/services/stream";
+import searchService from "@/services/search";
+import { b64EncodeUnicode } from "@/utils/zincutils";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue")
@@ -398,6 +767,7 @@ interface Props {
   sourceStream?: string; // The original stream user was viewing (e.g., logs stream)
   sourceType?: string; // The type of source stream (logs/metrics/traces)
   availableDimensions?: Record<string, string>; // Actual field names from source (for fallback queries)
+  ftsFields?: string[]; // Full text search fields from the source stream (used for trace_id extraction from log body)
   mode?: 'dialog' | 'embedded-tabs'; // Render mode: 'dialog' = full dialog, 'embedded-tabs' = just tabs content for DetailTable
   externalActiveTab?: string; // For embedded-tabs mode, allows parent to control active tab
 }
@@ -435,6 +805,47 @@ const dashboardRenderKey = ref(0);
 const logsDashboardRenderKey = ref(0);
 const showMetricSelector = ref(false);
 const metricSearchText = ref("");
+
+// Trace correlation state
+const tracesLoading = ref(false);
+const tracesError = ref<string | null>(null);
+const extractedTraceId = ref<string | null>(null);
+const traceCorrelationMode = ref<'direct' | 'dimension-based' | null>(null);
+const traceSpanList = ref<any[]>([]);
+const tracesForDimensions = ref<any[]>([]); // Traces found via dimension-based correlation
+
+// Table columns for span list (direct trace correlation)
+const spanTableColumns = [
+  { name: 'service_name', label: 'Service', field: 'service_name', align: 'left' as const, sortable: true },
+  { name: 'operation_name', label: 'Operation', field: 'operation_name', align: 'left' as const, sortable: true },
+  { name: 'duration', label: 'Duration', field: 'duration', align: 'left' as const, sortable: true },
+  { name: 'span_status', label: 'Status', field: 'span_status', align: 'left' as const, sortable: true },
+  { name: 'start_time', label: 'Start Time', field: 'start_time', align: 'left' as const, sortable: true },
+];
+
+// Table columns for trace list (dimension-based correlation)
+const traceListColumns = [
+  { name: 'trace_id', label: 'Trace ID', field: 'trace_id', align: 'left' as const },
+  { name: 'service_name', label: 'Service', field: 'service_name', align: 'left' as const },
+  { name: 'operation_name', label: 'Operation', field: 'operation_name', align: 'left' as const },
+  { name: 'duration', label: 'Duration', field: 'duration', align: 'left' as const, sortable: true },
+  { name: 'spans', label: 'Spans', field: 'spans', align: 'left' as const },
+  { name: 'errors', label: 'Errors', field: 'errors', align: 'left' as const },
+  { name: 'start_time', label: 'Time', field: 'start_time', align: 'left' as const, sortable: true },
+];
+
+// Service colors for span visualization
+const serviceColors: Record<string, string> = {};
+const colorPalette = ["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2", "#ff6b6b", "#4ecdc4", "#45b7d1", "#96ceb4", "#ffeaa7"];
+let colorIndex = 0;
+
+const getServiceColor = (serviceName: string): string => {
+  if (!serviceColors[serviceName]) {
+    serviceColors[serviceName] = colorPalette[colorIndex % colorPalette.length];
+    colorIndex++;
+  }
+  return serviceColors[serviceName];
+};
 
 // Use external tab control in embedded mode, otherwise manage internally
 const activeTab = computed({
@@ -730,6 +1141,429 @@ const formatTimeRange = (range: TimeRange) => {
 
   return `${formatTime(startDate)} - ${formatTime(endDate)} (${durationMinutes} min)`;
 };
+
+// ============= TRACE CORRELATION FUNCTIONS =============
+
+/**
+ * Derive all possible field name variations from a base field name
+ * For example, "trace_id" -> ["trace_id", "traceId", "traceid", "trace-id", "TraceId", "TRACE_ID", etc.]
+ */
+const deriveFieldNameVariations = (baseFieldName: string): string[] => {
+  const variations = new Set<string>();
+
+  // Add the original
+  variations.add(baseFieldName);
+
+  // Normalize to get base words (split by _, -, or camelCase)
+  const words = baseFieldName
+    .replace(/([a-z])([A-Z])/g, '$1_$2') // camelCase to snake_case
+    .replace(/-/g, '_') // kebab to snake
+    .toLowerCase()
+    .split('_')
+    .filter(w => w.length > 0);
+
+  if (words.length > 0) {
+    // snake_case: trace_id
+    variations.add(words.join('_'));
+
+    // UPPER_SNAKE_CASE: TRACE_ID
+    variations.add(words.join('_').toUpperCase());
+
+    // kebab-case: trace-id
+    variations.add(words.join('-'));
+
+    // camelCase: traceId
+    const camelCase = words[0] + words.slice(1).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('');
+    variations.add(camelCase);
+
+    // PascalCase: TraceId
+    const pascalCase = words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('');
+    variations.add(pascalCase);
+
+    // lowercase: traceid
+    variations.add(words.join(''));
+
+    // UPPERCASE: TRACEID
+    variations.add(words.join('').toUpperCase());
+  }
+
+  return Array.from(variations);
+};
+
+/**
+ * Build regex patterns for extracting trace_id from text content
+ * Dynamically generates patterns based on the configured field name
+ */
+const buildTraceIdTextPatterns = (fieldName: string): RegExp[] => {
+  const variations = deriveFieldNameVariations(fieldName);
+  const patterns: RegExp[] = [];
+
+  for (const variant of variations) {
+    // Escape special regex characters in the variant
+    const escaped = variant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // Pattern: [field_name abc123...]
+    patterns.push(new RegExp(`\\[${escaped}\\s+([a-fA-F0-9]{16,64})\\]`, 'i'));
+
+    // Pattern: field_name=abc123 or field_name: abc123
+    patterns.push(new RegExp(`${escaped}[=:]\\s*["']?([a-fA-F0-9]{16,64})["']?`, 'i'));
+
+    // Pattern: "field_name": "abc123" (JSON)
+    patterns.push(new RegExp(`"${escaped}"\\s*:\\s*"([a-fA-F0-9]{16,64})"`, 'i'));
+  }
+
+  return patterns;
+};
+
+/**
+ * Extract trace_id from text content (like log body/message)
+ * Uses dynamically generated patterns based on the configured trace_id_field_name
+ */
+const extractTraceIdFromText = (text: string): string | null => {
+  if (!text || typeof text !== 'string') return null;
+
+  // Get the configured field name, default to 'trace_id'
+  const configuredFieldName = store.state.organizationData?.organizationSettings?.trace_id_field_name || 'trace_id';
+
+  // Build patterns dynamically from the configured field name
+  const patterns = buildTraceIdTextPatterns(configuredFieldName);
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match && match[1] && isValidTraceId(match[1])) {
+      console.log(`[TelemetryCorrelationDashboard] Found trace_id in text via pattern ${pattern.source}:`, match[1]);
+      return match[1];
+    }
+  }
+  return null;
+};
+
+/**
+ * Extract trace_id from the log record
+ * Priority:
+ * 1. Use configured trace_id_field_name from org settings (exact match)
+ * 2. Scan derived field name variations from the configured name (structured fields)
+ * 3. Scan FTS (Full Text Search) fields for embedded trace_id patterns in text content
+ * 4. Fallback: Scan ALL string fields for embedded trace_id patterns
+ */
+const extractTraceIdFromLog = (): string | null => {
+  const logRecord = props.availableDimensions;
+  if (!logRecord) {
+    console.log("[TelemetryCorrelationDashboard] No log record (availableDimensions) provided");
+    return null;
+  }
+
+  console.log("[TelemetryCorrelationDashboard] extractTraceIdFromLog - log record keys:", Object.keys(logRecord));
+
+  // Get the configured field name, default to 'trace_id'
+  const configuredTraceIdField = store.state.organizationData?.organizationSettings?.trace_id_field_name || 'trace_id';
+
+  // 1. First check the exact configured field name
+  if (logRecord[configuredTraceIdField]) {
+    const value = String(logRecord[configuredTraceIdField]);
+    if (isValidTraceId(value)) {
+      console.log(`[TelemetryCorrelationDashboard] Found trace_id via configured field '${configuredTraceIdField}':`, value);
+      return value;
+    }
+  }
+
+  // 2. Derive all field name variations from the configured name and scan them
+  const fieldVariations = deriveFieldNameVariations(configuredTraceIdField);
+  console.log(`[TelemetryCorrelationDashboard] Scanning derived field variations:`, fieldVariations);
+
+  for (const variant of fieldVariations) {
+    // Check exact match
+    if (logRecord[variant]) {
+      const value = String(logRecord[variant]);
+      if (isValidTraceId(value)) {
+        console.log(`[TelemetryCorrelationDashboard] Found trace_id via derived variant '${variant}':`, value);
+        return value;
+      }
+    }
+
+    // Check case-insensitive match against all log record keys
+    const lowerVariant = variant.toLowerCase();
+    for (const [key, val] of Object.entries(logRecord)) {
+      if (key.toLowerCase() === lowerVariant && val) {
+        const value = String(val);
+        if (isValidTraceId(value)) {
+          console.log(`[TelemetryCorrelationDashboard] Found trace_id via case-insensitive match '${key}':`, value);
+          return value;
+        }
+      }
+    }
+  }
+
+  // 3. Scan FTS (Full Text Search) fields for embedded trace_id patterns in text content
+  // Use FTS fields from props if available, otherwise fall back to default FTS fields from config
+  const ftsFieldsToScan = props.ftsFields?.length
+    ? props.ftsFields
+    : (store.state.zoConfig?.default_fts_keys || ['body', 'message', 'log', 'msg']);
+
+  console.log(`[TelemetryCorrelationDashboard] Scanning FTS fields for embedded trace_id:`, ftsFieldsToScan);
+
+  for (const field of ftsFieldsToScan) {
+    // Check exact field name
+    if (logRecord[field]) {
+      const traceId = extractTraceIdFromText(String(logRecord[field]));
+      if (traceId) {
+        console.log(`[TelemetryCorrelationDashboard] Found trace_id embedded in FTS field '${field}':`, traceId);
+        return traceId;
+      }
+    }
+
+    // Check case-insensitive
+    for (const [key, val] of Object.entries(logRecord)) {
+      if (key.toLowerCase() === field.toLowerCase() && val) {
+        const traceId = extractTraceIdFromText(String(val));
+        if (traceId) {
+          console.log(`[TelemetryCorrelationDashboard] Found trace_id embedded in FTS field '${key}':`, traceId);
+          return traceId;
+        }
+      }
+    }
+  }
+
+  // 4. Fallback: Scan ALL string fields for embedded trace_id patterns
+  // This catches cases where trace_id is embedded in non-FTS fields
+  console.log("[TelemetryCorrelationDashboard] FTS fields scan failed, scanning all string fields as fallback");
+  const scannedFields = new Set(ftsFieldsToScan.map(f => f.toLowerCase()));
+
+  for (const [key, val] of Object.entries(logRecord)) {
+    // Skip fields we already scanned and non-string values
+    if (scannedFields.has(key.toLowerCase()) || typeof val !== 'string') continue;
+
+    // Only scan fields that look like they might contain text content
+    const value = String(val);
+    if (value.length > 50) { // Only scan longer strings that might be log messages
+      const traceId = extractTraceIdFromText(value);
+      if (traceId) {
+        console.log(`[TelemetryCorrelationDashboard] Found trace_id embedded in fallback field '${key}':`, traceId);
+        return traceId;
+      }
+    }
+  }
+
+  console.log("[TelemetryCorrelationDashboard] No trace_id found in log record after all scans");
+  return null;
+};
+
+/**
+ * Validate if a string looks like a valid trace ID
+ * Trace IDs are typically 16-32 character hex strings
+ */
+const isValidTraceId = (value: string): boolean => {
+  if (!value || typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  // Valid trace ID: 16-64 hex characters (some systems use 128-bit = 32 chars, some use 64-bit = 16 chars)
+  return /^[a-fA-F0-9]{16,64}$/.test(trimmed);
+};
+
+/**
+ * Fetch full trace details (all spans) for a specific trace_id
+ */
+const fetchTraceByTraceId = async (traceId: string) => {
+  if (!props.traceStreams?.length) {
+    console.log("[TelemetryCorrelationDashboard] No trace streams available");
+    return null;
+  }
+
+  const streamName = props.traceStreams[0].stream_name;
+  console.log(`[TelemetryCorrelationDashboard] Fetching trace ${traceId} from stream ${streamName}`);
+
+  // Use a wider time range when searching by specific trace_id
+  // Since we have an exact trace_id, we can search across a larger window (24 hours before to now)
+  // The log timestamp might not match the trace timestamp exactly
+  const nowMicros = Date.now() * 1000;
+  const oneDayAgoMicros = nowMicros - (24 * 60 * 60 * 1000000); // 24 hours in microseconds
+
+  // Use the wider range: either 24h before now, or props.timeRange.startTime, whichever is earlier
+  const searchStartTime = Math.min(oneDayAgoMicros, props.timeRange.startTime);
+  const searchEndTime = nowMicros; // Always search up to now
+
+  console.log(`[TelemetryCorrelationDashboard] Using extended time range for trace lookup:`, {
+    searchStartTime,
+    searchEndTime,
+    propsStartTime: props.timeRange.startTime,
+    propsEndTime: props.timeRange.endTime
+  });
+
+  // First, get trace metadata to find time range
+  const traceMetaResponse = await searchService.get_traces({
+    org_identifier: currentOrgIdentifier.value,
+    start_time: searchStartTime,
+    end_time: searchEndTime,
+    filter: `trace_id='${traceId}'`,
+    size: 1,
+    from: 0,
+    stream_name: streamName,
+  });
+
+  if (!traceMetaResponse.data?.hits?.length) {
+    console.log("[TelemetryCorrelationDashboard] Trace not found via get_traces");
+    return null;
+  }
+
+  const traceMeta = traceMetaResponse.data.hits[0];
+  const traceStartTime = Math.floor(traceMeta.start_time / 1000) - 10000;
+  const traceEndTime = Math.ceil(traceMeta.end_time / 1000) + 10000;
+
+  // Now fetch all spans for this trace
+  const query = {
+    query: {
+      sql: b64EncodeUnicode(`SELECT * FROM "${streamName}" WHERE trace_id = '${traceId}' ORDER BY start_time`),
+      start_time: traceStartTime,
+      end_time: traceEndTime,
+      from: 0,
+      size: 2500,
+    },
+    encoding: "base64",
+  };
+
+  const spansResponse = await searchService.search(
+    {
+      org_identifier: currentOrgIdentifier.value,
+      query: query,
+      page_type: "traces",
+    },
+    "ui"
+  );
+
+  return {
+    traceMeta,
+    spans: spansResponse.data?.hits || [],
+  };
+};
+
+/**
+ * Fetch traces via dimension-based correlation (service name match)
+ */
+const fetchTracesByDimensions = async () => {
+  if (!props.traceStreams?.length) {
+    console.log("[TelemetryCorrelationDashboard] No trace streams available for dimension-based correlation");
+    return [];
+  }
+
+  const streamName = props.traceStreams[0].stream_name;
+
+  // Build filter from matched dimensions
+  // Try to match on service_name or other common dimensions
+  const filterParts: string[] = [];
+
+  // Check if we have service-related dimensions
+  const serviceKeys = ['service_name', 'service', 'k8s-deployment', 'k8s_deployment'];
+  for (const key of serviceKeys) {
+    const normalizedKey = key.replace(/-/g, '_');
+    if (activeDimensions.value[key]) {
+      filterParts.push(`service_name='${activeDimensions.value[key]}'`);
+      break;
+    } else if (activeDimensions.value[normalizedKey]) {
+      filterParts.push(`service_name='${activeDimensions.value[normalizedKey]}'`);
+      break;
+    }
+  }
+
+  // If no service match, try using the service name from props
+  if (filterParts.length === 0 && props.serviceName) {
+    filterParts.push(`service_name='${props.serviceName}'`);
+  }
+
+  const filter = filterParts.join(' AND ');
+  console.log(`[TelemetryCorrelationDashboard] Fetching traces with filter: ${filter}`);
+
+  const response = await searchService.get_traces({
+    org_identifier: currentOrgIdentifier.value,
+    start_time: props.timeRange.startTime,
+    end_time: props.timeRange.endTime,
+    filter: filter,
+    size: 50,
+    from: 0,
+    stream_name: streamName,
+  });
+
+  return response.data?.hits || [];
+};
+
+/**
+ * Format duration in a human-readable way
+ */
+const formatDuration = (durationNs: number): string => {
+  if (durationNs < 1000) {
+    return `${durationNs}ns`;
+  } else if (durationNs < 1000000) {
+    return `${(durationNs / 1000).toFixed(2)}µs`;
+  } else if (durationNs < 1000000000) {
+    return `${(durationNs / 1000000).toFixed(2)}ms`;
+  } else {
+    return `${(durationNs / 1000000000).toFixed(2)}s`;
+  }
+};
+
+/**
+ * Format timestamp for display
+ */
+const formatTimestamp = (timestampMicros: number): string => {
+  const date = new Date(timestampMicros / 1000);
+  return date.toLocaleString();
+};
+
+/**
+ * Load correlated traces
+ */
+const loadCorrelatedTraces = async () => {
+  if (tracesLoading.value) return;
+
+  tracesLoading.value = true;
+  tracesError.value = null;
+  extractedTraceId.value = null;
+  traceCorrelationMode.value = null;
+  traceSpanList.value = [];
+  tracesForDimensions.value = [];
+
+  try {
+    // Step 1: Try to extract trace_id from the log record
+    const traceId = extractTraceIdFromLog();
+
+    if (traceId) {
+      // Direct trace correlation - fetch full trace
+      extractedTraceId.value = traceId;
+      traceCorrelationMode.value = 'direct';
+
+      const traceData = await fetchTraceByTraceId(traceId);
+      if (traceData && traceData.spans.length > 0) {
+        traceSpanList.value = traceData.spans;
+        console.log(`[TelemetryCorrelationDashboard] Loaded ${traceData.spans.length} spans for trace ${traceId}`);
+      } else {
+        // Trace ID found but no spans - fall back to dimension-based
+        console.log("[TelemetryCorrelationDashboard] Trace not found, falling back to dimension-based");
+        traceCorrelationMode.value = 'dimension-based';
+        tracesForDimensions.value = await fetchTracesByDimensions();
+      }
+    } else {
+      // No trace_id found - use dimension-based correlation
+      traceCorrelationMode.value = 'dimension-based';
+      tracesForDimensions.value = await fetchTracesByDimensions();
+      console.log(`[TelemetryCorrelationDashboard] Loaded ${tracesForDimensions.value.length} traces via dimension correlation`);
+    }
+  } catch (err: any) {
+    console.error("[TelemetryCorrelationDashboard] Error loading traces:", err);
+    tracesError.value = err.message || "Failed to load traces";
+    showErrorNotification(tracesError.value);
+  } finally {
+    tracesLoading.value = false;
+  }
+};
+
+// Load traces when traces tab is shown
+watch(
+  () => activeTab.value,
+  (newTab) => {
+    if (newTab === 'traces' && traceCorrelationMode.value === null && !tracesLoading.value) {
+      loadCorrelatedTraces();
+    }
+  },
+  { immediate: true }
+);
 
 // Load dashboard when modal opens
 watch(

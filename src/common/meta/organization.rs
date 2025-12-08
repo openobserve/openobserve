@@ -280,6 +280,37 @@ fn default_claim_parser_function() -> String {
     "".to_string()
 }
 
+/// Default FQN priority dimensions for service correlation
+///
+/// For enterprise: Uses O2_FQN_PRIORITY_DIMENSIONS env var from ServiceStreamsConfig if set,
+/// otherwise falls back to built-in defaults.
+/// For OSS: Returns built-in defaults.
+fn default_fqn_priority_dimensions() -> Vec<String> {
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+        get_o2_config()
+            .service_streams
+            .get_fqn_priority_dimensions()
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        // OSS built-in defaults
+        vec![
+            "k8s-deployment".to_string(),
+            "k8s-statefulset".to_string(),
+            "k8s-daemonset".to_string(),
+            "k8s-job".to_string(),
+            "aws-ecs-task".to_string(),
+            "faas-name".to_string(),
+            "gcp-cloud-run".to_string(),
+            "azure-cloud-role".to_string(),
+            "process-name".to_string(),
+            "service".to_string(),
+        ]
+    }
+}
+
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
 pub struct OrganizationSettingPayload {
     /// Ideally this should be the same as prometheus-scrape-interval (in
@@ -305,6 +336,9 @@ pub struct OrganizationSettingPayload {
     #[cfg(feature = "enterprise")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub claim_parser_function: Option<String>,
+    /// FQN priority dimensions for service correlation (ordered list)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fqn_priority_dimensions: Option<Vec<String>>,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
@@ -336,6 +370,15 @@ pub struct OrganizationSetting {
     #[cfg(feature = "enterprise")]
     #[serde(default = "default_claim_parser_function")]
     pub claim_parser_function: String,
+    /// FQN (Fully Qualified Name) priority dimensions for service correlation
+    ///
+    /// Defines which dimensions are used to derive the service-fqn, in priority order.
+    /// The first dimension with a value wins.
+    ///
+    /// If None/empty, uses the system default from config:
+    /// k8s-deployment, k8s-statefulset, k8s-daemonset, aws-ecs-task, faas-name, service
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fqn_priority_dimensions: Vec<String>,
 }
 
 impl Default for OrganizationSetting {
@@ -365,6 +408,7 @@ impl Default for OrganizationSetting {
             dark_mode_theme_color,
             #[cfg(feature = "enterprise")]
             claim_parser_function: default_claim_parser_function(),
+            fqn_priority_dimensions: default_fqn_priority_dimensions(),
         }
     }
 }
