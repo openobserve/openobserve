@@ -469,7 +469,17 @@ impl GlobalDeduplicationConfig {
     }
 
     /// Get default FQN priority dimensions
+    ///
+    /// For OSS builds, returns empty (must be configured).
+    /// For enterprise builds, ServiceStreamsConfig provides the full default list.
+    ///
+    /// Default priority order for deriving service-fqn (first match wins):
+    /// 1. K8s workload: deployment, statefulset, daemonset, job
+    /// 2. Cloud workload: ECS task family, Lambda function, Cloud Run service
+    /// 3. Bare metal: process name
+    /// 4. Fallback: service dimension
     pub fn default_fqn_priority() -> Vec<String> {
+        // OSS builds return empty - enterprise provides defaults via ServiceStreamsConfig
         vec![]
     }
 
@@ -613,6 +623,7 @@ mod tests {
             ],
             alert_fingerprint_groups: vec![],
             time_window_minutes: Some(10),
+            fqn_priority_dimensions: vec![],
         };
 
         assert!(config.validate().is_ok());
@@ -684,6 +695,7 @@ mod tests {
             ],
             alert_fingerprint_groups: vec![],
             time_window_minutes: Some(10),
+            fqn_priority_dimensions: vec![],
         };
 
         // Should succeed - overlaps are allowed, just logged as warnings
@@ -701,6 +713,7 @@ mod tests {
             ],
             alert_fingerprint_groups: vec![],
             time_window_minutes: Some(10),
+            fqn_priority_dimensions: vec![],
         };
 
         let json = serde_json::to_string_pretty(&config).unwrap();
