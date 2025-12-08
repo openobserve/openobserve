@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::meta::{
-    alerts::{ConditionList, QueryCondition, TriggerCondition},
+    alerts::{ConditionGroup, ConditionList, QueryCondition, TriggerCondition},
     stream::{RemoteStreamParams, StreamParams, StreamType},
 };
 
@@ -165,9 +165,79 @@ pub struct FunctionParams {
     pub num_args: u8,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
-pub struct ConditionParams {
-    pub conditions: ConditionList,
+#[derive(Debug, Clone, PartialEq, ToSchema)]
+pub enum ConditionParams {
+    /// v1 format: Tree-based ConditionList (default when no version field)
+    V1 { conditions: ConditionList },
+    /// v2 format: Linear ConditionGroup (version: 2)
+    V2 { conditions: ConditionGroup },
+}
+
+// Custom deserializer to handle missing version field (defaults to V1 for backward compatibility)
+impl<'de> Deserialize<'de> for ConditionParams {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Error;
+        use serde_json::Value;
+
+        let value = Value::deserialize(deserializer)?;
+
+        // If version field is missing, default to 1 for backward compatibility
+        let version = value.get("version").and_then(|v| v.as_u64()).unwrap_or(1);
+
+        let Some(conditions) = value.get("conditions") else {
+            return Err(D::Error::missing_field("conditions"));
+        };
+
+        match version {
+            1 => {
+                let conditions: ConditionList = serde_json::from_value(conditions.clone())
+                    .map_err(|e| {
+                        D::Error::custom(format!("Failed to parse v1 conditions: {}", e))
+                    })?;
+                Ok(ConditionParams::V1 { conditions })
+            }
+            2 => {
+                let conditions: ConditionGroup = serde_json::from_value(conditions.clone())
+                    .map_err(|e| {
+                        D::Error::custom(format!("Failed to parse v2 conditions: {}", e))
+                    })?;
+                Ok(ConditionParams::V2 { conditions })
+            }
+            _ => Err(D::Error::custom(format!(
+                "Unsupported version: {}",
+                version
+            ))),
+        }
+    }
+}
+
+// Custom serializer to omit version field for V1 (backward compatibility)
+impl Serialize for ConditionParams {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+
+        match self {
+            ConditionParams::V1 { conditions } => {
+                // V1: Omit version field for backward compatibility
+                let mut state = serializer.serialize_struct("ConditionParams", 1)?;
+                state.serialize_field("conditions", conditions)?;
+                state.end()
+            }
+            ConditionParams::V2 { conditions } => {
+                // V2: Include version field
+                let mut state = serializer.serialize_struct("ConditionParams", 2)?;
+                state.serialize_field("version", &2)?;
+                state.serialize_field("conditions", conditions)?;
+                state.end()
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
@@ -324,5 +394,152 @@ mod tests {
 
         let or_node_data = json::from_value::<NodeData>(or_payload);
         assert!(or_node_data.is_ok());
+    }
+
+    #[test]
+    fn test_condition_node_v2_serialization() {
+        // Test v2 condition format with version field
+        let payload = json::json!({
+            "node_type": "condition",
+            "version": 2,
+            "conditions": {
+                "filterType": "group",
+                "logicalOperator": "AND",
+                "conditions": [
+                    {
+                        "filterType": "condition",
+                        "column": "status",
+                        "operator": "=",
+                        "value": "error",
+                        "logicalOperator": "AND"
+                    },
+                    {
+                        "filterType": "condition",
+                        "column": "level",
+                        "operator": "=",
+                        "value": "critical",
+                        "logicalOperator": "OR"
+                    }
+                ]
+            }
+        });
+
+        let node_data = json::from_value::<NodeData>(payload);
+        assert!(node_data.is_ok());
+
+        // Verify it's V2
+        if let Ok(NodeData::Condition(params)) = node_data {
+            assert!(matches!(params, ConditionParams::V2 { .. }));
+        }
+    }
+
+    #[test]
+    fn test_condition_node_v2_nested_groups() {
+        // Test with nested groups
+        let nested_payload = json::json!({
+            "node_type": "condition",
+            "version": 2,
+            "conditions": {
+                "filterType": "group",
+                "logicalOperator": "AND",
+                "conditions": [
+                    {
+                        "filterType": "condition",
+                        "column": "status",
+                        "operator": "=",
+                        "value": "error",
+                        "logicalOperator": "AND"
+                    },
+                    {
+                        "filterType": "group",
+                        "logicalOperator": "OR",
+                        "conditions": [
+                            {
+                                "filterType": "condition",
+                                "column": "service",
+                                "operator": "=",
+                                "value": "api",
+                                "logicalOperator": "OR"
+                            },
+                            {
+                                "filterType": "condition",
+                                "column": "service",
+                                "operator": "=",
+                                "value": "web",
+                                "logicalOperator": "AND"
+                            }
+                        ],
+                        "logicalOperator": "AND"
+                    }
+                ]
+            }
+        });
+
+        let nested_node_data = json::from_value::<NodeData>(nested_payload);
+        assert!(nested_node_data.is_ok());
+    }
+
+    #[test]
+    fn test_deserialize_v2_nested_condition_nodes() {
+        let json_str = r#"[
+  {
+    "id": "7035edaa-e96c-4114-8b3c-6c77db44418d",
+    "data": {
+      "node_type": "condition",
+      "version": 2,
+      "conditions": {
+        "filterType": "group",
+        "logicalOperator": "AND",
+        "conditions": [
+          {
+            "filterType": "condition",
+            "column": "kubernetes_annotations_prometheus_io_path",
+            "operator": "=",
+            "value": "asdfa",
+            "logicalOperator": "AND"
+          },
+          {
+            "filterType": "group",
+            "logicalOperator": "AND",
+            "conditions": [
+              {
+                "filterType": "condition",
+                "column": "distinct_field_hc_0",
+                "operator": "=",
+                "value": "123",
+                "logicalOperator": "OR"
+              },
+              {
+                "filterType": "condition",
+                "column": "kubernetes_annotations_prometheus_io_path",
+                "operator": "=",
+                "value": "123",
+                "logicalOperator": "AND"
+              }
+            ]
+          },
+          {
+            "filterType": "condition",
+            "column": "kubernetes_container_hash",
+            "operator": "=",
+            "value": "dasfg",
+            "logicalOperator": "AND"
+          }
+        ]
+      }
+    },
+    "position": {
+      "x": 271.25,
+      "y": 335
+    },
+    "io_type": "default"
+  }
+]"#;
+        let result: Result<Vec<Node>, _> = json::from_str(json_str);
+        match &result {
+            Ok(nodes) => println!("✓ Successfully deserialized {} nodes", nodes.len()),
+            Err(e) => println!("✗ Deserialization error: {}", e),
+        }
+        assert!(result.is_ok(), "Failed to deserialize: {:?}", result.err());
     }
 }
