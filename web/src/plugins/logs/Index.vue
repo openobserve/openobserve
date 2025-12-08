@@ -2569,8 +2569,11 @@ export default defineComponent({
         }, 100);
       }
       if (this.searchObj.config.splitterModel > 0) {
+        // Only save if value is >= 1, otherwise reset to default (15)
         this.searchObj.config.lastSplitterPosition =
-          this.searchObj.config.splitterModel;
+          this.searchObj.config.splitterModel >= 1
+            ? this.searchObj.config.splitterModel
+            : 15;
       }
 
       this.searchObj.config.splitterModel = this.searchObj.meta.showFields
