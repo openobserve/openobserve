@@ -48,35 +48,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-subtitle2 q-mb-sm">
               Time Range <span class="text-red-600">*</span>
             </div>
-            <div class="tw-grid tw-grid-cols-2 tw-gap-4">
-              <div>
-                <div class="text-caption q-mb-xs">Start Time</div>
-                <q-input
-                  v-model="formData.startTime"
-                  type="datetime-local"
-                  outlined
-                  dense
-                  :rules="[
-                    (val) => !!val || 'Start time is required',
-                    validateStartTime,
-                  ]"
-                  data-test="start-time-input"
-                />
-              </div>
-              <div>
-                <div class="text-caption q-mb-xs">End Time</div>
-                <q-input
-                  v-model="formData.endTime"
-                  type="datetime-local"
-                  outlined
-                  dense
-                  :rules="[
-                    (val) => !!val || 'End time is required',
-                    validateEndTime,
-                  ]"
-                  data-test="end-time-input"
-                />
-              </div>
+            <date-time
+              ref="dateTimeRef"
+              auto-apply
+              default-type="absolute"
+              @on:date-change="updateDateTime"
+              data-test="time-range-picker"
+              disable-relative
+              min-date="1999/01/01"
+            />
+            <div
+              v-if="formData.startTimeMicros <= 0 || formData.endTimeMicros <= 0"
+              class="text-caption text-red-600 q-mt-xs"
+            >
+              Please select a valid time range
             </div>
           </div>
 
@@ -103,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="number"
                   outlined
                   dense
-                  placeholder="60"
+                  :placeholder="String(scheduleFrequency || 60)"
                   :rules="[(val) => !val || (val >= 1 && val <= 1440) || 'Must be between 1 and 1440']"
                   data-test="chunk-period-input"
                 />
@@ -203,11 +188,13 @@ import { ref, computed, watch } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import backfillService from "../../services/backfill";
+import DateTime from "@/components/DateTime.vue";
 
 interface Props {
   modelValue: boolean;
   pipelineId: string;
   pipelineName: string;
+  scheduleFrequency?: number; // Pipeline schedule frequency in minutes
 }
 
 interface Emits {
@@ -229,39 +216,28 @@ const show = computed({
 const showAdvanced = ref(false);
 const loading = ref(false);
 const errorMessage = ref("");
+const dateTimeRef = ref<InstanceType<typeof DateTime> | null>(null);
 
 const formData = ref({
-  startTime: "",
-  endTime: "",
-  chunkPeriodMinutes: null as number | null,
+  startTimeMicros: 0,
+  endTimeMicros: 0,
+  chunkPeriodMinutes: (props.scheduleFrequency || 60) as number | null,
   delayBetweenChunks: null as number | null,
   deleteBeforeBackfill: false,
 });
 
-// Validation functions
-const validateStartTime = (val: string) => {
-  if (!val) return true;
-  if (!formData.value.endTime) return true;
-  const start = new Date(val);
-  const end = new Date(formData.value.endTime);
-  return start < end || "Start time must be before end time";
-};
-
-const validateEndTime = (val: string) => {
-  if (!val) return true;
-  if (!formData.value.startTime) return true;
-  const start = new Date(formData.value.startTime);
-  const end = new Date(val);
-  return end > start || "End time must be after start time";
+// Handle datetime changes from the DateTime component
+const updateDateTime = (value: any) => {
+  formData.value.startTimeMicros = value.startTime;
+  formData.value.endTimeMicros = value.endTime;
 };
 
 // Calculate estimated processing info
 const estimatedInfo = computed(() => {
-  if (!formData.value.startTime || !formData.value.endTime) return null;
+  if (!formData.value.startTimeMicros || !formData.value.endTimeMicros) return null;
 
-  const start = new Date(formData.value.startTime);
-  const end = new Date(formData.value.endTime);
-  const diffMs = end.getTime() - start.getTime();
+  // Convert microseconds to milliseconds
+  const diffMs = (formData.value.endTimeMicros - formData.value.startTimeMicros) / 1000;
   const diffMinutes = Math.floor(diffMs / (1000 * 60));
 
   if (diffMinutes <= 0) return null;
@@ -294,14 +270,19 @@ watch(
 
 const resetForm = () => {
   formData.value = {
-    startTime: "",
-    endTime: "",
-    chunkPeriodMinutes: null,
+    startTimeMicros: 0,
+    endTimeMicros: 0,
+    chunkPeriodMinutes: (props.scheduleFrequency || 60) as number | null,
     delayBetweenChunks: null,
     deleteBeforeBackfill: false,
   };
   showAdvanced.value = false;
   errorMessage.value = "";
+
+  // Reset the DateTime component to default
+  if (dateTimeRef.value) {
+    dateTimeRef.value.resetTime("", "");
+  }
 };
 
 const onCancel = () => {
@@ -310,17 +291,32 @@ const onCancel = () => {
 };
 
 const onSubmit = async () => {
+  // Validate time range
+  if (formData.value.startTimeMicros <= 0 || formData.value.endTimeMicros <= 0) {
+    $q.notify({
+      type: "negative",
+      message: "Please select a valid time range",
+      timeout: 3000,
+    });
+    return;
+  }
+
+  if (formData.value.startTimeMicros >= formData.value.endTimeMicros) {
+    $q.notify({
+      type: "negative",
+      message: "Start time must be before end time",
+      timeout: 3000,
+    });
+    return;
+  }
+
   errorMessage.value = "";
   loading.value = true;
 
   try {
-    // Convert datetime-local to ISO 8601 format
-    const startTime = new Date(formData.value.startTime).toISOString();
-    const endTime = new Date(formData.value.endTime).toISOString();
-
     const requestData = {
-      start_time: startTime,
-      end_time: endTime,
+      start_time: formData.value.startTimeMicros,
+      end_time: formData.value.endTimeMicros,
       ...(formData.value.chunkPeriodMinutes && {
         chunk_period_minutes: formData.value.chunkPeriodMinutes,
       }),
