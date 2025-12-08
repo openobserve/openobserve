@@ -58,7 +58,7 @@ pub trait TableProvider: Sync + Send + 'static {
         machers: Matchers,
         label_selector: HashSet<String>,
         filters: &mut [(String, Vec<String>)],
-    ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats)>>;
+    ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>>;
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

@@ -39,7 +39,7 @@ use datafusion::{
 use futures::{TryStreamExt, future::try_join_all};
 use hashbrown::{HashMap, HashSet};
 use promql_parser::{
-    label::MatchOp,
+    label::{MatchOp, Matchers},
     parser::{
         AggregateExpr, BinModifier, BinaryExpr, Call, Expr as PromExpr, Function, FunctionArgs,
         LabelModifier, MatrixSelector, NumberLiteral, Offset, ParenExpr, StringLiteral, UnaryExpr,
@@ -594,11 +594,8 @@ impl Engine {
         // 1. Group by metrics (sets of label name-value pairs)
         let table_name = selector.name.as_ref().unwrap();
         log::info!(
-            "[trace_id: {}] loading data for stream: {}, range: [{},{}), filter: {:?}",
+            "[trace_id: {}] loading data for stream: {table_name}, range: [{start},{end}), filter: {:?}",
             self.trace_id,
-            table_name,
-            start,
-            end,
             selector.to_string(),
         );
 
@@ -680,9 +677,12 @@ impl Engine {
         label_selector.extend(self.ctx.label_selector.iter().cloned());
 
         let mut tasks = Vec::with_capacity(ctxs.len());
-        for (ctx, schema, scan_stats) in ctxs {
+        for (ctx, schema, scan_stats, keep_filters) in ctxs {
             let query_ctx = self.ctx.query_ctx.clone();
-            let selector = selector.clone();
+            let mut selector = selector.clone();
+            if !keep_filters {
+                selector.matchers = Matchers::empty();
+            };
             let label_selector = label_selector.clone();
             let task = tokio::time::timeout(
                 Duration::from_secs(self.ctx.query_ctx.timeout),
@@ -3028,6 +3028,7 @@ mod tests {
                 datafusion::prelude::SessionContext,
                 std::sync::Arc<datafusion::arrow::datatypes::Schema>,
                 config::meta::search::ScanStats,
+                bool,
             )>,
         > {
             Ok(vec![])
