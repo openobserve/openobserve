@@ -281,10 +281,6 @@ fn default_claim_parser_function() -> String {
 }
 
 /// Default FQN priority dimensions for service correlation
-///
-/// For enterprise: Uses O2_FQN_PRIORITY_DIMENSIONS env var from ServiceStreamsConfig if set,
-/// otherwise falls back to built-in defaults.
-/// For OSS: Returns built-in defaults.
 fn default_fqn_priority_dimensions() -> Vec<String> {
     #[cfg(feature = "enterprise")]
     {
@@ -295,19 +291,7 @@ fn default_fqn_priority_dimensions() -> Vec<String> {
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        // OSS built-in defaults
-        vec![
-            "k8s-deployment".to_string(),
-            "k8s-statefulset".to_string(),
-            "k8s-daemonset".to_string(),
-            "k8s-job".to_string(),
-            "aws-ecs-task".to_string(),
-            "faas-name".to_string(),
-            "gcp-cloud-run".to_string(),
-            "azure-cloud-role".to_string(),
-            "process-name".to_string(),
-            "service".to_string(),
-        ]
+        vec![]
     }
 }
 

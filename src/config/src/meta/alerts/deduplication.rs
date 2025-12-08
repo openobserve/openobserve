@@ -622,27 +622,11 @@ impl GlobalDeduplicationConfig {
 
     /// Get default FQN priority dimensions
     ///
-    /// This defines the order in which dimensions are checked to derive service-fqn.
-    /// The first dimension with a value wins.
+    /// Returns empty by default. Use O2_FQN_PRIORITY_DIMENSIONS env var to configure.
+    /// The first dimension with a value wins when deriving service-fqn.
     pub fn default_fqn_priority() -> Vec<String> {
-        vec![
-            // K8s workloads (most specific for K8s)
-            "k8s-deployment".to_string(),
-            "k8s-statefulset".to_string(),
-            "k8s-daemonset".to_string(),
-            "k8s-job".to_string(),
-            // AWS workloads
-            "aws-ecs-task".to_string(),
-            "faas-name".to_string(),
-            // GCP workloads
-            "gcp-cloud-run".to_string(),
-            // Azure workloads
-            "azure-cloud-role".to_string(),
-            // Bare metal
-            "process-name".to_string(),
-            // Fallback
-            "service".to_string(),
-        ]
+        // No hardcoded defaults - use O2_FQN_PRIORITY_DIMENSIONS env var
+        vec![]
     }
 
     /// Map a field name to its semantic group ID

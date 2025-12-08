@@ -264,19 +264,8 @@ interface OrganizationDeduplicationConfig {
   fqn_priority_dimensions?: string[];
 }
 
-// Default FQN priority dimensions - matches backend defaults
-const DEFAULT_FQN_PRIORITY = [
-  "k8s-deployment",
-  "k8s-statefulset",
-  "k8s-daemonset",
-  "k8s-job",
-  "aws-ecs-task",
-  "faas-name",
-  "gcp-cloud-run",
-  "azure-cloud-role",
-  "process-name",
-  "service",
-];
+// Default FQN priority dimensions - empty by default, uses O2_FQN_PRIORITY_DIMENSIONS env var
+const DEFAULT_FQN_PRIORITY: string[] = [];
 
 // All available dimensions that can be used for FQN priority
 const ALL_FQN_DIMENSIONS = [
