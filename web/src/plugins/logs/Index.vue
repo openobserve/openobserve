@@ -2569,11 +2569,14 @@ export default defineComponent({
         }, 100);
       }
       if (this.searchObj.config.splitterModel > 0) {
-        // Only save if value is >= 1, otherwise reset to default (15)
+        // Only save if value is >= 1, otherwise reset to last splitter position 
+        // because what happens is that when user tries to expand the collapsed splitter using button
+        // sometimes user unintentionally dragging little bit to right so we are considering that as 0.9 or somethign 
+        // so added the condition it won't effect that
         this.searchObj.config.lastSplitterPosition =
           this.searchObj.config.splitterModel >= 1
             ? this.searchObj.config.splitterModel
-            : 15;
+            : this.searchObj.config.lastSplitterPosition;
       }
 
       this.searchObj.config.splitterModel = this.searchObj.meta.showFields
