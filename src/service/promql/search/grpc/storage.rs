@@ -90,6 +90,7 @@ pub(crate) async fn create_context(
     let stream_settings = unwrap_stream_settings(&schema);
     let index_fields = get_stream_setting_index_fields(&stream_settings)
         .into_iter()
+        .filter(|field| schema.field_with_name(field).is_ok())
         .collect::<HashSet<_>>();
 
     // get partition time level
