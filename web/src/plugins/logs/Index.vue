@@ -90,6 +90,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dense
                   round
                   @click="collapseFieldList"
+                  @mousedown.stop
+                  @touchstart.stop
                 />
               </template>
               <template #after>
