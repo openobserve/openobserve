@@ -15,6 +15,7 @@
 
 use std::sync::Arc;
 
+use base64::Engine;
 use bytes::Bytes;
 
 use crate::{common::infra::config::KVS, service::db};
@@ -34,7 +35,13 @@ pub async fn get(org_id: &str, key: &str) -> Result<Bytes, anyhow::Error> {
 
     // Get from database table
     let val = match infra::table::kv_store::get(org_id, key).await? {
-        Some(model) => Bytes::from(model.value),
+        Some(model) => {
+            // Decode from base64 (data is stored as base64 in TEXT column)
+            let bytes = base64::engine::general_purpose::STANDARD
+                .decode(&model.value)
+                .map_err(|e| anyhow::anyhow!("Failed to decode KV value: {}", e))?;
+            Bytes::from(bytes)
+        }
         None => return Err(anyhow::anyhow!("Key not found")),
     };
 
@@ -49,10 +56,9 @@ pub async fn set(org_id: &str, key: &str, val: Bytes) -> Result<(), anyhow::Erro
     }
 
     let cache_key = mk_cache_key(org_id, key);
-    // Convert bytes to string, ensuring valid UTF-8
-    // This will fail if the data is binary/not valid UTF-8
-    let value_str = String::from_utf8(val.to_vec())
-        .map_err(|e| anyhow::anyhow!("KV value must be valid UTF-8: {}", e))?;
+    // Encode as base64 to safely store arbitrary bytes in TEXT column
+    // This maintains backward compatibility with existing code that stores binary data
+    let value_str = base64::engine::general_purpose::STANDARD.encode(&val);
 
     // Send to super cluster first (if enabled)
     #[cfg(feature = "enterprise")]
