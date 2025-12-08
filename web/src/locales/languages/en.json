@@ -1018,7 +1018,6 @@
     "functionDeletionFailed": "Function deletion failed.",
     "goBack": "Go Back",
     "invalidMethodNameMessage": "Invalid method name. Must start with a letter or underscore. Use only letters, numbers, and underscores.",
-    "streamRouting": "Stream Routing",
     "discardChanges": "Discard Changes",
     "confirmCancelRoutingChanges": "Are you sure you want to cancel routing changes?",
     "clickTestFunctionMessage": "Please click Test Function to see the events",
