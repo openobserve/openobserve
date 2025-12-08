@@ -224,8 +224,30 @@ export default class DashboardVariables {
   async selectValueFromVariableDropDown(label, value) {
     const input = this.page.getByLabel(label, { exact: true });
     await input.waitFor({ state: "visible", timeout: 10000 });
+
+    // Wait for _values API call when clicking on the dropdown
+    const valuesApiPromise = this.page.waitForResponse(
+      response => response.url().includes('_values') || response.url().includes('/values'),
+      { timeout: 15000 }
+    ).catch(() => null);
+
     await input.click();
+
+    // Wait for the API response to complete
+    await valuesApiPromise;
+    await this.page.waitForTimeout(500); // Wait for dropdown to render
+
+    // Wait for _values API call when filling/searching
+    const searchApiPromise = this.page.waitForResponse(
+      response => response.url().includes('_values') || response.url().includes('/values'),
+      { timeout: 15000 }
+    ).catch(() => null);
+
     await input.fill(value);
+
+    // Wait for search API to complete
+    await searchApiPromise;
+    await this.page.waitForTimeout(300); // Wait for filtered results
 
     const option = this.page.getByRole("option", { name: value });
     await option.waitFor({ state: "visible", timeout: 10000 });
