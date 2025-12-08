@@ -15,10 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card
-    class="column full-height no-wrap searchdetaildialog"
-    :class="store.state.theme === 'dark' ? 'dark' : ''"
-  >
+  <q-card class="column full-height no-wrap searchdetaildialog">
     <q-card-section class="q-pa-md q-pb-md">
       <div class="row items-center no-wrap">
         <div class="col">
