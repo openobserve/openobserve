@@ -279,8 +279,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 dense
                                 style="padding: 2px 4px; z-index: 1"
                                 @click="addToDashboard"
-                                title="Add To Dashboard"
-                                >Add To Dashboard</q-btn
+                                :title="t('search.addToDashboard')"
+                                >{{ t("search.addToDashboard") }}</q-btn
                               >
                             </div>
                           </div>

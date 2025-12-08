@@ -240,7 +240,7 @@ describe("useTextHighlighter", () => {
       expect(result).toContain("hello");
       expect(result).toContain("world");
       // Brackets should be styled with gray color
-      expect(result).toContain("#9ca3af");
+      expect(result).toContain("log-object-brace");
     });
   });
 
@@ -406,7 +406,7 @@ describe("useTextHighlighter", () => {
         "match_all('error')",
         mockColors,
       );
-      expect(result).toContain("background-color: rgb(255, 213, 0)");
+      expect(result).toContain("log-highlighted");
       expect(result).toContain("error");
     });
 
@@ -416,7 +416,7 @@ describe("useTextHighlighter", () => {
         "",
         mockColors,
       );
-      expect(result).toContain("color: #047857");
+      expect(result).toContain("log-string");
       // New behavior: text is tokenized into separate spans
       expect(result).toContain("normal");
       expect(result).toContain("text");
@@ -428,7 +428,7 @@ describe("useTextHighlighter", () => {
         "",
         mockColors,
       );
-      expect(result).toContain("color: #D97706");
+      expect(result).toContain("log-ip");
       expect(result).toContain("192.168.1.1");
     });
 
@@ -438,7 +438,7 @@ describe("useTextHighlighter", () => {
         "match_all('IP')",
         mockColors,
       );
-      expect(result).toContain("background-color: rgb(255, 213, 0)");
+      expect(result).toContain("log-highlighted");
       expect(result).toContain("IP");
     });
 

@@ -359,7 +359,7 @@ class="field_list" no-hover>
                         ><q-item-label
                           header
                           class="q-pa-sm text-bold favorite-label"
-                          >Favorite Views</q-item-label
+                          >{{ t("search.favoriteViews") }}</q-item-label
                         ></q-item
                       >
                       <q-separator horizontal inset></q-separator>
@@ -526,7 +526,7 @@ class="field_list" no-hover>
                         @click.stop
                       />
                     </div>
-                    Wrap Content
+                    {{ t("search.wrapContent") }}
                   </q-item-label>
                 </q-item-section>
               </q-item>
@@ -677,7 +677,7 @@ alt="Quick Mode" class="toolbar-icon" />
             <q-tooltip>
               {{
                 searchObj.meta.logsVisualizeToggle === "visualize"
-                  ? "Not supported for visualization"
+                  ? t("search.notSupportedForVisualization")
                   : t("search.messageWrapContent")
               }}
             </q-tooltip>
@@ -729,8 +729,7 @@ alt="Quick Mode" class="toolbar-icon" />
                       alt="Search History"
                       style="width: 20px; height: 20px"
                     />
-
-                    Search History</q-item-label
+                    {{ t("search.searchHistory") }}</q-item-label
                   >
                 </q-item-section>
               </q-item>
@@ -863,7 +862,7 @@ class="q-pr-sm q-pt-xs" />
                       alt="Create Scheduled Search"
                       style="width: 20px; height: 20px"
                     />
-                    Create Scheduled Search</q-item-label
+                    {{ t("search.createScheduledSearch") }}</q-item-label
                   >
                 </q-item-section>
               </q-item>
@@ -885,8 +884,7 @@ class="q-pr-sm q-pt-xs" />
                       alt="List Scheduled Search"
                       style="width: 20px; height: 20px"
                     />
-
-                    List Scheduled Search</q-item-label
+                    {{ t("search.listScheduledSearch") }}</q-item-label
                   >
                 </q-item-section>
               </q-item>
@@ -943,7 +941,7 @@ class="q-pr-sm q-pt-xs" />
                 data-test="logs-search-bar-region-btn"
                 class="region-dropdown-btn q-px-xs"
                 :title="t('search.regionTitle')"
-                label="Region"
+                :label="t('search.region')"
               >
                 <q-input
                   ref="reginFilterRef"
@@ -1023,7 +1021,7 @@ class="q-pr-sm q-pt-xs" />
                   dense
                   flat
                   no-caps
-                  :title="'Refresh Cache & Run Query'"
+                  :title="t('search.refreshCacheAndRunQuery')"
                   class="q-pa-sm search-button-dropdown tw-text-[12px]"
                   v-close-popup
                   @click="handleRunQueryFn(true)"
@@ -1033,7 +1031,7 @@ class="q-pr-sm q-pt-xs" />
                   "
                 >
                   <q-icon name="refresh" class="q-mr-xs" />
-                  Refresh Cache & Run Query</q-btn
+                  {{ t("search.refreshCacheAndRunQuery") }}</q-btn
                 >
               </q-btn-dropdown>
               </div>
@@ -1107,7 +1105,7 @@ class="q-pr-sm q-pt-xs" />
                       dense
                       flat
                       no-caps
-                      :title="'Refresh Cache & Run Query'"
+                      :title="t('search.refreshCacheAndRunQuery')"
                       class="q-pa-sm tw-text-[12px] "
                       v-close-popup
                       @click="handleRunQueryFn(true)"
@@ -1117,7 +1115,7 @@ class="q-pr-sm q-pt-xs" />
                       "
                       >
                       <q-icon name="refresh" class="q-mr-xs" />
-                      Refresh Cache & Run Query</q-btn>
+                      {{ t("search.refreshCacheAndRunQuery") }}</q-btn>
               </q-btn-dropdown>
             </div>
           </div>
@@ -1247,7 +1245,7 @@ class="q-pr-sm q-pt-xs" />
       </div>
       <q-btn
         data-test="logs-query-editor-full_screen-btn"
-        :title="isFocused ? 'Collapse' : 'Expand'"
+        :title="isFocused ? t('search.collapse') : t('search.expand')"
         dense
         size="10px"
         round
@@ -1555,25 +1553,22 @@ class="q-pr-sm q-pt-xs" />
     <q-dialog v-model="searchSchedulerJob">
       <q-card style="width: 700px; max-width: 80vw">
         <q-card-section>
-          <div class="text-h6">Schedule Search Job</div>
+          <div class="text-h6">{{ t("search.scheduleSearchJob") }}</div>
         </q-card-section>
 
         <q-card-section class="q-pt-none">
           <div>
             <div class="text-left q-mb-xs">
-              No of Records:
-              <q-icon name="info"
-size="17px" class="q-ml-xs cursor-pointer">
+              {{ t("search.noOfRecords") }}:
+              <q-icon name="info" size="17px" class="q-ml-xs cursor-pointer">
                 <q-tooltip
                   anchor="center right"
                   self="center left"
                   max-width="300px"
                 >
-                  <span style="font-size: 14px"
-                    >Number of records can be specified eg: if the no. of
-                    records is 1000 then user can get maximum of 1000
-                    records</span
-                  >
+                  <span style="font-size: 14px">{{
+                    t("search.noOfRecordsTooltip")
+                  }}</span>
                 </q-tooltip>
               </q-icon>
             </div>
@@ -1593,15 +1588,14 @@ size="17px" class="q-ml-xs cursor-pointer">
             />
           </div>
           <div class="text-left">
-            Maximum 100000 events can be returned in schedule job
+            {{ t("search.maxEventsScheduleJob") }}
           </div>
           <div
             style="opacity: 0.8"
             class="text-left mapping-warning-msg q-mt-md"
           >
-            <q-icon name="warning"
-color="red" class="q-mr-sm" />
-            <span>Histogram will be disabled for the schedule job</span>
+            <q-icon name="warning" color="red" class="q-mr-sm" />
+            <span>{{ t("search.histogramDisabledScheduleJob") }}</span>
           </div>
         </q-card-section>
 
@@ -3388,7 +3382,7 @@ export default defineComponent({
             //we are deleting the local storage item and also we are removing the item from the favoriteViews array
             if (res.status == 200) {
               $q.notify({
-                message: `View deleted successfully.`,
+                message: t("search.viewDeletedSuccessfully"),
                 color: "positive",
                 position: "bottom",
                 timeout: 1000,
@@ -3396,7 +3390,7 @@ export default defineComponent({
               getSavedViews();
             } else {
               $q.notify({
-                message: `Error while deleting saved view. ${res.data.error_detail}`,
+                message: `${t("search.errorDeletingSavedView")} ${res.data.error_detail}`,
                 color: "negative",
                 position: "bottom",
                 timeout: 1000,
@@ -3405,7 +3399,7 @@ export default defineComponent({
           })
           .catch((err) => {
             $q.notify({
-              message: `Error while deleting saved view.`,
+              message: t("search.errorDeletingSavedView"),
               color: "negative",
               position: "bottom",
               timeout: 1000,
@@ -3498,7 +3492,7 @@ export default defineComponent({
                 view_name: viewName,
               });
               $q.notify({
-                message: `View created successfully.`,
+                message: t("search.viewCreatedSuccessfully"),
                 color: "positive",
                 position: "bottom",
                 timeout: 1000,
@@ -3510,7 +3504,7 @@ export default defineComponent({
             } else {
               saveViewLoader.value = false;
               $q.notify({
-                message: `Error while creating saved view. ${res.data.error_detail}`,
+                message: `${t("search.errorCreatingSavedView")} ${res.data.error_detail}`,
                 color: "negative",
                 position: "bottom",
                 timeout: 1000,
@@ -3520,7 +3514,7 @@ export default defineComponent({
           .catch((err) => {
             saveViewLoader.value = false;
             $q.notify({
-              message: `Error while creating saved view.`,
+              message: t("search.errorCreatingSavedView"),
               color: "negative",
               position: "bottom",
               timeout: 1000,
@@ -3571,7 +3565,7 @@ export default defineComponent({
               );
 
               $q.notify({
-                message: `View updated successfully.`,
+                message: t("search.viewUpdatedSuccessfully"),
                 color: "positive",
                 position: "bottom",
                 timeout: 1000,
@@ -3583,7 +3577,7 @@ export default defineComponent({
             } else {
               saveViewLoader.value = false;
               $q.notify({
-                message: `Error while updating saved view. ${res.data.error_detail}`,
+                message: `${t("search.errorUpdatingSavedView")} ${res.data.error_detail}`,
                 color: "negative",
                 position: "bottom",
                 timeout: 1000,
@@ -3594,7 +3588,7 @@ export default defineComponent({
             dismiss();
             saveViewLoader.value = false;
             $q.notify({
-              message: `Error while updating saved view.`,
+              message: t("search.errorUpdatingSavedView"),
               color: "negative",
               position: "bottom",
               timeout: 1000,
@@ -3642,14 +3636,14 @@ export default defineComponent({
               .then(() => {
                 $q.notify({
                   type: "positive",
-                  message: "Link Copied Successfully!",
+                  message: t("search.linkCopiedSuccessfully"),
                   timeout: 5000,
                 });
               })
               .catch(() => {
                 $q.notify({
                   type: "negative",
-                  message: "Error while copy link.",
+                  message: t("search.errorCopyingLink"),
                   timeout: 5000,
                 });
               });
@@ -3658,7 +3652,7 @@ export default defineComponent({
         .catch(() => {
           $q.notify({
             type: "negative",
-            message: "Error while shortening link.",
+            message: t("search.errorShorteningLink"),
             timeout: 5000,
           });
         });
@@ -4140,8 +4134,7 @@ export default defineComponent({
         if (searchObj.meta.jobId != "") {
           $q.notify({
             type: "negative",
-            message:
-              "Job Already Scheduled , please change some parameters to schedule new job",
+            message: t("search.jobAlreadyScheduled"),
             timeout: 3000,
           });
           return;
@@ -4153,7 +4146,7 @@ export default defineComponent({
         ) {
           $q.notify({
             type: "negative",
-            message: "Job Scheduler should be between 1 and 100000",
+            message: t("search.jobSchedulerRange"),
             timeout: 3000,
           });
           return;
@@ -4166,7 +4159,7 @@ export default defineComponent({
         if (e.response.status != 403) {
           $q.notify({
             type: "negative",
-            message: "Error while adding job",
+            message: t("search.errorAddingJob"),
             timeout: 3000,
           });
           return;
