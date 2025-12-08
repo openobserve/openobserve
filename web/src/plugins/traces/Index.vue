@@ -144,11 +144,8 @@ style="min-height: auto">
                     data-test="logs-search-no-stream-selected-text"
                     class="text-center tw-mx-[10%] tw-py-[40px] tw-mt-0 tw-text-[20px]"
                   >
-                    <q-icon name="info" color="primary"
-size="md" /> Select a
-                    stream and press 'Run query' to continue. Additionally, you
-                    can apply additional filters and adjust the date range to
-                    enhance search.
+                    <q-icon name="info" color="primary" size="md" />
+                    {{ t("search.noStreamSelectedMessage") }}
                   </h5>
                 </div>
                 <div
