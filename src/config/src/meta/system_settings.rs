@@ -70,7 +70,13 @@ impl std::str::FromStr for SettingScope {
     }
 }
 
-/// Common setting categories
+/// Common setting categories for organizing settings
+///
+/// NOTE: This enum provides a set of common categories but is not exhaustive.
+/// The `setting_category` field in `SystemSetting` is an `Option<String>` to allow
+/// for custom categories beyond these predefined ones. Use these constants for
+/// consistency when applicable, but feel free to use custom category strings
+/// for domain-specific settings.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum SettingCategory {
