@@ -40,12 +40,12 @@
           :key="row[column.name] || 'null' + index + column.name"
           class="field_list"
           style="cursor: pointer"
-          :title="row[column.name] || 'null'"
+          :title="row[column.name] || t('logStream.nullValue')"
         >
           <div class="flex row items-center no-wrap">
             {{
               !row[column.name]
-                ? "null"
+                ? t('logStream.nullValue')
                 : row[column.name].toString().length > 50
                 ? row[column.name].substring(0, 47) + "..."
                 : row[column.name]
@@ -59,6 +59,7 @@
 
 <script lang="ts">
 import { defineComponent, onBeforeUpdate, ref } from "vue";
+import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   name: "StreamDataTable",
@@ -83,6 +84,7 @@ export default defineComponent({
   emits: ["update:scroll"],
   setup(props, { emit }) {
     const searchTableRef: any = ref(null);
+    const { t } = useI18n();
 
     const onScroll = (info: any) => {
       if (info.ref.items.length / info.index <= 1.4 && !props.isLoading) {
@@ -92,6 +94,7 @@ export default defineComponent({
     return {
       onScroll,
       searchTableRef,
+      t,
     };
   },
 });

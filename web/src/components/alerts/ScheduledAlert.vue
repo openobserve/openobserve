@@ -26,8 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <AlertsContainer 
                   name="Alert Settings"
                   v-model:is-expanded="expandState.thresholds"
-                  label="Alert Settings"
-                  subLabel="Set your alert rules and choose how you'd like to be notified."
+                  :label="t('alerts.alertSettings')"
+                  :subLabel="t('alerts.alertSettingsSubtitle')"
                   icon="tune"
                   class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2"
                   :iconClass="'tw-mt-[2px]'"
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       use-input
                       emit-value
                       hide-selected
-                      placeholder="Select column"
+                      :placeholder="t('alerts.selectColumnPlaceholder')"
                       fill-input
                       :input-debounce="400"
                       hide-bottom-space
@@ -819,7 +819,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="q-pl-sm">
                     <q-btn
                       data-test="create-destination-btn"
-                      label="Add New Destination"
+                      :label="t('alerts.addNewDestination')"
                       class="text-bold no-border"
                       color="primary"
                       no-caps
@@ -839,7 +839,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <AlertsContainer 
           name="Multi Window"
           v-model:is-expanded="expandState.multiWindowSelection"
-          label="Multi Window"
+          :label="t('alerts.multiWindow')"
           subLabel="Set relative alerting system based on SQL query"
         class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
         :iconClass="'tw-mt-[2px]'"
@@ -988,7 +988,7 @@ style="font-size: 12px;">
         <div class="tw-w-fit tw-flex tw-justify-center tw-border tw-border-gray-200 ">
         <q-btn
           data-test="multi-time-range-alerts-add-btn"
-          label="Add Comparision Window"
+          :label="t('alerts.addComparisonWindow')"
           size="sm"
           class="text-semibold add-variable q-pa-sm multi-window-text no-border  "
           style="font-size: 14px;"
@@ -1015,7 +1015,7 @@ size="20px" />
       <AlertsContainer 
           name="query"
           v-model:is-expanded="expandState.queryMode"
-          label="Conditions"
+          :label="t('alerts.conditions')"
           :image="conditionsImage"
           subLabel="What should trigger the alert."
           class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
@@ -1073,7 +1073,7 @@ class="tw-flex tw-items-center tw-gap-2 tw-bg-gray-200 tw-rounded-full tw-px-1 t
             <div>
               <q-btn
                 data-test="alert-variables-add-btn"
-                label="View Editor"
+                :label="t('alerts.viewEditor')"
                 size="sm"
                 class="text-bold add-variable no-border q-py-sm xl:tw-w-[130px] tw-w-[85px]"
                 color="primary"
@@ -1228,7 +1228,7 @@ class="tw-flex tw-items-center tw-gap-2 tw-bg-gray-200 tw-rounded-full tw-px-1 t
                               (val: string, update: any) => filterFields(val, update)
                             "
                           @update:modelValue="onColumnSelect"
-                          placeholder="Search for a field"
+                          :placeholder="t('alerts.searchFieldPlaceholder')"
                           style="width: 150px;"
                     >
                         <template #no-option>
@@ -1259,7 +1259,7 @@ class="tw-flex tw-items-center tw-gap-2 tw-bg-gray-200 tw-rounded-full tw-px-1 t
                   </div>
                   <FullViewContainer
                     name="Input"
-                    label="Input"
+                    :label="t('alerts.input')"
                     :isExpanded="true"
                     :showExpandIcon="false"
                     :label-class="'tw-ml-2'"
@@ -1373,7 +1373,7 @@ data-test="scheduled-alert-promql-editor"
                           clearable
                           @clear="onFunctionClear"
                           style="width: 150px;"
-                          placeholder="Saved functions"
+                          :placeholder="t('alerts.savedFunctionsPlaceholder')"
                                                 >
                           <template #no-option>
                         <q-item>
@@ -1401,7 +1401,7 @@ data-test="scheduled-alert-promql-editor"
                     </div>
                     <FullViewContainer
                     name="Input"
-                    label="Input"
+                    :label="t('alerts.input')"
                     :isExpanded="true"
                     :showExpandIcon="false"
                     :label-class="'tw-ml-2'"
@@ -1443,7 +1443,7 @@ data-test="scheduled-alert-promql-editor"
             <div class="tw-flex tw-items-center tw-justify-between tw-w-[100%] tw-gap-2">
               <FullViewContainer
                 name="Output"
-                label="Output"
+                :label="t('alerts.output')"
                 class="tw-w-full"
                 :isExpanded="expandSqlOutput"
                 @update:isExpanded="expandSqlOutput = $event"
@@ -1515,7 +1515,7 @@ class="tw-w-full"
             <div class="tw-flex tw-flex-col tw-items-start tw-justify-between tw-h-fit">
             <FullViewContainer
               name="Combined Output"
-              label="Combined Output"
+              :label="t('alerts.combinedOutput')"
               :isExpanded="expandCombinedOutput"
                 class="tw-w-full"
               @update:isExpanded="expandCombinedOutput = $event"

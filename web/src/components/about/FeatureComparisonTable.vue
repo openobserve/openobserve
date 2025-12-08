@@ -21,38 +21,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
           <q-icon name="compare_arrows" size="24px" />
         </div>
-        <h3 class="feature-title">Feature Comparison</h3>
+        <h3 class="feature-title">{{ t('about.featureComparison.title') }}</h3>
       </div>
       <div class="feature-subtitle-wrapper">
         <p
           v-if="store.state.zoConfig.build_type === 'opensource'"
           class="edition-info"
         >
-          You're currently using OpenObserve Open Source Edition. Upgrade to Enterprise Edition to unlock advanced features listed in the comparison table below.
+          {{ t('about.featureComparison.osDescription') }}
         </p>
         <p
           v-else-if="store.state.zoConfig.build_type === 'enterprise'"
           class="edition-info"
         >
-          You're using OpenObserve Enterprise Edition with access to all advanced features listed below.
+          {{ t('about.featureComparison.enterpriseDescription') }}
         </p>
         <p
           v-else
           class="feature-subtitle"
         >
-          Compare features across Open Source, Enterprise, and Cloud offerings
+          {{ t('about.featureComparison.generalDescription') }}
         </p>
         <p
           v-if="store.state.zoConfig.build_type === 'opensource'"
           class="enterprise-promotion"
         >
-          <strong>Good news:</strong> OpenObserve Enterprise Edition is completely free for up to 200 GB/day (~6 TB/month) of data ingestion.
+          <strong>{{ t('about.featureComparison.osPromotion').split(':')[0] }}:</strong> {{ t('about.featureComparison.osPromotion').split(': ')[1] }}
         </p>
         <p
           v-else-if="store.state.zoConfig.build_type === 'enterprise'"
           class="enterprise-promotion"
         >
-          <strong>Your plan:</strong> Enterprise Edition is free for up to 200 GB/day (~6 TB/month) of data ingestion.
+          <strong>{{ t('about.featureComparison.enterprisePromotion').split(':')[0] }}:</strong> {{ t('about.featureComparison.enterprisePromotion').split(': ')[1] }}
         </p>
       </div>
     </div>
@@ -133,6 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import type { QTableColumn } from "quasar";
 
 interface FeatureValue {
@@ -160,11 +161,12 @@ export default defineComponent({
   name: "FeatureComparisonTable",
   setup() {
     const store = useStore();
+    const { t } = useI18n();
 
-    const columns: QTableColumn[] = [
+    const columns = computed((): QTableColumn[] => [
       {
         name: 'name',
-        label: 'Feature',
+        label: t('about.featureComparison.columns.feature'),
         field: 'name',
         align: 'left',
         sortable: false,
@@ -172,7 +174,7 @@ export default defineComponent({
       },
       {
         name: 'opensource',
-        label: 'Open Source (Self hosted)',
+        label: t('about.featureComparison.columns.opensource'),
         field: 'opensource',
         align: 'center',
         sortable: false,
@@ -180,7 +182,7 @@ export default defineComponent({
       },
       {
         name: 'enterprise',
-        label: 'Enterprise (Self hosted)',
+        label: t('about.featureComparison.columns.enterprise'),
         field: 'enterprise',
         align: 'center',
         sortable: false,
@@ -188,63 +190,64 @@ export default defineComponent({
       },
       {
         name: 'cloud',
-        label: 'Cloud',
+        label: t('about.featureComparison.columns.cloud'),
         field: 'cloud',
         align: 'center',
         sortable: false,
         style: 'width: 150px; max-width: 150px;'
       }
-    ];
+    ]);
 
     const pagination = ref({
       rowsPerPage: 0 // 0 means show all rows
     });
 
-    const featureData: FeatureData = {
+    const featureData = computed((): FeatureData => ({
       editions: [
-        { id: 'opensource', name: 'Open Source (Self hosted)' },
-        { id: 'enterprise', name: 'Enterprise (Self hosted)' },
-        { id: 'cloud', name: 'Cloud' }
+        { id: 'opensource', name: t('about.featureComparison.editions.opensource') },
+        { id: 'enterprise', name: t('about.featureComparison.editions.enterprise') },
+        { id: 'cloud', name: t('about.featureComparison.editions.cloud') }
       ],
       features: [
-        { name: 'Logs', values: { opensource: true, enterprise: true, cloud: true } },
-        { name: 'Metrics', values: { opensource: true, enterprise: true, cloud: true } },
-        { name: 'Traces', values: { opensource: true, enterprise: true, cloud: true } },
-        { name: 'RUM', values: { opensource: true, enterprise: true, cloud: true } },
-        { name: 'Alerts', values: { opensource: true, enterprise: true, cloud: true } },
-        { name: 'Dashboards', values: { opensource: true, enterprise: true, cloud: true } },
-        { name: 'Reports', values: { opensource: true, enterprise: true, cloud: true } },
-        { name: 'VRL functions', values: { opensource: true, enterprise: true, cloud: true } },
-        { name: 'Pipelines', values: { opensource: true, enterprise: true, cloud: true } },
-        { name: 'High Availability', values: { opensource: true, enterprise: true, cloud: true } },
-        { name: 'Multitenancy (Organizations)', values: { opensource: true, enterprise: true, cloud: true } },
-        { name: 'Dynamic schema and schema evolution', values: { opensource: true, enterprise: true, cloud: true } },
-        { name: 'Advanced multilingual GUI', values: { opensource: true, enterprise: true, cloud: true } },
-        { name: 'Single Sign On', values: { opensource: false, enterprise: '✅ Available only in HA mode', cloud: true } },
-        { name: 'Role Based Access Control (RBAC)', values: { opensource: false, enterprise: '✅ Available only in HA mode', cloud: true } },
-        { name: 'Federated search / Super cluster', values: { opensource: false, enterprise: true, cloud: false } },
-        { name: 'Query management', values: { opensource: false, enterprise: true, cloud: false } },
-        { name: 'Workload management (QoS)', values: { opensource: false, enterprise: true, cloud: false } },
-        { name: 'Audit trail', values: { opensource: false, enterprise: true, cloud: true } },
-        { name: 'Action Scripts', values: { opensource: false, enterprise: true, cloud: false } },
-        { name: 'Sensitive data redaction', values: { opensource: false, enterprise: true, cloud: true } },
-        { name: 'Ability to influence roadmap', values: { opensource: false, enterprise: true, cloud: '✅ on enterprise plan' } },
-        { name: 'License', values: { opensource: 'AGPL', enterprise: 'Enterprise', cloud: 'Cloud' } },
-        { name: 'Support', values: { opensource: 'Community', enterprise: 'Enterprise', cloud: 'Cloud' } },
-        { name: 'Cost', values: { opensource: 'Free', enterprise: 'If self hosted, free for up to 200 GB/Day data ingested. Paid thereafter', cloud: '14 day free trial. Paid thereafter' } },
-        { name: 'Pipelines - External destinations', values: { opensource: false, enterprise: true, cloud: true } },
-        { name: 'Extreme performance (100x improvement for many queries)', values: { opensource: false, enterprise: true, cloud: true } },
-        { name: 'Query optimizer', values: { opensource: false, enterprise: true, cloud: true } }
+        { name: t('about.featureComparison.features.logs'), values: { opensource: true, enterprise: true, cloud: true } },
+        { name: t('about.featureComparison.features.metrics'), values: { opensource: true, enterprise: true, cloud: true } },
+        { name: t('about.featureComparison.features.traces'), values: { opensource: true, enterprise: true, cloud: true } },
+        { name: t('about.featureComparison.features.rum'), values: { opensource: true, enterprise: true, cloud: true } },
+        { name: t('about.featureComparison.features.alerts'), values: { opensource: true, enterprise: true, cloud: true } },
+        { name: t('about.featureComparison.features.dashboards'), values: { opensource: true, enterprise: true, cloud: true } },
+        { name: t('about.featureComparison.features.reports'), values: { opensource: true, enterprise: true, cloud: true } },
+        { name: t('about.featureComparison.features.vrlFunctions'), values: { opensource: true, enterprise: true, cloud: true } },
+        { name: t('about.featureComparison.features.pipelines'), values: { opensource: true, enterprise: true, cloud: true } },
+        { name: t('about.featureComparison.features.highAvailability'), values: { opensource: true, enterprise: true, cloud: true } },
+        { name: t('about.featureComparison.features.multitenancy'), values: { opensource: true, enterprise: true, cloud: true } },
+        { name: t('about.featureComparison.features.dynamicSchema'), values: { opensource: true, enterprise: true, cloud: true } },
+        { name: t('about.featureComparison.features.multilanguageGui'), values: { opensource: true, enterprise: true, cloud: true } },
+        { name: t('about.featureComparison.features.singleSignOn'), values: { opensource: false, enterprise: t('about.featureComparison.values.availableHaMode'), cloud: true } },
+        { name: t('about.featureComparison.features.rbac'), values: { opensource: false, enterprise: t('about.featureComparison.values.availableHaMode'), cloud: true } },
+        { name: t('about.featureComparison.features.federatedSearch'), values: { opensource: false, enterprise: true, cloud: false } },
+        { name: t('about.featureComparison.features.queryManagement'), values: { opensource: false, enterprise: true, cloud: false } },
+        { name: t('about.featureComparison.features.workloadManagement'), values: { opensource: false, enterprise: true, cloud: false } },
+        { name: t('about.featureComparison.features.auditTrail'), values: { opensource: false, enterprise: true, cloud: true } },
+        { name: t('about.featureComparison.features.actionScripts'), values: { opensource: false, enterprise: true, cloud: false } },
+        { name: t('about.featureComparison.features.dataRedaction'), values: { opensource: false, enterprise: true, cloud: true } },
+        { name: t('about.featureComparison.features.roadmapInfluence'), values: { opensource: false, enterprise: true, cloud: t('about.featureComparison.values.enterprisePlan') } },
+        { name: t('about.featureComparison.features.license'), values: { opensource: t('about.featureComparison.values.agplLicense'), enterprise: t('about.featureComparison.values.enterpriseLicense'), cloud: t('about.featureComparison.values.cloudLicense') } },
+        { name: t('about.featureComparison.features.support'), values: { opensource: t('about.featureComparison.values.communitySupport'), enterprise: t('about.featureComparison.values.enterpriseSupport'), cloud: t('about.featureComparison.values.cloudSupport') } },
+        { name: t('about.featureComparison.features.cost'), values: { opensource: t('about.featureComparison.values.freeCost'), enterprise: t('about.featureComparison.values.enterpriseCost'), cloud: t('about.featureComparison.values.cloudCost') } },
+        { name: t('about.featureComparison.features.externalDestinations'), values: { opensource: false, enterprise: true, cloud: true } },
+        { name: t('about.featureComparison.features.extremePerformance'), values: { opensource: false, enterprise: true, cloud: true } },
+        { name: t('about.featureComparison.features.queryOptimizer'), values: { opensource: false, enterprise: true, cloud: true } }
       ]
-    };
+    }));
 
     const currentPlanName = computed(() => {
       const buildType = store.state.zoConfig.build_type;
-      const edition = featureData.editions.find((ed) => ed.id === buildType);
+      const edition = featureData.value.editions.find((ed) => ed.id === buildType);
       return edition ? edition.name : "";
     });
 
     return {
+      t,
       store,
       featureData,
       columns,

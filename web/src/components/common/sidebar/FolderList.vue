@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="card-container tw-h-full tw-flex tw-flex-col tw-pb-[0.3rem]">
       <div class="folder-header" :class="store.state.theme === 'dark' ? 'folder-header-dark' : 'folder-header-light'">
         <div class="text-bold q-px-sm  q-py-sm tw-flex tw-items-center tw-justify-between tw-gap-2">
-          Folders
+          {{ t('common.folders') }}
           <div>
             <q-btn
               class="text-bold o2-secondary-button tw-h-[28px] tw-w-[32px]"
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             borderless
             data-test="folder-search"
-            placeholder="Search Folder"
+            :placeholder="t('common.searchFolder')"
             style="width: 100%;"
             clearable
             class="tw-mx-2 q-px-xs"
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-icon :name="outlinedDelete" size="xs" />
                       </q-item-section>
                       <q-item-section>
-                          <q-item-label>Delete</q-item-label>
+                          <q-item-label>{{ t('common.deleteFolder') }}</q-item-label>
                       </q-item-section>
                       </q-item>
                   </q-list>
@@ -142,9 +142,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </q-dialog>
     <ConfirmDialog
-    title="Delete Folder"
+    :title="t('common.deleteFolder')"
     data-test="dashboard-confirm-delete-folder-dialog"
-    message="Are you sure you want to delete this Folder?"
+    :message="t('common.deleteFolderConfirmation')"
     @update:ok="deleteFolder"
     @update:cancel="confirmDeleteFolderDialog = false"
     v-model="confirmDeleteFolderDialog"
@@ -225,6 +225,7 @@ export default defineComponent({
     emits: ['update:folders', 'update:activeFolderId'],
     setup(props, { emit }) {
       const store = useStore();
+      const { t } = useI18n();
       const { showPositiveNotification, showErrorNotification } =
       useNotifications();
       const activeFolderId = ref("");
@@ -284,14 +285,14 @@ export default defineComponent({
           if (activeFolderId.value === selectedFolderDelete.value)
             activeFolderId.value = "default";
 
-          showPositiveNotification("Folder deleted successfully.", {
+          showPositiveNotification(t('common.folderDeletedSuccessfully'), {
             timeout: 2000,
           });
         } catch (err) {
           showErrorNotification(
             err?.response?.data?.message ||
               err?.message ||
-              "Folder deletion failed",
+              t('common.folderDeletionFailed'),
             {
               timeout: 2000,
             },
@@ -341,6 +342,7 @@ export default defineComponent({
         editFolder,
         filteredTabs,
         searchQuery,
+        t,
 
       };
     },

@@ -305,13 +305,13 @@ export default defineComponent({
 
     const isValidParam = () => {
       const methodPattern = /^[A-Za-z0-9]+(?:,[A-Za-z0-9]+)*$/g;
-      return methodPattern.test(formData.value.params) || "Invalid params.";
+      return methodPattern.test(formData.value.params) || t("function.invalidParams");
     };
 
     const isValidMethodName = () => {
       const methodPattern = /^[$A-Z_][0-9A-Z_$]*$/i;
       return (
-        methodPattern.test(formData.value.name) || "Invalid Function name."
+        methodPattern.test(formData.value.name) || t("function.invalidFunctionName")
       );
     };
     const updateEditorContent = () => {
@@ -345,7 +345,7 @@ end`;
 
           const loadingNotification = $q.notify({
             spinner: true,
-            message: "Please wait...",
+            message: t("function.pleaseWait"),
             timeout: 0,
           });
 
@@ -388,7 +388,7 @@ end`;
                 loadingNotification();
                 $q.notify({
                   type: "positive",
-                  message: res.data.message || "Function saved successfully",
+                  message: res.data.message || t("function.functionSavedSuccessfully"),
                 });
               })
               .catch((err) => {
@@ -396,7 +396,7 @@ end`;
                 $q.notify({
                   type: "negative",
                   message:
-                    err.response?.data?.message ?? "Function creation failed",
+                    err.response?.data?.message ?? t("function.functionCreationFailed"),
                 });
                 loadingNotification();
               });

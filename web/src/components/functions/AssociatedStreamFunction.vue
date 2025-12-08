@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-inner-loading
                 size="sm"
                 :showing="loadingFunctions"
-                label="Fetching functions..."
+                :label="t('function.fetchingFunctions')"
                 label-style="font-size: 1.1em"
               />
             </div>
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-ml-md q-mb-xs text-bold no-border"
                       @click="addFunctionInProgress = true"
                       no-caps
-                      >Associate Function</q-btn
+                      >{{ t('function.associateFunction') }}</q-btn
                     >
                   </div>
                 </template>
@@ -203,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="!functionsList.length && !addFunctionInProgress"
                       style="width: 100%; text-align: center"
                     >
-                      No functions found
+                      {{ t('function.noFunctionsFound') }}
                     </div>
                     <!-- <div>
                     <q-btn @click="addFunctionInProgress = true" no-caps>Associate Function</q-btn>
@@ -405,7 +405,7 @@ export default defineComponent({
         {
           name: "applyBeforeFlattening",
           field: "applyBeforeFlattening",
-          label: "Apply Before Flattening",
+          label: t("function.applyBeforeFlattening"),
           align: "left",
           sortable: true,
         },
@@ -429,7 +429,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier;
         const dismiss = $q.notify({
           spinner: true,
-          message: "Please wait while loading streams...",
+          message: t("function.pleaseWaitLoadingStreams"),
         });
 
         getStreams("", false)
@@ -474,7 +474,7 @@ export default defineComponent({
             dismiss();
             $q.notify({
               type: "negative",
-              message: "Error while pulling stream.",
+              message: t("function.errorPullingStream"),
               timeout: 2000,
             });
           });
@@ -525,7 +525,7 @@ export default defineComponent({
             type: "negative",
             message:
               JSON.stringify(err.response.data["error"]) ||
-              "Function fetching failed",
+              t("function.functionFetchingFailed"),
             timeout: 2000,
           });
         });
@@ -601,7 +601,7 @@ export default defineComponent({
             type: "negative",
             message:
               JSON.stringify(err.response.data["error"]) ||
-              "Function creation failed",
+              t("function.functionCreationFailed"),
             timeout: 2000,
           });
         })
@@ -685,7 +685,7 @@ export default defineComponent({
         .catch((err: any) => {
           $q.notify({
             color: "negative",
-            message: "Error while deleting stream.",
+            message: t("function.errorDeletingStream"),
           });
         });
     };

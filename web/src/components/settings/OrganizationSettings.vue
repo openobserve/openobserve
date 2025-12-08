@@ -24,12 +24,12 @@
           (val: string) =>
             !!val
               ? isValidTraceField ||
-                `Use alphanumeric and '+=,.@-_' characters only, without spaces.`
+                t('settings.fieldNameValidationMessage')
               : t('common.nameRequired'),
         ]"
       >
         <template v-slot:hint>
-          Use alphanumeric and '+=,.@-_' characters only, without spaces.
+          {{ t('settings.fieldNameValidationMessage') }}
         </template>
       </q-input>
     </div>
@@ -51,13 +51,13 @@
           (val: string) =>
             !!val
               ? isValidSpanField ||
-                `Use alphanumeric and '+=,.@-_' characters only, without spaces.`
+                t('settings.fieldNameValidationMessage')
               : t('common.nameRequired'),
         ]"
         @update:model-value="updateFieldName('span')"
       >
         <template v-slot:hint>
-          Use alphanumeric and '+=,.@-_' characters only, without spaces.
+          {{ t('settings.fieldNameValidationMessage') }}
         </template>
       </q-input>
     </div>
@@ -169,14 +169,14 @@ const saveOrgSettings = async () => {
     store.dispatch("setOrganizationSettings", updatedSettings);
 
     q.notify({
-      message: "Organization settings updated successfully",
+      message: t('settings.organizationSettingsUpdatedSuccess'),
       color: "positive",
       position: "bottom",
       timeout: 3000,
     });
   } catch (e: any) {
     q.notify({
-      message: e?.message || "Error saving organization settings",
+      message: e?.message || t('settings.errorSavingOrganizationSettings'),
       color: "negative",
       position: "bottom",
       timeout: 3000,

@@ -90,15 +90,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card class="q-pa-sm" style="min-width: 450px;">
         <q-toolbar>
           <q-toolbar-title>
-            <span class="text-weight-bold" :title="extendTrialDataRow.name">Extend Trial for {{ extendTrialDataRow.name }}</span>
-            <span class="text-subtitle2 flex">Set the new trial extension period.</span>
+            <span class="text-weight-bold" :title="extendTrialDataRow.name">{{ t('settings.extendTrialForOrg', { orgName: extendTrialDataRow.name }) }}</span>
+            <span class="text-subtitle2 flex">{{ t('settings.setTrialExtensionPeriod') }}</span>
           </q-toolbar-title>
           <q-btn flat round dense icon="close" v-close-popup />
         </q-toolbar>
 
         <q-card-section>
           <div>
-            <div class="float-left text-bold">Week(s)</div>
+            <div class="float-left text-bold">{{ t('settings.weeksLabel') }}</div>
             <div class="float-right q-gutter-xs">
               <span
                 v-for="page in 4"
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-btn
             class="o2-primary-button no-border tw-h-[36px]"
-            :label="`Extend trial by ${extendedTrial} week(s)`"
+            :label="t('settings.extendTrialByWeeks', { weeks: extendedTrial })"
             no-caps
             flat
             :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
@@ -257,9 +257,9 @@ export default defineComponent({
     ];
 
     const subscriptionPlans: any = {
-      "0": "Free",
-      "1": "Pay as you go",
-      "2": "Enterprise"
+      "0": t('settings.freePlan'),
+      "1": t('settings.payAsYouGoPlan'),
+      "2": t('settings.enterprisePlan')
     }
     
     const changePagination = (val: { label: string; value: any }) => {
@@ -272,7 +272,7 @@ export default defineComponent({
       loading.value = true;
       const dismiss = $q.notify({
         spinner: true,
-        message: "Please wait while loading data...",
+        message: t('settings.loadingDataMessage'),
       });
 
       OrganizationServices.get_admin_org(store.state.selectedOrganization.identifier)
@@ -304,7 +304,7 @@ export default defineComponent({
               type: "negative",
               message:
                 error.response?.data?.message ||
-                "Failed to fetch organization data. Please try again.",
+                t('settings.fetchOrganizationDataFailed'),
               timeout: 5000,
             });
           }
@@ -328,14 +328,14 @@ export default defineComponent({
       loading.value = true;
       const dismiss = $q.notify({
         spinner: true,
-        message: "Please wait while processing trial period extension request...",
+        message: t('settings.processingTrialExtensionMessage'),
       });
       OrganizationServices.extend_trial_period(store.state.selectedOrganization.identifier, payload)
         .then((response) => {
           if(response.data) {
             $q.notify({
               type: "positive",
-              message: "Trial period extended successfully.",
+              message: t('settings.trialPeriodExtendedSuccess'),
             });
             extendTrialPrompt.value = false;
             extendTrialDataRow.value = {};
@@ -353,7 +353,7 @@ export default defineComponent({
               type: "negative",
               message:
                 error.response?.data?.message ||
-                "Failed to extend trial period. Please try again.",
+                t('settings.failedToExtendTrialPeriod'),
               timeout: 5000,
             });
           }

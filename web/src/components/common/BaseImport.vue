@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="cursor-pointer"
                             />
                           </template>
-                          <template v-slot:hint> .json files only </template>
+                          <template v-slot:hint> {{ t('common.jsonFilesOnly') }} </template>
                         </q-file>
                       </div>
                     </div>
@@ -199,11 +199,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <slot name="output-section">
                 <!-- Default output section - only shown if slot not used -->
                 <slot name="output-content">
-                  <div class="text-center text-h6 tw-py-2">Output Messages</div>
+                  <div class="text-center text-h6 tw-py-2">{{ t('common.outputMessages') }}</div>
                   <q-separator class="q-mx-md q-mt-md" />
                   <div class="error-report-container">
                     <div class="text-center q-pa-md text-grey-6">
-                      No messages to display
+                      {{ t('common.noMessagesToDisplay') }}
                     </div>
                   </div>
                 </slot>
@@ -434,7 +434,7 @@ export default defineComponent({
                   resolve(jsonArray);
                 } catch (error) {
                   q.notify({
-                    message: `Error parsing JSON from file ${file.name}`,
+                    message: t('common.errorParsingJsonFile', { fileName: file.name }),
                     color: "negative",
                     position: "bottom",
                     timeout: 2000,
@@ -479,7 +479,7 @@ export default defineComponent({
               emit("update:jsonArray", jsonArrayOfObj.value);
             } else {
               q.notify({
-                message: "Invalid JSON format in the URL",
+                message: t('common.invalidJsonFormatUrl'),
                 color: "negative",
                 position: "bottom",
                 timeout: 2000,
@@ -487,7 +487,7 @@ export default defineComponent({
             }
           } catch (parseError) {
             q.notify({
-              message: "Invalid JSON format",
+              message: t('common.invalidJsonFormat'),
               color: "negative",
               position: "bottom",
               timeout: 2000,
@@ -496,7 +496,7 @@ export default defineComponent({
         }
       } catch (error) {
         q.notify({
-          message: "Error fetching data",
+          message: t('common.errorFetchingData'),
           color: "negative",
           position: "bottom",
           timeout: 2000,
@@ -552,6 +552,7 @@ export default defineComponent({
       updateFiles,
       updateJsonStr,
       updateJsonArray,
+      translatedTabs,
       contentStyle,
       splitterStyle,
       outputContainerStyle,

@@ -64,7 +64,7 @@
       v-if="validationErrors.length > 0"
       class="q-pa-md text-negative validation-errors"
     >
-      <div class="text-bold q-mb-sm">Please fix the following issues:</div>
+      <div class="text-bold q-mb-sm">{{ t('common.pleaseFixFollowingIssues') }}</div>
       <ul class="q-ml-md">
         <li v-for="(error, index) in validationErrors" :key="index">
           {{ error }}
@@ -189,7 +189,7 @@ export default defineComponent({
           // Add validation errors for changed protected fields
           validationErrors.value = [
             ...validationErrors.value.filter(err => !err.startsWith('Cannot modify')),
-            ...protectedFieldChanges.map(field => `Cannot modify ${field} field directly , will be reverted to the original value`)
+            ...protectedFieldChanges.map(field => t('common.cannotModifyFieldDirectly', { field: field }))
           ];
 
           // Revert the changes by restoring protected fields
@@ -209,7 +209,7 @@ export default defineComponent({
         // Clear any previous protected field validation errors
         validationErrors.value = validationErrors.value.filter(err => !err.startsWith('Cannot modify'));
       } catch (error) {
-        validationErrors.value = ['Invalid JSON format'];
+        validationErrors.value = [t('common.invalidJsonFormat')];
       }
     };
 
@@ -239,7 +239,7 @@ export default defineComponent({
           emit("saveJson", JSON.stringify(finalContent));
         } catch (error) {
           console.log(error, 'error')
-          validationErrors.value = ['Invalid JSON format'];
+          validationErrors.value = [t('common.invalidJsonFormat')];
         }
       };
 

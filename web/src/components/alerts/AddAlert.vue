@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             width: 22px;
             height: 22px;
           "
-          title="Go Back"
+          :title="t('alerts.goBack')"
           @click="router.back()"
         >
           <q-icon name="arrow_back_ios_new" size="14px" />
@@ -77,8 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <AlertsContainer 
                   name="query"
                   v-model:is-expanded="expandState.alertSetup"
-                  label="Alert Setup"
-                  subLabel="Set the stage for your alert."
+                  :label="t('alerts.alertSetup')"
+                  :subLabel="t('alerts.alertSetupSubtitle')"
                   icon="edit"
                   class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
                   :iconClass="'tw-mt-[2px]'"
@@ -287,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <AlertsContainer 
                     name="advanced"
                     v-model:is-expanded="expandState.advancedSetup"
-                    label="Advanced Setup"
+                    :label="t('alerts.advancedSetup')"
                     :icon="'add'"
                    class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
                     />
@@ -306,7 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-if="expandState.advancedSetup" class=" tw-w-full t">
               <div data-test="add-alert-description-input tw-w-full " :class="store.state.theme === 'dark' ? '' : 'light-mode'">
                 <div class="flex items-center q-mb-sm ">
-                  <span class="text-bold custom-input-label">Description</span>
+                  <span class="text-bold custom-input-label">{{ t('alerts.description') }}</span>
                 </div>
                 <q-input
                   v-model="formData.description"
@@ -320,14 +320,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   tabindex="0"
                   style="width: 100%; resize: none;"
                   type="textarea"
-                  placeholder="Type something"
+                  :placeholder="t('alerts.descriptionPlaceholder')"
                   rows="5"
                 />
               </div>
               <div data-test="add-alert-row-input tw-w-full">
                 <div class="flex items-center justify-between q-mb-sm">
                   <div class="flex items-center">
-                    <span class="text-bold custom-input-label">Row Template</span>
+                    <span class="text-bold custom-input-label">{{ t('alerts.rowTemplate') }}</span>
                     <q-btn
                       data-test="add-alert-row-input-info-btn"
                       style="color: #A0A0A0;"
@@ -339,12 +339,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       icon="info_outline"
                     >
                       <q-tooltip>
-                        Row Template is used to format the alert message.
+                        {{ t('alerts.rowTemplateTooltip') }}
                       </q-tooltip>
                     </q-btn>
                   </div>
                   <div class="flex items-center">
-                    <span class="text-caption q-mr-sm">Template Type:</span>
+                    <span class="text-caption q-mr-sm">{{ t('alerts.templateType') }}:</span>
                     <q-btn-toggle
                       data-test="add-alert-row-template-type-toggle"
                       v-model="formData.row_template_type"
@@ -448,7 +448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <JsonEditor
         :data="formData"
-        :title="'Edit Alert JSON'"
+        :title="t('alerts.editAlertJson')"
         :type="'alerts'"
         :validation-errors="validationErrors"
         @close="showJsonEditorDialog = false"

@@ -22,12 +22,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("settings.generalPageTitle") }}
       </div>
       <div class="general-page-subtitle">
-        Adjust settings for your Application
+        {{ t('settings.adjustApplicationSettings') }}
       </div>
     </div>
     <!-- platform settings section -->
     <div class="tw-mx-4">
-      <GroupHeader title="Platform Settings" :showIcon="false" />
+      <GroupHeader :title="t('settings.platformSettingsTitle')" :showIcon="false" />
       <div class="tw-w-full tw-flex tw-flex-col">
         <q-form @submit.stop="onSubmit.execute">
           <!-- scape interval section -->
@@ -45,19 +45,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               borderless
               hide-bottom-space
               data-test="general-settings-scrape-interval"
-              :rules="[(val: any) => !!val || 'Scrape interval is required']"
+              :rules="[(val: any) => !!val || t('settings.scrapeIntervalRequired')]"
               :lazy-rules="true"
               style="width: 120px;"
             />
             <span class="individual-setting-description">
-              The scrape interval is the frequency, in seconds, at which the monitoring system collects metrics.
+              {{ t('settings.scrapeIntervalDescription') }}
             </span>
           </div>
 
           <!-- Manage Theme section -->
           <div class="settings-grid-item tw-items-start">
             <span class="individual-setting-title">
-              Manage Theme
+              {{ t('settings.manageThemeLabel') }}
             </span>
             <div class="tw-flex tw-gap-2 tw-items-center" style="margin-left: -60px;">
               <!-- Light Mode Theme -->
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="color-circle" :style="{ backgroundColor: customLightColor }">
                   <q-icon name="palette" size="14px" color="white" class="palette-icon" />
                 </div>
-                <span class="chip-label">Light</span>
+                <span class="chip-label">{{ t('settings.lightThemeLabel') }}</span>
                 <span class="chip-value">{{ customLightColor }}</span>
               </div>
 
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="color-circle" :style="{ backgroundColor: customDarkColor }">
                   <q-icon name="palette" size="14px" color="white" class="palette-icon" />
                 </div>
-                <span class="chip-label">Dark</span>
+                <span class="chip-label">{{ t('settings.darkThemeLabel') }}</span>
                 <span class="chip-value">{{ customDarkColor }}</span>
               </div>
 
@@ -93,11 +93,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="reset-theme-colors-btn"
               >
                 <q-icon name="refresh" size="16px" />
-                <q-tooltip>Reset to default colors</q-tooltip>
+                <q-tooltip>{{ t('settings.resetToDefaultColors') }}</q-tooltip>
               </div>
             </div>
             <span class="individual-setting-description tw-self-start">
-              Manage your organization's theme colors for both light and dark modes. These colors will be applied at the organization level.
+              {{ t('settings.themeManagementDescription') }}
             </span>
           </div>
 
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
     >
       <div class="q-px-md q-py-sm">
-        <GroupHeader title="Enterprise Features" :showIcon="false" />
+        <GroupHeader :title="t('settings.enterpriseFeaturesTitle')" :showIcon="false" />
       </div>
       <div class="q-mx-md">
         <div class="settings-grid-item no-border-bottom">
@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div v-else class="flex items-center">
-            <span class="tw-w-[190px] tw-text-center tw-truncate">{{ store.state.zoConfig.custom_logo_text || "No Text Available" }}
+            <span class="tw-w-[190px] tw-text-center tw-truncate">{{ store.state.zoConfig.custom_logo_text || t('settings.noTextAvailable') }}
               <q-tooltip v-if="store.state.zoConfig.custom_logo_text.length > 20" class="tw-text-center tw-text-[12px] tw-max-w-[250px]">
                 {{ store.state.zoConfig.custom_logo_text }}
               </q-tooltip>
@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <span class="individual-setting-description">
-            Custom logo text is used to change the default branding text displayed in the application.
+            {{ t('settings.customLogoTextDescription') }}
           </span>
         </div>
         <!-- Light Mode Logo -->
@@ -220,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-file
             data-test="setting_ent_custom_logo_img_file_upload"
             v-model="filesLight"
-            :label="'Drag & drop or click to upload'"
+            :label="t('settings.dragDropUploadLabel')"
             counter
             :counter-label="counterLabelFn"
             accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
@@ -260,7 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="tw-flex tw-flex-col tw-mb-5">
             <span class="individual-setting-description">
-              Custom logo for light mode theme. This will be displayed when users are in light mode.
+              {{ t('settings.lightModeLogoDescription') }}
             </span>
           </div>
         </div>
@@ -298,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-file
             data-test="setting_ent_custom_logo_dark_img_file_upload"
             v-model="filesDark"
-            :label="'Drag & drop or click to upload'"
+            :label="t('settings.dragDropUploadLabel')"
             counter
             :counter-label="counterLabelFn"
             accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
@@ -338,7 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="tw-flex tw-flex-col tw-mb-5">
             <span class="individual-setting-description">
-              Custom logo for dark mode theme. This will be displayed when users are in dark mode.
+              {{ t('settings.darkModeLogoDescription') }}
             </span>
           </div>
         </div>
@@ -382,7 +382,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-dialog v-model="showColorPicker" @hide="onColorPickerClose">
     <q-card style="min-width: 300px">
       <q-card-section>
-        <div class="text-h6">Pick Custom Color</div>
+        <div class="text-h6">{{ t('settings.pickCustomColorTitle') }}</div>
       </q-card-section>
       <q-card-section>
         <q-color
@@ -391,7 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </q-card-section>
       <q-card-actions align="right">
-        <q-btn flat label="Close" color="primary" v-close-popup />
+        <q-btn flat :label="t('settings.closeLabel')" color="primary" v-close-popup />
       </q-card-actions>
     </q-card>
   </q-dialog>

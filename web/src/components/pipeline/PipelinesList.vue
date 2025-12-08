@@ -649,8 +649,8 @@ const togglePipelineState = (row: any, from_now: boolean) => {
     .then(async (response) => {
       row.enabled = newState;
       const message = row.enabled
-        ? `${row.name} state resumed successfully`
-        : `${row.name} state paused successfully`;
+        ? `${row.name} ${t("pipeline.success.stateResumed")}`
+        : `${row.name} ${t("pipeline.success.statePaused")}`;
       q.notify({
         message: message,
         color: "positive",
@@ -664,7 +664,7 @@ const togglePipelineState = (row: any, from_now: boolean) => {
         q.notify({
           message:
             error.response?.data?.message ||
-            "Error while updating pipeline state",
+            t("pipeline.error.updatingStateError"),
           color: "negative",
           position: "bottom",
           timeout: 3000,
@@ -870,14 +870,14 @@ const openDeleteDialog = (pipeline: any) => {
   confirmDialogMeta.value.show = true;
   confirmDialogMeta.value.title = t("pipeline.deletePipeline");
   confirmDialogMeta.value.message =
-    "Are you sure you want to delete this pipeline?";
+    t("pipeline.error.deleteConfirm");
   confirmDialogMeta.value.onConfirm = deletePipeline;
   confirmDialogMeta.value.data = pipeline;
 };
 
 const savePipeline = (data: any) => {
   const dismiss = q.notify({
-    message: "saving pipeline...",
+    message: t("pipeline.saving"),
     position: "bottom",
     spinner: true,
   });
@@ -892,7 +892,7 @@ const savePipeline = (data: any) => {
       dismiss();
       showCreatePipeline.value = false;
       q.notify({
-        message: "Pipeline created successfully",
+        message: t("pipeline.success.created"),
         color: "positive",
         position: "bottom",
         timeout: 3000,
@@ -903,7 +903,7 @@ const savePipeline = (data: any) => {
       if (error.response.status != 403) {
         q.notify({
           message:
-            error.response?.data?.message || "Error while saving pipeline",
+            error.response?.data?.message || t("pipeline.error.savingError"),
           color: "negative",
           position: "bottom",
           timeout: 3000,
@@ -914,7 +914,7 @@ const savePipeline = (data: any) => {
 
 const deletePipeline = async () => {
   const dismiss = q.notify({
-    message: "deleting pipeline...",
+    message: t("pipeline.deleting"),
     position: "bottom",
     spinner: true,
   });
@@ -927,7 +927,7 @@ const deletePipeline = async () => {
     })
     .then(async () => {
       q.notify({
-        message: "Pipeline deleted successfully",
+        message: t("pipeline.success.deleted"),
         color: "positive",
         position: "bottom",
         timeout: 3000,
@@ -937,7 +937,7 @@ const deletePipeline = async () => {
       if (error.response.status != 403) {
         q.notify({
           message:
-            error.response?.data?.message || "Error while deleting pipeline",
+            error.response?.data?.message || t("pipeline.error.deletingError"),
           color: "negative",
           position: "bottom",
           timeout: 3000,
@@ -1033,7 +1033,7 @@ const exportBulkPipelines = () => {
 
   selectedPipelines.value = [];
   q.notify({
-    message: `${pipelinesToExport.length} pipelines exported successfully`,
+    message: `${pipelinesToExport.length} ${t("pipeline.success.pipelinesExported")}`,
     color: "positive",
     position: "bottom",
     timeout: 3000,
@@ -1084,7 +1084,7 @@ const goToPipelineHistory = () => {
 const bulkTogglePipelines = async (action: "pause" | "resume") => {
     const dismiss = q.notify({
       spinner: true,
-      message: `${action === "resume" ? "Resuming" : "Pausing"} pipelines...`,
+      message: `${action === "resume" ? t("pipeline.resuming") : t("pipeline.pausing")} ${t("pipeline.pipelinesEllipsis")}...`,
       timeout: 0,
     });
   try {
@@ -1097,7 +1097,7 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
     if (pipelinesToToggle.length === 0) {
       q.notify({
         type: "negative",
-        message: `No pipelines to ${action}`,
+        message: `${t("pipeline.error.noPipelinesToAction")} ${action}`,
         timeout: 2000,
       });
       dismiss();
@@ -1120,7 +1120,7 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
       dismiss();
       q.notify({
         type: "positive",
-        message: `Pipelines ${action}d successfully`,
+        message: `${t("pipeline.pipelinesLabel")} ${action}${t("pipeline.success.actionSuccessfully")}`,
         timeout: 2000,
       });
     }
@@ -1133,7 +1133,7 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
     console.error(`Error ${action}ing pipelines:`, error);
     q.notify({
       type: "negative",
-      message: `Error ${action}ing pipelines. Please try again.`,
+      message: `${t("pipeline.error.actioningPipelines")} ${action}${t("pipeline.error.pleaseRetry")}`,
       timeout: 2000,
     });
   }

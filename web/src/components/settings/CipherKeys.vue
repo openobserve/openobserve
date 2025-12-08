@@ -122,8 +122,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </q-page>
   <ConfirmDialog
-    title="Delete Cipher Key"
-    message="Are you sure you want to delete Cipher Key?"
+    :title="t('settings.deleteCipherKeyTitle')"
+    :message="t('settings.deleteCipherKeyMessage')"
     @update:ok="deleteCipherKey"
     @update:cancel="cancelDeleteCipherKey"
     v-model="confirmDelete.visible"
@@ -282,7 +282,7 @@ export default defineComponent({
       loading.value = true;
       const dismiss = $q.notify({
         spinner: true,
-        message: "Please wait while loading data...",
+        message: t('settings.loadingDataMessage'),
       });
 
       CipherKeysService.list(store.state.selectedOrganization.identifier)
@@ -311,7 +311,7 @@ export default defineComponent({
               type: "negative",
               message:
                 error.response?.data?.message ||
-                "Failed to fetch cipher keys. Please try again.",
+                t('settings.fetchCipherKeysFailed'),
               timeout: 5000,
             });
           }
@@ -335,7 +335,7 @@ export default defineComponent({
       if (confirmDelete.value?.data?.name) {
         const dismiss = $q.notify({
           spinner: true,
-          message: "Please wait while processing delete request...",
+          message: t('settings.processingDeleteMessage'),
           type: "warning",
         });
         CipherKeysService.delete(
@@ -346,7 +346,7 @@ export default defineComponent({
             dismiss();
             $q.notify({
               type: "positive",
-              message: `Cipher Key deleted successfully`,
+              message: t('settings.cipherKeyDeletedSuccess'),
               timeout: 2000,
             });
 

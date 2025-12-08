@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 class="tw-text-[18px] tw-flex tw-items-center tw-justify-between"
               >
-                External Destination
+                {{ t('pipeline.externalDestination') }}
                 <div>
                   <q-btn v-close-popup="true" round flat icon="cancel"> </q-btn>
                 </div>
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? 'o2-toggle-button-xs-dark'
                 : 'o2-toggle-button-xs-light'
             "
-            :label="'Create new Destination'"
+            :label="t('pipeline.createNewDestination')"
             v-model="createNewDestination"
           />
 
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-select
                 data-test="external-destination-select"
                 v-model="selectedDestination"
-                :label="'Destination *'"
+                :label="t('pipeline.destination.label') + ' *'"
                 :options="getFormattedDestinations"
                 color="input-border"
                 bg-color="input-bg"
@@ -220,7 +220,7 @@ const getFormattedDestinations = computed(() => {
 const getDestinations = () => {
   const dismiss = q.notify({
     spinner: true,
-    message: "Please wait while loading destinations...",
+    message: t("pipeline.loadingDestinations"),
   });
   destinationService
     .list({
@@ -238,7 +238,7 @@ const getDestinations = () => {
       if (err.response.status != 403) {
         q.notify({
           type: "negative",
-          message: "Error while pulling destinations.",
+          message: t("pipeline.error.pullingDestinations"),
           timeout: 2000,
         });
       }
@@ -259,7 +259,7 @@ const saveDestination = () => {
     selectedDestination.value.value === ""
   ) {
     q.notify({
-      message: "Please select External destination from the list",
+      message: t("pipeline.error.selectDestination"),
       color: "negative",
       position: "bottom",
       timeout: 2000,
@@ -286,8 +286,8 @@ const handleCancel = () => {
 
 const openDeleteDialog = () => {
   dialog.value.show = true;
-  dialog.value.title = "Delete Node";
-  dialog.value.message = "Are you sure you want to delete stream routing?";
+  dialog.value.title = t("pipeline.deleteNode");
+  dialog.value.message = t("pipeline.error.deleteRoutingConfirm");
   dialog.value.okCallback = deleteRoute;
 };
 

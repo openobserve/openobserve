@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-mb-sm tw-inline-block tw-h-[36px] o2-toggle-button-lg"
           size="lg"
           :class="[store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light', !createNewFunction ? '-tw-ml-4' : '']"
-          :label="isUpdating ? 'Edit function' : 'Create new function'"
+          :label="isUpdating ? t('function.editFunction') : t('function.createNewFunction')"
           v-model="createNewFunction"
         />
         <div
@@ -87,12 +87,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               use-input
               input-debounce="300"
-              :rules="[(val: any) => !!val || 'Field is required!']"
+              :rules="[(val: any) => !!val || t('pipeline.error.fieldRequired')]"
               style="min-width: 220px"
               v-bind:readonly="isUpdating"
               v-bind:disable="isUpdating"
               :error-message="
-                selectedFunction ? 'Function is already associated' : ''
+                selectedFunction ? t('pipeline.error.functionAlreadyAssociated') : ''
               "
               @filter="filterFunctions"
               :error="functionExists"
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-separator />
             <q-card-section class="function-definition-content q-pa-none">
               <div class="function-code-container">
-                <pre class="function-code">{{ pipelineObj.functions[selectedFunction]?.function || 'No definition available' }}</pre>
+                <pre class="function-code">{{ pipelineObj.functions[selectedFunction]?.function || t('function.noDefinitionAvailable') }}</pre>
               </div>
             </q-card-section>
           </q-card>
@@ -144,15 +144,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Info note explaining RAF/RBF -->
           <q-card class="note-container">
             <q-card-section class="q-pa-sm">
-              <div class="note-heading">Function Execution Guidelines:</div>
+              <div class="note-heading">{{ t('pipeline.function.executionGuidelines') }}:</div>
               <q-banner inline dense class="note-info">
                 <div>
                   <q-icon name="info" color="orange" class="q-mr-sm" />
-                  <span><span class="highlight">RBF (Run Before Flattening):</span> Function executes before data structure is flattened</span>
+                  <span><span class="highlight">RBF (Run Before Flattening):</span> {{ t('pipeline.function.rbfDescription') }}</span>
                 </div>
                 <div>
                   <q-icon name="info" color="orange" class="q-mr-sm" />
-                  <span><span class="highlight">RAF (Run After Flattening):</span> Function executes after data structure is flattened</span>
+                  <span><span class="highlight">RAF (Run After Flattening):</span> {{ t('pipeline.function.rafDescription') }}</span>
                 </div>
               </q-banner>
             </q-card-section>
@@ -347,8 +347,8 @@ const openCancelDialog = () => {
   }
 
   dialog.value.show = true;
-  dialog.value.title = "Discard Changes";
-  dialog.value.message = "Are you sure you want to cancel changes?";
+  dialog.value.title = t("pipeline.discardChanges");
+  dialog.value.message = t("pipeline.error.cancelConfirm");
   dialog.value.okCallback = () => emit("cancel:hideform");
   pipelineObj.userClickedNode = {};
   pipelineObj.userSelectedNode = {};
@@ -356,9 +356,9 @@ const openCancelDialog = () => {
 
 const openDeleteDialog = () => {
   dialog.value.show = true;
-  dialog.value.title = "Delete Node";
+  dialog.value.title = t("pipeline.deleteNode");
   dialog.value.message =
-    "Are you sure you want to delete function association?";
+    t("pipeline.error.deleteFunctionConfirm");
   dialog.value.okCallback = deleteFunction;
 };
 
@@ -368,7 +368,7 @@ const saveFunction = () => {
   if (createNewFunction.value) {
     if (addFunctionRef.value.formData.name == "") {
       q.notify({
-        message: "Function Name is required",
+        message: t("pipeline.error.functionNameRequired"),
         color: "negative",
         position: "bottom",
         timeout: 2000,

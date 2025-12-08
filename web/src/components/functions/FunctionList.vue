@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :icon="outlinedAccountTree"
                     round
                     flat
-                    :title="'Associated Pipelines'"
+                    :title="t('function.associatedPipelines')"
                     @click="getAssociatedPipelines(props)"
                   >
                 </q-btn>
@@ -161,8 +161,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <ConfirmDialog
-      title="Delete Transform"
-      message="Are you sure you want to delete transform?"
+      :title="t('function.deleteTransform')"
+      :message="t('function.confirmDeleteTransform')"
       @update:ok="deleteFn"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-h6 dialog-heading tw-flex tw-justify-between tw-items-center"
         >
           <div>
-            Pipelines Associated with
+            {{ t('function.pipelinesAssociatedWith') }}
             <strong> {{ selectedDelete.name }}</strong>
           </div>
           <q-icon
@@ -203,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div v-else>
             <div class="text-h6 text-center">
-              No pipelines associated with this function
+              {{ t('function.noPipelinesAssociated') }}
             </div>
           </div>
         </q-card-section>
@@ -312,7 +312,7 @@ export default defineComponent({
     const getJSTransforms = () => {
       const dismiss = $q.notify({
         spinner: true,
-        message: "Please wait while loading functions...",
+        message: t("function.pleaseWaitLoadingFunctions"),
       });
 
       jsTransformService
@@ -356,13 +356,13 @@ export default defineComponent({
           dismiss();
         })
         .catch((err) => {
-          console.error("Error while pulling function", err);
+          console.error(t("function.errorPullingFunction"), err);
 
           dismiss();
           if (err.response.status != 403) {
             $q.notify({
               type: "negative",
-              message: "Error while pulling function.",
+              message: t("function.errorPullingFunction"),
               timeout: 2000,
             });
           }
@@ -501,11 +501,11 @@ export default defineComponent({
             $q.notify({
               type: "negative",
               message:
-                "Function deletion failed as it is associated with pipelines. Click on view button to get associated pipelines.",
+                t("function.functionDeletionFailedAssociated"),
               timeout: 10000,
               actions: [
                 {
-                  label: "View",
+                  label: t("function.view"),
                   color: "white",
                   handler: () => {
                     forceRemoveFunction(err.response.data["message"]);
@@ -520,7 +520,7 @@ export default defineComponent({
               type: "negative",
               message:
                 JSON.stringify(err.response.data["message"]) ||
-                "Function deletion failed.",
+                t("function.functionDeletionFailed"),
             });
           }
         });

@@ -766,7 +766,7 @@ export default defineComponent({
       loading.value = true;
       const dismiss = $q.notify({
         spinner: true,
-        message: "Please wait while loading data...",
+        message: t('settings.loadingDataMessage'),
       });
 
       CommonService.list_nodes(store.state.selectedOrganization.identifier)
@@ -799,7 +799,7 @@ export default defineComponent({
               type: "negative",
               message:
                 error.response?.data?.message ||
-                "Failed to fetch nodes. Please try again.",
+                t('settings.fetchNodesFailed'),
               timeout: 5000,
             });
           }

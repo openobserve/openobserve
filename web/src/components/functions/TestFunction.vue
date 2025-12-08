@@ -461,7 +461,7 @@ const setEventsEditor = () => {
 
 const outputMessage = computed(() => {
   if (!outputEvents.value) {
-    return "Please click Test Function to see the events";
+    return t("function.clickTestFunctionMessage");
   }
 
   return "";
@@ -471,10 +471,10 @@ const areInputValid = () => {
   if (!inputQuery.value) {
     q.notify({
       type: "negative",
-      message: "Please enter a query",
+      message: t("function.pleaseEnterQuery"),
       timeout: 3000,
     });
-    sqlQueryErrorMsg.value = "Please enter a query";
+    sqlQueryErrorMsg.value = t("function.pleaseEnterQuery");
     return false;
   }
 
@@ -577,13 +577,13 @@ const getResults = async () => {
     .catch((err: any) => {
       sqlQueryErrorMsg.value = err.response?.data?.message
         ? err.response?.data?.message
-        : "Invalid SQL Query";
+        : t("function.invalidSQLQuery");
 
       // Show error only if it is not real time alert
       // This case happens when user enters invalid query and then switches to real time alert
       q.notify({
         type: "negative",
-        message: "Invalid SQL Query : " + err.response?.data?.message,
+        message: t("function.invalidSQLQueryPrefix") + err.response?.data?.message,
         timeout: 3000,
       });
     })
@@ -596,7 +596,7 @@ const isInputValid = () => {
     JSON.parse(inputEvents.value);
     return true;
   } catch (e: any) {
-    eventsErrorMsg.value = `Invalid events: ${e?.message}`;
+    eventsErrorMsg.value = t("function.invalidEventsPrefix") + e?.message;
     q.notify({
       type: "negative",
       message: eventsErrorMsg.value,
@@ -628,8 +628,8 @@ const processTestResults = async (results: any) => {
 };
 
 const handleTestError = (err: any) => {
-  const errMsg = err.response?.data?.message || "Error in testing function";
-  outputEventsErrorMsg.value = "Error while transforming results";
+  const errMsg = err.response?.data?.message || t("function.errorTestingFunction");
+  outputEventsErrorMsg.value = t("function.errorTransformingResults");
 
   q.notify({
     type: "negative",
@@ -713,7 +713,7 @@ function getLineRanges(object: any) {
       ranges.push({
         startLine: startLine + 1,
         endLine: endLine + 1,
-        error: `Error: Failed to apply VRL Function.\n${object.message}`,
+        error: t("function.errorFailedApplyVRL") + `\n${object.message}`,
       }); // Monaco uses 1-based indexing
     }
 
@@ -737,7 +737,7 @@ function highlightSpecificEvent() {
       }
     });
     if (errorEventRanges.length) {
-      outputEventsErrorMsg.value = "Failed to apply VRL Function on few events";
+      outputEventsErrorMsg.value = t("function.failedApplyVRLFewEvents");
     }
 
     if (outputEventsEditorRef.value)

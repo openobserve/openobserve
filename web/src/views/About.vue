@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="link-badge"
               >
                 <q-icon name="settings" size="16px" class="tw-mr-1" />
-                Cargo.toml
+                {{ t('about.cargo_toml') }}
               </a>
               <a
                 href="https://github.com/openobserve/openobserve/blob/main/web/package.json"
@@ -87,15 +87,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="link-badge"
               >
               <q-icon name="backpack" class="tw-mr-1" />
-                package.json
+                {{ t('about.package_json') }}
               </a>
               <a href="https://npmjs.com" target="_blank" class="link-badge">
                 <q-icon name="javascript" size="16px" class="tw-mr-1" />
-                npmjs.com
+                {{ t('about.npmjs_site') }}
               </a>
               <a href="https://crates.io" target="_blank" class="link-badge">
                 <q-icon name="inventory_2" size="16px" class="tw-mr-1" />
-                crates.io
+                {{ t('about.crates_site') }}
               </a>
             </div>
           </div>
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   href="https://github.com/openobserve/openobserve/blob/main/LICENSE"
                   target="_blank"
                   class="inline-link"
-                >GNU Affero General Public License (AGPL)</a>.
+                >{{ t('about.agpl_license') }}</a>.
               </p>
               <p v-if="store.state.zoConfig.build_type == 'enterprise' && config.isCloud == 'false'" class="feature-text">
                 {{ t("about.license_info_msg") }}
@@ -150,11 +150,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw-flex tw-flex-wrap tw-gap-2">
               <a href="https://github.com/openobserve/openobserve" target="_blank" class="link-badge">
                 <q-icon name="code" size="16px" class="tw-mr-1" />
-                GitHub
+                {{ t('about.github_lbl') }}
               </a>
               <a href="https://openobserve.ai" target="_blank" class="link-badge">
                 <q-icon name="language" size="16px" class="tw-mr-1" />
-                Website
+                {{ t('about.website_lbl') }}
               </a>
             </div>
           </div>
@@ -245,11 +245,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <tbody>
                       <tr>
                         <td class="tw-font-semibold">{{ t("about.ingestion_type") }}</td>
-                        <td>{{ !licenseData?.expired && licenseData.license.limits?.Ingestion?.typ ? licenseData.license.limits.Ingestion.typ : 'PerDayCount' }}</td>
+                        <td>{{ !licenseData?.expired && licenseData.license.limits?.Ingestion?.typ ? licenseData.license.limits.Ingestion.typ : t('about.per_day_count') }}</td>
                       </tr>
                       <tr>
                         <td class="tw-font-semibold">{{ t("about.ingestion_limit") }}</td>
-                        <td>{{ !licenseData?.expired && licenseData.license.limits?.Ingestion?.value ? `${licenseData.license.limits.Ingestion.value} GB / day` : '100 GB / day' }}</td>
+                        <td>{{ !licenseData?.expired && licenseData.license.limits?.Ingestion?.value ? `${licenseData.license.limits.Ingestion.value} ${t('about.gb_per_day')}` : `100 ${t('about.gb_per_day')}` }}</td>
                       </tr>
                       <tr v-if="licenseData.ingestion_used !== undefined">
                         <td class="tw-font-semibold">{{ t("about.today_usage") }}</td>
@@ -371,7 +371,7 @@ export default defineComponent({
       } else {
         // Show error notification when user doesn't have access to meta org
           $q.notify({
-            message: "You are not authorized to manage the license.",
+            message: t('about.unauthorized_license_msg'),
             color: 'negative',
             timeout: 5000,
           })

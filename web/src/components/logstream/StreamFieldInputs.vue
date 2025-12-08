@@ -1,7 +1,7 @@
 <template>
   <div data-test="add-stream-fields-section">
     <div v-if="showHeader" data-test="alert-conditions-text" class="text-bold">
-      Fields
+      {{ t('logStream.fieldsSection') }}
     </div>
     <template v-if="!fields.length">
       <q-btn
@@ -30,12 +30,12 @@
         <div data-test="add-stream-field-name-input" class="q-ml-none o2-input flex items-center ">
           <q-input
             v-model="field.name"
-            :placeholder="'Field Name' + ' *'"
+            :placeholder="t('logStream.fieldNamePlaceholder')"
             class="q-py-sm"
             stack-label
             borderless
             dense
-            :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+            :rules="[(val: any) => !!val.trim() || t('logStream.fieldRequired')]"
             tabindex="0"
             :style="isInSchema ? { width: '40vw' } : { width: '250px' }"
           />
@@ -83,7 +83,7 @@
             use-input
             fill-input
             style="width: 250px"
-            :placeholder="!isFocused && (!field.index_type || field.index_type.length === 0) ? 'Index Type' : ''"
+            :placeholder="!isFocused && (!field.index_type || field.index_type.length === 0) ? t('logStream.indexTypePlaceholder') : ''"
             @update:model-value="emits('input:update', 'conditions', field)"
             @focus="handleFocus"
             @blur="handleBlur"
@@ -109,8 +109,8 @@
             hide-selected
             emit-value
             style="width: 250px"
-            :placeholder="!isDataTypeFocused && (!field.type || field.type.length === 0) ? 'Data Type *' : ''"
-            :rules="[(val: any) => !!val || 'Data Type is required!']"
+            :placeholder="!isDataTypeFocused && (!field.type || field.type.length === 0) ? t('logStream.dataTypePlaceholder') : ''"
+            :rules="[(val: any) => !!val || t('logStream.dataTypeRequired')]"
             @update:model-value="emits('input:update', 'conditions', field)"
             @focus="handleDataTypeFocus"
             @blur="handleDataTypeBlur"
@@ -159,7 +159,7 @@
 import { useI18n } from "vue-i18n";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
-import { ref } from "vue";
+import { ref, computed } from "vue";
 
 defineProps({
   fields: {
@@ -187,45 +187,45 @@ defineProps({
 
 const emits = defineEmits(["add", "remove", "input:update"]);
 
-const streamIndexType = [
-  { label: "Full text search", value: "fullTextSearchKey" },
-  { label: "Secondary index", value: "secondaryIndexKey" },
-  { label: "Bloom filter", value: "bloomFilterKey" },
-  { label: "KeyValue partition", value: "keyPartition" },
-  { label: "Prefix partition", value: "prefixPartition" },
-  { label: "Hash partition (8 Buckets)", value: "hashPartition_8" },
-  { label: "Hash partition (16 Buckets)", value: "hashPartition_16" },
-  { label: "Hash partition (32 Buckets)", value: "hashPartition_32" },
-  { label: "Hash partition (64 Buckets)", value: "hashPartition_64" },
-  { label: "Hash partition (128 Buckets)", value: "hashPartition_128" },
-];
-
-const dataTypes = [
-  {
-    label: "Utf8",
-    value: "Utf8",
-  },
-  {
-    label: "Int64",
-    value: "Int64",
-  },
-  {
-    label: "Uint64",
-    value: "Uint64",
-  },
-  {
-    label: "Float64",
-    value: "Float64",
-  },
-  {
-    label: "Boolean",
-    value: "Boolean",
-  },
-];
-
 const store = useStore();
 
 const { t } = useI18n();
+
+const streamIndexType = computed(() => [
+  { label: t("logStream.indexTypes.fullTextSearch"), value: "fullTextSearchKey" },
+  { label: t("logStream.indexTypes.secondaryIndex"), value: "secondaryIndexKey" },
+  { label: t("logStream.indexTypes.bloomFilter"), value: "bloomFilterKey" },
+  { label: t("logStream.indexTypes.keyValuePartition"), value: "keyPartition" },
+  { label: t("logStream.indexTypes.prefixPartition"), value: "prefixPartition" },
+  { label: t("logStream.indexTypes.hashPartition8"), value: "hashPartition_8" },
+  { label: t("logStream.indexTypes.hashPartition16"), value: "hashPartition_16" },
+  { label: t("logStream.indexTypes.hashPartition32"), value: "hashPartition_32" },
+  { label: t("logStream.indexTypes.hashPartition64"), value: "hashPartition_64" },
+  { label: t("logStream.indexTypes.hashPartition128"), value: "hashPartition_128" },
+]);
+
+const dataTypes = computed(() => [
+  {
+    label: t("logStream.dataTypes.utf8"),
+    value: "Utf8",
+  },
+  {
+    label: t("logStream.dataTypes.int64"),
+    value: "Int64",
+  },
+  {
+    label: t("logStream.dataTypes.uint64"),
+    value: "Uint64",
+  },
+  {
+    label: t("logStream.dataTypes.float64"),
+    value: "Float64",
+  },
+  {
+    label: t("logStream.dataTypes.boolean"),
+    value: "Boolean",
+  },
+]);
 
 const isFocused = ref(false)
 //repetitive need to refactor
