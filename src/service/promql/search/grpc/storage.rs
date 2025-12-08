@@ -239,7 +239,7 @@ pub(crate) async fn create_context(
                     DataFusionError::Execution(e.to_string())
                 })?;
         log::info!(
-            "[trace_id {trace_id}] promql->search->storage: filter file list by tantivy index took: {idx_took} ms, is_full_convert: {is_full_convert}",
+            "[trace_id {trace_id}] promql->search->storage: filter file list by tantivy index took: {idx_took} ms, is_add_filter_back: {is_add_filter_back}, is_full_convert: {is_full_convert}",
         );
     }
     scan_stats.idx_took = idx_took as i64;
