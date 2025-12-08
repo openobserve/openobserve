@@ -309,7 +309,7 @@ fn convert_matchers_to_index_condition(
     index_fields: &HashSet<String>,
 ) -> Result<(IndexCondition, bool)> {
     let mut index_condition = IndexCondition::default();
-    let mut is_full_convert = matchers.or_matchers.is_empty();
+    let mut is_full_convert = true;
     for mat in matchers.matchers.iter() {
         if mat.name == TIMESTAMP_COL_NAME
             || mat.name == VALUE_LABEL
