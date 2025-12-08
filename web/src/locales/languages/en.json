@@ -735,9 +735,11 @@
     "createStream": "Create Stream",
     "indexType": "Index Type",
     "addField": "Add Field",
+    "addFieldsDialog": "Add Field(s)",
     "addSchemaField": "Add to Defined Schema",
     "removeSchemaField": "Remove Defined Schema",
     "storeOriginalData": "Store Original Data",
+    "enableDistinctValues": "Enable Distinct Values",
     "flattenLevel": "Flatten Level",
     "approxPartition": "Use Stream Stats for Partitioning",
     "indexSize": "Index Size",
@@ -864,6 +866,7 @@
     "savePipeline": "Save Pipeline",
     "importPipeline": "Import Pipeline",
     "outputMessages": "Output Messages",
+    "errorValidations": "Error Validations",
     "streamRouting": "Stream Routing",
     "addInputStreamNode": "Add Input Stream Node",
     "addOutputStreamNode": "Add Output Stream Node",
@@ -874,7 +877,13 @@
     "addRemoteStreamNode": "Add Remote Stream Node",
     "saving": "Saving pipeline...",
     "pleaseWait": "Please wait...",
+    "remoteDestination":"Remote Destination",
     "goBack": "Go Back",
+    "sqlQuery":"SQL Query",
+    "organizationId": "Organization Id",
+    "functionName":"Function Name'",
+    "timezone":"Timezone",
+    "pipelineCreation":"Pipeline Creation",
     "placeholder": {
       "value": "Value",
       "selectColumn": "Select column"
@@ -932,7 +941,9 @@
       "addCondition": "Please add at least one condition",
       "selectDestination": "Please select External destination from the list",
       "functionNameRequired": "Function Name is required",
-      "selectStream": "Please select Stream from the list"
+      "selectStream": "Please select Stream from the list",
+      "fieldRequired":"Field is required!",
+      "importingError":"Error importing Pipeline(s) please check the JSON"
     },
     "success": {
       "contentCopied": "Content Copied Successfully!",
