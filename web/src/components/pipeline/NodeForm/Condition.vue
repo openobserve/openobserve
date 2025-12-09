@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="stream-routing-title q-pb-sm q-pl-md tw-flex tw-items-center tw-justify-between ">
       {{ t("pipeline.conditionTitle") }}
       <div>
-          <q-btn v-close-popup="true" round flat icon="cancel" >
+          <q-btn round flat icon="cancel" @click="openCancelDialog">
           </q-btn>
         </div>
     </div>
@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :group="conditionGroup"
               :depth="0"
               condition-input-width="tw-w-[130px]"
+              :allow-custom-columns="true"
               @add-condition="(updatedGroup) => updateGroup(updatedGroup)"
               @add-group="(updatedGroup) => updateGroup(updatedGroup)"
               @remove-group="(groupId) => removeConditionGroup(groupId)"
@@ -305,7 +306,8 @@ const getDefaultStreamRoute: any = () => {
 const getDefaultConditionGroup = (): ConditionGroup => {
   if (pipelineObj.isEditNode && pipelineObj.currentSelectedNodeData?.data?.conditions) {
     try {
-      const conditions = pipelineObj.currentSelectedNodeData.data.conditions;
+      // Create a deep copy to avoid mutating the original pipelineObj data
+      const conditions = JSON.parse(JSON.stringify(pipelineObj.currentSelectedNodeData.data.conditions));
       const version = detectConditionsVersion(conditions);
 
       if (version === 0) {
@@ -531,8 +533,10 @@ const onInputUpdate = (name: string, field: any) => {
 };
 
 const closeDialog = () => {
+  // Restore the original condition group when canceling
+  conditionGroup.value = JSON.parse(JSON.stringify(originalConditionGroup.value));
   pipelineObj.userClickedNode = {};
-  pipelineObj.userSelectedNode = {};  
+  pipelineObj.userSelectedNode = {};
   emit("cancel:hideform");
 };
 
@@ -602,6 +606,8 @@ const saveCondition = async () => {
     }
 
     addNode(conditionData);
+    // Update originalConditionGroup to the newly saved state
+    originalConditionGroup.value = JSON.parse(JSON.stringify(conditionGroup.value));
     emit("cancel:hideform");
   } catch (error) {
     console.error("Error saving condition:", error);
