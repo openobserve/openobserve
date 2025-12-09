@@ -417,6 +417,9 @@ pub fn create_session_config(
         config = config.set_bool("datafusion.execution.split_file_groups_by_statistics", true);
     }
 
+    // due to: https://github.com/apache/datafusion/issues/19219
+    config = config.set_bool("datafusion.optimizer.enable_topk_aggregation", false);
+
     // When set to true, skips verifying that the schema produced by planning the input of
     // `LogicalPlan::Aggregate` exactly matches the schema of the input plan.
     config = config.set_bool(
