@@ -2444,15 +2444,18 @@ async fn handle_backfill_triggers(
 
     // 8. Update progress or complete
     if chunk_end >= backfill_job.end_time {
-        // Backfill complete - delete trigger
+        // Backfill complete - mark trigger as completed
         log::info!(
             "[BACKFILL trace_id {trace_id}] Backfill job completed for pipeline {}",
             backfill_job.source_pipeline_id
         );
-        db::scheduler::delete(
-            &trigger.org,
-            db::scheduler::TriggerModule::Backfill,
-            &trigger.module_key,
+        db::scheduler::update_trigger(
+            db::scheduler::Trigger {
+                status: db::scheduler::TriggerStatus::Completed,
+                ..trigger
+            },
+            true,
+            trace_id,
         )
         .await?;
     } else {

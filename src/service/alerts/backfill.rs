@@ -71,7 +71,7 @@ pub async fn create_backfill_job(
         return Err(anyhow::anyhow!("end_time cannot be in the future"));
     }
 
-    // 3. Create backfill job
+    // 3. Create backfill job in backfill_jobs table
     let backfill_job_id = ider::generate();
     let module_key = format!("backfill/{}/{}/{}", org_id, pipeline_id, backfill_job_id);
 
@@ -81,6 +81,22 @@ pub async fn create_backfill_job(
         DeletionStatus::NotRequired
     };
 
+    // Store static configuration in backfill_jobs table
+    let backfill_job_config = infra::table::backfill_jobs::BackfillJob {
+        id: backfill_job_id.clone(),
+        org: org_id.to_string(),
+        pipeline_id: pipeline_id.to_string(),
+        start_time,
+        end_time,
+        chunk_period_minutes,
+        delay_between_chunks_secs,
+        delete_before_backfill,
+        created_at: now,
+    };
+
+    infra::table::backfill_jobs::add(backfill_job_config).await?;
+
+    // Store dynamic state in scheduled_jobs trigger data
     let backfill_job = BackfillJob {
         source_pipeline_id: pipeline_id.to_string(),
         start_time,
@@ -308,7 +324,10 @@ pub async fn cancel_backfill_job(org_id: &str, job_id: &str) -> Result<(), anyho
                 job_id,
                 org_id
             );
+            // Delete from scheduled_jobs
             db::scheduler::delete(org_id, TriggerModule::Backfill, &trigger.module_key).await?;
+            // Delete from backfill_jobs table
+            infra::table::backfill_jobs::delete(org_id, job_id).await?;
             return Ok(());
         }
     }
