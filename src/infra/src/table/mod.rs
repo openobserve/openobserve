@@ -46,6 +46,7 @@ pub mod service_streams_dimensions;
 pub mod sessions;
 pub mod short_urls;
 pub mod system_prompts;
+pub mod system_settings;
 pub mod templates;
 pub mod timed_annotation_panels;
 pub mod timed_annotations;

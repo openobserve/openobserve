@@ -50,6 +50,7 @@ pub mod schema;
 pub mod search_job;
 pub mod session;
 pub mod short_url;
+pub mod system_settings;
 pub mod user;
 
 pub(crate) use infra_db::{Event, NEED_WATCH, NO_NEED_WATCH, get_coordinator};

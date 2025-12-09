@@ -163,6 +163,12 @@ struct ConfigResponse<'a> {
     service_streams_enabled: bool,
     #[cfg(not(feature = "enterprise"))]
     service_streams_enabled: bool,
+    /// Available FQN priority dimensions from O2_FQN_PRIORITY_DIMENSIONS env var
+    /// Used by UI to populate the FQN priority dimension selector
+    #[cfg(feature = "enterprise")]
+    fqn_priority_dimensions: Vec<String>,
+    #[cfg(not(feature = "enterprise"))]
+    fqn_priority_dimensions: Vec<String>,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -430,6 +436,12 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         mysql_deprecated_warning: cfg.common.meta_store.starts_with("mysql"),
         service_graph_enabled,
         service_streams_enabled,
+        #[cfg(feature = "enterprise")]
+        fqn_priority_dimensions: o2_enterprise::enterprise::common::config::get_config()
+            .service_streams
+            .get_fqn_priority_dimensions(),
+        #[cfg(not(feature = "enterprise"))]
+        fqn_priority_dimensions: vec![],
     }))
 }
 

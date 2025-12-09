@@ -434,6 +434,10 @@ export default {
       default: "",
       required: false,
     },
+    hideViewRelated: {
+      type: Boolean,
+      default: false,
+    },
   },
   components: {
     NotEqualIcon,
@@ -534,12 +538,13 @@ export default {
 
         // Show button if correlation is available AND we're in detail view (sidebar or expanded)
         // AND service_streams is enabled in config
+        // AND hideViewRelated prop is not set (used by DetailTable drawer to hide the button)
         // Mode can be 'sidebar' (when opened from sidebar) or 'expanded' (when log row is expanded in table)
         const isDetailView = props.mode === 'sidebar' || props.mode === 'expanded';
         const serviceStreamsEnabled = store.state.zoConfig.service_streams_enabled !== false; // Default to true if not set
-        showViewRelatedBtn.value = available && isDetailView && serviceStreamsEnabled;
+        showViewRelatedBtn.value = available && isDetailView && serviceStreamsEnabled && !props.hideViewRelated;
 
-        console.log("[JsonPreview] showViewRelatedBtn set to:", showViewRelatedBtn.value, "isDetailView:", isDetailView, "serviceStreamsEnabled:", serviceStreamsEnabled);
+        console.log("[JsonPreview] showViewRelatedBtn set to:", showViewRelatedBtn.value, "isDetailView:", isDetailView, "serviceStreamsEnabled:", serviceStreamsEnabled, "hideViewRelated:", props.hideViewRelated);
       } catch (err) {
         console.error("[JsonPreview] Error checking correlation availability:", err);
         showViewRelatedBtn.value = false;
