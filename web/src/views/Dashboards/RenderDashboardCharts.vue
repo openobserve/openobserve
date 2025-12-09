@@ -915,35 +915,55 @@ export default defineComponent({
         if (isFirstLoad) {
           globalVariablesLoaded.value = true;
 
-          nextTick(() => {
-            if (
-              tabVariablesValueSelectorRef.value &&
-              activeTabVariables.value.length > 0
-            ) {
-              tabVariablesValueSelectorRef.value.loadAllVariablesData(true);
-            } else if (activeTabVariables.value.length === 0) {
-              tabVariablesReady.value = true;
-              nextTick(() => {
-                // Check if there are any panel variables
-                const allPanelsWithVariables = panels.value.filter((panel: any) =>
-                  getPanelVariables(panel.id).length > 0
-                );
+          console.log('[RenderDashboardCharts] ✓ Global variables loaded');
+          console.log('  Global values:', JSON.stringify(currentGlobalValues));
+          console.log('  mergedVariablesValues BEFORE update:', JSON.stringify(mergedVariablesValues.value));
 
-                if (allPanelsWithVariables.length === 0 && isInitialDashboardLoad.value) {
-                  // No tab variables AND no panel variables - we can update now
-                  console.log('No tab or panel variables exist, updating currentVariablesDataRef with global only');
-                  currentVariablesDataRef.value = {
-                    __global: variablesData.value
-                  };
-                  isInitialDashboardLoad.value = false;
+          // CRITICAL: Wait for multiple ticks to ensure reactivity fully propagates
+          // This ensures mergedVariablesWrapper (computed) has updated values when child loads
+          nextTick(() => {
+            console.log('[RenderDashboardCharts] After tick 1 - mergedVariablesWrapper:', JSON.stringify(mergedVariablesWrapper.value));
+
+            nextTick(() => {
+              console.log('[RenderDashboardCharts] After tick 2 - mergedVariablesWrapper:', JSON.stringify(mergedVariablesWrapper.value));
+
+              if (
+                tabVariablesValueSelectorRef.value &&
+                activeTabVariables.value.length > 0
+              ) {
+                // Now trigger tab variables load with fully updated parent values
+                console.log('[RenderDashboardCharts] ▶ Triggering tab variables load (parent values ready)');
+
+                if (tabVariablesValueSelectorRef.value?.loadAllVariablesData) {
+                  tabVariablesValueSelectorRef.value.loadAllVariablesData(true);
                 } else {
-                  // Panel variables exist, trigger their loading
-                  visiblePanels.value.forEach((panelId) => {
-                    loadPanelVariablesIfVisible(panelId);
-                  });
+                  console.error('[RenderDashboardCharts] ✗ Tab ref not available');
                 }
-              });
-            }
+              } else if (activeTabVariables.value.length === 0) {
+                tabVariablesReady.value = true;
+                nextTick(() => {
+                  // Check if there are any panel variables
+                  const allPanelsWithVariables = panels.value.filter((panel: any) =>
+                    getPanelVariables(panel.id).length > 0
+                  );
+
+                  if (allPanelsWithVariables.length === 0 && isInitialDashboardLoad.value) {
+                    // No tab variables AND no panel variables - we can update now
+                    console.log('No tab or panel variables exist, updating currentVariablesDataRef with global only');
+                    currentVariablesDataRef.value = {
+                      __global: variablesData.value
+                    };
+                    console.log('[RenderDashboardCharts] ⚠ Setting isInitialDashboardLoad = false (location: no variables)');
+                    isInitialDashboardLoad.value = false;
+                  } else {
+                    // Panel variables exist, trigger their loading
+                    visiblePanels.value.forEach((panelId) => {
+                      loadPanelVariablesIfVisible(panelId);
+                    });
+                  }
+                });
+              }
+            });
           });
         }
 
@@ -961,6 +981,17 @@ export default defineComponent({
 
     // Track if this is the very first load of the dashboard (to prevent premature API calls)
     const isInitialDashboardLoad = ref(true);
+    console.log('[RenderDashboardCharts] Component initialized - isInitialDashboardLoad:', isInitialDashboardLoad.value);
+
+    // CRITICAL: Reset on every mount to handle page refresh
+    onMounted(() => {
+      console.log('[RenderDashboardCharts] onMounted - forcing isInitialDashboardLoad = true');
+      isInitialDashboardLoad.value = true;
+      globalVariablesLoaded.value = false;
+      tabVariablesReady.value = false;
+      panelVariablesLoaded.value.clear();
+      currentVariablesDataRef.value = { __global: {} };
+    });
 
     // Track last tab values to detect changes
     const lastTabValues = ref<Record<string, any>>({});
@@ -1129,6 +1160,7 @@ export default defineComponent({
                 values: mergedGlobalAndTabValues,
               }
             };
+            console.log('[RenderDashboardCharts] ⚠ Setting isInitialDashboardLoad = false (location: tab loaded)');
             isInitialDashboardLoad.value = false;
           } else {
             // Panel variables exist, trigger their loading
@@ -1351,6 +1383,7 @@ export default defineComponent({
               };
 
               // Mark initial load as complete
+              console.log('[RenderDashboardCharts] ⚠ Setting isInitialDashboardLoad = false (location: panel loaded)');
               isInitialDashboardLoad.value = false;
             }
           } else {
@@ -1822,12 +1855,24 @@ export default defineComponent({
     watch(
       () => props.initialVariableValues,
       (newVal) => {
-        if (newVal?.value && Object.keys(newVal.value).length > 0) {
+        // Always initialize, even if empty - this ensures the object exists
+        // Empty initialVariableValues means variables should load defaults
+        if (newVal?.value !== undefined) {
           mergedVariablesValues.value = { ...newVal.value };
+          console.log('[RenderDashboardCharts] Initialized mergedVariablesValues from props:', JSON.stringify(mergedVariablesValues.value));
         }
       },
       { immediate: true },
     );
+
+    // Watch for initial dashboard load flag changes
+    watch(isInitialDashboardLoad.value, (newVal, oldVal) => {
+      console.log(`[RenderDashboardCharts] isInitialDashboardLoad changed: ${oldVal} → ${newVal}`);
+      if (!newVal) {
+        console.log('  ✓ Initial load complete - panels can now load data');
+        console.log('  currentVariablesDataRef:', JSON.stringify(currentVariablesDataRef.value));
+      }
+    });
 
     // Watch for tab changes - reset state
     watch(selectedTabId, (newTabId, oldTabId) => {
@@ -1910,6 +1955,7 @@ export default defineComponent({
       tabVariablesValueSelectorRef,
       mergedVariablesWrapper,
       getPanelVariablesWrapper,
+      isInitialDashboardLoad,
     };
   },
   methods: {
