@@ -453,4 +453,141 @@ export class StreamsPage {
     async waitForUI(milliseconds) {
         await this.page.waitForTimeout(milliseconds);
     }
-} 
+
+    /**
+     * ==========================================
+     * STREAM API METHODS
+     * ==========================================
+     */
+
+    /**
+     * Create a stream via API
+     * @param {string} streamName - Name of the stream to create
+     * @param {string} streamType - Type of stream (logs, metrics, traces)
+     * @returns {Promise<object>} API response
+     */
+    async createStream(streamName, streamType = 'logs') {
+        const fetch = (await import('node-fetch')).default;
+        const orgId = process.env["ORGNAME"];
+        const headers = getHeaders();
+
+        const payload = {
+            fields: [],
+            settings: {
+                partition_keys: [],
+                index_fields: [],
+                full_text_search_keys: [],
+                bloom_filter_fields: [],
+                defined_schema_fields: [],
+                data_retention: 14
+            }
+        };
+
+        console.log(`Creating stream via API: ${streamName} (${streamType})`);
+
+        try {
+            const response = await fetch(`${process.env.INGESTION_URL}/api/${orgId}/streams/${streamName}?type=${streamType}`, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+
+            if (response.status === 200 && data.code === 200) {
+                console.log(`Stream created successfully: ${streamName}`);
+            } else {
+                console.warn(`Stream creation returned non-200 or already exists: ${streamName}`, response.status);
+            }
+
+            return { status: response.status, data };
+        } catch (error) {
+            console.error(`Failed to create stream: ${streamName}`, error.message);
+            return { status: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Verify stream exists via API
+     * @param {string} streamName - Name of the stream to verify
+     * @returns {Promise<boolean>} True if stream exists
+     */
+    async verifyStreamExists(streamName) {
+        const fetch = (await import('node-fetch')).default;
+        const orgId = process.env["ORGNAME"];
+        const headers = getHeaders();
+
+        try {
+            const response = await fetch(`${process.env.INGESTION_URL}/api/${orgId}/streams`, {
+                method: 'GET',
+                headers: headers
+            });
+
+            const data = await response.json();
+
+            if (response.status === 200 && data.list) {
+                const streamExists = data.list.some(s => s.name === streamName);
+                console.log(`Stream existence check: ${streamName} - ${streamExists ? 'exists' : 'not found'}`);
+                return streamExists;
+            }
+
+            console.warn(`Failed to check stream existence: ${streamName}`, response.status);
+            return false;
+        } catch (error) {
+            console.error(`Error checking stream existence: ${streamName}`, error.message);
+            return false;
+        }
+    }
+
+    /**
+     * Query stream via API
+     * @param {string} streamName - Stream to query
+     * @param {number} expectedMinCount - Minimum expected record count (optional)
+     * @returns {Promise<array>} Query results
+     */
+    async queryStream(streamName, expectedMinCount = null) {
+        const fetch = (await import('node-fetch')).default;
+        const orgId = process.env["ORGNAME"];
+        const headers = getHeaders();
+
+        console.log(`Querying stream via API: ${streamName}`);
+
+        // Query for last 10 minutes
+        const endTime = Date.now() * 1000; // microseconds
+        const startTime = endTime - (10 * 60 * 1000 * 1000);
+
+        const query = {
+            query: {
+                sql: `SELECT * FROM "${streamName}"`,
+                start_time: startTime,
+                end_time: endTime,
+                from: 0,
+                size: 1000
+            }
+        };
+
+        try {
+            const response = await fetch(`${process.env.INGESTION_URL}/api/${orgId}/_search?type=logs`, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(query)
+            });
+
+            const data = await response.json();
+            const results = data.hits || [];
+
+            console.log(`Query results for ${streamName}: ${results.length} records`);
+
+            if (expectedMinCount !== null && expectedMinCount !== 0) {
+                if (results.length < expectedMinCount) {
+                    throw new Error(`Expected at least ${expectedMinCount} records, got ${results.length}`);
+                }
+            }
+
+            return results;
+        } catch (error) {
+            console.error(`Failed to query stream: ${streamName}`, error.message);
+            throw error;
+        }
+    }
+}
