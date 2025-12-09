@@ -862,7 +862,11 @@
     "errorTestingFunction": "テスト機能のエラー",
     "errorTransformingResults": "結果の変換中にエラーが発生しました",
     "errorFailedApplyVRL": "エラー:VRL 機能を適用できませんでした。",
-    "failedApplyVRLFewEvents": "一部のイベントに VRL 機能を適用できませんでした"
+    "failedApplyVRLFewEvents": "一部のイベントに VRL 機能を適用できませんでした",
+    "noDefinitionAvailable": "定義はありません",
+    "executionGuidelines": "関数実行ガイドライン",
+    "rbfDescription": "データ構造がフラット化される前に関数が実行されます",
+    "rafDescription": "データ構造がフラット化された後に関数が実行されます"
   },
   "confirmDialog": {
     "cancel": "キャンセル",
@@ -2146,7 +2150,8 @@
     "organizationId": "組織 ID",
     "functionName": "関数名'",
     "timezone": "タイムゾーン",
-    "pipelineCreation": "パイプライン作成"
+    "pipelineCreation": "パイプライン作成",
+    "loadingConditions": "ロード条件"
   },
   "reports": {
     "header": "レポート",

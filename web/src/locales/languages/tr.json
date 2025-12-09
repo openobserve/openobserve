@@ -845,7 +845,11 @@
     "errorTestingFunction": "Test fonksiyonunda hata",
     "errorTransformingResults": "Sonuçları dönüştürürken hata oluştu",
     "errorFailedApplyVRL": "Hata: VRL Fonksiyonu uygulanamadı.",
-    "failedApplyVRLFewEvents": "Birkaç olaya VRL İşlevi uygulanamadı"
+    "failedApplyVRLFewEvents": "Birkaç olaya VRL İşlevi uygulanamadı",
+    "noDefinitionAvailable": "Tanım mevcut değil",
+    "executionGuidelines": "İşlev Yürütme Yönergeleri",
+    "rbfDescription": "Veri yapısı düzleştirilmeden önce işlev yürütülür",
+    "rafDescription": "Veri yapısı düzleştirildikten sonra işlev yürütülür"
   },
   "confirmDialog": {
     "cancel": "İptal",
@@ -2132,7 +2136,8 @@
     "organizationId": "Kuruluş Kimliği",
     "functionName": "İşlev Adı'",
     "timezone": "Saat dilimi",
-    "pipelineCreation": "Boru Hattı Oluşturma"
+    "pipelineCreation": "Boru Hattı Oluşturma",
+    "loadingConditions": "Yükleme koşulları"
   },
   "reports": {
     "header": "Raporlar",

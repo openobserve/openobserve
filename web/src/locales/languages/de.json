@@ -845,7 +845,11 @@
     "errorTestingFunction": "Fehler beim Testen der Funktion",
     "errorTransformingResults": "Fehler beim Transformieren der Ergebnisse",
     "errorFailedApplyVRL": "Fehler: VRL-Funktion konnte nicht angewendet werden.",
-    "failedApplyVRLFewEvents": "Die VRL-Funktion konnte bei einigen Ereignissen nicht angewendet werden"
+    "failedApplyVRLFewEvents": "Die VRL-Funktion konnte bei einigen Ereignissen nicht angewendet werden",
+    "noDefinitionAvailable": "Keine Definition verfügbar",
+    "executionGuidelines": "Richtlinien zur Ausführung von Funktionen",
+    "rbfDescription": "Die Funktion wird ausgeführt, bevor die Datenstruktur abgeflacht wird",
+    "rafDescription": "Die Funktion wird ausgeführt, nachdem die Datenstruktur abgeflacht wurde"
   },
   "confirmDialog": {
     "cancel": "Abbrechen",
@@ -2132,7 +2136,8 @@
     "organizationId": "ID der Organisation",
     "functionName": "Name der Funktion",
     "timezone": "Zeitzone",
-    "pipelineCreation": "Pipeline-Erstellung"
+    "pipelineCreation": "Pipeline-Erstellung",
+    "loadingConditions": "Ladebedingungen"
   },
   "reports": {
     "header": "Berichte",

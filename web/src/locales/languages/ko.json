@@ -845,7 +845,11 @@
     "errorTestingFunction": "테스트 기능 오류",
     "errorTransformingResults": "결과 변환 중 오류 발생",
     "errorFailedApplyVRL": "오류: VRL 함수를 적용하지 못했습니다.",
-    "failedApplyVRLFewEvents": "일부 이벤트에서 VRL 함수를 적용하지 못했습니다."
+    "failedApplyVRLFewEvents": "일부 이벤트에서 VRL 함수를 적용하지 못했습니다.",
+    "noDefinitionAvailable": "사용할 수 있는 정의가 없습니다.",
+    "executionGuidelines": "함수 실행 가이드라인",
+    "rbfDescription": "데이터 구조가 평면화되기 전에 함수 실행",
+    "rafDescription": "데이터 구조가 평면화된 후 함수 실행"
   },
   "confirmDialog": {
     "cancel": "취소",
@@ -2132,7 +2136,8 @@
     "organizationId": "조직 아이디",
     "functionName": "함수 이름'",
     "timezone": "타임존",
-    "pipelineCreation": "파이프라인 생성"
+    "pipelineCreation": "파이프라인 생성",
+    "loadingConditions": "적재 조건"
   },
   "reports": {
     "header": "보고서",

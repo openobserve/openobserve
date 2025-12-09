@@ -845,7 +845,11 @@
     "errorTestingFunction": "测试功能出错",
     "errorTransformingResults": "转换结果时出错",
     "errorFailedApplyVRL": "错误：无法应用 VRL 函数。",
-    "failedApplyVRLFewEvents": "未能对少数事件应用 VRL 函数"
+    "failedApplyVRLFewEvents": "未能对少数事件应用 VRL 函数",
+    "noDefinitionAvailable": "没有可用的定义",
+    "executionGuidelines": "函数执行指南",
+    "rbfDescription": "函数在数据结构扁平化之前执行",
+    "rafDescription": "函数在数据结构扁平化后执行"
   },
   "confirmDialog": {
     "cancel": "取消",
@@ -2128,7 +2132,8 @@
     "organizationId": "组织编号",
     "functionName": "函数名称'",
     "timezone": "时区",
-    "pipelineCreation": "管道创建"
+    "pipelineCreation": "管道创建",
+    "loadingConditions": "加载条件"
   },
   "reports": {
     "header": "报表",

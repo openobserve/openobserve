@@ -845,7 +845,11 @@
     "errorTestingFunction": "Erro na função de teste",
     "errorTransformingResults": "Erro ao transformar os resultados",
     "errorFailedApplyVRL": "Erro: Falha ao aplicar a função VRL.",
-    "failedApplyVRLFewEvents": "Falha ao aplicar a função VRL em alguns eventos"
+    "failedApplyVRLFewEvents": "Falha ao aplicar a função VRL em alguns eventos",
+    "noDefinitionAvailable": "Nenhuma definição disponível",
+    "executionGuidelines": "Diretrizes de execução de funções",
+    "rbfDescription": "A função é executada antes que a estrutura de dados seja nivelada",
+    "rafDescription": "A função é executada após a estrutura de dados ser nivelada"
   },
   "confirmDialog": {
     "cancel": "Cancelar",
@@ -2132,7 +2136,8 @@
     "organizationId": "ID da organização",
     "functionName": "Nome da função'",
     "timezone": "Fuso horário",
-    "pipelineCreation": "Criação de pipeline"
+    "pipelineCreation": "Criação de pipeline",
+    "loadingConditions": "Condições de carregamento"
   },
   "reports": {
     "header": "Relatórios",

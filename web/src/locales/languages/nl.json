@@ -845,7 +845,11 @@
     "errorTestingFunction": "Fout in de testfunctie",
     "errorTransformingResults": "Fout bij het omzetten van resultaten",
     "errorFailedApplyVRL": "Fout: kon de VRL-functie niet toepassen.",
-    "failedApplyVRLFewEvents": "Het toepassen van de VRL-functie is op enkele evenementen mislukt"
+    "failedApplyVRLFewEvents": "Het toepassen van de VRL-functie is op enkele evenementen mislukt",
+    "noDefinitionAvailable": "Geen definitie beschikbaar",
+    "executionGuidelines": "Richtlijnen voor de uitvoering van functies",
+    "rbfDescription": "De functie wordt uitgevoerd voordat de gegevensstructuur wordt afgevlakt",
+    "rafDescription": "De functie wordt uitgevoerd nadat de gegevensstructuur is afgevlakt"
   },
   "confirmDialog": {
     "cancel": "Annuleer",
@@ -2132,7 +2136,8 @@
     "organizationId": "ID van de organisatie",
     "functionName": "'Functienaam'",
     "timezone": "Tijdzone",
-    "pipelineCreation": "Creatie van pijpleidingen"
+    "pipelineCreation": "Creatie van pijpleidingen",
+    "loadingConditions": "Voorwaarden voor het laden"
   },
   "reports": {
     "header": "Rapporten",
