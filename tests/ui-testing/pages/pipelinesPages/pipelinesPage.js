@@ -1,6 +1,7 @@
 // pipelinesPage.js
 const { expect } = require('@playwright/test')
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const fetch = require('node-fetch');
 
 const randomNodeName = `remote-node-${Math.floor(Math.random() * 1000)}`;
 
@@ -932,6 +933,146 @@ export class PipelinesPage {
         if (await dialog.count() > 0) {
             await expect(dialog.first()).toBeVisible();
             await this.confirmButton.click();
+        }
+    }
+
+    /**
+     * ==========================================
+     * PIPELINE API METHODS
+     * ==========================================
+     */
+
+    /**
+     * Clean conditions for API (removes UI-only fields)
+     * This removes fields like 'id' and 'groupId' that are only used in UI
+     * @param {object} conditions - Condition configuration object with UI fields
+     * @returns {object} Cleaned conditions for API
+     */
+    cleanConditionsForAPI(conditions) {
+        if (conditions.filterType === "condition") {
+            // Remove UI-only fields: id, groupId
+            // KEEP values field as it's required by the backend
+            const { id, groupId, ...cleaned } = conditions;
+            return cleaned;
+        } else if (conditions.filterType === "group") {
+            // Recursively clean nested conditions
+            const { id, groupId, ...cleaned } = conditions;
+            cleaned.conditions = conditions.conditions.map(c => this.cleanConditionsForAPI(c));
+            return cleaned;
+        }
+        return conditions;
+    }
+
+    /**
+     * Create a pipeline via API
+     * @param {string} pipelineName - Name of the pipeline
+     * @param {string} sourceStream - Source stream name
+     * @param {string} destStream - Destination stream name
+     * @param {object} conditions - Condition configuration object
+     * @returns {Promise<object>} API response
+     */
+    async createPipeline(pipelineName, sourceStream, destStream, conditions) {
+        const orgId = process.env["ORGNAME"];
+        const basicAuthCredentials = Buffer.from(
+            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+        ).toString('base64');
+
+        const headers = {
+            "Authorization": `Basic ${basicAuthCredentials}`,
+            "Content-Type": "application/json",
+        };
+
+        // Clean conditions to remove UI-only fields
+        const cleanedConditions = this.cleanConditionsForAPI(conditions);
+        testLogger.info('Cleaned conditions', { cleaned: JSON.stringify(cleanedConditions, null, 2) });
+
+        // Generate unique node IDs
+        const inputNodeId = `input-${Date.now()}`;
+        const conditionNodeId = `condition-${Date.now()}`;
+        const outputNodeId = `output-${Date.now()}`;
+
+        const pipelinePayload = {
+            pipeline_id: "",
+            version: 0,
+            enabled: true,  // Enable pipeline for realtime processing
+            org: orgId,
+            name: pipelineName,
+            description: `Validation test pipeline for ${pipelineName}`,
+            source: {
+                source_type: "realtime"
+            },
+            paused_at: null,
+            nodes: [
+                {
+                    id: inputNodeId,
+                    position: { x: 100, y: 100 },
+                    data: {
+                        node_type: "stream",
+                        stream_type: "logs",
+                        stream_name: sourceStream,
+                        org_id: orgId
+                    },
+                    io_type: "input"
+                },
+                {
+                    id: conditionNodeId,
+                    position: { x: 300, y: 200 },
+                    data: {
+                        node_type: "condition",
+                        version: 2,
+                        conditions: cleanedConditions
+                    },
+                    io_type: "intermediate"
+                },
+                {
+                    id: outputNodeId,
+                    position: { x: 500, y: 100 },
+                    data: {
+                        node_type: "stream",
+                        stream_type: "logs",
+                        stream_name: destStream,
+                        org_id: orgId
+                    },
+                    io_type: "output"
+                }
+            ],
+            edges: [
+                {
+                    id: `${inputNodeId}-${conditionNodeId}`,
+                    source: inputNodeId,
+                    target: conditionNodeId,
+                    sourceHandle: "success"
+                },
+                {
+                    id: `${conditionNodeId}-${outputNodeId}`,
+                    source: conditionNodeId,
+                    target: outputNodeId,
+                    sourceHandle: "success"
+                }
+            ]
+        };
+
+        testLogger.info('Creating pipeline via API', { pipelineName, sourceStream, destStream });
+
+        try {
+            const response = await fetch(`${process.env.ZO_BASE_URL}/api/${orgId}/pipelines`, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(pipelinePayload)
+            });
+
+            const data = await response.json();
+
+            if (response.status === 200 && data.code === 200) {
+                testLogger.info('Pipeline created successfully', { pipelineName });
+            } else {
+                testLogger.warn('Pipeline creation returned non-200', { pipelineName, status: response.status, data });
+            }
+
+            return { status: response.status, data };
+        } catch (error) {
+            testLogger.error('Failed to create pipeline', { pipelineName, error: error.message });
+            return { status: 500, error: error.message };
         }
     }
 }

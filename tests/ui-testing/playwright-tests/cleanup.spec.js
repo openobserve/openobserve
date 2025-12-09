@@ -61,7 +61,18 @@ test.describe("Pre-Test Cleanup", () => {
         /^stress_test/,                // stress_test*, stress_test123, etc.
         /^sdr_/,                       // sdr_* (SDR test streams)
         /^e2e_join_/,                  // e2e_join_* (UNION test streams)
-        /^[a-z]{8,9}$/                 // Random 8-9 char lowercase strings
+        /^e2e_conditions_/,            // e2e_conditions_* (Pipeline conditions UI test streams)
+        /^[a-z]{8,9}$/,                // Random 8-9 char lowercase strings
+        /^e2e_cond_prec_(src|dest)_\d+$/,     // Test 1: Operator precedence test streams
+        /^e2e_multiple_or_(src|dest)_\d+$/,   // Test 2: Multiple OR test streams
+        /^e2e_nested_or_(src|dest)_\d+$/,     // Test 3: Nested OR test streams
+        /^e2e_numeric_(src|dest)_\d+$/,       // Test 4: Numeric comparison test streams
+        /^e2e_multiple_and_(src|dest)_\d+$/,  // Test 5: Multiple AND test streams
+        /^e2e_deep_(src|dest)_\d+$/,          // Test 6: Deeply nested test streams
+        /^e2e_not_operator_(src|dest)_\d+$/,  // Test 7: NOT operator test streams
+        /^e2e_impossible_(src|dest)_\d+$/,    // Test 8: Impossible condition test streams
+        /^e2e_universal_(src|dest)_\d+$/,     // Test 9: Universal condition test streams
+        /^e2e_4level_(src|dest)_\d+$/         // Test 10: 4-level nested test streams
       ],
       // Protected streams to never delete
       ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate']
