@@ -413,3 +413,135 @@ pub async fn count(org_id: &str) -> Result<u64, errors::Error> {
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_merge_streams_json_empty() {
+        let existing = r#"{"logs":[],"traces":[],"metrics":[]}"#;
+        let new = r#"{"logs":[],"traces":[],"metrics":[]}"#;
+
+        let merged = merge_streams_json(existing, new);
+        let parsed: serde_json::Value = serde_json::from_str(&merged).unwrap();
+
+        assert_eq!(parsed["logs"].as_array().unwrap().len(), 0);
+        assert_eq!(parsed["traces"].as_array().unwrap().len(), 0);
+        assert_eq!(parsed["metrics"].as_array().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn test_merge_streams_json_logs_only_existing() {
+        let existing = r#"{"logs":[{"stream_name":"default","filters":{}}],"traces":[],"metrics":[]}"#;
+        let new = r#"{"logs":[],"traces":[],"metrics":[]}"#;
+
+        let merged = merge_streams_json(existing, new);
+        let parsed: serde_json::Value = serde_json::from_str(&merged).unwrap();
+
+        assert_eq!(parsed["logs"].as_array().unwrap().len(), 1);
+        assert_eq!(parsed["logs"][0]["stream_name"], "default");
+    }
+
+    #[test]
+    fn test_merge_streams_json_logs_only_new() {
+        let existing = r#"{"logs":[],"traces":[],"metrics":[]}"#;
+        let new = r#"{"logs":[{"stream_name":"default","filters":{}}],"traces":[],"metrics":[]}"#;
+
+        let merged = merge_streams_json(existing, new);
+        let parsed: serde_json::Value = serde_json::from_str(&merged).unwrap();
+
+        assert_eq!(parsed["logs"].as_array().unwrap().len(), 1);
+        assert_eq!(parsed["logs"][0]["stream_name"], "default");
+    }
+
+    #[test]
+    fn test_merge_streams_json_different_types() {
+        // Simulates: Ingester 1 has logs, Ingester 2 has traces+metrics
+        let existing = r#"{"logs":[{"stream_name":"default","filters":{}}],"traces":[],"metrics":[]}"#;
+        let new = r#"{"logs":[],"traces":[{"stream_name":"default","filters":{}}],"metrics":[{"stream_name":"otel_metrics","filters":{}}]}"#;
+
+        let merged = merge_streams_json(existing, new);
+        let parsed: serde_json::Value = serde_json::from_str(&merged).unwrap();
+
+        // Should have all three types merged
+        assert_eq!(parsed["logs"].as_array().unwrap().len(), 1);
+        assert_eq!(parsed["traces"].as_array().unwrap().len(), 1);
+        assert_eq!(parsed["metrics"].as_array().unwrap().len(), 1);
+        assert_eq!(parsed["logs"][0]["stream_name"], "default");
+        assert_eq!(parsed["traces"][0]["stream_name"], "default");
+        assert_eq!(parsed["metrics"][0]["stream_name"], "otel_metrics");
+    }
+
+    #[test]
+    fn test_merge_streams_json_deduplication() {
+        // Both have the same stream - should deduplicate
+        let existing = r#"{"logs":[{"stream_name":"default","filters":{"k8s_cluster":"prod"}}],"traces":[],"metrics":[]}"#;
+        let new = r#"{"logs":[{"stream_name":"default","filters":{"k8s_cluster":"staging"}}],"traces":[],"metrics":[]}"#;
+
+        let merged = merge_streams_json(existing, new);
+        let parsed: serde_json::Value = serde_json::from_str(&merged).unwrap();
+
+        // Should have only 1 log stream (deduplicated by stream_name)
+        assert_eq!(parsed["logs"].as_array().unwrap().len(), 1);
+        // Existing wins (first one added)
+        assert_eq!(parsed["logs"][0]["filters"]["k8s_cluster"], "prod");
+    }
+
+    #[test]
+    fn test_merge_streams_json_multiple_streams_same_type() {
+        let existing = r#"{"logs":[{"stream_name":"app_logs","filters":{}}],"traces":[],"metrics":[]}"#;
+        let new = r#"{"logs":[{"stream_name":"system_logs","filters":{}}],"traces":[],"metrics":[]}"#;
+
+        let merged = merge_streams_json(existing, new);
+        let parsed: serde_json::Value = serde_json::from_str(&merged).unwrap();
+
+        // Should have both streams (different names)
+        assert_eq!(parsed["logs"].as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn test_merge_streams_json_race_condition_scenario() {
+        // Simulates the exact race condition:
+        // Ingester 1 discovers logs for service
+        // Ingester 2 discovers traces and metrics for same service
+        // Without merge, last write wins and logs are lost
+
+        let ingester1_writes = r#"{"logs":[{"stream_name":"default","stream_type":"Logs","filters":{"service":"openobserve"}}],"traces":[],"metrics":[]}"#;
+        let ingester2_writes = r#"{"logs":[],"traces":[{"stream_name":"default","stream_type":"Traces","filters":{"service":"openobserve"}}],"metrics":[{"stream_name":"otel_collector_metrics","stream_type":"Metrics","filters":{}}]}"#;
+
+        // Ingester 2's write merges with Ingester 1's data
+        let merged = merge_streams_json(ingester1_writes, ingester2_writes);
+        let parsed: serde_json::Value = serde_json::from_str(&merged).unwrap();
+
+        // All telemetry types should be preserved
+        assert_eq!(
+            parsed["logs"].as_array().unwrap().len(),
+            1,
+            "Logs should be preserved after merge"
+        );
+        assert_eq!(
+            parsed["traces"].as_array().unwrap().len(),
+            1,
+            "Traces should be added"
+        );
+        assert_eq!(
+            parsed["metrics"].as_array().unwrap().len(),
+            1,
+            "Metrics should be added"
+        );
+    }
+
+    #[test]
+    fn test_merge_streams_json_malformed_input() {
+        // Handle malformed JSON gracefully
+        let existing = "not valid json";
+        let new = r#"{"logs":[{"stream_name":"default"}],"traces":[],"metrics":[]}"#;
+
+        let merged = merge_streams_json(existing, new);
+        let parsed: serde_json::Value = serde_json::from_str(&merged).unwrap();
+
+        // Should still work, treating existing as empty
+        assert_eq!(parsed["logs"].as_array().unwrap().len(), 1);
+    }
+}
