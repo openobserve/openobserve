@@ -19,13 +19,17 @@ use arrow::array::{BooleanArray, Int64Array, RecordBatch, StringArray};
 use arrow_schema::{DataType, Field, Schema};
 use config::{
     get_config, ider,
-    meta::stream::{FileKey, PartitionTimeLevel, StreamStats, StreamType},
+    meta::{
+        search::ScanStats,
+        stream::{FileKey, PartitionTimeLevel, StreamStats, StreamType},
+    },
 };
 use hashbrown::HashMap;
 use infra::{
     errors,
     file_list::{FileId, FileRecord, calculate_max_ts_upper_bound},
 };
+use itertools::Itertools;
 use once_cell::sync::Lazy;
 use rayon::slice::ParallelSliceMut;
 
@@ -167,11 +171,52 @@ pub fn generate_dump_stream_name(stream_type: StreamType, stream_name: &str) -> 
 pub async fn exec(
     trace_id: &str,
     partitions: usize,
-    dump_files: Vec<FileKey>,
+    files: Vec<FileKey>,
     query: &str,
 ) -> Result<Vec<RecordBatch>, errors::Error> {
+    // load files to local cache
+    let start = std::time::Instant::now();
+    let mut scan_stats = ScanStats::default();
+    let (cache_type, ..) = super::search::grpc::storage::cache_files(
+        trace_id,
+        &files
+            .iter()
+            .map(|f| {
+                (
+                    f.id,
+                    &f.account,
+                    &f.key,
+                    f.meta.compressed_size,
+                    f.meta.max_ts,
+                )
+            })
+            .collect_vec(),
+        &mut scan_stats,
+        "parquet",
+    )
+    .await;
+
+    let cached_ratio = (scan_stats.querier_memory_cached_files
+        + scan_stats.querier_disk_cached_files) as f64
+        / scan_stats.querier_files as f64;
+
+    let download_msg = if cache_type == infra::cache::file_data::CacheType::None {
+        "".to_string()
+    } else {
+        format!(" downloading others into {cache_type:?} in background,")
+    };
+    log::info!(
+        "[FILE_LIST_DUMP {trace_id}] query load files {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
+        scan_stats.querier_files,
+        scan_stats.querier_memory_cached_files,
+        scan_stats.querier_disk_cached_files,
+        (cached_ratio * 100.0) as usize,
+        start.elapsed().as_millis()
+    );
+
+    // search real file list by datafusion
     let trace_id = format!("{trace_id}-file-list-dump");
-    let ret = inner_exec(&trace_id, partitions, dump_files, query).await;
+    let ret = inner_exec(&trace_id, partitions, files, query).await;
     // we always have to clear the files loaded
     super::search::datafusion::storage::file_list::clear(&trace_id);
     ret
@@ -211,6 +256,7 @@ pub async fn query(
     stream_name: &str,
     range: (i64, i64),
 ) -> Result<Vec<FileRecord>, errors::Error> {
+    let start = std::time::Instant::now();
     let batches = query_inner(
         trace_id,
         org_id,
@@ -224,6 +270,10 @@ pub async fn query(
         .into_iter()
         .flat_map(record_batch_to_file_record)
         .collect();
+    log::info!(
+        "[FILE_LIST_DUMP {trace_id}] query took {} ms",
+        start.elapsed().as_millis()
+    );
     Ok(ret)
 }
 
@@ -234,6 +284,7 @@ pub async fn query_ids(
     stream_name: &str,
     range: (i64, i64),
 ) -> Result<Vec<FileId>, errors::Error> {
+    let start = std::time::Instant::now();
     let batches = query_inner(
         trace_id,
         org_id,
@@ -247,6 +298,10 @@ pub async fn query_ids(
         .into_iter()
         .flat_map(record_batch_to_file_id)
         .collect();
+    log::info!(
+        "[FILE_LIST_DUMP {trace_id}] query_ids took {} ms",
+        start.elapsed().as_millis()
+    );
     Ok(ret)
 }
 

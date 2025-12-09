@@ -165,11 +165,7 @@ pub(crate) async fn create_context(
         "parquet",
     )
     .instrument(enter_span.clone())
-    .await
-    .map_err(|e| {
-        log::error!("[trace_id {trace_id}] promql->search->storage: cache files error: {e}");
-        DataFusionError::Execution(e.to_string())
-    })?;
+    .await;
 
     // report cache hit and miss metrics
     metrics::QUERY_DISK_CACHE_HIT_COUNT
