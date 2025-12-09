@@ -210,15 +210,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-if="dashboardPanelData.data.type === 'table'"
                           class="q-mt-sm q-mb-sm"
                         >
-                          <q-checkbox
-                            v-model="
-                              dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].fields.x[index].treatAsNonTimestamp
-                            "
-                            :label="'Mark this field as non-timestamp'"
-                            dense
-                          />
+                          <div>
+                            <q-checkbox
+                              v-model="
+                                dashboardPanelData.data.queries[
+                                  dashboardPanelData.layout.currentQueryIndex
+                                ].fields.x[index].treatAsNonTimestamp
+                              "
+                              :label="'Mark this field as non-timestamp'"
+                              dense
+                            />
+                          </div>
+                          <div class="q-mt-xs">
+                            <q-checkbox
+                              v-model="
+                                dashboardPanelData.data.queries[
+                                  dashboardPanelData.layout.currentQueryIndex
+                                ].fields.x[index].showFieldAsJson
+                              "
+                              :label="'Render Data as JSON / Array'"
+                              dense
+                            />
+                          </div>
                         </div>
 
                         <div
@@ -733,15 +746,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="dashboardPanelData.data.type === 'table'"
                       class="q-mt-sm q-mb-sm"
                     >
-                      <q-checkbox
-                        v-model="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.y[index].treatAsNonTimestamp
-                        "
-                        :label="'Mark this field as non-timestamp'"
-                        dense
-                      />
+                      <div>
+                        <q-checkbox
+                          v-model="
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.y[index].treatAsNonTimestamp
+                          "
+                          :label="'Mark this field as non-timestamp'"
+                          dense
+                        />
+                      </div>
+                      <div class="q-mt-xs">
+                        <q-checkbox
+                          v-model="
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.y[index].showFieldAsJson
+                          "
+                          :label="'Render Data as JSON / Array'"
+                          dense
+                        />
+                      </div>
                     </div>
                     <div
                       style="width: 100%"
@@ -1201,15 +1227,26 @@ export default defineComponent({
         }
       };
 
+      const setShowFieldAsJsonForField = (field: any) => {
+        if (
+          field.showFieldAsJson === undefined ||
+          field.showFieldAsJson === null
+        ) {
+          field.showFieldAsJson = false;
+        }
+      };
+
       // Only X and Y axes for table charts
       if (currentQuery?.fields?.x) {
         currentQuery.fields.x.forEach((field: any) => {
           setTreatAsNonTimestampForField(field);
+          setShowFieldAsJsonForField(field);
         });
       }
       if (currentQuery?.fields?.y) {
         currentQuery.fields.y.forEach((field: any) => {
           setTreatAsNonTimestampForField(field);
+          setShowFieldAsJsonForField(field);
         });
       }
     };

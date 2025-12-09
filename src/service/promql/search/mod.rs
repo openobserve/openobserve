@@ -27,7 +27,10 @@ use config::{
         self_reporting::usage::{RequestStats, UsageType},
         stream::StreamType,
     },
-    utils::time::{now_micros, second_micros},
+    utils::{
+        time::{now_micros, second_micros},
+        took_watcher::TookWatcher,
+    },
 };
 use futures::future::try_join_all;
 use hashbrown::HashMap;
@@ -35,6 +38,8 @@ use infra::{
     client::grpc::make_grpc_metrics_client,
     errors::{Error, ErrorCodes, Result},
 };
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::search::WorkGroup;
 use proto::cluster_rpc;
 use tracing::{Instrument, info_span};
 
@@ -85,9 +90,14 @@ async fn search_in_cluster(
     req: cluster_rpc::MetricsQueryRequest,
     user_email: &str,
 ) -> Result<Value> {
-    let op_start = std::time::Instant::now();
+    let mut stop_watch = TookWatcher::new();
     let started_at = now_micros();
     let cfg = get_config();
+    let timeout = if req.timeout > 0 {
+        req.timeout as u64
+    } else {
+        cfg.limit.query_timeout
+    };
 
     let &cluster_rpc::MetricsQueryStmt {
         ref query,
@@ -113,6 +123,32 @@ async fn search_in_cluster(
         step,
         query,
     );
+
+    // Check work group (OSS uses dist_lock, Enterprise uses WorkGroup::Short)
+    #[cfg(not(feature = "enterprise"))]
+    let _lock = crate::service::search::work_group::check_work_group(
+        trace_id,
+        &req.org_id,
+        timeout,
+        &mut stop_watch,
+        "metrics",
+    )
+    .await
+    .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
+
+    // Enterprise: Always use Short workgroup for metrics queries
+    #[cfg(feature = "enterprise")]
+    let _lock = crate::service::search::work_group::check_work_group(
+        trace_id,
+        &req.org_id,
+        Some(user_email),
+        timeout,
+        WorkGroup::Short,
+        &mut stop_watch,
+        "metrics",
+    )
+    .await
+    .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
 
     // get querier nodes from cluster
     let mut nodes = cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
@@ -170,6 +206,7 @@ async fn search_in_cluster(
         } else {
             merge_matrix_query(&cached_values)
         };
+
         return Ok(values);
     }
 
@@ -279,7 +316,12 @@ async fn search_in_cluster(
         }
     };
     for res in task_results {
-        results.push(res?);
+        match res {
+            Ok(response) => results.push(response),
+            Err(err) => {
+                return Err(err);
+            }
+        }
     }
 
     // merge multiple instances data
@@ -319,17 +361,18 @@ async fn search_in_cluster(
     } else {
         return Err(server_internal_error("invalid result type"));
     };
+    let result_time = stop_watch.record_split("result").as_secs_f64();
     log::info!(
         "[trace_id {trace_id}] promql->search->result: files: {}, scan_size: {} mb, took: {} ms",
         scan_stats.files,
         scan_stats.original_size,
-        op_start.elapsed().as_millis(),
+        (result_time * 1000.0) as u64,
     );
 
     let req_stats = RequestStats {
         records: scan_stats.records,
         size: scan_stats.original_size as f64,
-        response_time: op_start.elapsed().as_secs_f64(),
+        response_time: result_time,
         request_body: Some(query.to_string()),
         user_email: Some(user_email.to_string()),
         min_ts: Some(start),
@@ -366,6 +409,11 @@ async fn search_in_cluster(
     {
         log::error!("[trace_id {trace_id}] promql->search->cache: set cache err: {err:?}");
     }
+
+    log::info!(
+        "[trace_id {trace_id}] promql->search search finished {}",
+        stop_watch.get_summary()
+    );
 
     Ok(values)
 }

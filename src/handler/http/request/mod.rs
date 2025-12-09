@@ -49,6 +49,8 @@ pub mod rum;
 pub mod script_server;
 pub mod search;
 pub mod service_accounts;
+#[cfg(feature = "enterprise")]
+pub mod service_streams;
 pub mod short_url;
 pub mod status;
 pub mod stream;

@@ -241,7 +241,7 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
                     pos_y += pos_offset;
                     let condition_node = Node::new(
                         ider::uuid(),
-                        NodeData::Condition(ConditionParams {
+                        NodeData::Condition(ConditionParams::V1 {
                             conditions: ConditionList::LegacyConditions(routing_conditions),
                         }),
                         pos_x,

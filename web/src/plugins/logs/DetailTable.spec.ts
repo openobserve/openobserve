@@ -786,14 +786,16 @@ describe("DetailTable Component", () => {
     const componentOptions = wrapper.vm.$options;
     const expectedEmits = [
       "showPrevDetail",
-      "showNextDetail", 
+      "showNextDetail",
       "add:searchterm",
       "remove:searchterm",
       "search:timeboxed",
       "add:table",
       "view-trace",
       "sendToAiChat",
-      "closeTable"
+      "closeTable",
+      "show-correlation",
+      "load-correlation"
     ];
     expect(componentOptions.emits).toEqual(expectedEmits);
   });

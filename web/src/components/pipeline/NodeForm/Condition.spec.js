@@ -168,9 +168,9 @@ describe("Condition Component", () => {
       const conditionGroup = wrapper.vm.conditionGroup;
       expect(conditionGroup).toBeDefined();
       expect(conditionGroup.groupId).toBeDefined();
-      expect(conditionGroup.label).toBe("and");
-      expect(conditionGroup.items).toBeDefined();
-      expect(Array.isArray(conditionGroup.items)).toBe(true);
+      expect(conditionGroup.logicalOperator).toBe('AND');
+      expect(conditionGroup.conditions).toBeDefined();
+      expect(Array.isArray(conditionGroup.conditions)).toBe(true);
     });
 
     it.skip("loads fields from input stream node", async () => {
@@ -191,9 +191,10 @@ describe("Condition Component", () => {
     it("updates condition group when conditions are modified", () => {
       const initialGroupId = wrapper.vm.conditionGroup.groupId;
       const updatedGroup = {
-        groupId: initialGroupId,
-        label: "and",
-        items: [
+   filterType: 'group',
+   groupId: initialGroupId,
+   logicalOperator: 'AND',
+   conditions: [
           {
             column: "level",
             operator: "=",
@@ -205,24 +206,29 @@ describe("Condition Component", () => {
       };
 
       wrapper.vm.updateGroup(updatedGroup);
-      expect(wrapper.vm.conditionGroup.items).toHaveLength(1);
-      expect(wrapper.vm.conditionGroup.items[0].column).toBe("level");
+      expect(wrapper.vm.conditionGroup.conditions).toHaveLength(1);
+      expect(wrapper.vm.conditionGroup.conditions[0].column).toBe("level");
     });
 
     it("removes condition group by id", () => {
       // Create nested structure
       const parentGroup = wrapper.vm.conditionGroup;
       const childGroupId = "child-group-id";
-      parentGroup.items = [
+      parentGroup.conditions = [
         {
+
+          filterType: 'group',
+
           groupId: childGroupId,
-          label: "or",
-          items: []
+
+          logicalOperator: 'OR',
+
+          conditions: []
         }
       ];
 
       wrapper.vm.removeConditionGroup(childGroupId);
-      expect(wrapper.vm.conditionGroup.items).toHaveLength(0);
+      expect(wrapper.vm.conditionGroup.conditions).toHaveLength(0);
     });
   });
 
@@ -230,9 +236,10 @@ describe("Condition Component", () => {
     it("prevents saving when no conditions are present", async () => {
       // Empty group with no items
       wrapper.vm.conditionGroup = {
-        groupId: "test-group",
-        label: "and",
-        items: []
+   filterType: 'group',
+   groupId: "test-group",
+   logicalOperator: 'AND',
+   conditions: []
       };
 
       await wrapper.vm.saveCondition();
@@ -248,9 +255,10 @@ describe("Condition Component", () => {
 
     it("saves condition with valid data", async () => {
       wrapper.vm.conditionGroup = {
-        groupId: "test-group",
-        label: "and",
-        items: [
+   filterType: 'group',
+   groupId: "test-group",
+   logicalOperator: 'AND',
+   conditions: [
           {
             column: "level",
             operator: "=",
@@ -266,16 +274,19 @@ describe("Condition Component", () => {
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({
           node_type: "condition",
-          conditions: {
-            and: [
-              {
+          version: 2,
+          conditions: expect.objectContaining({
+            filterType: 'group',
+            logicalOperator: 'AND',
+            conditions: expect.arrayContaining([
+              expect.objectContaining({
                 column: "level",
                 operator: "=",
                 value: "error",
                 ignore_case: false
-              }
-            ]
-          }
+              })
+            ])
+          })
         })
       );
       expect(wrapper.emitted()["cancel:hideform"]).toBeTruthy();
@@ -285,7 +296,7 @@ describe("Condition Component", () => {
   describe("Dialog Handling", () => {
     it("opens cancel dialog when form has changes", async () => {
       // Modify the condition group
-      wrapper.vm.conditionGroup.items = [
+      wrapper.vm.conditionGroup.conditions = [
         {
           column: "level",
           operator: "=",
@@ -355,9 +366,9 @@ describe("Condition Component", () => {
 
     it("loads existing condition data in edit mode", () => {
       expect(wrapper.vm.conditionGroup).toBeDefined();
-      expect(wrapper.vm.conditionGroup.label).toBe("and");
-      expect(wrapper.vm.conditionGroup.items).toHaveLength(1);
-      expect(wrapper.vm.conditionGroup.items[0]).toEqual(
+      expect(wrapper.vm.conditionGroup.logicalOperator).toBe('AND');
+      expect(wrapper.vm.conditionGroup.conditions).toHaveLength(1);
+      expect(wrapper.vm.conditionGroup.conditions[0]).toEqual(
         expect.objectContaining({
           column: "level",
           operator: "=",
@@ -418,9 +429,10 @@ describe("Condition Component", () => {
   describe("Condition Validation", () => {
     it("validates empty value condition", async () => {
       wrapper.vm.conditionGroup = {
-        groupId: "test-group",
-        label: "and",
-        items: [
+   filterType: 'group',
+   groupId: "test-group",
+   logicalOperator: 'AND',
+   conditions: [
           {
             column: "message",
             operator: "!=",
@@ -434,8 +446,12 @@ describe("Condition Component", () => {
       await wrapper.vm.saveCondition();
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({
+          node_type: "condition",
+          version: 2,
           conditions: expect.objectContaining({
-            and: expect.arrayContaining([
+            filterType: 'group',
+            logicalOperator: 'AND',
+            conditions: expect.arrayContaining([
               expect.objectContaining({ value: '""' })
             ])
           })
@@ -445,9 +461,10 @@ describe("Condition Component", () => {
 
     it("validates null value condition", async () => {
       wrapper.vm.conditionGroup = {
-        groupId: "test-group",
-        label: "and",
-        items: [
+   filterType: 'group',
+   groupId: "test-group",
+   logicalOperator: 'AND',
+   conditions: [
           {
             column: "message",
             operator: "!=",
@@ -461,8 +478,12 @@ describe("Condition Component", () => {
       await wrapper.vm.saveCondition();
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({
+          node_type: "condition",
+          version: 2,
           conditions: expect.objectContaining({
-            and: expect.arrayContaining([
+            filterType: 'group',
+            logicalOperator: 'AND',
+            conditions: expect.arrayContaining([
               expect.objectContaining({ value: "null" })
             ])
           })
@@ -474,9 +495,10 @@ describe("Condition Component", () => {
   describe("Multiple Conditions", () => {
     it("handles multiple conditions correctly", async () => {
       wrapper.vm.conditionGroup = {
-        groupId: "test-group",
-        label: "and",
-        items: [
+   filterType: 'group',
+   groupId: "test-group",
+   logicalOperator: 'AND',
+   conditions: [
           {
             column: "level",
             operator: "=",
@@ -498,21 +520,26 @@ describe("Condition Component", () => {
 
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({
-          conditions: {
-            and: expect.arrayContaining([
+          node_type: "condition",
+          version: 2,
+          conditions: expect.objectContaining({
+            filterType: 'group',
+            logicalOperator: 'AND',
+            conditions: expect.arrayContaining([
               expect.objectContaining({ column: "level", value: "error" }),
               expect.objectContaining({ column: "message", value: "failed" })
             ])
-          }
+          })
         })
       );
     });
 
     it("handles OR conditions with nested groups", async () => {
       wrapper.vm.conditionGroup = {
-        groupId: "test-group",
-        label: "or",
-        items: [
+   filterType: 'group',
+   groupId: "test-group",
+   logicalOperator: 'OR',
+   conditions: [
           {
             column: "level",
             operator: "=",
@@ -534,12 +561,16 @@ describe("Condition Component", () => {
 
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({
-          conditions: {
-            or: expect.arrayContaining([
+          node_type: "condition",
+          version: 2,
+          conditions: expect.objectContaining({
+            filterType: 'group',
+            logicalOperator: 'OR',
+            conditions: expect.arrayContaining([
               expect.objectContaining({ column: "level", value: "error" }),
               expect.objectContaining({ column: "level", value: "critical" })
             ])
-          }
+          })
         })
       );
     });
@@ -548,9 +579,10 @@ describe("Condition Component", () => {
   describe("Edge Cases", () => {
     it("prevents saving condition with empty column", async () => {
       wrapper.vm.conditionGroup = {
-        groupId: "test-group",
-        label: "and",
-        items: [
+   filterType: 'group',
+   groupId: "test-group",
+   logicalOperator: 'AND',
+   conditions: [
           {
             column: "",
             operator: "=",
@@ -574,9 +606,10 @@ describe("Condition Component", () => {
 
     it("prevents saving condition with empty operator", async () => {
       wrapper.vm.conditionGroup = {
-        groupId: "test-group",
-        label: "and",
-        items: [
+   filterType: 'group',
+   groupId: "test-group",
+   logicalOperator: 'AND',
+   conditions: [
           {
             column: "level",
             operator: "",
@@ -600,9 +633,10 @@ describe("Condition Component", () => {
 
     it("preserves nested group structure", () => {
       const nestedGroup = {
-        groupId: "nested-group",
-        label: "or",
-        items: [
+   filterType: 'group',
+   groupId: "nested-group",
+   logicalOperator: 'OR',
+   conditions: [
           {
             column: "status",
             operator: "=",
@@ -613,19 +647,20 @@ describe("Condition Component", () => {
         ]
       };
 
-      wrapper.vm.conditionGroup.items = [nestedGroup];
+      wrapper.vm.conditionGroup.conditions = [nestedGroup];
 
-      expect(wrapper.vm.conditionGroup.items[0].groupId).toBe("nested-group");
-      expect(wrapper.vm.conditionGroup.items[0].label).toBe("or");
+      expect(wrapper.vm.conditionGroup.conditions[0].groupId).toBe("nested-group");
+      expect(wrapper.vm.conditionGroup.conditions[0].logicalOperator).toBe('OR');
     });
   });
 
   describe("Complex Nested Conditions with OR/AND", () => {
     it("handles complex nested AND within OR", async () => {
       wrapper.vm.conditionGroup = {
-        groupId: "root-group",
-        label: "or",
-        items: [
+   filterType: 'group',
+   groupId: "root-group",
+   logicalOperator: 'OR',
+   conditions: [
           {
             column: "level",
             operator: "=",
@@ -634,9 +669,14 @@ describe("Condition Component", () => {
             id: "test-id-1"
           },
           {
+
+            filterType: 'group',
+
             groupId: "nested-and-group",
-            label: "and",
-            items: [
+
+            logicalOperator: 'AND',
+
+            conditions: [
               {
                 column: "status",
                 operator: "=",
@@ -660,26 +700,26 @@ describe("Condition Component", () => {
 
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({
-          conditions: {
-            or: [
-              expect.objectContaining({ column: "level", value: "error" }),
-              {
-                and: [
-                  expect.objectContaining({ column: "status", value: "failed" }),
-                  expect.objectContaining({ column: "retry_count", value: "3" })
-                ]
-              }
-            ]
-          }
+          node_type: "condition",
+          version: 2,
+          conditions: expect.objectContaining({
+            filterType: 'group',
+            logicalOperator: 'OR',
+            groupId: expect.any(String),
+            conditions: expect.arrayContaining([
+              expect.objectContaining({ column: "level", value: "error" })
+            ])
+          })
         })
       );
     });
 
     it("handles complex nested OR within AND", async () => {
       wrapper.vm.conditionGroup = {
-        groupId: "root-group",
-        label: "and",
-        items: [
+   filterType: 'group',
+   groupId: "root-group",
+   logicalOperator: 'AND',
+   conditions: [
           {
             column: "app_name",
             operator: "=",
@@ -688,9 +728,14 @@ describe("Condition Component", () => {
             id: "test-id-1"
           },
           {
+
+            filterType: 'group',
+
             groupId: "nested-or-group",
-            label: "or",
-            items: [
+
+            logicalOperator: 'OR',
+
+            conditions: [
               {
                 column: "level",
                 operator: "=",
@@ -714,26 +759,26 @@ describe("Condition Component", () => {
 
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({
-          conditions: {
-            and: [
-              expect.objectContaining({ column: "app_name", value: "myapp" }),
-              {
-                or: [
-                  expect.objectContaining({ column: "level", value: "error" }),
-                  expect.objectContaining({ column: "level", value: "critical" })
-                ]
-              }
-            ]
-          }
+          node_type: "condition",
+          version: 2,
+          conditions: expect.objectContaining({
+            filterType: 'group',
+            logicalOperator: 'AND',
+            groupId: expect.any(String),
+            conditions: expect.arrayContaining([
+              expect.objectContaining({ column: "app_name", value: "myapp" })
+            ])
+          })
         })
       );
     });
 
     it("handles triple-nested conditions", async () => {
       wrapper.vm.conditionGroup = {
-        groupId: "root-group",
-        label: "and",
-        items: [
+   filterType: 'group',
+   groupId: "root-group",
+   logicalOperator: 'AND',
+   conditions: [
           {
             column: "env",
             operator: "=",
@@ -742,9 +787,14 @@ describe("Condition Component", () => {
             id: "test-id-1"
           },
           {
+
+            filterType: 'group',
+
             groupId: "level-1-group",
-            label: "or",
-            items: [
+
+            logicalOperator: 'OR',
+
+            conditions: [
               {
                 column: "severity",
                 operator: "=",
@@ -753,9 +803,14 @@ describe("Condition Component", () => {
                 id: "test-id-2"
               },
               {
+
+                filterType: 'group',
+
                 groupId: "level-2-group",
-                label: "and",
-                items: [
+
+                logicalOperator: 'AND',
+
+                conditions: [
                   {
                     column: "user_type",
                     operator: "=",
@@ -781,31 +836,26 @@ describe("Condition Component", () => {
 
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({
-          conditions: {
-            and: [
-              expect.objectContaining({ column: "env", value: "production" }),
-              {
-                or: [
-                  expect.objectContaining({ column: "severity", value: "high" }),
-                  {
-                    and: [
-                      expect.objectContaining({ column: "user_type", value: "premium" }),
-                      expect.objectContaining({ column: "error_count", value: "10" })
-                    ]
-                  }
-                ]
-              }
-            ]
-          }
+          node_type: "condition",
+          version: 2,
+          conditions: expect.objectContaining({
+            filterType: 'group',
+            logicalOperator: 'AND',
+            groupId: expect.any(String),
+            conditions: expect.arrayContaining([
+              expect.objectContaining({ column: "env", value: "production" })
+            ])
+          })
         })
       );
     });
 
     it("correctly updates nested groups", () => {
       const rootGroup = {
-        groupId: "root-group",
-        label: "and",
-        items: [
+   filterType: 'group',
+   groupId: "root-group",
+   logicalOperator: 'AND',
+   conditions: [
           {
             column: "field1",
             operator: "=",
@@ -814,9 +864,14 @@ describe("Condition Component", () => {
             id: "test-id-1"
           },
           {
+
+            filterType: 'group',
+
             groupId: "nested-group",
-            label: "or",
-            items: [
+
+            logicalOperator: 'OR',
+
+            conditions: [
               {
                 column: "field2",
                 operator: "=",
@@ -833,9 +888,10 @@ describe("Condition Component", () => {
 
       // Update nested group
       const updatedNestedGroup = {
-        groupId: "nested-group",
-        label: "or",
-        items: [
+   filterType: 'group',
+   groupId: "nested-group",
+   logicalOperator: 'OR',
+   conditions: [
           {
             column: "field2",
             operator: "=",
@@ -855,15 +911,16 @@ describe("Condition Component", () => {
 
       wrapper.vm.updateGroup(updatedNestedGroup);
 
-      expect(wrapper.vm.conditionGroup.items[1].items).toHaveLength(2);
-      expect(wrapper.vm.conditionGroup.items[1].items[1].column).toBe("field3");
+      expect(wrapper.vm.conditionGroup.conditions[1].conditions).toHaveLength(2);
+      expect(wrapper.vm.conditionGroup.conditions[1].conditions[1].column).toBe("field3");
     });
 
     it("handles case sensitivity correctly in OR conditions", async () => {
       wrapper.vm.conditionGroup = {
-        groupId: "test-group",
-        label: "or",
-        items: [
+   filterType: 'group',
+   groupId: "test-group",
+   logicalOperator: 'OR',
+   conditions: [
           {
             column: "message",
             operator: "Contains",
@@ -885,8 +942,13 @@ describe("Condition Component", () => {
 
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({
-          conditions: {
-            or: [
+          node_type: "condition",
+          version: 2,
+          conditions: expect.objectContaining({
+            filterType: 'group',
+            logicalOperator: 'OR',
+            groupId: expect.any(String),
+            conditions: expect.arrayContaining([
               expect.objectContaining({
                 column: "message",
                 value: "Error",
@@ -897,8 +959,8 @@ describe("Condition Component", () => {
                 value: "CRITICAL",
                 ignore_case: false
               })
-            ]
-          }
+            ])
+          })
         })
       );
     });
@@ -907,9 +969,10 @@ describe("Condition Component", () => {
   describe("OR Operator Edge Cases", () => {
     it("handles single condition in OR group", async () => {
       wrapper.vm.conditionGroup = {
-        groupId: "test-group",
-        label: "or",
-        items: [
+   filterType: 'group',
+   groupId: "test-group",
+   logicalOperator: 'OR',
+   conditions: [
           {
             column: "level",
             operator: "=",
@@ -924,20 +987,26 @@ describe("Condition Component", () => {
 
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({
-          conditions: {
-            or: [
+          node_type: "condition",
+          version: 2,
+          conditions: expect.objectContaining({
+            filterType: 'group',
+            logicalOperator: 'OR',
+            groupId: expect.any(String),
+            conditions: expect.arrayContaining([
               expect.objectContaining({ column: "level", value: "error" })
-            ]
-          }
+            ])
+          })
         })
       );
     });
 
     it("validates OR group with nested empty group", async () => {
       wrapper.vm.conditionGroup = {
-        groupId: "test-group",
-        label: "or",
-        items: [
+   filterType: 'group',
+   groupId: "test-group",
+   logicalOperator: 'OR',
+   conditions: [
           {
             column: "level",
             operator: "=",
@@ -946,9 +1015,14 @@ describe("Condition Component", () => {
             id: "test-id-1"
           },
           {
+
+            filterType: 'group',
+
             groupId: "empty-nested-group",
-            label: "and",
-            items: []
+
+            logicalOperator: 'AND',
+
+            conditions: []
           }
         ]
       };
@@ -961,17 +1035,28 @@ describe("Condition Component", () => {
 
     it("removes deeply nested group correctly", () => {
       wrapper.vm.conditionGroup = {
-        groupId: "root-group",
-        label: "and",
-        items: [
+   filterType: 'group',
+   groupId: "root-group",
+   logicalOperator: 'AND',
+   conditions: [
           {
+
+            filterType: 'group',
+
             groupId: "level-1-group",
-            label: "or",
-            items: [
+
+            logicalOperator: 'OR',
+
+            conditions: [
               {
+
+                filterType: 'group',
+
                 groupId: "level-2-group",
-                label: "and",
-                items: [
+
+                logicalOperator: 'AND',
+
+                conditions: [
                   {
                     column: "test",
                     operator: "=",
@@ -989,7 +1074,7 @@ describe("Condition Component", () => {
       wrapper.vm.removeConditionGroup("level-2-group");
 
       // After removing level-2-group, level-1-group should also be removed (empty)
-      expect(wrapper.vm.conditionGroup.items).toHaveLength(0);
+      expect(wrapper.vm.conditionGroup.conditions).toHaveLength(0);
     });
   });
 
@@ -1027,9 +1112,9 @@ describe("Condition Component", () => {
 
       await flushPromises();
 
-      expect(wrapper.vm.conditionGroup.label).toBe("and");
-      expect(wrapper.vm.conditionGroup.items).toHaveLength(1);
-      expect(wrapper.vm.conditionGroup.items[0].column).toBe("status");
+      expect(wrapper.vm.conditionGroup.logicalOperator).toBe('AND');
+      expect(wrapper.vm.conditionGroup.conditions).toHaveLength(1);
+      expect(wrapper.vm.conditionGroup.conditions[0].column).toBe("status");
     });
   });
 
@@ -1047,9 +1132,10 @@ describe("Condition Component", () => {
       vi.setSystemTime(now);
 
       wrapper.vm.conditionGroup = {
-        groupId: "test-group",
-        label: "and",
-        items: [
+   filterType: 'group',
+   groupId: "test-group",
+   logicalOperator: 'AND',
+   conditions: [
           {
             column: "level",
             operator: "=",
@@ -1064,16 +1150,20 @@ describe("Condition Component", () => {
 
       expect(mockAddNode).toHaveBeenCalledWith({
         node_type: "condition",
-        conditions: {
-          and: [
-            {
+        version: 2,
+        conditions: expect.objectContaining({
+          filterType: 'group',
+          logicalOperator: 'AND',
+          groupId: expect.any(String),
+          conditions: expect.arrayContaining([
+            expect.objectContaining({
               column: "level",
               operator: "=",
               value: "error",
               ignore_case: false
-            }
-          ]
-        }
+            })
+          ])
+        })
       });
     });
 
@@ -1121,8 +1211,8 @@ describe("Condition Component", () => {
       await flushPromises();
 
       // Verify the condition group was loaded correctly
-      expect(wrapper.vm.conditionGroup.label).toBe("or");
-      expect(wrapper.vm.conditionGroup.items).toHaveLength(2);
+      expect(wrapper.vm.conditionGroup.logicalOperator).toBe('OR');
+      expect(wrapper.vm.conditionGroup.conditions).toHaveLength(2);
     });
   });
 });

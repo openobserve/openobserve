@@ -34,6 +34,7 @@ use config::{
         schema_ext::SchemaExt,
     },
 };
+use hashbrown::HashSet;
 use infra::{
     schema::{
         SchemaCache, get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
@@ -43,8 +44,10 @@ use infra::{
 };
 use ingester::WAL_PARQUET_METADATA;
 use once_cell::sync::Lazy;
-use scc::HashSet;
-use tokio::{fs::remove_file, sync::Mutex};
+use tokio::{
+    fs::remove_file,
+    sync::{Mutex, RwLock},
+};
 
 use crate::{
     common::infra::wal,
@@ -56,13 +59,13 @@ use crate::{
     },
 };
 
-static PROCESSING_FILES: Lazy<HashSet<String>> = Lazy::new(HashSet::new);
+static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
 
 pub async fn run() -> Result<(), anyhow::Error> {
     // add the pending delete files to processing set
     let pending_delete_files = db::file_list::local::get_pending_delete().await;
     for file in pending_delete_files {
-        let _ = PROCESSING_FILES.insert_async(file).await;
+        PROCESSING_FILES.write().await.insert(file);
     }
 
     // start worker threads
@@ -137,7 +140,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             // If draining and no more files to process, we can exit
             if is_draining {
                 // Check if there are any remaining files to process
-                let processing_count = PROCESSING_FILES.len();
+                let processing_count = PROCESSING_FILES.read().await.len();
                 let has_pending_files =
                     o2_enterprise::enterprise::drain::parquet::check_has_pending_files(
                         processing_count,
@@ -168,7 +171,7 @@ async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
     let pending_delete_files = db::file_list::local::get_pending_delete().await;
     let files_num = pending_delete_files.len();
     for file_key in pending_delete_files {
-        if wal::lock_files_exists(&file_key).await {
+        if wal::lock_files_exists(&file_key) {
             continue;
         }
         log::warn!("[INGESTER:JOB] the file was released, delete it: {file_key}");
@@ -183,7 +186,7 @@ async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
             log::error!("[INGESTER:JOB] Failed to remove parquet file: {file_key}, {e}");
         }
         // need release the file
-        PROCESSING_FILES.remove_async(&file_key).await;
+        PROCESSING_FILES.write().await.remove(&file_key);
         // delete from pending delete list
         if let Err(e) = db::file_list::local::remove_pending_delete(&file_key).await {
             log::error!("[INGESTER:JOB] Failed to remove pending delete file: {file_key}, {e}");
@@ -295,7 +298,7 @@ async fn prepare_files(
             file.to_str().unwrap().replace('\\', "/")
         };
         // check if the file is processing
-        if PROCESSING_FILES.contains_async(&file_key).await {
+        if PROCESSING_FILES.read().await.contains(&file_key) {
             continue;
         }
 
@@ -331,7 +334,7 @@ async fn prepare_files(
             false,
         ));
         // mark the file as processing
-        let _ = PROCESSING_FILES.insert_async(file_key).await;
+        PROCESSING_FILES.write().await.insert(file_key);
     }
 
     Ok(partition_files_with_size)
@@ -371,7 +374,7 @@ async fn move_files(
                 );
             }
             // remove the file from processing set
-            PROCESSING_FILES.remove_async(&file.key).await;
+            PROCESSING_FILES.write().await.remove(&file.key);
         }
         return Ok(());
     }
@@ -389,7 +392,7 @@ async fn move_files(
             );
             // need release all the files
             for file in files.iter() {
-                PROCESSING_FILES.remove_async(&file.key).await;
+                PROCESSING_FILES.write().await.remove(&file.key);
             }
             return Err(e.into());
         }
@@ -417,7 +420,7 @@ async fn move_files(
                 );
             }
             // remove the file from processing set
-            PROCESSING_FILES.remove_async(&file.key).await;
+            PROCESSING_FILES.write().await.remove(&file.key);
         }
         return Ok(());
     }
@@ -459,7 +462,7 @@ async fn move_files(
                     );
                 }
                 // remove the file from processing set
-                PROCESSING_FILES.remove_async(&file.key).await;
+                PROCESSING_FILES.write().await.remove(&file.key);
             }
             return Ok(());
         }
@@ -509,7 +512,7 @@ async fn move_files(
         if !has_expired_files {
             // need release all the files
             for file in files_with_size.iter() {
-                PROCESSING_FILES.remove_async(&file.key).await;
+                PROCESSING_FILES.write().await.remove(&file.key);
             }
             return Ok(());
         }
@@ -561,14 +564,14 @@ async fn move_files(
             );
             // need release all the files
             for file in files_with_size.iter() {
-                PROCESSING_FILES.remove_async(&file.key).await;
+                PROCESSING_FILES.write().await.remove(&file.key);
             }
             return Ok(());
         };
 
         // check if allowed to delete the file
         for file in new_file_list.iter() {
-            let can_delete = if wal::lock_files_exists(&file.key).await {
+            let can_delete = if wal::lock_files_exists(&file.key) {
                 log::warn!(
                     "[INGESTER:JOB:{thread_id}] the file is in use, set to pending delete list: {}",
                     file.key
@@ -618,7 +621,7 @@ async fn move_files(
                     }
                     Ok(_) => {
                         // remove the file from processing set
-                        PROCESSING_FILES.remove_async(&file.key).await;
+                        PROCESSING_FILES.write().await.remove(&file.key);
                         // deleted successfully then update metrics
                         metrics::INGEST_WAL_USED_BYTES
                             .with_label_values(&[org_id.as_str(), stream_type.as_str()])
@@ -764,7 +767,7 @@ async fn merge_files(
 
     // we shouldn't use the latest schema, because there are too many fields, we need read schema
     // from files only get the fields what we need
-    let mut shared_fields = hashbrown::HashSet::new();
+    let mut shared_fields = HashSet::new();
     for file in new_file_list.iter() {
         let file_schema = read_schema_from_file(&(&wal_dir.join(&file.key)).into()).await?;
         shared_fields.extend(file_schema.fields().iter().cloned());
@@ -888,6 +891,61 @@ async fn merge_files(
     let account = storage::get_account(&new_file_key).unwrap_or_default();
     storage::put(&account, &new_file_key, buf.clone()).await?;
 
+    // Enterprise: Extract service metadata during data processing
+    // This runs BEFORE indexing checks to ensure all stream types are discovered
+    #[cfg(feature = "enterprise")]
+    {
+        use config::cluster::LOCAL_NODE;
+        let service_streams_config =
+            &o2_enterprise::enterprise::common::config::get_config().service_streams;
+
+        // Only process in ingester mode (if mode is "compactor", this will be handled during merge)
+        // Skip self-reporting streams from _meta organization to avoid processing internal metrics
+        if LOCAL_NODE.is_ingester()
+            && service_streams_config.enabled
+            && service_streams_config.is_ingester_mode()
+            && org_id != config::META_ORG_ID
+            && (stream_type == StreamType::Logs
+                || stream_type == StreamType::Metrics
+                || stream_type == StreamType::Traces)
+        {
+            // Check if we should process this file (per-stream-type sampling)
+            let should_process =
+                o2_enterprise::enterprise::service_streams::sampler::should_process_file(
+                    &org_id,
+                    stream_type,
+                    &stream_name,
+                    &new_file_key,
+                );
+
+            if should_process {
+                let buf_clone = buf.clone();
+                let org_id_clone = org_id.clone();
+                let stream_name_clone = stream_name.clone();
+
+                // Queue services for batched processing (non-blocking)
+                tokio::spawn(async move {
+                    if let Err(e) = queue_services_from_parquet(
+                        &org_id_clone,
+                        stream_type,
+                        &stream_name_clone,
+                        &buf_clone,
+                    )
+                    .await
+                    {
+                        log::error!(
+                            "[ServiceStreams] Failed to queue services for {}/{}/{}: {}",
+                            org_id_clone,
+                            stream_type,
+                            stream_name_clone,
+                            e
+                        );
+                    }
+                });
+            }
+        }
+    }
+
     // skip index generation if not enabled or not supported by stream type
     if !cfg.common.inverted_index_enabled || !stream_type.support_index() {
         return Ok((account, new_file_key, new_file_meta, retain_file_list));
@@ -898,7 +956,7 @@ async fn merge_files(
         .fields()
         .iter()
         .map(|f| f.name())
-        .collect::<hashbrown::HashSet<_>>();
+        .collect::<HashSet<_>>();
     let need_index = full_text_search_fields
         .iter()
         .chain(index_fields.iter())
@@ -1073,6 +1131,133 @@ async fn extract_patterns_from_parquet(
     metrics::PATTERN_EXTRACTION_TIME
         .with_label_values(&[org_id, "total"])
         .observe(total_duration.as_secs_f64());
+
+    Ok(())
+}
+
+#[cfg(feature = "enterprise")]
+async fn queue_services_from_parquet(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    parquet_data: &[u8],
+) -> Result<(), anyhow::Error> {
+    use std::collections::HashMap;
+
+    let start = std::time::Instant::now();
+
+    // Read parquet data and extract services
+    let parquet_bytes = Bytes::from(parquet_data.to_vec());
+    let (_schema, mut reader) = get_recordbatch_reader_from_bytes(&parquet_bytes).await?;
+
+    let mut all_records = Vec::new();
+
+    // Read all record batches and extract field values
+    use futures::StreamExt;
+    while let Some(batch_result) = reader.next().await {
+        let batch = batch_result?;
+        let num_rows = batch.num_rows();
+        if num_rows == 0 {
+            continue;
+        }
+
+        // Build records for each row
+        for row_idx in 0..num_rows {
+            let mut record = HashMap::new();
+
+            // Extract all string columns
+            for (col_idx, field) in batch.schema().fields().iter().enumerate() {
+                let column = batch.column(col_idx);
+
+                // Only process string columns for service discovery
+                use arrow::array::Array;
+                if let Some(array) = column.as_any().downcast_ref::<arrow::array::StringArray>()
+                    && !array.is_null(row_idx)
+                {
+                    let value = array.value(row_idx);
+                    if !value.is_empty() {
+                        record.insert(
+                            field.name().clone(),
+                            serde_json::Value::String(value.to_string()),
+                        );
+                    }
+                }
+            }
+
+            if !record.is_empty() {
+                all_records.push(record);
+            }
+        }
+    }
+
+    if all_records.is_empty() {
+        return Ok(());
+    }
+
+    // Get semantic field groups (use enterprise defaults for comprehensive field mapping)
+    let semantic_groups =
+        o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file();
+
+    // Create processor (with org_id for cardinality tracking)
+    let processor = o2_enterprise::enterprise::service_streams::processor::StreamProcessor::new(
+        org_id.to_string(),
+        semantic_groups,
+    );
+
+    // Extract services from records (with automatic cardinality protection)
+    let services = processor
+        .process_records(stream_type, stream_name, &all_records)
+        .await;
+
+    // Log if any dimensions were blocked due to high cardinality
+    let blocked = processor.get_blocked_dimensions().await;
+    if !blocked.is_empty() {
+        log::warn!(
+            "[ServiceStreams] Blocked high-cardinality dimensions for {}/{}: {:?}",
+            org_id,
+            stream_name,
+            blocked
+        );
+        // Record blocked dimensions in metrics
+        for (dimension, _count) in &blocked {
+            metrics::SERVICE_STREAMS_HIGH_CARDINALITY_BLOCKED
+                .with_label_values(&[org_id, dimension])
+                .inc();
+        }
+    }
+
+    if services.is_empty() {
+        return Ok(());
+    }
+
+    // Record number of services discovered
+    let service_count = services.len() as u64;
+    metrics::SERVICE_STREAMS_SERVICES_DISCOVERED
+        .with_label_values(&[org_id, &stream_type.to_string()])
+        .inc_by(service_count);
+
+    // Record processing time
+    let duration = start.elapsed();
+    metrics::SERVICE_STREAMS_PROCESSING_TIME
+        .with_label_values(&[org_id])
+        .observe(duration.as_secs_f64());
+
+    // Update dimension cardinality gauge
+    let dimension_stats = processor.get_dimension_stats().await;
+    for (dimension, count) in dimension_stats {
+        metrics::SERVICE_STREAMS_DIMENSION_CARDINALITY
+            .with_label_values(&[org_id, &dimension])
+            .set(count as i64);
+    }
+
+    // Queue services for batched processing (avoids per-file DB writes)
+    o2_enterprise::enterprise::service_streams::batch_processor::queue_services(
+        org_id.to_string(),
+        services,
+    )
+    .await;
+
+    // No bookkeeping needed - sampling is stateless hash-based per stream type
 
     Ok(())
 }

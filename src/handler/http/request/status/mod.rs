@@ -159,6 +159,16 @@ struct ConfigResponse<'a> {
     service_graph_enabled: bool,
     #[cfg(not(feature = "enterprise"))]
     service_graph_enabled: bool,
+    #[cfg(feature = "enterprise")]
+    service_streams_enabled: bool,
+    #[cfg(not(feature = "enterprise"))]
+    service_streams_enabled: bool,
+    /// Available FQN priority dimensions from O2_FQN_PRIORITY_DIMENSIONS env var
+    /// Used by UI to populate the FQN priority dimension selector
+    #[cfg(feature = "enterprise")]
+    fqn_priority_dimensions: Vec<String>,
+    #[cfg(not(feature = "enterprise"))]
+    fqn_priority_dimensions: Vec<String>,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -316,6 +326,11 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(not(feature = "enterprise"))]
     let service_graph_enabled = false;
 
+    #[cfg(feature = "enterprise")]
+    let service_streams_enabled = o2cfg.service_streams.enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let service_streams_enabled = false;
+
     #[cfg(all(feature = "cloud", not(feature = "enterprise")))]
     let build_type = "cloud";
     #[cfg(feature = "enterprise")]
@@ -420,6 +435,13 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         query_values_default_num: cfg.limit.query_values_default_num,
         mysql_deprecated_warning: cfg.common.meta_store.starts_with("mysql"),
         service_graph_enabled,
+        service_streams_enabled,
+        #[cfg(feature = "enterprise")]
+        fqn_priority_dimensions: o2_enterprise::enterprise::common::config::get_config()
+            .service_streams
+            .get_fqn_priority_dimensions(),
+        #[cfg(not(feature = "enterprise"))]
+        fqn_priority_dimensions: vec![],
     }))
 }
 
@@ -1018,7 +1040,7 @@ async fn enable_node(
     node.scheduled = enable;
     if !node.scheduled {
         // release all the searching files
-        crate::common::infra::wal::clean_lock_files().await;
+        crate::common::infra::wal::clean_lock_files();
 
         #[cfg(feature = "enterprise")]
         {
@@ -1058,7 +1080,7 @@ async fn flush_node() -> Result<HttpResponse, Error> {
     };
 
     // release all the searching files
-    crate::common::infra::wal::clean_lock_files().await;
+    crate::common::infra::wal::clean_lock_files();
 
     match ingester::flush_all().await {
         Ok(_) => Ok(MetaHttpResponse::json(true)),
@@ -1134,6 +1156,117 @@ async fn refresh_user_sessions() -> Result<HttpResponse, Error> {
         e
     });
     Ok(MetaHttpResponse::json("user sessions refreshed"))
+}
+
+// List of all available cache modules
+const CACHE_MODULES: &[&str] = &[
+    "schema",
+    "organization",
+    "user",
+    "session",
+    "functions",
+    "pipeline",
+    "alerts",
+    "destinations",
+    "templates",
+    "short_url",
+    "realtime_triggers",
+    "org_users",
+    "compact_retention",
+];
+
+// Helper function to reload cache for a specific module
+async fn reload_module_cache(module: &str) -> Result<(), anyhow::Error> {
+    match module {
+        "schema" => db::schema::cache().await,
+        "organization" => db::organization::cache().await,
+        "user" => db::user::cache().await,
+        "session" => db::session::cache().await,
+        "functions" => db::functions::cache().await,
+        "pipeline" => db::pipeline::cache().await,
+        "alerts" => db::alerts::alert::cache().await,
+        "destinations" => db::alerts::destinations::cache().await,
+        "templates" => db::alerts::templates::cache().await,
+        "short_url" => db::short_url::cache().await,
+        "realtime_triggers" => db::alerts::realtime_triggers::cache().await,
+        "org_users" => db::org_users::cache().await,
+        "compact_retention" => db::compact::retention::cache().await,
+        _ => Err(anyhow::anyhow!("unsupported module")),
+    }
+}
+
+#[get("/reload")]
+async fn cache_reload(
+    web::Query(query): web::Query<HashMap<String, String>>,
+) -> Result<HttpResponse, Error> {
+    let modules_str = match query.get("module") {
+        Some(m) => m,
+        None => {
+            return Ok(MetaHttpResponse::bad_request(
+                "missing 'module' query parameter (e.g., ?module=schema,user,functions or ?module=all)",
+            ));
+        }
+    };
+
+    let mut modules: Vec<&str> = modules_str.split(',').map(|s| s.trim()).collect();
+    if modules.is_empty() {
+        return Ok(MetaHttpResponse::bad_request(
+            "module parameter cannot be empty",
+        ));
+    }
+
+    // Expand "all" to all available modules
+    if modules.contains(&"all") {
+        modules = CACHE_MODULES.to_vec();
+    }
+
+    let total_modules = modules.len();
+    let mut results: HashMap<String, String> = HashMap::new();
+    let mut success_count = 0;
+    let mut failed_count = 0;
+
+    for module in modules {
+        match reload_module_cache(module).await {
+            Ok(_) => {
+                results.insert(module.to_string(), "success".to_string());
+                success_count += 1;
+                log::info!(
+                    "[CACHE_RELOAD] Successfully reloaded cache for module: {}",
+                    module
+                );
+            }
+            Err(e) => {
+                let error_msg = format!("failed: {}", e);
+                results.insert(module.to_string(), error_msg.clone());
+                failed_count += 1;
+                log::error!(
+                    "[CACHE_RELOAD] Failed to reload cache for module {}: {}",
+                    module,
+                    e
+                );
+            }
+        }
+    }
+
+    let status = if failed_count == 0 {
+        "success"
+    } else if success_count > 0 {
+        "partial"
+    } else {
+        "failed"
+    };
+
+    let response = json::json!({
+        "status": status,
+        "results": results,
+        "summary": {
+            "total": total_modules,
+            "success": success_count,
+            "failed": failed_count,
+        }
+    });
+
+    Ok(MetaHttpResponse::json(response))
 }
 
 #[cfg(test)]

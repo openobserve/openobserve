@@ -163,7 +163,7 @@ pub struct QueryCondition {
     #[serde(rename = "type")]
     pub query_type: QueryType,
     #[schema(value_type = Option<Object>)]
-    pub conditions: Option<meta_alerts::ConditionList>,
+    pub conditions: Option<meta_alerts::AlertConditionParams>,
     pub sql: Option<String>,
     pub promql: Option<String>,
     pub promql_condition: Option<Condition>,
@@ -353,6 +353,7 @@ impl From<meta_alerts::QueryCondition> for QueryCondition {
     fn from(value: meta_alerts::QueryCondition) -> Self {
         Self {
             query_type: value.query_type.into(),
+            // Pass AlertConditionParams directly (supports both V1 and V2)
             conditions: value.conditions,
             sql: value.sql,
             promql: value.promql,
@@ -454,6 +455,9 @@ impl From<meta_stream::StreamType> for StreamType {
             meta_stream::StreamType::Logs => Self::Logs,
             meta_stream::StreamType::Metrics => Self::Metrics,
             meta_stream::StreamType::Traces => Self::Traces,
+            meta_stream::StreamType::ServiceGraph => Self::Metadata, // ServiceGraph not
+            // alertable, map to
+            // Metadata
             meta_stream::StreamType::EnrichmentTables => Self::EnrichmentTables,
             meta_stream::StreamType::Filelist => Self::Filelist,
             meta_stream::StreamType::Metadata => Self::Metadata,
@@ -528,6 +532,7 @@ impl From<QueryCondition> for meta_alerts::QueryCondition {
     fn from(value: QueryCondition) -> Self {
         Self {
             query_type: value.query_type.into(),
+            // Pass AlertConditionParams directly (supports both V1 and V2)
             conditions: value.conditions,
             sql: value.sql,
             promql: value.promql,
@@ -633,6 +638,118 @@ impl From<StreamType> for meta_stream::StreamType {
             StreamType::Filelist => Self::Filelist,
             StreamType::Metadata => Self::Metadata,
             StreamType::Index => Self::Index,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_query_condition_v2_deserialization() {
+        // Test that the API layer can deserialize V2 conditions
+        let json = r#"{
+            "type": "custom",
+            "conditions": {
+                "version": 2,
+                "conditions": {
+                    "filterType": "group",
+                    "logicalOperator": "AND",
+                    "conditions": [
+                        {
+                            "filterType": "condition",
+                            "type": "condition",
+                            "column": "level",
+                            "operator": "=",
+                            "value": "error",
+                            "logicalOperator": "AND"
+                        },
+                        {
+                            "filterType": "condition",
+                            "type": "condition",
+                            "column": "service",
+                            "operator": "=",
+                            "value": "api",
+                            "logicalOperator": "OR"
+                        }
+                    ]
+                }
+            },
+            "sql": null,
+            "promql": null,
+            "aggregation": null,
+            "promql_condition": null,
+            "vrl_function": null,
+            "search_event_type": null,
+            "multi_time_range": null
+        }"#;
+
+        let result: Result<QueryCondition, _> = serde_json::from_str(json);
+        assert!(
+            result.is_ok(),
+            "V2 deserialization failed: {:?}",
+            result.err()
+        );
+
+        let query_cond = result.unwrap();
+        assert_eq!(query_cond.query_type, QueryType::Custom);
+        assert!(query_cond.conditions.is_some());
+
+        // Verify it's V2
+        match query_cond.conditions.unwrap() {
+            meta_alerts::AlertConditionParams::V2(group) => {
+                assert_eq!(group.filter_type, "group");
+                assert_eq!(group.conditions.len(), 2);
+            }
+            _ => panic!("Expected V2 variant"),
+        }
+    }
+
+    #[test]
+    fn test_query_condition_v1_deserialization() {
+        // Test that the API layer still supports V1 conditions
+        let json = r#"{
+            "type": "custom",
+            "conditions": {
+                "and": [
+                    {
+                        "column": "level",
+                        "operator": "=",
+                        "value": "error",
+                        "ignore_case": false
+                    },
+                    {
+                        "column": "service",
+                        "operator": "=",
+                        "value": "api",
+                        "ignore_case": false
+                    }
+                ]
+            },
+            "sql": null,
+            "promql": null,
+            "aggregation": null,
+            "promql_condition": null,
+            "vrl_function": null,
+            "search_event_type": null,
+            "multi_time_range": null
+        }"#;
+
+        let result: Result<QueryCondition, _> = serde_json::from_str(json);
+        assert!(
+            result.is_ok(),
+            "V1 deserialization failed: {:?}",
+            result.err()
+        );
+
+        let query_cond = result.unwrap();
+        assert!(query_cond.conditions.is_some());
+
+        // Verify it's V1
+        match query_cond.conditions.unwrap() {
+            meta_alerts::AlertConditionParams::V1(_) => {}
+            _ => panic!("Expected V1 variant"),
         }
     }
 }

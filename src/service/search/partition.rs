@@ -158,9 +158,8 @@ impl PartitionGenerator {
         order_by: OrderBy,
         add_mini_partition: bool,
     ) -> Vec<[i64; 2]> {
-        let mini_partition_size = self.calculate_mini_partition_size(step);
-
         let mut partitions = if add_mini_partition {
+            let mini_partition_size = self.calculate_mini_partition_size(step);
             self.generate_histogram_aligned_partitions_with_mini(
                 start_time,
                 end_time,
@@ -190,13 +189,13 @@ impl PartitionGenerator {
         // Handle the alignment for the first and last partition
         let mut new_end = end_time;
         let last_partition_step = end_time % self.min_step;
-        if last_partition_step > 0 && duration > self.min_step * 3 {
+        if last_partition_step > 0 && duration > self.min_step {
             new_end = end_time - last_partition_step;
             partitions.push([new_end, end_time]);
         }
         let mut new_start = start_time;
         let last_partition_step = start_time % self.min_step;
-        if last_partition_step > 0 && duration > self.min_step * 3 {
+        if last_partition_step > 0 && duration > self.min_step {
             new_start = start_time + self.min_step - last_partition_step;
             partitions.push([start_time, new_start]);
         }

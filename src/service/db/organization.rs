@@ -113,6 +113,33 @@ pub async fn get_org_setting(org_id: &str) -> Result<OrganizationSetting, Error>
     Ok(settings)
 }
 
+/// Get the toggle ingestion logs setting for an org
+/// If the setting is not found, return false
+/// we add a separate function for avoid clone the setting
+pub async fn get_org_setting_toggle_ingestion_logs(org_id: &str) -> Result<bool, Error> {
+    let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
+    if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {
+        return Ok(v.toggle_ingestion_logs);
+    }
+
+    // Try to get settings from DB, but use default if not found
+    let settings: OrganizationSetting = match db::get(&key).await {
+        Ok(settings) => json::from_slice(&settings)?,
+        Err(Error::DbError(infra::errors::DbError::KeyNotExists(_))) => {
+            OrganizationSetting::default()
+        }
+        Err(e) => return Err(e),
+    };
+    let toggle_ingestion_logs = settings.toggle_ingestion_logs;
+
+    // Cache the org setting (even if it's default)
+    ORGANIZATION_SETTING
+        .write()
+        .await
+        .insert(key.to_string(), settings);
+    Ok(toggle_ingestion_logs)
+}
+
 /// Cache the existing org settings in the beginning
 pub async fn org_settings_cache() -> Result<(), anyhow::Error> {
     let prefix = ORG_SETTINGS_KEY_PREFIX;

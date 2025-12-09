@@ -319,16 +319,6 @@ async fn main() -> Result<(), anyhow::Error> {
                 panic!("job init failed: {e}");
             }
 
-            // init service graph workers
-            #[cfg(feature = "enterprise")]
-            if o2_enterprise::enterprise::common::config::get_config()
-                .service_graph
-                .enabled
-            {
-                log::info!("Initializing service graph background workers");
-                openobserve::service::traces::service_graph::init_background_workers();
-            }
-
             // Register job runtime for metrics collection
             if let Ok(handle) = tokio::runtime::Handle::try_current() {
                 openobserve::service::runtime_metrics::register_runtime("job".to_string(), handle);
@@ -503,6 +493,17 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // flush usage report
     self_reporting::flush().await;
+
+    // flush service discovery
+    #[cfg(feature = "enterprise")]
+    {
+        log::info!("Flushing service discovery...");
+        if let Err(e) =
+            o2_enterprise::enterprise::service_streams::batch_processor::flush_all().await
+        {
+            log::error!("Failed to flush service discovery: {}", e);
+        }
+    }
 
     // leave the cluster
     _ = cluster::leave().await;

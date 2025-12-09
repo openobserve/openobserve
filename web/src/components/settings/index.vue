@@ -196,6 +196,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >{{ t('regex_patterns.title') }}</span>
                 </div>
               </q-route-tab>
+                <q-route-tab
+                  v-if="config.isEnterprise == 'true'"
+                  data-test="correlation-settings-tab"
+                  name="correlation_settings"
+                  :to="{
+                    name: 'correlationSettings',
+                    query: {
+                      org_identifier: store.state.selectedOrganization?.identifier,
+                    },
+                  }"
+                  icon="group_work"
+                  :label="t('settings.correlationSettings')"
+                  content-class="tab_content"
+                />
                 </q-tabs>
               </div>
             </div>

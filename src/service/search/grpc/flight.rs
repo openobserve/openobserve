@@ -151,11 +151,11 @@ pub async fn search(
     let stream_created_at = unwrap_stream_created_at(&db_schema);
     let fst_fields = get_stream_setting_fts_fields(&stream_settings)
         .into_iter()
-        .filter_map(|v| latest_schema_map.contains_key(&v).then_some(v))
+        .filter(|v| latest_schema_map.contains_key(v))
         .collect_vec();
     let index_fields = get_stream_setting_index_fields(&stream_settings)
         .into_iter()
-        .filter_map(|v| latest_schema_map.contains_key(&v).then_some(v))
+        .filter(|v| latest_schema_map.contains_key(v))
         .collect_vec();
     let index_updated_at = get_stream_setting_index_updated_at(&stream_settings, stream_created_at);
 

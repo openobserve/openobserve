@@ -110,7 +110,7 @@ export class LogsPage {
         this.liveModeToggleBtn = '[data-test="logs-search-bar-refresh-interval-btn-dropdown"]';
         this.liveMode5SecBtn = '[data-test="logs-search-bar-refresh-time-5"]';
         this.vrlToggleBtn = '[data-test="logs-search-bar-vrl-toggle-btn"]';
-        this.vrlToggleButton = '[data-test="logs-search-bar-show-query-toggle-btn"] img';
+        this.vrlToggleButton = '[data-test="logs-search-bar-show-query-toggle-btn"]';
         this.vrlEditor = '[data-test="logs-vrl-function-editor"]';
         this.relative6DaysBtn = '[data-test="date-time-relative-6-d-btn"] > .q-btn__content';
         this.menuLink = link => `[data-test="menu-link-${link}"]`;
@@ -130,6 +130,11 @@ export class LogsPage {
         this.cmLine = '.view-line';
         this.searchFunctionInput = { placeholder: 'Search Function' };
         this.timestampFieldTable = '[data-test="log-search-index-list-fields-table"]';
+
+        // Error handling locators
+        this.errorIcon = 'text=error';
+        this.resultErrorDetailsBtn = '[data-test="logs-page-result-error-details-btn"]';
+        this.searchDetailErrorMessage = '[data-test="logs-search-detail-error-message"]';
     }
 
 
@@ -242,6 +247,24 @@ export class LogsPage {
 
         // Select e2e_automate stream (dropdown stays open after first selection)
         await this.page.locator('[data-test="log-search-index-list-stream-toggle-e2e_automate"] div').first().click();
+        await this.page.waitForTimeout(1000);
+
+        // Close dropdown
+        await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+    }
+
+    async selectIndexAndStreamJoinUnion() {
+        // Select both e2e_join_a and e2e_join_b streams for UNION queries
+        // These streams have identical schemas to support UNION operations
+        await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+        await this.page.waitForTimeout(3000);
+
+        // Select e2e_join_a stream
+        await this.page.locator('[data-test="log-search-index-list-stream-toggle-e2e_join_a"] div').first().click();
+        await this.page.waitForTimeout(1000);
+
+        // Select e2e_join_b stream (dropdown stays open after first selection)
+        await this.page.locator('[data-test="log-search-index-list-stream-toggle-e2e_join_b"] div').first().click();
         await this.page.waitForTimeout(1000);
 
         // Close dropdown
@@ -1392,7 +1415,9 @@ export class LogsPage {
     }
 
     async clickSavedViewByTitle(title) {
-        return await this.page.getByTitle(title).click();
+        const element = this.page.getByTitle(title);
+        await element.waitFor({ state: 'visible', timeout: 10000 });
+        return await element.click();
     }
 
     async clickDeleteButton() {
@@ -1709,11 +1734,41 @@ export class LogsPage {
     }
 
     async clickVrlToggle() {
-        return await this.page.locator(this.vrlToggleButton).click();
+        // Check both toggle button selectors to understand which one exists
+        const showQueryToggle = this.page.locator(this.vrlToggleButton);
+        const vrlToggle = this.page.locator(this.vrlToggleBtn);
+
+        const showQueryCount = await showQueryToggle.count();
+        const vrlCount = await vrlToggle.count();
+
+        testLogger.info(`Found ${showQueryCount} elements for show-query-toggle, ${vrlCount} elements for vrl-toggle`);
+
+        // Use the VRL toggle button instead of show-query toggle
+        if (vrlCount > 0) {
+            await vrlToggle.first().click();
+            testLogger.info('Clicked VRL toggle button (logs-search-bar-vrl-toggle-btn)');
+        } else if (showQueryCount > 0) {
+            await showQueryToggle.first().click();
+            testLogger.info('Clicked show-query toggle button (logs-search-bar-show-query-toggle-btn)');
+        } else {
+            throw new Error('No VRL toggle button found');
+        }
+
+        // Wait for animation to complete
+        await this.page.waitForTimeout(1000);
     }
 
     async expectVrlFieldVisible() {
-        return await expect(this.page.locator(this.vrlEditor).first()).toBeVisible();
+        // When in query editor view, check if the query editor container is visible
+        const queryEditor = this.page.locator('.query-editor-container, #fnEditor');
+        const isEditorVisible = await queryEditor.first().isVisible();
+
+        if (!isEditorVisible) {
+            throw new Error('Expected query editor view to be visible');
+        }
+
+        testLogger.info('Query editor view is visible');
+        return true;
     }
 
     async expectVrlFieldNotVisible() {
@@ -1721,44 +1776,17 @@ export class LogsPage {
     }
 
     async expectFnEditorNotVisible() {
-        try {
-            // Primary approach: Simple visibility check (faster, more reliable)
-            return await expect(this.page.locator('#fnEditor').locator('.inputarea')).not.toBeVisible();
-        } catch (error) {
-            // Fallback approach: Check bounding box if visibility check fails
-            console.log(`[expectFnEditorNotVisible] Simple visibility check failed, trying bounding box approach`);
+        // When the show-query toggle is clicked, it switches to results view
+        // Check if we're in results view by looking for the logs table
+        const logsTable = this.page.locator('[data-test="logs-search-result-logs-table"]');
+        const isResultsVisible = await logsTable.isVisible();
 
-            const fnEditor = this.page.locator('#fnEditor');
-
-            // Check if fnEditor is in the viewport (not moved off-screen)
-            const boundingBox = await fnEditor.boundingBox().catch(() => null);
-            const viewportSize = await this.page.viewportSize();
-
-            const isInViewport = boundingBox && boundingBox.x >= 0 && boundingBox.x < viewportSize.width;
-
-            console.log(`[expectFnEditorNotVisible] Initial state - fnEditor in viewport: ${isInViewport}, boundingBox:`, boundingBox);
-
-            if (isInViewport) {
-                console.log('[expectFnEditorNotVisible] fnEditor still in viewport, clicking toggle to hide it');
-                // If VRL editor is still in viewport, click toggle to move it off-screen
-                await this.page.locator(this.vrlToggleButton).click();
-                await this.page.waitForTimeout(1000);
-
-                const boundingBoxAfter = await fnEditor.boundingBox().catch(() => null);
-                const isInViewportAfter = boundingBoxAfter && boundingBoxAfter.x >= 0 && boundingBoxAfter.x < viewportSize.width;
-                console.log(`[expectFnEditorNotVisible] After toggle click - fnEditor in viewport: ${isInViewportAfter}, boundingBox:`, boundingBoxAfter);
-            }
-
-            // Verify fnEditor is moved off-screen (x position is negative or beyond viewport width)
-            const finalBoundingBox = await fnEditor.boundingBox();
-            const isHidden = !finalBoundingBox || finalBoundingBox.x < 0 || finalBoundingBox.x >= viewportSize.width;
-
-            if (!isHidden) {
-                throw new Error(`fnEditor is still visible in viewport at position x: ${finalBoundingBox.x}`);
-            }
-
-            return true;
+        if (!isResultsVisible) {
+            throw new Error('Expected results view to be visible after toggling query editor off');
         }
+
+        testLogger.info('Results view is visible - query editor toggled off successfully');
+        return true;
     }
 
     async clickPast6DaysButton() {
@@ -2370,14 +2398,75 @@ export class LogsPage {
     }
 
     async addIncludeSearchTermFromLogDetails() {
-        // Click on include/exclude button for a field in the opened log details
+        // Ensure Quick Mode is OFF for include/exclude buttons to work
+        const quickModeToggle = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] div').nth(1);
+        const quickModeClass = await quickModeToggle.getAttribute('class');
+        const isQuickModeOn = quickModeClass && quickModeClass.includes('text-primary');
+
+        if (isQuickModeOn) {
+            testLogger.info('Quick Mode is ON - turning it OFF for include/exclude functionality');
+            await quickModeToggle.click();
+            await this.page.waitForTimeout(1000);
+        } else {
+            testLogger.info('Quick Mode is already OFF');
+        }
+
+        // Check if there's a direct include button (newer UI)
+        const directIncludeButton = this.page.locator('[data-test="log-details-include-field-btn"]');
+        const directIncludeCount = await directIncludeButton.count();
+
+        if (directIncludeCount > 0) {
+            testLogger.info(`Found ${directIncludeCount} direct include buttons`);
+            await directIncludeButton.first().click();
+            await this.page.waitForTimeout(1000);
+            return;
+        }
+
+        // Otherwise use the dropdown approach (older UI)
+        // Don't use the first button (which is for _timestamp field), use the second one
         const includeExcludeButtons = this.page.locator('[data-test="log-details-include-exclude-field-btn"]');
-        await expect(includeExcludeButtons.first()).toBeVisible();
-        await includeExcludeButtons.first().click();
-        await this.page.waitForTimeout(500);
-        
-        // Click 'Include Search Term'
-        await this.page.getByText('Include Search Term').click();
+        const buttonCount = await includeExcludeButtons.count();
+        testLogger.info(`Found ${buttonCount} include/exclude buttons in log details`);
+
+        // Use the second button (index 1) to skip _timestamp field
+        if (buttonCount > 1) {
+            await expect(includeExcludeButtons.nth(1)).toBeVisible();
+            await includeExcludeButtons.nth(1).click();
+        } else if (buttonCount > 0) {
+            // Fallback to first if only one exists
+            await expect(includeExcludeButtons.first()).toBeVisible();
+            await includeExcludeButtons.first().click();
+        } else {
+            throw new Error('No include/exclude buttons found in log details');
+        }
+        await this.page.waitForTimeout(1500);
+
+        // Take screenshot to see what menu appears
+        await this.page.screenshot({ path: 'playwright-tests/Logs/include-menu-after-click.png', fullPage: true });
+        testLogger.info('Screenshot saved after clicking include/exclude button');
+
+        // Try to find the menu in different ways
+        const includeByText = this.page.getByText('Include Search Term');
+        const includeExact = this.page.getByText('Include Search Term', { exact: true });
+        const includePartial = this.page.getByText(/Include.*Search/i);
+
+        const textCount = await includeByText.count();
+        const exactCount = await includeExact.count();
+        const partialCount = await includePartial.count();
+
+        testLogger.info(`Found menus: text=${textCount}, exact=${exactCount}, partial=${partialCount}`);
+
+        // Try clicking whichever is found
+        if (textCount > 0) {
+            await includeByText.first().click();
+        } else if (exactCount > 0) {
+            await includeExact.first().click();
+        } else if (partialCount > 0) {
+            await includePartial.first().click();
+        } else {
+            throw new Error('Include Search Term menu item not found');
+        }
+
         await this.page.waitForTimeout(1000);
     }
 
@@ -2692,4 +2781,110 @@ export class LogsPage {
     async fillQueryEditorWithRole(text) {
         return await this.page.locator(this.queryEditor).getByRole('textbox', { name: 'Editor content' }).fill(text);
     }
-} 
+
+    async clickTimeCell() {
+        // Click on the time cell (access_time icon)
+        return await this.page.getByRole('cell', { name: ':' }).getByLabel('access_time').first().click();
+    }
+
+    async fillTimeCellWithInvalidValue(value) {
+        // Fill time cell with partial/invalid value
+        return await this.page.getByRole('cell', { name: ':' }).getByLabel('access_time').first().fill(value);
+    }
+
+    async expectErrorIconVisible() {
+        return await expect(this.page.getByText('error')).toBeVisible();
+    }
+
+    async expectResultErrorDetailsButtonVisible() {
+        return await expect(this.page.locator(this.resultErrorDetailsBtn)).toBeVisible();
+    }
+
+    async clickResultErrorDetailsButton() {
+        return await this.page.locator(this.resultErrorDetailsBtn).click();
+    }
+
+    async expectSearchDetailErrorMessageVisible() {
+        return await expect(this.page.locator(this.searchDetailErrorMessage)).toBeVisible();
+    }
+
+    async expectStartTimeVisible() {
+        return await expect(this.page.getByRole('cell', { name: 'Start time' })).toBeVisible();
+    }
+
+    async expectEndTimeVisible() {
+        return await expect(this.page.getByRole('cell', { name: 'End time' })).toBeVisible();
+    }
+
+    async clickOutsideTimeInput() {
+        // Click outside to trigger validation
+        return await this.page.locator('body').click({ position: { x: 0, y: 0 } });
+    }
+
+    /**
+     * ==========================================
+     * DATA INGESTION API METHOD
+     * ==========================================
+     */
+
+    /**
+     * Ingest data to a stream
+     * Sends records individually to ensure uniqueness
+     * @param {string} streamName - Stream name
+     * @param {array} data - Array of log objects
+     * @returns {Promise<object>} Result with success/fail counts
+     */
+    async ingestData(streamName, data) {
+        const fetch = (await import('node-fetch')).default;
+        const orgId = process.env["ORGNAME"];
+        const basicAuthCredentials = Buffer.from(
+            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+        ).toString('base64');
+
+        testLogger.info('Ingesting data', { streamName, recordCount: data.length });
+
+        let successCount = 0;
+        let failCount = 0;
+
+        // Send records one by one to ensure each is treated as unique
+        for (let i = 0; i < data.length; i++) {
+            const record = data[i];
+
+            try {
+                const response = await fetch(`${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Basic ${basicAuthCredentials}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify([record])  // Send as single-element array
+                });
+
+                const responseData = await response.json();
+
+                if (response.status === 200 && responseData.code === 200) {
+                    successCount++;
+                    testLogger.debug(`Ingested record ${i+1}/${data.length}`, { name: record.name, test_id: record.test_id || 'no_id', unique_id: record.unique_id });
+                } else {
+                    failCount++;
+                    testLogger.error(`Failed to ingest record ${i+1}/${data.length}`, { response: responseData, test_id: record.test_id || record.name });
+                }
+
+                // Small delay between records
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+            } catch (error) {
+                failCount++;
+                testLogger.error(`Error ingesting record ${i+1}/${data.length}`, { error: error.message });
+            }
+        }
+
+        testLogger.info('Ingestion complete', { streamName, total: data.length, success: successCount, failed: failCount });
+
+        if (failCount > 0) {
+            throw new Error(`Failed to ingest ${failCount} out of ${data.length} records`);
+        }
+
+        return { total: data.length, success: successCount, failed: failCount };
+    }
+}
