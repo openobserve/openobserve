@@ -943,7 +943,8 @@
       "functionNameRequired": "Function Name is required",
       "selectStream": "Please select Stream from the list",
       "fieldRequired":"Field is required!",
-      "importingError":"Error importing Pipeline(s) please check the JSON"
+      "importingError":"Error importing Pipeline(s) please check the JSON",
+      "functionAlreadyAssociated":"Function is already associated"
     },
     "success": {
       "contentCopied": "Content Copied Successfully!",
