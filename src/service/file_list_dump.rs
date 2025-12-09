@@ -17,11 +17,9 @@ use std::sync::Arc;
 
 use arrow::array::{BooleanArray, Int64Array, RecordBatch, StringArray};
 use arrow_schema::{DataType, Field, Schema};
-use chrono::Utc;
 use config::{
     get_config, ider,
-    meta::stream::{FileKey, FileListDeleted, PartitionTimeLevel, StreamStats, StreamType},
-    utils::time::BASE_TIME,
+    meta::stream::{FileKey, PartitionTimeLevel, StreamStats, StreamType},
 };
 use hashbrown::HashMap;
 use infra::{
@@ -70,7 +68,7 @@ macro_rules! get_col {
     };
 }
 
-fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
+pub fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
     get_col!(id_col, "id", Int64Array, rb);
     get_col!(account_col, "account", StringArray, rb);
     get_col!(org_col, "org", StringArray, rb);
@@ -166,7 +164,7 @@ pub fn generate_dump_stream_name(stream_type: StreamType, stream_name: &str) -> 
     format!("{}_{}", stream_name, stream_type)
 }
 
-async fn exec(
+pub async fn exec(
     trace_id: &str,
     partitions: usize,
     dump_files: Vec<FileKey>,
@@ -300,131 +298,6 @@ async fn query_inner(
     );
 
     Ok(ret)
-}
-
-pub async fn delete_all(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-) -> Result<(), errors::Error> {
-    delete_by_time_range(
-        org_id,
-        stream_type,
-        stream_name,
-        (BASE_TIME.timestamp_micros(), Utc::now().timestamp_micros()),
-        true,
-    )
-    .await
-}
-
-// check this delete is daily or hourly
-// -> daily
-//   1. we need to get all the files in the range
-//   2. simple mark these files as deleted
-//   3. insert the deleted items into file_list_deleted table
-// -> hourly
-//   1. we need to get all the files in the range
-//   2. pickup the items that need to be deleted
-//   3. generate a new dump file excluding the items that need to be deleted and insert to file_list
-//      table
-//   4. make the old files deleted
-//   5. insert the deleted items into file_list_deleted table
-pub async fn delete_by_time_range(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    range: (i64, i64),
-    is_daily: bool,
-) -> Result<(), errors::Error> {
-    let dump_stream_name = generate_dump_stream_name(stream_type, stream_name);
-    let list =
-        infra::file_list::query_for_dump(org_id, StreamType::Filelist, &dump_stream_name, range)
-            .await?;
-    if list.is_empty() {
-        return Ok(());
-    }
-    if is_daily {
-        if let Err(e) = delete_daily_inner(org_id, list, range).await {
-            log::error!("[FILE_LIST_DUMP] delete_daily_inner failed: {e}");
-            return Err(e);
-        }
-    } else if let Err(e) = delete_hourly_inner(org_id, stream_type, stream_name, list, range).await
-    {
-        log::error!("[FILE_LIST_DUMP] delete_hourly_inner failed: {e}");
-        return Err(e);
-    }
-    Ok(())
-}
-
-async fn delete_daily_inner(
-    org_id: &str,
-    list: Vec<FileRecord>,
-    _range: (i64, i64),
-) -> Result<(), errors::Error> {
-    let cfg = get_config();
-    let dump_files = list.iter().map(|f| f.into()).collect::<Vec<_>>();
-    let query = "SELECT * FROM file_list";
-    let trace_id = ider::generate_trace_id();
-    let ret = exec(&trace_id, cfg.limit.cpu_num, dump_files.clone(), query).await?;
-    let files = ret
-        .into_iter()
-        .flat_map(record_batch_to_file_record)
-        .collect::<Vec<_>>();
-
-    let del_items: Vec<_> = files
-        .iter()
-        .map(|f| FileListDeleted {
-            id: 0,
-            account: f.account.to_string(),
-            file: format!("files/{}/{}/{}", f.stream, f.date, f.file),
-            index_file: false,
-            flattened: false,
-        })
-        .collect();
-
-    let mut inserted_into_deleted = false;
-    for _ in 0..5 {
-        if !inserted_into_deleted
-            && let Err(e) = infra::file_list::batch_add_deleted(
-                org_id,
-                Utc::now().timestamp_micros(),
-                &del_items,
-            )
-            .await
-        {
-            log::error!("[FILE_LIST_DUMP] batch_add_deleted to db failed, retrying: {e}");
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            continue;
-        }
-        inserted_into_deleted = true;
-        let items: Vec<_> = dump_files
-            .iter()
-            .map(|f| {
-                let mut f = f.clone();
-                f.deleted = true;
-                f.segment_ids = None;
-                f
-            })
-            .collect();
-        if let Err(e) = infra::file_list::batch_process(&items).await {
-            log::error!("[FILE_LIST_DUMP] batch_delete to db failed, retrying: {e}");
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            continue;
-        }
-        break;
-    }
-
-    Ok(())
-}
-
-async fn delete_hourly_inner(
-    _org_id: &str,
-    _stream_type: StreamType,
-    _stream_name: &str,
-    _list: Vec<FileRecord>,
-    _range: (i64, i64),
-) -> Result<(), errors::Error> {
-    todo!()
 }
 
 // 1. use updated_at time range to get changed file_list dump files

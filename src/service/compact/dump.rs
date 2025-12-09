@@ -27,12 +27,12 @@ use config::{
     get_config, get_parquet_compression,
     meta::{
         cluster::Role,
-        stream::{FileKey, FileMeta, PartitionTimeLevel, StreamType},
+        stream::{FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamType},
     },
-    utils::time::{hour_micros, now},
+    utils::time::{BASE_TIME, get_ymdh_from_micros, hour_micros, now},
 };
 use infra::{
-    file_list as infra_file_list,
+    errors, file_list as infra_file_list,
     file_list::FileRecord,
     schema::{STREAM_SCHEMAS_LATEST, SchemaCache, get_settings, unwrap_partition_time_level},
 };
@@ -42,10 +42,7 @@ use tokio::sync::mpsc;
 
 use crate::{
     common::infra::cluster::get_node_from_consistent_hash,
-    service::{
-        db,
-        file_list_dump::{FILE_LIST_SCHEMA, generate_dump_stream_name},
-    },
+    service::{db, file_list_dump::*},
 };
 
 #[derive(Clone)]
@@ -286,37 +283,266 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
     }
 
     // generate the dump file
-    let records = match generate_dump(job, (start_time, end_time), files).await {
+    let ids: Vec<i64> = files.iter().map(|r| r.id).collect();
+    let dump_file = match generate_dump(
+        &job.org_id,
+        job.stream_type,
+        &job.stream_name,
+        (start_time, end_time),
+        files,
+    )
+    .await
+    {
         Ok(v) => v,
         Err(e) => {
-            log::error!("[COMPACTOR::DUMP] file_list dump file generation error : {e}");
-            return Err(e);
+            log::error!("[COMPACTOR::DUMP] file_list dump file generation error: {e}");
+            return Err(e.into());
         }
     };
 
-    log::info!(
-        "[COMPACTOR::DUMP] successfully dumped file list for stream [{}/{}/{}] offset {start_time} records {records}, took: {} ms",
-        job.org_id,
-        job.stream_type,
-        job.stream_name,
-        start.elapsed().as_millis(),
-    );
+    if let Some(dump_file) = dump_file {
+        // update the entries in db
+        let records = dump_file.meta.records;
+        let file_name = dump_file.key.clone();
+        infra_file_list::update_dump_records(&dump_file, &ids).await?;
+        infra_file_list::set_job_dumped_status(&[job.job_id], true).await?;
+        log::info!(
+            "[COMPACTOR::DUMP] successfully dumped file list for stream [{}/{}/{}] offset {start_time} records {records} to file {file_name}, took: {} ms",
+            job.org_id,
+            job.stream_type,
+            job.stream_name,
+            start.elapsed().as_millis(),
+        );
+    }
 
     Ok(())
 }
 
+pub async fn delete_all(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> Result<(), errors::Error> {
+    delete_by_time_range(
+        org_id,
+        stream_type,
+        stream_name,
+        (BASE_TIME.timestamp_micros(), Utc::now().timestamp_micros()),
+        true,
+    )
+    .await
+}
+
+// check this delete is daily or hourly
+// -> daily
+//   1. we need to get all the files in the range
+//   2. simple mark these files as deleted
+//   3. insert the deleted items into file_list_deleted table
+// -> hourly
+//   1. we need to get all the files in the range
+//   2. pickup the items that need to be deleted
+//   3. insert the deleted items into file_list_deleted table
+//   4. generate a new dump file excluding the items that need to be deleted
+//   5. make the old files deleted and add the new file to file_list table
+pub async fn delete_by_time_range(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    range: (i64, i64),
+    is_daily: bool,
+) -> Result<(), errors::Error> {
+    let dump_stream_name = generate_dump_stream_name(stream_type, stream_name);
+    let list =
+        infra::file_list::query_for_dump(org_id, StreamType::Filelist, &dump_stream_name, range)
+            .await?;
+    if list.is_empty() {
+        return Ok(());
+    }
+    if is_daily {
+        if let Err(e) = delete_daily_inner(org_id, list, range).await {
+            log::error!("[FILE_LIST_DUMP] delete_daily_inner failed: {e}");
+            return Err(e);
+        }
+    } else if let Err(e) = delete_hourly_inner(org_id, stream_type, stream_name, list, range).await
+    {
+        log::error!("[FILE_LIST_DUMP] delete_hourly_inner failed: {e}");
+        return Err(e);
+    }
+    Ok(())
+}
+
+async fn delete_daily_inner(
+    org_id: &str,
+    list: Vec<FileRecord>,
+    _range: (i64, i64),
+) -> Result<(), errors::Error> {
+    let cfg = get_config();
+    let dump_files = list.iter().map(|f| f.into()).collect::<Vec<_>>();
+    let query = "SELECT * FROM file_list";
+    let trace_id = config::ider::generate_trace_id();
+    let ret = exec(&trace_id, cfg.limit.cpu_num, dump_files.clone(), query).await?;
+    let files = ret
+        .into_iter()
+        .flat_map(record_batch_to_file_record)
+        .collect::<Vec<_>>();
+
+    let del_items: Vec<_> = files
+        .iter()
+        .map(|f| FileListDeleted {
+            id: 0,
+            account: f.account.to_string(),
+            file: format!("files/{}/{}/{}", f.stream, f.date, f.file),
+            index_file: false,
+            flattened: false,
+        })
+        .collect();
+
+    let mut inserted_into_deleted = false;
+    for _ in 0..5 {
+        if !inserted_into_deleted
+            && let Err(e) = infra::file_list::batch_add_deleted(
+                org_id,
+                Utc::now().timestamp_micros(),
+                &del_items,
+            )
+            .await
+        {
+            log::error!("[FILE_LIST_DUMP] batch_add_deleted to db failed, retrying: {e}");
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            continue;
+        }
+        inserted_into_deleted = true;
+        let items: Vec<_> = dump_files
+            .iter()
+            .map(|f| {
+                let mut f = f.clone();
+                f.deleted = true;
+                f.segment_ids = None;
+                f
+            })
+            .collect();
+        if let Err(e) = infra::file_list::batch_process(&items).await {
+            log::error!("[FILE_LIST_DUMP] batch_delete to db failed, retrying: {e}");
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            continue;
+        }
+        break;
+    }
+
+    Ok(())
+}
+
+async fn delete_hourly_inner(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    list: Vec<FileRecord>,
+    range: (i64, i64),
+) -> Result<(), errors::Error> {
+    let cfg = get_config();
+    let dump_files = list.iter().map(|f| f.into()).collect::<Vec<_>>();
+    let query = "SELECT * FROM file_list;";
+    let trace_id = config::ider::generate_trace_id();
+    let ret = exec(&trace_id, cfg.limit.cpu_num, dump_files.clone(), query).await?;
+    let files = ret
+        .into_iter()
+        .flat_map(record_batch_to_file_record)
+        .collect::<Vec<_>>();
+
+    // Filter files based on the time range to find files to delete
+    let start_date = get_ymdh_from_micros(range.0);
+    let end_date = get_ymdh_from_micros(range.1);
+    let (files_to_delete, files_to_keep): (Vec<_>, Vec<_>) = files
+        .into_iter()
+        .partition(|f| f.date >= start_date && f.date <= end_date);
+
+    if files_to_delete.is_empty() {
+        return Ok(()); // nothing need to do
+    }
+
+    // generate new dump file with files_to_keep and upload to storage
+    let new_dump_file = if !files_to_keep.is_empty() {
+        match generate_dump(org_id, stream_type, stream_name, range, files_to_keep).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!(
+                    "[FILE_LIST_DUMP] failed to generate dump file for delete hourly data, time range: {range:?}, error: {e}"
+                );
+                return Err(e);
+            }
+        }
+    } else {
+        None
+    };
+
+    // create deleted items for file_list table
+    let mut items: Vec<_> = dump_files
+        .into_iter()
+        .map(|mut f| {
+            f.deleted = true;
+            f.segment_ids = None;
+            f
+        })
+        .collect();
+    // insert the new dump file into file_list table
+    if let Some(new_dump_file) = new_dump_file {
+        items.push(new_dump_file);
+    }
+
+    // Create deleted items for file_list_deleted table
+    let del_items: Vec<_> = files_to_delete
+        .iter()
+        .map(|f| FileListDeleted {
+            id: 0,
+            account: f.account.to_string(),
+            file: format!("files/{}/{}/{}", f.stream, f.date, f.file),
+            index_file: false,
+            flattened: false,
+        })
+        .collect();
+
+    // Insert deleted items into file_list_deleted table with retry logic
+    let mut inserted_into_deleted = false;
+    for _ in 0..5 {
+        if !inserted_into_deleted
+            && let Err(e) = infra::file_list::batch_add_deleted(
+                org_id,
+                Utc::now().timestamp_micros(),
+                &del_items,
+            )
+            .await
+        {
+            log::error!("[FILE_LIST_DUMP] batch_add_deleted to db failed, retrying: {e}");
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            continue;
+        }
+        inserted_into_deleted = true;
+
+        if let Err(e) = infra::file_list::batch_process(&items).await {
+            log::error!("[FILE_LIST_DUMP] batch_process to db failed, retrying: {e}");
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            continue;
+        }
+        break;
+    }
+
+    Ok(())
+}
+
+// Generate a new dump file and upload to storage
 async fn generate_dump(
-    job: &DumpJob,
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
     range: (i64, i64),
     files: Vec<FileRecord>,
-) -> Result<usize, anyhow::Error> {
+) -> Result<Option<FileKey>, errors::Error> {
     // if there are no files to dump, no point in making a dump file
     if files.is_empty() {
-        return Ok(0);
+        return Ok(None);
     }
 
     let records = files.len();
-    let ids: Vec<i64> = files.iter().map(|r| r.id).collect();
 
     let mut buf = Vec::new();
     let mut writer = get_writer(FILE_LIST_SCHEMA.clone(), &mut buf)?;
@@ -346,10 +572,10 @@ async fn generate_dump(
         config::ider::generate_file_name()
     );
 
-    let dump_stream_name = generate_dump_stream_name(job.stream_type, &job.stream_name);
+    let dump_stream_name = generate_dump_stream_name(stream_type, stream_name);
     let file_key = format!(
         "files/{}/{}/{dump_stream_name}/{file_name}",
-        job.org_id,
+        org_id,
         StreamType::Filelist,
     );
 
@@ -363,9 +589,7 @@ async fn generate_dump(
         flattened: false,
     };
 
-    // first store the file in storage
-    // then update the entries in db,
-    // and if both pass only then set the job as dumped=true
+    // store the file in storage
     let account = infra::storage::get_account(&file_key).unwrap_or_default();
     infra::storage::put(&account, &file_key, buf.into()).await?;
 
@@ -377,16 +601,14 @@ async fn generate_dump(
         deleted: false,
         segment_ids: None,
     };
-    infra_file_list::update_dump_records(&dump_file, &ids).await?;
-    infra_file_list::set_job_dumped_status(&[job.job_id], true).await?;
 
-    Ok(records)
+    Ok(Some(dump_file))
 }
 
 fn get_writer(
     schema: Arc<Schema>,
     buf: &mut Vec<u8>,
-) -> Result<AsyncArrowWriter<&mut Vec<u8>>, anyhow::Error> {
+) -> Result<AsyncArrowWriter<&mut Vec<u8>>, errors::Error> {
     let cfg = get_config();
     let writer_props = WriterProperties::builder()
         .set_write_batch_size(PARQUET_BATCH_SIZE) // in bytes
@@ -398,7 +620,7 @@ fn get_writer(
     Ok(writer)
 }
 
-fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, anyhow::Error> {
+fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, errors::Error> {
     let schema = FILE_LIST_SCHEMA.clone();
     if files.is_empty() {
         return Ok(RecordBatch::new_empty(schema));

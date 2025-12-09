@@ -303,7 +303,7 @@ pub async fn delete_all(
 
     // delete from file list
     delete_from_file_list(org_id, stream_type, stream_name, (start_time, end_time)).await?;
-    super::super::file_list_dump::delete_all(org_id, stream_type, stream_name).await?;
+    super::dump::delete_all(org_id, stream_type, stream_name).await?;
     log::info!("deleted file list for: {org_id}/{stream_type}/{stream_name}/all");
 
     // mark delete done
@@ -403,7 +403,7 @@ pub async fn delete_by_date(
             log::error!("[COMPACTOR] delete_by_date delete_from_file_list failed: {e}");
             e
         })?;
-    super::super::file_list_dump::delete_by_time_range(
+    super::dump::delete_by_time_range(
         org_id,
         stream_type,
         stream_name,

@@ -5274,6 +5274,7 @@ dependencies = [
  "ahash 0.8.11",
  "anyhow",
  "arc-swap",
+ "arrow",
  "async-nats",
  "async-recursion",
  "async-trait",
