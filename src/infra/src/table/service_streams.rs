@@ -165,7 +165,10 @@ pub async fn put(record: ServiceRecord) -> Result<(), errors::Error> {
     let service_name_for_log = record.service_name.clone();
     log::info!(
         "[SERVICE_STREAMS] put() called for org={} service={} correlation_key={} incoming_streams={}",
-        record.org_id, service_name_for_log, record.correlation_key, record.streams
+        record.org_id,
+        service_name_for_log,
+        record.correlation_key,
+        record.streams
     );
 
     // Try to find existing record by unique constraint (org_id, correlation_key)
@@ -180,7 +183,8 @@ pub async fn put(record: ServiceRecord) -> Result<(), errors::Error> {
     if let Some(existing_record) = existing {
         log::info!(
             "[SERVICE_STREAMS] Found existing record for service={} existing_streams={}",
-            service_name_for_log, existing_record.streams
+            service_name_for_log,
+            existing_record.streams
         );
 
         // MERGE streams instead of overwriting to prevent race conditions
@@ -189,7 +193,10 @@ pub async fn put(record: ServiceRecord) -> Result<(), errors::Error> {
 
         log::info!(
             "[SERVICE_STREAMS_MERGE] service={}: existing={} + incoming={} => merged={}",
-            service_name_for_log, existing_record.streams, record.streams, merged_streams
+            service_name_for_log,
+            existing_record.streams,
+            record.streams,
+            merged_streams
         );
 
         // Keep the earliest first_seen and latest last_seen
@@ -212,11 +219,16 @@ pub async fn put(record: ServiceRecord) -> Result<(), errors::Error> {
             .await
             .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
-        log::info!("[SERVICE_STREAMS] Updated service={} successfully", service_name_for_log);
+        log::info!(
+            "[SERVICE_STREAMS] Updated service={} successfully",
+            service_name_for_log
+        );
     } else {
         log::info!(
             "[SERVICE_STREAMS] INSERT new service={} correlation_key={} streams={}",
-            service_name_for_log, record.correlation_key, record.streams
+            service_name_for_log,
+            record.correlation_key,
+            record.streams
         );
 
         // Insert new record
