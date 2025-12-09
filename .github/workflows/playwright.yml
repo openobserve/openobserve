@@ -194,6 +194,7 @@ jobs:
             browser: "chrome"
             run_files: [
                 "pipeline-conditions.spec.js",
+                "pipeline-conditions-validation.spec.js",
                 "pipelines.spec.js",
                 "pipeline-dynamic.spec.js",
                 "pipeline-core.spec.js",
