@@ -1881,6 +1881,7 @@
     "loadingTraces": "Loading correlated traces...",
     "tracesError": "Failed to load traces",
     "directTraceMatch": "Direct Trace Match",
+    "openTraceInNewWindow": "Open trace in new window",
     "spans": "span(s)",
     "dimensionBasedCorrelation": "Dimension-based Correlation",
     "tracesFromService": "Traces from service: {service}",
