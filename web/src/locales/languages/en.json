@@ -947,7 +947,10 @@
       "importingError": "Error importing Pipeline(s) please check the JSON",
       "functionAlreadyAssociated": "Function is already associated",
       "cancelConfirm": "Are you sure you want to cancel changes?",
-      "deleteFunctionConfirm": "Are you sure you want to delete function association?"
+      "deleteFunctionConfirm": "Are you sure you want to delete function association?",
+      "cancelConditionConfirm": "Are you sure you want to discard condition changes?",
+      "deleteRoutingConfirm": "Are you sure you want to delete stream routing?",
+      "savingCondition": "Error saving condition"
     },
     "success": {
       "contentCopied": "Content Copied Successfully!",
@@ -956,6 +959,13 @@
       "imported": "Pipeline(s) imported successfully",
       "created": "Pipeline created successfully",
       "deleted": "Pipeline deleted successfully"
+    },
+    "condition": {
+      "valueGuidelines": "Value Guidelines",
+      "emptyValueHelp": "For empty string checks, use",
+      "nullValueHelp": "For null value checks, use",
+      "recordDropped": "If conditions are not met, the record will be dropped.",
+      "fieldNotFound": "If the record does not have the specified field, it will be dropped."
     }
   },
   "function": {
