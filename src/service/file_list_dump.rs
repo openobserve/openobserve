@@ -255,7 +255,12 @@ pub async fn query(
     stream_type: StreamType,
     stream_name: &str,
     range: (i64, i64),
+    ids: &[i64],
 ) -> Result<Vec<FileRecord>, errors::Error> {
+    let cfg = get_config();
+    if !cfg.compact.file_list_dump_enabled {
+        return Ok(vec![]);
+    }
     let start = std::time::Instant::now();
     let batches = query_inner(
         trace_id,
@@ -263,6 +268,7 @@ pub async fn query(
         stream_type,
         stream_name,
         range,
+        ids,
         QueryType::FileRecord,
     )
     .await?;
@@ -284,6 +290,10 @@ pub async fn query_ids(
     stream_name: &str,
     range: (i64, i64),
 ) -> Result<Vec<FileId>, errors::Error> {
+    let cfg = get_config();
+    if !cfg.compact.file_list_dump_enabled {
+        return Ok(vec![]);
+    }
     let start = std::time::Instant::now();
     let batches = query_inner(
         trace_id,
@@ -291,6 +301,7 @@ pub async fn query_ids(
         stream_type,
         stream_name,
         range,
+        &[],
         QueryType::FileId,
     )
     .await?;
@@ -311,13 +322,9 @@ async fn query_inner(
     stream_type: StreamType,
     stream_name: &str,
     range: (i64, i64),
+    ids: &[i64],
     query_type: QueryType,
 ) -> Result<Vec<RecordBatch>, errors::Error> {
-    let cfg = get_config();
-    if !cfg.compact.file_list_dump_enabled {
-        return Ok(vec![]);
-    }
-
     let dump_stream_name = generate_dump_stream_name(stream_type, stream_name);
     let db_start = std::time::Instant::now();
     let dump_files = infra::file_list::query(
@@ -335,17 +342,27 @@ async fn query_inner(
     let db_time = db_start.elapsed().as_millis();
 
     let process_start = std::time::Instant::now();
-    let max_ts_upper_bound = calculate_max_ts_upper_bound(range.1, stream_type);
     let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
     let fields = match query_type {
         QueryType::FileRecord => "*",
         QueryType::FileId => "id, records, original_size",
     };
-    let query = format!(
-        "SELECT {fields} FROM file_list WHERE org = '{org_id}' AND stream = '{stream_key}' AND max_ts >= {} AND max_ts <= {} AND min_ts <= {};",
-        range.0, max_ts_upper_bound, range.1
-    );
-    let ret = exec(trace_id, cfg.limit.cpu_num, dump_files, &query).await?;
+    let query = if !ids.is_empty() && ids.len() <= 1000 {
+        format!(
+            "SELECT {fields} FROM file_list WHERE id IN ({})",
+            ids.iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<String>>()
+                .join(",")
+        )
+    } else {
+        let max_ts_upper_bound = calculate_max_ts_upper_bound(range.1, stream_type);
+        format!(
+            "SELECT {fields} FROM file_list WHERE org = '{org_id}' AND stream = '{stream_key}' AND max_ts >= {} AND max_ts <= {} AND min_ts <= {};",
+            range.0, max_ts_upper_bound, range.1
+        )
+    };
+    let ret = exec(trace_id, get_config().limit.cpu_num, dump_files, &query).await?;
     let process_time = process_start.elapsed().as_millis();
 
     log::info!(
@@ -369,8 +386,8 @@ pub async fn stats(time_range: (i64, i64)) -> Result<Vec<(String, StreamStats)>,
     let (deleted_files, added_files): (Vec<_>, Vec<_>) =
         dump_files.into_iter().partition(|file| file.deleted);
     // calculate the stats
-    let added_stats = stats_inner(added_files, time_range).await?;
-    let deleted_stats = stats_inner(deleted_files, time_range).await?;
+    let added_stats = stats_inner(added_files, time_range, true).await?;
+    let deleted_stats = stats_inner(deleted_files, time_range, false).await?;
     // we need convert deleted stats to negative
     let deleted_stats = deleted_stats.into_iter().map(|(stream, stats)| {
         (
@@ -395,6 +412,7 @@ pub async fn stats(time_range: (i64, i64)) -> Result<Vec<(String, StreamStats)>,
 async fn stats_inner(
     files: Vec<FileRecord>,
     time_range: (i64, i64),
+    need_apply_time_range: bool,
 ) -> Result<Vec<(String, StreamStats)>, errors::Error> {
     if files.is_empty() {
         return Ok(vec![]);
@@ -403,13 +421,16 @@ async fn stats_inner(
     let cfg = get_config();
     let (min_ts, max_ts) = time_range;
     let dump_files: Vec<_> = files.iter().map(|f| f.into()).collect();
+    let filter = if need_apply_time_range {
+        format!("WHERE updated_at > {min_ts} AND updated_at <= {max_ts}")
+    } else {
+        "".to_string()
+    };
     let sql = format!(
         r#"
 SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, COUNT(*)::BIGINT AS file_num, 
 SUM(records)::BIGINT AS records, SUM(original_size)::BIGINT AS original_size, SUM(compressed_size)::BIGINT AS compressed_size, SUM(index_size)::BIGINT AS index_size
-FROM file_list
-WHERE updated_at > {min_ts} AND updated_at <= {max_ts}
-GROUP BY stream
+FROM file_list {filter} GROUP BY stream
         "#
     );
 

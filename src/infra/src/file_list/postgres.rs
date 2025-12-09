@@ -161,7 +161,7 @@ impl super::FileList for PostgresFileList {
                 .map(|id| id.to_string())
                 .collect::<Vec<String>>()
                 .join(",");
-            let query_str = format!("delete FROM file_list WHERE id IN ({ids})");
+            let query_str = format!("DELETE FROM file_list WHERE id IN ({ids})");
             DB_QUERY_NUMS
                 .with_label_values(&["delete_by_ids", "file_list"])
                 .inc();

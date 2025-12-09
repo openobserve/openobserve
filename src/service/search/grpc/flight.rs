@@ -590,11 +590,11 @@ async fn get_file_list_by_ids(
     let partition_keys = stream_settings.partition_keys;
     let file_list = crate::service::file_list::query_by_ids(
         trace_id,
-        ids,
         org_id,
         stream_type,
         stream_name,
         time_range,
+        ids,
     )
     .await?;
 

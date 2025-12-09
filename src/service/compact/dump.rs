@@ -29,7 +29,7 @@ use config::{
         cluster::Role,
         stream::{FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamType},
     },
-    utils::time::{BASE_TIME, get_ymdh_from_micros, hour_micros, now},
+    utils::time::{BASE_TIME, get_ymdh_from_micros, hour_micros, now, now_micros},
 };
 use infra::{
     errors, file_list as infra_file_list,
@@ -351,6 +351,10 @@ pub async fn delete_by_time_range(
     range: (i64, i64),
     is_daily: bool,
 ) -> Result<(), errors::Error> {
+    let cfg = get_config();
+    if !cfg.compact.file_list_dump_enabled {
+        return Ok(());
+    }
     let dump_stream_name = generate_dump_stream_name(stream_type, stream_name);
     let list =
         infra::file_list::query_for_dump(org_id, StreamType::Filelist, &dump_stream_name, range)
@@ -386,6 +390,15 @@ async fn delete_daily_inner(
         .flat_map(record_batch_to_file_record)
         .collect::<Vec<_>>();
 
+    let items: Vec<_> = dump_files
+        .into_iter()
+        .map(|mut f| {
+            f.deleted = true;
+            f.segment_ids = None;
+            f
+        })
+        .collect();
+
     let del_items: Vec<_> = files
         .iter()
         .map(|f| FileListDeleted {
@@ -397,32 +410,20 @@ async fn delete_daily_inner(
         })
         .collect();
 
-    let mut inserted_into_deleted = false;
+    let mut mark_deleted_done = false;
     for _ in 0..5 {
-        if !inserted_into_deleted
-            && let Err(e) = infra::file_list::batch_add_deleted(
-                org_id,
-                Utc::now().timestamp_micros(),
-                &del_items,
-            )
-            .await
-        {
-            log::error!("[FILE_LIST_DUMP] batch_add_deleted to db failed, retrying: {e}");
+        if !mark_deleted_done && let Err(e) = infra::file_list::batch_process(&items).await {
+            log::error!("[FILE_LIST_DUMP] batch_delete to db failed, retrying: {e}");
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             continue;
         }
-        inserted_into_deleted = true;
-        let items: Vec<_> = dump_files
-            .iter()
-            .map(|f| {
-                let mut f = f.clone();
-                f.deleted = true;
-                f.segment_ids = None;
-                f
-            })
-            .collect();
-        if let Err(e) = infra::file_list::batch_process(&items).await {
-            log::error!("[FILE_LIST_DUMP] batch_delete to db failed, retrying: {e}");
+        mark_deleted_done = true;
+
+        if let Err(e) =
+            infra::file_list::batch_add_deleted(org_id, Utc::now().timestamp_micros(), &del_items)
+                .await
+        {
+            log::error!("[FILE_LIST_DUMP] batch_add_deleted to db failed, retrying: {e}");
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             continue;
         }
@@ -452,7 +453,7 @@ async fn delete_hourly_inner(
     // Filter files based on the time range to find files to delete
     let start_date = get_ymdh_from_micros(range.0);
     let end_date = get_ymdh_from_micros(range.1);
-    let (files_to_delete, files_to_keep): (Vec<_>, Vec<_>) = files
+    let (files_to_delete, mut files_to_keep): (Vec<_>, Vec<_>) = files
         .into_iter()
         .partition(|f| f.date >= start_date && f.date <= end_date);
 
@@ -461,6 +462,11 @@ async fn delete_hourly_inner(
     }
 
     // generate new dump file with files_to_keep and upload to storage
+    // we need reset updated_at for fix stream stats
+    let updated_at = now_micros();
+    files_to_keep
+        .iter_mut()
+        .for_each(|f| f.updated_at = updated_at);
     let new_dump_file = if !files_to_keep.is_empty() {
         match generate_dump(org_id, stream_type, stream_name, range, files_to_keep).await {
             Ok(v) => v,
@@ -502,24 +508,20 @@ async fn delete_hourly_inner(
         .collect();
 
     // Insert deleted items into file_list_deleted table with retry logic
-    let mut inserted_into_deleted = false;
+    let mut mark_deleted_done = false;
     for _ in 0..5 {
-        if !inserted_into_deleted
-            && let Err(e) = infra::file_list::batch_add_deleted(
-                org_id,
-                Utc::now().timestamp_micros(),
-                &del_items,
-            )
-            .await
-        {
-            log::error!("[FILE_LIST_DUMP] batch_add_deleted to db failed, retrying: {e}");
+        if !mark_deleted_done && let Err(e) = infra::file_list::batch_process(&items).await {
+            log::error!("[FILE_LIST_DUMP] batch_process to db failed, retrying: {e}");
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             continue;
         }
-        inserted_into_deleted = true;
+        mark_deleted_done = true;
 
-        if let Err(e) = infra::file_list::batch_process(&items).await {
-            log::error!("[FILE_LIST_DUMP] batch_process to db failed, retrying: {e}");
+        if let Err(e) =
+            infra::file_list::batch_add_deleted(org_id, Utc::now().timestamp_micros(), &del_items)
+                .await
+        {
+            log::error!("[FILE_LIST_DUMP] batch_add_deleted to db failed, retrying: {e}");
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             continue;
         }
