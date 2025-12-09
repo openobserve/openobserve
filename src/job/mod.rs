@@ -230,10 +230,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(o2_enterprise::enterprise::domain_management::db::watch());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(db::ai_prompts::watch());
+    // Service streams watch only needed on queriers - they serve the UI APIs
     #[cfg(feature = "enterprise")]
-    tokio::task::spawn(
-        async move { o2_enterprise::enterprise::service_streams::cache::watch().await },
-    );
+    if LOCAL_NODE.is_querier() {
+        tokio::task::spawn(async move {
+            o2_enterprise::enterprise::service_streams::cache::watch().await
+        });
+    }
 
     // pipeline not used on compactors
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
@@ -288,10 +291,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::ai_prompts::cache()
         .await
         .expect("ai prompts cache failed");
+    // Service streams cache only needed on queriers - they serve the UI APIs
     #[cfg(feature = "enterprise")]
-    o2_enterprise::enterprise::service_streams::cache::init_cache()
-        .await
-        .expect("service discovery cache failed");
+    if LOCAL_NODE.is_querier() {
+        o2_enterprise::enterprise::service_streams::cache::init_cache()
+            .await
+            .expect("service discovery cache failed");
+    }
 
     #[cfg(feature = "enterprise")]
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
@@ -332,9 +338,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // Note: Service discovery extraction runs automatically during parquet file processing
     // See src/job/files/parquet.rs:queue_services_from_parquet for implementation
     #[cfg(feature = "enterprise")]
-    tokio::task::spawn(async move {
-        o2_enterprise::enterprise::service_streams::batch_processor::run().await
-    });
+    spawn_pausable_job!(
+        "service_streams_batch_processor",
+        get_enterprise_config().service_streams.batch_flush_interval_seconds,
+        {
+            o2_enterprise::enterprise::service_streams::batch_processor::run_once().await;
+        },
+        pause_if: !get_enterprise_config().service_streams.enabled
+    );
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(pipeline::run());
     pipeline_error_cleanup::run();
