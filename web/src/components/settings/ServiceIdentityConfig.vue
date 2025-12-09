@@ -297,7 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { ref, computed } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
@@ -319,26 +319,11 @@ interface SemanticFieldGroup {
   normalize: boolean;
 }
 
-interface OrganizationDeduplicationConfig {
-  enabled: boolean;
-  semantic_field_groups?: SemanticFieldGroup[];
-  alert_dedup_enabled?: boolean;
-  alert_fingerprint_groups?: string[];
-  time_window_minutes?: number;
-  fqn_priority_dimensions?: string[];
-}
-
-// Default FQN priority dimensions - empty by default, uses O2_FQN_PRIORITY_DIMENSIONS env var
-const DEFAULT_FQN_PRIORITY: string[] = [];
-
 interface Props {
   orgId: string;
-  config?: OrganizationDeduplicationConfig | null;
 }
 
-const props = withDefaults(defineProps<Props>(), {
-  config: null,
-});
+const props = defineProps<Props>();
 
 const emit = defineEmits<{
   (e: "saved"): void;
@@ -349,20 +334,10 @@ const savingFqn = ref(false);
 const savingSemanticMappings = ref(false);
 const fqnSectionExpanded = ref(true);
 const semanticSectionExpanded = ref(true);
-const localFqnPriority = ref<string[]>([...DEFAULT_FQN_PRIORITY]);
+const localFqnPriority = ref<string[]>([]);
 const localSemanticGroups = ref<SemanticFieldGroup[]>([]);
 const selectedSemanticGroup = ref<string | null>(null);
 const newFqnDimension = ref<string | null>(null);
-
-// Full config for saving
-const localConfig = ref<OrganizationDeduplicationConfig>({
-  enabled: true,
-  alert_dedup_enabled: props.config?.alert_dedup_enabled ?? true,
-  alert_fingerprint_groups: props.config?.alert_fingerprint_groups ?? [],
-  time_window_minutes: props.config?.time_window_minutes ?? undefined,
-  semantic_field_groups: props.config?.semantic_field_groups ?? [],
-  fqn_priority_dimensions: props.config?.fqn_priority_dimensions ?? [...DEFAULT_FQN_PRIORITY],
-});
 
 // Reserved IDs that should not be used as semantic groups
 // service-fqn is the OUTPUT of correlation, not an input dimension
@@ -371,11 +346,7 @@ const RESERVED_GROUP_IDS = ['service-fqn', 'servicefqn', 'fqn'];
 // Computed: Get all semantic groups for the first dropdown
 // Shows groups that have at least one field not yet in the priority list
 const availableSemanticGroups = computed(() => {
-  const semanticGroups = localSemanticGroups.value.length > 0
-    ? localSemanticGroups.value
-    : localConfig.value.semantic_field_groups || [];
-
-  return semanticGroups
+  return localSemanticGroups.value
     .filter(group => {
       // Exclude reserved/computed fields like service-fqn (it's the output, not an input)
       if (RESERVED_GROUP_IDS.includes(group.id?.toLowerCase())) {
@@ -396,11 +367,7 @@ const availableSemanticGroups = computed(() => {
 const availableFieldsFromGroup = computed(() => {
   if (!selectedSemanticGroup.value) return [];
 
-  const semanticGroups = localSemanticGroups.value.length > 0
-    ? localSemanticGroups.value
-    : localConfig.value.semantic_field_groups || [];
-
-  const group = semanticGroups.find(g => g.id === selectedSemanticGroup.value);
+  const group = localSemanticGroups.value.find(g => g.id === selectedSemanticGroup.value);
   if (!group?.fields) return [];
 
   // Filter out reserved IDs and fields already in the priority list
@@ -420,10 +387,7 @@ const availableFieldsFromGroup = computed(() => {
 
 // Get display name for a dimension - check semantic groups first, then format the ID
 const getDimensionDisplay = (dimId: string): string => {
-  const semanticGroups = localSemanticGroups.value.length > 0
-    ? localSemanticGroups.value
-    : localConfig.value.semantic_field_groups;
-  const group = semanticGroups.find(g => g.id === dimId);
+  const group = localSemanticGroups.value.find(g => g.id === dimId);
   if (group?.display) {
     return group.display;
   }
@@ -436,10 +400,7 @@ const getDimensionDisplay = (dimId: string): string => {
 
 // Get fields for a dimension from semantic groups (for description)
 const getFieldsForDimension = (dimId: string): string => {
-  const semanticGroups = localSemanticGroups.value.length > 0
-    ? localSemanticGroups.value
-    : localConfig.value.semantic_field_groups;
-  const group = semanticGroups.find(g => g.id === dimId);
+  const group = localSemanticGroups.value.find(g => g.id === dimId);
   if (group?.fields?.length) {
     return group.fields.slice(0, 3).join(", ") + (group.fields.length > 3 ? "..." : "");
   }
@@ -449,7 +410,6 @@ const getFieldsForDimension = (dimId: string): string => {
 const handleSemanticGroupsUpdate = (groups: SemanticFieldGroup[]) => {
   // Filter out reserved IDs like service-fqn (it's the output, not an input)
   const filteredGroups = groups.filter(g => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()));
-  localConfig.value.semantic_field_groups = filteredGroups;
   localSemanticGroups.value = filteredGroups;
 };
 
@@ -491,9 +451,6 @@ const resetFqnPriority = () => {
 const saveFqnPriority = async () => {
   savingFqn.value = true;
   try {
-    // Update local config
-    localConfig.value.fqn_priority_dimensions = localFqnPriority.value;
-
     // Save FQN priority dimensions using settings v2 API (org-level setting)
     await settingsService.setOrgSetting(
       props.orgId,
@@ -525,9 +482,6 @@ const saveFqnPriority = async () => {
 const saveSemanticMappings = async () => {
   savingSemanticMappings.value = true;
   try {
-    // Update local config
-    localConfig.value.semantic_field_groups = localSemanticGroups.value;
-
     // Save semantic field groups using settings v2 API (org-level setting)
     await settingsService.setOrgSetting(
       props.orgId,
@@ -535,12 +489,6 @@ const saveSemanticMappings = async () => {
       localSemanticGroups.value,
       "correlation",
       "Semantic field groups for dimension extraction and correlation"
-    );
-
-    // Also save semantic field groups to deduplication config API (for backward compatibility)
-    await alertsService.setOrganizationDeduplicationConfig(
-      props.orgId,
-      localConfig.value,
     );
 
     $q.notify({
@@ -562,130 +510,70 @@ const saveSemanticMappings = async () => {
   }
 };
 
-// Fetch config on mount if not provided
+// Fetch config on mount
 const loadConfig = async () => {
   // Get backend defaults for FQN priority dimensions
   const backendDefaults = store.state.zoConfig?.fqn_priority_dimensions || [];
 
-  if (!props.config) {
+  try {
+    // Load FQN priority from settings v2 API
+    let fqnPriorityFromSettings: string[] | null = null;
     try {
-      // First, try to load FQN priority from settings v2 API
-      let fqnPriorityFromSettings: string[] | null = null;
-      try {
-        const settingResponse = await settingsService.getSetting(props.orgId, "fqn_priority_dimensions");
-        const setting = settingResponse.data;
-        console.log("ServiceIdentityConfig: Loaded FQN setting from v2 API:", setting);
-        if (setting?.setting_value && Array.isArray(setting.setting_value) && setting.setting_value.length > 0) {
-          fqnPriorityFromSettings = setting.setting_value;
-        }
-      } catch (settingError: any) {
-        // 404 means setting not found, which is fine - use defaults
-        if (settingError?.response?.status !== 404) {
-          console.log("ServiceIdentityConfig: Error loading FQN settings v2, using defaults:", settingError);
-        }
+      const settingResponse = await settingsService.getSetting(props.orgId, "fqn_priority_dimensions");
+      const setting = settingResponse.data;
+      if (setting?.setting_value && Array.isArray(setting.setting_value) && setting.setting_value.length > 0) {
+        fqnPriorityFromSettings = setting.setting_value;
       }
-
-      // Try to load semantic field groups from settings v2 API
-      let semanticGroupsFromSettings: SemanticFieldGroup[] | null = null;
-      try {
-        const semanticSettingResponse = await settingsService.getSetting(props.orgId, "semantic_field_groups");
-        const semanticSetting = semanticSettingResponse.data;
-        console.log("ServiceIdentityConfig: Loaded semantic groups setting from v2 API:", semanticSetting);
-        if (semanticSetting?.setting_value && Array.isArray(semanticSetting.setting_value) && semanticSetting.setting_value.length > 0) {
-          semanticGroupsFromSettings = semanticSetting.setting_value;
-        }
-      } catch (settingError: any) {
-        // 404 means setting not found, which is fine - fall back to dedup config
-        if (settingError?.response?.status !== 404) {
-          console.log("ServiceIdentityConfig: Error loading semantic groups settings v2:", settingError);
-        }
-      }
-
-      // Load deduplication config for backward compatibility (if settings v2 not found)
-      let dedupConfig: any = null;
-      try {
-        const response = await alertsService.getOrganizationDeduplicationConfig(props.orgId);
-        dedupConfig = response.data;
-        console.log("ServiceIdentityConfig: Loaded dedup config:", dedupConfig);
-      } catch (dedupError) {
-        console.log("ServiceIdentityConfig: No dedup config found:", dedupError);
-      }
-
-      // Use settings v2 FQN priority if available, otherwise use backend defaults
-      const fqnPriority = fqnPriorityFromSettings ?? [...backendDefaults];
-
-      // Use settings v2 semantic groups if available, otherwise fall back to dedup config
-      // If neither exists, load default semantic groups from backend
-      let semanticGroups: SemanticFieldGroup[] = [];
-      if (semanticGroupsFromSettings) {
-        semanticGroups = semanticGroupsFromSettings;
-      } else if (dedupConfig?.semantic_field_groups && dedupConfig.semantic_field_groups.length > 0) {
-        semanticGroups = dedupConfig.semantic_field_groups;
-      } else {
-        // Load default semantic groups from backend
-        try {
-          const semanticGroupsResponse = await alertsService.getSemanticGroups(props.orgId);
-          semanticGroups = semanticGroupsResponse.data ?? [];
-        } catch (semanticError) {
-          console.error("Failed to load default semantic groups:", semanticError);
-        }
-      }
-
-      // Filter out reserved IDs like service-fqn (it's the output, not an input)
-      const filteredSemanticGroups = semanticGroups
-        .filter((g: SemanticFieldGroup) => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()));
-
-      localConfig.value = {
-        enabled: dedupConfig?.enabled ?? true,
-        alert_dedup_enabled: dedupConfig?.alert_dedup_enabled ?? true,
-        alert_fingerprint_groups: dedupConfig?.alert_fingerprint_groups ?? [],
-        time_window_minutes: dedupConfig?.time_window_minutes ?? undefined,
-        semantic_field_groups: filteredSemanticGroups,
-        fqn_priority_dimensions: fqnPriority,
-      };
-      localFqnPriority.value = fqnPriority;
-      localSemanticGroups.value = filteredSemanticGroups;
-    } catch (error) {
-      console.log("ServiceIdentityConfig: Error loading config, using defaults", error);
-      localFqnPriority.value = [...backendDefaults];
-      localSemanticGroups.value = [];
+    } catch (settingError: any) {
+      // Error loading setting, use defaults
+      console.log("ServiceIdentityConfig: Error loading FQN settings v2, using defaults:", settingError);
     }
-  } else {
-    console.log("ServiceIdentityConfig: Using config from props:", props.config);
-    localFqnPriority.value = props.config.fqn_priority_dimensions ?? [...backendDefaults];
+
+    // Load semantic field groups from settings v2 API
+    let semanticGroupsFromSettings: SemanticFieldGroup[] | null = null;
+    try {
+      const semanticSettingResponse = await settingsService.getSetting(props.orgId, "semantic_field_groups");
+      const semanticSetting = semanticSettingResponse.data;
+      if (semanticSetting?.setting_value && Array.isArray(semanticSetting.setting_value) && semanticSetting.setting_value.length > 0) {
+        semanticGroupsFromSettings = semanticSetting.setting_value;
+      }
+    } catch (settingError: any) {
+      // Error loading setting, will use defaults
+      console.log("ServiceIdentityConfig: Error loading semantic groups settings v2:", settingError);
+    }
+
+    // Use settings v2 FQN priority if available, otherwise use backend defaults
+    const fqnPriority = fqnPriorityFromSettings ?? [...backendDefaults];
+
+    // Use settings v2 semantic groups if available, otherwise load defaults from backend
+    let semanticGroups: SemanticFieldGroup[] = [];
+    if (semanticGroupsFromSettings) {
+      semanticGroups = semanticGroupsFromSettings;
+    } else {
+      // Load default semantic groups from backend
+      try {
+        const semanticGroupsResponse = await alertsService.getSemanticGroups(props.orgId);
+        semanticGroups = semanticGroupsResponse.data ?? [];
+      } catch (semanticError) {
+        console.error("Failed to load default semantic groups:", semanticError);
+      }
+    }
+
     // Filter out reserved IDs like service-fqn (it's the output, not an input)
-    localSemanticGroups.value = (props.config.semantic_field_groups ?? [])
-      .filter(g => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()));
+    const filteredSemanticGroups = semanticGroups
+      .filter((g: SemanticFieldGroup) => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()));
+
+    localFqnPriority.value = fqnPriority;
+    localSemanticGroups.value = filteredSemanticGroups;
+  } catch (error) {
+    console.log("ServiceIdentityConfig: Error loading config, using defaults", error);
+    localFqnPriority.value = [...backendDefaults];
+    localSemanticGroups.value = [];
   }
 };
 
 // Load config on mount
 loadConfig();
-
-// Watch for external changes
-watch(
-  () => props.config,
-  (newVal) => {
-    if (newVal) {
-      const backendDefaults = store.state.zoConfig?.fqn_priority_dimensions || [];
-      console.log("ServiceIdentityConfig: Config changed from props:", newVal);
-      // Filter out reserved IDs like service-fqn (it's the output, not an input)
-      const filteredSemanticGroups = (newVal.semantic_field_groups ?? [])
-        .filter(g => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()));
-      localConfig.value = {
-        enabled: newVal.enabled ?? true,
-        alert_dedup_enabled: newVal.alert_dedup_enabled ?? true,
-        alert_fingerprint_groups: newVal.alert_fingerprint_groups ?? [],
-        time_window_minutes: newVal.time_window_minutes ?? undefined,
-        semantic_field_groups: filteredSemanticGroups,
-        fqn_priority_dimensions: newVal.fqn_priority_dimensions ?? [...backendDefaults],
-      };
-      localFqnPriority.value = newVal.fqn_priority_dimensions ?? [...backendDefaults];
-      localSemanticGroups.value = filteredSemanticGroups;
-    }
-  },
-  { deep: true, immediate: true },
-);
 </script>
 
 <style scoped lang="scss">

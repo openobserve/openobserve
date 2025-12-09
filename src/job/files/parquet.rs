@@ -1194,9 +1194,9 @@ async fn queue_services_from_parquet(
         return Ok(());
     }
 
-    // Get semantic field groups (use enterprise defaults for comprehensive field mapping)
+    // Get semantic field groups from system_settings (user-customizable via UI, with caching)
     let semantic_groups =
-        o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file();
+        crate::service::db::system_settings::get_semantic_field_groups(org_id).await;
 
     // Get FQN priority from DB/cache (org-level setting or system default)
     let fqn_priority =
