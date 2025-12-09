@@ -713,6 +713,8 @@ export default defineComponent({
       }
     });
 
+    console.log('[viewDashboard] initialVariableValues created:', JSON.stringify(initialVariableValues));
+
     // ======= [END] default variable values
 
     onMounted(async () => {

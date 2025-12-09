@@ -344,6 +344,18 @@ export default defineComponent({
         );
       }
 
+      // IMPORTANT: After loading is complete, if value is still null and multiSelect is true,
+      // and selectAllValueForMultiSelect is 'all', set value to _o2_all_
+      if (
+        variableObject.value === null &&
+        variableObject.multiSelect &&
+        variableObject.selectAllValueForMultiSelect === 'all'
+      ) {
+        variableObject.value = [SELECT_ALL_VALUE];
+        variableObject.isVariablePartialLoaded = true;
+        emitVariablesData();
+      }
+
       removeTraceId(variableObject.name, payload.traceId);
     };
 
@@ -646,6 +658,14 @@ export default defineComponent({
 
       // make list of variables using variables config list
       // set initial variables values from props
+      console.log("[VariablesValueSelector] initializeVariablesData:", {
+        propsInitialVariableValues: props.initialVariableValues,
+        valueObject: props.initialVariableValues?.value,
+        valueKeys: props.initialVariableValues?.value
+          ? Object.keys(props.initialVariableValues.value)
+          : [],
+      });
+
       props?.variablesConfig?.list?.forEach((item: any) => {
         let initialValue =
           item.type == "dynamic_filters"
@@ -769,6 +789,16 @@ export default defineComponent({
         "init",
         `Variables initialized: total=${variablesData.values.length}, currentLevel=${variablesData.values.filter((v: any) => v._isCurrentLevel !== false).length}, parentOnly=${variablesData.values.filter((v: any) => v._isCurrentLevel === false).length}, dependencyGraph=${JSON.stringify(variablesDependencyGraph)}`,
       );
+
+      // if in variablesData some values are null then dont emit variables data
+      const anyNullValues = variablesData.values.some(
+        (v: any) => v.value === null,
+      );
+      if (!anyNullValues) {
+        // Emit immediately for URL syncing with share/refresh
+        // Parent will see isVariablesLoading=true and won't trigger API calls yet
+        emitVariablesData();
+      }
     };
 
     const rejectAllPromises = () => {
@@ -787,6 +817,10 @@ export default defineComponent({
     const hasInitialLoadCompleted = ref(false);
 
     onMounted(() => {
+      console.log(
+        "[VariablesValueSelector] onMounted - initialVariableValues:",
+        JSON.stringify(props.initialVariableValues),
+      );
       // make list of variables using variables config list
       initializeVariablesData();
 
@@ -1503,6 +1537,20 @@ export default defineComponent({
         : dummyQuery;
 
       // Replace variable placeholders with actual values
+      console.log(
+        `[VariablesValueSelector] buildQueryContext for ${variableObject.name}:`,
+      );
+      console.log(`  Query BEFORE replacement:`, queryContext);
+      console.log(
+        `  Available variables:`,
+        variablesData.values.map((v: any) => ({
+          name: v.name,
+          value: v.value,
+          isPartialLoaded: v.isVariablePartialLoaded,
+          _isCurrentLevel: v._isCurrentLevel,
+        })),
+      );
+
       for (const variable of variablesData.values) {
         if (variable.isVariablePartialLoaded) {
           // Replace array values
@@ -1524,10 +1572,11 @@ export default defineComponent({
         }
       }
 
+      console.log(`  Query AFTER replacement:`, queryContext);
+
       // Base64 encode the query context
       return b64EncodeUnicode(queryContext);
     };
-
 
     /**
      * Finalizes the variable loading process for a single variable.
@@ -1548,6 +1597,17 @@ export default defineComponent({
         variableObject.isLoading = false;
         variableObject.isVariablePartialLoaded = true;
         variableObject.isVariableLoadingPending = false;
+
+        // IMPORTANT: After loading is complete, if value is still null and multiSelect is true,
+        // and selectAllValueForMultiSelect is 'all', set value to _o2_all_
+        // This ensures API fires with _o2_all_ only after all loading is done
+        if (
+          variableObject.value === null &&
+          variableObject.multiSelect &&
+          variableObject.selectAllValueForMultiSelect === 'all'
+        ) {
+          variableObject.value = [SELECT_ALL_VALUE];
+        }
 
         // Update global loading state
         variablesData.isVariablesLoading = variablesData.values.some(
