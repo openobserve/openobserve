@@ -185,7 +185,11 @@ pub async fn delete_org_settings(org_id: &str) -> Result<u64> {
         // Emit event to update cache on other cluster nodes
         let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, key);
         if let Err(e) = infra::coordinator::system_settings::emit_delete_event(&event_key).await {
-            log::error!("Failed to emit system settings delete event for {}: {}", key, e);
+            log::error!(
+                "Failed to emit system settings delete event for {}: {}",
+                key,
+                e
+            );
         }
     }
 
@@ -213,7 +217,11 @@ pub async fn delete_user_settings(org_id: &str, user_id: &str) -> Result<u64> {
         // Emit event to update cache on other cluster nodes
         let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, key);
         if let Err(e) = infra::coordinator::system_settings::emit_delete_event(&event_key).await {
-            log::error!("Failed to emit system settings delete event for {}: {}", key, e);
+            log::error!(
+                "Failed to emit system settings delete event for {}: {}",
+                key,
+                e
+            );
         }
     }
 
@@ -374,6 +382,48 @@ pub fn get_default_fqn_priority_dimensions() -> Vec<String> {
         get_o2_config()
             .service_streams
             .get_fqn_priority_dimensions()
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        vec![]
+    }
+}
+
+/// Get semantic field groups for an organization
+///
+/// Resolution order:
+/// 1. Check settings v2 for org-level setting
+/// 2. Fall back to enterprise defaults from JSON file
+///
+/// Returns empty vec for OSS builds.
+pub async fn get_semantic_field_groups(
+    org_id: &str,
+) -> Vec<config::meta::alerts::deduplication::SemanticFieldGroup> {
+    use config::meta::{
+        alerts::deduplication::SemanticFieldGroup, system_settings::keys::SEMANTIC_FIELD_GROUPS,
+    };
+
+    // Try to get from settings v2 (org level)
+    if let Ok(Some(setting)) = get_resolved(Some(org_id), None, SEMANTIC_FIELD_GROUPS).await
+        && let Ok(groups) = serde_json::from_value::<Vec<SemanticFieldGroup>>(setting.setting_value)
+        && !groups.is_empty()
+    {
+        return groups;
+    }
+
+    // Fall back to enterprise defaults
+    get_default_semantic_field_groups()
+}
+
+/// Get the default semantic field groups from enterprise config
+///
+/// For enterprise builds, loads from enterprise JSON file.
+/// For OSS builds, returns empty vec.
+pub fn get_default_semantic_field_groups()
+-> Vec<config::meta::alerts::deduplication::SemanticFieldGroup> {
+    #[cfg(feature = "enterprise")]
+    {
+        o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file()
     }
     #[cfg(not(feature = "enterprise"))]
     {

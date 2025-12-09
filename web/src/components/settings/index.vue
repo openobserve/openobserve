@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-slot:after>
         <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem] q-pt-xs">
             <div
-              class="card-container tw-h-[calc(100vh-50px)]"
+              class="card-container tw-h-[calc(100vh-50px)] tw-overflow-auto"
             >
              <router-view title=""> </router-view>
           </div>

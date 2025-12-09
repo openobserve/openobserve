@@ -15,15 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card flat class="tw-p-6">
-    <div class="tw-mb-4">
-      <div class="text-h6 tw-mb-2">{{ t("settings.correlation.serviceIdentityTitle") }}</div>
-      <div class="text-body2 text-grey-7">
-        {{ t("settings.correlation.serviceIdentityDescription") }}
-      </div>
+  <div class="tw-w-full service-identity-config">
+    <!-- Section Header -->
+    <GroupHeader :title="t('settings.correlation.serviceIdentityTitle')" :showIcon="false" class="tw-mb-2" />
+    <div class="text-body2 text-grey-7 tw-mb-4">
+      {{ t("settings.correlation.serviceIdentityDescription") }}
     </div>
-
-    <q-separator class="tw-mb-4" />
 
     <!-- How it works explanation -->
     <q-expansion-item
@@ -44,62 +41,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="text-grey-7"> {{ t("settings.correlation.priorityOrderDescription") }}</span>
         </div>
         <div class="tw-mb-3 tw-p-3 tw-rounded" :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-white'">
-          <span class="tw-font-semibold text-primary">{{ t("settings.correlation.exampleLabel") }}</span>
-          <span class="text-grey-7"> {{ t("settings.correlation.exampleText1") }} </span>
-          <q-chip dense size="sm" color="primary" text-color="white" class="tw-mx-1">k8s-deployment=my-app</q-chip>
-          <span class="text-grey-7"> {{ t("settings.correlation.exampleText2") }} </span>
-          <q-chip dense size="sm" color="grey-7" text-color="white" class="tw-mx-1">service=myapp</q-chip>
-          <span class="text-grey-7">, {{ t("settings.correlation.exampleText3") }} </span>
-          <q-chip dense size="sm" color="positive" text-color="white" class="tw-mx-1">my-app</q-chip>
-          <span class="text-grey-7"> {{ t("settings.correlation.exampleText4") }} </span>
-          <span class="tw-font-semibold">k8s-deployment</span>
-          <span class="text-grey-7"> {{ t("settings.correlation.exampleText5") }}</span>
+          <span class="tw-font-semibold text-primary">{{ t("settings.correlation.exampleLabel") }} </span>
+          <i18n-t keypath="settings.correlation.exampleText" tag="span" class="text-grey-7">
+            <template #dim1>
+              <q-chip dense size="sm" color="primary" text-color="white" class="tw-mx-1">k8s-deployment=my-app</q-chip>
+            </template>
+            <template #dim2>
+              <q-chip dense size="sm" color="grey-7" text-color="white" class="tw-mx-1">service=myapp</q-chip>
+            </template>
+            <template #value>
+              <q-chip dense size="sm" color="positive" text-color="white" class="tw-mx-1">my-app</q-chip>
+            </template>
+          </i18n-t>
         </div>
         <div>
-          <span class="tw-font-semibold text-primary">{{ t("settings.correlation.correlationDescription").split(' ')[0] }}:</span>
-          <span class="text-grey-7"> {{ t("settings.correlation.correlationDescription") }} </span>
-          <span class="tw-font-mono tw-font-semibold">{{ t("settings.correlation.correlationDescriptionField") }}</span>
-          <span class="text-grey-7"> {{ t("settings.correlation.correlationDescriptionEnd") }}</span>
+          <span class="tw-font-semibold text-primary">{{ t("settings.correlation.correlationLabel") }} </span>
+          <i18n-t keypath="settings.correlation.correlationDescription" tag="span" class="text-grey-7">
+            <template #field>
+              <span class="tw-font-mono tw-font-semibold">service</span>
+            </template>
+          </i18n-t>
         </div>
       </div>
     </q-expansion-item>
 
-    <!-- FQN Priority Dimensions -->
-    <div class="tw-mb-6">
-      <div class="tw-font-semibold tw-pb-2 tw-flex tw-items-center tw-text-lg">
-        {{ t("settings.correlation.fqnPriorityTitle") }}
-        <q-icon
-          :name="outlinedInfo"
-          size="1.125rem"
-          class="q-ml-xs cursor-pointer"
-          :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-        >
-          <q-tooltip
-            anchor="center right"
-            self="center left"
-            max-width="21.875rem"
-            class="tooltip-text"
+    <!-- FQN Priority Dimensions - Collapsible Section -->
+    <q-expansion-item
+      v-model="fqnSectionExpanded"
+      icon="reorder"
+      :label="t('settings.correlation.fqnPriorityTitle')"
+      :caption="t('settings.correlation.fqnPriorityDescription')"
+      header-class="section-header"
+      class="tw-mb-4 tw-rounded-lg tw-border tw-border-solid"
+      :class="store.state.theme === 'dark' ? 'tw-border-gray-700' : 'tw-border-gray-200'"
+      default-opened
+    >
+      <div class="tw-p-4">
+        <div class="tw-flex tw-gap-2 tw-mb-3">
+          <q-btn
+            flat
+            dense
+            size="sm"
+            icon="restart_alt"
+            :label="t('settings.correlation.resetToDefaults')"
+            @click="resetFqnPriority"
+          />
+          <q-icon
+            :name="outlinedInfo"
+            size="1rem"
+            class="cursor-pointer tw-self-center"
+            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
           >
-            {{ t("settings.correlation.fqnPriorityTooltip") }}
-          </q-tooltip>
-        </q-icon>
-      </div>
-      <div class="tw-text-sm tw-text-gray-600 dark:tw-text-gray-400 tw-mb-3">
-        {{ t("settings.correlation.fqnPriorityDescription") }}
-      </div>
+            <q-tooltip
+              anchor="center right"
+              self="center left"
+              max-width="21.875rem"
+              class="tooltip-text"
+            >
+              {{ t("settings.correlation.fqnPriorityTooltip") }}
+            </q-tooltip>
+          </q-icon>
+        </div>
 
-      <div class="tw-flex tw-gap-2 tw-mb-3">
-        <q-btn
-          flat
-          dense
-          size="sm"
-          icon="restart_alt"
-          :label="t('settings.correlation.resetToDefaults')"
-          @click="resetFqnPriority"
-        />
-      </div>
-
-      <q-list bordered class="tw-rounded-lg">
+        <q-list bordered class="tw-rounded-lg">
         <q-item
           v-for="(dim, index) in localFqnPriority"
           :key="dim"
@@ -173,9 +177,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="selectedSemanticGroup"
             :options="availableSemanticGroups"
             dense
-            filled
+            borderless
+            stack-label
             :label="t('settings.correlation.selectSemanticGroup')"
-            class="tw-flex-1"
+            class="tw-flex-1 showLabelOnTop"
             emit-value
             map-options
             clearable
@@ -205,9 +210,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="newFqnDimension"
             :options="availableFieldsFromGroup"
             dense
-            filled
+            borderless
+            stack-label
             :label="t('settings.correlation.selectField')"
-            class="tw-flex-1"
+            class="tw-flex-1 showLabelOnTop"
             emit-value
             map-options
             clearable
@@ -244,51 +250,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="availableSemanticGroups.length === 0 && localSemanticGroups.length === 0" class="tw-mt-2 tw-text-sm tw-text-amber-600 dark:tw-text-amber-400">
         {{ t("settings.correlation.noSemanticGroupsConfigured") }}
       </div>
-    </div>
 
-    <q-separator class="tw-my-4" />
-
-    <!-- Semantic Field Groups (for dimension extraction) -->
-    <div class="tw-mb-6">
-      <div class="tw-font-semibold tw-pb-2 tw-flex tw-items-center tw-text-lg">
-        {{ t("settings.correlation.semanticFieldTitle") }}
-        <q-icon
-          :name="outlinedInfo"
-          size="1.125rem"
-          class="q-ml-xs cursor-pointer"
-          :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-        >
-          <q-tooltip
-            anchor="center right"
-            self="center left"
-            max-width="21.875rem"
-            class="tooltip-text"
-          >
-            {{ t("settings.correlation.semanticFieldTooltip") }}
-          </q-tooltip>
-        </q-icon>
+        <!-- Save FQN Priority Button -->
+        <div class="tw-flex tw-justify-end tw-mt-4">
+          <q-btn
+            :label="t('common.save')"
+            color="primary"
+            @click="saveFqnPriority"
+            :loading="savingFqn"
+            class="tw-px-4"
+          />
+        </div>
       </div>
-      <div class="tw-text-sm tw-text-gray-600 dark:tw-text-gray-400 tw-mb-3">
-        {{ t("settings.correlation.semanticFieldDescription") }}
+    </q-expansion-item>
+
+    <!-- Semantic Field Groups - Collapsible Section -->
+    <q-expansion-item
+      v-model="semanticSectionExpanded"
+      icon="category"
+      :label="t('settings.correlation.semanticFieldTitle')"
+      :caption="t('settings.correlation.semanticFieldDescription')"
+      header-class="section-header"
+      class="tw-mb-4 tw-rounded-lg tw-border tw-border-solid"
+      :class="store.state.theme === 'dark' ? 'tw-border-gray-700' : 'tw-border-gray-200'"
+      default-opened
+    >
+      <div class="tw-p-4">
+          <SemanticFieldGroupsConfig
+          v-model:semantic-field-groups="localSemanticGroups"
+          @update:semantic-field-groups="handleSemanticGroupsUpdate"
+        />
+
+        <!-- Save Semantic Mappings Button -->
+        <div class="tw-flex tw-justify-end tw-mt-4">
+          <q-btn
+            :label="t('common.save')"
+            color="primary"
+            @click="saveSemanticMappings"
+            :loading="savingSemanticMappings"
+            class="tw-px-4"
+          />
+        </div>
       </div>
-
-      <SemanticFieldGroupsConfig
-        v-model:semantic-field-groups="localSemanticGroups"
-        @update:semantic-field-groups="handleSemanticGroupsUpdate"
-      />
-    </div>
-
-    <div class="tw-flex tw-justify-end tw-gap-3 tw-mt-6">
-      <q-btn outline :label="t('common.cancel')" @click="$emit('cancel')" class="tw-px-4" />
-      <q-btn
-        :label="t('settings.correlation.saveConfiguration')"
-        color="primary"
-        @click="saveSettings"
-        :loading="saving"
-        class="tw-px-4"
-      />
-    </div>
-  </q-card>
+    </q-expansion-item>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -298,6 +303,7 @@ import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
+import GroupHeader from "@/components/common/GroupHeader.vue";
 import alertsService from "@/services/alerts";
 import settingsService from "@/services/settings";
 
@@ -339,7 +345,10 @@ const emit = defineEmits<{
   (e: "cancel"): void;
 }>();
 
-const saving = ref(false);
+const savingFqn = ref(false);
+const savingSemanticMappings = ref(false);
+const fqnSectionExpanded = ref(true);
+const semanticSectionExpanded = ref(true);
 const localFqnPriority = ref<string[]>([...DEFAULT_FQN_PRIORITY]);
 const localSemanticGroups = ref<SemanticFieldGroup[]>([]);
 const selectedSemanticGroup = ref<string | null>(null);
@@ -479,12 +488,11 @@ const resetFqnPriority = () => {
   localFqnPriority.value = [...backendDefaults];
 };
 
-const saveSettings = async () => {
-  saving.value = true;
+const saveFqnPriority = async () => {
+  savingFqn.value = true;
   try {
-    // Merge FQN priority into config
+    // Update local config
     localConfig.value.fqn_priority_dimensions = localFqnPriority.value;
-    localConfig.value.semantic_field_groups = localSemanticGroups.value;
 
     // Save FQN priority dimensions using settings v2 API (org-level setting)
     await settingsService.setOrgSetting(
@@ -495,7 +503,41 @@ const saveSettings = async () => {
       "FQN priority dimensions for service correlation"
     );
 
-    // Also save semantic field groups to deduplication config API
+    $q.notify({
+      type: "positive",
+      message: t("settings.correlation.fqnPrioritySaved"),
+      timeout: 2000,
+    });
+
+    emit("saved");
+  } catch (error: any) {
+    console.error("Error saving FQN priority settings:", error);
+    $q.notify({
+      type: "negative",
+      message: error?.message || t("settings.correlation.configSaveFailed"),
+      timeout: 3000,
+    });
+  } finally {
+    savingFqn.value = false;
+  }
+};
+
+const saveSemanticMappings = async () => {
+  savingSemanticMappings.value = true;
+  try {
+    // Update local config
+    localConfig.value.semantic_field_groups = localSemanticGroups.value;
+
+    // Save semantic field groups using settings v2 API (org-level setting)
+    await settingsService.setOrgSetting(
+      props.orgId,
+      "semantic_field_groups",
+      localSemanticGroups.value,
+      "correlation",
+      "Semantic field groups for dimension extraction and correlation"
+    );
+
+    // Also save semantic field groups to deduplication config API (for backward compatibility)
     await alertsService.setOrganizationDeduplicationConfig(
       props.orgId,
       localConfig.value,
@@ -503,20 +545,20 @@ const saveSettings = async () => {
 
     $q.notify({
       type: "positive",
-      message: t("settings.correlation.configSavedSuccess"),
+      message: t("settings.correlation.semanticMappingsSaved"),
       timeout: 2000,
     });
 
     emit("saved");
   } catch (error: any) {
-    console.error("Error saving service identity settings:", error);
+    console.error("Error saving semantic mappings:", error);
     $q.notify({
       type: "negative",
       message: error?.message || t("settings.correlation.configSaveFailed"),
       timeout: 3000,
     });
   } finally {
-    saving.value = false;
+    savingSemanticMappings.value = false;
   }
 };
 
@@ -539,58 +581,74 @@ const loadConfig = async () => {
       } catch (settingError: any) {
         // 404 means setting not found, which is fine - use defaults
         if (settingError?.response?.status !== 404) {
-          console.log("ServiceIdentityConfig: Error loading settings v2, using defaults:", settingError);
+          console.log("ServiceIdentityConfig: Error loading FQN settings v2, using defaults:", settingError);
         }
       }
 
-      // Load deduplication config for semantic field groups
-      const response = await alertsService.getOrganizationDeduplicationConfig(props.orgId);
-      const config = response.data;
-      console.log("ServiceIdentityConfig: Loaded dedup config:", config);
+      // Try to load semantic field groups from settings v2 API
+      let semanticGroupsFromSettings: SemanticFieldGroup[] | null = null;
+      try {
+        const semanticSettingResponse = await settingsService.getSetting(props.orgId, "semantic_field_groups");
+        const semanticSetting = semanticSettingResponse.data;
+        console.log("ServiceIdentityConfig: Loaded semantic groups setting from v2 API:", semanticSetting);
+        if (semanticSetting?.setting_value && Array.isArray(semanticSetting.setting_value) && semanticSetting.setting_value.length > 0) {
+          semanticGroupsFromSettings = semanticSetting.setting_value;
+        }
+      } catch (settingError: any) {
+        // 404 means setting not found, which is fine - fall back to dedup config
+        if (settingError?.response?.status !== 404) {
+          console.log("ServiceIdentityConfig: Error loading semantic groups settings v2:", settingError);
+        }
+      }
+
+      // Load deduplication config for backward compatibility (if settings v2 not found)
+      let dedupConfig: any = null;
+      try {
+        const response = await alertsService.getOrganizationDeduplicationConfig(props.orgId);
+        dedupConfig = response.data;
+        console.log("ServiceIdentityConfig: Loaded dedup config:", dedupConfig);
+      } catch (dedupError) {
+        console.log("ServiceIdentityConfig: No dedup config found:", dedupError);
+      }
 
       // Use settings v2 FQN priority if available, otherwise use backend defaults
       const fqnPriority = fqnPriorityFromSettings ?? [...backendDefaults];
 
+      // Use settings v2 semantic groups if available, otherwise fall back to dedup config
+      // If neither exists, load default semantic groups from backend
+      let semanticGroups: SemanticFieldGroup[] = [];
+      if (semanticGroupsFromSettings) {
+        semanticGroups = semanticGroupsFromSettings;
+      } else if (dedupConfig?.semantic_field_groups && dedupConfig.semantic_field_groups.length > 0) {
+        semanticGroups = dedupConfig.semantic_field_groups;
+      } else {
+        // Load default semantic groups from backend
+        try {
+          const semanticGroupsResponse = await alertsService.getSemanticGroups(props.orgId);
+          semanticGroups = semanticGroupsResponse.data ?? [];
+        } catch (semanticError) {
+          console.error("Failed to load default semantic groups:", semanticError);
+        }
+      }
+
       // Filter out reserved IDs like service-fqn (it's the output, not an input)
-      const filteredSemanticGroups = (config.semantic_field_groups ?? [])
+      const filteredSemanticGroups = semanticGroups
         .filter((g: SemanticFieldGroup) => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()));
 
       localConfig.value = {
-        enabled: config.enabled ?? true,
-        alert_dedup_enabled: config.alert_dedup_enabled ?? true,
-        alert_fingerprint_groups: config.alert_fingerprint_groups ?? [],
-        time_window_minutes: config.time_window_minutes ?? undefined,
+        enabled: dedupConfig?.enabled ?? true,
+        alert_dedup_enabled: dedupConfig?.alert_dedup_enabled ?? true,
+        alert_fingerprint_groups: dedupConfig?.alert_fingerprint_groups ?? [],
+        time_window_minutes: dedupConfig?.time_window_minutes ?? undefined,
         semantic_field_groups: filteredSemanticGroups,
         fqn_priority_dimensions: fqnPriority,
       };
       localFqnPriority.value = fqnPriority;
       localSemanticGroups.value = filteredSemanticGroups;
     } catch (error) {
-      console.log("ServiceIdentityConfig: No existing config, loading defaults", error);
-
-      // Load default semantic groups from backend
-      try {
-        const semanticGroupsResponse = await alertsService.getSemanticGroups(props.orgId);
-        // Filter out reserved IDs like service-fqn (it's the output, not an input)
-        const defaultGroups = (semanticGroupsResponse.data ?? [])
-          .filter((g: SemanticFieldGroup) => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()));
-        console.log(`Loaded ${defaultGroups.length} default semantic groups`);
-
-        localConfig.value = {
-          enabled: true,
-          alert_dedup_enabled: true,
-          alert_fingerprint_groups: [],
-          time_window_minutes: undefined,
-          semantic_field_groups: defaultGroups,
-          fqn_priority_dimensions: [...backendDefaults],
-        };
-        localFqnPriority.value = [...backendDefaults];
-        localSemanticGroups.value = defaultGroups;
-      } catch (semanticError) {
-        console.error("Failed to load default semantic groups:", semanticError);
-        localFqnPriority.value = [...backendDefaults];
-        localSemanticGroups.value = [];
-      }
+      console.log("ServiceIdentityConfig: Error loading config, using defaults", error);
+      localFqnPriority.value = [...backendDefaults];
+      localSemanticGroups.value = [];
     }
   } else {
     console.log("ServiceIdentityConfig: Using config from props:", props.config);
@@ -631,8 +689,17 @@ watch(
 </script>
 
 <style scoped lang="scss">
-.q-card {
-  max-width: 75rem;
+.service-identity-config {
+  // Match parent card-container background
+  background: var(--o2-card-bg);
+}
+
+:deep(.section-header) {
+  font-weight: 600;
+}
+
+:deep(.q-expansion-item__content) {
+  background: var(--o2-card-bg);
 }
 
 :deep(.tooltip-text) {

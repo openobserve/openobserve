@@ -153,13 +153,11 @@ pub async fn correlate_streams(
         .await
         {
             Ok(Some(response)) => Ok(MetaHttpResponse::json(response)),
-            Ok(None) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                404u16,
-                format!(
-                    "No service found for stream '{}' (type: {}) with the provided dimensions",
-                    req.source_stream, req.source_type
-                ),
-            ))),
+            Ok(None) => {
+                // No service found - this is a successful API call with no results
+                // Return 200 with null to indicate "no match" (not an error)
+                Ok(HttpResponse::Ok().json(serde_json::json!(null)))
+            }
             Err(e) => Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                     500u16,

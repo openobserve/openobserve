@@ -356,6 +356,7 @@ color="warning" size="xs"></q-icon> Error while
           :stream-type="searchObj.data.stream.streamType"
           :correlation-props="correlationDashboardProps"
           :correlation-loading="correlationLoading"
+          :correlation-error="correlationError"
           class="detail-table-dialog"
           :currentIndex="searchObj.meta.resultGrid.navigation.currentRowIndex"
           :totalLength="parseInt(searchObj.data.queryResults.hits.length)"
@@ -731,6 +732,7 @@ export default defineComponent({
     const correlationContext = ref<TelemetryContext | null>(null);
     const correlationDashboardProps = ref<any>(null);
     const correlationLoading = ref(false);
+    const correlationError = ref<string | null>(null);
     const { findRelatedTelemetry } = useServiceCorrelation();
 
     // Debug: computed to check why dialog isn't showing
@@ -891,6 +893,7 @@ export default defineComponent({
 
       try {
         correlationLoading.value = true;
+        correlationError.value = null; // Clear any previous error
 
         // Set the correlation context from the log data
         const context: TelemetryContext = {
@@ -913,6 +916,7 @@ export default defineComponent({
 
         if (!result) {
           console.warn("[SearchResult] No correlation result returned");
+          correlationError.value = "No matching service found for correlation";
           $q.notify({
             type: "warning",
             message: "No matching service found for correlation",
@@ -923,6 +927,7 @@ export default defineComponent({
 
         if (!result.correlationData) {
           console.warn("[SearchResult] No correlation data in result");
+          correlationError.value = "Unable to retrieve correlation data";
           $q.notify({
             type: "warning",
             message: "Unable to retrieve correlation data",
@@ -941,6 +946,7 @@ export default defineComponent({
         // Check if there are any metric streams
         if (result.correlationData.related_streams.metrics.length === 0) {
           console.warn("[SearchResult] No metric streams found for correlation");
+          correlationError.value = `No metric streams found for service "${result.correlationData.service_name}"`;
           $q.notify({
             type: "info",
             message: `No metric streams found for service "${result.correlationData.service_name}"`,
@@ -964,6 +970,7 @@ export default defineComponent({
 
         // Check if there are any metrics to show
         if (!result.correlationData.related_streams.metrics || result.correlationData.related_streams.metrics.length === 0) {
+          correlationError.value = "No correlated metrics found for this service";
           $q.notify({
             type: "info",
             message: "No correlated metrics found for this service",
@@ -1004,6 +1011,7 @@ export default defineComponent({
         }
       } catch (err: any) {
         console.error("[SearchResult] Error in openCorrelationFromLog:", err);
+        correlationError.value = `Correlation error: ${err.message || err}`;
         $q.notify({
           type: "negative",
           message: `Correlation error: ${err.message || err}`,
@@ -1411,6 +1419,7 @@ export default defineComponent({
       correlationContext,
       correlationDashboardProps,
       correlationLoading,
+      correlationError,
       shouldShowInlineDialog,
       openCorrelationPanel,
       openCorrelationFromLog,

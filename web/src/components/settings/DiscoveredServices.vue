@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card flat class="tw-p-6">
+  <div class="tw-w-full discovered-services">
     <div class="tw-mb-6">
       <div class="text-h6 tw-mb-2">{{ t("settings.correlation.discoveredServicesTitle") }}</div>
       <div class="text-body2 text-grey-7">
@@ -590,7 +590,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card>
       </q-dialog>
     </div>
-  </q-card>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -1135,6 +1135,11 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
+.discovered-services {
+  // Match parent card-container background
+  background: var(--o2-card-bg);
+}
+
 .bg-warning-1 {
   background-color: rgba(255, 193, 7, 0.1);
 }
