@@ -164,7 +164,7 @@ pub async fn put(record: ServiceRecord) -> Result<(), errors::Error> {
 
     let service_name_for_log = record.service_name.clone();
     log::info!(
-        "[SERVICE_STREAMS] put() called for org={} service={} correlation_key={} incoming_streams={}",
+        "[SERVICE_STREAMS] put () called for org={} service={} correlation_key={} incoming_streams={}",
         record.org_id,
         service_name_for_log,
         record.correlation_key,
