@@ -25,7 +25,7 @@ use actix_web::{
 };
 use config::{
     get_config,
-    meta::user::{DBUser, UserRole},
+    meta::user::{DBUser, User, UserRole, UserType},
     utils::base64,
 };
 #[cfg(feature = "enterprise")]
@@ -50,7 +50,7 @@ use crate::{
             redirect_response::RedirectResponseBuilder,
         },
     },
-    service::{db, db::org_users, users},
+    service::{db, users},
 };
 
 pub const PKCE_STATE_ORG: &str = "o2_pkce_state";
@@ -163,7 +163,7 @@ pub async fn validate_credentials(
         path_columns.pop();
     }
 
-    let user = if path_columns.last().unwrap_or(&"").eq(&"organizations") {
+    let mut user = if path_columns.last().unwrap_or(&"").eq(&"organizations") {
         let db_user = db::user::get_db_user(user_id).await;
         match db_user {
             Ok(user) => {
@@ -204,33 +204,37 @@ pub async fn validate_credentials(
         // logged in. So here we check if the user id is part of atleast one
         // org, and if so, allow the call. If the user is not part of the current org
         // rest of api calls will get blocked anyways, but without this,
-        // native users get stuck in logout loop if they go t any page calling license
+        // native users get stuck in logout loop if they go to any page calling license
         // api call
         if path == "license"
-            && !org_users::list_orgs_by_user(user_id)
-                .await
-                .unwrap_or_default()
-                .is_empty()
+            && let Ok(v) = db::user::get_user_record(user_id).await
         {
+            // we set the record manually with minimal permission,
+            // so the password check later can be done correctly
+            user = Some(User {
+                email: v.email,
+                first_name: v.first_name,
+                last_name: v.last_name,
+                password: v.password,
+                salt: v.salt,
+                token: "".into(),
+                rum_token: None,
+                role: UserRole::User,
+                org: "".into(),
+                is_external: v.user_type == UserType::External,
+                password_ext: v.password_ext,
+            });
+        } else {
             return Ok(TokenValidationResponse {
-                is_valid: true,
-                user_email: user_id.to_string(),
-                is_internal_user: true,
-                user_role: Some(UserRole::User), // minimal role
+                is_valid: false,
+                user_email: "".to_string(),
+                is_internal_user: false,
+                user_role: None,
                 user_name: "".to_string(),
                 family_name: "".to_string(),
                 given_name: "".to_string(),
             });
         }
-        return Ok(TokenValidationResponse {
-            is_valid: false,
-            user_email: "".to_string(),
-            is_internal_user: false,
-            user_role: None,
-            user_name: "".to_string(),
-            family_name: "".to_string(),
-            given_name: "".to_string(),
-        });
     }
     let user = user.unwrap();
 
