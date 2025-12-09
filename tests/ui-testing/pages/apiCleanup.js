@@ -578,8 +578,8 @@ class APICleanup {
     async cleanupPipelines(streamNames = [], sourceStreamPatterns = [], pipelineNamePatterns = []) {
         testLogger.info('Starting pipeline cleanup', {
             streams: streamNames,
-            sourceStreamPatterns: sourceStreamPatterns.map(p => p.source),
-            pipelineNamePatterns: pipelineNamePatterns.map(p => p.source)
+            sourceStreamPatterns: sourceStreamPatterns.map(p => p.toString()),
+            pipelineNamePatterns: pipelineNamePatterns.map(p => p.toString())
         });
 
         try {
