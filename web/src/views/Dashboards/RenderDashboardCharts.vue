@@ -1886,6 +1886,7 @@ export default defineComponent({
     // Watch for tab changes - reset state
     watch(selectedTabId, (newTabId, oldTabId) => {
       if (newTabId !== oldTabId) {
+        console.log(`[RenderDashboardCharts] Tab changed from ${oldTabId} to ${newTabId}`);
 
         // Reset state for new tab
         tabVariablesReady.value = false;
@@ -1894,18 +1895,31 @@ export default defineComponent({
         lastPanelValues.value = {}; // Reset panel value tracking
         isInitialDashboardLoad.value = true; // Treat tab change as new initial load
 
-        // If no tab variables, mark as ready immediately
+        // Wait for DOM updates and trigger tab variables load
         nextTick(() => {
-          if (activeTabVariables.value.length === 0) {
-            tabVariablesReady.value = true;
+          nextTick(() => {
+            if (activeTabVariables.value.length === 0) {
+              // No tab variables, mark as ready immediately
+              tabVariablesReady.value = true;
 
-            // Trigger panel loads if no tab variables
-            nextTick(() => {
-              visiblePanels.value.forEach((panelId) => {
-                loadPanelVariablesIfVisible(panelId);
+              // Trigger panel loads if no tab variables
+              nextTick(() => {
+                visiblePanels.value.forEach((panelId) => {
+                  loadPanelVariablesIfVisible(panelId);
+                });
               });
-            });
-          }
+            } else {
+              // Tab has variables - trigger them to load
+              console.log(`[RenderDashboardCharts] Tab has ${activeTabVariables.value.length} variables, triggering load`);
+
+              if (tabVariablesValueSelectorRef.value?.loadAllVariablesData) {
+                console.log('[RenderDashboardCharts] ▶ Triggering tab variables load on tab change');
+                tabVariablesValueSelectorRef.value.loadAllVariablesData(true);
+              } else {
+                console.error('[RenderDashboardCharts] ✗ Tab variables ref not available on tab change');
+              }
+            }
+          });
         });
       }
     });
