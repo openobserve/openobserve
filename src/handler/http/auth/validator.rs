@@ -50,7 +50,7 @@ use crate::{
             redirect_response::RedirectResponseBuilder,
         },
     },
-    service::{db, users},
+    service::{db, db::org_users, users},
 };
 
 pub const PKCE_STATE_ORG: &str = "o2_pkce_state";
@@ -199,6 +199,29 @@ pub async fn validate_credentials(
     };
 
     if user.is_none() {
+        // for license, we do not provide org in path, but
+        // want to be able to access it in all orgs, as long as user has
+        // logged in. So here we check if the user id is part of atleast one
+        // org, and if so, allow the call. If the user is not part of the current org
+        // rest of api calls will get blocked anyways, but without this,
+        // native users get stuck in logout loop if they go t any page calling license
+        // api call
+        if path == "license"
+            && !org_users::list_orgs_by_user(user_id)
+                .await
+                .unwrap_or_default()
+                .is_empty()
+        {
+            return Ok(TokenValidationResponse {
+                is_valid: true,
+                user_email: user_id.to_string(),
+                is_internal_user: true,
+                user_role: Some(UserRole::User), // minimal role
+                user_name: "".to_string(),
+                family_name: "".to_string(),
+                given_name: "".to_string(),
+            });
+        }
         return Ok(TokenValidationResponse {
             is_valid: false,
             user_email: "".to_string(),
