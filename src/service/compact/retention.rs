@@ -517,10 +517,18 @@ async fn write_file_list(
                 .compact
                 .file_list_deleted_mode
                 .eq(&FileListBookKeepMode::History.to_string())
-                && let Err(e) = infra_file_list::batch_add_history(&events).await
             {
-                log::error!("[COMPACTOR] file_list batch_add_history failed: {}", e);
-                return Err(e.into());
+                let events = events
+                    .iter()
+                    .map(|v| FileKey {
+                        deleted: false,
+                        ..v.clone()
+                    })
+                    .collect::<Vec<_>>();
+                if let Err(e) = infra_file_list::batch_add_history(&events).await {
+                    log::error!("[COMPACTOR] file_list batch_add_history failed: {}", e);
+                    return Err(e.into());
+                }
             }
             // delete from file_list table
             if let Err(e) = infra_file_list::batch_process(&events).await {
