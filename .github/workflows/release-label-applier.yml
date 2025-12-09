@@ -48,13 +48,14 @@ jobs:
                 run_id: runId
               });
 
-              // Extract tag from head_branch (e.g., "refs/tags/v0.30.0-rc1")
-              const headBranch = workflowRun.data.head_branch;
-              if (!headBranch) {
+              // Extract tag from head_ref (more reliable for tag-triggered workflows)
+              // head_ref contains the tag name directly (e.g., "v0.30.0-rc1")
+              const headRef = workflowRun.data.head_ref;
+              if (!headRef) {
                 core.setFailed('Could not determine release tag from workflow run');
                 return;
               }
-              releaseTag = headBranch.replace('refs/tags/', '');
+              releaseTag = headRef;
             }
 
             console.log(`📦 Processing release tag: ${releaseTag}`);
