@@ -59,6 +59,8 @@ jobs:
               pull_number: prNumber
             });
 
+            const sha = pr.head.sha;
+
             // Get all issue comments
             const { data: issueComments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
@@ -87,7 +89,26 @@ jobs:
             console.log(`Total texts checked (PR body + comments): ${allTexts.length}`);
             console.log(`Has design comment: ${hasDesignComment}`);
 
+            // Function to update commit status
+            const updateStatus = async (state, description) => {
+              try {
+                await github.rest.repos.createCommitStatus({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  sha: sha,
+                  state: state,
+                  context: 'Feature Design Comment Checker',
+                  description: description
+                });
+                console.log(`Status updated: ${state} - ${description}`);
+              } catch (error) {
+                console.log(`Failed to update status: ${error.message}`);
+              }
+            };
+
             if (!hasDesignComment) {
+              const errorMsg = '❌ Missing required design location for feat: PR';
+              await updateStatus('failure', errorMsg);
               core.setFailed(
                 '❌ This PR has a title starting with "feat:" but is missing a required design comment.\n\n' +
                 'Please add the design location in the PR description or as a comment in this format:\n' +
@@ -96,4 +117,5 @@ jobs:
               );
             } else {
               console.log('✅ Design comment found!');
+              await updateStatus('success', '✅ Design location provided');
             }
