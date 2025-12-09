@@ -832,7 +832,7 @@
     "create": "Create Pipeline",
     "SelectParentNode": "Select Parent Node",
     "SelectChildNode": "Select Child Node",
-    "deleteNode": "Delete",
+    "deleteNode": "Delete Node",
     "addPipeline": "New pipeline",
     "deletePipeline": "Delete Pipeline",
     "search": "Search Pipeline",
@@ -884,6 +884,7 @@
     "functionName":"Function Name'",
     "timezone":"Timezone",
     "pipelineCreation":"Pipeline Creation",
+    "loadingConditions": "Loading conditions",
     "placeholder": {
       "value": "Value",
       "selectColumn": "Select column"
@@ -942,9 +943,11 @@
       "selectDestination": "Please select External destination from the list",
       "functionNameRequired": "Function Name is required",
       "selectStream": "Please select Stream from the list",
-      "fieldRequired":"Field is required!",
-      "importingError":"Error importing Pipeline(s) please check the JSON",
-      "functionAlreadyAssociated":"Function is already associated"
+      "fieldRequired": "Field is required!",
+      "importingError": "Error importing Pipeline(s) please check the JSON",
+      "functionAlreadyAssociated": "Function is already associated",
+      "cancelConfirm": "Are you sure you want to cancel changes?",
+      "deleteFunctionConfirm": "Are you sure you want to delete function association?"
     },
     "success": {
       "contentCopied": "Content Copied Successfully!",
@@ -1040,7 +1043,11 @@
     "errorTestingFunction": "Error in testing function",
     "errorTransformingResults": "Error while transforming results",
     "errorFailedApplyVRL": "Error: Failed to apply VRL Function.",
-    "failedApplyVRLFewEvents": "Failed to apply VRL Function on few events"
+    "failedApplyVRLFewEvents": "Failed to apply VRL Function on few events",
+    "noDefinitionAvailable":"No definition available",
+    "executionGuidelines":"Function Execution Guidelines",
+    "rbfDescription":"Function executes before data structure is flattened",
+    "rafDescription":"Function executes after data structure is flattened"
   },
   "latencyInsights": {
     "title": "Insights",

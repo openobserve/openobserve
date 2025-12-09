@@ -144,15 +144,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Info note explaining RAF/RBF -->
           <q-card class="note-container">
             <q-card-section class="q-pa-sm">
-              <div class="note-heading">{{ t('pipeline.function.executionGuidelines') }}:</div>
+              <div class="note-heading">{{ t('function.executionGuidelines') }}:</div>
               <q-banner inline dense class="note-info">
                 <div>
                   <q-icon name="info" color="orange" class="q-mr-sm" />
-                  <span><span class="highlight">RBF (Run Before Flattening):</span> {{ t('pipeline.function.rbfDescription') }}</span>
+                  <span><span class="highlight">RBF (Run Before Flattening):</span> {{ t('function.rbfDescription') }}</span>
                 </div>
                 <div>
                   <q-icon name="info" color="orange" class="q-mr-sm" />
-                  <span><span class="highlight">RAF (Run After Flattening):</span> {{ t('pipeline.function.rafDescription') }}</span>
+                  <span><span class="highlight">RAF (Run After Flattening):</span> {{ t('function.rafDescription') }}</span>
                 </div>
               </q-banner>
             </q-card-section>
