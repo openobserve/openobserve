@@ -1,0 +1,124 @@
+name: "Feature Design Comment Checker"
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+  issue_comment:
+    types: [created, edited]
+  pull_request_review_comment:
+    types: [created, edited]
+
+jobs:
+  check-design-comment:
+    permissions:
+      pull-requests: read
+      statuses: write
+    # Only run on pull requests
+    if: github.event_name == 'pull_request' || (github.event_name == 'issue_comment' && github.event.issue.pull_request) || github.event_name == 'pull_request_review_comment'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Get PR details
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            let prNumber, prTitle;
+
+            if (context.eventName === 'pull_request') {
+              prNumber = context.payload.pull_request.number;
+              prTitle = context.payload.pull_request.title;
+            } else {
+              // For comment events, get the PR
+              prNumber = context.issue.number;
+              const { data: pr } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber
+              });
+              prTitle = pr.title;
+            }
+
+            core.setOutput('number', prNumber);
+            core.setOutput('title', prTitle);
+
+            // Check if title starts with feat: or feat : (case insensitive, flexible spacing)
+            const isFeat = /^feat\s*:/i.test(prTitle);
+            core.setOutput('is_feat', isFeat);
+            console.log(`PR #${prNumber}: "${prTitle}"`);
+            console.log(`Is feature PR: ${isFeat}`);
+
+      - name: Check for design comment
+        if: steps.pr.outputs.is_feat == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = ${{ steps.pr.outputs.number }};
+
+            // Get PR details including body
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+
+            const sha = pr.head.sha;
+
+            // Get all issue comments
+            const { data: issueComments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber
+            });
+
+            // Get all review comments
+            const { data: reviewComments } = await github.rest.pulls.listReviewComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+
+            // Combine PR body and all comments
+            const allTexts = [
+              pr.body || '',
+              ...issueComments.map(c => c.body || ''),
+              ...reviewComments.map(c => c.body || '')
+            ];
+
+            // Check if any text matches the pattern "Design at : <location>" or "Design at: <location>"
+            const designPattern = /Design\s+at\s*:\s*.+/i;
+            const hasDesignComment = allTexts.some(text => designPattern.test(text));
+
+            console.log(`Total texts checked (PR body + comments): ${allTexts.length}`);
+            console.log(`Has design comment: ${hasDesignComment}`);
+
+            // Function to update commit status
+            const updateStatus = async (state, description) => {
+              try {
+                await github.rest.repos.createCommitStatus({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  sha: sha,
+                  state: state,
+                  context: 'Feature Design Comment Checker',
+                  description: description
+                });
+                console.log(`Status updated: ${state} - ${description}`);
+              } catch (error) {
+                console.log(`Failed to update status: ${error.message}`);
+              }
+            };
+
+            if (!hasDesignComment) {
+              const errorMsg = '❌ Missing required design location for feat: PR';
+              await updateStatus('failure', errorMsg);
+              core.setFailed(
+                '❌ This PR has a title starting with "feat:" but is missing a required design comment.\n\n' +
+                'Please add the design location in the PR description or as a comment in this format:\n' +
+                '  Design at : <design location>\n\n' +
+                'Example: Design at : streams-corelation'
+              );
+            } else {
+              console.log('✅ Design comment found!');
+              await updateStatus('success', '✅ Design location provided');
+            }
