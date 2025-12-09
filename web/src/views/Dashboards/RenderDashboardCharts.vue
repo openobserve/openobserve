@@ -682,7 +682,6 @@ export default defineComponent({
         return;
       }
     };
-
     // ======= [END] dashboard PrintMode =======
 
     const hoveredSeriesState = ref({
@@ -1111,7 +1110,6 @@ export default defineComponent({
     const openEditLayout = (id: string) => {
       emit("openEditLayout", id);
     };
-
     return {
       store,
       addPanelData,
