@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :flat="selectedType !== 'relative'"
             @click="setDateType('relative')"
           >
-            Relative
+            {{ t("common.relative") }}
           </q-btn>
           <q-separator vertical inset />
           <q-btn
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :flat="selectedType !== 'absolute'"
             @click="setDateType('absolute')"
           >
-            Absolute
+            {{ t("common.absolute") }}
           </q-btn>
         </div>
         <q-separator />

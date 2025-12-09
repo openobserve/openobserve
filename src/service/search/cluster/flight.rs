@@ -76,7 +76,7 @@ use crate::{
     fields(org_id = req.org_id)
 )]
 pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<SearchResult> {
-    let mut stop_watch = TookWatcher::new();
+    let mut took_watch = TookWatcher::new();
     let cfg = get_config();
     log::info!("[trace_id {trace_id}] flight->search: start {sql}");
 
@@ -107,7 +107,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     let file_id_list_vec = file_id_list.values().flatten().collect::<Vec<_>>();
     let file_id_list_num = file_id_list_vec.len();
     let file_id_list_records = file_id_list_vec.iter().map(|v| v.records).sum::<i64>();
-    let file_id_list_took = stop_watch.record_split("get_file_list").as_millis() as usize;
+    let file_id_list_took = took_watch.record_split("get_file_list").as_millis() as usize;
     log::info!(
         "{}",
         search_inspector_fields(
@@ -182,7 +182,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
                 .node_name(LOCAL_NODE.name.clone())
                 .component("flight:leader get nodes".to_string())
                 .search_role("leader".to_string())
-                .duration(stop_watch.record_split("get_nodes").as_millis() as usize)
+                .duration(took_watch.record_split("get_nodes").as_millis() as usize)
                 .desc(format!(
                     "get nodes num: {}, querier num: {}",
                     nodes.len(),
@@ -200,7 +200,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     let _lock = crate::service::search::work_group::acquire_work_group_lock(
         trace_id,
         &req,
-        &mut stop_watch,
+        &mut took_watch,
         "logs",
         &nodes,
         &file_id_list_vec,
@@ -324,7 +324,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
 
     log::info!(
         "[trace_id {trace_id}] flight->search: search finished, {}",
-        stop_watch.get_summary()
+        took_watch.get_summary()
     );
 
     scan_stats.format_to_mb();

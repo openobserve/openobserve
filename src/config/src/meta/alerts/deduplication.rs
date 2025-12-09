@@ -174,159 +174,7 @@ impl SemanticFieldGroup {
     /// instead.
     #[allow(dead_code)]
     pub fn default_presets() -> Vec<Self> {
-        vec![
-            Self::new(
-                "host",
-                "Host",
-                &["host", "hostname", "node", "node_name"],
-                true,
-            ),
-            // IP addresses removed - too high cardinality for service dimensions
-            // Users with stable IPs can use "host" dimension instead
-            Self::new(
-                "service",
-                "Service",
-                &[
-                    // Generic
-                    "service",
-                    "service_name",
-                    "svc",
-                    "app",
-                    "application",
-                    "app_name",
-                    // OpenTelemetry (traces and metrics)
-                    "service.name",            // OTLP attribute format
-                    "attributes_service.name", // Flattened OTLP attributes
-                    "resource_service_name",
-                    "resource_attributes_service_name",
-                    "resource_attributes_service.name",
-                    // Prometheus/Metrics
-                    "job", // Prometheus job label (common service identifier)
-                    "service_instance",
-                    "__name__", // Metric name can indicate service
-                    // Kubernetes
-                    "kubernetes_labels_app",
-                    "kubernetes_labels_app_kubernetes_io_name",
-                    "k8s_labels_app",
-                    // AWS ECS/Fargate
-                    "ecs_task_family",
-                    "ecs_service_name",
-                    "ecs_container_name",
-                    // AWS Lambda
-                    "lambda_function_name",
-                    "aws_lambda_function_name",
-                    // GCP Cloud Run/Functions
-                    "resource_labels_service_name",
-                    "cloud_run_service_name",
-                    "resource_labels_function_name",
-                    // Azure
-                    "ServiceName",
-                    "ContainerName",
-                    "azure_service_name",
-                    // Systemd (VMs)
-                    "_SYSTEMD_UNIT",
-                ],
-                true,
-            ),
-            // Kubernetes groups
-            Self::new(
-                "k8s-cluster",
-                "K8s Cluster",
-                &["k8s_cluster", "cluster", "cluster_name", "cluster_id"],
-                false,
-            ),
-            Self::new(
-                "k8s-namespace",
-                "K8s Namespace",
-                &["k8s_namespace", "namespace", "k8s_ns", "ns"],
-                false,
-            ),
-            Self::new(
-                "k8s-pod",
-                "K8s Pod",
-                &["k8s_pod", "pod", "pod_name", "pod_id"],
-                false,
-            ),
-            Self::new(
-                "k8s-node",
-                "K8s Node",
-                &["k8s_node", "node", "node_name", "kubernetes_node"],
-                false,
-            ),
-            Self::new(
-                "k8s-container",
-                "K8s Container",
-                &[
-                    "container",
-                    "container_name",
-                    "container_id",
-                    "k8s_container",
-                ],
-                false,
-            ),
-            // Environment dimension (common across all platforms)
-            Self::new(
-                "environment",
-                "Environment",
-                &[
-                    "environment",
-                    "env",
-                    "stage",
-                    "tier",
-                    "deployment_environment",
-                    "service_deployment_environment", /* OTLP traces: service_ + attribute key
-                                                       * (dots replaced with underscores) */
-                    "attributes_deployment_environment", // Flattened OTLP attributes
-                    "resource_deployment_environment",
-                    "resource_attributes_deployment_environment",
-                    "kubernetes_labels_environment",
-                    "kubernetes_labels_env",
-                    "k8s_labels_environment",
-                    "ecs_task_definition_tags_environment",
-                    "labels_environment",
-                ],
-                true,
-            ),
-            // Version dimension
-            Self::new(
-                "version",
-                "Version",
-                &[
-                    "version",
-                    "app_version",
-                    "service_version",
-                    "release",
-                    // OTLP traces - service_ prefix with dots replaced by underscores
-                    "service_service_version", /* OTLP traces: service_ + service.version (dots
-                                                * → underscores) */
-                    "attributes_service_version", // Flattened OTLP attributes
-                    "resource_service_version",
-                    "resource_attributes_service_version",
-                    // Kubernetes
-                    "kubernetes_labels_version",
-                    "k8s_labels_version",
-                    "aws_lambda_version",
-                ],
-                true,
-            ),
-            // Region dimension (cloud + datacenter)
-            Self::new(
-                "region",
-                "Region",
-                &[
-                    "region",
-                    "aws_region",
-                    "gcp_region",
-                    "azure_region",
-                    "resource_labels_location",
-                    "kubernetes_node_labels_topology_kubernetes_io_region",
-                    "kubernetes_node_labels_region",
-                    "datacenter",
-                    "location",
-                ],
-                false,
-            ),
-        ]
+        vec![]
     }
 
     /// Load default semantic groups
@@ -399,6 +247,22 @@ pub struct GlobalDeduplicationConfig {
     /// Can be overridden per-alert.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time_window_minutes: Option<i64>,
+
+    /// FQN (Fully Qualified Name) priority dimensions for service correlation
+    ///
+    /// Defines which semantic dimensions are used to derive the service-fqn,
+    /// in priority order. The first dimension with a value wins.
+    ///
+    /// Default priority (if empty):
+    /// 1. k8s-deployment, k8s-statefulset, k8s-daemonset, k8s-job (K8s workloads)
+    /// 2. aws-ecs-task, faas-name, gcp-cloud-run, azure-cloud-role (Cloud workloads)
+    /// 3. process-name (Bare metal)
+    /// 4. service (Fallback)
+    ///
+    /// Example custom priority: ["k8s-deployment", "aws-ecs-task", "service"]
+    /// This would skip statefulset/daemonset and use deployment directly.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fqn_priority_dimensions: Vec<String>,
 }
 
 /// Per-alert deduplication configuration (from main branch)
@@ -600,7 +464,23 @@ impl GlobalDeduplicationConfig {
             alert_dedup_enabled: false,
             alert_fingerprint_groups: vec![],
             time_window_minutes: None,
+            fqn_priority_dimensions: Self::default_fqn_priority(),
         }
+    }
+
+    /// Get default FQN priority dimensions
+    ///
+    /// For OSS builds, returns empty (must be configured).
+    /// For enterprise builds, ServiceStreamsConfig provides the full default list.
+    ///
+    /// Default priority order for deriving service-fqn (first match wins):
+    /// 1. K8s workload: deployment, statefulset, daemonset, job
+    /// 2. Cloud workload: ECS task family, Lambda function, Cloud Run service
+    /// 3. Bare metal: process name
+    /// 4. Fallback: service dimension
+    pub fn default_fqn_priority() -> Vec<String> {
+        // OSS builds return empty - enterprise provides defaults via ServiceStreamsConfig
+        vec![]
     }
 
     /// Map a field name to its semantic group ID
@@ -743,6 +623,7 @@ mod tests {
             ],
             alert_fingerprint_groups: vec![],
             time_window_minutes: Some(10),
+            fqn_priority_dimensions: vec![],
         };
 
         assert!(config.validate().is_ok());
@@ -814,6 +695,7 @@ mod tests {
             ],
             alert_fingerprint_groups: vec![],
             time_window_minutes: Some(10),
+            fqn_priority_dimensions: vec![],
         };
 
         // Should succeed - overlaps are allowed, just logged as warnings
@@ -831,6 +713,7 @@ mod tests {
             ],
             alert_fingerprint_groups: vec![],
             time_window_minutes: Some(10),
+            fqn_priority_dimensions: vec![],
         };
 
         let json = serde_json::to_string_pretty(&config).unwrap();
@@ -896,19 +779,9 @@ mod tests {
 
     #[test]
     fn test_default_presets() {
+        // OSS builds return empty defaults - semantic groups are loaded from
+        // enterprise JSON or configured via API
         let presets = SemanticFieldGroup::default_presets();
-        assert!(!presets.is_empty());
-
-        // Check that we have common groups
-        assert!(presets.iter().any(|g| g.id == "host"));
-        assert!(presets.iter().any(|g| g.id == "service"));
-        assert!(presets.iter().any(|g| g.id == "k8s-cluster"));
-
-        // Validate all preset IDs
-        for preset in &presets {
-            assert!(SemanticFieldGroup::validate_id(&preset.id));
-            assert!(!preset.display.is_empty());
-            assert!(!preset.fields.is_empty());
-        }
+        assert!(presets.is_empty());
     }
 }

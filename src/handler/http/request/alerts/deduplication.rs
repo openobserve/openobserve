@@ -391,8 +391,10 @@ pub async fn preview_semantic_groups_diff(
 
 /// Save semantic field groups for an organization
 ///
-/// Replaces all semantic groups with the provided list.
-/// Usually called after user reviews the diff from preview-diff endpoint.
+/// Merges provided groups with existing ones:
+/// - Groups with matching IDs are updated (replaced)
+/// - New groups (no matching ID) are added
+/// - Existing groups not in the request are preserved
 #[cfg(feature = "enterprise")]
 #[utoipa::path(
     context_path = "/api",
@@ -402,7 +404,7 @@ pub async fn preview_semantic_groups_diff(
     params(
         ("org_id" = String, Path, description = "Organization ID"),
     ),
-    request_body(content = Vec<SemanticFieldGroup>, description = "Semantic groups to save", content_type = "application/json"),
+    request_body(content = Vec<SemanticFieldGroup>, description = "Semantic groups to save (merged with existing)", content_type = "application/json"),
     responses(
         (status = 200, description = "Success"),
         (status = 400, description = "Bad request - Invalid semantic groups"),
@@ -415,10 +417,10 @@ pub async fn save_semantic_groups(
     groups: web::Json<Vec<SemanticFieldGroup>>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let org_id = org_id.into_inner();
-    let new_groups = groups.into_inner();
+    let incoming_groups = groups.into_inner();
 
     // Validate all group IDs
-    for group in &new_groups {
+    for group in &incoming_groups {
         if !SemanticFieldGroup::validate_id(&group.id) {
             return Ok(HttpResponse::BadRequest().json(serde_json::json!({
                 "error": format!("Invalid semantic group ID: '{}'. IDs must be lowercase, alphanumeric, dash-separated", group.id)
@@ -430,7 +432,7 @@ pub async fn save_semantic_groups(
     let mut config =
         match crate::service::alerts::org_config::get_deduplication_config(&org_id).await {
             Ok(Some(cfg)) => cfg,
-            Ok(None) => GlobalDeduplicationConfig::default(),
+            Ok(None) => GlobalDeduplicationConfig::default_with_presets(),
             Err(e) => {
                 log::error!(
                     "Error getting deduplication config for org {}: {}",
@@ -443,14 +445,43 @@ pub async fn save_semantic_groups(
             }
         };
 
-    // Replace semantic groups
-    config.semantic_field_groups = new_groups;
+    // Merge incoming groups with existing ones
+    // Build a map of incoming groups by ID for quick lookup
+    let incoming_map: std::collections::HashMap<String, SemanticFieldGroup> = incoming_groups
+        .into_iter()
+        .map(|g| (g.id.clone(), g))
+        .collect();
+
+    // Update existing groups if they're in incoming, keep others unchanged
+    let mut merged_groups: Vec<SemanticFieldGroup> = config
+        .semantic_field_groups
+        .into_iter()
+        .map(|existing| {
+            if let Some(updated) = incoming_map.get(&existing.id) {
+                updated.clone()
+            } else {
+                existing
+            }
+        })
+        .collect();
+
+    // Add new groups that don't exist in current config
+    let existing_ids: std::collections::HashSet<String> =
+        merged_groups.iter().map(|g| g.id.clone()).collect();
+    for (id, group) in incoming_map {
+        if !existing_ids.contains(&id) {
+            merged_groups.push(group);
+        }
+    }
+
+    let total_groups = merged_groups.len();
+    config.semantic_field_groups = merged_groups;
 
     // Save config
     match crate::service::alerts::org_config::set_deduplication_config(&org_id, &config).await {
         Ok(()) => Ok(HttpResponse::Ok().json(serde_json::json!({
             "message": "Semantic groups saved successfully",
-            "total_groups": config.semantic_field_groups.len()
+            "total_groups": total_groups
         }))),
         Err(e) => {
             log::error!("Error saving semantic groups for org {}: {}", org_id, e);

@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
      hide-bottom-space>
       <template v-slot:label>
         <div class="row items-center all-pointer-events">
-          Step Value
+          {{ t("dashboard.stepValue") }}
           <div>
             <q-icon
               class="q-ml-xs"
@@ -80,10 +80,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               max-width="250px"
             >
               <b>Step - </b>
-              The interval between datapoints, which must be returned from the
-              range query.
+              {{ t("dashboard.stepValueTooltip") }}
               <br />
-              Eg: 10s, 1h
+              {{ t("dashboard.stepValueExample") }}
             </q-tooltip>
           </div>
         </div>
@@ -202,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <q-toggle
           v-model="dashboardPanelData.data.config.trellis.group_by_y_axis"
-          label="Group multi Y-axis for trellis"
+          :label="t('dashboard.groupMultiYAxisTrellis')"
           data-test="dashboard-config-trellis-group-by-y-axis"
           class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
           size="lg"
@@ -217,24 +216,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle">
             <div>
-              <b>Group multi Y-axis for trellis</b>
+              <b>{{ t("dashboard.groupMultiYAxisTrellisTooltipTitle") }}</b>
               <br /><br />
-              When you have multiple Y-axis fields and a breakdown field:
+              {{ t("dashboard.groupMultiYAxisTrellisTooltipDescription") }}
               <br /><br />
-              <b>Enabled:</b> Groups all Y-axis metrics for the same breakdown
-              value into a single trellis chart <br /><br />
-              <b>Disabled:</b> Creates separate trellis charts for each Y-axis
-              metric and breakdown value combination <br /><br />
-              <i
-                >Example: With Y-axis fields [CPU, Memory] and breakdown by
-                [Server A, Server B]:</i
-              >
+              <b>{{ t("dashboard.groupMultiYAxisTrellisTooltipEnabled") }}</b> <br /><br />
+              <b>{{ t("dashboard.groupMultiYAxisTrellisTooltipDisabled") }}</b> <br /><br />
+              <i>{{ t("dashboard.groupMultiYAxisTrellisTooltipExample") }}</i>
               <br />
-              • Enabled: 2 charts (Server A chart with CPU+Memory, Server B
-              chart with CPU+Memory)
+              {{ t("dashboard.groupMultiYAxisTrellisTooltipEnabledResult") }}
               <br />
-              • Disabled: 4 charts (Server A CPU, Server A Memory, Server B CPU,
-              Server B Memory)
+              {{ t("dashboard.groupMultiYAxisTrellisTooltipDisabledResult") }}
             </div>
           </q-tooltip>
         </div>
@@ -315,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="dashboardPanelData.data.config.legends_type"
         :options="legendTypeOptions"
         dense
-        label="Legends Type"
+        :label="t('dashboard.legendsType')"
         class="showLabelOnTop"
         stack-label
         emit-value
@@ -350,7 +342,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-input
           v-if="shouldShowLegendHeight(dashboardPanelData)"
           v-model.number="legendHeightValue"
-          label="Legend Height"
+          :label="t('dashboard.legendHeight')"
           color="input-border"
           bg-color="input-bg"
           class="q-py-md showLabelOnTop q-mr-sm"
@@ -448,7 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="dashboardPanelData.data.config.chart_align"
         :options="chartAlignOptions"
         dense
-        label="Chart Align"
+        :label="t('dashboard.chartAlign')"
         class="showLabelOnTop"
         stack-label
         emit-value
@@ -508,9 +500,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         :rules="[
           (val: any) =>
-            (val >= 0 && val <= 100) || 'Decimals must be between 0 and 100',
+            (val >= 0 && val <= 100) || t('dashboard.decimalsMustBeBetween'),
         ]"
-        label="Decimals"
+        :label="t('dashboard.decimals')"
         color="input-border"
         bg-color="input-bg"
         class="q-py-md showLabelOnTop"
@@ -557,7 +549,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="space"></div>
 
       <div v-if="dashboardPanelData.data.type == 'geomap'">
-        <span>Initial View:</span>
+        <span>{{ t("dashboard.initialView") }}</span>
         <div class="row">
           <q-input
             v-model.number="dashboardPanelData.data.config.map_view.lat"
@@ -729,7 +721,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="q-py-md showLabelOnTop"
         style="font-weight: 600"
       >
-        Query
+        {{ t("dashboard.query") }}
         <q-tabs
           v-model="dashboardPanelData.layout.currentQueryIndex"
           narrow-indicator
@@ -744,7 +736,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="(tab, index) in dashboardPanelData.data.queries"
             :key="index"
             :name="index"
-            :label="'Query ' + (index + 1)"
+            :label="t('dashboard.queryLabel') + ' ' + (index + 1)"
             :data-test="`dashboard-config-query-tab-${index}`"
           >
           </q-tab>
@@ -775,13 +767,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.layout.currentQueryIndex
             ].config.limit = value ? value : 0)
         "
-        label="Limit"
+        :label="t('dashboard.limit')"
         color="input-border"
         bg-color="input-bg"
         class="q-py-sm showLabelOnTop"
         stack-label
         borderless
-        
+
         dense
         label-slot
         placeholder="0"
@@ -790,7 +782,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-slot:label>
           <div class="row items-center all-pointer-events">
-            Query Limit
+            {{ t("dashboard.queryLimit") }}
             <div>
               <q-icon
                 class="q-ml-xs"
@@ -803,7 +795,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 anchor="top middle"
                 self="bottom middle"
               >
-                Limit for the query result
+                {{ t("dashboard.limitForQueryResult") }}
               </q-tooltip>
             </div>
           </div>
@@ -830,13 +822,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           (value: any) =>
             (dashboardPanelData.data.config.top_results = value ? value : null)
         "
-        label="Top Results"
+        :label="t('dashboard.topResults')"
         color="input-border"
         bg-color="input-bg"
         class="q-py-sm showLabelOnTop"
         stack-label
         borderless
-        
+
         dense
         label-slot
         placeholder="ALL"
@@ -849,7 +841,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-config-top_results"
         ><template v-slot:label>
           <div class="row items-center all-pointer-events">
-            Show Top N values
+            {{ t("dashboard.showTopNValues") }}
             <div>
               <q-icon
                 class="q-ml-xs"
@@ -863,11 +855,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 self="bottom middle"
                 max-width="250px"
               >
-                <b>This is only applicable when breakdown field is available</b>
+                <b>{{ t("dashboard.topNTooltipTitle") }}</b>
                 <br />
                 <br />
-                Specify the number of Top N values to show when breakdown field
-                is available.
+                {{ t("dashboard.topNTooltipDescription") }}
               </q-tooltip>
             </div>
           </div>
@@ -891,7 +882,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <q-toggle
           v-model="dashboardPanelData.data.config.top_results_others"
-          label="Add 'others' series"
+          :label="t('dashboard.addOthersSeries')"
           data-test="dashboard-config-top_results_others"
           :disable="
             dashboardPanelData.data.queries[
@@ -915,8 +906,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             self="bottom middle"
             max-width="250px"
           >
-            Include an 'others' series for values outside the top results when
-            using breakdown fields.
+            {{ t("dashboard.addOthersSeriesTooltip") }}
           </q-tooltip>
         </q-icon>
       </div>
@@ -978,7 +968,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           )
         "
         v-model="dashboardPanelData.data.config.connect_nulls"
-        label="Connect null values"
+        :label="t('dashboard.connectNullValues')"
         data-test="dashboard-config-connect-null-values"
         class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
       size="lg"
@@ -994,7 +984,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ) && !promqlMode
         "
         v-model="dashboardPanelData.data.config.no_value_replacement"
-        label="No Value Replacement"
+        :label="t('dashboard.noValueReplacement')"
         color="input-border"
         bg-color="input-bg"
         class="q-py-md showLabelOnTop"
@@ -1005,7 +995,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-config-no-value-replacement"
          borderless hide-bottom-space><template v-slot:label>
           <div class="row items-center all-pointer-events">
-            No Value Replacement
+            {{ t("dashboard.noValueReplacement") }}
             <div>
               <q-icon
                 class="q-ml-xs"
@@ -1018,7 +1008,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 anchor="top middle"
                 self="bottom middle"
               >
-                What to display when a value is missing for time series
+                {{ t("dashboard.noValueReplacementTooltip") }}
               </q-tooltip>
             </div>
           </div>
@@ -1095,20 +1085,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.layout.currentQueryIndex
             ].config.min = value ? value : 0)
         "
-        label="Gauge Min Value"
+        :label="t('dashboard.gaugeMinValue')"
         color="input-border"
         bg-color="input-bg"
         class="q-py-md showLabelOnTop"
         stack-label
         borderless
-        
+
         dense
         label-slot
         :type="'number'"
         data-test="dashboard-config-gauge-min"
       >
         <template v-slot:label>
-          <div class="row items-center all-pointer-events">Gauge Min Value</div>
+          <div class="row items-center all-pointer-events">{{ t("dashboard.gaugeMinValue") }}</div>
         </template>
       </q-input>
       <q-input
@@ -1125,13 +1115,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.layout.currentQueryIndex
             ].config.max = value ? value : 100)
         "
-        label="Gauge Max Value"
+        :label="t('dashboard.gaugeMaxValue')"
         color="input-border"
         bg-color="input-bg"
         class="q-py-md showLabelOnTop"
         stack-label
         borderless
-        
+
         dense
         label-slot
         placeholder="100"
@@ -1139,7 +1129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-config-gauge-max"
       >
         <template v-slot:label>
-          <div class="row items-center all-pointer-events">Gauge Max Value</div>
+          <div class="row items-center all-pointer-events">{{ t("dashboard.gaugeMaxValue") }}</div>
         </template>
       </q-input>
 
@@ -1245,12 +1235,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   anchor="top middle"
                   self="bottom middle"
                 >
-                  <b>Set the minimum value for the Y-axis.</b>
+                  <b>{{ t("dashboard.yAxisMinTooltipTitle") }}</b>
                   <br />
-                  This defines the lowest point to display on the chart, but the
-                  axis
-                  <br />
-                  may adjust lower if the data includes smaller values.
+                  {{ t("dashboard.yAxisMinTooltipDescription") }}
                 </q-tooltip>
               </div>
             </div>
@@ -1289,12 +1276,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   anchor="top middle"
                   self="bottom middle"
                 >
-                  <b>Set the maximum value for the Y-axis.</b>
+                  <b>{{ t("dashboard.yAxisMaxTooltipTitle") }}</b>
                   <br />
-                  This defines the highest point to display on the chart, but
-                  the
-                  <br />
-                  axis may adjust higher if the data includes larger values.
+                  {{ t("dashboard.yAxisMaxTooltipDescription") }}
                 </q-tooltip>
               </div>
             </div>
@@ -1344,7 +1328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-toggle
         v-if="shouldShowGridlines(dashboardPanelData)"
         v-model="dashboardPanelData.data.config.show_gridlines"
-        label="Show Gridlines"
+        :label="t('dashboard.showGridlines')"
         data-test="dashboard-config-show-gridlines"
         class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
         size="lg"
@@ -1485,16 +1469,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             (dashboardPanelData.data.config.line_thickness =
               typeof value == 'number' && value >= 0 ? value : 1.5)
         "
-        label="Line Thickness"
+        :label="t('dashboard.lineThickness')"
         color="input-border"
         bg-color="input-bg"
         class="q-py-sm showLabelOnTop"
         stack-label
         borderless
-        
+
         dense
         label-slot
-        placeholder="Default: 1.5"
+        :placeholder="t('dashboard.lineThicknessDefault')"
         :type="'number'"
         data-test="dashboard-config-line_thickness"
       >
@@ -1553,7 +1537,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-bold q-py-md flex items-center"
           style="width: 190px"
         >
-          Comparison Against
+          {{ t("dashboard.comparisonAgainst") }}
           <q-btn
             no-caps
             padding="xs"
@@ -1569,11 +1553,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               max-width="250px"
             >
               <span>
-                This feature allows you to compare data points from multiple
-                queries over a selected time range. By adjusting the date or
-                time, the system will retrieve corresponding data from different
-                queries, enabling you to observe changes or differences between
-                the selected time periods.
+                {{ t("dashboard.comparisonAgainstTooltip") }}
               </span>
             </q-tooltip>
           </q-btn>
@@ -1612,7 +1592,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-btn
         @click="addTimeShift"
         style="cursor: pointer; padding: 0px 5px"
-        label="+ Add"
+        :label="t('dashboard.addButton')"
         class="el-border"
         no-caps
         data-test="dashboard-addpanel-config-time-shift-add-btn"
@@ -1911,11 +1891,11 @@ export default defineComponent({
     //options for symbol
     const symbolOptions = [
       {
-        label: "Fixed",
+        label: t("dashboard.fixed"),
         value: "fixed",
       },
       {
-        label: "By Value",
+        label: t("dashboard.byValue"),
         value: "by Value",
       },
     ];
@@ -1957,30 +1937,30 @@ export default defineComponent({
 
     const legendTypeOptions = [
       {
-        label: "Auto",
+        label: t("dashboard.legendTypeAuto"),
         value: null,
       },
       {
-        label: "Plain",
+        label: t("dashboard.legendTypePlain"),
         value: "plain",
       },
       {
-        label: "Scroll",
+        label: t("dashboard.legendTypeScroll"),
         value: "scroll",
       },
     ];
 
     const chartAlignOptions = [
       {
-        label: "Auto",
+        label: t("dashboard.chartAlignAuto"),
         value: null,
       },
       {
-        label: "Left",
+        label: t("dashboard.chartAlignLeft"),
         value: "left",
       },
       {
-        label: "Center",
+        label: t("dashboard.chartAlignCenter"),
         value: "center",
       },
     ];

@@ -73,7 +73,7 @@ pub async fn search(
     DeferredLock,
     ScanStats,
 )> {
-    let mut stop_watch = config::utils::took_watcher::TookWatcher::new();
+    let mut took_watch = config::utils::took_watcher::TookWatcher::new();
 
     let cfg = config::get_config();
     let mut req: Request = (*flight_request).clone().into();
@@ -118,7 +118,7 @@ pub async fn search(
     let file_id_list_vec = file_id_list.iter().collect::<Vec<_>>();
     let file_id_list_num = file_id_list_vec.len();
 
-    let file_id_list_took = stop_watch.record_split("get_file_list").as_millis() as usize;
+    let file_id_list_took = took_watch.record_split("get_file_list").as_millis() as usize;
     log::info!(
         "{}",
         search_inspector_fields(
@@ -201,7 +201,7 @@ pub async fn search(
     let _lock = crate::service::search::work_group::acquire_work_group_lock(
         &trace_id,
         &req,
-        &mut stop_watch,
+        &mut took_watch,
         "super_cluster_follower",
         &nodes,
         &file_id_list_vec,

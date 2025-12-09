@@ -247,9 +247,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="padding: 2px 4px; z-index: 1"
                         color="primary"
                         @click="addToDashboard"
-                        title="Add To Dashboard"
+                        :title="t('search.addToDashboard')"
                         :disabled="errorData?.errors?.length > 0"
-                        >Add To Dashboard</q-btn
+                        >{{ t("search.addToDashboard") }}</q-btn
                       >
                     </div>
                   </div>

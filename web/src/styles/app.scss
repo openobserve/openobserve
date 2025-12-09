@@ -1523,6 +1523,12 @@ body {
 
   // Smooth fade-in animation
   animation: tooltipFadeIn 0.2s ease-out;
+
+  // Override max-width for pipeline view tooltips
+  &:has(.pipeline-view-tooltip) {
+    max-width: min(520px, 85vw) !important;
+    padding: 12px !important;
+  }
 }
 
 @keyframes tooltipFadeIn {

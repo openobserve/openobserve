@@ -17,7 +17,7 @@
 <template>
   <div>
     <div class="q-mb-sm" style="font-weight: 600">
-      <span>Color by series</span>
+      <span>{{ t("dashboard.colorBySeriesTitle") }}</span>
       <q-btn
         no-caps
         padding="xs"
@@ -33,8 +33,7 @@
           self="top middle"
           max-width="250px"
         >
-          Apply colors to series for better visual distinction in charts.
-          Customize colors for each series to enhance data visualization.
+          {{ t("dashboard.colorBySeriesTooltip") }}
         </q-tooltip>
       </q-btn>
     </div>
@@ -43,8 +42,8 @@
       style="cursor: pointer; padding: 0px 5px"
       :label="
         dashboardPanelData?.data?.config?.color?.colorBySeries?.length
-          ? ' Edit color by series'
-          : ' Apply color by series'
+          ? t('dashboard.editColorBySeries')
+          : t('dashboard.applyColorBySeries')
       "
       no-caps
       data-test="dashboard-addpanel-config-colorBySeries-add-btn"
@@ -66,6 +65,7 @@
 
 <script lang="ts">
 import { defineComponent, inject, ref, computed, onBeforeMount } from "vue";
+import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import ColorBySeriesPopUp from "./ColorBySeriesPopUp.vue";
@@ -79,6 +79,7 @@ export default defineComponent({
     },
   },
   setup(props) {
+    const { t } = useI18n();
     const store = useStore();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
@@ -139,6 +140,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       store,
       dashboardPanelData,
       // colorBySeries:
