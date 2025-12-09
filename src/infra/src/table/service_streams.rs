@@ -433,7 +433,8 @@ mod tests {
 
     #[test]
     fn test_merge_streams_json_logs_only_existing() {
-        let existing = r#"{"logs":[{"stream_name":"default","filters":{}}],"traces":[],"metrics":[]}"#;
+        let existing =
+            r#"{"logs":[{"stream_name":"default","filters":{}}],"traces":[],"metrics":[]}"#;
         let new = r#"{"logs":[],"traces":[],"metrics":[]}"#;
 
         let merged = merge_streams_json(existing, new);
@@ -458,7 +459,8 @@ mod tests {
     #[test]
     fn test_merge_streams_json_different_types() {
         // Simulates: Ingester 1 has logs, Ingester 2 has traces+metrics
-        let existing = r#"{"logs":[{"stream_name":"default","filters":{}}],"traces":[],"metrics":[]}"#;
+        let existing =
+            r#"{"logs":[{"stream_name":"default","filters":{}}],"traces":[],"metrics":[]}"#;
         let new = r#"{"logs":[],"traces":[{"stream_name":"default","filters":{}}],"metrics":[{"stream_name":"otel_metrics","filters":{}}]}"#;
 
         let merged = merge_streams_json(existing, new);
@@ -490,8 +492,10 @@ mod tests {
 
     #[test]
     fn test_merge_streams_json_multiple_streams_same_type() {
-        let existing = r#"{"logs":[{"stream_name":"app_logs","filters":{}}],"traces":[],"metrics":[]}"#;
-        let new = r#"{"logs":[{"stream_name":"system_logs","filters":{}}],"traces":[],"metrics":[]}"#;
+        let existing =
+            r#"{"logs":[{"stream_name":"app_logs","filters":{}}],"traces":[],"metrics":[]}"#;
+        let new =
+            r#"{"logs":[{"stream_name":"system_logs","filters":{}}],"traces":[],"metrics":[]}"#;
 
         let merged = merge_streams_json(existing, new);
         let parsed: serde_json::Value = serde_json::from_str(&merged).unwrap();

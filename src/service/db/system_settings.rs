@@ -173,16 +173,22 @@ pub async fn delete_org_settings(org_id: &str) -> Result<u64> {
         .await
         .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
 
-    // Clear org settings from cache and emit events for each deleted key
-    let mut cache = SYSTEM_SETTINGS.write().await;
-    let keys_to_remove: Vec<String> = cache
-        .iter()
-        .filter(|(k, _)| k.split(':').nth(1) == Some(org_id))
-        .map(|(k, _)| k.clone())
-        .collect();
+    // Clear org settings from cache, then emit events after releasing lock
+    let keys_to_remove: Vec<String> = {
+        let mut cache = SYSTEM_SETTINGS.write().await;
+        let keys: Vec<String> = cache
+            .iter()
+            .filter(|(k, _)| k.split(':').nth(1) == Some(org_id))
+            .map(|(k, _)| k.clone())
+            .collect();
+        for key in &keys {
+            cache.remove(key);
+        }
+        keys
+    }; // Lock released here
+
+    // Emit events without holding lock
     for key in &keys_to_remove {
-        cache.remove(key);
-        // Emit event to update cache on other cluster nodes
         let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, key);
         if let Err(e) = infra::coordinator::system_settings::emit_delete_event(&event_key).await {
             log::error!(
@@ -202,19 +208,25 @@ pub async fn delete_user_settings(org_id: &str, user_id: &str) -> Result<u64> {
         .await
         .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
 
-    // Clear user settings from cache and emit events for each deleted key
-    let mut cache = SYSTEM_SETTINGS.write().await;
-    let keys_to_remove: Vec<String> = cache
-        .iter()
-        .filter(|(k, _)| {
-            let parts: Vec<&str> = k.split(':').collect();
-            parts.len() >= 3 && parts[1] == org_id && parts[2] == user_id
-        })
-        .map(|(k, _)| k.clone())
-        .collect();
+    // Clear user settings from cache, then emit events after releasing lock
+    let keys_to_remove: Vec<String> = {
+        let mut cache = SYSTEM_SETTINGS.write().await;
+        let keys: Vec<String> = cache
+            .iter()
+            .filter(|(k, _)| {
+                let parts: Vec<&str> = k.split(':').collect();
+                parts.len() >= 3 && parts[1] == org_id && parts[2] == user_id
+            })
+            .map(|(k, _)| k.clone())
+            .collect();
+        for key in &keys {
+            cache.remove(key);
+        }
+        keys
+    }; // Lock released here
+
+    // Emit events without holding lock
     for key in &keys_to_remove {
-        cache.remove(key);
-        // Emit event to update cache on other cluster nodes
         let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, key);
         if let Err(e) = infra::coordinator::system_settings::emit_delete_event(&event_key).await {
             log::error!(
