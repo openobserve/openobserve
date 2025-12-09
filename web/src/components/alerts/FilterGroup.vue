@@ -59,6 +59,7 @@
             @remove-group="emit('remove-group', $event)"
             :stream-fields="props.streamFields"
             :condition-input-width="props.conditionInputWidth"
+            :allow-custom-columns="props.allowCustomColumns"
             @input:update="(name, field) => inputUpdate(name, field)"
           />
           <div
@@ -75,6 +76,7 @@
                 :depth="depth"
                 :input-width="props.conditionInputWidth"
                 :is-first-in-group="index === 0"
+                :allow-custom-columns="props.allowCustomColumns"
             />
             <div class="tw-mb-3">
                 <q-btn data-test="alert-conditions-delete-condition-btn" icon="close" size="10px" flat border-less @click="removeCondition(item.id)" />
@@ -183,6 +185,11 @@
         required: false,
     },
     isFirstGroup: {
+        type: Boolean,
+        default: false,
+        required: false,
+    },
+    allowCustomColumns: {
         type: Boolean,
         default: false,
         required: false,
