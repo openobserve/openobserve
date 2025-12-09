@@ -87,7 +87,7 @@ pub struct BackfillResponse {
 /// Creates a new backfill job to fill gaps in summary streams.
 #[utoipa::path(
     context_path = "/api",
-    tag = "Backfill",
+    tag = "Pipelines",
     operation_id = "CreateBackfillJob",
     security(("Authorization" = [])),
     params(
@@ -112,7 +112,7 @@ pub struct BackfillResponse {
         (status = 500, description = "Internal server error"),
     ),
 )]
-#[post("/{org_id}/backfill/pipelines/{pipeline_id}")]
+#[post("/{org_id}/pipelines/{pipeline_id}/backfill")]
 pub async fn create_backfill(
     path: web::Path<(String, String)>,
     req: web::Json<BackfillRequest>,
@@ -169,7 +169,7 @@ pub async fn create_backfill(
 /// Returns a list of all backfill jobs in the specified organization.
 #[utoipa::path(
     context_path = "/api",
-    tag = "Backfill",
+    tag = "Pipelines",
     operation_id = "ListBackfillJobs",
     security(("Authorization" = [])),
     params(
@@ -180,7 +180,7 @@ pub async fn create_backfill(
         (status = 500, description = "Internal server error"),
     ),
 )]
-#[get("/{org_id}/backfill/jobs")]
+#[get("/{org_id}/pipelines/backfill")]
 pub async fn list_backfills(
     path: web::Path<String>,
 ) -> Result<HttpResponse, actix_web::Error> {
@@ -210,7 +210,7 @@ pub async fn list_backfills(
 /// Returns the status of a specific backfill job.
 #[utoipa::path(
     context_path = "/api",
-    tag = "Backfill",
+    tag = "Pipelines",
     operation_id = "GetBackfillJob",
     security(("Authorization" = [])),
     params(
@@ -223,7 +223,7 @@ pub async fn list_backfills(
         (status = 500, description = "Internal server error"),
     ),
 )]
-#[get("/{org_id}/backfill/jobs/{job_id}")]
+#[get("/{org_id}/pipelines/backfill/{job_id}")]
 pub async fn get_backfill(
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse, actix_web::Error> {
@@ -254,7 +254,7 @@ pub async fn get_backfill(
 /// Cancels a running backfill job.
 #[utoipa::path(
     context_path = "/api",
-    tag = "Backfill",
+    tag = "Pipelines",
     operation_id = "CancelBackfillJob",
     security(("Authorization" = [])),
     params(
@@ -267,7 +267,7 @@ pub async fn get_backfill(
         (status = 500, description = "Internal server error"),
     ),
 )]
-#[delete("/{org_id}/backfill/jobs/{job_id}")]
+#[delete("/{org_id}/pipelines/backfill/{job_id}")]
 pub async fn cancel_backfill(
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse, actix_web::Error> {

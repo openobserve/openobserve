@@ -68,7 +68,7 @@ const backfill = {
     pipeline_id: string;
     data: CreateBackfillJobRequest;
   }): Promise<CreateBackfillJobResponse> => {
-    const url = `/api/${org_id}/backfill/pipelines/${pipeline_id}`;
+    const url = `/api/${org_id}/pipelines/${pipeline_id}/backfill`;
     const response = await http().post(url, data);
     return response.data;
   },
@@ -81,7 +81,7 @@ const backfill = {
   }: {
     org_id: string;
   }): Promise<BackfillJob[]> => {
-    const url = `/api/${org_id}/backfill/jobs`;
+    const url = `/api/${org_id}/pipelines/backfill`;
     const response = await http().get(url);
     return response.data;
   },
@@ -96,7 +96,7 @@ const backfill = {
     org_id: string;
     job_id: string;
   }): Promise<BackfillJob> => {
-    const url = `/api/${org_id}/backfill/jobs/${job_id}`;
+    const url = `/api/${org_id}/pipelines/backfill/${job_id}`;
     const response = await http().get(url);
     return response.data;
   },
@@ -111,7 +111,7 @@ const backfill = {
     org_id: string;
     job_id: string;
   }): Promise<CancelBackfillJobResponse> => {
-    const url = `/api/${org_id}/backfill/jobs/${job_id}`;
+    const url = `/api/${org_id}/pipelines/backfill/${job_id}`;
     const response = await http().delete(url);
     return response.data;
   },
