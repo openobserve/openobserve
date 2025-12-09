@@ -5,6 +5,7 @@ import { IngestionPage } from '../generalPages/ingestionPage.js';
 import { ManagementPage } from '../generalPages/managementPage.js';
 
 import { getHeaders, getIngestionUrl, sendRequest } from '../../utils/apiUtils.js';
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 export class StreamsPage {
     constructor(page) {
@@ -483,7 +484,7 @@ export class StreamsPage {
             }
         };
 
-        console.log(`Creating stream via API: ${streamName} (${streamType})`);
+        testLogger.info('Creating stream via API', { streamName, streamType });
 
         try {
             const response = await fetch(`${process.env.INGESTION_URL}/api/${orgId}/streams/${streamName}?type=${streamType}`, {
@@ -495,14 +496,14 @@ export class StreamsPage {
             const data = await response.json();
 
             if (response.status === 200 && data.code === 200) {
-                console.log(`Stream created successfully: ${streamName}`);
+                testLogger.info('Stream created successfully', { streamName });
             } else {
-                console.warn(`Stream creation returned non-200 or already exists: ${streamName}`, response.status);
+                testLogger.warn('Stream creation returned non-200 or already exists', { streamName, status: response.status });
             }
 
             return { status: response.status, data };
         } catch (error) {
-            console.error(`Failed to create stream: ${streamName}`, error.message);
+            testLogger.error('Failed to create stream', { streamName, error: error.message });
             return { status: 500, error: error.message };
         }
     }
@@ -527,14 +528,14 @@ export class StreamsPage {
 
             if (response.status === 200 && data.list) {
                 const streamExists = data.list.some(s => s.name === streamName);
-                console.log(`Stream existence check: ${streamName} - ${streamExists ? 'exists' : 'not found'}`);
+                testLogger.info('Stream existence check', { streamName, exists: streamExists });
                 return streamExists;
             }
 
-            console.warn(`Failed to check stream existence: ${streamName}`, response.status);
+            testLogger.warn('Failed to check stream existence', { streamName, status: response.status });
             return false;
         } catch (error) {
-            console.error(`Error checking stream existence: ${streamName}`, error.message);
+            testLogger.error('Error checking stream existence', { streamName, error: error.message });
             return false;
         }
     }
@@ -550,7 +551,7 @@ export class StreamsPage {
         const orgId = process.env["ORGNAME"];
         const headers = getHeaders();
 
-        console.log(`Querying stream via API: ${streamName}`);
+        testLogger.info('Querying stream via API', { streamName });
 
         // Query for last 10 minutes
         const endTime = Date.now() * 1000; // microseconds
@@ -576,7 +577,7 @@ export class StreamsPage {
             const data = await response.json();
             const results = data.hits || [];
 
-            console.log(`Query results for ${streamName}: ${results.length} records`);
+            testLogger.info('Query results', { streamName, recordCount: results.length });
 
             if (expectedMinCount !== null && expectedMinCount !== 0) {
                 if (results.length < expectedMinCount) {
@@ -586,7 +587,7 @@ export class StreamsPage {
 
             return results;
         } catch (error) {
-            console.error(`Failed to query stream: ${streamName}`, error.message);
+            testLogger.error('Failed to query stream', { streamName, error: error.message });
             throw error;
         }
     }
