@@ -363,6 +363,7 @@ name="warning" class="q-mr-xs" />
                     processedResults[`${cell.column.id}_${virtualRow.index}`]
                   "
                   :key="`${cell.column.id}_${virtualRow.index}`"
+                  :class="store.state.theme === 'dark' ? 'dark' : ''"
                   v-html="
                     processedResults[`${cell.column.id}_${virtualRow.index}`]
                   "

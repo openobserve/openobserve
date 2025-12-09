@@ -35,7 +35,10 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::{
     common::infra::cluster::get_cached_online_ingester_nodes,
     service::{
-        promql::utils::{apply_label_selector, apply_matchers},
+        promql::{
+            search::grpc::Context,
+            utils::{apply_label_selector, apply_matchers},
+        },
         search::{
             datafusion::{
                 distributed_plan::{
@@ -58,7 +61,7 @@ pub(crate) async fn create_context(
     time_range: (i64, i64),
     matchers: Matchers,
     label_selector: HashSet<String>,
-) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats)>> {
+) -> Result<Vec<Context>> {
     let mut resp = vec![];
     // fetch all schema versions, get latest schema
     let schema = Arc::new(
@@ -91,6 +94,7 @@ pub(crate) async fn create_context(
             SessionContext::new(),
             Arc::new(Schema::empty()),
             ScanStats::default(),
+            true,
         )]);
     }
 
@@ -107,7 +111,7 @@ pub(crate) async fn create_context(
     let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![batches])?);
     log::info!("[trace_id {trace_id}] promql->wal->search: register mem table done");
     ctx.register_table(stream_name, mem_table)?;
-    resp.push((ctx, schema, stats));
+    resp.push((ctx, schema, stats, true));
 
     Ok(resp)
 }

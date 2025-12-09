@@ -354,6 +354,8 @@ color="warning" size="xs"></q-icon> Error while
             ]
           "
           :stream-type="searchObj.data.stream.streamType"
+          :correlation-props="correlationDashboardProps"
+          :correlation-loading="correlationLoading"
           class="detail-table-dialog"
           :currentIndex="searchObj.meta.resultGrid.navigation.currentRowIndex"
           :totalLength="parseInt(searchObj.data.queryResults.hits.length)"
@@ -377,7 +379,7 @@ color="warning" size="xs"></q-icon> Error while
           "
           @sendToAiChat="sendToAiChat"
           @closeTable="closeTable"
-          @show-correlation="openCorrelationFromLog"
+          @load-correlation="openCorrelationFromLog"
         />
       </q-dialog>
 
@@ -409,9 +411,10 @@ color="warning" size="xs"></q-icon> Error while
       />
     </div>
 
-    <!-- Correlation Dashboard -->
+    <!-- Correlation Dashboard (for inline expanded logs, opens as separate dialog) -->
     <TelemetryCorrelationDashboard
-      v-if="showCorrelation && correlationDashboardProps"
+      v-if="shouldShowInlineDialog"
+      mode="dialog"
       :service-name="correlationDashboardProps.serviceName"
       :matched-dimensions="correlationDashboardProps.matchedDimensions"
       :metric-streams="correlationDashboardProps.metricStreams"
@@ -420,6 +423,7 @@ color="warning" size="xs"></q-icon> Error while
       :source-stream="correlationDashboardProps.sourceStream"
       :source-type="correlationDashboardProps.sourceType"
       :available-dimensions="correlationDashboardProps.availableDimensions"
+      :fts-fields="correlationDashboardProps.ftsFields"
       :time-range="correlationDashboardProps.timeRange"
       @close="showCorrelation = false"
     />
@@ -726,7 +730,20 @@ export default defineComponent({
     const showCorrelation = ref(false);
     const correlationContext = ref<TelemetryContext | null>(null);
     const correlationDashboardProps = ref<any>(null);
+    const correlationLoading = ref(false);
     const { findRelatedTelemetry } = useServiceCorrelation();
+
+    // Debug: computed to check why dialog isn't showing
+    const shouldShowInlineDialog = computed(() => {
+      const result = showCorrelation.value && correlationDashboardProps.value && !searchObj.meta.showDetailTab;
+      console.log("[SearchResult] shouldShowInlineDialog:", {
+        showCorrelation: showCorrelation.value,
+        hasProps: !!correlationDashboardProps.value,
+        showDetailTab: searchObj.meta.showDetailTab,
+        result
+      });
+      return result;
+    });
 
     const patternsColumns = [
       {
@@ -873,6 +890,8 @@ export default defineComponent({
       console.log("[SearchResult] Current stream:", searchObj.data.stream.selectedStream[0]);
 
       try {
+        correlationLoading.value = true;
+
         // Set the correlation context from the log data
         const context: TelemetryContext = {
           timestamp: logData._timestamp || Date.now() * 1000,
@@ -953,6 +972,11 @@ export default defineComponent({
           return;
         }
 
+        // Extract FTS fields from stream settings
+        const ftsFields = searchObj.data.stream.selectedStreamFields
+          ?.filter((field: any) => field.ftsKey === true)
+          .map((field: any) => field.name) || [];
+
         correlationDashboardProps.value = {
           serviceName: result.correlationData.service_name,
           matchedDimensions: result.correlationData.matched_dimensions,
@@ -962,14 +986,22 @@ export default defineComponent({
           sourceStream: searchObj.data.stream.selectedStream[0],
           sourceType: "logs",
           availableDimensions: context.fields, // Actual field names from the log record
+          ftsFields: ftsFields, // Full text search fields for trace_id extraction from log body
           timeRange: {
             startTime: startTimeMicros,
             endTime: endTimeMicros,
           },
         };
 
-        // Open the correlation dashboard
-        showCorrelation.value = true;
+        // For inline expanded logs, open the correlation dashboard as a dialog
+        // For DetailTable drawer, the data is passed via props (tabs are already visible)
+        console.log("[SearchResult] showDetailTab:", searchObj.meta.showDetailTab);
+        if (!searchObj.meta.showDetailTab) {
+          console.log("[SearchResult] Opening correlation dialog for inline expansion");
+          showCorrelation.value = true;
+        } else {
+          console.log("[SearchResult] DetailTable drawer is open, passing props to drawer tabs");
+        }
       } catch (err: any) {
         console.error("[SearchResult] Error in openCorrelationFromLog:", err);
         $q.notify({
@@ -977,6 +1009,9 @@ export default defineComponent({
           message: `Correlation error: ${err.message || err}`,
           timeout: 3000,
         });
+        correlationDashboardProps.value = null;
+      } finally {
+        correlationLoading.value = false;
       }
     };
 
@@ -1091,6 +1126,11 @@ export default defineComponent({
         Number(searchObj.meta.resultGrid.navigation.currentRowIndex),
       );
       searchObj.meta.resultGrid.navigation.currentRowIndex = newIndex;
+
+      // Clear correlation data when navigating to a different log
+      // User will need to click a correlation tab again for the new log
+      correlationDashboardProps.value = null;
+      correlationLoading.value = false;
     };
 
     const addSearchTerm = (
@@ -1370,6 +1410,8 @@ export default defineComponent({
       showCorrelation,
       correlationContext,
       correlationDashboardProps,
+      correlationLoading,
+      shouldShowInlineDialog,
       openCorrelationPanel,
       openCorrelationFromLog,
     };

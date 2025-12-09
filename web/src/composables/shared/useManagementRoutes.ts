@@ -141,7 +141,19 @@ const useManagementRoutes = () => {
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
-          
+
+        },
+        {
+          path: "correlation_settings",
+          name: "correlationSettings",
+          component: () => import("@/components/settings/CorrelationSettings.vue"),
+          meta: {
+            keepAlive: true,
+            title: "Correlation Settings",
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
         },
         {
           path: "license",

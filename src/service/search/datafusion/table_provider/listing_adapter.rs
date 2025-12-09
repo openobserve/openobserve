@@ -187,6 +187,7 @@ fn handler_tantivy_index(
             file_groups = new_file_groups;
         }
 
+        let start = std::time::Instant::now();
         let new_file_groups: Vec<_> = file_groups
             .into_par_iter()
             .map(|file_group| {
@@ -211,7 +212,8 @@ fn handler_tantivy_index(
         let files_nums = new_file_groups.iter().map(|g| g.len()).sum::<usize>();
 
         log::info!(
-            "[trace_id {trace_id}] parquet scan exec, file groups: {groups_len}, max group len: {max_group_len}, total files: {files_nums}",
+            "[trace_id {trace_id}] listing table adapter, file groups: {groups_len}, max group len: {max_group_len}, total files: {files_nums}, took: {} ms",
+            start.elapsed().as_millis() as usize,
         );
 
         let mut config = config.clone();

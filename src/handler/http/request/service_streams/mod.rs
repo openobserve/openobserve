@@ -183,9 +183,70 @@ pub struct CorrelationRequest {
     pub available_dimensions: std::collections::HashMap<String, String>,
 }
 
+/// GET /api/{org_id}/service_streams/_grouped
+///
+/// Get services grouped by their Fully Qualified Name (FQN)
+///
+/// This endpoint is used by the Correlation Settings UI to display
+/// which services are correlated together via their shared FQN.
+///
+/// Response includes:
+/// - Services grouped by FQN
+/// - Each group shows which services share the FQN
+/// - Stream counts per group (logs/traces/metrics)
+/// - Whether each group has full telemetry coverage
+#[utoipa::path(
+    get,
+    path = "/{org_id}/service_streams/_grouped",
+    tag = "Service Streams",
+    params(
+        ("org_id" = String, Path, description = "Organization ID")
+    ),
+    responses(
+        (status = 200, description = "Services grouped by FQN", body = GroupedServicesResponse),
+        (status = 401, description = "Unauthorized - Authentication required"),
+        (status = 403, description = "Forbidden - Enterprise feature"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("Authorization" = [])
+    )
+)]
+#[get("/{org_id}/service_streams/_grouped")]
+pub async fn get_services_grouped(
+    org_id: web::Path<String>,
+    Headers(_user_email): Headers<UserEmail>, // Require authentication
+) -> Result<HttpResponse, Error> {
+    let org_id = org_id.into_inner();
+
+    #[cfg(feature = "enterprise")]
+    {
+        match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::list_grouped_by_fqn(&org_id)
+            .await
+        {
+            Ok(response) => Ok(MetaHttpResponse::json(response)),
+            Err(e) => Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                    500u16,
+                    format!("Failed to get grouped services: {}", e),
+                )),
+            ),
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+            403u16,
+            "Service Discovery is an enterprise-only feature".to_string(),
+        )))
+    }
+}
+
 // Re-export shared types from config for API documentation (utoipa)
 // These types are the same for both enterprise and non-enterprise builds
 pub use config::meta::service_streams::{
     CardinalityClass, CorrelationResponse, DimensionAnalytics, DimensionAnalyticsSummary,
-    RelatedStreams, StreamInfo,
+    GroupedServicesResponse, RelatedStreams, ServiceFqnGroup, ServiceInGroup, ServiceStreams,
+    StreamInfo, StreamSummary,
 };

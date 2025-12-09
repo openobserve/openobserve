@@ -487,7 +487,12 @@ async fn write_logs(
                         triggers.push((alert.clone(), trigger_results.data.unwrap()));
                         evaluated_alerts.insert(key);
                     }
-                    _ => {}
+                    Ok(_) => {
+                        // the data doesn't satisfy the alert condition
+                    }
+                    Err(e) => {
+                        log::error!("[LOGS] Error while evaluating realtime alert: {e}");
+                    }
                 }
             }
         }
@@ -578,7 +583,9 @@ async fn write_logs(
     }
 
     // only one trigger per request
-    evaluate_trigger(triggers).await;
+    if !triggers.is_empty() {
+        tokio::spawn(async move { evaluate_trigger(triggers).await });
+    }
 
     Ok(req_stats)
 }
