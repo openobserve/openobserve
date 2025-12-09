@@ -566,7 +566,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <!-- here we will render the number of regex patterns associated with the specific field -->
                   <template v-slot:body-cell-patterns="props">
-                    <q-td v-if="!(props.row.name == store.state.zoConfig.timestamp_column) && (props.row.type == 'Utf8' || props.row.type == 'utf8')" class="field-name text-left tw-text-[#5960B2] tw-cursor-pointer " style="padding-left: 12px !important;" @click="openPatternAssociationDialog(props.row.name)">
+                    <q-td v-if="config.isEnterprise == 'true' && !(props.row.name == store.state.zoConfig.timestamp_column) && (props.row.type == 'Utf8' || props.row.type == 'utf8')" class="field-name text-left tw-text-[#5960B2] tw-cursor-pointer " style="padding-left: 12px !important;" @click="openPatternAssociationDialog(props.row.name)">
                       {{ patternAssociations[props.row.name]?.length ? `View ${patternAssociations[props.row.name]?.length} Patterns` : 'Add Pattern' }}
                       <span>
                         <q-icon name="arrow_forward" size="xs" />
@@ -1847,12 +1847,13 @@ export default defineComponent({
         align: "left",
         sortable: false,
       },
-      {
+      // Only show patterns column for enterprise builds
+      ...(config.isEnterprise == 'true' ? [{
         name: "patterns",
         label: t("logStream.regexPatterns"),
         align: "left",
         sortable: false,
-      },
+      }] : []),
     ];
 
     const redBtnColumns = [
