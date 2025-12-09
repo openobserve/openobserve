@@ -143,12 +143,18 @@ pub async fn correlate_streams(
         let fqn_priority =
             crate::service::db::system_settings::get_fqn_priority_dimensions(&org_id).await;
 
+        // Get semantic field groups - MUST use same source as UI to ensure consistency
+        // This resolves org-level custom groups or falls back to enterprise defaults
+        let semantic_groups =
+            crate::service::db::system_settings::get_semantic_field_groups(&org_id).await;
+
         match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::correlate(
             &org_id,
             &req.source_stream,
             &req.source_type,
             &req.available_dimensions,
             &fqn_priority,
+            &semantic_groups,
         )
         .await
         {
