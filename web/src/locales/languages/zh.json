@@ -2133,7 +2133,14 @@
     "functionName": "函数名称'",
     "timezone": "时区",
     "pipelineCreation": "管道创建",
-    "loadingConditions": "加载条件"
+    "loadingConditions": "加载条件",
+    "condition": {
+      "valueGuidelines": "价值指南",
+      "emptyValueHelp": "要检查空字符串，请使用",
+      "nullValueHelp": "要检查空值，请使用",
+      "recordDropped": "如果条件不满足，记录将被删除。",
+      "fieldNotFound": "如果记录没有指定字段，则会将其删除。"
+    }
   },
   "reports": {
     "header": "报表",

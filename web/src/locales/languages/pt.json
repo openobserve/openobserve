@@ -2137,7 +2137,14 @@
     "functionName": "Nome da função'",
     "timezone": "Fuso horário",
     "pipelineCreation": "Criação de pipeline",
-    "loadingConditions": "Condições de carregamento"
+    "loadingConditions": "Condições de carregamento",
+    "condition": {
+      "valueGuidelines": "Diretrizes de valor",
+      "emptyValueHelp": "Para verificações de cadeias de caracteres vazias, use",
+      "nullValueHelp": "Para verificações de valor nulo, use",
+      "recordDropped": "Se as condições não forem atendidas, o registro será descartado.",
+      "fieldNotFound": "Se o registro não tiver o campo especificado, ele será descartado."
+    }
   },
   "reports": {
     "header": "Relatórios",

@@ -2137,7 +2137,14 @@
     "functionName": "함수 이름'",
     "timezone": "타임존",
     "pipelineCreation": "파이프라인 생성",
-    "loadingConditions": "적재 조건"
+    "loadingConditions": "적재 조건",
+    "condition": {
+      "valueGuidelines": "가치 가이드라인",
+      "emptyValueHelp": "빈 문자열 검사의 경우 다음을 사용하십시오.",
+      "nullValueHelp": "null 값 검사의 경우 다음을 사용하십시오.",
+      "recordDropped": "조건이 충족되지 않으면 레코드가 삭제됩니다.",
+      "fieldNotFound": "레코드에 지정된 필드가 없는 경우 레코드는 삭제됩니다."
+    }
   },
   "reports": {
     "header": "보고서",

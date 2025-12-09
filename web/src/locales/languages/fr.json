@@ -2137,7 +2137,14 @@
     "functionName": "Nom de la fonction '",
     "timezone": "Fuseau horaire",
     "pipelineCreation": "Création d'un pipeline",
-    "loadingConditions": "Conditions de chargement"
+    "loadingConditions": "Conditions de chargement",
+    "condition": {
+      "valueGuidelines": "Directives relatives aux valeurs",
+      "emptyValueHelp": "Pour vérifier les chaînes vides, utilisez",
+      "nullValueHelp": "Pour les vérifications de valeurs nulles, utilisez",
+      "recordDropped": "Si les conditions ne sont pas remplies, l'enregistrement sera supprimé.",
+      "fieldNotFound": "Si l'enregistrement ne possède pas le champ spécifié, il sera supprimé."
+    }
   },
   "reports": {
     "header": "Rapports",

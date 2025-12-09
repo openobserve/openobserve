@@ -2151,7 +2151,14 @@
     "functionName": "関数名'",
     "timezone": "タイムゾーン",
     "pipelineCreation": "パイプライン作成",
-    "loadingConditions": "ロード条件"
+    "loadingConditions": "ロード条件",
+    "condition": {
+      "valueGuidelines": "バリューガイドライン",
+      "emptyValueHelp": "空の文字列チェックには、",
+      "nullValueHelp": "NULL 値チェックには、",
+      "recordDropped": "条件が満たされない場合、レコードは削除されます。",
+      "fieldNotFound": "レコードに指定されたフィールドがない場合、そのレコードは削除されます。"
+    }
   },
   "reports": {
     "header": "レポート",

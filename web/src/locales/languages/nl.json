@@ -2137,7 +2137,14 @@
     "functionName": "'Functienaam'",
     "timezone": "Tijdzone",
     "pipelineCreation": "Creatie van pijpleidingen",
-    "loadingConditions": "Voorwaarden voor het laden"
+    "loadingConditions": "Voorwaarden voor het laden",
+    "condition": {
+      "valueGuidelines": "Richtlijnen voor waarden",
+      "emptyValueHelp": "Gebruik voor controles van lege tekenreeksen",
+      "nullValueHelp": "Gebruik voor controles van nulwaarden",
+      "recordDropped": "Als niet aan de voorwaarden wordt voldaan, wordt het record verwijderd.",
+      "fieldNotFound": "Als het record niet het opgegeven veld bevat, wordt het verwijderd."
+    }
   },
   "reports": {
     "header": "Rapporten",

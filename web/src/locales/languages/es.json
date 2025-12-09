@@ -2137,7 +2137,14 @@
     "functionName": "Nombre de la función'",
     "timezone": "Zona horaria",
     "pipelineCreation": "Creación de oleoductos",
-    "loadingConditions": "Condiciones de carga"
+    "loadingConditions": "Condiciones de carga",
+    "condition": {
+      "valueGuidelines": "Pautas de valor",
+      "emptyValueHelp": "Para comprobar cadenas vacías, utilice",
+      "nullValueHelp": "Para las comprobaciones de valores nulos, utilice",
+      "recordDropped": "Si no se cumplen las condiciones, se eliminará el registro.",
+      "fieldNotFound": "Si el registro no tiene el campo especificado, se eliminará."
+    }
   },
   "reports": {
     "header": "Informes",

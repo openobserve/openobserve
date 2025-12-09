@@ -2137,7 +2137,14 @@
     "functionName": "İşlev Adı'",
     "timezone": "Saat dilimi",
     "pipelineCreation": "Boru Hattı Oluşturma",
-    "loadingConditions": "Yükleme koşulları"
+    "loadingConditions": "Yükleme koşulları",
+    "condition": {
+      "valueGuidelines": "Değer Yönergeleri",
+      "emptyValueHelp": "Boş dize denetimleri için kullanın",
+      "nullValueHelp": "Boş değer denetimleri için kullanın",
+      "recordDropped": "Koşullar karşılanmazsa, kayıt düşürülür.",
+      "fieldNotFound": "Kayıt belirtilen alana sahip değilse, bırakılır."
+    }
   },
   "reports": {
     "header": "Raporlar",

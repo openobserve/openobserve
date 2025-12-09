@@ -2137,7 +2137,14 @@
     "functionName": "Name der Funktion",
     "timezone": "Zeitzone",
     "pipelineCreation": "Pipeline-Erstellung",
-    "loadingConditions": "Ladebedingungen"
+    "loadingConditions": "Ladebedingungen",
+    "condition": {
+      "valueGuidelines": "Wertrichtlinien",
+      "emptyValueHelp": "Für Prüfungen leerer Zeichenketten verwenden Sie",
+      "nullValueHelp": "Verwenden Sie für Nullwertprüfungen",
+      "recordDropped": "Wenn die Bedingungen nicht erfüllt sind, wird der Datensatz gelöscht.",
+      "fieldNotFound": "Wenn der Datensatz das angegebene Feld nicht enthält, wird es gelöscht."
+    }
   },
   "reports": {
     "header": "Berichte",
