@@ -750,9 +750,7 @@ export default defineComponent({
       if (store.state.refreshIntervalID)
         clearInterval(store.state.refreshIntervalID);
 
-      if (config.isEnterprise === "true") {
-        cancelQuery();
-      }
+      cancelQuery();
 
       removeAiContextHandler();
       cleanupContextProvider();
