@@ -351,6 +351,7 @@ pub async fn search_http2_stream(
                 stream_type.as_str(),
                 stream_name,
                 "PUT",
+                "",
             )
             .await
             {

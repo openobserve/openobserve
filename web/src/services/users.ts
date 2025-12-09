@@ -44,6 +44,9 @@ const users = {
   delete: (org_identifier: string, user_email: string) => {
     return http().delete(`/api/${org_identifier}/users/${user_email}`);
   },
+  bulkDelete: (org_identifier: string, data: any) => {
+    return http().delete(`/api/${org_identifier}/users/bulk`, { data });
+  },
   verifyUser: (email: string) => {
     return http().get(`/api/users/verifyuser/${email}`);
   },

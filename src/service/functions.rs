@@ -43,10 +43,15 @@ use crate::{
 
 const FN_SUCCESS: &str = "Function saved successfully";
 const FN_NOT_FOUND: &str = "Function not found";
-const FN_DELETED: &str = "Function deleted";
 const FN_ALREADY_EXIST: &str = "Function already exist";
 const FN_IN_USE: &str =
     "Function is associated with streams, please remove association from streams before deleting:";
+
+pub enum FunctionDeleteError {
+    NotFound,
+    FunctionInUse(String),
+    PipelineDependencies(String),
+}
 
 pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpResponse, Error> {
     if let Some(_existing_fn) = check_existing_fn(&org_id, &func.name).await {
@@ -264,12 +269,11 @@ pub async fn list_functions(
     }
 }
 
-pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResponse, Error> {
-    let existing_fn = match check_existing_fn(&org_id, &fn_name).await {
+pub async fn delete_function(org_id: &str, fn_name: &str) -> Result<(), FunctionDeleteError> {
+    let existing_fn = match check_existing_fn(org_id, &fn_name).await {
         Some(function) => function,
         None => {
-            return Ok(HttpResponse::NotFound()
-                .json(MetaHttpResponse::error(StatusCode::NOT_FOUND, FN_NOT_FOUND)));
+            return Err(FunctionDeleteError::NotFound);
         }
     };
     // TODO(taiming): Function Stream Association to be deprecated starting v0.13.1.
@@ -289,37 +293,28 @@ pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResp
             .collect::<Vec<_>>()
             .join(", ");
         if !names.is_empty() {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                StatusCode::BAD_REQUEST,
-                format!("{FN_IN_USE} {names}"),
+            return Err(FunctionDeleteError::FunctionInUse(format!(
+                "{FN_IN_USE} {names}"
             )));
         }
     }
-    let pipeline_dep = get_dependencies(&org_id, &fn_name).await;
+    let pipeline_dep = get_dependencies(org_id, &fn_name).await;
     if !pipeline_dep.is_empty() {
         let pipeline_data = serde_json::to_string(&pipeline_dep).unwrap_or("[]".to_string());
-        return Ok(HttpResponse::Conflict().json(MetaHttpResponse::error(
-            http::StatusCode::CONFLICT,
-            format!(
-                "Warning: Function '{}' has {} pipeline dependencies. Please remove these pipelines first: {}",
-                fn_name,
-                pipeline_dep.len(),
-                pipeline_data
-            ),
+        return Err(FunctionDeleteError::PipelineDependencies(format!(
+            "Warning: Function '{}' has {} pipeline dependencies. Please remove these pipelines first: {}",
+            fn_name,
+            pipeline_dep.len(),
+            pipeline_data
         )));
     }
-    let result = db::functions::delete(&org_id, &fn_name).await;
+    let result = db::functions::delete(org_id, &fn_name).await;
     match result {
         Ok(_) => {
             remove_ownership(&org_id, "functions", Authz::new(&fn_name)).await;
-
-            Ok(
-                HttpResponse::Ok()
-                    .json(MetaHttpResponse::message(http::StatusCode::OK, FN_DELETED)),
-            )
+            Ok(())
         }
-        Err(_) => Ok(HttpResponse::NotFound()
-            .json(MetaHttpResponse::error(StatusCode::NOT_FOUND, FN_NOT_FOUND))),
+        Err(_) => Err(FunctionDeleteError::NotFound),
     }
 }
 
@@ -408,17 +403,13 @@ mod tests {
 
         assert_eq!(trans.num_args, 1);
 
-        let res = save_function("nexus".to_owned(), trans).await;
+        let res = save_function("nexus".to_string(), trans).await;
         assert!(res.is_ok());
 
         let list_resp = list_functions("nexus".to_string(), None).await;
         assert!(list_resp.is_ok());
 
-        assert!(
-            delete_function("nexus".to_string(), "dummyfn".to_owned())
-                .await
-                .is_ok()
-        );
+        assert!(delete_function("nexus", "dummyfn").await.is_ok());
     }
 
     #[tokio::test]
