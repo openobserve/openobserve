@@ -385,7 +385,8 @@ const originalStreamRouting: Ref<StreamRoute> = ref(getDefaultStreamRoute());
 
 const conditionGroup: Ref<ConditionGroup> = ref(getDefaultConditionGroup());
 
-const originalConditionGroup: Ref<ConditionGroup> = ref(getDefaultConditionGroup());
+// Create a deep copy to preserve the original state for comparison
+const originalConditionGroup: Ref<ConditionGroup> = ref(JSON.parse(JSON.stringify(getDefaultConditionGroup())));
 
 // Simple incrementing key to force re-render when needed
 const filterGroupKey = ref(0);
