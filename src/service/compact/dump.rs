@@ -349,7 +349,7 @@ pub async fn delete_by_time_range(
     stream_type: StreamType,
     stream_name: &str,
     range: (i64, i64),
-    is_daily: bool,
+    is_hourly: bool,
 ) -> Result<(), errors::Error> {
     let cfg = get_config();
     if !cfg.compact.file_list_dump_enabled {
@@ -362,14 +362,13 @@ pub async fn delete_by_time_range(
     if list.is_empty() {
         return Ok(());
     }
-    if is_daily {
-        if let Err(e) = delete_daily_inner(org_id, list, range).await {
-            log::error!("[FILE_LIST_DUMP] delete_daily_inner failed: {e}");
+    if is_hourly {
+        if let Err(e) = delete_hourly_inner(org_id, stream_type, stream_name, list, range).await {
+            log::error!("[FILE_LIST_DUMP] delete_hourly_inner failed: {e}");
             return Err(e);
         }
-    } else if let Err(e) = delete_hourly_inner(org_id, stream_type, stream_name, list, range).await
-    {
-        log::error!("[FILE_LIST_DUMP] delete_hourly_inner failed: {e}");
+    } else if let Err(e) = delete_daily_inner(org_id, list, range).await {
+        log::error!("[FILE_LIST_DUMP] delete_daily_inner failed: {e}");
         return Err(e);
     }
     Ok(())

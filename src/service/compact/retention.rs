@@ -352,8 +352,8 @@ pub async fn delete_by_date(
         return handle_delete_by_date_done(org_id, stream_type, stream_name, date_range).await;
     }
 
-    let is_daily = date_range.0.ends_with("00Z") || date_range.1.ends_with("00Z");
-    let mut date_start = if is_daily {
+    let is_hourly = date_range.0.ends_with("00Z") || date_range.1.ends_with("00Z");
+    let mut date_start = if is_hourly {
         DateTime::parse_from_rfc3339(date_range.0)?.with_timezone(&Utc)
     } else {
         DateTime::parse_from_rfc3339(&format!("{}T00:00:00Z", date_range.0))?.with_timezone(&Utc)
@@ -362,7 +362,7 @@ pub async fn delete_by_date(
     if date_range.0.starts_with("1970-01-01") {
         date_start += Duration::try_milliseconds(1).unwrap();
     }
-    let date_end = if is_daily {
+    let date_end = if is_hourly {
         DateTime::parse_from_rfc3339(date_range.1)?.with_timezone(&Utc)
     } else {
         DateTime::parse_from_rfc3339(&format!("{}T00:00:00Z", date_range.1))?.with_timezone(&Utc)
@@ -408,7 +408,7 @@ pub async fn delete_by_date(
         stream_type,
         stream_name,
         (date_start.timestamp_micros(), date_end.timestamp_micros()),
-        is_daily,
+        is_hourly,
     )
     .await
     .map_err(|e| {
