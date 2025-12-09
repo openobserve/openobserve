@@ -93,7 +93,7 @@ test.describe("Pipeline Conditions - Data Filtering Validation", () => {
    * 4. city!='Boston', state!='CA', age>=50 → FAIL (no matches)
    */
   test.skip("should validate operator precedence: A OR B AND C", {
-    tag: ['@validation', '@precedence', '@phase1']
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@pipelinesOperatorPrecedence']
   }, async ({ page }) => {
     const testTimestamp = Date.now();
     const pipelineName = `validation-precedence-${testTimestamp}`;
@@ -283,7 +283,7 @@ test.describe("Pipeline Conditions - Data Filtering Validation", () => {
    * 6. city='Miami' → FAIL (not in OR list)
    */
   test.skip("should validate multiple flat OR conditions", {
-    tag: ['@validation', '@or', '@phase1']
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@pipelinesMultipleOR']
   }, async ({ page }) => {
     const testTimestamp = Date.now();
     const pipelineName = `validation-multiple-or-${testTimestamp}`;
@@ -428,7 +428,7 @@ test.describe("Pipeline Conditions - Data Filtering Validation", () => {
    * 4. income<150000, age>30, state='TX' → FAIL (no matches)
    */
   test.skip("should validate nested groups with OR logic", {
-    tag: ['@validation', '@nested', '@phase1']
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@pipelinesNestedOR']
   }, async ({ page }) => {
     const testTimestamp = Date.now();
     const pipelineName = `validation-nested-or-${testTimestamp}`;
@@ -565,7 +565,7 @@ test.describe("Pipeline Conditions - Data Filtering Validation", () => {
    * 4. age=73, income=88000 → PASS
    */
   test("should validate numeric comparisons", {
-    tag: ['@validation', '@numeric', '@phase1']
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@pipelinesNumericComparisons']
   }, async ({ page }) => {
     const testTimestamp = Date.now();
     const pipelineName = `validation-numeric-${testTimestamp}`;
@@ -680,7 +680,7 @@ test.describe("Pipeline Conditions - Data Filtering Validation", () => {
    * 6. age=65, state='CA', income=100000 → FAIL (age > 60)
    */
   test("should validate multiple AND conditions", {
-    tag: ['@validation', '@and', '@phase1']
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@pipelinesMultipleAND']
   }, async ({ page }) => {
     const testTimestamp = Date.now();
     const pipelineName = `validation-multiple-and-${testTimestamp}`;
@@ -816,7 +816,7 @@ test.describe("Pipeline Conditions - Data Filtering Validation", () => {
    * This tests 3-level nesting with mixed AND/OR logic
    */
   test("should validate deeply nested groups (3 levels)", {
-    tag: ['@validation', '@nested', '@deep', '@phase1']
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@pipelinesDeepNested']
   }, async ({ page }) => {
     const testTimestamp = Date.now();
     const pipelineName = `validation-deep-nested-${testTimestamp}`;
@@ -950,7 +950,7 @@ test.describe("Pipeline Conditions - Data Filtering Validation", () => {
    * 5. city='Miami', age=60 → PASS (city not Boston, age >= 40)
    */
   test("should validate NOT operator (!=)", {
-    tag: ['@validation', '@not', '@phase1']
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@pipelinesNotOperator']
   }, async ({ page }) => {
     const testTimestamp = Date.now();
     const pipelineName = `validation-not-operator-${testTimestamp}`;
@@ -1072,7 +1072,7 @@ test.describe("Pipeline Conditions - Data Filtering Validation", () => {
    * Expected: 0 records should pass
    */
   test("should validate negative test with impossible condition", {
-    tag: ['@validation', '@negative', '@phase1']
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@pipelinesImpossibleCondition']
   }, async ({ page }) => {
     const testTimestamp = Date.now();
     const pipelineName = `validation-impossible-${testTimestamp}`;
@@ -1174,7 +1174,7 @@ test.describe("Pipeline Conditions - Data Filtering Validation", () => {
    * Expected: All 5 records should pass
    */
   test("should validate universal condition where all records pass", {
-    tag: ['@validation', '@universal', '@phase1']
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@pipelinesUniversalCondition']
   }, async ({ page }) => {
     const testTimestamp = Date.now();
     const pipelineName = `validation-universal-${testTimestamp}`;
@@ -1291,7 +1291,7 @@ test.describe("Pipeline Conditions - Data Filtering Validation", () => {
    * 6. income=95000, state='CA', city='San Jose', age=50 → PASS (all match)
    */
   test("should validate maximum nesting depth", {
-    tag: ['@validation', '@complex', '@phase1']
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@pipelinesConditionsMaxDepth']
   }, async ({ page }) => {
     const testTimestamp = Date.now();
     const pipelineName = `validation-4level-${testTimestamp}`;
