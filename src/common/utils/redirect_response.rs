@@ -143,15 +143,12 @@ mod tests {
     fn test_redirect_with_short_url() {
         // Build a RedirectResponse with a short_url query parameter
         let redirect_response = RedirectResponseBuilder::new("/web")
-            .with_query_param(
-                "redirect_url",
-                "http://localhost:5080/api/default/short/1234",
-            )
+            .with_query_param("short_url", "http://localhost:5080/api/default/short/1234")
             .build();
 
         // Check if the constructed URI is correct (URL-encoded)
         let expected_uri =
-            "/web?redirect_url=http%3A%2F%2Flocalhost%3A5080%2Fapi%2Fdefault%2Fshort%2F1234";
+            "/web?short_url=http%3A%2F%2Flocalhost%3A5080%2Fapi%2Fdefault%2Fshort%2F1234";
         assert_eq!(redirect_response.build_full_redirect_uri(), expected_uri);
 
         // Check if the HTTP response contains the correct "Location" header
@@ -179,17 +176,14 @@ mod tests {
     fn test_redirect_with_multiple_query_params() {
         // Build a RedirectResponse with multiple query parameters
         let redirect_response = RedirectResponseBuilder::new("/web")
-            .with_query_param(
-                "redirect_url",
-                "http://localhost:5080/api/default/short/1234",
-            )
+            .with_query_param("short_url", "http://localhost:5080/api/default/short/1234")
             .with_query_param("user_id", "42")
             .build();
 
         // Check if the constructed URI is correct with multiple query parameters (URL-encoded)
         // Note: HashMap iteration order is not guaranteed, so we check both possible orders
-        let expected_uri_1 = "/web?redirect_url=http%3A%2F%2Flocalhost%3A5080%2Fapi%2Fdefault%2Fshort%2F1234&user_id=42";
-        let expected_uri_2 = "/web?user_id=42&redirect_url=http%3A%2F%2Flocalhost%3A5080%2Fapi%2Fdefault%2Fshort%2F1234";
+        let expected_uri_1 = "/web?short_url=http%3A%2F%2Flocalhost%3A5080%2Fapi%2Fdefault%2Fshort%2F1234&user_id=42";
+        let expected_uri_2 = "/web?user_id=42&short_url=http%3A%2F%2Flocalhost%3A5080%2Fapi%2Fdefault%2Fshort%2F1234";
         assert!(
             redirect_response.build_full_redirect_uri() == expected_uri_1
                 || redirect_response.build_full_redirect_uri() == expected_uri_2

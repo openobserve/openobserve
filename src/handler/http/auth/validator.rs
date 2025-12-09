@@ -1061,7 +1061,7 @@ fn handle_auth_failure_for_redirect(req: ServiceRequest, error: &Error) -> (Erro
     let redirect_path = req.path();
 
     let redirect_http = RedirectResponseBuilder::default()
-        .with_query_param("redirect_url", redirect_path)
+        .with_query_param("short_url", redirect_path)
         .build();
     log::warn!(
         "Authentication failed for path: {}, err: {}, {}",
@@ -1073,6 +1073,7 @@ fn handle_auth_failure_for_redirect(req: ServiceRequest, error: &Error) -> (Erro
 }
 
 /// Extracts the full URL from the request.
+#[allow(dead_code)]
 fn extract_full_url(req: &ServiceRequest) -> String {
     let connection_info = req.connection_info();
     let scheme = connection_info.scheme();
@@ -1380,10 +1381,10 @@ mod tests {
 
         // Test that the function handles errors properly
         let (redirect_error, _) = handle_auth_failure_for_redirect(req, &error);
-        // The error should be a redirect response with redirect_url parameter
+        // The error should be a redirect response with short_url parameter
         let error_str = redirect_error.to_string();
         assert!(!error_str.is_empty());
-        assert!(error_str.contains("redirect_url"));
+        assert!(error_str.contains("short_url"));
     }
 
     #[test]
