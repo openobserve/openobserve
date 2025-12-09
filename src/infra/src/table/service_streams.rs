@@ -163,7 +163,7 @@ pub async fn put(record: ServiceRecord) -> Result<(), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     let service_name_for_log = record.service_name.clone();
-    log::info!(
+    log::debug!(
         "[SERVICE_STREAMS] put () called for org={} service={} correlation_key={} incoming_streams={}",
         record.org_id,
         service_name_for_log,
@@ -181,7 +181,7 @@ pub async fn put(record: ServiceRecord) -> Result<(), errors::Error> {
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
     if let Some(existing_record) = existing {
-        log::info!(
+        log::debug!(
             "[SERVICE_STREAMS] Found existing record for service={} existing_streams={}",
             service_name_for_log,
             existing_record.streams
@@ -191,7 +191,7 @@ pub async fn put(record: ServiceRecord) -> Result<(), errors::Error> {
         // between multiple ingesters processing different telemetry types
         let merged_streams = merge_streams_json(&existing_record.streams, &record.streams);
 
-        log::info!(
+        log::debug!(
             "[SERVICE_STREAMS_MERGE] service={}: existing={} + incoming={} => merged={}",
             service_name_for_log,
             existing_record.streams,
@@ -219,12 +219,12 @@ pub async fn put(record: ServiceRecord) -> Result<(), errors::Error> {
             .await
             .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
-        log::info!(
+        log::debug!(
             "[SERVICE_STREAMS] Updated service={} successfully",
             service_name_for_log
         );
     } else {
-        log::info!(
+        log::debug!(
             "[SERVICE_STREAMS] INSERT new service={} correlation_key={} streams={}",
             service_name_for_log,
             record.correlation_key,
