@@ -153,6 +153,11 @@ pub async fn create_table() -> Result<(), errors::Error> {
 }
 
 /// Add or update a service (upsert)
+///
+/// IMPORTANT: When updating an existing record, streams are MERGED (not overwritten)
+/// to prevent race conditions between multiple ingesters. This ensures that logs
+/// discovered by one ingester are not lost when another ingester updates the same
+/// service with traces/metrics.
 pub async fn put(record: ServiceRecord) -> Result<(), errors::Error> {
     let _lock = get_lock().await;
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
@@ -167,15 +172,23 @@ pub async fn put(record: ServiceRecord) -> Result<(), errors::Error> {
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
     if let Some(existing_record) = existing {
-        // Update existing record
+        // MERGE streams instead of overwriting to prevent race conditions
+        // between multiple ingesters processing different telemetry types
+        let merged_streams = merge_streams_json(&existing_record.streams, &record.streams);
+
+        // Keep the earliest first_seen and latest last_seen
+        let first_seen = existing_record.first_seen.min(record.first_seen);
+        let last_seen = existing_record.last_seen.max(record.last_seen);
+
+        // Update existing record with merged streams
         let mut active_model: ActiveModel = existing_record.into();
         active_model.service_key = Set(record.service_key);
         active_model.correlation_key = Set(record.correlation_key);
         active_model.service_name = Set(record.service_name);
         active_model.dimensions = Set(record.dimensions);
-        active_model.streams = Set(record.streams);
-        active_model.first_seen = Set(record.first_seen);
-        active_model.last_seen = Set(record.last_seen);
+        active_model.streams = Set(merged_streams);
+        active_model.first_seen = Set(first_seen);
+        active_model.last_seen = Set(last_seen);
         active_model.metadata = Set(record.metadata);
 
         active_model
@@ -205,6 +218,80 @@ pub async fn put(record: ServiceRecord) -> Result<(), errors::Error> {
     }
 
     Ok(())
+}
+
+/// Merge two streams JSON objects, combining logs/traces/metrics arrays
+///
+/// This prevents race conditions where one ingester overwrites streams
+/// discovered by another ingester. The merge is a union operation - all
+/// unique streams from both sources are preserved.
+fn merge_streams_json(existing_json: &str, new_json: &str) -> String {
+    use std::collections::HashSet;
+
+    // Parse both JSON strings
+    let existing: serde_json::Value = serde_json::from_str(existing_json).unwrap_or_default();
+    let new: serde_json::Value = serde_json::from_str(new_json).unwrap_or_default();
+
+    // Helper to merge arrays as sets (by stream_name to deduplicate)
+    let merge_array =
+        |existing_arr: &serde_json::Value, new_arr: &serde_json::Value| -> Vec<serde_json::Value> {
+            let mut seen: HashSet<String> = HashSet::new();
+            let mut result: Vec<serde_json::Value> = Vec::new();
+
+            // Add all existing streams
+            if let Some(arr) = existing_arr.as_array() {
+                for item in arr {
+                    // Use stream_name as dedup key, or serialize the whole object
+                    let key = item
+                        .get("stream_name")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| item.to_string());
+                    if seen.insert(key) {
+                        result.push(item.clone());
+                    }
+                }
+            }
+
+            // Add new streams that don't already exist
+            if let Some(arr) = new_arr.as_array() {
+                for item in arr {
+                    let key = item
+                        .get("stream_name")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| item.to_string());
+                    if seen.insert(key) {
+                        result.push(item.clone());
+                    }
+                }
+            }
+
+            result
+        };
+
+    // Merge each stream type
+    let logs = merge_array(
+        existing.get("logs").unwrap_or(&serde_json::Value::Null),
+        new.get("logs").unwrap_or(&serde_json::Value::Null),
+    );
+    let traces = merge_array(
+        existing.get("traces").unwrap_or(&serde_json::Value::Null),
+        new.get("traces").unwrap_or(&serde_json::Value::Null),
+    );
+    let metrics = merge_array(
+        existing.get("metrics").unwrap_or(&serde_json::Value::Null),
+        new.get("metrics").unwrap_or(&serde_json::Value::Null),
+    );
+
+    // Build merged result
+    let merged = serde_json::json!({
+        "logs": logs,
+        "traces": traces,
+        "metrics": metrics
+    });
+
+    merged.to_string()
 }
 
 /// Get a specific service
