@@ -10,6 +10,9 @@ on:
 
 jobs:
   check-design-comment:
+    permissions:
+      pull-requests: read
+      statuses: write
     # Only run on pull requests
     if: github.event_name == 'pull_request' || (github.event_name == 'issue_comment' && github.event.issue.pull_request) || github.event_name == 'pull_request_review_comment'
     runs-on: ubuntu-latest
