@@ -787,10 +787,13 @@ describe("VariablesValueSelector", () => {
         (v: any) => v.name === "region",
       );
 
-      // Region not loaded yet, service should not load
+      // Region is still loading (not ready yet), service should wait
+      // When parent is still loading (isVariablePartialLoaded = false but has a value),
+      // child should have isVariableLoadingPending = true
       regionVariable.isVariablePartialLoaded = false;
-      regionVariable.value = null;
-      regionVariable.isVariableLoadingPending = false;
+      regionVariable.value = "us-east-1"; // Parent has a value but not fully loaded
+      regionVariable.isLoading = true; // Parent is actively loading
+      regionVariable.isVariableLoadingPending = true;
 
       // Test through public API - child should not load if parent is not ready
       await vm.loadVariableOptions(serviceVariable);
