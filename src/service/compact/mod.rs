@@ -34,8 +34,8 @@ use tokio::sync::mpsc;
 use crate::{common::infra::cluster::get_node_from_consistent_hash, service::db};
 
 pub mod deleted;
-pub mod flatten;
 pub mod dump;
+pub mod flatten;
 pub mod merge;
 pub mod retention;
 pub mod stats;

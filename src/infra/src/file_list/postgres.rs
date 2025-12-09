@@ -1732,7 +1732,7 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
                 query_builder.push_values(files, |mut b, item| {
                     let (stream_key, date_key, file_name) =
                         parse_file_key_columns(&item.key).expect("parse file key failed");
-                    let org_id = stream_key[..stream_key.find('/').unwrap()].to_string(); 
+                    let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
                     if item.meta.min_ts == 0 || item.meta.max_ts == 0 {
                         log::warn!("[POSTGRES] min_ts or max_ts is 0 for file: {}", item.key);
                     }

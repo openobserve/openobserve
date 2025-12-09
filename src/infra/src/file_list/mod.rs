@@ -94,10 +94,8 @@ pub trait FileList: Sync + Send + 'static {
         stream_name: &str,
         time_range: (i64, i64),
     ) -> Result<Vec<FileRecord>>;
-    async fn query_for_dump_by_updated_at(
-        &self, 
-        time_range: (i64, i64),
-    ) -> Result<Vec<FileRecord>>;
+    async fn query_for_dump_by_updated_at(&self, time_range: (i64, i64))
+    -> Result<Vec<FileRecord>>;
     async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<FileKey>>;
     async fn query_ids(
         &self,
@@ -318,9 +316,7 @@ pub async fn query_for_dump(
 
 #[inline]
 #[tracing::instrument(name = "infra:file_list:db:query_for_dump_by_updated_at")]
-pub async fn query_for_dump_by_updated_at(
-    time_range: (i64, i64),
-) -> Result<Vec<FileRecord>> {
+pub async fn query_for_dump_by_updated_at(time_range: (i64, i64)) -> Result<Vec<FileRecord>> {
     CLIENT.query_for_dump_by_updated_at(time_range).await
 }
 

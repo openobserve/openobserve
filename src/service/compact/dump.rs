@@ -57,13 +57,13 @@ pub struct DumpJob {
     pub offset: i64,
 }
 
-/// compactor dump run steps:
-/// 1. we only get the jobs with node is empty and if any job picked upby this node will set the
-///    node to this node then no other node will pick it up again.
-/// 2.also we will start a thread to keepalive the updated_at that can't be reset by
-///    check_running_jobs.
-/// 3. if one job wasn't update for a long time, we will reset the node to empty and another job
-///    will pick it up
+// compactor dump run steps:
+// 1. we only get the jobs with node is empty and if any job picked upby this node will set the node
+//    to this node then no other node will pick it up again.
+// 2.also we will start a thread to keepalive the updated_at that can't be reset by
+//    check_running_jobs.
+// 3. if one job wasn't update for a long time, we will reset the node to empty and another job will
+//    pick it up
 pub async fn run(tx: mpsc::Sender<DumpJob>) -> Result<(), anyhow::Error> {
     let cfg = get_config();
     let jobs =

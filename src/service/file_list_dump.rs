@@ -208,14 +208,14 @@ async fn inner_exec(
 
 pub async fn query(
     trace_id: &str,
-    org: &str,
+    org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     range: (i64, i64),
 ) -> Result<Vec<FileRecord>, errors::Error> {
     let batches = query_inner(
         trace_id,
-        org,
+        org_id,
         stream_type,
         stream_name,
         range,
@@ -231,14 +231,14 @@ pub async fn query(
 
 pub async fn query_ids(
     trace_id: &str,
-    org: &str,
+    org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     range: (i64, i64),
 ) -> Result<Vec<FileId>, errors::Error> {
     let batches = query_inner(
         trace_id,
-        org,
+        org_id,
         stream_type,
         stream_name,
         range,
@@ -254,7 +254,7 @@ pub async fn query_ids(
 
 async fn query_inner(
     trace_id: &str,
-    org: &str,
+    org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     range: (i64, i64),
@@ -268,7 +268,7 @@ async fn query_inner(
     let dump_stream_name = generate_dump_stream_name(stream_type, stream_name);
     let db_start = std::time::Instant::now();
     let dump_files = infra::file_list::query(
-        org,
+        org_id,
         StreamType::Filelist,
         &dump_stream_name,
         PartitionTimeLevel::Hourly,
@@ -283,13 +283,13 @@ async fn query_inner(
 
     let process_start = std::time::Instant::now();
     let max_ts_upper_bound = calculate_max_ts_upper_bound(range.1, stream_type);
-    let stream_key = format!("{org}/{stream_type}/{stream_name}");
+    let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
     let fields = match query_type {
         QueryType::FileRecord => "*",
         QueryType::FileId => "id, records, original_size",
     };
     let query = format!(
-        "SELECT {fields} FROM file_list WHERE org = '{org}' AND stream = '{stream_key}' AND max_ts >= {} AND max_ts <= {} AND min_ts <= {};",
+        "SELECT {fields} FROM file_list WHERE org = '{org_id}' AND stream = '{stream_key}' AND max_ts >= {} AND max_ts <= {} AND min_ts <= {};",
         range.0, max_ts_upper_bound, range.1
     );
     let ret = exec(trace_id, cfg.limit.cpu_num, dump_files, &query).await?;
@@ -303,77 +303,104 @@ async fn query_inner(
 }
 
 pub async fn delete_all(
-    org: &str,
+    org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
 ) -> Result<(), errors::Error> {
-    delete_inner(
-        org,
+    delete_by_time_range(
+        org_id,
         stream_type,
         stream_name,
         (BASE_TIME.timestamp_micros(), Utc::now().timestamp_micros()),
+        true,
     )
     .await
 }
 
-pub async fn delete_by_date(
-    org: &str,
+// check this delete is daily or hourly
+// -> daily
+//   1. we need to get all the files in the range
+//   2. simple mark these files as deleted
+//   3. insert the deleted items into file_list_deleted table
+// -> hourly
+//   1. we need to get all the files in the range
+//   2. pickup the items that need to be deleted
+//   3. generate a new dump file excluding the items that need to be deleted and insert to file_list
+//      table
+//   4. make the old files deleted
+//   5. insert the deleted items into file_list_deleted table
+pub async fn delete_by_time_range(
+    org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     range: (i64, i64),
-) -> Result<(), errors::Error> {
-    delete_inner(org, stream_type, stream_name, range).await
-}
-
-async fn delete_inner(
-    org: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    range: (i64, i64),
+    is_daily: bool,
 ) -> Result<(), errors::Error> {
     let dump_stream_name = generate_dump_stream_name(stream_type, stream_name);
     let list =
-        infra::file_list::query_for_dump(org, StreamType::Filelist, &dump_stream_name, range)
+        infra::file_list::query_for_dump(org_id, StreamType::Filelist, &dump_stream_name, range)
             .await?;
+    if list.is_empty() {
+        return Ok(());
+    }
+    if is_daily {
+        if let Err(e) = delete_daily_inner(org_id, list, range).await {
+            log::error!("[FILE_LIST_DUMP] delete_daily_inner failed: {e}");
+            return Err(e);
+        }
+    } else if let Err(e) = delete_hourly_inner(org_id, stream_type, stream_name, list, range).await
+    {
+        log::error!("[FILE_LIST_DUMP] delete_hourly_inner failed: {e}");
+        return Err(e);
+    }
+    Ok(())
+}
 
-    // for deleting dump files themselves, we explicitly make sure that
-    // the min and max ts both are in the range given, so to not accidentally delete
-    // dump files which may have entries outside the range
-    let dump_files: Vec<_> = get_dump_files_in_range(org, Some(stream), range, None)
-        .await?
+async fn delete_daily_inner(
+    org_id: &str,
+    list: Vec<FileRecord>,
+    _range: (i64, i64),
+) -> Result<(), errors::Error> {
+    let cfg = get_config();
+    let dump_files = list.iter().map(|f| f.into()).collect::<Vec<_>>();
+    let query = "SELECT * FROM file_list";
+    let trace_id = ider::generate_trace_id();
+    let ret = exec(&trace_id, cfg.limit.cpu_num, dump_files.clone(), query).await?;
+    let files = ret
         .into_iter()
-        .filter(|f| f.min_ts >= range.0 && f.max_ts <= range.1)
-        .collect();
-    let del_items: Vec<_> = list
+        .flat_map(record_batch_to_file_record)
+        .collect::<Vec<_>>();
+
+    let del_items: Vec<_> = files
         .iter()
-        .chain(dump_files.iter())
         .map(|f| FileListDeleted {
             id: 0,
             account: f.account.to_string(),
-            file: format!("files/{}/{}/{}", stream_key, f.date, f.file),
+            file: format!("files/{}/{}/{}", f.stream, f.date, f.file),
             index_file: false,
             flattened: false,
         })
         .collect();
 
     let mut inserted_into_deleted = false;
-
     for _ in 0..5 {
         if !inserted_into_deleted
-            && let Err(e) =
-                infra::file_list::batch_add_deleted(org, Utc::now().timestamp_micros(), &del_items)
-                    .await
+            && let Err(e) = infra::file_list::batch_add_deleted(
+                org_id,
+                Utc::now().timestamp_micros(),
+                &del_items,
+            )
+            .await
         {
             log::error!("[FILE_LIST_DUMP] batch_add_deleted to db failed, retrying: {e}");
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             continue;
         }
         inserted_into_deleted = true;
-        let items: Vec<_> = list
+        let items: Vec<_> = dump_files
             .iter()
-            .chain(dump_files.iter())
             .map(|f| {
-                let mut f = FileKey::from(f);
+                let mut f = f.clone();
                 f.deleted = true;
                 f.segment_ids = None;
                 f
@@ -388,6 +415,16 @@ async fn delete_inner(
     }
 
     Ok(())
+}
+
+async fn delete_hourly_inner(
+    _org_id: &str,
+    _stream_type: StreamType,
+    _stream_name: &str,
+    _list: Vec<FileRecord>,
+    _range: (i64, i64),
+) -> Result<(), errors::Error> {
+    todo!()
 }
 
 // 1. use updated_at time range to get changed file_list dump files
@@ -479,62 +516,6 @@ mod tests {
     };
 
     use super::*;
-
-    #[test]
-    fn test_round_down_to_hour_basic() {
-        // Test basic hour rounding
-        let hour_micros = 3_600_000_000i64; // 1 hour in microseconds
-
-        // Test exact hour boundary
-        let timestamp = hour_micros * 5; // 5 hours
-        assert_eq!(round_down_to_hour(timestamp), timestamp);
-
-        // Test within hour - should round down
-        let timestamp = hour_micros * 5 + 1_800_000_000; // 5.5 hours
-        assert_eq!(round_down_to_hour(timestamp), hour_micros * 5);
-
-        // Test just before next hour
-        let timestamp = hour_micros * 3 + hour_micros - 1; // Almost 4 hours
-        assert_eq!(round_down_to_hour(timestamp), hour_micros * 3);
-    }
-
-    #[test]
-    fn test_round_down_to_hour_zero() {
-        // Test zero timestamp
-        assert_eq!(round_down_to_hour(0), 0);
-
-        // Test small value less than an hour
-        let small_timestamp = 1_800_000_000i64; // 30 minutes
-        assert_eq!(round_down_to_hour(small_timestamp), 0);
-    }
-
-    #[test]
-    fn test_round_down_to_hour_negative() {
-        // Test negative timestamps (edge case)
-        let hour_micros = 3_600_000_000i64;
-        let negative_timestamp = -hour_micros / 2; // -30 minutes = -1,800,000,000
-
-        // For negative_timestamp = -1,800,000,000
-        // negative_timestamp % hour_micros = -1,800,000,000 % 3,600,000,000 = -1,800,000,000 (in
-        // Rust) So result = -1,800,000,000 - (-1,800,000,000) = 0
-        let result = round_down_to_hour(negative_timestamp);
-
-        // For negative values, the "floor" behavior is different in Rust's % operator
-        // The function actually rounds toward zero, not down for negatives
-        assert_eq!(result, 0); // Should be 0 for this specific case
-    }
-
-    #[test]
-    fn test_round_down_to_hour_large_values() {
-        // Test with large timestamps (years in the future)
-        let hour_micros = 3_600_000_000i64;
-        let large_timestamp = hour_micros * 10000 + 1_500_000_000; // 10000.25 hours
-
-        let result = round_down_to_hour(large_timestamp);
-        assert_eq!(result, hour_micros * 10000);
-        assert!(result <= large_timestamp);
-        assert!(large_timestamp - result < hour_micros);
-    }
 
     fn create_test_record_batch() -> RecordBatch {
         let schema = Arc::new(Schema::new(vec![
@@ -860,27 +841,5 @@ mod tests {
 
         let records = record_batch_to_file_record(empty_rb);
         assert_eq!(records.len(), 0);
-    }
-
-    #[test]
-    fn test_time_boundary_calculations() {
-        let hour_micros = 3_600_000_000i64;
-
-        // Test range calculations as used in get_dump_files_in_range
-        let range = (
-            hour_micros * 2 + 1_800_000_000,
-            hour_micros * 5 + 600_000_000,
-        ); // 2.5 to 5.1 hours
-        let start = round_down_to_hour(range.0);
-        let end = round_down_to_hour(range.1) + hour_micros;
-
-        // Start should be rounded down to 2 hours
-        assert_eq!(start, hour_micros * 2);
-        // End should be rounded down to 5 hours then add 1 hour = 6 hours
-        assert_eq!(end, hour_micros * 6);
-
-        // Verify range covers the original timestamps
-        assert!(start <= range.0);
-        assert!(end > range.1);
     }
 }

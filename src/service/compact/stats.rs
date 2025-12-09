@@ -90,7 +90,7 @@ async fn update_stats_from_file_list_inner(
     let stream_stats = infra_file_list::stats(time_range)
         .await
         .map_err(|e| anyhow::anyhow!("get add stream stats error: {e}"))?;
-    // get stats from file_list_dump 
+    // get stats from file_list_dump
     let dumped_stats = file_list_dump::stats(time_range)
         .await
         .map_err(|e| anyhow::anyhow!("get dumped add stream stats error: {e}"))?;
