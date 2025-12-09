@@ -426,6 +426,18 @@ export default defineComponent({
         );
       }
 
+      // IMPORTANT: After loading is complete, if value is still null and multiSelect is true,
+      // and selectAllValueForMultiSelect is 'all', set value to _o2_all_
+      if (
+        variableObject.value === null &&
+        variableObject.multiSelect &&
+        variableObject.selectAllValueForMultiSelect === 'all'
+      ) {
+        variableObject.value = [SELECT_ALL_VALUE];
+        variableObject.isVariablePartialLoaded = true;
+        emitVariablesData();
+      }
+
       removeTraceId(variableObject.name, payload.traceId);
     };
 
@@ -819,6 +831,14 @@ export default defineComponent({
 
       // make list of variables using variables config list
       // set initial variables values from props
+      console.log("[VariablesValueSelector] initializeVariablesData:", {
+        propsInitialVariableValues: props.initialVariableValues,
+        valueObject: props.initialVariableValues?.value,
+        valueKeys: props.initialVariableValues?.value
+          ? Object.keys(props.initialVariableValues.value)
+          : [],
+      });
+
       props?.variablesConfig?.list?.forEach((item: any) => {
         let initialValue =
           item.type == "dynamic_filters"
@@ -1811,6 +1831,17 @@ export default defineComponent({
         variableObject.isLoading = false;
         variableObject.isVariablePartialLoaded = true;
         variableObject.isVariableLoadingPending = false;
+
+        // IMPORTANT: After loading is complete, if value is still null and multiSelect is true,
+        // and selectAllValueForMultiSelect is 'all', set value to _o2_all_
+        // This ensures API fires with _o2_all_ only after all loading is done
+        if (
+          variableObject.value === null &&
+          variableObject.multiSelect &&
+          variableObject.selectAllValueForMultiSelect === 'all'
+        ) {
+          variableObject.value = [SELECT_ALL_VALUE];
+        }
 
         // Update global loading state
         variablesData.isVariablesLoading = variablesData.values.some(
