@@ -19,6 +19,7 @@ use actix_web::{
     HttpResponse, ResponseError,
     http::header::{ContentType, LOCATION},
 };
+use url::form_urlencoded;
 
 const DEFAULT_REDIRECT_RELATIVE_URI: &str = "/web/";
 
@@ -36,14 +37,13 @@ impl RedirectResponse {
     fn build_full_redirect_uri(&self) -> String {
         let mut redirect_uri = self.redirect_relative_uri.clone();
 
-        // If there are query parameters, append them to the URI.
+        // If there are query parameters, append them to the URI with proper URL encoding
         if !self.query_params.is_empty() {
-            let query_string: String = self
-                .query_params
-                .iter()
-                .map(|(key, value)| format!("{key}={value}"))
-                .collect::<Vec<String>>()
-                .join("&");
+            let mut encoder = form_urlencoded::Serializer::new(String::new());
+            for (key, value) in &self.query_params {
+                encoder.append_pair(key, value);
+            }
+            let query_string = encoder.finish();
 
             redirect_uri = format!("{redirect_uri}?{query_string}");
         }
@@ -149,8 +149,9 @@ mod tests {
             )
             .build();
 
-        // Check if the constructed URI is correct
-        let expected_uri = "/web?redirect_url=http://localhost:5080/api/default/short/1234";
+        // Check if the constructed URI is correct (URL-encoded)
+        let expected_uri =
+            "/web?redirect_url=http%3A%2F%2Flocalhost%3A5080%2Fapi%2Fdefault%2Fshort%2F1234";
         assert_eq!(redirect_response.build_full_redirect_uri(), expected_uri);
 
         // Check if the HTTP response contains the correct "Location" header
@@ -185,11 +186,10 @@ mod tests {
             .with_query_param("user_id", "42")
             .build();
 
-        // Check if the constructed URI is correct with multiple query parameters
-        let expected_uri_1 =
-            "/web?redirect_url=http://localhost:5080/api/default/short/1234&user_id=42";
-        let expected_uri_2 =
-            "/web?user_id=42&redirect_url=http://localhost:5080/api/default/short/1234";
+        // Check if the constructed URI is correct with multiple query parameters (URL-encoded)
+        // Note: HashMap iteration order is not guaranteed, so we check both possible orders
+        let expected_uri_1 = "/web?redirect_url=http%3A%2F%2Flocalhost%3A5080%2Fapi%2Fdefault%2Fshort%2F1234&user_id=42";
+        let expected_uri_2 = "/web?user_id=42&redirect_url=http%3A%2F%2Flocalhost%3A5080%2Fapi%2Fdefault%2Fshort%2F1234";
         assert!(
             redirect_response.build_full_redirect_uri() == expected_uri_1
                 || redirect_response.build_full_redirect_uri() == expected_uri_2
@@ -198,7 +198,6 @@ mod tests {
         // Check if the HTTP response contains the correct "Location" header
         let http_response: HttpResponse = redirect_response.redirect_http();
         assert_eq!(http_response.status(), actix_web::http::StatusCode::FOUND);
-        // assert_eq!(http_response.headers().get(LOCATION).unwrap(), expected_uri);
         let location = http_response.headers().get(LOCATION).unwrap();
         assert!(location == expected_uri_1 || location == expected_uri_2);
     }

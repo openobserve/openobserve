@@ -143,7 +143,6 @@ pub async fn validator(
 ///
 /// ### Args:
 /// - token: The token to validate
-///  
 pub async fn validate_token(token: &str, org_id: &str) -> Result<(), Error> {
     match users::get_user_by_token(org_id, token).await {
         Some(_user) => Ok(()),
@@ -1051,10 +1050,18 @@ fn is_short_url_path(path_columns: &[&str]) -> bool {
 /// This function is responsible for logging the authentication failure and returning a redirect
 /// response. It takes in the request and the error message, and returns a tuple containing the
 /// redirect response and the service request.
+///
+/// For short URLs, this will redirect to `/web/` with a `redirect_url` query parameter containing
+/// the relative path of the short URL (e.g., `/api/{org_id}/short/{short_id}`), allowing the
+/// frontend to handle the authentication flow and redirect back to the short URL after login.
 fn handle_auth_failure_for_redirect(req: ServiceRequest, error: &Error) -> (Error, ServiceRequest) {
-    let full_url = extract_full_url(&req);
+    // Use only the path (without query parameters) to avoid URL length issues
+    // Query parameters in short URLs can be extremely long and cause the redirect URL
+    // to exceed 1024 chars, which would result in an HTML page instead of a redirect
+    let redirect_path = req.path();
+
     let redirect_http = RedirectResponseBuilder::default()
-        .with_query_param("short_url", &full_url)
+        .with_query_param("redirect_url", redirect_path)
         .build();
     log::warn!(
         "Authentication failed for path: {}, err: {}, {}",
@@ -1373,8 +1380,10 @@ mod tests {
 
         // Test that the function handles errors properly
         let (redirect_error, _) = handle_auth_failure_for_redirect(req, &error);
-        // The error should be a redirect response, not necessarily contain "redirect" in the string
-        assert!(!redirect_error.to_string().is_empty());
+        // The error should be a redirect response with redirect_url parameter
+        let error_str = redirect_error.to_string();
+        assert!(!error_str.is_empty());
+        assert!(error_str.contains("redirect_url"));
     }
 
     #[test]
