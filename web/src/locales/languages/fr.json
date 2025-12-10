@@ -451,7 +451,8 @@
     "roles": "Rôles",
     "groups": "Groupes",
     "customRole": "Rôles personnalisés",
-    "description": "Descriptif"
+    "description": "Descriptif",
+    "revoke_invite": "Révoquer l'invitation"
   },
   "ticket": {
     "header": "Tickets d'assistance",
@@ -1570,7 +1571,8 @@
     "basicUsers": "Les utilisateurs",
     "quota": "Quotas",
     "externalUserWarningTitle": "Avertissement destiné aux utilisateurs externes",
-    "externalUserWarningMessage": "L'ajout d'utilisateurs externes directement aux rôles n'accordera pas d'autorisations. Ajoutez-les plutôt aux groupes d'utilisateurs."
+    "externalUserWarningMessage": "L'ajout d'utilisateurs externes directement aux rôles n'accordera pas d'autorisations. Ajoutez-les plutôt aux groupes d'utilisateurs.",
+    "invitations": "Invitations"
   },
   "pipeline": {
     "header": "Canalisations",
@@ -1961,6 +1963,7 @@
     "dimensionBasedCorrelation": "Corrélation basée sur les dimensions",
     "tracesFromService": "Traces provenant du service : {service}",
     "noTracesFound": "Aucune trace corrélée n'a été trouvée",
-    "noTracesDescription": "Aucune trace n'a été trouvée pour le service {service} dans la plage de temps sélectionnée"
+    "noTracesDescription": "Aucune trace n'a été trouvée pour le service {service} dans la plage de temps sélectionnée",
+    "openTraceInNewWindow": "Ouvrir la trace dans une nouvelle fenêtre"
   }
 }

@@ -451,7 +451,8 @@
     "roles": "Ruoli",
     "groups": "Gruppi",
     "customRole": "Ruoli personalizzati",
-    "description": "Descrizione"
+    "description": "Descrizione",
+    "revoke_invite": "Revoca l'invito"
   },
   "ticket": {
     "header": "Ticket di assistenza",
@@ -1570,7 +1571,8 @@
     "basicUsers": "Utenti",
     "quota": "Quote",
     "externalUserWarningTitle": "Avviso per l'utente esterno",
-    "externalUserWarningMessage": "L'aggiunta diretta di utenti esterni ai ruoli non concederà autorizzazioni. Aggiungili invece ai gruppi di utenti."
+    "externalUserWarningMessage": "L'aggiunta diretta di utenti esterni ai ruoli non concederà autorizzazioni. Aggiungili invece ai gruppi di utenti.",
+    "invitations": "Inviti"
   },
   "pipeline": {
     "header": "Oleodotti",
@@ -1961,6 +1963,7 @@
     "dimensionBasedCorrelation": "Correlazione basata sulle dimensioni",
     "tracesFromService": "Tracce dal servizio: {service}",
     "noTracesFound": "Nessuna traccia correlata trovata",
-    "noTracesDescription": "Nessuna traccia trovata per service {service} nell'intervallo di tempo selezionato"
+    "noTracesDescription": "Nessuna traccia trovata per service {service} nell'intervallo di tempo selezionato",
+    "openTraceInNewWindow": "Apri traccia in una nuova finestra"
   }
 }
