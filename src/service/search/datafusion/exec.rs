@@ -455,29 +455,25 @@ pub async fn create_runtime_env(trace_id: &str, memory_limit: usize) -> Result<R
         .map_err(|e| {
             DataFusionError::Execution(format!("Invalid datafusion memory pool type: {e}"))
         })?;
-    match mem_pool {
+    let memory_pool = match mem_pool {
         super::MemoryPoolType::Greedy => {
             let pool = GreedyMemoryPool::new(memory_size);
             let track_memory_pool = TrackConsumersPool::new(pool, NonZero::new(20).unwrap());
-            let peak_memory_pool =
-                PeakMemoryPool::new(Arc::new(track_memory_pool), trace_id.to_string());
-            builder = builder.with_memory_pool(Arc::new(peak_memory_pool));
+            PeakMemoryPool::new(Arc::new(track_memory_pool), trace_id.to_string())
         }
         super::MemoryPoolType::Fair => {
             let pool = FairSpillPool::new(memory_size);
             let track_memory_pool = TrackConsumersPool::new(pool, NonZero::new(20).unwrap());
-            let peak_memory_pool =
-                PeakMemoryPool::new(Arc::new(track_memory_pool), trace_id.to_string());
-            builder = builder.with_memory_pool(Arc::new(peak_memory_pool));
+            PeakMemoryPool::new(Arc::new(track_memory_pool), trace_id.to_string())
         }
         super::MemoryPoolType::None => {
             let pool = UnboundedMemoryPool::default();
             let track_memory_pool = TrackConsumersPool::new(pool, NonZero::new(20).unwrap());
-            let peak_memory_pool =
-                PeakMemoryPool::new(Arc::new(track_memory_pool), trace_id.to_string());
-            builder = builder.with_memory_pool(Arc::new(peak_memory_pool));
+            PeakMemoryPool::new(Arc::new(track_memory_pool), trace_id.to_string())
         }
     };
+
+    builder = builder.with_memory_pool(Arc::new(memory_pool));
     builder.build()
 }
 
