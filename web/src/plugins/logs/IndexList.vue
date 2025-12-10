@@ -82,9 +82,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="logs-search-no-field-found-text"
         class="text-center col-10 q-mx-none"
       >
-        <q-icon name="info" color="primary"
-size="xs" /> No field found in
-        selected stream.
+        <q-icon name="info" color="primary" size="xs" />
+        {{ t("search.noFieldFoundInStream") }}
       </h3>
     </div>
     <div v-else class="index-table q-mt-xs">
@@ -1076,7 +1075,7 @@ export default defineComponent({
 
     const placeHolderText = computed(() => {
       return searchObj.data.stream?.selectedStream?.length === 0
-        ? "Select Stream"
+        ? t("search.selectStream")
         : "";
     });
 

@@ -234,7 +234,6 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
     if triggers.is_empty() {
         return;
     }
-    log::debug!("Evaluating triggers: {triggers:?}");
     let mut trigger_usage_reports = vec![];
     for (alert, val) in triggers.iter() {
         let module_key = scheduler_key(alert.id);
@@ -262,6 +261,11 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             time_in_queue_ms: None,
             ..Default::default()
         };
+        log::info!(
+            "Evaluating trigger for alert: {}/{}",
+            alert.org_id,
+            alert.name
+        );
         match alert.send_notification(val, now, None, now).await {
             Err(e) => {
                 log::error!("Failed to send notification: {e}");

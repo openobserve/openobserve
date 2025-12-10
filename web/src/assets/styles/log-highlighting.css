@@ -10,11 +10,11 @@
 
 /* Syntax highlighting classes */
 .log-key {
-  color: #b71c1c;
+  color: #B71C1C;
 
 }
 .log-string {
-  color: #2e7d32;
+  color: #047857;
 
 }
 .log-number {
@@ -38,99 +38,111 @@
 
 }
 
-/* Semantic type classes */
+/* Semantic type classes - colors from keyValueParser.ts */
 .log-ip {
-  color: #1976d2;
+  color: #D97706; /* Bold amber for IP addresses */
 
 }
 .log-url {
-  color: #00796b;
+  color: #1D4ED8; /* Strong blue for URLs */
 
 }
 .log-email {
-  color: #7b1fa2;
+  color: #9333EA; /* Vivid purple for emails */
 
 }
 .log-timestamp {
-  color: #e65100;
+  color: #2563EB; /* Blue for timestamps */
 
 }
 .log-http-method {
-  color: #388e3c;
+  color: #388e3c; /* Green for HTTP methods (not in keyValueParser) */
 
 }
 .log-status-code {
-  color: #f57c00;
+  color: #f57c00; /* Orange for status codes (not in keyValueParser) */
 
 }
 .log-path {
-  color: #5d4037;
+  color: #4338CA; /* Deep indigo for file paths */
 
 }
 .log-uuid {
-  color: #455a64;
+  color: #047857; /* Dark teal for UUIDs */
 
 }
 .log-file-size {
-  color: #2563eb;
+  color: #2563eb; /* Blue for file sizes (not in keyValueParser) */
 
 }
 .log-object-value {
-  color: #4b5563;
+  color: #4b5563; /* Neutral gray for objects */
+
+}
+.log-array-value {
+  color: #0E7490; /* Calm teal for arrays */
 
 }
 
-/* Dark theme variants */
+/* Dark theme variants - colors from keyValueParser.ts */
 .dark .log-key {
-  color: #f44336;
+  color: #f67a7aff; /* Lighter red for dark mode */
 
 }
 .dark .log-string {
-  color: #4caf50;
+  color: #6EE7B7; /* Soft mint green */
 
 }
 .dark .log-number {
-  color: #2196f3;
+  color: #60A5FA; /* Light blue for numbers */
 
 }
 .dark .log-boolean {
-  color: #9c27b0;
+  color: #A5B4FC; /* Lavender */
 
 }
 .dark .log-null {
-  color: #9e9e9e;
+  color: #9CA3AF; /* Medium gray */
 
 }
 .dark .log-ip {
-  color: #42a5f5;
+  color: #FCD34D; /* Soft gold */
 
 }
 .dark .log-url {
-  color: #26a69a;
+  color: #93C5FD; /* Light blue */
 
 }
 .dark .log-email {
-  color: #ab47bc;
+  color: #C4B5FD; /* Soft purple */
 
 }
 .dark .log-timestamp {
-  color: #ff9800;
+  color: #60A5FA; /* Light blue */
 
 }
 .dark .log-http-method {
-  color: #66bb6a;
+  color: #66bb6a; /* Green for HTTP methods (not in keyValueParser) */
 
 }
 .dark .log-status-code {
-  color: #ffb74d;
+  color: #ffb74d; /* Orange for status codes (not in keyValueParser) */
 
 }
 .dark .log-path {
-  color: #8d6e63;
+  color: #BAE6FD; /* Ice blue */
 
 }
 .dark .log-uuid {
-  color: #78909c;
+  color: #6EE7B7; /* Mint green (consistent with string) */
+
+}
+.dark .log-object-value {
+  color: #D1D5DB; /* Light gray */
+
+}
+.dark .log-array-value {
+  color: #67E8F9; /* Soft cyan */
 
 }
 

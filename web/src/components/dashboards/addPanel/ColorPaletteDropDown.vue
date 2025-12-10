@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="dashboardPanelData.data.config.color.mode"
         :options="colorOptions"
         dense
-        label="Color palette"
+        :label="t('dashboard.colorPalette')"
         class="showLabelOnTop"
         stack-label
         :display-value="selectedOptionLabel"
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="q-pt-md"
       v-if="dashboardPanelData.data.config.color.mode.startsWith('continuous')"
     >
-      Color series by:
+      {{ t("dashboard.colorSeriesBy") }}
       <div>
         <q-btn-toggle
           v-model="dashboardPanelData.data.config.color.seriesBy"
@@ -111,9 +111,13 @@ import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { getColorPalette } from "@/utils/dashboard/colorPalette";
 import { computed, inject, onBeforeMount, defineComponent } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
+
 export default defineComponent({
   name: "ColorPaletteDropdown",
   setup() {
+    const { t } = useI18n();
+
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
       "dashboard",
@@ -136,19 +140,18 @@ export default defineComponent({
 
     const colorOptions = [
       {
-        label: "<b>By Series</b>",
+        label: t("dashboard.colorBySeries"),
         isGroup: true,
       },
       {
-        label: "Default Palette (By Series)",
-        subLabel: "Series with the same name will use the same color",
+        label: t("dashboard.colorDefaultPaletteBySeries"),
+        subLabel: t("dashboard.colorDefaultPaletteBySeriesSubLabel"),
         colorPalette: getColorPalette(store.state.theme),
         value: "palette-classic-by-series",
       },
       {
-        label: "Palette-Classic",
-        subLabel:
-          "A random color will be used for each series, regardless of its name",
+        label: t("dashboard.colorPaletteClassic"),
+        subLabel: t("dashboard.colorPaletteClassicSubLabel"),
         colorPalette: [
           "#5470c6",
           "#91cc75",
@@ -167,46 +170,46 @@ export default defineComponent({
         value: "palette-classic",
       },
       {
-        label: "Single Color",
-        subLabel: "Set a specific color to all series",
+        label: t("dashboard.colorSingleColor"),
+        subLabel: t("dashboard.colorSingleColorSubLabel"),
         value: "fixed",
       },
       {
-        label: "Shades Of Specific Color",
-        subLabel: "Different shades of specific color",
+        label: t("dashboard.colorShadesOfSpecificColor"),
+        subLabel: t("dashboard.colorShadesOfSpecificColorSubLabel"),
         value: "shades",
       },
       {
-        label: "<b>By Value</b>",
+        label: t("dashboard.colorByValue"),
         isGroup: true,
       },
       {
-        label: "Green-Yellow-Red (By Value)",
+        label: t("dashboard.colorGreenYellowRed"),
         colorPalette: ["green", "yellow", "red"],
         value: "continuous-green-yellow-red",
       },
       {
-        label: "Red-Yellow-Green (By Value)",
+        label: t("dashboard.colorRedYellowGreen"),
         colorPalette: ["red", "yellow", "green"],
         value: "continuous-red-yellow-green",
       },
       {
-        label: "Temperature (By Value)",
+        label: t("dashboard.colorTemperature"),
         colorPalette: ["#F6EADB", "#FBDBA2", "#FFC86D", "#FC8585"],
         value: "continuous-temperature",
       },
       {
-        label: "Positive (By Value)",
+        label: t("dashboard.colorPositive"),
         colorPalette: ["#A7D1A7", "#7AB97A", "#4EA24E", "#228B22"],
         value: "continuous-positive",
       },
       {
-        label: "Negative (By Value)",
+        label: t("dashboard.colorNegative"),
         colorPalette: ["#FFD4D4", "#FFADAD", "#F77272", "#F03030", "#B12E21"],
         value: "continuous-negative",
       },
       {
-        label: "Light To Dark Blue (By Value)",
+        label: t("dashboard.colorLightToDarkBlue"),
         colorPalette: ["#B8CCE0", "#96AFCD", "#7392BA", "#5175A7", "#2E5894"],
         value: "continuous-light-to-dark-blue",
       },
@@ -221,7 +224,7 @@ export default defineComponent({
       );
       return selectedOption
         ? selectedOption.label
-        : "Palette-Classic (By Series)";
+        : t("dashboard.colorPaletteClassicBySeries");
     });
 
     const onColorModeChange = (value: any) => {
@@ -241,6 +244,7 @@ export default defineComponent({
       dashboardPanelData.data.config.color.mode = value.value;
     };
     return {
+      t,
       dashboardPanelData,
       promqlMode,
       colorOptions,

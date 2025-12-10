@@ -17,7 +17,7 @@
 <template>
   <div>
     <div class="q-mb-sm" style="font-weight: 600">
-      <span>MarkLines</span>
+      <span>{{ t("dashboard.markLines") }}</span>
       <q-btn
         no-caps
         padding="xs"
@@ -33,7 +33,7 @@
           self="top middle"
           max-width="250px"
         >
-          Show threshold lines on the chart.
+          {{ t("dashboard.markLinesTooltip") }}
         </q-tooltip>
       </q-btn>
     </div>
@@ -52,7 +52,7 @@
         <div style="width: 90%">
           <q-select
             v-model="dashboardPanelData.data.config.mark_line[index].type"
-            label="Type"
+            :label="t('dashboard.markLineType')"
             :options="markLineTypeOptions"
             input-debounce="0"
             behavior="menu"
@@ -66,7 +66,7 @@
            hide-bottom-space></q-select>
           <q-input
             v-model="dashboardPanelData.data.config.mark_line[index].name"
-            label="Label"
+            :label="t('dashboard.markLineLabel')"
             color="input-border"
             bg-color="input-bg"
             class="q-py-sm showLabelOnTop"
@@ -84,7 +84,7 @@
               )
             "
             v-model="dashboardPanelData.data.config.mark_line[index].value"
-            label="Value"
+            :label="t('dashboard.markLineValue')"
             color="input-border"
             bg-color="input-bg"
             class="q-py-sm showLabelOnTop"
@@ -110,7 +110,7 @@
     <q-btn
       @click="addNewMarkLine"
       style="cursor: pointer; padding: 0px 5px"
-      label="+ Add"
+      :label="t('dashboard.markLineAdd')"
       class="el-border"
       no-caps
       data-test="dashboard-addpanel-config-markline-add-btn"
@@ -121,6 +121,7 @@
 <script lang="ts">
 import { defineComponent, inject } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { onBeforeMount } from "vue";
 
@@ -128,13 +129,15 @@ export default defineComponent({
   name: "MarkLineConfig",
   setup() {
     const store = useStore();
+    const { t } = useI18n();
+
     const markLineTypeOptions = [
-      { label: "Average", value: "average" },
-      { label: "Median", value: "median" },
-      { label: "Min", value: "min" },
-      { label: "Max", value: "max" },
-      { label: "X-Axis", value: "xAxis" },
-      { label: "Y-Axis", value: "yAxis" },
+      { label: t("dashboard.markLineAverage"), value: "average" },
+      { label: t("dashboard.markLineMedian"), value: "median" },
+      { label: t("dashboard.markLineMin"), value: "min" },
+      { label: t("dashboard.markLineMax"), value: "max" },
+      { label: t("dashboard.markLineXAxis"), value: "xAxis" },
+      { label: t("dashboard.markLineYAxis"), value: "yAxis" },
     ];
 
     const dashboardPanelDataPageKey = inject(
@@ -165,6 +168,7 @@ export default defineComponent({
     };
 
     return {
+      t,
       store,
       dashboardPanelData,
       markLineTypeOptions,
