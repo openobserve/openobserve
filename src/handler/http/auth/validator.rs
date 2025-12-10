@@ -143,7 +143,6 @@ pub async fn validator(
 ///
 /// ### Args:
 /// - token: The token to validate
-///  
 pub async fn validate_token(token: &str, org_id: &str) -> Result<(), Error> {
     match users::get_user_by_token(org_id, token).await {
         Some(_user) => Ok(()),
@@ -850,29 +849,16 @@ pub async fn oo_validator(
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let path_prefix = "/api/";
     let path = extract_relative_path(req.request().path(), path_prefix);
-    let path_columns = path.split('/').collect::<Vec<&str>>();
-    let is_short_url = is_short_url_path(&path_columns);
+    let _path_columns = path.split('/').collect::<Vec<&str>>();
 
     let auth_info = match auth_result {
         Ok(info) => info,
-        Err(e) => {
-            return if is_short_url {
-                Err(handle_auth_failure_for_redirect(req, &e))
-            } else {
-                Err((e, req))
-            };
-        }
+        Err(e) => return Err((e, req)),
     };
 
     match oo_validator_internal(req, auth_info, path_prefix).await {
         Ok(service_req) => Ok(service_req),
-        Err((err, err_req)) => {
-            if is_short_url {
-                Err(handle_auth_failure_for_redirect(err_req, &err))
-            } else {
-                Err((err, err_req))
-            }
-        }
+        Err((err, err_req)) => Err((err, err_req)),
     }
 }
 
@@ -1067,7 +1053,7 @@ fn extract_relative_path(full_path: &str, path_prefix: &str) -> String {
 }
 
 /// Helper function to check if the path corresponds to a short URL
-fn is_short_url_path(path_columns: &[&str]) -> bool {
+fn _is_short_url_path(path_columns: &[&str]) -> bool {
     path_columns
         .get(1)
         .is_some_and(|&segment| segment.to_lowercase() == "short")
@@ -1078,8 +1064,11 @@ fn is_short_url_path(path_columns: &[&str]) -> bool {
 /// This function is responsible for logging the authentication failure and returning a redirect
 /// response. It takes in the request and the error message, and returns a tuple containing the
 /// redirect response and the service request.
-fn handle_auth_failure_for_redirect(req: ServiceRequest, error: &Error) -> (Error, ServiceRequest) {
-    let full_url = extract_full_url(&req);
+fn _handle_auth_failure_for_redirect(
+    req: ServiceRequest,
+    error: &Error,
+) -> (Error, ServiceRequest) {
+    let full_url = _extract_full_url(&req);
     let redirect_http = RedirectResponseBuilder::default()
         .with_query_param("short_url", &full_url)
         .build();
@@ -1093,7 +1082,7 @@ fn handle_auth_failure_for_redirect(req: ServiceRequest, error: &Error) -> (Erro
 }
 
 /// Extracts the full URL from the request.
-fn extract_full_url(req: &ServiceRequest) -> String {
+fn _extract_full_url(req: &ServiceRequest) -> String {
     let connection_info = req.connection_info();
     let scheme = connection_info.scheme();
     let host = connection_info.host();
@@ -1321,19 +1310,19 @@ mod tests {
     async fn test_is_short_url_path() {
         // Test short URL path
         let short_url_path = ["api", "short", "abc123"];
-        assert!(is_short_url_path(&short_url_path));
+        assert!(_is_short_url_path(&short_url_path));
 
         // Test non-short URL path
         let normal_path = ["api", "v1", "logs"];
-        assert!(!is_short_url_path(&normal_path));
+        assert!(!_is_short_url_path(&normal_path));
 
         // Test path with insufficient segments
         let short_path = ["api"];
-        assert!(!is_short_url_path(&short_path));
+        assert!(!_is_short_url_path(&short_path));
 
         // Test case insensitive
         let mixed_case_path = ["api", "SHORT", "abc123"];
-        assert!(is_short_url_path(&mixed_case_path));
+        assert!(_is_short_url_path(&mixed_case_path));
     }
 
     #[test]
@@ -1388,7 +1377,7 @@ mod tests {
 
         // This test would need more setup to work properly
         // For now, just test that the function exists and compiles
-        let _ = extract_full_url(&service_req);
+        let _ = _extract_full_url(&service_req);
     }
 
     #[test]
@@ -1399,7 +1388,7 @@ mod tests {
         let error = ErrorUnauthorized("Test error");
 
         // Test that the function handles errors properly
-        let (redirect_error, _) = handle_auth_failure_for_redirect(req, &error);
+        let (redirect_error, _) = _handle_auth_failure_for_redirect(req, &error);
         // The error should be a redirect response, not necessarily contain "redirect" in the string
         assert!(!redirect_error.to_string().is_empty());
     }
