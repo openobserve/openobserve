@@ -687,3 +687,303 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, errors::Er
     )?;
     Ok(batch)
 }
+
+#[cfg(test)]
+mod tests {
+    use arrow::array::{BooleanArray, Int64Array, StringArray};
+
+    use super::*;
+
+    #[test]
+    fn test_dump_job_creation() {
+        let job = DumpJob {
+            org_id: "test_org".to_string(),
+            stream_type: StreamType::Logs,
+            stream_name: "test_stream".to_string(),
+            job_id: 123,
+            offset: 1000000,
+        };
+
+        assert_eq!(job.org_id, "test_org");
+        assert_eq!(job.stream_type, StreamType::Logs);
+        assert_eq!(job.stream_name, "test_stream");
+        assert_eq!(job.job_id, 123);
+        assert_eq!(job.offset, 1000000);
+    }
+
+    #[test]
+    fn test_dump_job_clone() {
+        let job = DumpJob {
+            org_id: "test_org".to_string(),
+            stream_type: StreamType::Metrics,
+            stream_name: "metric_stream".to_string(),
+            job_id: 456,
+            offset: 2000000,
+        };
+
+        let cloned = job.clone();
+        assert_eq!(cloned.org_id, job.org_id);
+        assert_eq!(cloned.stream_type, job.stream_type);
+        assert_eq!(cloned.stream_name, job.stream_name);
+        assert_eq!(cloned.job_id, job.job_id);
+        assert_eq!(cloned.offset, job.offset);
+    }
+
+    #[test]
+    fn test_dump_create_record_batch_empty() {
+        let files: Vec<FileRecord> = vec![];
+        let result = create_record_batch(files);
+
+        assert!(result.is_ok());
+        let batch = result.unwrap();
+        assert_eq!(batch.num_rows(), 0);
+        assert_eq!(batch.num_columns(), 16);
+    }
+
+    #[test]
+    fn test_dump_create_record_batch_single_file() {
+        let file = FileRecord {
+            id: 1,
+            account: "test_account".to_string(),
+            org: "test_org".to_string(),
+            stream: "test_stream".to_string(),
+            date: "2024-01-01".to_string(),
+            file: "file1.parquet".to_string(),
+            deleted: false,
+            flattened: true,
+            min_ts: 1000,
+            max_ts: 2000,
+            records: 100,
+            original_size: 10000,
+            compressed_size: 5000,
+            index_size: 500,
+            created_at: 1000,
+            updated_at: 1100,
+        };
+
+        let files = vec![file];
+        let result = create_record_batch(files);
+
+        assert!(result.is_ok());
+        let batch = result.unwrap();
+        assert_eq!(batch.num_rows(), 1);
+        assert_eq!(batch.num_columns(), 16);
+
+        // Verify column values
+        let id_col = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(id_col.value(0), 1);
+
+        let org_col = batch
+            .column(2)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert_eq!(org_col.value(0), "test_org");
+
+        let deleted_col = batch
+            .column(6)
+            .as_any()
+            .downcast_ref::<BooleanArray>()
+            .unwrap();
+        assert!(!deleted_col.value(0));
+
+        let flattened_col = batch
+            .column(7)
+            .as_any()
+            .downcast_ref::<BooleanArray>()
+            .unwrap();
+        assert!(flattened_col.value(0));
+    }
+
+    #[test]
+    fn test_dump_create_record_batch_multiple_files() {
+        let files = vec![
+            FileRecord {
+                id: 1,
+                account: "account1".to_string(),
+                org: "org1".to_string(),
+                stream: "stream1".to_string(),
+                date: "2024-01-01".to_string(),
+                file: "file1.parquet".to_string(),
+                deleted: false,
+                flattened: true,
+                min_ts: 1000,
+                max_ts: 2000,
+                records: 100,
+                original_size: 10000,
+                compressed_size: 5000,
+                index_size: 500,
+                created_at: 1000,
+                updated_at: 1100,
+            },
+            FileRecord {
+                id: 2,
+                account: "account2".to_string(),
+                org: "org2".to_string(),
+                stream: "stream2".to_string(),
+                date: "2024-01-02".to_string(),
+                file: "file2.parquet".to_string(),
+                deleted: true,
+                flattened: false,
+                min_ts: 3000,
+                max_ts: 4000,
+                records: 200,
+                original_size: 20000,
+                compressed_size: 10000,
+                index_size: 1000,
+                created_at: 2000,
+                updated_at: 2100,
+            },
+            FileRecord {
+                id: 3,
+                account: "account3".to_string(),
+                org: "org3".to_string(),
+                stream: "stream3".to_string(),
+                date: "2024-01-03".to_string(),
+                file: "file3.parquet".to_string(),
+                deleted: false,
+                flattened: true,
+                min_ts: 5000,
+                max_ts: 6000,
+                records: 300,
+                original_size: 30000,
+                compressed_size: 15000,
+                index_size: 1500,
+                created_at: 3000,
+                updated_at: 3100,
+            },
+        ];
+
+        let result = create_record_batch(files.clone());
+
+        assert!(result.is_ok());
+        let batch = result.unwrap();
+        assert_eq!(batch.num_rows(), 3);
+
+        // Verify the data integrity
+        let id_col = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(id_col.value(0), 1);
+        assert_eq!(id_col.value(1), 2);
+        assert_eq!(id_col.value(2), 3);
+
+        let records_col = batch
+            .column(10)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(records_col.value(0), 100);
+        assert_eq!(records_col.value(1), 200);
+        assert_eq!(records_col.value(2), 300);
+
+        let deleted_col = batch
+            .column(6)
+            .as_any()
+            .downcast_ref::<BooleanArray>()
+            .unwrap();
+        assert!(!deleted_col.value(0));
+        assert!(deleted_col.value(1));
+        assert!(!deleted_col.value(2));
+    }
+
+    #[test]
+    fn test_dump_create_record_batch_with_special_characters() {
+        let file = FileRecord {
+            id: 999,
+            account: "test-account_2024".to_string(),
+            org: "org/with/slashes".to_string(),
+            stream: "stream@special#chars".to_string(),
+            date: "2024-12-10".to_string(),
+            file: "file-with-dashes_and_underscores.parquet".to_string(),
+            deleted: false,
+            flattened: false,
+            min_ts: 1234567890,
+            max_ts: 1234567999,
+            records: 5000,
+            original_size: 500000,
+            compressed_size: 250000,
+            index_size: 25000,
+            created_at: 1234567000,
+            updated_at: 1234568000,
+        };
+
+        let result = create_record_batch(vec![file]);
+
+        assert!(result.is_ok());
+        let batch = result.unwrap();
+        assert_eq!(batch.num_rows(), 1);
+
+        let org_col = batch
+            .column(2)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert_eq!(org_col.value(0), "org/with/slashes");
+
+        let stream_col = batch
+            .column(3)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert_eq!(stream_col.value(0), "stream@special#chars");
+    }
+
+    #[test]
+    fn test_dump_create_record_batch_column_order() {
+        let file = FileRecord {
+            id: 1,
+            account: "account".to_string(),
+            org: "org".to_string(),
+            stream: "stream".to_string(),
+            date: "2024-01-01".to_string(),
+            file: "file.parquet".to_string(),
+            deleted: false,
+            flattened: false,
+            min_ts: 1000,
+            max_ts: 2000,
+            records: 100,
+            original_size: 10000,
+            compressed_size: 5000,
+            index_size: 500,
+            created_at: 1000,
+            updated_at: 1100,
+        };
+
+        let result = create_record_batch(vec![file]);
+        assert!(result.is_ok());
+
+        let batch = result.unwrap();
+        let schema = batch.schema();
+
+        // Verify column names are in the expected order
+        let expected_columns = vec![
+            "id",
+            "account",
+            "org",
+            "stream",
+            "date",
+            "file",
+            "deleted",
+            "flattened",
+            "min_ts",
+            "max_ts",
+            "records",
+            "original_size",
+            "compressed_size",
+            "index_size",
+            "created_at",
+            "updated_at",
+        ];
+
+        for (i, expected_name) in expected_columns.iter().enumerate() {
+            assert_eq!(schema.field(i).name(), expected_name);
+        }
+    }
+}

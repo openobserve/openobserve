@@ -791,4 +791,52 @@ mod tests {
         let records = record_batch_to_file_record(empty_rb);
         assert_eq!(records.len(), 0);
     }
+
+    #[test]
+    fn test_generate_dump_stream_name() {
+        // Test with different stream types
+        let result = generate_dump_stream_name(StreamType::Logs, "my_stream");
+        assert_eq!(result, "my_stream_logs");
+
+        let result = generate_dump_stream_name(StreamType::Metrics, "metric_stream");
+        assert_eq!(result, "metric_stream_metrics");
+
+        let result = generate_dump_stream_name(StreamType::Traces, "trace_stream");
+        assert_eq!(result, "trace_stream_traces");
+
+        // Test with stream name containing special characters
+        let result = generate_dump_stream_name(StreamType::Logs, "my-stream_2024");
+        assert_eq!(result, "my-stream_2024_logs");
+
+        // Test with empty stream name
+        let result = generate_dump_stream_name(StreamType::Logs, "");
+        assert_eq!(result, "_logs");
+    }
+
+    #[test]
+    fn test_file_list_schema() {
+        // Verify the schema has the expected fields
+        let schema = FILE_LIST_SCHEMA.clone();
+
+        assert_eq!(schema.fields().len(), 16);
+
+        // Check key field names and types
+        assert_eq!(schema.field(0).name(), "id");
+        assert_eq!(schema.field(0).data_type(), &DataType::Int64);
+
+        assert_eq!(schema.field(1).name(), "account");
+        assert_eq!(schema.field(1).data_type(), &DataType::Utf8);
+
+        assert_eq!(schema.field(2).name(), "org");
+        assert_eq!(schema.field(2).data_type(), &DataType::Utf8);
+
+        assert_eq!(schema.field(3).name(), "stream");
+        assert_eq!(schema.field(3).data_type(), &DataType::Utf8);
+
+        assert_eq!(schema.field(6).name(), "deleted");
+        assert_eq!(schema.field(6).data_type(), &DataType::Boolean);
+
+        assert_eq!(schema.field(7).name(), "flattened");
+        assert_eq!(schema.field(7).data_type(), &DataType::Boolean);
+    }
 }
