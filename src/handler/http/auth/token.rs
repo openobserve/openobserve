@@ -13,12 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{Error, dev::ServiceRequest};
 #[cfg(feature = "enterprise")]
-use actix_web::{
-    error::ErrorUnauthorized,
-    http::{Method, header},
-};
+use actix_web::http::{Method, header};
+use actix_web::{Error, dev::ServiceRequest, error::ErrorUnauthorized};
 #[cfg(feature = "enterprise")]
 use o2_dex::{config::get_config as get_dex_config, service::auth::get_dex_jwks};
 
@@ -115,13 +112,13 @@ pub async fn token_validator(
                         {
                             Ok(req)
                         } else {
-                            Err((ErrorForbidden("Unauthorized Access"), req))
+                            Err((ErrorForbidden("Forbidden"), req))
                         }
                     }
-                    _ => Err((ErrorForbidden("Unauthorized Access"), req)),
+                    _ => Err((ErrorUnauthorized("Unauthorized Access"), req)),
                 }
             } else {
-                Err((ErrorForbidden("Unauthorized Access"), req))
+                Err((ErrorUnauthorized("Unauthorized Access"), req))
             }
         }
         Err(err) => Err((ErrorUnauthorized(err), req)),
@@ -156,7 +153,5 @@ pub async fn token_validator(
     req: ServiceRequest,
     _token: AuthExtractor,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    use actix_web::error::ErrorForbidden;
-
-    Err((ErrorForbidden("Not Supported"), req))
+    Err((ErrorUnauthorized("Not Supported"), req))
 }
