@@ -71,12 +71,18 @@ export const useSearchQuery = () => {
 
     const queryReq: SearchRequestPayload = buildSearch();
 
+    // Update highlight query on run-query
+    if (searchObj.meta.sqlMode) {
+      searchObj.data.highlightQuery = searchObj.data.query.toLowerCase().split("where")[1];
+    } else {
+      searchObj.data.highlightQuery = searchObj.data.query.toLowerCase();
+    }
+
     if (queryReq === null) {
       searchObj.loading = false;
       if (!notificationMsg.value) {
         notificationMsg.value = "Search query is empty or invalid.";
-      }
-      else{
+      } else {
         searchObj.data.errorMsg = notificationMsg.value;
       }
       return null;
