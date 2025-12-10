@@ -146,9 +146,7 @@ pub async fn validator(
 pub async fn validate_token(token: &str, org_id: &str) -> Result<(), Error> {
     match users::get_user_by_token(org_id, token).await {
         Some(_user) => Ok(()),
-        None => Err(ErrorUnauthorized(
-            "User associated with this token not found",
-        )),
+        None => Err(ErrorForbidden("User associated with this token not found")),
     }
 }
 
