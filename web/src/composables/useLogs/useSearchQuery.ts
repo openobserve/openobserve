@@ -46,6 +46,8 @@ export const useSearchQuery = () => {
   const { searchObj, notificationMsg, initialQueryPayload, searchAggData } = searchState();
 
   const getQueryReq = (isPagination: boolean): SearchRequestPayload | null => {
+    searchObj.data.highlightQuery = "";
+
     if (!isPagination) {
       searchObj.data.queryResults = {};
     }
@@ -54,10 +56,9 @@ export const useSearchQuery = () => {
     searchObj.meta.searchApplied = true;
     searchObj.data.functionError = "";
 
-
     searchAggData.total = 0;
     searchAggData.hasAggregation = false;
-       
+
     if (
       !searchObj.data.stream.streamLists?.length ||
       searchObj.data.stream.selectedStream.length == 0
@@ -71,12 +72,18 @@ export const useSearchQuery = () => {
 
     const queryReq: SearchRequestPayload = buildSearch();
 
+    // Update highlight query on run-query
+    if (searchObj.meta.sqlMode) {
+      searchObj.data.highlightQuery = searchObj.data.query.toLowerCase().split("where")[1];
+    } else {
+      searchObj.data.highlightQuery = searchObj.data.query.toLowerCase();
+    }
+
     if (queryReq === null) {
       searchObj.loading = false;
       if (!notificationMsg.value) {
         notificationMsg.value = "Search query is empty or invalid.";
-      }
-      else{
+      } else {
         searchObj.data.errorMsg = notificationMsg.value;
       }
       return null;
