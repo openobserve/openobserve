@@ -100,6 +100,7 @@ def test_e2e_templatescreation(create_session, base_url):
 
 def test_e2e_createdestination(create_session, base_url):
     """Running an E2E test for create a new destination."""
+    import time
 
     session = create_session
     url = base_url
@@ -108,8 +109,14 @@ def test_e2e_createdestination(create_session, base_url):
 
     headers = {"Content-Type": "application/json", "Custom-Header": "value"}
 
+    # Generate unique names using timestamp
+    timestamp = int(time.time() * 1000)
+    template_name = f"pytesttemplate_{timestamp}"
+    destination_name = f"py-destinations_{timestamp}"
+    alert_name = f"py-alert_{timestamp}"
+
     payload = {
-        "name": "pytesttemplate",
+        "name": template_name,
         "body": """
             {{
                 "text": "{alert_name} is active"
@@ -127,15 +134,6 @@ def test_e2e_createdestination(create_session, base_url):
     )
     print(resp_create_destinations.content)
 
-    destination_name = "py-destinations"
-    payload = {
-        "url": "www",
-        "method": "post",
-        "skip_tls_verify": skip_tls_verify_value,
-        "template": "pytesttemplate",
-        "headers": {"test": "test"},
-        "name":"py-destinations"
-    }
 
     # create destination
     resp_create_destinations = session.post(
@@ -189,7 +187,6 @@ def test_e2e_createdestination(create_session, base_url):
     ), f"Get all alerts list 200, but got {resp_create_logstream.status_code} {resp_create_logstream.content}"
 
     stream_name = "newpy_tests"
-    alert_name = "py-alert"
     is_real_time = False
     payload = {
         "name": alert_name,
@@ -216,7 +213,7 @@ def test_e2e_createdestination(create_session, base_url):
             "threshold": 3,
             "silence": 10,
         },
-        "destinations": ["py-destinations"],
+        "destinations": [destination_name],
         "context_attributes": {},
         "enabled": True,
         "description": "",
@@ -258,6 +255,7 @@ def test_e2e_createdestination(create_session, base_url):
 
 def test_e2e_createalertsql(create_session, base_url):
     """Running an E2E test for create a new destination."""
+    import time
 
     session = create_session
     url = base_url
@@ -266,8 +264,14 @@ def test_e2e_createalertsql(create_session, base_url):
 
     headers = {"Content-Type": "application/json", "Custom-Header": "value"}
 
+    # Generate unique names using timestamp
+    timestamp = int(time.time() * 1000)
+    template_name = f"pytesttemplate_{timestamp}"
+    destination_name = f"py-destinations_{timestamp}"
+    alert_name = f"py-alert_{timestamp}"
+
     payload = {
-        "name": "pytesttemplate",
+        "name": template_name,
         "body": """
             {{
                 "text": "{alert_name} is active"
@@ -283,15 +287,6 @@ def test_e2e_createalertsql(create_session, base_url):
         json=payload,
         headers=headers,
     )
-    print(resp_create_destinations.content)
-
-    destination_name = "py-destinations"
-    payload = {
-        "url": "www",
-        "method": "post",
-        "skip_tls_verify": skip_tls_verify_value,
-        "template": "pytesttemplate",
-        "headers": {"test": "test"},
         "name":"py-destinations"
     }
 
@@ -348,7 +343,6 @@ def test_e2e_createalertsql(create_session, base_url):
     ), f"Get all alerts list 200, but got {resp_create_logstream.status_code} {resp_create_logstream.content}"
 
     stream_name = "newpy_tests"
-    alert_name = "py-alert"
     is_real_time = False
     payload = {
         "name": alert_name,
@@ -372,7 +366,7 @@ def test_e2e_createalertsql(create_session, base_url):
             "threshold": 3,
             "silence": 10,
         },
-        "destinations": ["py-destinations"],
+        "destinations": [destination_name],
         "context_attributes": {},
         "enabled": True,
         "description": "",
