@@ -1283,19 +1283,19 @@ mod tests {
     async fn test_is_short_url_path() {
         // Test short URL path
         let short_url_path = ["api", "short", "abc123"];
-        assert!(is_short_url_path(&short_url_path));
+        assert!(_is_short_url_path(&short_url_path));
 
         // Test non-short URL path
         let normal_path = ["api", "v1", "logs"];
-        assert!(!is_short_url_path(&normal_path));
+        assert!(!_is_short_url_path(&normal_path));
 
         // Test path with insufficient segments
         let short_path = ["api"];
-        assert!(!is_short_url_path(&short_path));
+        assert!(!_is_short_url_path(&short_path));
 
         // Test case insensitive
         let mixed_case_path = ["api", "SHORT", "abc123"];
-        assert!(is_short_url_path(&mixed_case_path));
+        assert!(_is_short_url_path(&mixed_case_path));
     }
 
     #[test]
@@ -1350,7 +1350,7 @@ mod tests {
 
         // This test would need more setup to work properly
         // For now, just test that the function exists and compiles
-        let _ = extract_full_url(&service_req);
+        let _ = _extract_full_url(&service_req);
     }
 
     #[test]
@@ -1361,7 +1361,7 @@ mod tests {
         let error = ErrorUnauthorized("Test error");
 
         // Test that the function handles errors properly
-        let (redirect_error, _) = handle_auth_failure_for_redirect(req, &error);
+        let (redirect_error, _) = _handle_auth_failure_for_redirect(req, &error);
         // The error should be a redirect response, not necessarily contain "redirect" in the string
         assert!(!redirect_error.to_string().is_empty());
     }
