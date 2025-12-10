@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card flat class="tw-p-6">
+  <div class="tw-w-full org-dedup-settings">
     <div class="tw-mb-6">
       <div class="text-h6 tw-mb-2">Alert Correlation</div>
       <div class="text-body2 text-grey-7">
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw-px-4"
       />
     </div>
-  </q-card>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -342,7 +342,8 @@ watch(
 </script>
 
 <style scoped lang="scss">
-.q-card {
-  max-width: 1200px;
+.org-dedup-settings {
+  // Match parent card-container background
+  background: var(--o2-card-bg);
 }
 </style>

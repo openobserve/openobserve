@@ -1965,6 +1965,7 @@
     "dimensionBasedCorrelation": "基于维度的关联",
     "tracesFromService": "来自服务的跟踪：{service}",
     "noTracesFound": "未找到相关的痕迹",
-    "noTracesDescription": "在所选时间范围内未找到服务 {service} 的跟踪"
+    "noTracesDescription": "在所选时间范围内未找到服务 {service} 的跟踪",
+    "openTraceInNewWindow": "在新窗口中打开 trace"
   }
 }

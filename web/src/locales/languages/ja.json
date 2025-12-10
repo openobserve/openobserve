@@ -1962,6 +1962,7 @@
     "dimensionBasedCorrelation": "ディメンションベースの相関",
     "tracesFromService": "サービスからのトレース:{service}",
     "noTracesFound": "相関トレースは見つかりませんでした",
-    "noTracesDescription": "選択した時間範囲のサービス {service} のトレースが見つかりません"
+    "noTracesDescription": "選択した時間範囲のサービス {service} のトレースが見つかりません",
+    "openTraceInNewWindow": "トレースを新しいウィンドウで開く"
   }
 }

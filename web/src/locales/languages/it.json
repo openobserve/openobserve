@@ -1969,6 +1969,7 @@
     "dimensionBasedCorrelation": "Correlazione basata sulle dimensioni",
     "tracesFromService": "Tracce dal servizio: {service}",
     "noTracesFound": "Nessuna traccia correlata trovata",
-    "noTracesDescription": "Nessuna traccia trovata per service {service} nell'intervallo di tempo selezionato"
+    "noTracesDescription": "Nessuna traccia trovata per service {service} nell'intervallo di tempo selezionato",
+    "openTraceInNewWindow": "Apri traccia in una nuova finestra"
   }
 }

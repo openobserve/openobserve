@@ -569,30 +569,18 @@ class APICleanup {
     }
 
     /**
-     * Clean up all pipelines for specific streams
-     * Deletes pipelines where source.stream_name matches any of the target streams
-     * @param {Array<string>} streamNames - Array of stream names to match (default: ['e2e_automate', 'e2e_automate1', 'e2e_automate2', 'e2e_automate3'])
+     * Clean up all pipelines for specific streams and matching patterns
+     * Deletes pipelines where source.stream_name matches any of the target streams or patterns
+     * @param {Array<string>} streamNames - Array of stream names to match
+     * @param {Array<RegExp>} sourceStreamPatterns - Array of regex patterns to match source stream names
+     * @param {Array<RegExp>} pipelineNamePatterns - Array of regex patterns to match pipeline names
      */
-    async cleanupPipelines(streamNames = [
-        'e2e_automate',
-        'e2e_automate1',
-        'e2e_automate2',
-        'e2e_automate3',
-        'e2e_conditions_validation_precedence_src',
-        'e2e_conditions_validation_nested_and_src',
-        'e2e_conditions_validation_nested_or_src',
-        'e2e_conditions_validation_numeric_src',
-        'e2e_conditions_validation_contains_src',
-        'e2e_conditions_validation_deep_src',
-        'e2e_conditions_basic',
-        'e2e_conditions_groups',
-        'e2e_conditions_validation',
-        'e2e_conditions_precedence',
-        'e2e_conditions_multiple',
-        'e2e_conditions_delete',
-        'e2e_conditions_operators'
-    ]) {
-        testLogger.info('Starting pipeline cleanup', { streams: streamNames });
+    async cleanupPipelines(streamNames = [], sourceStreamPatterns = [], pipelineNamePatterns = []) {
+        testLogger.info('Starting pipeline cleanup', {
+            streams: streamNames,
+            sourceStreamPatterns: sourceStreamPatterns.map(p => p.toString()),
+            pipelineNamePatterns: pipelineNamePatterns.map(p => p.toString())
+        });
 
         try {
             // Fetch all pipelines
@@ -604,51 +592,17 @@ class APICleanup {
                 if (!p.source) return false;
 
                 // Exact match for stream names
-                if (streamNames.includes(p.source.stream_name)) return true;
+                if (streamNames.length > 0 && streamNames.includes(p.source.stream_name)) return true;
 
-                // Pattern match for validation tests (old naming - static names)
-                if (p.source.stream_name && p.source.stream_name.startsWith('e2e_conditions_validation_')) return true;
-
-                // Pattern match for timestamp-based test pipelines (new naming)
-                const sourceStreamPatterns = [
-                    /^e2e_precedence_src_\d+$/,
-                    /^e2e_multiple_or_src_\d+$/,
-                    /^e2e_nested_or_src_\d+$/,
-                    /^e2e_numeric_src_\d+$/,
-                    /^e2e_multiple_and_src_\d+$/,
-                    /^e2e_deep_src_\d+$/,
-                    /^e2e_not_operator_src_\d+$/,
-                    /^e2e_impossible_src_\d+$/,
-                    /^e2e_universal_src_\d+$/,
-                    /^e2e_4level_src_\d+$/,
-                    /^simple_src_\d+$/,
-                    /^manual_debug_src_/,
-                    /^manual_verify_src_/
-                ];
-
-                if (p.source.stream_name && sourceStreamPatterns.some(pattern => pattern.test(p.source.stream_name))) {
+                // Pattern match for source stream names
+                if (sourceStreamPatterns.length > 0 && p.source.stream_name &&
+                    sourceStreamPatterns.some(pattern => pattern.test(p.source.stream_name))) {
                     return true;
                 }
 
-                // Also match by pipeline name patterns for comprehensive cleanup
-                const pipelineNamePatterns = [
-                    /^validation-precedence-\d+$/,
-                    /^validation-multiple-or-\d+$/,
-                    /^validation-nested-or-\d+$/,
-                    /^validation-numeric-\d+$/,
-                    /^validation-multiple-and-\d+$/,
-                    /^validation-deep-nested-\d+$/,
-                    /^validation-not-operator-\d+$/,
-                    /^validation-impossible-\d+$/,
-                    /^validation-universal-\d+$/,
-                    /^validation-4level-\d+$/,
-                    /^simple-test-\d+$/,
-                    /^or-root-test-\d+$/,
-                    /^manual-debug-pipeline-/,
-                    /^manual-verify-pipeline-/
-                ];
-
-                if (p.name && pipelineNamePatterns.some(pattern => pattern.test(p.name))) {
+                // Pattern match for pipeline names
+                if (pipelineNamePatterns.length > 0 && p.name &&
+                    pipelineNamePatterns.some(pattern => pattern.test(p.name))) {
                     return true;
                 }
 

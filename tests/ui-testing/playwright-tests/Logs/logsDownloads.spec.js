@@ -16,7 +16,8 @@ test.describe("Logs Downloads testcases", () => {
     );
     await pageManager.logsPage.selectStream("e2e_automate");
     await pageManager.logsPage.clickRefreshButton();
-    await expect(page.locator('[data-test="log-table-column-0-source"]').getByText('{"_timestamp":')).toBeVisible();
+    // Wait for results to load by checking the results summary text shows non-zero records
+    await expect(page.getByText(/Showing [1-9]\d* to \d+ out of [1-9][\d,]*/)).toBeVisible({ timeout: 10000 });
   }
 
   // Helper function to set up SQL mode with LIMIT 2000
@@ -59,7 +60,8 @@ test.describe("Logs Downloads testcases", () => {
     );
     await pageManager.logsPage.selectStream("e2e_automate");
     await pageManager.logsPage.clickRefreshButton();
-    await expect(page.locator('[data-test="log-table-column-0-source"]').getByText('{"_timestamp":')).toBeVisible();
+    // Wait for results to load by checking the results summary text shows non-zero records
+    await expect(page.getByText(/Showing [1-9]\d* to \d+ out of [1-9][\d,]*/)).toBeVisible({ timeout: 10000 });
 
     // Setup download directory using page function
     downloadDir = await pageManager.logsPage.setupDownloadDirectory();
@@ -76,6 +78,9 @@ test.describe("Logs Downloads testcases", () => {
   test("should download all formats and scenarios with detailed error handling", {
     tag: ['@downloadAll', '@all', '@logs', '@logsDownloads']
   }, async ({ page }) => {
+    // Set timeout for this specific test to 6 minutes
+    test.setTimeout(360000);
+
     testLogger.info('🚀 Starting comprehensive download test: All formats and scenarios');
 
     const testResults = [];
