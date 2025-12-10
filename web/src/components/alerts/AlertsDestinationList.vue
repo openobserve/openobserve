@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <q-btn
                   class="q-mt-md"
-                  label="Create Template"
+                  :label="t('alerts.createTemplate')"
                   size="md"
                   color="primary"
                   no-caps

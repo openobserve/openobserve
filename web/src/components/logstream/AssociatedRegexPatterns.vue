@@ -485,7 +485,7 @@ export default defineComponent({
           } catch (error) {
             $q.notify({
               color: "negative",
-              message: error.response?.data?.message || "Failed to test string",
+              message: error.response?.data?.message || t('logStream.failedToTestString'),
               timeout: 4000,
             });
           }
@@ -682,7 +682,7 @@ export default defineComponent({
           else{
             if(apply_at.value.length == 0){
               $q.notify({
-                message: "Please select detect at option",
+                message: t('logStream.selectDetectAtOption'),
                 color: "negative",
                 icon: "error",
               });

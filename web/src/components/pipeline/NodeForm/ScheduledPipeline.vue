@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <FullViewContainer
                     name="query"
                     v-model:is-expanded="expandState.buildQuery"
-                    label="Build Query"
+                    :label="t('pipeline.buildQuery')"
                     class="tw-mt-1"
                   />
                 </span>
@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <FullViewContainer
                     name="query"
                     v-model:is-expanded="expandState.setVariables"
-                    label="Set Variables"
+                    :label="t('pipeline.setVariables')"
                     class="tw-mt-1"
                   />
                 </span>
@@ -851,7 +851,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="text-red-8 q-pt-xs"
                           style="font-size: 11px; line-height: 12px"
                         >
-                          {{ cronJobError || "Field is required!" }}
+                          {{ cronJobError || t('pipeline.error.fieldRequired') }}
                         </div>
                       </div>
                     </div>
@@ -1104,7 +1104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <FullViewContainer
                       name="output"
                       v-model:is-expanded="expandState.output"
-                      label="Output"
+                      :label="t('pipeline.output')"
                       class="tw-mt-1"
                     />
                   </span>
@@ -1749,7 +1749,7 @@ function convertCronToMinutes(cronExpression: string) {
 
     return diffInMinutes;
   } catch (err) {
-    cronJobError.value = "Invalid cron expression";
+    cronJobError.value = t("pipeline.error.invalidCron");
     return -1;
   }
 }
@@ -2007,11 +2007,11 @@ const validateFrequency = () => {
       ) {
         const minInterval =
           Number(store.state?.zoConfig?.min_auto_refresh_interval) || 1;
-        cronJobError.value = `Frequency should be greater than ${minInterval - 1} seconds.`;
+        cronJobError.value = t("pipeline.error.frequencyTooLow", { minInterval: minInterval - 1 });
         return;
       }
     } catch (err) {
-      cronJobError.value = "Invalid cron expression";
+      cronJobError.value = t("pipeline.error.invalidCron");
     }
   }
 
@@ -2174,11 +2174,11 @@ const runQuery = async () => {
   //check if datetime is present or not 
   //else show the error message
   if(!dateTime.value.startTime) {
-    notificationMsgValue.value = "The selected start time is  invalid. Please choose a valid time.";
+    notificationMsgValue.value = t("pipeline.error.invalidStartTime");
     return null;
   }
   if(!dateTime.value.endTime){
-     notificationMsgValue.value = "The selected end time is  invalid. Please choose a valid time.";
+     notificationMsgValue.value = t("pipeline.error.invalidEndTime");
      return null;
   }
   if (tab.value == "sql") {
@@ -2212,7 +2212,7 @@ const runQuery = async () => {
           notificationMsgValue.value = err.response?.data?.message || err.response?.data
         }
         else {
-          notificationMsgValue.value = "Error while getting results"
+          notificationMsgValue.value = t("pipeline.error.gettingResults")
         }
       })
       .finally(() => {

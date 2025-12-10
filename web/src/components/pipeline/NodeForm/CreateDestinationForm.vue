@@ -33,13 +33,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Step 1: Choose Destination Type -->
         <q-step
           :name="1"
-          title="Choose Type"
+          :title="t('pipeline.destination.chooseType')"
           icon="category"
           :done="step > 1"
           :header-nav="step > 1"
         >
           <div class="text-subtitle2 q-mb-md" style="font-weight: 500">
-            Select Destination Type <span class="text-red">*</span>
+            {{ t('pipeline.destination.selectType') }} <span class="text-red">*</span>
           </div>
           <div class="destination-type-grid">
             <div
@@ -80,13 +80,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Step 2: Connection Details -->
         <q-step
           :name="2"
-          title="Connection"
+          :title="t('pipeline.destination.connection')"
           icon="settings_ethernet"
           :done="step > 2"
           :header-nav="step > 2"
         >
           <div class="text-subtitle2 q-mb-lg" style="font-weight: 500">
-            Connection Details
+            {{ t('pipeline.destination.connectionDetails') }}
           </div>
 
           <div class="q-gutter-sm">
@@ -687,7 +687,7 @@ const destinationTypes = [
     image: getImageURL("images/pipeline/newrelic.png"),
   },
   {
-    label: "Custom",
+    label: t("pipeline.destination.custom"),
     value: "custom",
     icon: "settings",
     image: getImageURL("images/pipeline/custom.png"),

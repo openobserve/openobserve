@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-item-label class="text-weight-medium">{{ group.display }}</q-item-label>
                     <q-item-label caption lines="1">
                       {{ group.id }} • {{ group.fields.length }} fields
-                      <q-badge v-if="group.normalize" color="blue" label="norm" class="q-ml-xs" />
+                      <q-badge v-if="group.normalize" color="blue" :label="t('alerts.norm')" class="q-ml-xs" />
                     </q-item-label>
                   </q-item-section>
                   <q-item-section side>
@@ -282,8 +282,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ field }}
         </q-chip>
         <div class="q-mt-md">
-          <q-badge v-if="selectedGroup?.normalize" color="blue" label="Normalized" />
-          <q-badge v-else color="grey" label="Not Normalized" />
+          <q-badge v-if="selectedGroup?.normalize" color="blue" :label="t('alerts.normalized')" />
+          <q-badge v-else color="grey" :label="t('alerts.notNormalized')" />
         </div>
       </q-card-section>
 
@@ -354,6 +354,7 @@ import { ref, computed } from "vue";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import BaseImport from "@/components/common/BaseImport.vue";
 import alertsService from "@/services/alerts";
 
@@ -378,6 +379,7 @@ interface SemanticGroupDiff {
 const router = useRouter();
 const q = useQuasar();
 const store = useStore();
+const { t } = useI18n();
 
 const jsonFile = ref<File | null>(null);
 const importedGroups = ref<SemanticGroup[]>([]);

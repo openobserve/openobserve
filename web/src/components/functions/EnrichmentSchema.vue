@@ -90,7 +90,7 @@
           </div>
           <div class="flex items-center justify-between tw-gap-4 tw-mt-4">
             <div class="tw-text-sm display-total-fields">
-                All Fields ({{ schemaData.schema.length }})
+                {{ t('function.allFields', { count: schemaData.schema.length }) }}
             </div>
                 <q-input
                   data-test="schema-field-search-input"

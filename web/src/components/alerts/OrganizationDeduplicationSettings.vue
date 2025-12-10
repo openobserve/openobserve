@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dense
         filled
         min="1"
-        placeholder="Use alert period by default"
+        :placeholder="t('alerts.useAlertPeriodPlaceholder')"
         :class="
           store.state.theme === 'dark'
             ? 'input-box-bg-dark input-border-dark'
@@ -157,11 +157,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
+import { useI18n } from "vue-i18n";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import alertsService from "@/services/alerts";
 
 const store = useStore();
 const $q = useQuasar();
+const { t } = useI18n();
 
 interface SemanticFieldGroup {
   id: string;

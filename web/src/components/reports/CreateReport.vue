@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               width: 22px;
               height: 22px;
             "
-            title="Go Back"
+            :title="t('reports.goBack')"
             @click="router.back()"
           >
             <q-icon name="arrow_back_ios_new" size="14px" />
@@ -73,14 +73,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   (val: any) =>
                     !!val
                       ? isValidResourceName(val) ||
-                        `Characters like :, ?, /, #, and spaces are not allowed.`
+                        t('reports.invalidCharactersMessage')
                       : t('common.nameRequired'),
                 ]"
                 tabindex="0"
                 style="width: 400px"
               >
                 <template v-slot:hint>
-                  Characters like :, ?, /, #, and spaces are not allowed.
+                  {{ t('reports.invalidCharactersHint') }}
                 </template>
               </q-input>
             </div>
@@ -122,8 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   self="center left"
                   class="tw-text-[12px]"
                 >
-                  Note: Cached reports are stored for quick access to dashboards;
-                  sharing is disabled for these reports.</q-tooltip
+                  {{ t('reports.cachedReportNote') }}</q-tooltip
                 >
               </q-icon>
             </div>
@@ -139,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-step
                 data-test="add-report-select-dashboard-step"
                 :name="1"
-                title="Select Dashboard"
+                :title="t('reports.selectDashboard')"
                 :icon="outlinedDashboard"
                 :done="step > 1"
               >
@@ -181,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             onFilterOptions('folders', args[0], args[1])
                         "
                         behavior="menu"
-                        :rules="[(val: any) => !!val || 'Field is required!']"
+                        :rules="[(val: any) => !!val || t('reports.fieldRequired')]"
                         style="
                           min-width: 250px !important;
                           width: 100% !important;
@@ -220,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             onFilterOptions('dashboards', args[0], args[1])
                         "
                         behavior="menu"
-                        :rules="[(val: any) => !!val || 'Field is required!']"
+                        :rules="[(val: any) => !!val || t('reports.fieldRequired')]"
                         style="
                           min-width: 250px !important;
                           width: 100% !important;
@@ -252,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         input-style="text-transform: none;"
                         :input-debounce="400"
                         :rules="[
-                          (val: any) => !!val.length || 'Field is required!',
+                          (val: any) => !!val.length || t('reports.fieldRequired'),
                         ]"
                         @filter="
                           (...args: any) =>
@@ -274,10 +273,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           style="font-size: 14px"
                           class="text-bold text-grey-8"
                         >
-                          Time Range*
+                          {{ t('reports.timeRangeRequired') }}
                         </div>
                         <div style="font-size: 12px">
-                          Generates report with the data from specified time range
+                          {{ t('reports.timeRangeDescription') }}
                         </div>
                       </div>
                       <DateTime
@@ -313,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
                     flat
                     no-caps
-                    :label="'Continue'"
+                    :label="t('reports.continue')"
                   />
                 </q-stepper-navigation>
               </q-step>
@@ -321,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-step
                 data-test="add-report-select-schedule-step"
                 :name="2"
-                title="Schedule"
+                :title="t('reports.schedule')"
                 icon="schedule"
                 :done="step > 2"
                 class="q-mt-md"
@@ -338,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="font-size: 14px"
                     class="text-bold text-grey-8 q-mb-sm"
                   >
-                    Frequency
+                    {{ t('reports.frequency') }}
                   </div>
                   <div
                     style="
@@ -385,17 +384,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                             <q-tooltip anchor="center right" self="center left">
                               <span style="font-size: 14px">
-                                Pattern: * * * * * * means every second.
-                                <br />
-                                Format: [Second (optional) 0-59] [Minute 0-59]
-                                [Hour 0-23] [Day of Month 1-31, 'L'] [Month 1-12]
-                                [Day of Week 0-7 or '1L-7L', 0 and 7 for Sunday].
-                                <br />
-                                Use '*' to represent any value, 'L' for the last
-                                day/weekday. <br />
-                                Example: 0 0 12 * * ? - Triggers at 12:00 PM
-                                daily. It specifies second, minute, hour, day of
-                                month, month, and day of week, respectively.</span
+                                {{ t('reports.cronTooltipText') }}</span
                               >
                             </q-tooltip>
                           </q-icon>
@@ -413,7 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 ? cronError.length
                                   ? cronError
                                   : true
-                                : 'Field is required!',
+                                : t('reports.fieldRequired'),
                           ]"
                           dense
                           style="width: 100%"
@@ -442,7 +431,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           hide-selected
                           :label="t('logStream.timezone') + ' *'"
                           :display-value="`Timezone: ${timezone}`"
-                          :rules="[(val: any) => !!val || 'Field is required!']"
+                          :rules="[(val: any) => !!val || t('reports.fieldRequired')]"
                           class="timezone-select showLabelOnTop"
                           stack-label
                           outlined
@@ -491,10 +480,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           self="center left"
                           class="tw-text-[12px]"
                         >
-                          "Schedule Now" will schedule the report using the
-                          current date, time, and timezone.<br />
-                          In "Schedule Later" you can customize the date, time,
-                          and timezone.
+                          {{ t('reports.scheduleTooltipText') }}
                         </q-tooltip>
                       </q-icon>
                     </div>
@@ -511,7 +497,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <q-input
                           filled
                           v-model="frequency.custom.interval"
-                          label="Repeat every *"
+                          :label="t('reports.repeatEvery')"
                           color="input-border"
                           bg-color="input-bg"
                           class="showLabelOnTop"
@@ -519,7 +505,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           type="number"
                           outlined
                           dense
-                          :rules="[(val: any) => !!val || 'Field is required!']"
+                          :rules="[(val: any) => !!val || t('reports.fieldRequired')]"
                           style="width: 100%"
                         />
                       </div>
@@ -532,7 +518,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <q-select
                           v-model="frequency.custom.period"
                           :options="customFrequencyOptions"
-                          :label="'Frequency *'"
+                          :label="t('reports.frequencyRequired')"
                           :popup-content-style="{ textTransform: 'capitalize' }"
                           color="input-border"
                           bg-color="input-bg"
@@ -542,7 +528,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           stack-label
                           dense
                           behavior="menu"
-                          :rules="[(val: any) => !!val || 'Field is required!']"
+                          :rules="[(val: any) => !!val || t('reports.fieldRequired')]"
                           style="width: 100% !important"
                         />
                       </div>
@@ -560,7 +546,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <q-input
                           filled
                           v-model="scheduling.date"
-                          label="Start Date *"
+                          :label="t('reports.startDateRequired')"
                           color="input-border"
                           bg-color="input-bg"
                           class="showLabelOnTop"
@@ -568,7 +554,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             (val: any) =>
                               /^(0[1-9]|[12]\d|3[01])-(0[1-9]|1[0-2])-\d{4}$/.test(
                                 val,
-                              ) || 'Date format is incorrect!',
+                              ) || t('reports.incorrectDateFormat'),
                           ]"
                           stack-label
                           outlined
@@ -607,7 +593,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <q-input
                           filled
                           v-model="scheduling.time"
-                          label="Start Time *"
+                          :label="t('reports.startTimeRequired')"
                           color="input-border"
                           bg-color="input-bg"
                           class="showLabelOnTop"
@@ -661,7 +647,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           hide-selected
                           :label="t('logStream.timezone') + ' *'"
                           :display-value="`Timezone: ${timezone}`"
-                          :rules="[(val: any) => !!val || 'Field is required!']"
+                          :rules="[(val: any) => !!val || t('reports.fieldRequired')]"
                           class="timezone-select showLabelOnTop"
                           stack-label
                           outlined
@@ -679,7 +665,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click="step = 1"
                     class="o2-secondary-button tw-h-[36px] q-ml-sm"
                     :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                    :label="'Back'"
+                    :label="t('reports.back')"
                     no-caps
                   />
                   <q-btn
@@ -690,7 +676,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
                     flat
                     no-caps
-                    :label="'Continue'"
+                    :label="t('reports.continue')"
                   />
                 </q-stepper-navigation>
               </q-step>
@@ -699,7 +685,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="!isCachedReport"
                 data-test="add-report-share-step"
                 :name="3"
-                title="Share"
+                :title="t('reports.share')"
                 icon="mail"
                 :done="step > 3"
                 class="q-mt-md"
@@ -720,7 +706,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       filled
                       dense
                       :rules="[
-                        (val: any) => !!val.trim() || 'Field is required!',
+                        (val: any) => !!val.trim() || t('reports.fieldRequired'),
                       ]"
                       tabindex="0"
                       style="width: 400px"
@@ -745,7 +731,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         (val: any) =>
                           /^([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(\s*[;,]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))*$/.test(
                             val,
-                          ) || 'Add valid emails!',
+                          ) || t('reports.addValidEmails'),
                       ]"
                       tabindex="0"
                       style="width: 100%"
@@ -755,7 +741,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div data-test="add-report-share-message-section">
                     <div style="font-size: 14px" class="text-bold text-grey-8">
-                      Message
+                      {{ t('reports.message') }}
                     </div>
 
                     <div data-test="add-report-share-message-input">
@@ -774,7 +760,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click="step = 2"
                     class="o2-secondary-button tw-h-[36px] q-ml-sm"
                     :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                    :label="'Back'"
+                    :label="t('reports.back')"
                     no-caps
                   />
                 </q-stepper-navigation>
@@ -932,42 +918,42 @@ const dialog = ref({
 
 const timeTabs = [
   {
-    label: "Schedule now",
+    label: t("reports.scheduleNow"),
     value: "scheduleNow",
   },
   {
-    label: "Schedule later",
+    label: t("reports.scheduleLater"),
     value: "scheduleLater",
   },
 ];
 
 const frequencyTabs = [
   {
-    label: "Cron Job",
+    label: "Cron Job", // Keep as is since it's technical
     value: "cron",
   },
   {
-    label: "Once",
+    label: t("reports.once"),
     value: "once",
   },
   {
-    label: "Hourly",
+    label: t("reports.hourly"),
     value: "hours",
   },
   {
-    label: "Daily",
+    label: t("reports.daily"),
     value: "days",
   },
   {
-    label: "Weekly",
+    label: t("reports.weekly"),
     value: "weeks",
   },
   {
-    label: "Monthly",
+    label: t("reports.monthly"),
     value: "months",
   },
   {
-    label: "Custom",
+    label: t("reports.custom"),
     value: "custom",
   },
 ];
@@ -1030,7 +1016,7 @@ onBeforeMount(async () => {
           q.notify({
             type: "negative",
             message:
-              err.response?.data?.message || "Error while fetching report!",
+              err.response?.data?.message || t("reports.errorFetchingReports"),
             timeout: 4000,
           });
         }
@@ -1175,19 +1161,19 @@ const updateDateTime = (datetime: any) => {
 
 const customFrequencyOptions = [
   {
-    label: "days",
+    label: t("reports.daily"),
     value: "days",
   },
   {
-    label: "hours",
+    label: t("reports.hourly"),
     value: "hours",
   },
   {
-    label: "weeks",
+    label: t("reports.weekly"),
     value: "weeks",
   },
   {
-    label: "months",
+    label: t("reports.monthly"),
     value: "months",
   },
 ];
@@ -1363,7 +1349,7 @@ const saveReport = async () => {
 
   const dismiss = q.notify({
     spinner: true,
-    message: "Please wait...",
+    message: t("reports.pleaseWait"),
     timeout: 2000,
   });
 
@@ -1371,9 +1357,7 @@ const saveReport = async () => {
     .then(() => {
       q.notify({
         type: "positive",
-        message: `Report ${
-          isEditingReport.value ? "updated" : "saved"
-        } successfully.`,
+        message: isEditingReport.value ? t("reports.reportUpdatedSuccessfully") : t("reports.reportSavedSuccessfully"),
         timeout: 3000,
       });
       goToReports();
@@ -1384,9 +1368,7 @@ const saveReport = async () => {
           type: "negative",
           message:
             error?.response?.data?.message ||
-            `Error while ${
-              isEditingReport.value ? "updating" : "saving"
-            } report.`,
+            isEditingReport.value ? t("reports.errorUpdatingReport") : t("reports.errorSavingReport"),
           timeout: 4000,
         });
       }
@@ -1443,7 +1425,7 @@ const validateReportData = async () => {
       cronParser.parseExpression(frequency.value.cron);
       validateFrequency();
     } catch (err) {
-      cronError.value = "Invalid cron expression!";
+      cronError.value = t("reports.invalidCronExpression");
       return;
     }
   }
@@ -1484,8 +1466,7 @@ const validateFrequency = () => {
 
       // parse cron expression
       if (frequency.value.cron.trim().split(" ").length !== 6) {
-        cronError.value =
-          "Cron expression must have exactly 6 fields: [Second] [Minute] [Hour] [Day of Month] [Month] [Day of Week]";
+        cronError.value = t("reports.cronMustHaveSixFields");
         return;
       }
 
@@ -1495,11 +1476,11 @@ const validateFrequency = () => {
       ) {
         const minInterval =
           Number(store.state?.zoConfig?.min_auto_refresh_interval) || 1;
-        cronError.value = `Frequency should be greater than ${minInterval - 1} seconds.`;
+        cronError.value = t("reports.frequencyTooLow", { minInterval: minInterval - 1 });
         return;
       }
     } catch (err) {
-      cronError.value = "Invalid cron expression!";
+      cronError.value = t("reports.invalidCronExpression");
       return;
     }
   }
@@ -1624,7 +1605,7 @@ const setupEditingReport = async (report: any) => {
     formData.value.dashboards[0].folder = "";
     q.notify({
       type: "negative",
-      message: "Selected folder has been deleted!",
+      message: t("reports.folderDeleted"),
       timeout: 4000,
     });
   }
@@ -1640,7 +1621,7 @@ const setupEditingReport = async (report: any) => {
     formData.value.dashboards[0].dashboard = "";
     q.notify({
       type: "negative",
-      message: "Selected dashboard has been deleted!",
+      message: t("reports.dashboardDeleted"),
       timeout: 4000,
     });
   }
@@ -1657,7 +1638,7 @@ const setupEditingReport = async (report: any) => {
   } else {
     q.notify({
       type: "negative",
-      message: "Selected dashboard tab has been deleted!",
+      message: t("reports.tabDeleted"),
       timeout: 4000,
     });
     formData.value.dashboards[0].tabs = "";
@@ -1674,8 +1655,8 @@ const openCancelDialog = () => {
     return;
   }
   dialog.value.show = true;
-  dialog.value.title = "Discard Changes";
-  dialog.value.message = "Are you sure you want to cancel report changes?";
+  dialog.value.title = t("reports.discardChanges");
+  dialog.value.message = t("reports.confirmDiscardChanges");
   dialog.value.okCallback = goToReports;
 };
 </script>

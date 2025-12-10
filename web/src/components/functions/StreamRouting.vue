@@ -1,7 +1,7 @@
 <template>
   <div data-test="add-stream-routing-section" class="bg-white full-height">
     <div class="q-py-sm q-px-md flex justify-between items-center">
-      <div class="stream-routing-title">Stream Routing</div>
+      <div class="stream-routing-title">{{ t('function.streamRouting') }}</div>
       <q-icon
         data-test="stream-routing-close-dialog-btn"
         name="cancel"
@@ -29,7 +29,7 @@
           dense
           v-bind:readonly="isUpdating"
           v-bind:disable="isUpdating"
-          :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+          :rules="[(val: any) => !!val.trim() || t('function.fieldRequired')]"
           tabindex="0"
           style="width: 480px"
         />
@@ -55,7 +55,7 @@
             v-bind:readonly="isUpdating"
             v-bind:disable="isUpdating"
             @update:model-value="updateStreams()"
-            :rules="[(val: any) => !!val || 'Field is required!']"
+            :rules="[(val: any) => !!val || t('function.fieldRequired')]"
             style="min-width: 220px"
           />
         </div>
@@ -87,7 +87,7 @@
               updateStreamFields(streamRoute.sourceStreamName)
             "
             behavior="menu"
-            :rules="[(val: any) => !!val || 'Field is required!']"
+            :rules="[(val: any) => !!val || t('function.fieldRequired')]"
             style="min-width: 250px !important; width: 250px !important"
           />
         </div>
@@ -296,8 +296,8 @@ const openCancelDialog = () => {
     return;
   }
   dialog.value.show = true;
-  dialog.value.title = "Discard Changes";
-  dialog.value.message = "Are you sure you want to cancel routing changes?";
+  dialog.value.title = t("function.discardChanges");
+  dialog.value.message = t("function.confirmCancelRoutingChanges");
   dialog.value.okCallback = goToRoutings;
 };
 

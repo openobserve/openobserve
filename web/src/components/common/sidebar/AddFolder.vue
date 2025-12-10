@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 folderData.value,
                 props.type
               );
-              showPositiveNotification("Folder updated successfully", {
+              showPositiveNotification(t('common.folderUpdatedSuccessfully'), {
                 timeout: 2000,
               });
               emit("update:modelValue", folderData.value);
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               folderData.value.name = folderData.value.name.trim();
               const newFolder: any = await createFolderByType(store, folderData.value, props.type);
               emit("update:modelValue", newFolder);
-              showPositiveNotification("Folder added successfully", {
+              showPositiveNotification(t('common.folderAddedSuccessfully'), {
                 timeout: 2000,
               });
             }
@@ -187,8 +187,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             showErrorNotification(
               err?.response?.data?.message ??
                 (props.editMode
-                  ? "Folder updation failed"
-                  : "Folder creation failed"),
+                  ? t('common.folderUpdateFailed')
+                  : t('common.folderCreationFailed')),
               { timeout: 2000 }
             );
           }

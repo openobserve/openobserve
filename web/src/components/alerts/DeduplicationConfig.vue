@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 filled
                 min="1"
-                placeholder="Use alert period by default"
+                :placeholder="t('alerts.useAlertPeriodPlaceholder')"
                 :class="store.state.theme === 'dark' ? 'input-box-bg-dark input-border-dark' : 'input-box-bg-light input-border-light'"
                 @update:model-value="emitUpdate"
               />

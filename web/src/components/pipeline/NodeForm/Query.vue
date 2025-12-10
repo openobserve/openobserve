@@ -344,8 +344,8 @@ const openCancelDialog = () => {
   }
 
   dialog.value.show = true;
-  dialog.value.title = "Discard Changes";
-  dialog.value.message = "Are you sure you want to cancel routing changes?";
+  dialog.value.title = t("pipeline.discardChanges");
+  dialog.value.message = t("pipeline.error.cancelRoutingConfirm");
   dialog.value.okCallback = closeDialog;
 };
 
@@ -431,8 +431,8 @@ const saveQueryData = async () => {
 
 const openDeleteDialog = () => {
   dialog.value.show = true;
-  dialog.value.title = "Delete Node";
-  dialog.value.message = "Are you sure you want to delete stream routing?";
+  dialog.value.title = t("pipeline.deleteNode");
+  dialog.value.message = t("pipeline.error.deleteRoutingConfirm");
   dialog.value.okCallback = deleteRoute;
 };
 
@@ -519,8 +519,8 @@ const validateSqlQuery = async () => {
         if (err) {
           isValidSqlQuery.value = false;
           const message = err?.response?.data?.message
-            ? `Invalid SQL Query: ${err?.response?.data?.message}`
-            : "Invalid SQL Query";
+            ? `${t('pipeline.error.invalidSql')}: ${err?.response?.data?.message}`
+            : t('pipeline.error.invalidSql');
           q.notify({
             type: "negative",
             message: `${message}`,

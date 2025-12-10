@@ -248,8 +248,8 @@
       ]);
     const deleteDialog = ref({
       show: false,
-      title: "Delete Regex Pattern",
-      message: "Are you sure you want to delete this regex pattern?",
+      title: t('settings.deleteRegexPatternTitle'),
+      message: t('settings.deleteRegexPatternConfirm'),
       data: "" as any,
     });
 
@@ -345,7 +345,7 @@
         resultTotal.value = regexPatterns.value.length;
       } catch (error) {
         $q.notify({
-          message: error.data.message || "Error fetching regex patterns",
+          message: error.data.message || t('settings.errorFetchingRegexPatterns'),
           color: "negative",
           icon: "error",
         });
@@ -371,13 +371,13 @@
         await regexPatternsService.delete(store.state.selectedOrganization.identifier, deleteDialog.value.data);
         getRegexPatterns();
         $q.notify({
-          message: `Regex pattern deleted successfully.`,
+          message: t('settings.regexPatternDeletedSuccess'),
           color: "positive",
           timeout: 1500,
         });
       } catch (error) {
         $q.notify({
-          message: error?.data?.message || error?.response?.data?.message || "Error deleting regex pattern",
+          message: error?.data?.message || error?.response?.data?.message || t('settings.errorDeletingRegexPattern'),
           color: "negative",
           timeout: 1500,
         });
@@ -412,13 +412,13 @@
       link.download = `${row.name || 'regex_pattern'}.json`;
       link.click();
       $q.notify({
-        message: `Regex pattern exported successfully`,
+        message: t('settings.regexPatternExportedSuccess'),
         color: "positive",
         icon: "check",
       });
     } catch (error) {
       $q.notify({
-        message: error.data.message || "Error exporting regex pattern",
+        message: error.data.message || t('settings.errorExportingRegexPattern'),
         color: "negative",
         icon: "error",
       });

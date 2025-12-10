@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="q-pl-sm">
                   <q-btn
                     data-test="create-destination-btn"
-                    label="Add New Destination"
+                    :label="t('alerts.addNewDestination')"
                     class="text-bold no-border"
                     color="primary"
                     no-caps

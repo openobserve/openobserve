@@ -96,8 +96,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         borderless
                         :lazy-rules="true"
                         :hide-bottom-space="true"
-                        :rules="[val => val !== '' || '* Name is required']"
-                        placeholder="Eg. Internal Passwords"
+                        :rules="[val => val !== '' || t('settings.regexNameRequired')]"
+                        :placeholder="t('settings.regexNamePlaceholder')"
                         />
                     <q-input
                         v-bind:readonly="isEdit"
@@ -110,19 +110,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :hide-bottom-space="true"
                         dense
                         data-test="add-regex-pattern-description-input"
-                        placeholder="Describe your pattern to help users understand"
+                        :placeholder="t('settings.regexDescriptionPlaceholder')"
                         />
                 <div class="regex-pattern-input-container">
                     <div class="tw-flex tw-items-center tw-justify-between">
                         <span class="regex-pattern-input-label">
-                            Regex Pattern
+                            {{ t('settings.regexPatternLabel') }}
                         </span>
                         <q-btn v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
                          class="tw-px-2 tw-py-1 tw-flex tw-items-center"
                         style="border-radius: 4px;" dense no-caps flat  @click="toggleAIChat">
                         <img :src="goToAILogo" class="tw-w-[20px] tw-h-[20px] tw-mr-1" />
                         <span class="tw-text-[#5960B2] tw-text-sm tw-flex tw-items-center tw-gap-1">
-                            Try O2 AI to write expressions 
+                            {{ t('settings.tryO2AILabel') }}
                         </span>
                         <q-icon size="sm" name="arrow_right_alt" class="tw-text-[#5960B2] tw-w-[20px] tw-h-[20px] tw-ml-1" />
 
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     : 'tw-text-[#6B7280]',
                                 ]"
                                 >
-                                Write Pattern
+                                {{ t('settings.writePatternLabel') }}
                                 </div>    
                         </div>
                             <q-input
@@ -155,9 +155,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             tabindex="0"
                             style="width: 100%; resize: none;"
                             type="textarea"
-                            placeholder="Eg. \d....\d "
+                            :placeholder="t('settings.regexPatternPlaceholder')"
                             rows="5"
-                            :rules="[val => val !== '' || '* Pattern is required']"
+                            :rules="[val => val !== '' || t('settings.regexPatternRequired')]"
                             :hide-bottom-space="true"
                         />
                     </div>
@@ -166,13 +166,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div>
                     <div class="tw-flex tw-items-center tw-justify-between">
                         <span class="regex-pattern-test-string-label">
-                            Test Regex Pattern
+                            {{ t('settings.testRegexPatternLabel') }}
                         </span>
                         <div class="tw-h-[19px] tw-flex tw-items-center tw-justify-center tw-font-[600]" style="border-radius: 3px;">
                             <q-btn :disable="regexPatternInputs.pattern.length === 0" class="tw-px-2 tw-bg-[#5960B2] tw-text-[12px] tw-text-white tw-min-h-[19px] tw-h-[19px] tw-flex tw-items-center tw-justify-center"
                         style="border-radius: 3px;" flat dense no-caps borderless  @click="testStringOutput">
                         <span>
-                            Test Input
+                            {{ t('settings.testInputLabel') }}
                         </span>
                     </q-btn>
                         </div>
@@ -182,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <FullViewContainer
                         name="query"
                         v-model:is-expanded="expandState.regexTestString"
-                        label="Input string"
+                        :label="t('settings.inputStringLabel')"
                         class="tw-mt-1 tw-py-md tw-h-[24px]"
                         :labelClass="store.state.theme === 'dark' ? 'dark-test-string-container-label' : 'light-test-string-container-label'"
                     >
@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         tabindex="0"
                         style="width: 100%; resize: none;"
                         type="textarea"
-                        placeholder="Eg. 1234567890"
+                        :placeholder="t('settings.testStringPlaceholder')"
                         rows="5"
                         />
                     </div>
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <FullViewContainer
                         name="output"
                         v-model:is-expanded="expandState.outputString"
-                        label="Output"
+                        :label="t('settings.outputLabel')"
                         class="tw-mt-1 tw-py-md tw-h-[24px]"
                         :labelClass="store.state.theme === 'dark' ? 'dark-test-string-container-label' : 'light-test-string-container-label'"
                     >
@@ -234,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         tabindex="0"
                         style="width: 100%; resize: none;"
                         type="textarea"
-                        placeholder="Output String"
+                        :placeholder="t('settings.outputStringPlaceholder')"
                         rows="5"
                         />
                         <div v-else class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-[111px] " 
@@ -244,7 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <div v-if="!testLoading && outputString.length === 0">
                                 <q-icon :name="outlinedLightbulb" size="24px" :class="store.state.theme === 'dark' ? 'tw-text-[#ffffff]' : 'tw-text-[#A8A8A8]'" />
                             <span class="tw-text-[12px] tw-font-[400] tw-text-center" :class="store.state.theme === 'dark' ? 'tw-text-[#ffffff]' : 'tw-text-[#4B5563]'">
-                                Please click Test Input to see the results
+                                {{ t('settings.clickTestInputMessage') }}
                             </span>
                             </div>
                             <div v-else-if="testLoading">
@@ -270,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <q-btn
                     class="o2-primary-button no-border tw-h-[36px]"
-                    :label="isSaving ? 'Saving...' : isEdit ? t('regex_patterns.update_close') : t('regex_patterns.create_close')"
+                    :label="isSaving ? t('settings.savingLabel') : isEdit ? t('regex_patterns.update_close') : t('regex_patterns.create_close')"
                     type="submit"
                     no-caps
                     flat
@@ -440,7 +440,7 @@ setup(props, {emit}) {
             if(response.status == 200){
                 q.notify({
                     color: "positive",
-                    message: props.isEdit ? "Regex pattern updated successfully" : "Regex pattern created successfully",
+                    message: props.isEdit ? t('settings.regexPatternUpdatedSuccess') : t('settings.regexPatternCreatedSuccess'),
                     timeout: 4000,
                 });
                 emit("close");
@@ -450,7 +450,7 @@ setup(props, {emit}) {
             if(error.response.status != 403){
                 q.notify({
                     color: "negative",
-                    message: error.response?.data?.message || (props.isEdit ? "Failed to update regex pattern" : "Failed to create regex pattern"),
+                    message: error.response?.data?.message || (props.isEdit ? t('settings.regexPatternUpdateFailed') : t('settings.regexPatternCreateFailed')),
                     timeout: 4000,
                 });
             }
@@ -475,7 +475,7 @@ setup(props, {emit}) {
         } catch (error) {
             q.notify({
                 color: "negative",
-                message: error.response?.data?.message || "Failed to test string",
+                message: error.response?.data?.message || t('settings.testStringFailed'),
                 timeout: 4000,
             });
         }

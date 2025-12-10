@@ -1,11 +1,11 @@
 <template>
   <div class="q-pa-md">
     <LicensePeriod @updateLicense="showUpdateFormAndFocus"></LicensePeriod>
-    <div class="text-h6 q-mb-md">License Management</div>
+    <div class="text-h6 q-mb-md">{{ t('settings.licenseManagementTitle') }}</div>
 
     <div v-if="loading" class="q-pa-md text-center">
       <q-spinner size="40px" />
-      <div class="q-mt-md">Loading license information...</div>
+      <div class="q-mt-md">{{ t('settings.loadingLicenseInfo') }}</div>
     </div>
     <div v-else class="tw-grid tw-grid-cols-3 tw-gap-4 tw-items-start tw-pb-4">
 
@@ -13,16 +13,16 @@
       <div v-if="licenseData.license === null || !licenseData.license">
         <q-card class="q-mb-md">
           <q-card-section>
-            <div class="text-h6">No License Found</div>
+            <div class="text-h6">{{ t('settings.noLicenseFound') }}</div>
             <div class="q-mt-sm text-body2">
-              Installation ID: <strong>{{ licenseData.installation_id || 'N/A' }}</strong>
+              <span v-html="t('settings.installationIdLabel', { installationId: licenseData.installation_id || 'N/A' })"></span>
             </div>
             <div class="q-mt-md text-body2">
-              Contact your administrator for getting a license and paste the key here, <strong>or:</strong>
+              <span v-html="t('settings.contactAdminForLicense')"></span>
               <q-btn
                 color="primary"
                 no-caps
-                label="Get License"
+                :label="t('settings.getLicenseButton')"
                 @click="redirectToGetLicense"
                 class="q-ml-sm"
                 size="sm"
@@ -34,24 +34,24 @@
 
         <q-card>
           <q-card-section>
-            <div class="text-subtitle1 q-mb-md">Enter License Key</div>
+            <div class="text-subtitle1 q-mb-md">{{ t('settings.enterLicenseKeyTitle') }}</div>
             <q-input
               v-model="licenseKey"
               outlined
               type="textarea"
               rows="8"
-              placeholder="Paste your license key here..."
+              :placeholder="t('settings.pasteLicenseKeyPlaceholder')"
               style="height: 200px;"
             />
             <div v-if="isLicenseKeyAutoFilled" class="q-mt-sm q-mb-md">
               <div class="modern-info-banner">
                 <q-icon name="check_circle" class="text-green-6 q-mr-sm" size="20px" />
-                <span class="text-body2">License key auto-filled from URL. Click "Update License" to apply.</span>
+                <span class="text-body2">{{ t('settings.licenseKeyAutoFilled') }}</span>
               </div>
             </div>
             <q-btn
               color="primary"
-              label="Update License"
+              :label="t('settings.updateLicenseButton')"
               @click="updateLicense"
               :loading="updating"
               :disable="!licenseKey.trim()"
@@ -63,39 +63,39 @@
       <div v-else>
         <q-card>
           <q-card-section>
-            <div class="text-h6 q-mb-md">License Information</div>
+            <div class="text-h6 q-mb-md">{{ t('settings.licenseInformationTitle') }}</div>
             <q-markup-table flat bordered dense class="compact-table">
               <tbody>
                 <tr>
-                  <td class="text-weight-bold">Installation ID</td>
+                  <td class="text-weight-bold">{{ t('settings.installationIdField') }}</td>
                   <td>{{ licenseData.installation_id }}</td>
                 </tr>
                 <tr>
-                  <td class="text-weight-bold">License ID</td>
+                  <td class="text-weight-bold">{{ t('settings.licenseIdField') }}</td>
                   <td>{{ licenseData.license.license_id }}</td>
                 </tr>
                 <tr>
-                  <td class="text-weight-bold">Status</td>
+                  <td class="text-weight-bold">{{ t('settings.statusField') }}</td>
                   <td>
                     <q-badge :color="licenseData?.expired ? 'red' : 'green'">
-                      {{ licenseData?.expired ? 'Expired' : 'Active' }}
+                      {{ licenseData?.expired ? t('settings.expiredStatus') : t('settings.activeStatus') }}
                     </q-badge>
                   </td>
                 </tr>
                 <tr>
-                  <td class="text-weight-bold">Created At</td>
+                  <td class="text-weight-bold">{{ t('settings.createdAtField') }}</td>
                   <td>{{ formatDate(licenseData.license.created_at) }}</td>
                 </tr>
                 <tr>
-                  <td class="text-weight-bold">Expires At</td>
+                  <td class="text-weight-bold">{{ t('settings.expiresAtField') }}</td>
                   <td>{{ formatDate(licenseData.license.expires_at) }}</td>
                 </tr>
                 <tr>
-                  <td class="text-weight-bold">Company</td>
+                  <td class="text-weight-bold">{{ t('settings.companyField') }}</td>
                   <td>{{ licenseData.license.company }}</td>
                 </tr>
                 <tr v-if="licenseData.key">
-                  <td class="text-weight-bold">License Key</td>
+                  <td class="text-weight-bold">{{ t('settings.licenseKeyField') }}</td>
                   <td>
                     <div class="row items-center q-gutter-sm">
                       <span>{{ getMaskedLicenseKey() }}</span>
@@ -112,11 +112,11 @@
                   </td>
                 </tr>
                 <tr v-if="licenseData.license.contact_name">
-                  <td class="text-weight-bold">Contact Name</td>
+                  <td class="text-weight-bold">{{ t('settings.contactNameField') }}</td>
                   <td>{{ licenseData.license.contact_name }}</td>
                 </tr>
                 <tr v-if="licenseData.license.contact_email">
-                  <td class="text-weight-bold">Contact Email</td>
+                  <td class="text-weight-bold">{{ t('settings.contactEmailField') }}</td>
                   <td>{{ licenseData.license.contact_email }}</td>
                 </tr>
               </tbody>
@@ -124,14 +124,14 @@
             <div class="tw-mt-3 tw-flex tw-gap-3">
               <q-btn
                 no-caps
-                label="Request new License"
+                :label="t('settings.requestNewLicenseButton')"
                 class="o2-primary-button"
                 @click="redirectToGetLicense"
               />
               <q-btn
                 no-caps
                 class="o2-primary-button"
-                label="Add New License Key"
+                :label="t('settings.addNewLicenseKeyButton')"
                 @click="showUpdateFormAndFocus"
               />
             </div>
@@ -140,32 +140,32 @@
 
           <q-card v-show="showUpdateForm" class="q-mt-md">
             <q-card-section>
-              <div class="text-subtitle1 q-mb-sm">Update License Key</div>
+              <div class="text-subtitle1 q-mb-sm">{{ t('settings.updateLicenseKeyTitle') }}</div>
               <q-input
                 v-model="licenseKey"
                 outlined
                 type="textarea"
                 rows="6"
-                placeholder="Paste new license key here..."
+                :placeholder="t('settings.pasteNewLicenseKeyPlaceholder')"
                 style="min-height: 150px;"
               />
               <div v-if="isLicenseKeyAutoFilled" class="q-mt-sm q-mb-md">
                 <div class="modern-info-banner">
                   <q-icon name="check_circle" class="text-green-6 q-mr-sm" size="20px" />
-                  <span class="text-body2">License key auto-filled from URL. Click "Update License" to apply.</span>
+                  <span class="text-body2">{{ t('settings.licenseKeyAutoFilled') }}</span>
                 </div>
               </div>
               <div class="row q-gutter-sm">
                 <q-btn
                   no-caps
-                  label="Cancel"
+                  :label="t('settings.cancelButton')"
                   class="o2-secondary-button"
                   @click="showUpdateForm = false; licenseKey = ''"
                 />
                 <q-btn
                   color="primary"
                   no-caps
-                  label="Update License"
+                  :label="t('settings.updateLicenseButton')"
                   @click="updateLicense"
                   :loading="updating"
                   :disable="!licenseKey.trim()"
@@ -179,9 +179,9 @@
     <div class="tw-col-span-1 tw-self-start">
             <q-card>
               <q-card-section>
-                <div class="text-h6 q-mb-md tw-mx-auto">Usage Information</div>
+                <div class="text-h6 q-mb-md tw-mx-auto">{{ t('settings.usageInformationTitle') }}</div>
                 <div  class="text-center q-mb-md tw-mt-[10px]">
-                  <div class="text-subtitle2 q-mb-sm">Ingestion Usage</div>
+                  <div class="text-subtitle2 q-mb-sm">{{ t('settings.ingestionUsageTitle') }}</div>
                   <q-circular-progress
                     :value="ingestionUsagePercent"
                     size="120px"
@@ -194,30 +194,30 @@
                     <span class="text-h6">{{ ingestionUsagePercent }}%</span>
                   </q-circular-progress>
                   <div class="text-caption text-weight-bold">
-                    {{ isIngestionUnlimited ? 'Limit: Unlimited' : `Limit: ${!licenseData?.expired && licenseData?.license?.limits?.Ingestion?.value ? `${licenseData?.license?.limits?.Ingestion?.value} GB / day` : '100 GB / day'}` }}
+                    {{ isIngestionUnlimited ? t('settings.limitUnlimited') : t('settings.limitValue', { value: !licenseData?.expired && licenseData?.license?.limits?.Ingestion?.value ? `${licenseData?.license?.limits?.Ingestion?.value} GB / day` : '100 GB / day' }) }}
                   </div>
                   <div v-if="isIngestionUnlimited" class="text-caption text-grey-6 q-mt-xs" style="font-size: 10px;">
-                    * Usage shows 0% for unlimited plans
+                    {{ t('settings.usageUnlimitedNote') }}
                   </div>
                 </div>
                 <q-markup-table flat bordered dense class="q-mt-auto compact-table">
                   <thead>
                     <tr>
-                      <th colspan="2" class="text-center text-weight-bold">Ingestion</th>
+                      <th colspan="2" class="text-center text-weight-bold">{{ t('settings.ingestionTableHeader') }}</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      <td class="text-weight-bold">Type</td>
+                      <td class="text-weight-bold">{{ t('settings.typeField') }}</td>
                       <td>{{ !licenseData?.expired && licenseData?.license?.limits?.Ingestion?.typ ? licenseData?.license?.limits?.Ingestion?.typ : 'PerDayCount' }}</td>
                     </tr>
                     <tr>
-                      <td class="text-weight-bold">Value</td>
+                      <td class="text-weight-bold">{{ t('settings.valueField') }}</td>
                       <td>{{ !licenseData?.expired && licenseData?.license?.limits?.Ingestion?.value ? `${licenseData?.license?.limits?.Ingestion?.value} GB / day` : '100 GB / day' }}</td>
                     </tr>
                     <tr>
-                      <td class="text-weight-bold">Limit Exceeded</td>
-                      <td>{{ licenseData?.ingestion_exceeded ? `${licenseData?.ingestion_exceeded} times this month` : '0 times this month' }}</td>
+                      <td class="text-weight-bold">{{ t('settings.limitExceededField') }}</td>
+                      <td>{{ licenseData?.ingestion_exceeded ? t('settings.timesThisMonth', { count: licenseData.ingestion_exceeded }) : t('settings.zeroTimesThisMonth') }}</td>
                     </tr>
                   </tbody>
                 </q-markup-table>
@@ -230,13 +230,13 @@
     <q-dialog v-model="showLicenseKeyModal" persistent>
       <q-card style="min-width: 500px">
         <q-card-section class="row items-center q-pb-none">
-          <div class="text-h6">License Key</div>
+          <div class="text-h6">{{ t('settings.licenseKeyModalTitle') }}</div>
           <q-space />
           <q-btn icon="close" flat round dense v-close-popup />
         </q-card-section>
 
         <q-card-section>
-          <div class="text-body2 q-mb-md">Your complete license key:</div>
+          <div class="text-body2 q-mb-md">{{ t('settings.completeKeyLabel') }}</div>
           <q-input
             v-model="licenseData.key"
             outlined
@@ -251,13 +251,13 @@
         <q-card-actions align="right" class="q-pt-none">
           <q-btn
             no-caps
-            label="Cancel"
+            :label="t('settings.cancelButton')"
             class="o2-secondary-button"
             v-close-popup
               />
           <q-btn
             color="primary"
-            label="Copy Key"
+            :label="t('settings.copyKeyButton')"
             no-caps
             @click="copyLicenseKey"
             :disable="!licenseData.key"
@@ -271,6 +271,7 @@
 <script lang="ts">
 import { defineComponent, ref, onMounted, computed } from "vue";
 import { useQuasar } from "quasar";
+import { useI18n } from "vue-i18n";
 import licenseServer from "@/services/license_server";
 import { useStore } from "vuex";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
@@ -281,6 +282,7 @@ export default defineComponent({
     LicensePeriod,
   },
   setup() {
+    const { t } = useI18n();
     const $q = useQuasar();
     const loading = ref(false);
     const updating = ref(false);
@@ -301,7 +303,7 @@ export default defineComponent({
         console.error("Error loading license data:", error);
         $q.notify({
           type: "negative",
-          message: "Failed to load license information",
+          message: t('settings.failedToLoadLicense'),
         });
       } finally {
         loading.value = false;
@@ -314,7 +316,7 @@ export default defineComponent({
         await licenseServer.update_license(licenseKey.value.trim());
         $q.notify({
           type: "positive",
-          message: "License updated successfully",
+          message: t('settings.licenseUpdatedSuccess'),
         });
         licenseKey.value = "";
         isLicenseKeyAutoFilled.value = false;
@@ -331,7 +333,7 @@ export default defineComponent({
         console.error("Error updating license:", error);
         $q.notify({
           type: "negative",
-          message: "Failed to update license",
+          message: t('settings.failedToUpdateLicense'),
         });
       } finally {
         updating.value = false;
@@ -368,14 +370,14 @@ export default defineComponent({
         await navigator.clipboard.writeText(licenseData.value.key);
         $q.notify({
           type: "positive",
-          message: "License key copied to clipboard",
+          message: t('settings.licenseKeyCopied'),
         });
         showLicenseKeyModal.value = false;
       } catch (error) {
         console.error("Error copying license key:", error);
         $q.notify({
           type: "negative",
-          message: "Failed to copy license key",
+          message: t('settings.failedToCopyLicenseKey'),
         });
       }
     };
@@ -398,17 +400,17 @@ export default defineComponent({
           if (licenseData.value.license && licenseData.value.license.active) {
             // License is active, show dialog asking if they want to update
             $q.dialog({
-              title: 'License Already Active',
-              message: 'Your license is still active. Do you want to update it with the new license key?',
+              title: t('settings.licenseAlreadyActiveTitle'),
+              message: t('settings.licenseAlreadyActiveMessage'),
               persistent: true,
               ok: {
-                label: 'Yes, update license',
+                label: t('settings.yesUpdateLicense'),
                 color: 'primary',
                 noCaps: true,
                 unelevated: true
               },
               cancel: {
-                label: 'No, keep current',
+                label: t('settings.noKeepCurrent'),
                 color: 'grey-7',
                 noCaps: true,
                 outline: true
@@ -484,6 +486,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       loading,
       updating,
       licenseData,

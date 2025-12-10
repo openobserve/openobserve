@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <q-inner-loading
                           size="xs"
                           :showing="fieldValues[props.row.name]?.isLoading"
-                          label="Fetching values..."
+                          :label="t('common.fetchingValues')"
                           label-style="font-size: 1.1em"
                         />
                       </div>
@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         class="q-pl-md q-py-xs text-subtitle2"
                       >
-                        No values found
+                        {{ t('common.noValuesFound') }}
                       </div>
                       <div
                         v-for="value in fieldValues[props.row.name]?.values ||
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <q-btn
                                 class="q-mr-xs !tw-border !tw-border-solid !tw-border-[var(--o2-border-color)]"
                                 size="5px"
-                                title="Include Term"
+                                :title="t('common.includeTerm')"
                                 round
                                 @click="
                                   addSearchTerm(
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <q-btn
                                 class="q-mr-xs !tw-border !tw-border-solid !tw-border-[var(--o2-border-color)]"
                                 size="5px"
-                                title="Include Term"
+                                :title="t('common.includeTerm')"
                                 round
                                 @click="
                                   addSearchTerm(
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <q-btn
                                 class="q-ml-md"
                                 size="8px"
-                                title="Copy Value"
+                                :title="t('common.copyValue')"
                                 round
                                 dense
                                 flat
@@ -373,7 +373,7 @@ export default defineComponent({
         .catch(() => {
           $q.notify({
             type: "negative",
-            message: `Error while fetching values for ${name}`,
+            message: t('common.errorFetchingValuesFor', { fieldName: name }),
           });
         })
         .finally(() => {
@@ -389,7 +389,7 @@ export default defineComponent({
       navigator.clipboard.writeText(value);
       $q.notify({
         type: "positive",
-        message: "Value copied to clipboard",
+        message: t('common.valueCopiedToClipboard'),
       });
     };
 

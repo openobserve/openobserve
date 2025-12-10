@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="q-mb-sm tw-mr-3 tw-h-[36px] o2-toggle-button-lg"
         size="lg"
         :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
-        :label="isUpdating ? 'Edit Stream' : 'Create new Stream'"
+        :label="isUpdating ? t('pipeline.editStream') : t('pipeline.createNewStream')"
         v-model="createNewStream"
       />
 
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               filled
               dense
               @update:model-value="updateStreams()"
-              :rules="[(val: any) => !!val || 'Field is required!']"
+              :rules="[(val: any) => !!val || t('pipeline.error.fieldRequired')]"
             />
           </div>
           <div
@@ -115,10 +115,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           </div>
           <div v-if="selectedNodeType == 'output'" style="font-size: 14px;" class="note-message" >
-            <span class="tw-flex tw-items-center"> <q-icon name="info" class="q-pr-xs"</q-icon> Select an existing stream from the list or enter the name to create a new one</span>
-            <span class="tw-flex tw-items-center"> <q-icon name="info" class="q-pr-xs"</q-icon> Enrichment_tables as destination stream is only available for scheduled pipelines</span>
+            <span class="tw-flex tw-items-center"> <q-icon name="info" class="q-pr-xs"</q-icon> {{ t('pipeline.stream.selectExistingOrCreate') }}</span>
+            <span class="tw-flex tw-items-center"> <q-icon name="info" class="q-pr-xs"</q-icon> {{ t('pipeline.stream.enrichmentTablesScheduledOnly') }}</span>
 
-          <span class="tw-flex"> <q-icon name="info" class="q-pr-xs q-pt-xs"</q-icon> Use curly braces '{}' to configure stream name dynamically. e.g. static_text_{fieldname}_postfix. Static text before/after {} is optional</span>
+          <span class="tw-flex"> <q-icon name="info" class="q-pr-xs q-pt-xs"</q-icon> {{ t('pipeline.stream.useCurlyBraces') }}</span>
 
             </div>
         </div>
@@ -249,7 +249,7 @@ watch(
   function sanitizeStreamName(input: string): string {
     if(input.length > 100){
       $q.notify({
-        message: "Stream name should be less than 100 characters",
+        message: t("pipeline.error.streamNameTooLong"),
         color: "negative",
         position: "bottom",
         timeout: 2000,
@@ -391,8 +391,8 @@ const dialog = ref({
 
 const openCancelDialog = () => {
   dialog.value.show = true;
-  dialog.value.title = "Discard Changes";
-  dialog.value.message = "Are you sure you want to cancel changes?";
+  dialog.value.title = t("pipeline.discardChanges");
+  dialog.value.message = t("pipeline.error.cancelConfirm");
   dialog.value.warningMessage = "";
   dialog.value.okCallback = () => emit("cancel:hideform");
   pipelineObj.userClickedNode = {};
@@ -401,9 +401,9 @@ const openCancelDialog = () => {
 
 const openDeleteDialog = () => {
   dialog.value.show = true;
-  dialog.value.title = "Delete Node";
+  dialog.value.title = t("pipeline.deleteNode");
   dialog.value.message =
-    "Are you sure you want to delete stream association?";
+    t("pipeline.error.deleteStreamConfirm");
   //here we will check if the destination node is added by default if yes then we will show a warning message to the user
   if(pipelineObj.currentSelectedNodeData?.data.hasOwnProperty('node_type') && pipelineObj.currentSelectedNodeData?.data.node_type === 'stream' && checkIfDefaultDestinationNode(pipelineObj.currentSelectedNodeID)){
       dialog.value.warningMessage = defaultDestinationNodeWarningMessage
@@ -437,7 +437,7 @@ const saveStream = () => {
 
   if( typeof stream_name.value === 'object' && stream_name.value !== null && stream_name.value.hasOwnProperty('value') && stream_name.value.value === ""){
     $q.notify({
-      message: "Please select Stream from the list",
+      message: t("pipeline.error.selectStream"),
       color: "negative",
       position: "bottom",
       timeout: 2000,

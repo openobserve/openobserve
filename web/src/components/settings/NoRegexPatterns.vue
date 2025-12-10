@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="width: 125px; margin: 20vh auto 1rem"
       />
       <span class="title-text">{{ t("regex_patterns.no_data") }}</span>
-        <span class="subtitle-text">Import patterns from your Library or <span class="create-new-text" @click="createNewRegexPattern">Create New</span></span>
+        <span class="subtitle-text">{{ t('settings.importPatternsFromLibrary') }} <span class="create-new-text" @click="createNewRegexPattern">{{ t('settings.createNew') }}</span></span>
         <div class="import-button-container">
             <q-btn no-caps class="q-mt-sm" @click="importRegexPattern">
               <span class="import-button-text">{{ t("regex_patterns.import_title") }}</span>

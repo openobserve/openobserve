@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             stack-label
             borderless
             dense
-            :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+            :rules="[(val: any) => !!val.trim() || t('logStream.fieldRequired')]"
             tabindex="0"
             style="min-width: 480px"
           />
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             emit-value
             borderless
             dense
-            :rules="[(val: any) => !!val || 'Field is required!']"
+            :rules="[(val: any) => !!val || t('logStream.fieldRequired')]"
             style="min-width: 220px"
           />
         </div>
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             borderless
             dense
             type="number"
-            :rules="[(val: any) => val > 0 || 'Field is required!']"
+            :rules="[(val: any) => val > 0 || t('logStream.fieldRequired')]"
             style="min-width: 480px"
           />
         </div>
@@ -194,7 +194,7 @@ const saveStream = async () => {
     .then(() => {
       q.notify({
         color: "negative",
-        message: `Stream "${streamInputs.value.name}" of type "${streamInputs.value.stream_type}" is already present.`,
+        message: t('logStream.streamAlreadyExists', { streamName: streamInputs.value.name, streamType: streamInputs.value.stream_type }),
         timeout: 4000,
       });
       isStreamPresent = true;
@@ -214,7 +214,7 @@ const saveStream = async () => {
     .then(() => {
       q.notify({
         color: "positive",
-        message: "Stream created successfully",
+        message: t('logStream.streamCreatedSuccessfully'),
         timeout: 4000,
       });
 
@@ -235,7 +235,7 @@ const saveStream = async () => {
       if(err.response.status != 403){
         q.notify({
         color: "negative",
-        message: err.response?.data?.message || "Failed to create stream",
+        message: err.response?.data?.message || t('logStream.failedToCreateStream'),
         timeout: 4000,
       });
       }
@@ -272,8 +272,7 @@ const getStreamPayload = () => {
   if (showDataRetention.value && streamInputs.value.dataRetentionDays < 1) {
     q.notify({
       color: "negative",
-      message:
-        "Invalid Data Retention Period: Retention period must be at least 1 day.",
+      message: t('logStream.invalidDataRetentionPeriod'),
       timeout: 4000,
     });
     return;

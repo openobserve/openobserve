@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="row items-center no-wrap">
           <div class="col">
             <div class="text-body1 text-bold">
-              Move <span class="text-capitalize">{{ type }}</span> To Another Folder
+              {{ t('common.moveToAnotherFolder', { type: type }) }}
             </div>
           </div>
           <div class="col-auto">
@@ -153,14 +153,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               props.activeFolderId
             );
 
-            showPositiveNotification(`${props.type} Moved successfully`, {
+            showPositiveNotification(t('common.itemMovedSuccessfully', { type: props.type }), {
               timeout: 2000,
             });
 
             emit("updated", props.activeFolderId, selectedFolder.value.value);
             moveFolderForm.value.resetValidation();
           } catch (err: any) {
-            showErrorNotification(err?.message ?? `${props.type} move failed.`, {
+            showErrorNotification(err?.message ?? t('common.itemMoveFailed', { type: props.type }), {
               timeout: 2000,
             });
           }

@@ -52,33 +52,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @input:update="(name, field) => onInputUpdate(name, field)"
             />
             <div v-else class="q-pa-md text-grey-7">
-              Loading conditions...
+              {{ t('pipeline.loadingConditions') }}...
             </div>
           </div>
           <q-card class="note-container " >
 
           <q-card-section class="q-pa-sm ">
-            <div class="note-heading ">Condition value Guidelines:</div>
+            <div class="note-heading ">{{ t('pipeline.condition.valueGuidelines') }}:</div>
             <q-banner  inline dense class="note-info " >
               <div>
                 <q-icon name="info" color="orange" class="q-mr-sm" />
-                <span>To check for an empty value, use <span class="highlight">""</span>. Example: 
+                <span>{{ t('pipeline.condition.emptyValueHelp') }}
                   <span class="code">app_name != ""</span>
                 </span>
               </div>
               <div>
                 <q-icon name="info" color="orange"class="q-mr-sm" />
-                <span>To check for an Null value, use <span class="highlight">null</span>. Example: 
+                <span>{{ t('pipeline.condition.nullValueHelp') }}
                   <span class="code">app_name != null</span>
                 </span>
               </div>
               <div>
                 <q-icon name="warning" color="red" class="q-mr-sm" />
-                <span>If conditions are not met, the record will be dropped.</span>
+                <span>{{ t('pipeline.condition.recordDropped') }}</span>
               </div>
               <div>
                 <q-icon name="warning" color="red" class="q-mr-sm" />
-                <span>If the record does not have the specified field, it will be dropped.</span>
+                <span>{{ t('pipeline.condition.fieldNotFound') }}</span>
               </div>
             </q-banner>
           </q-card-section>
@@ -550,8 +550,8 @@ const openCancelDialog = () => {
     }
 
     dialog.value.show = true;
-    dialog.value.title = "Discard Changes";
-    dialog.value.message = "Are you sure you want to cancel condition changes?";
+    dialog.value.title = t("pipeline.discardChanges");
+    dialog.value.message = t("pipeline.error.cancelConditionConfirm");
     dialog.value.okCallback = closeDialog;
   } catch (e) {
     closeDialog();
@@ -572,7 +572,7 @@ const saveCondition = async () => {
     if (!hasValidConditions) {
       q.notify({
         type: "negative",
-        message: "Please add at least one condition",
+        message: t("pipeline.error.addCondition"),
         timeout: 3000,
       });
       return;
@@ -606,7 +606,7 @@ const saveCondition = async () => {
     console.error("Error saving condition:", error);
     q.notify({
       type: "negative",
-      message: "Error saving condition: " + (error as Error).message,
+      message: t("pipeline.error.savingCondition") + ": " + (error as Error).message,
       timeout: 5000,
     });
     emit("cancel:hideform");
@@ -615,8 +615,8 @@ const saveCondition = async () => {
 
 const openDeleteDialog = () => {
   dialog.value.show = true;
-  dialog.value.title = "Delete Node";
-  dialog.value.message = "Are you sure you want to delete stream routing?";
+  dialog.value.title = t("pipeline.deleteNode");
+  dialog.value.message = t("pipeline.error.deleteRoutingConfirm");
   dialog.value.okCallback = deleteRoute;
 };
 
@@ -668,7 +668,7 @@ const validateSqlQuery = () => {
           isValidSqlQuery.value = false;
           q.notify({
             type: "negative",
-            message: "Invalid SQL Query : " + err.response.data.message,
+            message: t("pipeline.error.invalidSql") + ": " + err.response.data.message,
             timeout: 3000,
           });
           reject("");

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <base-import
     v-if="activeTab !== 'import_built_in_patterns'"
     ref="baseImportRef"
-    title="Import Regex Pattern"
+    :title="t('settings.importRegexPatternTitle')"
     test-prefix="regex-pattern"
     :is-importing="isImporting"
     container-class="o2-custom-bg"
@@ -40,9 +40,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="regexPatternErrorsToDisplay.length > 0"
           class="text-center text-h6 tw-py-2"
         >
-          Error Validations
+          {{ t('settings.errorValidationsTitle') }}
         </div>
-        <div v-else class="text-center text-h6 tw-py-2">Output Messages</div>
+        <div v-else class="text-center text-h6 tw-py-2">{{ t('settings.outputMessagesTitle') }}</div>
         <q-separator class="q-mx-md q-mt-md" />
         <div class="error-report-container">
               <!-- Regex Pattern Errors Section -->
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-input
                             data-test="regex-pattern-import-name-input"
                             v-model="userSelectedRegexPatternName[index]"
-                            :label="'Regex Pattern Name *'"
+                            :label="t('settings.regexPatternNameRequired')"
                             color="input-border"
                             bg-color="input-bg"
                             class="showLabelOnTop"
@@ -316,15 +316,15 @@ export default defineComponent({
     // All tabs including the built-in patterns tab
     const allTabs = ref([
       {
-        label: "Built-in Patterns",
+        label: t('settings.builtInPatternsTab'),
         value: "import_built_in_patterns",
       },
       {
-        label: "File Upload / JSON",
+        label: t('settings.fileUploadJsonTab'),
         value: "import_json_file",
       },
       {
-        label: "URL Import",
+        label: t('settings.urlImportTab'),
         value: "import_json_url",
       },
     ]);
@@ -370,7 +370,7 @@ export default defineComponent({
 
       try {
         if (!jsonString || jsonString.trim() === "") {
-          throw new Error("JSON string is empty");
+          throw new Error(t('settings.jsonStringEmpty'));
         }
 
         const parsedJson = JSON.parse(jsonString);
@@ -379,7 +379,7 @@ export default defineComponent({
           : [parsedJson];
       } catch (e: any) {
         q.notify({
-          message: e.message || "Invalid JSON format",
+          message: e.message || t('settings.invalidJsonFormat'),
           color: "negative",
           position: "bottom",
           timeout: 2000,
@@ -400,7 +400,7 @@ export default defineComponent({
 
       if (successCount === totalCount) {
         q.notify({
-          message: `Successfully imported ${successCount} pattern(s)`,
+          message: t('settings.successfullyImportedPatterns', { count: successCount }),
           color: "positive",
           position: "bottom",
           timeout: 2000,
@@ -442,7 +442,7 @@ export default defineComponent({
         return false;
       } catch (e: any) {
         q.notify({
-          message: "Error importing Regex Pattern please check the JSON",
+          message: t('settings.errorImportingRegexPattern'),
           color: "negative",
           position: "bottom",
           timeout: 2000,
@@ -455,7 +455,7 @@ export default defineComponent({
       if(!jsonObj.name || !jsonObj.name.trim() || typeof jsonObj.name !== 'string'){
         regexPatternErrorsToDisplay.value.push([{
           field: 'regex_pattern_name',
-          message: `Regex pattern - ${index}: name is required`
+          message: t('settings.regexPatternNameRequiredIndex', { index })
         }]);
         return false;
       }
@@ -465,12 +465,12 @@ export default defineComponent({
       if(!jsonObj.pattern || !jsonObj.pattern.trim() || typeof jsonObj.pattern !== 'string'){
         regexPatternErrorsToDisplay.value.push([{
           field: 'regex_pattern',
-          message: `Regex pattern - ${index}: is required`
+          message: t('settings.regexPatternRequiredIndex', { index })
         }]);
         return false;
       }
       if(typeof jsonObj.description !== 'string' && jsonObj.description !== null && jsonObj.description !== undefined){
-        regexPatternErrorsToDisplay.value.push([`Regex pattern - ${index}: description must be a string or should be empty`]);
+        regexPatternErrorsToDisplay.value.push([t('settings.regexPatternDescriptionInvalid', { index })]);
         return false;
       }
       return true;

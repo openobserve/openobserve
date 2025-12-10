@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div class="row query-editor-container">
       <div class="col" style="border-top: 1px solid #dbdbdb; height: 100px">
-        <b>Query Editor:</b>
+        <b>{{ t('logStream.queryEditor') }}</b>
         <code-query-editor
           editor-id="logsStreamQueryEditor"
           ref="queryEditorRef"
@@ -176,7 +176,7 @@ export default defineComponent({
     };
 
     const downloadLogs = () => {
-      const filename = "logs-data.csv";
+      const filename = t('logStream.exportFilename');
       const data = jsonToCsv(props.queryData.queryResults.hits);
       const file = new File([data], filename, {
         type: "text/csv",

@@ -57,10 +57,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex items-center col-12 q-mb-md"
         >
           <div class="text-subtitle2 q-mr-sm">
-            It looks like you haven't created any Email Templates yet.
+            {{ t('alerts.noEmailTemplatesMessage') }}
           </div>
           <q-btn
-            label="Create Email Template"
+            :label="t('alerts.createEmailTemplate')"
             size="sm"
             no-caps
             class="o2-secondary-button"

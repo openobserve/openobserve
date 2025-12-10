@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               v-bind:readonly="isUpdating"
               v-bind:disable="isUpdating"
-              :rules="[(val: any) => !!val || 'Field is required!']"
+              :rules="[(val: any) => !!val || t('function.fieldRequired')]"
               tabindex="0"
             />
 
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               outlined
               accept=".csv"
               dense
-              :rules="[(val: any) => !!val || 'CSV File is required!']"
+              :rules="[(val: any) => !!val || t('function.csvFileRequired')]"
               hide-bottom-space
             >
               <template v-slot:prepend>
@@ -152,7 +152,7 @@ export default defineComponent({
     const onSubmit = () => {
       const dismiss = q.notify({
         spinner: true,
-        message: "Please wait...",
+        message: t("function.pleaseWait"),
         timeout: 2000,
       });
       let reqformData = new FormData();
@@ -176,13 +176,13 @@ export default defineComponent({
           });
         })
         .catch((err) => {
-          compilationErr.value = err.response?.data?.["message"] || err.message || "Unknown error";
+          compilationErr.value = err.response?.data?.["message"] || err.message || t("function.unknownError");
           if(err.response?.status != 403){
             q.notify({
             type: "negative",
             message:
               JSON.stringify(err.response?.data?.["error"]) ||
-              "Enrichment Table creation failed",
+              t("function.enrichmentTableCreationFailed"),
           });
           }
           dismiss();

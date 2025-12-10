@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <base-import
     ref="baseImportRef"
-    title="Import Pipeline"
+    :title="t('pipeline.importPipeline')"
     test-prefix="pipeline"
     :is-importing="isPipelineImporting"
     :editor-heights="{
@@ -37,9 +37,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="pipelineErrorsToDisplay.length > 0"
           class="text-center text-h6 tw-py-2"
         >
-          Error Validations
+          {{ t('pipeline.errorValidations') }}
         </div>
-        <div v-else class="text-center text-h6 tw-py-2">Output Messages</div>
+        <div v-else class="text-center text-h6 tw-py-2">{{ t('pipeline.outputMessages') }}</div>
         <q-separator class="q-mx-md q-mt-md" />
         <div class="error-report-container" style="height: calc(100vh - 128px) !important; overflow: auto; resize: none;">
           <!-- Pipeline Errors Section -->
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           getSourceStreamsList(val, index);
                         }"
                         :rules="[
-                          (val: any) => !!val || 'Field is required!',
+                          (val: any) => !!val || t('pipeline.error.fieldRequired'),
                         ]"
                         style="width: 300px"
                       />
@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="width: 100%; height: 200px"
                         data-test="pipeline-import-sql-query-input"
                         :model-value="userSelectedSqlQuery[index] || ''"
-                        :label="'SQL Query'"
+                        :label="t('pipeline.sqlQuery')"
                         :debounceTime="300"
                         language="sql"
                         @update:query="(val) => {
@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           getDestinationStreamsList(val, index);
                         }"
                         :rules="[
-                          (val: any) => !!val || 'Field is required!',
+                          (val: any) => !!val || t('pipeline.error.fieldRequired'),
                         ]"
                         style="width: 300px"
                       />
@@ -252,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="pipeline-import-org-id-input"
                         :model-value="userSelectedOrgId[index] || null"
                         :options="organizationData"
-                        :label="'Organization Id'"
+                        :label="t('pipeline.organizationId')"
                         :popup-content-style="{
                           textTransform: 'lowercase',
                         }"
@@ -289,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="pipeline-import-destination-function-name-input"
                         :model-value="userSelectedFunctionName[errorMessage.nodeIndex] || ''"
                         :options="existingFunctions"
-                        :label="'Function Name'"
+                        :label="t('pipeline.functionName')"
                         :popup-content-style="{
                           textTransform: 'lowercase',
                         }"
@@ -305,7 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           updateFunctionName(val, index, errorMessage.nodeIndex);
                         }"
                         :rules="[
-                          (val: any) => !!val || 'Field is required!',
+                          (val: any) => !!val || t('pipeline.error.fieldRequired'),
                         ]"
                         style="width: 300px"
                       />
@@ -325,7 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="pipeline-import-destination-stream-type-input"
                         :model-value="userSelectedRemoteDestination[index] || ''"
                         :options="pipelineDestinations"
-                        :label="'Remote Destination'"
+                        :label="t('pipeline.remoteDestination')"
                         :popup-content-style="{
                           textTransform: 'lowercase',
                         }"
@@ -341,7 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           updateRemoteDestination(val, index);
                         }"
                         :rules="[
-                          (val: any) => !!val || 'Field is required!',
+                          (val: any) => !!val || t('pipeline.error.fieldRequired'),
                         ]"
                         style="width: 300px"
                       />
@@ -360,7 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="pipeline-import-destination-stream-type-input"
                         :model-value="userSelectedTimezone[index] || ''"
                         :options="timezoneOptions"
-                        :label="'Timezone'"
+                        :label="t('pipeline.timezone')"
                         color="input-border"
                         bg-color="input-bg"
                         class="q-py-sm showLabelOnTop no-case"
@@ -373,7 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           updateTimezone(val, index);
                         }"
                         :rules="[
-                          (val: any) => !!val || 'Field is required!',
+                          (val: any) => !!val || t('pipeline.error.fieldRequired'),
                         ]"
                         style="width: 300px"
                       />
@@ -390,7 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="section-title text-primary"
               data-test="pipeline-import-creation-title"
             >
-              Pipeline Creation
+              {{ t('pipeline.pipelineCreation') }}
             </div>
             <div
               class="error-list"
@@ -717,7 +717,7 @@ export default defineComponent({
       try {
         // Check if jsonStr is empty or null
         if (!jsonString || jsonString.trim() === "") {
-          throw new Error("JSON string is empty");
+          throw new Error(t("pipeline.error.jsonEmpty"));
         }
 
         const parsedJson = JSON.parse(jsonString);
@@ -727,7 +727,7 @@ export default defineComponent({
           : [parsedJson];
       } catch (e: any) {
         q.notify({
-          message: e.message || "Invalid JSON format",
+          message: e.message || t("pipeline.error.invalidJson"),
           color: "negative",
           position: "bottom",
           timeout: 2000,
@@ -748,7 +748,7 @@ export default defineComponent({
 
       if (allPipelinesCreated) {
         q.notify({
-          message: "Pipeline(s) imported successfully",
+          message: t("pipeline.success.imported"),
           color: "positive",
           position: "bottom",
           timeout: 2000,
@@ -786,7 +786,7 @@ export default defineComponent({
         }
       } catch (e: any) {
         q.notify({
-          message: "Error importing Pipeline(s) please check the JSON",
+          message: t("pipeline.error.importingError"),
           color: "negative",
           position: "bottom",
           timeout: 2000,

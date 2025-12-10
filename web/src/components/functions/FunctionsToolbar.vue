@@ -11,14 +11,14 @@
           outline
           icon="arrow_back_ios_new"
           class="el-border tw-w-6 tw-h-6 tw-flex tw-items-center tw-justify-center cursor-pointer el-border-radius q-mr-sm"
-          title="Go Back"
+          :title="t('function.goBack')"
           @click="redirectToFunctions"
         >
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
       </div>
       <div class="tw-text-lg tw-w-full add-function-title q-mr-sm">
-        Add Function
+        {{ t('function.addFunction') }}
       </div>
       <q-form ref="addFunctionForm" class="o2-input">
         <div class="tw-flex tw-items-center">
@@ -36,7 +36,7 @@
             v-bind:readonly="disableName"
             v-bind:disable="disableName"
             :rules="[
-              (val: any) => !!val || 'Field is required!',
+              (val: any) => !!val || t('function.fieldRequired'),
               isValidMethodName,
             ]"
             no-error-icon
@@ -167,11 +167,11 @@ const showInputError = ref(false);
 
 const isHovered = ref(false);
 const isValidMethodName = () => {
-  if (!functionName.value) return "Field is required!";
+  if (!functionName.value) return t("function.fieldRequired");
   const methodPattern = /^[A-Z_][A-Z0-9_]*$/i;
   return (
     methodPattern.test(functionName.value) ||
-    "Invalid method name. Must start with a letter or underscore. Use only letters, numbers, and underscores."
+    t("function.invalidMethodNameMessage")
   );
 };
 

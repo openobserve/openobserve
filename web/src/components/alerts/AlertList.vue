@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-toggle
                 data-test="alert-list-search-across-folders-toggle"
                 v-model="searchAcrossFolders"
-                label="All Folders"
+                :label="t('alerts.allFolders')"
                 class="tw-mr-3 tw-h-[36px] o2-toggle-button-lg"
                 size="lg"
               >
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-ml-sm o2-secondary-button tw-h-[36px]"
             no-caps
             flat
-            label="Alert Insights"
+            :label="t('alerts.alertInsights')"
             @click="goToAlertInsights"
             data-test="alert-insights-btn"
             icon="insights"
@@ -416,7 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <q-btn
                           data-test="alert-list-create-template-btn"
                           class="q-mt-md"
-                          label="Create Template"
+                          :label="t('alerts.createTemplate')"
                           size="md"
                           color="primary"
                           no-caps
@@ -436,7 +436,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <q-btn
                           data-test="alert-list-create-destination-btn"
                           class="q-mt-md"
-                          label="Create Destination"
+                          :label="t('alerts.createDestination')"
                           size="md"
                           color="primary"
                           no-caps
@@ -631,7 +631,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Description -->
           <div class="tw-mb-6">
             <div class="tw-text-sm tw-font-semibold tw-mb-2" :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'">Description</div>
-            <pre :class="store.state.theme === 'dark' ? 'tw-bg-gray-800 tw-text-gray-200' : 'tw-bg-gray-100 tw-text-gray-900'" class="tw-p-3 tw-rounded tw-text-sm" style="white-space: pre-wrap">{{ selectedAlertDetails.description || "No description" }}</pre>
+            <pre :class="store.state.theme === 'dark' ? 'tw-bg-gray-800 tw-text-gray-200' : 'tw-bg-gray-100 tw-text-gray-900'" class="tw-p-3 tw-rounded tw-text-sm" style="white-space: pre-wrap">{{ selectedAlertDetails.description || t('alerts.noDescription') }}</pre>
           </div>
 
           <!-- Alert History Table -->
@@ -640,12 +640,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <div v-if="isLoadingHistory" class="tw-text-center tw-py-8">
               <q-spinner size="32px" color="primary" />
-              <div class="tw-text-sm tw-mt-3" :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'">Loading history...</div>
+              <div class="tw-text-sm tw-mt-3" :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'">{{ t('alerts.loadingHistory') }}</div>
             </div>
 
             <div v-else-if="expandedAlertHistory.length === 0" class="tw-text-center tw-py-8" :class="store.state.theme === 'dark' ? 'tw-text-gray-500' : 'tw-text-gray-500'">
               <q-icon name="history" size="48px" class="tw-mb-2 tw-opacity-30" />
-              <div class="tw-text-sm">No evaluation history available for this alert</div>
+              <div class="tw-text-sm">{{ t('alerts.noEvaluationHistory') }}</div>
             </div>
 
             <q-table
@@ -662,7 +662,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-td :props="props">
                   <q-badge
                     :color="props.row.status?.toLowerCase() === 'firing' || props.row.status?.toLowerCase() === 'error' ? 'negative' : 'positive'"
-                    :label="props.row.status || 'Unknown'"
+                    :label="props.row.status || t('alerts.unknown')"
                   />
                 </q-td>
               </template>
@@ -686,7 +686,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   width: 22px;
                   height: 22px;
                 "
-                title="Go Back"
+                :title="t('alerts.goBack')"
                 @click="showForm = false"
               >
                 <q-icon name="arrow_back_ios_new" size="14px" />
@@ -701,7 +701,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-input
                 data-test="to-be-clone-alert-name"
                 v-model="toBeCloneAlertName"
-                label="Alert Name"
+                :label="t('alerts.alertName')"
                 class="showLabelOnTop q-mb-sm"
                 stack-label
                 hide-bottom-space

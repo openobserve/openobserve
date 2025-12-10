@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-tab
                     name="schemaSettings"
                     icon="settings"
-                    label="Schema Settings"
+                    :label="t('logStream.schemaSettings')"
                     no-caps
                   />
 
@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-tab
                     name="redButton"
                     icon="backup"
-                    label="Extended Retention"
+                    :label="t('logStream.extendedRetention')"
                     no-caps
                   />
 
@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-tab
                     name="configuration"
                     icon="tune"
-                    label="Configuration"
+                    :label="t('logStream.configuration')"
                     no-caps
                   />
                 </q-tabs>
@@ -316,7 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="min-width: 0px !important; min-height: 0px !important;"
                       flat
                       @click.stop="openDialog"
-                      title="Add Field(s)"
+                      :title="t('logStream.addFieldsDialog')"
                     >
                     <q-icon name="add" size="xs" />
                     </q-btn>
@@ -331,7 +331,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="padding: 4px 16px 4px 16px"
                   >
                     <div class="tw-flex tw-justify-between tw-items-center">
-                      <div class="text-h6">Add Field(s)</div>
+                      <div class="text-h6">{{ t('logStream.addFieldsDialog') }}</div>
                       <div>
                         <q-btn
                           data-test="add-stream-cancel-btn"
@@ -750,7 +750,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         store.state.theme === 'dark' ? 'tw-border-gray-600 tw-text-gray-200' : 'tw-border-gray-200 tw-text-gray-700'
                       ]"
                     >
-                      <span>Store Original Data</span>
+                      <span>{{ t('logStream.storeOriginalData') }}</span>
                       <q-toggle
                         v-if="showStoreOriginalDataToggle"
                         data-test="log-stream-store-original-data-toggle-btn"
@@ -768,7 +768,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         store.state.theme === 'dark' ? 'tw-border-gray-600 tw-text-gray-200' : 'tw-border-gray-200 tw-text-gray-700'
                       ]"
                     >
-                      <span>Enable Distinct Values</span>
+                      <span>{{ t('logStream.enableDistinctValues') }}</span>
                       <q-toggle
                         data-test="log-stream-enabled-distinct-values-toggle-btn"
                         v-model="enableDistinctFields"
@@ -801,7 +801,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="q-mt-sm">
                 <div class="text-center q-mt-sm tw-flex items-center">
                   <div class="flex items-center">
-                    <span class="text-bold"> Select Date</span>
+                    <span class="text-bold"> {{ t('logStream.selectDate') }}</span>
                     <date-time
                       class="q-mx-sm"
                       @on:date-change="dateChangeValue"
@@ -953,7 +953,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-card-section>
   </q-card>
   <q-card v-else class="column q-pa-md full-height no-wrap">
-    <h5>Wait while loading...</h5>
+    <h5>{{ t('logStream.waitWhileLoading') }}</h5>
   </q-card>
   <q-dialog v-model="patternAssociationDialog.show" position="right" full-height maximized>
     <AssociatedRegexPatterns :data="patternAssociationDialog.data" :fieldName="patternAssociationDialog.fieldName" @closeDialog="patternAssociationDialog.show = false" @addPattern="handleAddPattern" @removePattern="handleRemovePattern" @updateSettings="onSubmit" @updateAppliedPattern="handleUpdateAppliedPattern" />
@@ -1154,12 +1154,12 @@ export default defineComponent({
     const mainTabs = computed(() => [
       {
         value: "schemaSettings",
-        label: `Schema Settings`,
+        label: t('logStream.schemaSettings'),
         disabled: false,
       },
       {
         value: "redButton",
-        label: `Extended Retention`,
+        label: t('logStream.extendedRetention'),
         disabled: false,
       },
     ]);

@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="report-list-toggle-report-state-loader"
                   style="display: inline-block; width: 33.14px; height: auto"
                   class="flex justify-center items-center"
-                  :title="`Turning ${props.row.enabled ? 'Off' : 'On'}`"
+                  :title="props.row.enabled ? t('reports.turningOff') : t('reports.turningOn')"
                 >
                   <q-circular-progress
                     indeterminate
@@ -262,8 +262,8 @@ const filterQuery = ref("");
 
 const deleteDialog = ref({
   show: false,
-  title: "Delete Report",
-  message: "Are you sure you want to delete report?",
+  title: t("reports.deleteReportTitle"),
+  message: t("reports.defaultDeleteMessage"),
   data: "" as any,
 });
 
@@ -325,7 +325,7 @@ onBeforeMount(() => {
 
   const dismiss = q.notify({
     spinner: true,
-    message: "Please wait while fetching reports...",
+    message: t("reports.fetchingReports"),
     timeout: 2000,
   });
 
@@ -349,7 +349,7 @@ onBeforeMount(() => {
       if (err.response.status != 403) {
         q.notify({
           type: "negative",
-          message: err?.data?.message || "Error while fetching reports!",
+          message: err?.data?.message || t("reports.errorFetchingReports"),
           timeout: 3000,
         });
       }
@@ -390,7 +390,7 @@ const filterData = (rows: any, terms: any) => {
 const toggleReportState = (report: any) => {
   const state = report.enabled ? "Stopping" : "Starting";
   const dismiss = q.notify({
-    message: `${state} report "${report.name}"`,
+    message: state === "Stopping" ? t("reports.stoppingReport", { reportName: report.name }) : t("reports.startingReport", { reportName: report.name }),
   });
   reportsStateLoadingMap.value[report.name] = true;
   reports
@@ -421,9 +421,7 @@ const toggleReportState = (report: any) => {
 
       q.notify({
         type: "positive",
-        message: `${
-          updatedReport.enabled ? "Started" : "Stopped"
-        } report successfully.`,
+        message: updatedReport.enabled ? t("reports.reportStartedSuccessfully") : t("reports.reportStoppedSuccessfully"),
         timeout: 2000,
       });
     })
@@ -431,7 +429,7 @@ const toggleReportState = (report: any) => {
       if (err.response.status != 403) {
         q.notify({
           type: "negative",
-          message: err?.data?.message || "Error while stopping report!",
+          message: err?.data?.message || t("reports.errorStoppingReport"),
           timeout: 4000,
         });
       }
@@ -455,13 +453,13 @@ const editReport = (report: any) => {
 
 const confirmDeleteReport = (report: any) => {
   deleteDialog.value.show = true;
-  deleteDialog.value.message = `Are you sure you want to delete report "${report.name}"`;
+  deleteDialog.value.message = t("reports.confirmDeleteMessage", { reportName: report.name });
   deleteDialog.value.data = report.name;
 };
 
 const deleteReport = (report: any) => {
   const dismiss = q.notify({
-    message: `Deleting report "${deleteDialog.value.data}"`,
+    message: t("reports.deletingReport", { reportName: deleteDialog.value.data }),
   });
   reports
     .deleteReport(
@@ -479,7 +477,7 @@ const deleteReport = (report: any) => {
 
       q.notify({
         type: "positive",
-        message: `Delete report successfully.`,
+        message: t("reports.reportDeletedSuccessfully"),
         timeout: 3000,
       });
     })
@@ -487,7 +485,7 @@ const deleteReport = (report: any) => {
       if (err.response.status != 403) {
         q.notify({
           type: "negative",
-          message: err?.data?.message || "Error while deleting report!",
+          message: err?.data?.message || t("reports.errorDeletingReport"),
           timeout: 4000,
         });
       }

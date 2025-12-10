@@ -170,8 +170,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <ConfirmDialog
-      title="Delete Enrichment Table"
-      message="Are you sure you want to delete enrichment table?"
+      :title="t('function.deleteEnrichmentTable')"
+      :message="t('function.confirmDeleteEnrichmentTable')"
       @update:ok="deleteLookupTable"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
@@ -324,7 +324,7 @@ export default defineComponent({
     const getLookupTables = (force: boolean = false) => {
       const dismiss = $q.notify({
         spinner: true,
-        message: "Please wait while loading enrichment tables...",
+        message: t("function.pleaseWaitLoadingEnrichmentTables"),
       });
 
       getStreams("enrichment_tables", false, false, force)
@@ -361,14 +361,14 @@ export default defineComponent({
           dismiss();
         })
         .catch((err) => {
-          console.info("Error while fetching enrichment tables", err);
+          console.info(t("function.errorFetchingFunctions"), err);
           dismiss();
           if (err.response.status != 403) {
             $q.notify({
               type: "negative",
               message:
                 err.response?.data?.message ||
-                "Error while fetching functions.",
+                t("function.errorFetchingFunctions"),
               timeout: 2000,
             });
           }
@@ -487,7 +487,7 @@ export default defineComponent({
             $q.notify({
               color: "negative",
               message:
-                err.response?.data?.message || "Error while deleting stream.",
+                err.response?.data?.message || t("function.errorDeletingStream"),
             });
           }
         });
@@ -516,7 +516,7 @@ export default defineComponent({
 
       const dismiss = $q.notify({
         spinner: true,
-        message: "Redirecting to explorer...",
+        message: t("function.redirectingToExplorer"),
         color: "secondary",
       });
 
