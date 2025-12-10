@@ -2892,4 +2892,93 @@ export class LogsPage {
 
         return { total: data.length, success: successCount, failed: failCount };
     }
+
+    /**
+     * Get severity colors from all visible log rows
+     * Returns array of {severity, color} objects
+     */
+    async getSeverityColors() {
+        return await this.page.evaluate(() => {
+            const rows = document.querySelectorAll('tbody tr[data-index]');
+            const findings = [];
+
+            for (const row of rows) {
+                const text = row.textContent;
+                const colorDiv = row.querySelector('div[class*="tw-absolute"][class*="tw-left-0"]');
+
+                if (!colorDiv) continue;
+
+                const bgColor = window.getComputedStyle(colorDiv).backgroundColor;
+
+                // Check for severity value in the row text - look for "severity":"X" or "severity":X
+                for (let sev = 0; sev <= 7; sev++) {
+                    if (text.includes(`"severity":"${sev}"`) || text.includes(`"severity":${sev},`)) {
+                        findings.push({
+                            severity: sev,
+                            color: bgColor
+                        });
+                        break;
+                    }
+                }
+            }
+
+            return findings;
+        });
+    }
+
+    /**
+     * Get severity color for a specific severity level
+     * @param {number} severityLevel - Severity level (0-7)
+     * @returns {string|null} RGB color string or null if not found
+     */
+    async getSeverityColorBySeverityLevel(severityLevel) {
+        const results = await this.getSeverityColors();
+        const match = results.find(r => r.severity === severityLevel);
+        return match ? match.color : null;
+    }
+
+    /**
+     * Verify severity color matches expected hex color
+     * @param {number} severityLevel - Severity level (0-7)
+     * @param {string} expectedHexColor - Expected hex color (e.g., "#dc2626")
+     * @returns {boolean} True if colors match
+     */
+    async verifySeverityColor(severityLevel, expectedHexColor) {
+        const rgbColor = await this.getSeverityColorBySeverityLevel(severityLevel);
+        if (!rgbColor) {
+            testLogger.warn(`No color found for severity ${severityLevel}`);
+            return false;
+        }
+
+        const hexColor = this.rgbToHex(rgbColor);
+        const normalizedActual = this.normalizeHexColor(hexColor);
+        const normalizedExpected = this.normalizeHexColor(expectedHexColor);
+
+        testLogger.info(`Severity ${severityLevel}: Expected ${normalizedExpected}, Got ${normalizedActual}`);
+        return normalizedActual === normalizedExpected;
+    }
+
+    /**
+     * Convert RGB color to Hex
+     * @param {string} rgb - RGB color string (e.g., "rgb(220, 38, 38)")
+     * @returns {string} Hex color string (e.g., "#dc2626")
+     */
+    rgbToHex(rgb) {
+        const result = rgb.match(/\d+/g);
+        if (!result || result.length < 3) return null;
+        return '#' + result.slice(0, 3).map(x => parseInt(x).toString(16).padStart(2, '0')).join('');
+    }
+
+    /**
+     * Normalize hex color (remove alpha channel if present, lowercase)
+     * @param {string} hex - Hex color string
+     * @returns {string} Normalized hex color
+     */
+    normalizeHexColor(hex) {
+        hex = hex.replace('#', '');
+        if (hex.length === 8) {
+            hex = hex.substring(0, 6);
+        }
+        return '#' + hex.toLowerCase();
+    }
 }
