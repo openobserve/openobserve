@@ -317,6 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-else class="tw-flex tw-items-center tw-justify-center tw-h-full tw-py-20">
           <div class="tw-text-center">
             <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw-mb-4" />
+            <div v-else-if="correlationError" class="tw-text-base tw-text-red-500">{{ correlationError }}</div>
             <div v-else class="tw-text-base tw-text-gray-500">{{ t('correlation.clickToLoadLogs') }}</div>
           </div>
         </div>
@@ -344,6 +345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-else class="tw-flex tw-items-center tw-justify-center tw-h-full tw-py-20">
           <div class="tw-text-center">
             <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw-mb-4" />
+            <div v-else-if="correlationError" class="tw-text-base tw-text-red-500">{{ correlationError }}</div>
             <div v-else class="tw-text-base tw-text-gray-500">{{ t('correlation.clickToLoadMetrics') }}</div>
           </div>
         </div>
@@ -371,6 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-else class="tw-flex tw-items-center tw-justify-center tw-h-full tw-py-20">
           <div class="tw-text-center">
             <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw-mb-4" />
+            <div v-else-if="correlationError" class="tw-text-base tw-text-red-500">{{ correlationError }}</div>
             <div v-else class="tw-text-base tw-text-gray-500">{{ t('correlation.clickToLoadTraces') }}</div>
           </div>
         </div>
@@ -507,6 +510,10 @@ export default defineComponent({
     correlationLoading: {
       type: Boolean,
       default: false,
+    },
+    correlationError: {
+      type: String,
+      default: null,
     },
   },
   methods: {

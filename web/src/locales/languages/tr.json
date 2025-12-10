@@ -1961,6 +1961,7 @@
     "dimensionBasedCorrelation": "Boyut Tabanlı Korelasyon",
     "tracesFromService": "Hizmetten gelen izler: {service}",
     "noTracesFound": "İlişkili iz bulunamadı",
-    "noTracesDescription": "Seçilen zaman aralığında {service} hizmeti için iz bulunamadı"
+    "noTracesDescription": "Seçilen zaman aralığında {service} hizmeti için iz bulunamadı",
+    "openTraceInNewWindow": "İzini yeni pencerede aç"
   }
 }
