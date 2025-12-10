@@ -229,10 +229,10 @@ export default defineComponent({
           if (indexListSelectField.updateInputValue) {
             indexListSelectField.updateInputValue("");
           }
-          // Close the dropdown menu
-          if (indexListSelectField.hidePopup) {
-            indexListSelectField.hidePopup();
-          }
+          // // Close the dropdown menu
+          // if (indexListSelectField.hidePopup) {
+          //   indexListSelectField.hidePopup();
+          // }
         }
       });
       this.onStreamChange("");
