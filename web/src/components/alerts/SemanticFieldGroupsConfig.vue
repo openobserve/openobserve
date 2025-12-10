@@ -24,34 +24,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Preset Templates -->
+    <!-- Category Filter -->
     <div class="row q-col-gutter-md q-mb-md">
       <div class="col-12 col-md-4">
         <q-select
-          v-model="selectedPreset"
-          :options="presetOptions"
-          label="Load Preset Template"
-          hint="Quick start with common field groups"
+          v-model="selectedCategory"
+          :options="categoryOptions"
+          label="Category"
+          hint="Filter groups by category"
           dense
-          filled
-          color="input-border"
-          bg-color="input-bg"
+          borderless
+          stack-label
+          class="showLabelOnTop"
           emit-value
           map-options
-          clearable
-          @update:model-value="loadPreset"
           style="max-width: 100%"
         >
-          <template v-slot:selected>
-            <div
-              class="ellipsis"
-              style="max-width: 100%; overflow: hidden; text-overflow: ellipsis"
-            >
-              {{
-                presetOptions.find((p) => p.value === selectedPreset)?.label ||
-                "Select preset"
-              }}
-            </div>
+          <template v-slot:option="scope">
+            <q-item v-bind="scope.itemProps">
+              <q-item-section>
+                <q-item-label>{{ scope.opt.label }}</q-item-label>
+                <q-item-label caption>{{ scope.opt.count }} groups</q-item-label>
+              </q-item-section>
+            </q-item>
           </template>
         </q-select>
       </div>
@@ -74,22 +69,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Semantic Groups List -->
-    <div v-if="localGroups.length > 0" class="groups-list q-mb-md">
+    <!-- Filtered Semantic Groups List -->
+    <div v-if="filteredGroups.length > 0" class="groups-list q-mb-md">
       <SemanticGroupItem
-        v-for="(group, index) in localGroups"
+        v-for="(group, index) in filteredGroups"
         :key="`${group.id}-${index}`"
         :group="group"
-        @update="updateGroup(index, $event)"
-        @delete="removeGroup(index)"
+        @update="updateGroupByFilter(index, $event)"
+        @delete="removeGroupByFilter(index)"
       />
     </div>
     <div v-else class="text-center q-pa-lg text-grey-7">
-      <q-icon name="info" size="md"
-class="q-mb-sm" />
+      <q-icon name="info" size="md" class="q-mb-sm" />
       <div>
-        No semantic groups defined. Add a group or load a preset template.
+        No semantic groups in this category. Select a different category or add a custom group.
       </div>
+    </div>
+
+    <!-- Total groups indicator -->
+    <div v-if="localGroups.length > 0" class="text-caption text-grey-6 q-mt-sm">
+      Showing {{ filteredGroups.length }} of {{ localGroups.length }} total groups
     </div>
 
     <!-- Fingerprint Fields Selection (only for per-alert, not org-level) -->
@@ -127,14 +126,11 @@ class="q-mb-sm" />
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, watch, onMounted } from "vue";
+import { ref, computed, watch, onMounted, nextTick } from "vue";
 import { useRouter } from "vue-router";
-import { useStore } from "vuex";
-import alertsService from "@/services/alerts";
 import SemanticGroupItem from "./SemanticGroupItem.vue";
 
 const router = useRouter();
-const store = useStore();
 
 interface SemanticGroup {
   id: string;
@@ -170,16 +166,22 @@ const localGroups = ref<SemanticGroup[]>(
   props.semanticFieldGroups.filter(g => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()))
 );
 const localFingerprintFields = ref<string[]>([...props.fingerprintFields]);
-const selectedPreset = ref<string | null>(null);
-const availableSemanticGroups = ref<SemanticGroup[]>([]);
-const loadingPresets = ref(false);
+const selectedCategory = ref<string | null>(null);
 
-// Watch for external changes
+// Watch for external changes and auto-select first category
 watch(
   () => props.semanticFieldGroups,
   (newGroups) => {
     // Filter out reserved IDs like service-fqn (it's the output, not an input)
     localGroups.value = newGroups.filter(g => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()));
+    // Auto-select first category if none selected
+    if (!selectedCategory.value && localGroups.value.length > 0) {
+      nextTick(() => {
+        if (categoryOptions.value.length > 0) {
+          selectedCategory.value = categoryOptions.value[0].value;
+        }
+      });
+    }
   },
   { deep: true },
 );
@@ -191,30 +193,38 @@ watch(
   },
 );
 
-// Dynamically build preset options from backend semantic groups
-const presetOptions = computed(() => {
-  if (availableSemanticGroups.value.length === 0) {
+// Build category options from localGroups (the actual data)
+const categoryOptions = computed(() => {
+  if (localGroups.value.length === 0) {
     return [];
   }
 
   // Group semantic groups by their 'group' field
-  const groupsMap = new Map<string, SemanticGroup[]>();
+  const groupsMap = new Map<string, number>();
 
-  for (const group of availableSemanticGroups.value) {
+  for (const group of localGroups.value) {
     const category = group.group || "Other";
-    if (!groupsMap.has(category)) {
-      groupsMap.set(category, []);
-    }
-    groupsMap.get(category)!.push(group);
+    groupsMap.set(category, (groupsMap.get(category) || 0) + 1);
   }
 
-  // Convert to preset options, sorted by category name
-  return Array.from(groupsMap.keys())
-    .sort()
-    .map(category => ({
+  // Convert to options, sorted by category name
+  return Array.from(groupsMap.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([category, count]) => ({
       label: category,
-      value: category.toLowerCase().replace(/\s+/g, '-'),
+      value: category,
+      count: count,
     }));
+});
+
+// Filter groups by selected category
+const filteredGroups = computed(() => {
+  if (!selectedCategory.value) {
+    return localGroups.value;
+  }
+  return localGroups.value.filter(
+    group => (group.group || "Other") === selectedCategory.value
+  );
 });
 
 // Group ID options for fingerprint selection
@@ -225,51 +235,12 @@ const groupIdOptions = computed(() => {
   }));
 });
 
-// Load semantic groups from backend on mount
-const loadSemanticGroups = async () => {
-  loadingPresets.value = true;
-  try {
-    const orgId = store.state.selectedOrganization.identifier;
-    const response = await alertsService.getSemanticGroups(orgId);
-    // Filter out reserved IDs like service-fqn (it's the output, not an input)
-    availableSemanticGroups.value = (response.data ?? [])
-      .filter((g: SemanticGroup) => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()));
-    console.log(`Loaded ${availableSemanticGroups.value.length} semantic groups from backend`);
-  } catch (error) {
-    console.error("Failed to load semantic groups:", error);
-    availableSemanticGroups.value = [];
-  } finally {
-    loadingPresets.value = false;
-  }
-};
-
-// Load preset by category name
-const loadPreset = (presetKey: string | null) => {
-  if (!presetKey || availableSemanticGroups.value.length === 0) return;
-
-  // Find the category name from the preset key
-  const categoryOption = presetOptions.value.find(opt => opt.value === presetKey);
-  if (!categoryOption) return;
-
-  const categoryName = categoryOption.label;
-
-  // Filter groups by category
-  const categoryGroups = availableSemanticGroups.value.filter(
-    group => group.group === categoryName
-  );
-
-  if (categoryGroups.length > 0) {
-    localGroups.value = [...categoryGroups];
-    // Auto-select all groups for fingerprinting
-    localFingerprintFields.value = categoryGroups.map(g => g.id);
-    emitUpdate();
-  }
-};
-
+// Add a new custom group (assign to current category if selected)
 const addGroup = () => {
   const newGroup: SemanticGroup = {
     id: "",
     display: "",
+    group: selectedCategory.value || "Other",
     fields: [],
     normalize: true,
   };
@@ -277,21 +248,31 @@ const addGroup = () => {
   emitUpdate();
 };
 
-const updateGroup = (index: number, updatedGroup: SemanticGroup) => {
-  localGroups.value[index] = updatedGroup;
-  emitUpdate();
+// Update group by filtered index - find actual index in localGroups
+const updateGroupByFilter = (filteredIndex: number, updatedGroup: SemanticGroup) => {
+  const group = filteredGroups.value[filteredIndex];
+  const actualIndex = localGroups.value.findIndex(g => g.id === group.id && g.display === group.display);
+  if (actualIndex !== -1) {
+    localGroups.value[actualIndex] = updatedGroup;
+    emitUpdate();
+  }
 };
 
-const removeGroup = (index: number) => {
-  const removedId = localGroups.value[index].id;
-  localGroups.value.splice(index, 1);
+// Remove group by filtered index - find actual index in localGroups
+const removeGroupByFilter = (filteredIndex: number) => {
+  const group = filteredGroups.value[filteredIndex];
+  const actualIndex = localGroups.value.findIndex(g => g.id === group.id && g.display === group.display);
+  if (actualIndex !== -1) {
+    const removedId = localGroups.value[actualIndex].id;
+    localGroups.value.splice(actualIndex, 1);
 
-  // Remove from fingerprint fields if present
-  localFingerprintFields.value = localFingerprintFields.value.filter(
-    (id) => id !== removedId,
-  );
+    // Remove from fingerprint fields if present
+    localFingerprintFields.value = localFingerprintFields.value.filter(
+      (id) => id !== removedId,
+    );
 
-  emitUpdate();
+    emitUpdate();
+  }
 };
 
 const navigateToImport = () => {
@@ -305,9 +286,13 @@ const emitUpdate = () => {
   emit("update:fingerprintFields", [...localFingerprintFields.value]);
 };
 
-// Load semantic groups from backend on component mount
+// Auto-select first category on mount
 onMounted(() => {
-  loadSemanticGroups();
+  nextTick(() => {
+    if (categoryOptions.value.length > 0 && !selectedCategory.value) {
+      selectedCategory.value = categoryOptions.value[0].value;
+    }
+  });
 });
 </script>
 

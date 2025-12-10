@@ -237,12 +237,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Direct Trace Correlation - Full Span List -->
           <div v-else-if="traceCorrelationMode === 'direct' && traceSpanList.length > 0" class="tw-h-full">
             <!-- Trace Header -->
-            <div class="tw-p-3 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-bg-white">
+            <div class="tw-p-3 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] trace-header-bg">
               <div class="tw-flex tw-items-center tw-gap-3">
                 <q-icon name="link" color="positive" size="1.25rem" />
                 <div class="tw-flex tw-flex-col">
                   <span class="tw-text-sm tw-font-semibold">{{ t('correlation.directTraceMatch') }}</span>
-                  <span class="tw-text-xs tw-text-gray-500 tw-font-mono">{{ extractedTraceId }}</span>
+                  <a
+                    href="#"
+                    class="tw-text-xs tw-text-blue-500 tw-font-mono tw-underline hover:tw-text-blue-700 tw-cursor-pointer"
+                    @click.prevent="openTraceInNewWindow"
+                    :title="t('correlation.openTraceInNewWindow')"
+                  >
+                    {{ extractedTraceId }}
+                    <q-icon name="open_in_new" size="xs" class="tw-ml-1" />
+                  </a>
                 </div>
                 <q-chip dense color="primary" text-color="white" class="tw-ml-auto">
                   {{ traceSpanList.length }} {{ t('correlation.spans') }}
@@ -302,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Dimension-based Correlation - Traces List -->
           <div v-else-if="traceCorrelationMode === 'dimension-based' && tracesForDimensions.length > 0" class="tw-h-full">
             <!-- Header -->
-            <div class="tw-p-3 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-bg-white">
+            <div class="tw-p-3 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] trace-header-bg">
               <div class="tw-flex tw-items-center tw-gap-3">
                 <q-icon name="hub" color="primary" size="1.25rem" />
                 <div class="tw-flex tw-flex-col">
@@ -326,10 +334,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :rows-per-page-options="[0]"
                 class="trace-list-table"
               >
-                <template v-slot:body-cell-trace_id="props">
-                  <q-td :props="props">
-                    <span class="tw-font-mono tw-text-xs tw-text-primary tw-cursor-pointer hover:tw-underline">
-                      {{ props.row.trace_id?.substring(0, 16) }}...
+                <template v-slot:body-cell-trace_id="slotProps">
+                  <q-td :props="slotProps">
+                    <span
+                      class="tw-font-mono tw-text-xs tw-text-primary tw-cursor-pointer hover:tw-underline"
+                      @click="openTraceInNewWindow(slotProps.row.trace_id)"
+                      :title="t('correlation.openTraceInNewWindow')"
+                    >
+                      {{ slotProps.row.trace_id?.substring(0, 16) }}...
+                      <q-icon name="open_in_new" size="0.75rem" class="tw-ml-1" />
                     </span>
                   </q-td>
                 </template>
@@ -508,12 +521,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Direct Trace Correlation - Full Span List -->
           <div v-else-if="traceCorrelationMode === 'direct' && traceSpanList.length > 0" class="tw-h-full">
             <!-- Trace Header -->
-            <div class="tw-p-3 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-bg-white">
+            <div class="tw-p-3 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] trace-header-bg">
               <div class="tw-flex tw-items-center tw-gap-3">
                 <q-icon name="link" color="positive" size="1.25rem" />
                 <div class="tw-flex tw-flex-col">
                   <span class="tw-text-sm tw-font-semibold">{{ t('correlation.directTraceMatch') }}</span>
-                  <span class="tw-text-xs tw-text-gray-500 tw-font-mono">{{ extractedTraceId }}</span>
+                  <a
+                    href="#"
+                    class="tw-text-xs tw-text-blue-500 tw-font-mono tw-underline hover:tw-text-blue-700 tw-cursor-pointer"
+                    @click.prevent="openTraceInNewWindow"
+                    :title="t('correlation.openTraceInNewWindow')"
+                  >
+                    {{ extractedTraceId }}
+                    <q-icon name="open_in_new" size="xs" class="tw-ml-1" />
+                  </a>
                 </div>
                 <q-chip dense color="primary" text-color="white" class="tw-ml-auto">
                   {{ traceSpanList.length }} {{ t('correlation.spans') }}
@@ -573,7 +594,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Dimension-based Correlation - Traces List -->
           <div v-else-if="traceCorrelationMode === 'dimension-based' && tracesForDimensions.length > 0" class="tw-h-full">
             <!-- Header -->
-            <div class="tw-p-3 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-bg-white">
+            <div class="tw-p-3 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] trace-header-bg">
               <div class="tw-flex tw-items-center tw-gap-3">
                 <q-icon name="hub" color="primary" size="1.25rem" />
                 <div class="tw-flex tw-flex-col">
@@ -597,10 +618,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :rows-per-page-options="[0]"
                 class="trace-list-table"
               >
-                <template v-slot:body-cell-trace_id="props">
-                  <q-td :props="props">
-                    <span class="tw-font-mono tw-text-xs tw-text-primary tw-cursor-pointer hover:tw-underline">
-                      {{ props.row.trace_id?.substring(0, 16) }}...
+                <template v-slot:body-cell-trace_id="slotProps">
+                  <q-td :props="slotProps">
+                    <span
+                      class="tw-font-mono tw-text-xs tw-text-primary tw-cursor-pointer hover:tw-underline"
+                      @click="openTraceInNewWindow(slotProps.row.trace_id)"
+                      :title="t('correlation.openTraceInNewWindow')"
+                    >
+                      {{ slotProps.row.trace_id?.substring(0, 16) }}...
+                      <q-icon name="open_in_new" size="0.75rem" class="tw-ml-1" />
                     </span>
                   </q-td>
                 </template>
@@ -739,9 +765,11 @@ import {
   provide,
 } from "vue";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import useNotifications from "@/composables/useNotifications";
 import { useMetricsCorrelationDashboard, type MetricsCorrelationConfig } from "@/composables/useMetricsCorrelationDashboard";
+import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import type { StreamInfo } from "@/services/service_streams";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import streamService from "@/services/stream";
@@ -783,8 +811,10 @@ const emit = defineEmits<{
 
 const { showErrorNotification } = useNotifications();
 const store = useStore();
+const router = useRouter();
 const { t } = useI18n();
 const { generateDashboard, generateLogsDashboard } = useMetricsCorrelationDashboard();
+const { semanticGroups, loadSemanticGroups } = useServiceCorrelation();
 
 // Check if embedded tabs mode
 const isEmbeddedTabs = computed(() => props.mode === 'embedded-tabs');
@@ -1202,14 +1232,15 @@ const buildTraceIdTextPatterns = (fieldName: string): RegExp[] => {
     // Escape special regex characters in the variant
     const escaped = variant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-    // Pattern: [field_name abc123...]
-    patterns.push(new RegExp(`\\[${escaped}\\s+([a-fA-F0-9]{16,64})\\]`, 'i'));
+    // Pattern: [field_name abc123-suffix] - handles formats like [trace_id 019b042dc72d76429043efccfe8e96c9-f1Mwiur]
+    // Captures the hex part before any dash suffix
+    patterns.push(new RegExp(`\\[${escaped}\\s+([a-fA-F0-9]{16,64})(?:-[^\\]]*)?\\]`, 'i'));
 
-    // Pattern: field_name=abc123 or field_name: abc123
-    patterns.push(new RegExp(`${escaped}[=:]\\s*["']?([a-fA-F0-9]{16,64})["']?`, 'i'));
+    // Pattern: field_name=abc123 or field_name: abc123 (possibly with dash suffix)
+    patterns.push(new RegExp(`${escaped}[=:]\\s*["']?([a-fA-F0-9]{16,64})(?:-[^"'\\s]*)?["']?`, 'i'));
 
-    // Pattern: "field_name": "abc123" (JSON)
-    patterns.push(new RegExp(`"${escaped}"\\s*:\\s*"([a-fA-F0-9]{16,64})"`, 'i'));
+    // Pattern: "field_name": "abc123" (JSON, possibly with dash suffix)
+    patterns.push(new RegExp(`"${escaped}"\\s*:\\s*"([a-fA-F0-9]{16,64})(?:-[^"]*)?\\s*"`, 'i'));
   }
 
   return patterns;
@@ -1436,6 +1467,52 @@ const fetchTraceByTraceId = async (traceId: string) => {
 };
 
 /**
+ * Get service field names from the "service" semantic group
+ * Falls back to common field names if semantic groups not loaded yet
+ */
+const getServiceFieldNames = (): string[] => {
+  // Try to find the "service" semantic group
+  const serviceGroup = semanticGroups.value.find(
+    (group) => group.id === 'service' || group.id?.toLowerCase() === 'service'
+  );
+
+  if (serviceGroup && serviceGroup.fields.length > 0) {
+    return serviceGroup.fields;
+  }
+
+  // Fallback to common service field names if semantic groups not loaded
+  return [
+    'service_name',
+    'service',
+    'svc',
+    'app',
+    'application',
+    'app_name',
+    'attributes_service_name',
+    'resource_service_name',
+    'resource_attributes_service_name',
+    'service_service_name',
+    'job',
+  ];
+};
+
+/**
+ * Find the service field name and value from StreamInfo filters
+ * Uses semantic groups to get the list of possible service field names
+ */
+const findServiceFilter = (filters: Record<string, string> | undefined): { fieldName: string; value: string } | null => {
+  if (!filters) return null;
+
+  const serviceFieldNames = getServiceFieldNames();
+  for (const fieldName of serviceFieldNames) {
+    if (filters[fieldName]) {
+      return { fieldName, value: filters[fieldName] };
+    }
+  }
+  return null;
+};
+
+/**
  * Fetch traces via dimension-based correlation (service name match)
  */
 const fetchTracesByDimensions = async () => {
@@ -1444,26 +1521,35 @@ const fetchTracesByDimensions = async () => {
     return [];
   }
 
-  const streamName = props.traceStreams[0].stream_name;
+  const traceStreamInfo = props.traceStreams[0];
+  const streamName = traceStreamInfo.stream_name;
 
-  // Build filter from matched dimensions
-  // Try to match on service_name or other common dimensions
+  // Build filter using the service field from the trace stream's filters
+  // This uses the exact field name from the trace data (e.g., 'service_name', 'service', etc.)
   const filterParts: string[] = [];
 
-  // Check if we have service-related dimensions
-  const serviceKeys = ['service_name', 'service', 'k8s-deployment', 'k8s_deployment'];
-  for (const key of serviceKeys) {
-    const normalizedKey = key.replace(/-/g, '_');
-    if (activeDimensions.value[key]) {
-      filterParts.push(`service_name='${activeDimensions.value[key]}'`);
-      break;
-    } else if (activeDimensions.value[normalizedKey]) {
-      filterParts.push(`service_name='${activeDimensions.value[normalizedKey]}'`);
-      break;
+  // Find the service field from StreamInfo filters (using semantic group field names)
+  const serviceFilter = findServiceFilter(traceStreamInfo.filters);
+  if (serviceFilter) {
+    filterParts.push(`${serviceFilter.fieldName}='${serviceFilter.value}'`);
+  }
+
+  // Fallback: if no service field in filters, try activeDimensions
+  if (filterParts.length === 0) {
+    const serviceFieldNames = getServiceFieldNames();
+    for (const fieldName of serviceFieldNames) {
+      const normalizedKey = fieldName.replace(/-/g, '_');
+      if (activeDimensions.value[fieldName]) {
+        filterParts.push(`${fieldName}='${activeDimensions.value[fieldName]}'`);
+        break;
+      } else if (activeDimensions.value[normalizedKey]) {
+        filterParts.push(`${normalizedKey}='${activeDimensions.value[normalizedKey]}'`);
+        break;
+      }
     }
   }
 
-  // If no service match, try using the service name from props
+  // Last resort: use the service name from props (FQN) with default field name
   if (filterParts.length === 0 && props.serviceName) {
     filterParts.push(`service_name='${props.serviceName}'`);
   }
@@ -1505,6 +1591,36 @@ const formatDuration = (durationNs: number): string => {
 const formatTimestamp = (timestampMicros: number): string => {
   const date = new Date(timestampMicros / 1000);
   return date.toLocaleString();
+};
+
+/**
+ * Open traces screen in new window with trace_id filter
+ * @param traceIdOrEvent - trace_id string to use, or event object (when called from @click without args)
+ */
+const openTraceInNewWindow = (traceIdOrEvent?: string | Event) => {
+  // Handle case where event object is passed instead of trace_id (e.g., from @click without args)
+  const traceId = typeof traceIdOrEvent === 'string' ? traceIdOrEvent : undefined;
+  const targetTraceId = traceId || extractedTraceId.value;
+  if (!targetTraceId) return;
+
+  const org = store.state.selectedOrganization.identifier;
+  const traceStream = props.traceStreams?.[0]?.stream_name || "default";
+
+  // Build the URL with sql_mode and just trace_id filter
+  const route = router.resolve({
+    name: "traces",
+    query: {
+      org_identifier: org,
+      stream: traceStream,
+      sql_mode: "true",
+      query: b64EncodeUnicode(`trace_id='${targetTraceId}'`),
+      from: props.timeRange.startTime.toString(),
+      to: props.timeRange.endTime.toString(),
+    },
+  });
+
+  // Open in new window/tab
+  window.open(route.href, "_blank");
 };
 
 /**
@@ -1686,8 +1802,16 @@ watch(
   }
 }
 
+// Trace header background - light mode
+.trace-header-bg {
+  background: #ffffff;
+}
+
 // Dark mode support
 body.body--dark {
+  .trace-header-bg {
+    background: #1e1e1e;
+  }
   .correlation-dashboard-embedded {
     background: #1e1e1e !important;
 

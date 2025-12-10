@@ -148,6 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon="refresh"
               @click="refreshData"
               :disable="arePanelsLoading"
+              :loading="arePanelsLoading"
               data-test="dashboard-refresh-btn"
               :color="isVariablesChanged ? 'warning' : ''"
               :text-color="store.state.theme == 'dark' ? 'white' : 'dark'"

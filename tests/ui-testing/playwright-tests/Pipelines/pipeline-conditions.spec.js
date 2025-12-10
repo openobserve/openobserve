@@ -69,7 +69,9 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     currentPipelineName = null;
   });
 
-  test("should create, edit, and test basic condition operations with multiple operators", async ({ page }) => {
+  test("should create, edit, and test basic condition operations with multiple operators", {
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@pipelinesBasicOperations', '@pipelinesMultipleOperators']
+  }, async ({ page }) => {
     const pipelineName = `pipeline-basic-ops-${Math.random().toString(36).substring(7)}`;
     currentPipelineName = pipelineName;
 
@@ -147,7 +149,9 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     await pageManager.pipelinesPage.deletePipelineByName(pipelineName);
   });
 
-  test("should handle condition groups, nesting, and reordering", async ({ page }) => {
+  test("should handle condition groups, nesting, and reordering", {
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@pipelinesNesting', '@pipelinesReordering']
+  }, async ({ page }) => {
     await pageManager.pipelinesPage.createPipelineWithCondition("e2e_conditions_groups");
 
     // Test 1: Add first condition
@@ -216,7 +220,9 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     await pageManager.pipelinesPage.verifyConfirmationDialog();
   });
 
-  test("should validate fields and show proper error messages", async ({ page }) => {
+  test("should validate fields and show proper error messages", {
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@pipelinesValidation', '@pipelinesErrorMessages']
+  }, async ({ page }) => {
     await pageManager.pipelinesPage.createPipelineWithCondition("e2e_conditions_validation");
 
     // Test 1: Verify guidelines are displayed
@@ -250,7 +256,9 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     await pageManager.pipelinesPage.verifyConfirmationDialog();
   });
 
-  test("should test complex conditions and operator precedence (A OR B AND C)", async ({ page }) => {
+  test("should test complex conditions and operator precedence (A OR B AND C)", {
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@pipelinesOperatorPrecedence', '@pipelinesComplexConditions']
+  }, async ({ page }) => {
     const pipelineName = `pipeline-complex-${Math.random().toString(36).substring(7)}`;
     currentPipelineName = pipelineName;
 
@@ -299,7 +307,9 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     await pageManager.pipelinesPage.deletePipelineByName(pipelineName);
   });
 
-  test("should test multiple conditions: A, B, C, and D", async ({ page }) => {
+  test("should test multiple conditions: A, B, C, and D", {
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@pipelinesMultipleConditions']
+  }, async ({ page }) => {
     const pipelineName = `pipeline-multiple-${Math.random().toString(36).substring(7)}`;
     currentPipelineName = pipelineName;
 
@@ -350,7 +360,9 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     await pageManager.pipelinesPage.deletePipelineByName(pipelineName);
   });
 
-  test("should delete condition node from pipeline", async ({ page }) => {
+  test("should delete condition node from pipeline", {
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@pipelinesDeleteNode']
+  }, async ({ page }) => {
     const pipelineName = `pipeline-delete-${Math.random().toString(36).substring(7)}`;
     currentPipelineName = pipelineName;
 
@@ -386,7 +398,9 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     await pageManager.pipelinesPage.deletePipelineByName(pipelineName);
   });
 
-  test("should test different comparison operators (>=, !=, Contains, NotContains)", async ({ page }) => {
+  test("should test different comparison operators (>=, !=, Contains, NotContains)", {
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@pipelinesComparisonOperators']
+  }, async ({ page }) => {
     const pipelineName = `pipeline-operators-${Math.random().toString(36).substring(7)}`;
     currentPipelineName = pipelineName;
 

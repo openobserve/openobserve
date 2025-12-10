@@ -42,8 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-separator />
 
-      <q-tab-panels v-model="activeTab" animated class="tw-mt-4">
-        <q-tab-panel name="identity" class="tw-p-0">
+      <q-tab-panels v-model="activeTab" animated class="tw-mt-4 tw-overflow-hidden tw-bg-transparent">
+        <q-tab-panel name="identity" class="tw-p-0 tw-overflow-hidden">
           <ServiceIdentityConfig
             :org-id="store.state.selectedOrganization.identifier"
             :config="store.state.organizationSettings?.deduplication_config"
@@ -51,11 +51,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </q-tab-panel>
 
-        <q-tab-panel name="services" class="tw-p-0">
+        <q-tab-panel name="services" class="tw-p-0 tw-overflow-hidden">
           <DiscoveredServices />
         </q-tab-panel>
 
-        <q-tab-panel name="alert-correlation" class="tw-p-0">
+        <q-tab-panel name="alert-correlation" class="tw-p-0 tw-overflow-hidden">
           <OrganizationDeduplicationSettings
             :org-id="store.state.selectedOrganization.identifier"
             :config="store.state.organizationSettings?.deduplication_config"
@@ -91,12 +91,8 @@ export default defineComponent({
 
     const onCorrelationSettingsSaved = async () => {
       // Reload organization settings to get updated dedup config
+      // Note: Child components show their own success notifications
       await store.dispatch("getDefaultOrganizationSettings");
-      q.notify({
-        type: "positive",
-        message: t("settings.correlation.correlationSettingsSaved"),
-        timeout: 2000,
-      });
     };
 
     return {
@@ -119,5 +115,16 @@ export default defineComponent({
   font-size: 0.875rem;
   font-weight: 500;
   line-height: 1.25rem;
+}
+
+// Ensure tab panels have consistent background with card-container
+:deep(.q-tab-panels) {
+  background: var(--o2-card-bg) !important;
+  overflow: hidden;
+}
+
+:deep(.q-tab-panel) {
+  overflow: hidden;
+  background: var(--o2-card-bg) !important;
 }
 </style>
