@@ -218,14 +218,21 @@ export default defineComponent({
         this.searchObj.data.stream.selectedFields = [];
       }
       this.searchObj.data.stream.selectedStream = [opt.value];
-      // Clear the filter input when single stream is selected
+      // Clear the filter input and close the menu when single stream is selected
       //we will first check if qselect is there or not and then call the method
       //we will use the quasar next tick to ensure that the dom is updated before we call the method
       //we will also us the quasar's updateInputValue method to clear the input value
       this.$nextTick(() => {
         const indexListSelectField = this.$refs.streamSelect;
-        if (indexListSelectField && indexListSelectField.inputValue && indexListSelectField.updateInputValue) {
-          indexListSelectField.updateInputValue("");
+        if (indexListSelectField) {
+          // Clear the search input
+          if (indexListSelectField.updateInputValue) {
+            indexListSelectField.updateInputValue("");
+          }
+          // // Close the dropdown menu
+          // if (indexListSelectField.hidePopup) {
+          //   indexListSelectField.hidePopup();
+          // }
         }
       });
       this.onStreamChange("");
