@@ -27,7 +27,8 @@ pub struct Model {
     pub user_id: Option<String>,
     pub setting_key: String,
     pub setting_category: Option<String>,
-    pub setting_value: String, // JSON stored as text
+    #[sea_orm(column_type = "JsonBinary")]
+    pub setting_value: serde_json::Value,
     pub description: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,

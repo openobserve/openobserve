@@ -128,20 +128,19 @@ function buildExactDimensionConditions(
 /**
  * Generate trace query using exact field names from StreamInfo
  * Timestamp is NOT included in SQL - it's passed as separate from/to query params
+ *
+ * Uses only the filters from StreamInfo (same as logs/metrics) - service_name
+ * is already included in filters if present.
  */
 export function buildTraceQuery(
-  serviceName: string,
   streamInfo: StreamInfo,
   context: TelemetryContext,
   timeWindowMinutes: number = 5
 ): CorrelationQuery {
   const conditions: string[] = [];
 
-  // Add service name condition
-  const escapedServiceName = serviceName.replace(/'/g, "''");
-  conditions.push(`service_name = '${escapedServiceName}'`);
-
   // Add dimension conditions using exact field names from StreamInfo.filters
+  // This includes service_name if present in the trace stream
   const dimensionConditions = buildExactDimensionConditions(streamInfo.filters);
   conditions.push(...dimensionConditions);
 
@@ -269,12 +268,12 @@ export function generateCorrelationQueries(
 
   // If we have correlation data from the API, use the exact StreamInfo with field names
   if (correlationData) {
-    const serviceName = correlationData.service_name;
-
     // Generate queries for each target type (excluding source type)
     if (sourceType !== "traces") {
       for (const streamInfo of correlationData.related_streams.traces) {
-        queries.push(buildTraceQuery(serviceName, streamInfo, context, timeWindowMinutes));
+        // Use filters from StreamInfo directly (same as logs/metrics)
+        // service_name is already in filters if present
+        queries.push(buildTraceQuery(streamInfo, context, timeWindowMinutes));
       }
     }
 

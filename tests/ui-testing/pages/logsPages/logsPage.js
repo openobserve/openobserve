@@ -300,9 +300,14 @@ export class LogsPage {
         await this.page.waitForTimeout(1000);
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-        // Wait for the stream to be visible in the dropdown
+        // Type the stream name to filter the dropdown
+        await this.page.locator(this.indexDropDown).fill(stream);
+        await this.page.waitForTimeout(2000); // Wait for filtering to complete
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+        // Find the stream in the filtered results and scroll it into view if needed
         const streamLocator = this.page.getByText(stream, { exact: true }).first();
-        await streamLocator.waitFor({ state: 'visible', timeout: 15000 });
+        await streamLocator.scrollIntoViewIfNeeded({ timeout: 15000 });
         await streamLocator.click();
     }
 
