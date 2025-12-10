@@ -451,7 +451,8 @@
     "roles": "역할",
     "groups": "그룹",
     "customRole": "사용자 지정 역할",
-    "description": "설명"
+    "description": "설명",
+    "revoke_invite": "초대 취소"
   },
   "ticket": {
     "header": "지원 티켓",
@@ -1471,7 +1472,8 @@
     "basicUsers": "유저",
     "quota": "할당량",
     "externalUserWarningTitle": "외부 사용자 경고",
-    "externalUserWarningMessage": "외부 사용자를 역할에 직접 추가해도 권한이 부여되지 않습니다.대신 사용자 그룹에 추가하세요."
+    "externalUserWarningMessage": "외부 사용자를 역할에 직접 추가해도 권한이 부여되지 않습니다.대신 사용자 그룹에 추가하세요.",
+    "invitations": "초대장"
   },
   "pipeline": {
     "header": "파이프라인",

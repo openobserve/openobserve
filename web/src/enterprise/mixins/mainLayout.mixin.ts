@@ -3,7 +3,7 @@ import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import { useStore } from "vuex";
 
-import { getUserInfo, getImageURL, useLocalOrganization } from "@/utils/zincutils";
+import { getUserInfo, getImageURL, useLocalOrganization, invalidateLoginData, useLocalCurrentUser, useLocalUserInfo } from "@/utils/zincutils";
 import organizationService from "@/services/organizations";
 import billingService from "@/services/billings";
 import userService from "@/services/users";
@@ -84,7 +84,9 @@ const MainLayoutCloudMixin = {
             },
           );
         })
-        .catch((error) => console.log(error));
+        .catch((error) => {
+          if (error.status === 403) signout();
+        });
     };
 
     /**
@@ -111,6 +113,20 @@ const MainLayoutCloudMixin = {
         .catch((e) => {
           console.log("Error while fetching refresh token:", e);
         });
+    };
+
+
+
+    const signout = async () => {
+      if (config.isEnterprise == "true") {
+        invalidateLoginData();
+      }
+      store.dispatch("logout");
+
+      useLocalCurrentUser("", true);
+      useLocalUserInfo("", true);
+
+      router.push("/logout");
     };
 
     return {

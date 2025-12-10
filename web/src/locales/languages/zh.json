@@ -451,7 +451,8 @@
     "roles": "角色",
     "groups": "群组",
     "customRole": "自定义角色",
-    "description": "描述"
+    "description": "描述",
+    "revoke_invite": "撤销邀请"
   },
   "ticket": {
     "header": "工单",
@@ -1467,7 +1468,8 @@
     "basicUsers": "用户",
     "quota": "配额",
     "externalUserWarningTitle": "外部用户警告",
-    "externalUserWarningMessage": "将外部用户直接添加到角色不会授予权限。改为将它们添加到用户组。"
+    "externalUserWarningMessage": "将外部用户直接添加到角色不会授予权限。改为将它们添加到用户组。",
+    "invitations": "邀请"
   },
   "pipeline": {
     "header": "流水线",
