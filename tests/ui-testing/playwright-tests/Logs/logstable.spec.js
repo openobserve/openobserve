@@ -3,7 +3,7 @@ const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const logData = require("../../fixtures/log.json");
 const logsdata = require("../../../test-data/logs_data.json");
-const severityColorData = require("../../../test-data/severity_color_data.json");
+const { SeverityTestHelpers } = require('../../pages/logsPages/severityTestHelpers.js');
 
 // Legacy login function replaced by global authentication via navigateToBase
 
@@ -40,75 +40,6 @@ async function ingestion(page) {
     return response;
   } catch (error) {
     testLogger.error('Ingestion failed:', { error: error.message });
-    throw error;
-  }
-}
-
-async function severityColorIngestionToStream(page, streamName) {
-  const orgId = process.env["ORGNAME"];
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString('base64');
-
-  const headers = {
-    "Authorization": `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  };
-
-  try {
-    const response = await page.evaluate(async ({ url, headers, orgId, streamName, severityColorData }) => {
-      const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify(severityColorData)
-      });
-      if (!fetchResponse.ok) {
-        throw new Error(`HTTP error! status: ${fetchResponse.status}`);
-      }
-      return await fetchResponse.json();
-    }, {
-      url: process.env.INGESTION_URL,
-      headers: headers,
-      orgId: orgId,
-      streamName: streamName,
-      severityColorData: severityColorData
-    });
-    return response;
-  } catch (error) {
-    testLogger.error('Severity color ingestion failed:', { error: error.message });
-    throw error;
-  }
-}
-
-async function deleteStream(page, streamName) {
-  const orgId = process.env["ORGNAME"];
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString('base64');
-
-  const headers = {
-    "Authorization": `Basic ${basicAuthCredentials}`,
-  };
-
-  try {
-    const response = await page.evaluate(async ({ url, headers, orgId, streamName }) => {
-      const fetchResponse = await fetch(`${url}/api/${orgId}/streams/${streamName}`, {
-        method: 'DELETE',
-        headers: headers
-      });
-      if (!fetchResponse.ok && fetchResponse.status !== 404) {
-        throw new Error(`HTTP error! status: ${fetchResponse.status}`);
-      }
-      return { status: fetchResponse.status };
-    }, {
-      url: process.env.INGESTION_URL,
-      headers: headers,
-      orgId: orgId,
-      streamName: streamName
-    });
-    return response;
-  } catch (error) {
-    testLogger.error('Stream deletion failed:', { error: error.message });
     throw error;
   }
 }
@@ -627,6 +558,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
 test.describe("Severity Color Mapping Tests - Issue #9439", () => {
   let pageManager;
   let testStreamName;
+  let severityHelpers;
 
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -638,8 +570,11 @@ test.describe("Severity Color Mapping Tests - Issue #9439", () => {
 
     testLogger.info(`Creating stream: ${testStreamName}`);
 
+    // Initialize severity helpers
+    severityHelpers = new SeverityTestHelpers(page);
+
     // Ingest severity test data
-    await severityColorIngestionToStream(page, testStreamName);
+    await severityHelpers.severityColorIngestionToStream(testStreamName);
     testLogger.info(`Ingested test data to stream: ${testStreamName}`);
 
     // Wait for data to be indexed
@@ -713,7 +648,10 @@ test.describe("Severity Color Mapping Tests - Issue #9439", () => {
     const page = await context.newPage();
 
     testLogger.info(`Cleaning up stream: ${testStreamName}`);
-    await deleteStream(page, testStreamName);
+
+    // Initialize severity helpers for cleanup
+    const cleanupHelpers = new SeverityTestHelpers(page);
+    await cleanupHelpers.deleteStream(testStreamName);
 
     await context.close();
   });
