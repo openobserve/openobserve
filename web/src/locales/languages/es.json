@@ -452,7 +452,8 @@
     "roles": "Roles",
     "groups": "Grupos",
     "customRole": "Funciones personalizadas",
-    "description": "Descripción"
+    "description": "Descripción",
+    "revoke_invite": "Revocar invitación"
   },
   "ticket": {
     "header": "Tickets de soporte",
@@ -1471,7 +1472,8 @@
     "basicUsers": "Usuarios",
     "quota": "Cuotas",
     "externalUserWarningTitle": "Advertencia de usuario externo",
-    "externalUserWarningMessage": "Agregar usuarios externos directamente a los roles no otorgará permisos. En su lugar, agréguelos a los grupos de usuarios."
+    "externalUserWarningMessage": "Agregar usuarios externos directamente a los roles no otorgará permisos. En su lugar, agréguelos a los grupos de usuarios.",
+    "invitations": "Invitaciones"
   },
   "pipeline": {
     "header": "Tuberías",

@@ -451,7 +451,8 @@
     "roles": "Roller",
     "groups": "Gruplar",
     "customRole": "Özel Roller",
-    "description": "Açıklama"
+    "description": "Açıklama",
+    "revoke_invite": "Daveti İptal Et"
   },
   "ticket": {
     "header": "Destek Talepleri",
@@ -1471,7 +1472,8 @@
     "basicUsers": "Kullanıcılar",
     "quota": "Kontenjanlar",
     "externalUserWarningTitle": "Harici kullanıcı uyarısı",
-    "externalUserWarningMessage": "Harici kullanıcıları doğrudan rollere eklemek izin vermez. Bunun yerine Kullanıcı Gruplarına ekleyin."
+    "externalUserWarningMessage": "Harici kullanıcıları doğrudan rollere eklemek izin vermez. Bunun yerine Kullanıcı Gruplarına ekleyin.",
+    "invitations": "Davetiyeler"
   },
   "pipeline": {
     "header": "Boru hatları",
