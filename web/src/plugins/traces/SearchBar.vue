@@ -131,6 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('search.runQuery')"
             class="q-pa-none o2-primary-button tw-h-[30px] element-box-shadow"
             @click="searchData"
+            :loading="isLoading"
             :disable="isLoading"
             >{{ t("search.runQuery") }}</q-btn
           >
