@@ -46,6 +46,8 @@ export const useSearchQuery = () => {
   const { searchObj, notificationMsg, initialQueryPayload, searchAggData } = searchState();
 
   const getQueryReq = (isPagination: boolean): SearchRequestPayload | null => {
+    searchObj.data.highlightQuery = "";
+
     if (!isPagination) {
       searchObj.data.queryResults = {};
     }
@@ -54,10 +56,9 @@ export const useSearchQuery = () => {
     searchObj.meta.searchApplied = true;
     searchObj.data.functionError = "";
 
-
     searchAggData.total = 0;
     searchAggData.hasAggregation = false;
-       
+
     if (
       !searchObj.data.stream.streamLists?.length ||
       searchObj.data.stream.selectedStream.length == 0
