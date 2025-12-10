@@ -39,7 +39,7 @@ async function ingestion(page) {
     });
     return response;
   } catch (error) {
-    console.error('Ingestion failed:', error);
+    testLogger.error('Ingestion failed:', { error: error.message });
     throw error;
   }
 }
@@ -75,7 +75,7 @@ async function severityColorIngestionToStream(page, streamName) {
     });
     return response;
   } catch (error) {
-    console.error('Severity color ingestion failed:', error);
+    testLogger.error('Severity color ingestion failed:', { error: error.message });
     throw error;
   }
 }
@@ -108,7 +108,7 @@ async function deleteStream(page, streamName) {
     });
     return response;
   } catch (error) {
-    console.error('Stream deletion failed:', error);
+    testLogger.error('Stream deletion failed:', { error: error.message });
     throw error;
   }
 }
