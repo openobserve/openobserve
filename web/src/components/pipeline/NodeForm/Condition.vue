@@ -63,15 +63,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-banner  inline dense class="note-info " >
               <div>
                 <q-icon name="info" color="orange" class="q-mr-sm" />
-                <span>To check for an empty value, use <span class="highlight">""</span>. Example: 
+                <span>To check for an empty value, use <span class="highlight">""</span>. Example:
                   <span class="code">app_name != ""</span>
                 </span>
               </div>
               <div>
                 <q-icon name="info" color="orange"class="q-mr-sm" />
-                <span>To check for an Null value, use <span class="highlight">null</span>. Example: 
+                <span>To check for an Null value, use <span class="highlight">null</span>. Example:
                   <span class="code">app_name != null</span>
                 </span>
+              </div>
+              <div>
+                <q-icon name="info" color="orange" class="q-mr-sm" />
+                <span>To add a custom column, type column name and press <span class="highlight">Enter</span>.</span>
               </div>
               <div>
                 <q-icon name="warning" color="red" class="q-mr-sm" />
