@@ -19,14 +19,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw-w-full tw-h-full tw-pr-[0.625rem]">
       <!-- Header -->
       <div class="card-container tw-mb-[0.625rem]">
-        <div class="flex justify-between full-width tw-h-[68px] tw-px-2 tw-py-3">
+        <div class="flex justify-between full-width tw-h-[68px] tw-px-4 tw-py-3">
           <div class="flex items-center">
             <q-btn
               no-caps
               padding="xs"
               outline
               icon="arrow_back_ios_new"
-              class="hideOnPrintMode el-border"
+              class="hideOnPrintMode"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-secondary-button-dark'
+                  : 'o2-secondary-button-light'
+              "
               @click="goBack"
               data-test="backfill-jobs-back-btn"
             />
@@ -79,6 +84,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             label="Clear Filters"
             outline
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-secondary-button-dark'
+                : 'o2-secondary-button-light'
+            "
             @click="clearFilters"
             data-test="clear-filters-btn"
           />
@@ -233,35 +243,35 @@ const columns = [
   {
     name: "pipeline_name",
     label: "Pipeline",
-    align: "left",
+    align: "left" as const,
     field: "pipeline_name",
     sortable: true,
   },
   {
     name: "status",
     label: "Status",
-    align: "left",
+    align: "left" as const,
     field: "status",
     sortable: true,
   },
   {
     name: "progress_percent",
     label: "Progress",
-    align: "left",
+    align: "left" as const,
     field: "progress_percent",
     sortable: true,
   },
   {
     name: "created_at",
     label: "Created",
-    align: "left",
+    align: "left" as const,
     field: "created_at",
     sortable: true,
   },
   {
     name: "actions",
     label: "Actions",
-    align: "right",
+    align: "right" as const,
     field: "actions",
   },
 ];
@@ -298,12 +308,13 @@ const loadJobs = async () => {
 
 const loadPipelineOptions = () => {
   // Extract unique pipelines from jobs
-  const uniquePipelines = [...new Map(
+  const pipelineMap = new Map(
     jobs.value.map(job => [job.pipeline_id, {
       label: job.pipeline_name || job.pipeline_id,
       value: job.pipeline_id,
     }])
-  ).values()];
+  );
+  const uniquePipelines = Array.from(pipelineMap.values());
 
   allPipelineOptions.value = uniquePipelines;
   pipelineOptions.value = uniquePipelines;
@@ -460,12 +471,6 @@ const formatTimestamp = (timestamp?: number) => {
 
 <style scoped lang="scss">
 .card-container {
-  background: white;
   border-radius: 8px;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-}
-
-.el-border {
-  border: 1px solid #e0e0e0;
 }
 </style>
