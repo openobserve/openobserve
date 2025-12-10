@@ -1,4 +1,5 @@
 import pytest
+import time
 
 def test_e2e_alerts(create_session, base_url):
     """Running an E2E test for get all the alerts list."""
@@ -100,7 +101,6 @@ def test_e2e_templatescreation(create_session, base_url):
 
 def test_e2e_createdestination(create_session, base_url):
     """Running an E2E test for create a new destination."""
-    import time
 
     session = create_session
     url = base_url
@@ -134,6 +134,14 @@ def test_e2e_createdestination(create_session, base_url):
     )
     print(resp_create_destinations.content)
 
+    payload = {
+        "url": "www",
+        "method": "post",
+        "skip_tls_verify": skip_tls_verify_value,
+        "template": template_name,
+        "headers": {"test": "test"},
+        "name": destination_name
+    }
 
     # create destination
     resp_create_destinations = session.post(
@@ -235,7 +243,6 @@ def test_e2e_createdestination(create_session, base_url):
     ), f"Deleting this function, but got {resp_delete_alert.status_code} {resp_delete_alert.content}"
 
     # Wait for alert deletion to propagate
-    import time
     time.sleep(2)
 
     resp_delete_destination = session.delete(
@@ -255,7 +262,6 @@ def test_e2e_createdestination(create_session, base_url):
 
 def test_e2e_createalertsql(create_session, base_url):
     """Running an E2E test for create a new destination."""
-    import time
 
     session = create_session
     url = base_url
@@ -287,7 +293,15 @@ def test_e2e_createalertsql(create_session, base_url):
         json=payload,
         headers=headers,
     )
-        "name":"py-destinations"
+    print(resp_create_destinations.content)
+
+    payload = {
+        "url": "www",
+        "method": "post",
+        "skip_tls_verify": skip_tls_verify_value,
+        "template": template_name,
+        "headers": {"test": "test"},
+        "name": destination_name
     }
 
     # create destination
@@ -388,7 +402,6 @@ def test_e2e_createalertsql(create_session, base_url):
     ), f"Deleting this function, but got {resp_delete_alert.status_code} {resp_delete_alert.content}"
 
     # Wait for alert deletion to propagate
-    import time
     time.sleep(2)
 
     resp_delete_destination = session.delete(
@@ -409,7 +422,6 @@ def test_e2e_createalertsql(create_session, base_url):
 
 def test_e2e_createalertfloat(create_session, base_url):
     """Running an E2E test for create a new destination."""
-    import time
 
     session = create_session
     url = base_url
@@ -551,7 +563,6 @@ def test_e2e_createalertfloat(create_session, base_url):
     ), f"Deleting this function, but got {resp_delete_alert.status_code} {resp_delete_alert.content}"
 
     # Wait for alert deletion to propagate
-    import time
     time.sleep(2)
 
     resp_delete_destination = session.delete(
