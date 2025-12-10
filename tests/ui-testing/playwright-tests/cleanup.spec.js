@@ -129,7 +129,8 @@ test.describe("Pre-Test Cleanup", () => {
         /^e2e_not_operator_(src|dest)_\d+$/,  // Test 7: NOT operator test streams
         /^e2e_impossible_(src|dest)_\d+$/,    // Test 8: Impossible condition test streams
         /^e2e_universal_(src|dest)_\d+$/,     // Test 9: Universal condition test streams
-        /^e2e_4level_(src|dest)_\d+$/         // Test 10: 4-level nested test streams
+        /^e2e_4level_(src|dest)_\d+$/,        // Test 10: 4-level nested test streams
+        /^stream\d{13}$/               // stream1765164273471, etc. (timestamp-based test streams)
       ],
       // Protected streams to never delete
       ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate']
