@@ -569,22 +569,45 @@ class APICleanup {
     }
 
     /**
-     * Clean up all pipelines for specific streams
-     * Deletes pipelines where source.stream_name matches any of the target streams
-     * @param {Array<string>} streamNames - Array of stream names to match (default: ['e2e_automate', 'e2e_automate1', 'e2e_automate2', 'e2e_automate3'])
+     * Clean up all pipelines for specific streams and matching patterns
+     * Deletes pipelines where source.stream_name matches any of the target streams or patterns
+     * @param {Array<string>} streamNames - Array of stream names to match
+     * @param {Array<RegExp>} sourceStreamPatterns - Array of regex patterns to match source stream names
+     * @param {Array<RegExp>} pipelineNamePatterns - Array of regex patterns to match pipeline names
      */
-    async cleanupPipelines(streamNames = ['e2e_automate', 'e2e_automate1', 'e2e_automate2', 'e2e_automate3']) {
-        testLogger.info('Starting pipeline cleanup', { streams: streamNames });
+    async cleanupPipelines(streamNames = [], sourceStreamPatterns = [], pipelineNamePatterns = []) {
+        testLogger.info('Starting pipeline cleanup', {
+            streams: streamNames,
+            sourceStreamPatterns: sourceStreamPatterns.map(p => p.toString()),
+            pipelineNamePatterns: pipelineNamePatterns.map(p => p.toString())
+        });
 
         try {
             // Fetch all pipelines
             const pipelines = await this.fetchPipelines();
             testLogger.info('Fetched pipelines', { total: pipelines.length });
 
-            // Filter pipelines by source stream name
-            const matchingPipelines = pipelines.filter(p =>
-                p.source && streamNames.includes(p.source.stream_name)
-            );
+            // Filter pipelines by source stream name OR by pattern matching
+            const matchingPipelines = pipelines.filter(p => {
+                if (!p.source) return false;
+
+                // Exact match for stream names
+                if (streamNames.length > 0 && streamNames.includes(p.source.stream_name)) return true;
+
+                // Pattern match for source stream names
+                if (sourceStreamPatterns.length > 0 && p.source.stream_name &&
+                    sourceStreamPatterns.some(pattern => pattern.test(p.source.stream_name))) {
+                    return true;
+                }
+
+                // Pattern match for pipeline names
+                if (pipelineNamePatterns.length > 0 && p.name &&
+                    pipelineNamePatterns.some(pattern => pattern.test(p.name))) {
+                    return true;
+                }
+
+                return false;
+            });
             testLogger.info('Found pipelines matching target streams', { count: matchingPipelines.length });
 
             if (matchingPipelines.length === 0) {
@@ -1825,6 +1848,354 @@ class APICleanup {
 
         } catch (error) {
             testLogger.error('Complete cascade cleanup failed', { error: error.message });
+        }
+    }
+
+    /**
+     * ==========================================
+     * PIPELINE-SPECIFIC API METHODS
+     * ==========================================
+     */
+
+    /**
+     * Clean conditions for API (removes UI-only fields)
+     * This removes fields like 'id' and 'groupId' that are only used in UI
+     * @param {object} conditions - Condition configuration object with UI fields
+     * @returns {object} Cleaned conditions for API
+     */
+    cleanConditionsForAPI(conditions) {
+        if (conditions.filterType === "condition") {
+            // Remove UI-only fields: id, groupId
+            // KEEP values field as it's required by the backend
+            const { id, groupId, ...cleaned } = conditions;
+            return cleaned;
+        } else if (conditions.filterType === "group") {
+            // Recursively clean nested conditions
+            const { id, groupId, ...cleaned } = conditions;
+            cleaned.conditions = conditions.conditions.map(c => this.cleanConditionsForAPI(c));
+            return cleaned;
+        }
+        return conditions;
+    }
+
+    /**
+     * Create a stream via API
+     * @param {string} streamName - Name of the stream to create
+     * @param {string} streamType - Type of stream (logs, metrics, traces)
+     * @returns {Promise<object>} API response
+     */
+    async createStream(streamName, streamType = 'logs') {
+        const payload = {
+            fields: [],
+            settings: {
+                partition_keys: [],
+                index_fields: [],
+                full_text_search_keys: [],
+                bloom_filter_fields: [],
+                defined_schema_fields: [],
+                data_retention: 14
+            }
+        };
+
+        testLogger.info('Creating stream via API', { streamName, streamType });
+
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/streams/${streamName}?type=${streamType}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+
+            if (response.status === 200 && data.code === 200) {
+                testLogger.info('Stream created successfully', { streamName });
+            } else {
+                testLogger.warn('Stream creation returned non-200 or already exists', { streamName, status: response.status, data });
+            }
+
+            return { status: response.status, data };
+        } catch (error) {
+            testLogger.error('Failed to create stream', { streamName, error: error.message });
+            return { status: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Create a pipeline via API
+     * @param {string} pipelineName - Name of the pipeline
+     * @param {string} sourceStream - Source stream name
+     * @param {string} destStream - Destination stream name
+     * @param {object} conditions - Condition configuration object
+     * @returns {Promise<object>} API response
+     */
+    async createPipeline(pipelineName, sourceStream, destStream, conditions) {
+        // Clean conditions to remove UI-only fields
+        const cleanedConditions = this.cleanConditionsForAPI(conditions);
+        testLogger.info('Cleaned conditions', { cleaned: JSON.stringify(cleanedConditions, null, 2) });
+
+        // Generate unique node IDs
+        const inputNodeId = `input-${Date.now()}`;
+        const conditionNodeId = `condition-${Date.now()}`;
+        const outputNodeId = `output-${Date.now()}`;
+
+        const pipelinePayload = {
+            pipeline_id: "",
+            version: 0,
+            enabled: true,
+            org: this.org,
+            name: pipelineName,
+            description: `Validation test pipeline for ${pipelineName}`,
+            source: {
+                source_type: "realtime"
+            },
+            paused_at: null,
+            nodes: [
+                {
+                    id: inputNodeId,
+                    position: { x: 100, y: 100 },
+                    data: {
+                        node_type: "stream",
+                        stream_type: "logs",
+                        stream_name: sourceStream,
+                        org_id: this.org
+                    },
+                    io_type: "input"
+                },
+                {
+                    id: conditionNodeId,
+                    position: { x: 300, y: 200 },
+                    data: {
+                        node_type: "condition",
+                        version: 2,
+                        conditions: cleanedConditions
+                    },
+                    io_type: "default"
+                },
+                {
+                    id: outputNodeId,
+                    position: { x: 500, y: 300 },
+                    data: {
+                        node_type: "stream",
+                        stream_type: "logs",
+                        stream_name: destStream,
+                        org_id: this.org
+                    },
+                    io_type: "output"
+                }
+            ],
+            edges: [
+                {
+                    id: `e-${inputNodeId}-${conditionNodeId}`,
+                    source: inputNodeId,
+                    target: conditionNodeId,
+                    markerEnd: {
+                        type: "arrowclosed",
+                        width: 20,
+                        height: 20
+                    },
+                    type: "custom",
+                    style: {
+                        strokeWidth: 2
+                    },
+                    animated: true,
+                    updatable: true
+                },
+                {
+                    id: `e-${conditionNodeId}-${outputNodeId}`,
+                    source: conditionNodeId,
+                    target: outputNodeId,
+                    markerEnd: {
+                        type: "arrowclosed",
+                        width: 20,
+                        height: 20
+                    },
+                    type: "custom",
+                    style: {
+                        strokeWidth: 2
+                    },
+                    animated: true,
+                    updatable: true
+                }
+            ],
+            type: "realtime",
+            stream_name: sourceStream,
+            stream_type: "logs"
+        };
+
+        testLogger.info('Creating pipeline via API', { pipelineName, sourceStream, destStream });
+        testLogger.info('Pipeline payload', { payload: JSON.stringify(pipelinePayload, null, 2) });
+
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/pipelines`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(pipelinePayload)
+            });
+
+            const contentType = response.headers.get('content-type');
+            let data;
+
+            if (contentType && contentType.includes('application/json')) {
+                data = await response.json();
+            } else {
+                const text = await response.text();
+                data = { error: text };
+            }
+
+            testLogger.info('Pipeline creation response', { pipelineName, status: response.status, data });
+
+            if (response.status !== 200) {
+                throw new Error(`Pipeline creation failed: ${JSON.stringify(data)}`);
+            }
+
+            return { status: response.status, data };
+        } catch (error) {
+            testLogger.error('Failed to create pipeline', { pipelineName, error: error.message });
+            throw error;
+        }
+    }
+
+    /**
+     * Ingest data to a stream
+     * Sends records individually to ensure uniqueness
+     * @param {string} streamName - Stream name
+     * @param {array} data - Array of log objects
+     * @returns {Promise<object>} Result with success/fail counts
+     */
+    async ingestData(streamName, data) {
+        testLogger.info('Ingesting data', { streamName, recordCount: data.length });
+
+        let successCount = 0;
+        let failCount = 0;
+
+        // Send records one by one to ensure each is treated as unique
+        for (let i = 0; i < data.length; i++) {
+            const record = data[i];
+
+            try {
+                const response = await fetch(`${process.env.INGESTION_URL}/api/${this.org}/${streamName}/_json`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': this.authHeader,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify([record])  // Send as single-element array
+                });
+
+                const responseData = await response.json();
+
+                if (response.status === 200 && responseData.code === 200) {
+                    successCount++;
+                    testLogger.debug(`Ingested record ${i+1}/${data.length}`, { name: record.name, test_id: record.test_id || 'no_id', unique_id: record.unique_id });
+                } else {
+                    failCount++;
+                    testLogger.error(`Failed to ingest record ${i+1}/${data.length}`, { response: responseData, test_id: record.test_id || record.name });
+                }
+
+                // Small delay between records
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+            } catch (error) {
+                failCount++;
+                testLogger.error(`Error ingesting record ${i+1}/${data.length}`, { error: error.message });
+            }
+        }
+
+        testLogger.info('Ingestion complete', { streamName, total: data.length, success: successCount, failed: failCount });
+
+        if (failCount > 0) {
+            throw new Error(`Failed to ingest ${failCount} out of ${data.length} records`);
+        }
+
+        return { total: data.length, success: successCount, failed: failCount };
+    }
+
+    /**
+     * Query stream via API
+     * @param {string} streamName - Stream to query
+     * @param {number} expectedMinCount - Minimum expected record count (optional)
+     * @returns {Promise<array>} Query results
+     */
+    async queryStream(streamName, expectedMinCount = null) {
+        testLogger.info('Querying stream via API', { streamName });
+
+        // Query for last 10 minutes
+        const endTime = Date.now() * 1000; // microseconds
+        const startTime = endTime - (10 * 60 * 1000 * 1000);
+
+        const query = {
+            query: {
+                sql: `SELECT * FROM "${streamName}"`,
+                start_time: startTime,
+                end_time: endTime,
+                from: 0,
+                size: 1000
+            }
+        };
+
+        try {
+            const response = await fetch(`${process.env.INGESTION_URL}/api/${this.org}/_search?type=logs`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(query)
+            });
+
+            const data = await response.json();
+            const results = data.hits || [];
+
+            testLogger.info('Query results', { streamName, recordCount: results.length });
+
+            if (expectedMinCount !== null && expectedMinCount !== 0) {
+                if (results.length < expectedMinCount) {
+                    throw new Error(`Expected at least ${expectedMinCount} records, got ${results.length}`);
+                }
+            }
+
+            return results;
+        } catch (error) {
+            testLogger.error('Failed to query stream', { streamName, error: error.message });
+            throw error;
+        }
+    }
+
+    /**
+     * Verify stream exists via API
+     * @param {string} streamName - Name of the stream to verify
+     * @returns {Promise<boolean>} True if stream exists
+     */
+    async verifyStreamExists(streamName) {
+        try {
+            const response = await fetch(`${process.env.INGESTION_URL}/api/${this.org}/streams`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const data = await response.json();
+
+            if (response.status === 200 && data.list) {
+                const streamExists = data.list.some(s => s.name === streamName);
+                testLogger.info('Stream existence check', { streamName, exists: streamExists });
+                return streamExists;
+            }
+
+            testLogger.warn('Failed to check stream existence', { streamName, status: response.status });
+            return false;
+        } catch (error) {
+            testLogger.error('Error checking stream existence', { streamName, error: error.message });
+            return false;
         }
     }
 }

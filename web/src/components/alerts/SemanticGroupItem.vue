@@ -15,36 +15,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card flat bordered
-class="semantic-group-item q-pa-md q-mb-sm">
+  <div class="semantic-group-item q-pa-md q-mb-sm">
     <div class="group-layout">
-      <!-- Left Column: ID and Display Name stacked -->
+      <!-- Left Column: Display Name only (ID is internal/read-only) -->
       <div class="left-column">
-        <div class="q-mb-sm">
-          <q-input
-            v-model="localGroup.id"
-            label="Name *"
-            hint="e.g., k8s-cluster"
-            :rules="[validateId]"
-            dense
-            filled
-            color="input-border"
-            bg-color="input-bg"
-            @update:model-value="emitUpdate"
-          />
-        </div>
-        <div>
+        <div class="input-wrapper">
           <q-input
             v-model="localGroup.display"
-            label="Display *"
-            hint="Human-readable"
-            :rules="[(val) => !!val || 'Display name is required']"
+            label="Name *"
+            :rules="[(val) => !!val || 'Name is required']"
             dense
-            filled
-            color="input-border"
-            bg-color="input-bg"
-            @update:model-value="emitUpdate"
+            borderless
+            stack-label
+            class="showLabelOnTop"
+            @update:model-value="handleDisplayChange"
           />
+        </div>
+        <!-- Show ID as read-only caption for existing groups -->
+        <div v-if="localGroup.id" class="text-caption text-grey-6">
+          ID: {{ localGroup.id }}
         </div>
       </div>
 
@@ -85,7 +74,7 @@ class="semantic-group-item q-pa-md q-mb-sm">
         </div>
       </div>
     </div>
-  </q-card>
+  </div>
 </template>
 
 <script lang="ts" setup>
@@ -119,12 +108,24 @@ watch(
   { deep: true },
 );
 
-const validateId = (val: string) => {
-  if (!val) return "ID is required";
-  if (!/^[a-z0-9-]+$/.test(val)) {
-    return "ID must be lowercase letters, numbers, and dashes only";
+// Auto-generate ID from display name for new groups (when ID is empty)
+const generateIdFromDisplay = (display: string): string => {
+  return display
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+};
+
+// Handle display name change - auto-generate ID for new groups
+const handleDisplayChange = () => {
+  // Only auto-generate ID if it's empty (new group)
+  if (!props.group.id && localGroup.value.display) {
+    localGroup.value.id = generateIdFromDisplay(localGroup.value.display);
   }
-  return true;
+  emitUpdate();
 };
 
 const emitUpdate = () => {
@@ -138,10 +139,8 @@ const emitUpdate = () => {
   transition: all 0.2s ease;
   width: 100%;
   max-width: 100%;
-
-  &:hover {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  }
+  background: var(--o2-card-bg);
+  border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.12));
 }
 
 .group-layout {
@@ -156,8 +155,9 @@ const emitUpdate = () => {
 .left-column {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
   min-width: 0;
+  justify-content: center;
 }
 
 .right-column {

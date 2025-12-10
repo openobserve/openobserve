@@ -32,6 +32,7 @@ import useNotifications from "@/composables/useNotifications";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useSearchStream from "@/composables/useLogs/useSearchStream";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
+import config from "@/aws-exports";
 
 export const useSearchBar = () => {
   const { getStream, isStreamExists, isStreamFetched } = useStreams();
@@ -786,6 +787,13 @@ export const useSearchBar = () => {
   const cancelQuery = async (): Promise<boolean> => {
     return new Promise((resolve, reject) => {
       try {
+        // only call cancel query api if it is enterprise 
+        // otherwise resolve and return immediately
+        if (config.isEnterprise !== "true") {
+          resolve(true);
+          return;
+        }
+
         const tracesIds = [...searchObj.data.searchRequestTraceIds];
 
         if (!searchObj.data.searchRequestTraceIds.length) {

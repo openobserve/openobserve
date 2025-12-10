@@ -100,6 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               Manage your organization's theme colors for both light and dark modes. These colors will be applied at the organization level.
             </span>
           </div>
+
           <span>&nbsp;</span>
 
           <div class="flex justify-start">

@@ -139,22 +139,31 @@ pub async fn correlate_streams(
 
     #[cfg(feature = "enterprise")]
     {
+        // Get FQN priority from DB/cache (org-level setting or system default)
+        let fqn_priority =
+            crate::service::db::system_settings::get_fqn_priority_dimensions(&org_id).await;
+
+        // Get semantic field groups - MUST use same source as UI to ensure consistency
+        // This resolves org-level custom groups or falls back to enterprise defaults
+        let semantic_groups =
+            crate::service::db::system_settings::get_semantic_field_groups(&org_id).await;
+
         match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::correlate(
             &org_id,
             &req.source_stream,
             &req.source_type,
             &req.available_dimensions,
+            &fqn_priority,
+            &semantic_groups,
         )
         .await
         {
             Ok(Some(response)) => Ok(MetaHttpResponse::json(response)),
-            Ok(None) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                404u16,
-                format!(
-                    "No service found for stream '{}' (type: {}) with the provided dimensions",
-                    req.source_stream, req.source_type
-                ),
-            ))),
+            Ok(None) => {
+                // No service found - this is a successful API call with no results
+                // Return 200 with null to indicate "no match" (not an error)
+                Ok(HttpResponse::Ok().json(serde_json::json!(null)))
+            }
             Err(e) => Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                     500u16,
@@ -183,9 +192,74 @@ pub struct CorrelationRequest {
     pub available_dimensions: std::collections::HashMap<String, String>,
 }
 
+/// GET /api/{org_id}/service_streams/_grouped
+///
+/// Get services grouped by their Fully Qualified Name (FQN)
+///
+/// This endpoint is used by the Correlation Settings UI to display
+/// which services are correlated together via their shared FQN.
+///
+/// Response includes:
+/// - Services grouped by FQN
+/// - Each group shows which services share the FQN
+/// - Stream counts per group (logs/traces/metrics)
+/// - Whether each group has full telemetry coverage
+#[utoipa::path(
+    get,
+    path = "/{org_id}/service_streams/_grouped",
+    tag = "Service Streams",
+    params(
+        ("org_id" = String, Path, description = "Organization ID")
+    ),
+    responses(
+        (status = 200, description = "Services grouped by FQN", body = GroupedServicesResponse),
+        (status = 401, description = "Unauthorized - Authentication required"),
+        (status = 403, description = "Forbidden - Enterprise feature"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("Authorization" = [])
+    )
+)]
+#[get("/{org_id}/service_streams/_grouped")]
+pub async fn get_services_grouped(
+    org_id: web::Path<String>,
+    Headers(_user_email): Headers<UserEmail>, // Require authentication
+) -> Result<HttpResponse, Error> {
+    let org_id = org_id.into_inner();
+
+    #[cfg(feature = "enterprise")]
+    {
+        // Get FQN priority from DB/cache (org-level setting or system default)
+        let fqn_priority =
+            crate::service::db::system_settings::get_fqn_priority_dimensions(&org_id).await;
+
+        match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::list_grouped_by_fqn(&org_id, &fqn_priority)
+            .await
+        {
+            Ok(response) => Ok(MetaHttpResponse::json(response)),
+            Err(e) => Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                    500u16,
+                    format!("Failed to get grouped services: {}", e),
+                )),
+            ),
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+            403u16,
+            "Service Discovery is an enterprise-only feature".to_string(),
+        )))
+    }
+}
+
 // Re-export shared types from config for API documentation (utoipa)
 // These types are the same for both enterprise and non-enterprise builds
 pub use config::meta::service_streams::{
     CardinalityClass, CorrelationResponse, DimensionAnalytics, DimensionAnalyticsSummary,
-    RelatedStreams, StreamInfo,
+    GroupedServicesResponse, RelatedStreams, ServiceFqnGroup, ServiceInGroup, ServiceStreams,
+    StreamInfo, StreamSummary,
 };

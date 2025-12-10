@@ -39,7 +39,7 @@ use datafusion::{
 use futures::{TryStreamExt, future::try_join_all};
 use hashbrown::{HashMap, HashSet};
 use promql_parser::{
-    label::MatchOp,
+    label::{MatchOp, Matchers},
     parser::{
         AggregateExpr, BinModifier, BinaryExpr, Call, Expr as PromExpr, Function, FunctionArgs,
         LabelModifier, MatrixSelector, NumberLiteral, Offset, ParenExpr, StringLiteral, UnaryExpr,
@@ -303,6 +303,11 @@ impl Engine {
             PromExpr::VectorSelector(vs) => {
                 let mut vs = vs.clone();
                 remove_filter_all(&mut vs);
+                if !vs.matchers.or_matchers.is_empty() {
+                    return Err(DataFusionError::Plan(
+                        "VectorSelector: or_matchers is not supported".into(),
+                    ));
+                }
                 let data = self.eval_vector_selector(&vs).await?;
                 if data.is_empty() {
                     Value::None
@@ -313,6 +318,11 @@ impl Engine {
             PromExpr::MatrixSelector(MatrixSelector { vs, range }) => {
                 let mut vs = vs.clone();
                 remove_filter_all(&mut vs);
+                if !vs.matchers.or_matchers.is_empty() {
+                    return Err(DataFusionError::Plan(
+                        "MatrixSelector: or_matchers is not supported".into(),
+                    ));
+                }
                 let data = self.eval_matrix_selector(&vs, *range).await?;
                 if data.is_empty() {
                     Value::None
@@ -594,11 +604,8 @@ impl Engine {
         // 1. Group by metrics (sets of label name-value pairs)
         let table_name = selector.name.as_ref().unwrap();
         log::info!(
-            "[trace_id: {}] loading data for stream: {}, range: [{},{}), filter: {:?}",
+            "[trace_id: {}] loading data for stream: {table_name}, range: [{start},{end}), filter: {:?}",
             self.trace_id,
-            table_name,
-            start,
-            end,
             selector.to_string(),
         );
 
@@ -680,9 +687,12 @@ impl Engine {
         label_selector.extend(self.ctx.label_selector.iter().cloned());
 
         let mut tasks = Vec::with_capacity(ctxs.len());
-        for (ctx, schema, scan_stats) in ctxs {
+        for (ctx, schema, scan_stats, keep_filters) in ctxs {
             let query_ctx = self.ctx.query_ctx.clone();
-            let selector = selector.clone();
+            let mut selector = selector.clone();
+            if !keep_filters {
+                selector.matchers = Matchers::empty();
+            };
             let label_selector = label_selector.clone();
             let task = tokio::time::timeout(
                 Duration::from_secs(self.ctx.query_ctx.timeout),
@@ -1256,9 +1266,10 @@ async fn selector_load_data_from_datafusion(
     let start1 = std::time::Instant::now();
     let hash_field_type = schema.field_with_name(HASH_LABEL).unwrap().data_type();
     let (mut metrics, timestamp_set) = if query_ctx.query_exemplars {
-        load_exemplars_from_datafusion(hash_field_type, df_group.clone()).await?
+        load_exemplars_from_datafusion(&query_ctx.trace_id, hash_field_type, df_group.clone())
+            .await?
     } else {
-        load_samples_from_datafusion(hash_field_type, df_group.clone()).await?
+        load_samples_from_datafusion(&query_ctx.trace_id, hash_field_type, df_group.clone()).await?
     };
 
     log::info!(
@@ -1385,6 +1396,7 @@ async fn selector_load_data_from_datafusion(
 }
 
 async fn load_samples_from_datafusion(
+    trace_id: &str,
     hash_field_type: &DataType,
     df: DataFrame,
 ) -> Result<(HashMap<u64, RangeValue>, HashSet<i64>)> {
@@ -1402,8 +1414,15 @@ async fn load_samples_from_datafusion(
             target_partitions,
         ),
     )?);
-    let streams = execute_stream_partitioned(plan, ctx)?;
 
+    if config::get_config().common.print_key_sql {
+        log::info!(
+            "{}",
+            config::meta::plan::generate_plan_string(trace_id, plan.as_ref())
+        );
+    }
+
+    let streams = execute_stream_partitioned(plan, ctx)?;
     let mut tasks = Vec::new();
     for mut stream in streams {
         let hash_field_type = hash_field_type.clone();
@@ -1496,6 +1515,7 @@ async fn load_samples_from_datafusion(
 }
 
 async fn load_exemplars_from_datafusion(
+    trace_id: &str,
     hash_field_type: &DataType,
     df: DataFrame,
 ) -> Result<(HashMap<u64, RangeValue>, HashSet<i64>)> {
@@ -1514,8 +1534,15 @@ async fn load_exemplars_from_datafusion(
             target_partitions,
         ),
     )?);
-    let streams = execute_stream_partitioned(plan, ctx)?;
 
+    if config::get_config().common.print_key_sql {
+        log::info!(
+            "{}",
+            config::meta::plan::generate_plan_string(trace_id, plan.as_ref())
+        );
+    }
+
+    let streams = execute_stream_partitioned(plan, ctx)?;
     let mut tasks = Vec::new();
     for mut stream in streams {
         let hash_field_type = hash_field_type.clone();
@@ -3028,6 +3055,7 @@ mod tests {
                 datafusion::prelude::SessionContext,
                 std::sync::Arc<datafusion::arrow::datatypes::Schema>,
                 config::meta::search::ScanStats,
+                bool,
             )>,
         > {
             Ok(vec![])
