@@ -24,7 +24,9 @@
 use anyhow::anyhow;
 use config::meta::system_settings::{SettingScope, SystemSetting};
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter, QueryOrder,
+    ActiveModelTrait,
+    ActiveValue::{NotSet, Set},
+    ColumnTrait, EntityTrait, QueryFilter, QueryOrder,
 };
 
 use crate::{
@@ -200,7 +202,7 @@ pub async fn set(setting: &SystemSetting) -> Result<SystemSetting, anyhow::Error
             user_id: Set(setting.user_id.clone()),
             setting_key: Set(setting.setting_key.clone()),
             setting_category: Set(setting.setting_category.clone()),
-            setting_value: Set(setting.setting_value.to_string()),
+            setting_value: Set(setting.setting_value.clone()),
             description: Set(setting.description.clone()),
             created_at: Set(existing.created_at),
             updated_at: Set(now),
@@ -217,13 +219,13 @@ pub async fn set(setting: &SystemSetting) -> Result<SystemSetting, anyhow::Error
     } else {
         // Insert new
         let active_model = ActiveModel {
-            id: Set(0), // Auto-increment
+            id: NotSet, // Auto-increment - let database assign
             scope: Set(setting.scope.as_str().to_string()),
             org_id: Set(setting.org_id.clone()),
             user_id: Set(setting.user_id.clone()),
             setting_key: Set(setting.setting_key.clone()),
             setting_category: Set(setting.setting_category.clone()),
-            setting_value: Set(setting.setting_value.to_string()),
+            setting_value: Set(setting.setting_value.clone()),
             description: Set(setting.description.clone()),
             created_at: Set(now),
             updated_at: Set(now),
@@ -318,9 +320,6 @@ pub async fn delete_user_settings(org_id: &str, user_id: &str) -> Result<u64, an
 
 /// Convert DB model to domain type
 fn model_to_setting(model: Model) -> SystemSetting {
-    let setting_value = serde_json::from_str(&model.setting_value)
-        .unwrap_or(serde_json::Value::String(model.setting_value.clone()));
-
     SystemSetting {
         id: Some(model.id),
         scope: model.scope.parse().unwrap_or(SettingScope::System),
@@ -328,7 +327,7 @@ fn model_to_setting(model: Model) -> SystemSetting {
         user_id: model.user_id,
         setting_key: model.setting_key,
         setting_category: model.setting_category,
-        setting_value,
+        setting_value: model.setting_value,
         description: model.description,
         created_at: model.created_at,
         updated_at: model.updated_at,
@@ -357,7 +356,7 @@ mod tests {
             user_id: None,
             setting_key: "test_key".to_string(),
             setting_category: Some("correlation".to_string()),
-            setting_value: r#"["a","b","c"]"#.to_string(),
+            setting_value: serde_json::json!(["a", "b", "c"]),
             description: Some("Test setting".to_string()),
             created_at: 1000000,
             updated_at: 2000000,

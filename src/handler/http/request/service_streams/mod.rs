@@ -139,22 +139,31 @@ pub async fn correlate_streams(
 
     #[cfg(feature = "enterprise")]
     {
+        // Get FQN priority from DB/cache (org-level setting or system default)
+        let fqn_priority =
+            crate::service::db::system_settings::get_fqn_priority_dimensions(&org_id).await;
+
+        // Get semantic field groups - MUST use same source as UI to ensure consistency
+        // This resolves org-level custom groups or falls back to enterprise defaults
+        let semantic_groups =
+            crate::service::db::system_settings::get_semantic_field_groups(&org_id).await;
+
         match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::correlate(
             &org_id,
             &req.source_stream,
             &req.source_type,
             &req.available_dimensions,
+            &fqn_priority,
+            &semantic_groups,
         )
         .await
         {
             Ok(Some(response)) => Ok(MetaHttpResponse::json(response)),
-            Ok(None) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                404u16,
-                format!(
-                    "No service found for stream '{}' (type: {}) with the provided dimensions",
-                    req.source_stream, req.source_type
-                ),
-            ))),
+            Ok(None) => {
+                // No service found - this is a successful API call with no results
+                // Return 200 with null to indicate "no match" (not an error)
+                Ok(HttpResponse::Ok().json(serde_json::json!(null)))
+            }
             Err(e) => Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                     500u16,
@@ -221,7 +230,11 @@ pub async fn get_services_grouped(
 
     #[cfg(feature = "enterprise")]
     {
-        match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::list_grouped_by_fqn(&org_id)
+        // Get FQN priority from DB/cache (org-level setting or system default)
+        let fqn_priority =
+            crate::service::db::system_settings::get_fqn_priority_dimensions(&org_id).await;
+
+        match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::list_grouped_by_fqn(&org_id, &fqn_priority)
             .await
         {
             Ok(response) => Ok(MetaHttpResponse::json(response)),

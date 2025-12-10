@@ -245,15 +245,9 @@ pub async fn get_semantic_groups(
 ) -> Result<HttpResponse, actix_web::Error> {
     let org_id = org_id.into_inner();
 
-    match crate::service::alerts::org_config::get_semantic_groups(&org_id).await {
-        Ok(groups) => Ok(HttpResponse::Ok().json(groups)),
-        Err(e) => {
-            log::error!("Error getting semantic groups for org {}: {}", org_id, e);
-            Ok(HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": format!("Failed to get semantic groups: {}", e)
-            })))
-        }
-    }
+    // Use system_settings which has proper caching and cluster watch
+    let groups = crate::service::db::system_settings::get_semantic_field_groups(&org_id).await;
+    Ok(HttpResponse::Ok().json(groups))
 }
 
 /// Get semantic field groups (OSS - Not Supported)
@@ -315,21 +309,9 @@ pub async fn preview_semantic_groups_diff(
         }
     }
 
-    // Get current groups from DB
+    // Get current groups from system_settings (with caching)
     let current_groups =
-        match crate::service::alerts::org_config::get_semantic_groups(&org_id).await {
-            Ok(groups) => groups,
-            Err(e) => {
-                log::error!(
-                    "Error getting current semantic groups for org {}: {}",
-                    org_id,
-                    e
-                );
-                return Ok(HttpResponse::InternalServerError().json(serde_json::json!({
-                    "error": format!("Failed to get current groups: {}", e)
-                })));
-            }
-        };
+        crate::service::db::system_settings::get_semantic_field_groups(&org_id).await;
 
     // Build a map of current groups by ID
     let current_map: std::collections::HashMap<String, &SemanticFieldGroup> =
@@ -416,6 +398,10 @@ pub async fn save_semantic_groups(
     org_id: web::Path<String>,
     groups: web::Json<Vec<SemanticFieldGroup>>,
 ) -> Result<HttpResponse, actix_web::Error> {
+    use config::meta::system_settings::{
+        SettingCategory, SystemSetting, keys::SEMANTIC_FIELD_GROUPS,
+    };
+
     let org_id = org_id.into_inner();
     let incoming_groups = groups.into_inner();
 
@@ -428,22 +414,9 @@ pub async fn save_semantic_groups(
         }
     }
 
-    // Get existing config or create new one
-    let mut config =
-        match crate::service::alerts::org_config::get_deduplication_config(&org_id).await {
-            Ok(Some(cfg)) => cfg,
-            Ok(None) => GlobalDeduplicationConfig::default_with_presets(),
-            Err(e) => {
-                log::error!(
-                    "Error getting deduplication config for org {}: {}",
-                    org_id,
-                    e
-                );
-                return Ok(HttpResponse::InternalServerError().json(serde_json::json!({
-                    "error": format!("Failed to get existing config: {}", e)
-                })));
-            }
-        };
+    // Get existing groups from system_settings (with caching)
+    let existing_groups =
+        crate::service::db::system_settings::get_semantic_field_groups(&org_id).await;
 
     // Merge incoming groups with existing ones
     // Build a map of incoming groups by ID for quick lookup
@@ -453,8 +426,7 @@ pub async fn save_semantic_groups(
         .collect();
 
     // Update existing groups if they're in incoming, keep others unchanged
-    let mut merged_groups: Vec<SemanticFieldGroup> = config
-        .semantic_field_groups
+    let mut merged_groups: Vec<SemanticFieldGroup> = existing_groups
         .into_iter()
         .map(|existing| {
             if let Some(updated) = incoming_map.get(&existing.id) {
@@ -475,11 +447,17 @@ pub async fn save_semantic_groups(
     }
 
     let total_groups = merged_groups.len();
-    config.semantic_field_groups = merged_groups;
 
-    // Save config
-    match crate::service::alerts::org_config::set_deduplication_config(&org_id, &config).await {
-        Ok(()) => Ok(HttpResponse::Ok().json(serde_json::json!({
+    // Save to system_settings table (with caching and cluster watch)
+    let setting = SystemSetting::new_org(
+        &org_id,
+        SEMANTIC_FIELD_GROUPS,
+        serde_json::to_value(&merged_groups).unwrap_or_default(),
+    )
+    .with_category(SettingCategory::Correlation);
+
+    match crate::service::db::system_settings::set(&setting).await {
+        Ok(_) => Ok(HttpResponse::Ok().json(serde_json::json!({
             "message": "Semantic groups saved successfully",
             "total_groups": total_groups
         }))),

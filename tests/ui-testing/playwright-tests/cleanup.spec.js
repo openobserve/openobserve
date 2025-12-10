@@ -32,7 +32,64 @@ test.describe("Pre-Test Cleanup", () => {
     await pm.apiCleanup.cleanupDashboards();
 
     // Clean up all pipelines for e2e_automate streams
-    await pm.apiCleanup.cleanupPipelines();
+    await pm.apiCleanup.cleanupPipelines(
+      // Stream names to match
+      [
+        'e2e_automate',
+        'e2e_automate1',
+        'e2e_automate2',
+        'e2e_automate3',
+        'e2e_conditions_validation_precedence_src',
+        'e2e_conditions_validation_nested_and_src',
+        'e2e_conditions_validation_nested_or_src',
+        'e2e_conditions_validation_numeric_src',
+        'e2e_conditions_validation_contains_src',
+        'e2e_conditions_validation_deep_src',
+        'e2e_conditions_basic',
+        'e2e_conditions_groups',
+        'e2e_conditions_validation',
+        'e2e_conditions_precedence',
+        'e2e_conditions_multiple',
+        'e2e_conditions_delete',
+        'e2e_conditions_operators'
+      ],
+      // Source stream patterns to match
+      [
+        /^e2e_precedence_src_\d+$/,
+        /^e2e_multiple_or_src_\d+$/,
+        /^e2e_nested_or_src_\d+$/,
+        /^e2e_numeric_src_\d+$/,
+        /^e2e_multiple_and_src_\d+$/,
+        /^e2e_deep_src_\d+$/,
+        /^e2e_not_operator_src_\d+$/,
+        /^e2e_impossible_src_\d+$/,
+        /^e2e_universal_src_\d+$/,
+        /^e2e_4level_src_\d+$/,
+        /^simple_src_\d+$/,
+        /^manual_debug_src_/,
+        /^manual_verify_src_/
+      ],
+      // Pipeline name patterns to match
+      [
+        /^validation-precedence-\d+$/,
+        /^validation-multiple-or-\d+$/,
+        /^validation-nested-or-\d+$/,
+        /^validation-numeric-\d+$/,
+        /^validation-multiple-and-\d+$/,
+        /^validation-deep-nested-\d+$/,
+        /^validation-not-operator-\d+$/,
+        /^validation-impossible-\d+$/,
+        /^validation-universal-\d+$/,
+        /^validation-4level-\d+$/,
+        /^simple-test-\d+$/,
+        /^or-root-test-\d+$/,
+        /^manual-debug-pipeline-/,
+        /^manual-verify-pipeline-/,
+        /^scheurl\d+$/,       // scheurl556, scheurl149, scheurl56, etc.
+        /^schefile\d+$/,      // schefile399, schefile971, schefile123, etc.
+        /^realurl\d+$/        // realurl822, etc.
+      ]
+    );
 
     // Clean up pipeline destinations matching test patterns
     await pm.apiCleanup.cleanupPipelineDestinations([

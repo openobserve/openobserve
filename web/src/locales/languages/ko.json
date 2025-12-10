@@ -1961,6 +1961,7 @@
     "dimensionBasedCorrelation": "차원 기반 상관관계",
     "tracesFromService": "서비스의 추적: {service}",
     "noTracesFound": "상관관계가 있는 흔적을 찾을 수 없습니다.",
-    "noTracesDescription": "선택한 시간 범위에서 서비스 {service} 에 대한 추적을 찾을 수 없습니다."
+    "noTracesDescription": "선택한 시간 범위에서 서비스 {service} 에 대한 추적을 찾을 수 없습니다.",
+    "openTraceInNewWindow": "트레이스를 새 창에서 열기"
   }
 }

@@ -34,7 +34,8 @@ use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::db::s
     operation_id = "SystemSettingGetResolved",
     summary = "Get resolved system setting",
     description = "Retrieves a setting value with multi-level resolution. Checks user-level first, \
-                   then org-level, then system-level defaults. Returns the most specific setting found.",
+                   then org-level, then system-level defaults. Returns the most specific setting found, \
+                   or null if no setting exists at any level.",
     security(
         ("Authorization"= [])
     ),
@@ -44,8 +45,7 @@ use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::db::s
         ("user_id" = Option<String>, Query, description = "User ID for user-level resolution"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = SystemSetting),
-        (status = 404, description = "Not Found", content_type = "application/json", body = ()),
+        (status = 200, description = "Success", content_type = "application/json", body = Option<SystemSetting>),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -61,8 +61,7 @@ async fn get_setting(
     let user_id = query.user_id.as_deref();
 
     match system_settings::get_resolved(Some(&org_id), user_id, &key).await {
-        Ok(Some(setting)) => Ok(HttpResponse::Ok().json(setting)),
-        Ok(None) => Ok(MetaHttpResponse::not_found("Setting not found")),
+        Ok(setting) => Ok(HttpResponse::Ok().json(setting)), // Returns setting or null
         Err(e) => Ok(MetaHttpResponse::bad_request(e.to_string().as_str())),
     }
 }

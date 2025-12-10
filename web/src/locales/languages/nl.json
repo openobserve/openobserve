@@ -1961,6 +1961,7 @@
     "dimensionBasedCorrelation": "Correlatie op basis van dimensies",
     "tracesFromService": "Sporen van service: {service}",
     "noTracesFound": "Geen gecorreleerde sporen gevonden",
-    "noTracesDescription": "Geen sporen gevonden voor service {service} in de geselecteerde periode"
+    "noTracesDescription": "Geen sporen gevonden voor service {service} in de geselecteerde periode",
+    "openTraceInNewWindow": "Open trace in nieuw venster"
   }
 }
