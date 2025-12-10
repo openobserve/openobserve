@@ -61,8 +61,9 @@ use {
 };
 
 use super::{
-    planner::extension_planner::OpenobserveQueryPlanner, storage::file_list,
-    table_provider::uniontable::NewUnionTable, udf::transform_udf::get_all_transform,
+    peak_memory_pool::PeakMemoryPool, planner::extension_planner::OpenobserveQueryPlanner,
+    storage::file_list, table_provider::uniontable::NewUnionTable,
+    udf::transform_udf::get_all_transform,
 };
 use crate::service::{
     metadata::distinct_values::DISTINCT_STREAM_PREFIX,
@@ -430,7 +431,7 @@ pub fn create_session_config(
     Ok(config)
 }
 
-pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
+pub async fn create_runtime_env(trace_id: &str, memory_limit: usize) -> Result<RuntimeEnv> {
     let object_store_registry = DefaultObjectStoreRegistry::new();
 
     let memory = super::storage::memory::FS::new();
@@ -457,23 +458,25 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
         .map_err(|e| {
             DataFusionError::Execution(format!("Invalid datafusion memory pool type: {e}"))
         })?;
-    match mem_pool {
+    let memory_pool = match mem_pool {
         super::MemoryPoolType::Greedy => {
             let pool = GreedyMemoryPool::new(memory_size);
             let track_memory_pool = TrackConsumersPool::new(pool, NonZero::new(20).unwrap());
-            builder = builder.with_memory_pool(Arc::new(track_memory_pool));
+            PeakMemoryPool::new(Arc::new(track_memory_pool), trace_id.to_string())
         }
         super::MemoryPoolType::Fair => {
             let pool = FairSpillPool::new(memory_size);
             let track_memory_pool = TrackConsumersPool::new(pool, NonZero::new(20).unwrap());
-            builder = builder.with_memory_pool(Arc::new(track_memory_pool));
+            PeakMemoryPool::new(Arc::new(track_memory_pool), trace_id.to_string())
         }
         super::MemoryPoolType::None => {
             let pool = UnboundedMemoryPool::default();
             let track_memory_pool = TrackConsumersPool::new(pool, NonZero::new(20).unwrap());
-            builder = builder.with_memory_pool(Arc::new(track_memory_pool));
+            PeakMemoryPool::new(Arc::new(track_memory_pool), trace_id.to_string())
         }
     };
+
+    builder = builder.with_memory_pool(Arc::new(memory_pool));
     builder.build()
 }
 
@@ -551,7 +554,7 @@ impl<'a> DataFusionContextBuilder<'a> {
         .await?;
 
         let session_config = create_session_config(self.sorted_by_time, target_partitions)?;
-        let runtime_env = Arc::new(create_runtime_env(memory_size).await?);
+        let runtime_env = Arc::new(create_runtime_env(self.trace_id, memory_size).await?);
         let mut builder = SessionStateBuilder::new()
             .with_config(session_config)
             .with_runtime_env(runtime_env)
@@ -1039,7 +1042,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_runtime_env() -> Result<()> {
         let memory_limit = 1024 * 1024 * 512; // 512MB
-        let runtime_env = create_runtime_env(memory_limit).await?;
+        let runtime_env = create_runtime_env("test", memory_limit).await?;
 
         // Check that object stores are registered
         let memory_url = url::Url::parse("memory:///").unwrap();
@@ -1064,7 +1067,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_runtime_env_min_memory() -> Result<()> {
         let small_memory = 1024; // Very small memory
-        let runtime_env = create_runtime_env(small_memory).await?;
+        let runtime_env = create_runtime_env("test", small_memory).await?;
 
         // Should handle small memory gracefully
         // Memory pool behavior may vary by implementation
@@ -1179,7 +1182,7 @@ mod tests {
         let memory_limit = 1024 * 1024 * 256; // 256MB
 
         // Test that runtime env creation works (which tests different pool types)
-        let runtime_env = create_runtime_env(memory_limit).await?;
+        let runtime_env = create_runtime_env("test", memory_limit).await?;
         // Memory pool exists and was created successfully
         // Memory pool exists and was created successfully
         let _ = runtime_env.memory_pool.reserved();
@@ -1320,7 +1323,7 @@ mod tests {
             // This test verifies error handling in memory pool creation
             // The actual error handling is in the FromStr implementation
             let memory_limit = 1024 * 1024 * 256;
-            let result = create_runtime_env(memory_limit).await;
+            let result = create_runtime_env("test", memory_limit).await;
             assert!(result.is_ok()); // Should handle gracefully
         }
 
