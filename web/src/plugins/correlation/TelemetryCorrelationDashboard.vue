@@ -237,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Direct Trace Correlation - Full Span List -->
           <div v-else-if="traceCorrelationMode === 'direct' && traceSpanList.length > 0" class="tw-h-full">
             <!-- Trace Header -->
-            <div class="tw-p-3 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-bg-white">
+            <div class="tw-p-3 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] trace-header-bg">
               <div class="tw-flex tw-items-center tw-gap-3">
                 <q-icon name="link" color="positive" size="1.25rem" />
                 <div class="tw-flex tw-flex-col">
@@ -310,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Dimension-based Correlation - Traces List -->
           <div v-else-if="traceCorrelationMode === 'dimension-based' && tracesForDimensions.length > 0" class="tw-h-full">
             <!-- Header -->
-            <div class="tw-p-3 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-bg-white">
+            <div class="tw-p-3 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] trace-header-bg">
               <div class="tw-flex tw-items-center tw-gap-3">
                 <q-icon name="hub" color="primary" size="1.25rem" />
                 <div class="tw-flex tw-flex-col">
@@ -521,7 +521,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Direct Trace Correlation - Full Span List -->
           <div v-else-if="traceCorrelationMode === 'direct' && traceSpanList.length > 0" class="tw-h-full">
             <!-- Trace Header -->
-            <div class="tw-p-3 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-bg-white">
+            <div class="tw-p-3 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] trace-header-bg">
               <div class="tw-flex tw-items-center tw-gap-3">
                 <q-icon name="link" color="positive" size="1.25rem" />
                 <div class="tw-flex tw-flex-col">
@@ -594,7 +594,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Dimension-based Correlation - Traces List -->
           <div v-else-if="traceCorrelationMode === 'dimension-based' && tracesForDimensions.length > 0" class="tw-h-full">
             <!-- Header -->
-            <div class="tw-p-3 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-bg-white">
+            <div class="tw-p-3 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] trace-header-bg">
               <div class="tw-flex tw-items-center tw-gap-3">
                 <q-icon name="hub" color="primary" size="1.25rem" />
                 <div class="tw-flex tw-flex-col">
@@ -1802,8 +1802,16 @@ watch(
   }
 }
 
+// Trace header background - light mode
+.trace-header-bg {
+  background: #ffffff;
+}
+
 // Dark mode support
 body.body--dark {
+  .trace-header-bg {
+    background: #1e1e1e;
+  }
   .correlation-dashboard-embedded {
     background: #1e1e1e !important;
 
