@@ -2981,4 +2981,84 @@ export class LogsPage {
         }
         return '#' + hex.toLowerCase();
     }
+
+    /**
+     * Ingest severity color test data to a specific stream
+     * @param {string} streamName - Name of the stream to ingest data to
+     * @returns {Promise<Object>} Response from the ingestion API
+     */
+    async severityColorIngestionToStream(streamName) {
+        const severityColorData = (await import('../../../test-data/severity_color_data.json', { assert: { type: 'json' } })).default;
+        const orgId = process.env["ORGNAME"];
+        const basicAuthCredentials = Buffer.from(
+            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+        ).toString('base64');
+
+        const headers = {
+            "Authorization": `Basic ${basicAuthCredentials}`,
+            "Content-Type": "application/json",
+        };
+
+        try {
+            const response = await this.page.evaluate(async ({ url, headers, orgId, streamName, severityColorData }) => {
+                const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(severityColorData)
+                });
+                if (!fetchResponse.ok) {
+                    throw new Error(`HTTP error! status: ${fetchResponse.status}`);
+                }
+                return await fetchResponse.json();
+            }, {
+                url: process.env.INGESTION_URL,
+                headers: headers,
+                orgId: orgId,
+                streamName: streamName,
+                severityColorData: severityColorData
+            });
+            return response;
+        } catch (error) {
+            testLogger.error('Severity color ingestion failed:', { error: error.message });
+            throw error;
+        }
+    }
+
+    /**
+     * Delete a stream by name
+     * @param {string} streamName - Name of the stream to delete
+     * @returns {Promise<Object>} Response with status
+     */
+    async deleteStream(streamName) {
+        const orgId = process.env["ORGNAME"];
+        const basicAuthCredentials = Buffer.from(
+            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+        ).toString('base64');
+
+        const headers = {
+            "Authorization": `Basic ${basicAuthCredentials}`,
+        };
+
+        try {
+            const response = await this.page.evaluate(async ({ url, headers, orgId, streamName }) => {
+                const fetchResponse = await fetch(`${url}/api/${orgId}/streams/${streamName}`, {
+                    method: 'DELETE',
+                    headers: headers
+                });
+                if (!fetchResponse.ok && fetchResponse.status !== 404) {
+                    throw new Error(`HTTP error! status: ${fetchResponse.status}`);
+                }
+                return { status: fetchResponse.status };
+            }, {
+                url: process.env.INGESTION_URL,
+                headers: headers,
+                orgId: orgId,
+                streamName: streamName
+            });
+            return response;
+        } catch (error) {
+            testLogger.error('Stream deletion failed:', { error: error.message });
+            throw error;
+        }
+    }
 }

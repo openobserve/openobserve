@@ -3,7 +3,6 @@ const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const logData = require("../../fixtures/log.json");
 const logsdata = require("../../../test-data/logs_data.json");
-const { SeverityTestHelpers } = require('../../pages/logsPages/severityTestHelpers.js');
 
 // Legacy login function replaced by global authentication via navigateToBase
 
@@ -558,7 +557,6 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
 test.describe("Severity Color Mapping Tests - Issue #9439", () => {
   let pageManager;
   let testStreamName;
-  let severityHelpers;
 
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext();
@@ -570,11 +568,11 @@ test.describe("Severity Color Mapping Tests - Issue #9439", () => {
 
     testLogger.info(`Creating stream: ${testStreamName}`);
 
-    // Initialize severity helpers
-    severityHelpers = new SeverityTestHelpers(page);
+    // Initialize page manager to access logsPage methods
+    const setupPageManager = new PageManager(page);
 
     // Ingest severity test data
-    await severityHelpers.severityColorIngestionToStream(testStreamName);
+    await setupPageManager.logsPage.severityColorIngestionToStream(testStreamName);
     testLogger.info(`Ingested test data to stream: ${testStreamName}`);
 
     // Wait for data to be indexed
@@ -649,9 +647,9 @@ test.describe("Severity Color Mapping Tests - Issue #9439", () => {
 
     testLogger.info(`Cleaning up stream: ${testStreamName}`);
 
-    // Initialize severity helpers for cleanup
-    const cleanupHelpers = new SeverityTestHelpers(page);
-    await cleanupHelpers.deleteStream(testStreamName);
+    // Initialize page manager for cleanup
+    const cleanupPageManager = new PageManager(page);
+    await cleanupPageManager.logsPage.deleteStream(testStreamName);
 
     await context.close();
   });
