@@ -73,6 +73,7 @@ interface SearchObjectData {
   transforms: any[];
   resultGrid: ResultGrid;
   searchAround: SearchAroundData;
+  highlightQuery: string;
 }
 
 interface SearchObject {
