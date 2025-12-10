@@ -2988,7 +2988,7 @@ export class LogsPage {
      * @returns {Promise<Object>} Response from the ingestion API
      */
     async severityColorIngestionToStream(streamName) {
-        const severityColorData = (await import('../../../test-data/severity_color_data.json', { assert: { type: 'json' } })).default;
+        const severityColorData = require('../../../test-data/severity_color_data.json');
         const orgId = process.env["ORGNAME"];
         const basicAuthCredentials = Buffer.from(
             `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
