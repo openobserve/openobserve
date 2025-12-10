@@ -237,6 +237,10 @@ def test_e2e_createdestination(create_session, base_url):
         resp_delete_alert.status_code == 200
     ), f"Deleting this function, but got {resp_delete_alert.status_code} {resp_delete_alert.content}"
 
+    # Wait for alert deletion to propagate
+    import time
+    time.sleep(2)
+
     resp_delete_destination = session.delete(
         f"{url}api/{org_id}/alerts/destinations/{destination_name}"
     )
@@ -245,7 +249,7 @@ def test_e2e_createdestination(create_session, base_url):
     ), f"Deleting this function, but got {resp_delete_destination.status_code} {resp_delete_destination.content}"
 
     resp_delete_template = session.delete(
-        f"{url}api/{org_id}/alerts/templates/pytesttemplate"
+        f"{url}api/{org_id}/alerts/templates/{template_name}"
     )
     assert (
         resp_delete_template.status_code == 200
@@ -389,6 +393,10 @@ def test_e2e_createalertsql(create_session, base_url):
         resp_delete_alert.status_code == 200
     ), f"Deleting this function, but got {resp_delete_alert.status_code} {resp_delete_alert.content}"
 
+    # Wait for alert deletion to propagate
+    import time
+    time.sleep(2)
+
     resp_delete_destination = session.delete(
         f"{url}api/{org_id}/alerts/destinations/{destination_name}"
     )
@@ -397,7 +405,7 @@ def test_e2e_createalertsql(create_session, base_url):
     ), f"Deleting this function, but got {resp_delete_destination.status_code} {resp_delete_destination.content}"
 
     resp_delete_template = session.delete(
-        f"{url}api/{org_id}/alerts/templates/pytesttemplate"
+        f"{url}api/{org_id}/alerts/templates/{template_name}"
     )
     assert (
         resp_delete_template.status_code == 200
@@ -407,6 +415,7 @@ def test_e2e_createalertsql(create_session, base_url):
 
 def test_e2e_createalertfloat(create_session, base_url):
     """Running an E2E test for create a new destination."""
+    import time
 
     session = create_session
     url = base_url
@@ -415,8 +424,14 @@ def test_e2e_createalertfloat(create_session, base_url):
 
     headers = {"Content-Type": "application/json", "Custom-Header": "value"}
 
+    # Generate unique names using timestamp
+    timestamp = int(time.time() * 1000)
+    template_name = f"pytesttemplate_{timestamp}"
+    destination_name = f"py-destinations_{timestamp}"
+    alert_name = f"py-alert_{timestamp}"
+
     payload = {
-        "name": "pytesttemplate",
+        "name": template_name,
         "body": """
             {{
                 "text": "{alert_name} is active"
@@ -434,14 +449,13 @@ def test_e2e_createalertfloat(create_session, base_url):
     )
     print(resp_create_destinations.content)
 
-    destination_name = "py-destinations"
     payload = {
         "url": "www",
         "method": "post",
         "skip_tls_verify": skip_tls_verify_value,
-        "template": "pytesttemplate",
+        "template": template_name,
         "headers": {"test": "test"},
-        "name":"py-destinations"
+        "name": destination_name
     }
 
     # create destination
@@ -498,7 +512,6 @@ def test_e2e_createalertfloat(create_session, base_url):
     ), f"Get all alerts list 200, but got {resp_create_logstream.status_code} {resp_create_logstream.content}"
 
     stream_name = "newpy_tests"
-    alert_name = "py-alert"
     is_real_time = False
     payload = {
         "name": alert_name,
@@ -522,7 +535,7 @@ def test_e2e_createalertfloat(create_session, base_url):
             "threshold": 3,
             "silence": 10,
         },
-        "destinations": ["py-destinations"],
+        "destinations": [destination_name],
         "context_attributes": {},
         "enabled": True,
         "description": "",
@@ -543,6 +556,10 @@ def test_e2e_createalertfloat(create_session, base_url):
         resp_delete_alert.status_code == 200
     ), f"Deleting this function, but got {resp_delete_alert.status_code} {resp_delete_alert.content}"
 
+    # Wait for alert deletion to propagate
+    import time
+    time.sleep(2)
+
     resp_delete_destination = session.delete(
         f"{url}api/{org_id}/alerts/destinations/{destination_name}"
     )
@@ -551,7 +568,7 @@ def test_e2e_createalertfloat(create_session, base_url):
     ), f"Deleting this function, but got {resp_delete_destination.status_code} {resp_delete_destination.content}"
 
     resp_delete_template = session.delete(
-        f"{url}api/{org_id}/alerts/templates/pytesttemplate"
+        f"{url}api/{org_id}/alerts/templates/{template_name}"
     )
     assert (
         resp_delete_template.status_code == 200
