@@ -894,7 +894,7 @@ export class PipelinesPage {
 
     async verifyDeleteButtonCount(expectedCount) {
         const count = await this.deleteConditionBtn.count();
-        expect(count).toBeLessThan(expectedCount);
+        expect(count).toBe(expectedCount);
     }
 
     async tryToSaveWithoutValidConditions() {
