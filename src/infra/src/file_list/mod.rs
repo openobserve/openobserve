@@ -323,6 +323,9 @@ pub async fn query_for_dump_by_updated_at(time_range: (i64, i64)) -> Result<Vec<
 #[inline]
 #[tracing::instrument(name = "infra:file_list:query_db_by_ids", skip_all)]
 pub async fn query_by_ids(ids: &[i64]) -> Result<Vec<FileKey>> {
+    if ids.is_empty() {
+        return Ok(Vec::default());
+    }
     CLIENT.query_by_ids(ids).await
 }
 
