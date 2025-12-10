@@ -65,7 +65,7 @@ export default defineComponent({
             return `${dueDays} Day remaining in your trial account`;
           }
         } else {
-          return "Your trial period has been expired.";
+          return "Your trial period has expired.";
         }
       }
     },
