@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @keydown.enter.prevent="addTag"
           @input="handleInput"
           @keydown.delete="handleBackspace"
+          @blur="addTag"
         />
       </div>
     </div>
@@ -123,9 +124,9 @@ const handleBackspace = () => {
   display: flex;
   flex-direction: column;
   padding: 8px 12px;
-  border: 1px solid var(--q-input-border-color, rgba(0, 0, 0, 0.24));
+  border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.12));
   border-radius: 4px;
-  background-color: var(--q-input-bg-color, rgba(0, 0, 0, 0.05));
+  background-color: var(--o2-card-bg);
   min-height: 56px;
   height: 100%;
   width: 100%;

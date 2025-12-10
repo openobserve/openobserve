@@ -26,6 +26,7 @@ use config::{
         promql::ClusterLeader,
         ratelimit::CachedUserRoles,
         stream::StreamParams,
+        system_settings::SystemSetting,
         user::User,
     },
 };
@@ -100,6 +101,12 @@ pub static USER_SESSIONS: Lazy<RwHashMap<String, String>> = Lazy::new(Default::d
 pub static SHORT_URLS: Lazy<RwHashMap<String, ShortUrlRecord>> = Lazy::new(DashMap::default);
 pub static USER_ROLES_CACHE: Lazy<RwAHashMap<String, CachedUserRoles>> =
     Lazy::new(Default::default);
+
+/// System settings cache
+/// Key format: "{scope}:{org_id}:{user_id}:{setting_key}" where org_id/user_id can be "_" if not
+/// applicable
+pub static SYSTEM_SETTINGS: Lazy<Arc<RwAHashMap<String, SystemSetting>>> =
+    Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
 
 #[cfg(test)]
 mod tests {

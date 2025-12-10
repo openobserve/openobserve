@@ -29,6 +29,7 @@ export interface MetricsCorrelationConfig {
   sourceStream?: string; // Original stream being viewed
   sourceType?: string; // Type of source stream
   availableDimensions?: Record<string, string>; // Actual field names (for source stream queries)
+  metricSchemas?: Record<string, any>; // Cached metric schemas with metrics_meta
 }
 
 /**
@@ -48,18 +49,7 @@ export function useMetricsCorrelationDashboard() {
       return createMetricPanel(stream, index, config);
     });
 
-    // Create dashboard variables from matched dimensions (using correct structure)
-    const variablesList = Object.entries(config.matchedDimensions).map(([key, value]) => ({
-      type: "textbox" as const,
-      name: key,
-      label: key,
-      value: value,
-      multiSelect: false,
-      isLoading: false,
-      isVariableLoading: false,
-      description: `Filter by ${key}`,
-    }));
-
+    // No variables in the metrics dashboard - dimensions are managed at the top level
     const dashboard = {
       version: 5,
       dashboardId: ``,
@@ -69,7 +59,7 @@ export function useMetricsCorrelationDashboard() {
       owner: "",
       created: new Date().toISOString(),
       variables: {
-        list: variablesList,
+        list: [],
         showDynamicFilters: false,
       },
       tabs: [
@@ -99,8 +89,37 @@ export function useMetricsCorrelationDashboard() {
     index: number,
     config: MetricsCorrelationConfig
   ) => {
+    // Get schema information for this metric stream
+    const schema = config.metricSchemas?.[stream.stream_name];
+    const metricsMeta = schema?.metrics_meta;
+    const rawUnit = metricsMeta?.unit || "";
+    const metricType = (metricsMeta?.metric_type || "").toLowerCase();
+
+    console.log(`[useMetricsCorrelationDashboard] Stream: ${stream.stream_name}, Unit: ${rawUnit}, Type: ${metricType}`);
+
+    // Map OpenTelemetry/Prometheus units to dashboard units
+    const unitMapping: Record<string, string> = {
+      "By": "bytes",
+      "s": "seconds",
+      "ms": "milliseconds",
+      "us": "microseconds",
+      "ns": "nanoseconds",
+      "{cpu}": "percentunit", // CPU as percentage
+      "1": "percentunit", // Dimensionless ratio (0-1)
+      "%": "percent",
+    };
+    const unit = unitMapping[rawUnit] || rawUnit || "short";
+
+    // Determine aggregation function based on metric type
+    // Counter: sum to see total increase over time buckets
+    // Gauge: avg or latest value
+    // Histogram/Summary: need special handling
+    const isCounter = metricType === "counter";
+    const aggregationFunc = isCounter ? "sum" : "avg";
+
     // Build WHERE clause from stream filters
     // Quote field names that contain special characters (hyphens, dots, etc.)
+    // Note: "_o2_all_" is a special value that the backend recognizes to skip filtering
     const whereConditions = Object.entries(stream.filters)
       .map(([field, value]) => {
         // Quote field name if it contains special characters
@@ -114,7 +133,8 @@ export function useMetricsCorrelationDashboard() {
 
     // Time-series SQL query for metrics
     // Note: Time range comes from dashboard defaultDatetimeDuration, not embedded in SQL
-    const query = `SELECT histogram(_timestamp) as x_axis_1, avg(value) as y_axis_1
+    // For counters, we sum the values to see total increase over time buckets
+    const query = `SELECT histogram(_timestamp) as x_axis_1, ${aggregationFunc}(value) as y_axis_1
 FROM "${stream.stream_name}"
 ${whereClause}
 GROUP BY x_axis_1
@@ -128,11 +148,11 @@ ORDER BY x_axis_1`;
       id: `panel_${stream.stream_name}_${index}`,
       type: "line",
       title: stream.stream_name,
-      description: `Time series for ${stream.stream_name}`,
+      description: `Time series for ${stream.stream_name}${metricType ? ` (${metricType})` : ""}`,
       config: {
         show_legends: false,
         legends_position: "bottom",
-        unit: "short",
+        unit: unit,
         unit_custom: "",
         promql_legend: "",
         axis_border_show: true,
@@ -263,20 +283,51 @@ ORDER BY x_axis_1`;
       // Use only the matched dimensions from availableDimensions
       // Extract only the fields that correspond to matched dimension keys
       filters = {};
+
+      console.log("[useMetricsCorrelationDashboard] availableDimensions:", config.availableDimensions);
+      console.log("[useMetricsCorrelationDashboard] matchedDimensions:", config.matchedDimensions);
+
       if (config.availableDimensions && config.matchedDimensions) {
-        // For each matched dimension, find the actual field name in availableDimensions
+        // Build a reverse mapping: value -> field name from availableDimensions
+        const valueToFieldMap = new Map<string, string>();
+        for (const [fieldName, fieldValue] of Object.entries(config.availableDimensions)) {
+          if (typeof fieldValue === 'string') {
+            valueToFieldMap.set(String(fieldValue), fieldName);
+          }
+        }
+
+        console.log("[useMetricsCorrelationDashboard] valueToFieldMap:", Object.fromEntries(valueToFieldMap));
+
+        // For each matched dimension, find the actual field name
         for (const [semanticKey, value] of Object.entries(config.matchedDimensions)) {
-          // Try to find a field in availableDimensions that matches this value
-          for (const [fieldName, fieldValue] of Object.entries(config.availableDimensions)) {
-            if (String(fieldValue) === String(value) && typeof fieldValue === 'string') {
-              filters[fieldName] = String(fieldValue);
-              break; // Found the field, move to next dimension
+          if (value === "_o2_all_") {
+            // For _o2_all_, we need to find the field name by matching against the semantic key
+            // Try exact match first with underscores
+            const normalizedKey = semanticKey.replace(/-/g, '_');
+            if (config.availableDimensions[normalizedKey] !== undefined) {
+              filters[normalizedKey] = "_o2_all_";
+            } else {
+              // Try to find by partial match
+              for (const fieldName of Object.keys(config.availableDimensions)) {
+                if (fieldName.toLowerCase() === normalizedKey.toLowerCase()) {
+                  filters[fieldName] = "_o2_all_";
+                  break;
+                }
+              }
+            }
+          } else {
+            // For actual values, use the reverse mapping
+            const fieldName = valueToFieldMap.get(value);
+            if (fieldName) {
+              filters[fieldName] = value;
             }
           }
         }
       } else {
         filters = config.matchedDimensions;
       }
+
+      console.log("[useMetricsCorrelationDashboard] Final filters for logs:", filters);
     } else if (streams && streams.length > 0) {
       // Use correlated log streams from API response
       const primaryStream = streams[0];
@@ -289,6 +340,7 @@ ORDER BY x_axis_1`;
 
     // Build WHERE clause from filters
     // Filter out non-string values and internal fields
+    // Note: "_o2_all_" is a special value that the backend recognizes to skip filtering
     const whereConditions = Object.entries(filters)
       .filter(([field, value]) => {
         // Only include string values and skip internal fields
@@ -335,7 +387,16 @@ ORDER BY x_axis_1`;
           fields: {
             stream: streamName,
             stream_type: "logs",
-            x: [],
+            x: [
+              {
+                label: "",
+                alias: "x_axis_1",
+                column: "x_axis_1",
+                color: null,
+                isDerived: false,
+                havingConditions: [],
+              },
+            ],
             y: [],
             z: [],
             breakdown: [],
@@ -348,7 +409,7 @@ ORDER BY x_axis_1`;
           config: {
             limit: 150,
             promql_legend: "",
-            layer_type: "scatter",
+            layer_type: "",
             weight_fixed: 1,
             min: 0,
             max: 100,
@@ -360,8 +421,8 @@ ORDER BY x_axis_1`;
         x: 0,
         y: 0,
         w: 192,
-        h: 48,
-        i: "logs_table_panel",
+        h: 36,
+        i: 1,
       },
       htmlContent: "",
       markdownContent: "",

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /// usize indicates the number of parts to skip based on their actual paths.
-const QUERIER_ROUTES: [(&str, usize); 24] = [
+const QUERIER_ROUTES: [(&str, usize); 25] = [
     ("config", 0),         // /config
     ("summary", 2),        // /api/{org_id}/summary
     ("organizations", 1),  // /api/organizations
@@ -42,6 +42,7 @@ const QUERIER_ROUTES: [(&str, usize); 24] = [
     ("chat_stream", 3),                       /* /api/{org_id}/ai/chat_stream
                                                * {label_name}/
                                                * values */
+    ("service_streams", 2), // /api/{org_id}/service_streams/...
 ];
 const QUERIER_ROUTES_BY_BODY: [&str; 6] = [
     "/_search",
@@ -137,6 +138,11 @@ mod tests {
         // Test prometheus routes
         assert!(is_querier_route("/api/org1/prometheus/api/v1/query"));
         assert!(is_querier_route("/api/org1/prometheus/api/v1/query_range"));
+
+        // Test service_streams routes
+        assert!(is_querier_route("/api/org1/service_streams/_analytics"));
+        assert!(is_querier_route("/api/org1/service_streams/_correlate"));
+        assert!(is_querier_route("/api/org1/service_streams/_grouped"));
     }
 
     #[test]
