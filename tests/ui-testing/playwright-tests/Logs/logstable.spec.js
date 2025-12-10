@@ -17,7 +17,7 @@ async function ingestion(page) {
     "Authorization": `Basic ${basicAuthCredentials}`,
     "Content-Type": "application/json",
   };
-  
+
   try {
     const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
       const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
@@ -38,7 +38,7 @@ async function ingestion(page) {
     });
     return response;
   } catch (error) {
-    console.error('Ingestion failed:', error);
+    testLogger.error('Ingestion failed:', { error: error.message });
     throw error;
   }
 }
@@ -551,5 +551,106 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
         // Pass gracefully if deletion fails
       }
     }
+  });
+});
+
+test.describe("Severity Color Mapping Tests - Issue #9439", () => {
+  let pageManager;
+  let testStreamName;
+
+  test.beforeAll(async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    // Generate unique stream name
+    const timestamp = Date.now();
+    testStreamName = `severity_test_${timestamp}`;
+
+    testLogger.info(`Creating stream: ${testStreamName}`);
+
+    // Initialize page manager to access logsPage methods
+    const setupPageManager = new PageManager(page);
+
+    // Ingest severity test data
+    await setupPageManager.logsPage.severityColorIngestionToStream(testStreamName);
+    testLogger.info(`Ingested test data to stream: ${testStreamName}`);
+
+    // Wait for data to be indexed
+    await page.waitForTimeout(3000);
+
+    await context.close();
+  });
+
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
+    await navigateToBase(page);
+    pageManager = new PageManager(page);
+    await page.waitForTimeout(500);
+
+    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await page.waitForTimeout(1000);
+    await pageManager.logsPage.selectStream(testStreamName);
+    await pageManager.logsPage.clickDateTimeButton();
+    await pageManager.logsPage.selectRelative1Hour();
+    await page.waitForTimeout(500);
+
+    await pageManager.logsPage.ensureQuickModeState(false);
+    await pageManager.logsPage.clickSearchBarRefreshButton();
+    await page.waitForTimeout(3000);
+  });
+
+  test("should display correct colors for all severity levels (0-7)", {
+    tag: ['@logsTable', '@all', '@logs', '@severityColors', '@issue9439']
+  }, async ({ page }) => {
+    testLogger.info('Testing severity color mapping for all severity levels');
+
+    // Expected color mapping based on mapNumericStatus function
+    const expectedColors = {
+      0: '#dc2626', // emergency - red
+      1: '#ea580c', // alert - dark orange
+      2: '#d97706', // critical - orange
+      3: '#dc2626', // error - red
+      4: '#eab308', // warning - yellow
+      5: '#16a34a', // notice - green
+      6: '#84a8f6', // info - blue
+      7: '#6b7280'  // debug - gray
+    };
+
+    // Get severity colors using POM method
+    const results = await pageManager.logsPage.getSeverityColors();
+    testLogger.info(`Found ${results.length} rows with severity values`);
+
+    // Verify each severity level
+    const verified = new Set();
+
+    for (const result of results) {
+      if (verified.has(result.severity)) continue;
+
+      const hexColor = pageManager.logsPage.normalizeHexColor(pageManager.logsPage.rgbToHex(result.color));
+      const expectedHex = pageManager.logsPage.normalizeHexColor(expectedColors[result.severity]);
+
+      testLogger.info(`Severity ${result.severity}: Expected ${expectedHex}, Got ${hexColor}`);
+      expect(hexColor).toBe(expectedHex);
+      testLogger.info(`✓ Severity ${result.severity} color verified`);
+
+      verified.add(result.severity);
+    }
+
+    // Ensure all 8 severity levels were tested
+    expect(verified.size).toBe(8);
+    testLogger.info(`Successfully verified all 8 severity levels`);
+  });
+
+  test.afterAll(async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    testLogger.info(`Cleaning up stream: ${testStreamName}`);
+
+    // Initialize page manager for cleanup
+    const cleanupPageManager = new PageManager(page);
+    await cleanupPageManager.logsPage.deleteStream(testStreamName);
+
+    await context.close();
   });
 });
