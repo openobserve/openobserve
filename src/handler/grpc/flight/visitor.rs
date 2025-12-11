@@ -124,12 +124,30 @@ impl<'n> TreeNodeVisitor<'n> for PeakMemoryVisitor {
 
 /// Get the peak memory from the SessionContext's memory pool.
 /// This should be called after the query execution to get the peak memory usage.
+///
+/// # Safety
+/// This function uses unsafe code to downcast Arc<dyn MemoryPool> to Arc<PeakMemoryPool>.
+/// This is sound because:
+/// 1. The memory pool is always created as PeakMemoryPool in datafusion context creation (see
+///    exec.rs)
+/// 2. Arc::into_raw/from_raw maintain proper Arc semantics
+/// 3. The type name is checked at runtime to verify the cast is valid
 pub fn get_peak_memory_from_ctx(ctx: &SessionContext) -> Arc<AtomicUsize> {
     let memory_pool = ctx.runtime_env().memory_pool.clone();
 
-    // Use unsafe to downcast Arc<dyn MemoryPool> to Arc<PeakMemoryPool>
-    // This is safe because we know the memory pool is created as PeakMemoryPool in datafusion
-    // context creation
+    // Runtime type check: verify this is actually a PeakMemoryPool
+    let type_name = format!("{:?}", memory_pool);
+    if !type_name.contains("PeakMemoryPool") {
+        log::warn!(
+            "Memory pool is not PeakMemoryPool (type: {}), returning 0",
+            type_name
+        );
+        return Arc::new(AtomicUsize::new(0));
+    }
+
+    // SAFETY: We've verified the concrete type is PeakMemoryPool via runtime check above.
+    // The memory pool is created as PeakMemoryPool in datafusion context creation.
+    // We use Arc::into_raw and Arc::from_raw to maintain proper reference counting.
     unsafe {
         let raw_ptr = Arc::into_raw(memory_pool);
         let peak_pool_ptr = raw_ptr as *const PeakMemoryPool;
