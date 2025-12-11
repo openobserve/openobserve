@@ -1064,7 +1064,10 @@
     "panelDuplicatedSuccessfully": "Panneau dupliqué avec succès",
     "panelDuplicationFailed": "La duplication du panneau a échoué",
     "mapname": "Nom",
-    "mapvalue": "Valeur"
+    "mapvalue": "Valeur",
+    "customChartTypeSelector": "Sélecteur de type de graphique personnalisé",
+    "customChartTypeSelectorHint": "Sélectionnez un type de graphique dans la bibliothèque eCharts pour commencer avec une structure de code de base",
+    "selectChartType": "Sélectionnez le type de graphique"
   },
   "home": {
     "streams": "Ruisseaux",
