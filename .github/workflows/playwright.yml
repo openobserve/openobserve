@@ -38,8 +38,7 @@ env:
 jobs:
   build_binary:
     name: build_binary
-    runs-on:
-      labels: ubicloud-standard-16
+    runs-on: ubuntu-2204-8-cores
 
     steps:
       - name: Remove unused tools
@@ -55,7 +54,7 @@ jobs:
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-07-20
+          toolchain: nightly-2024-07-20
           targets: x86_64-unknown-linux-gnu
       - uses: Swatinem/rust-cache@v2
         with:
@@ -153,6 +152,7 @@ jobs:
         run: ps aux | grep openobserve || echo "Process not found"
 
       - name: Ensure we are getting a reply from the server
+        shell: bash
         run: |
           for i in {1..30}; do
             if curl -f http://localhost:5080/web/login; then
