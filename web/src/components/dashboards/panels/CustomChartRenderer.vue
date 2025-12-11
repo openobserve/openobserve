@@ -133,7 +133,7 @@ export default defineComponent({
 
       const echartsGL = await import("echarts-gl");
 
-      // Initialize chart
+      // Initialize chart if it doesn't exist, otherwise reuse existing instance
       if (!chart) {
         chart = echarts.init(chartRef.value, undefined, {
           renderer: "canvas",
@@ -146,8 +146,7 @@ export default defineComponent({
       try {
         const convertedData = convertStringToFunction(props.data);
         const safeChartOptions = deepSanitize(convertedData);
-        // Use notMerge: true to replace the entire option instead of merging
-        chart.setOption(safeChartOptions, { notMerge: true });
+        chart.setOption(safeChartOptions);
 
         if (convertedData.o2_events) {
           // Add event listeners for custom interactions
