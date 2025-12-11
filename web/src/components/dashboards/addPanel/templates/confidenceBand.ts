@@ -1,82 +1,126 @@
 // Example Query for this chart:
 // This query should be used in the dashboard query editor
 const exampleQuery = `SELECT
-kubernetes_pod_id as "x_axis_1",
-_timestamp as "y_value",
-kubernetes_namespace_name as "upper",
-kubernetes_pod_name as "lower"
-FROM "default"`;
+_timestamp as "x_axis",
+LENGTH(log) as "y_value"
+FROM "default"
+ORDER BY _timestamp
+LIMIT 200`;
 
 // Chart code template
 const chartCode = `
-// Confidence Band
+// Confidence Band Chart
+// This chart displays a mean line with upper and lower confidence bounds
 
 // Example Query:
 // SELECT
-// kubernetes_pod_id as "x_axis_1",
-// _timestamp as "y_value",
-// kubernetes_namespace_name as "upper",
-// kubernetes_pod_name as "lower"
+// _timestamp as "x_axis",
+// LENGTH(log) as "y_value"
 // FROM "default"
+// ORDER BY _timestamp
+// LIMIT 200
 
 // -----------------------------------------------------------
 // IMPORTANT: Update the aliases below to match your query!
 
-const xAlias = "x_axis_1";
+const xAlias = "x_axis";
 const yAlias = "y_value";
-const upperAlias = "upper";
-const lowerAlias = "lower";
 // -----------------------------------------------------------
 
+const xData = [];
+const meanData = [];
+const lowerData = [];
+const upperData = [];
 
-const processData = (chartData, xKey, yKey, upperKey, lowerKey) => {
-  if (!chartData || !Array.isArray(chartData)) {
-    return { xData: [], yData: [], upperData: [], lowerData: [] };
-  }
-
-  const xData = [];
-  const yData = [];
-  const upperData = [];
-  const lowerData = [];
-
-  chartData.forEach(row => {
-    if (row[xKey] !== undefined) {
-      xData.push(row[xKey]);
-      yData.push(row[yKey] !== undefined ? row[yKey] : 0);
-      upperData.push(row[upperKey] !== undefined ? row[upperKey] : 0);
-      lowerData.push(row[lowerKey] !== undefined ? row[lowerKey] : 0);
-    }
+// Process data
+if (data && data[0] && Array.isArray(data[0])) {
+  // Sort data by x-axis for smoother lines
+  const sortedData = data[0].slice().sort((a, b) => {
+    const aTime = new Date(a[xAlias]).getTime();
+    const bTime = new Date(b[xAlias]).getTime();
+    return aTime - bTime;
   });
 
-  return { xData, yData, upperData, lowerData };
-};
+  sortedData.forEach(row => {
+    const x = row[xAlias];
+    const y = parseFloat(row[yAlias]);
+    
+    if (x !== undefined && !isNaN(y)) {
+      xData.push(x);
+      meanData.push(y);
+      
+      // Calculate confidence band (±20% for better visibility)
+      const confidenceRange = Math.abs(y) * 0.20 + 0.1;
+      lowerData.push(y - confidenceRange);
+      upperData.push(y + confidenceRange);
+    }
+  });
+}
 
-const { xData, yData, upperData, lowerData } = processData(data[0], xAlias, yAlias, upperAlias, lowerAlias);
+// Calculate base value for proper stacking
+const base = -Math.min(...lowerData);
 
 option = {
+  title: {
+    text: 'Confidence Band',
+    subtext: 'Example in MetricsGraphics.js',
+    left: 'center'
+  },
   tooltip: {
-    trigger: 'axis'
+    trigger: 'axis',
+    axisPointer: {
+      type: 'cross',
+      animation: false,
+      label: {
+        backgroundColor: '#ccc',
+        borderColor: '#aaa',
+        borderWidth: 1,
+        shadowBlur: 0,
+        shadowOffsetX: 0,
+        shadowOffsetY: 0,
+        color: '#222'
+      }
+    },
+    formatter: function (params) {
+      return (
+        params[0].axisValueLabel +
+        '<br />' +
+        params[2].marker +
+        params[2].seriesName +
+        ' : ' +
+        params[2].value
+      );
+    }
+  },
+  grid: {
+    left: '3%',
+    right: '4%',
+    bottom: '3%',
+    containLabel: true
   },
   xAxis: {
     type: 'category',
-    data: xData
+    boundaryGap: false,
+    data: xData,
+    axisLine: { onZero: false }
   },
   yAxis: {
     type: 'value'
   },
   series: [
     {
-      name: 'Lower Bound',
+      name: 'L',
       type: 'line',
-      data: lowerData,
+      data: lowerData.map(val => val + base),
       lineStyle: {
         opacity: 0
       },
       stack: 'confidence-band',
-      symbol: 'none'
+      symbol: 'none',
+      smooth: true  // More aggressive smoothing
     },
     {
-      name: 'Upper Bound',
+      name: 'U',
       type: 'line',
       data: upperData.map((val, idx) => val - lowerData[idx]),
       lineStyle: {
@@ -86,15 +130,20 @@ option = {
         color: '#ccc'
       },
       stack: 'confidence-band',
-      symbol: 'none'
+      symbol: 'none',
+      smooth: true  // More aggressive smoothing
     },
     {
       name: 'Mean',
       type: 'line',
-      data: yData,
+      data: meanData.map(val => val + base),
+      hoverAnimation: false,
+      symbolSize: 6,
       itemStyle: {
         color: '#333'
-      }
+      },
+      showSymbol: false,
+      smooth: true  // More aggressive smoothing
     }
   ]
 };
