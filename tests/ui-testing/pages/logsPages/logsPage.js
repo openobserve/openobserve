@@ -2999,25 +2999,21 @@ export class LogsPage {
             "Content-Type": "application/json",
         };
 
+        const url = `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
+
         try {
-            const response = await this.page.evaluate(async ({ url, headers, orgId, streamName, severityColorData }) => {
-                const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-                    method: 'POST',
-                    headers: headers,
-                    body: JSON.stringify(severityColorData)
-                });
-                if (!fetchResponse.ok) {
-                    throw new Error(`HTTP error! status: ${fetchResponse.status}`);
-                }
-                return await fetchResponse.json();
-            }, {
-                url: process.env.INGESTION_URL,
+            const response = await this.page.request.post(url, {
                 headers: headers,
-                orgId: orgId,
-                streamName: streamName,
-                severityColorData: severityColorData
+                data: severityColorData
             });
-            return response;
+
+            if (!response.ok()) {
+                throw new Error(`HTTP error! status: ${response.status()}`);
+            }
+
+            const result = await response.json();
+            testLogger.info(`Successfully ingested ${severityColorData.length} records to stream '${streamName}'`);
+            return result;
         } catch (error) {
             testLogger.error('Severity color ingestion failed:', { error: error.message });
             throw error;
@@ -3039,23 +3035,25 @@ export class LogsPage {
             "Authorization": `Basic ${basicAuthCredentials}`,
         };
 
+        const url = `${process.env.INGESTION_URL}/api/${orgId}/streams/${streamName}`;
+
         try {
-            const response = await this.page.evaluate(async ({ url, headers, orgId, streamName }) => {
-                const fetchResponse = await fetch(`${url}/api/${orgId}/streams/${streamName}`, {
-                    method: 'DELETE',
-                    headers: headers
-                });
-                if (!fetchResponse.ok && fetchResponse.status !== 404) {
-                    throw new Error(`HTTP error! status: ${fetchResponse.status}`);
-                }
-                return { status: fetchResponse.status };
-            }, {
-                url: process.env.INGESTION_URL,
-                headers: headers,
-                orgId: orgId,
-                streamName: streamName
+            const response = await this.page.request.delete(url, {
+                headers: headers
             });
-            return response;
+
+            if (!response.ok() && response.status() !== 404) {
+                throw new Error(`HTTP error! status: ${response.status()}`);
+            }
+
+            const status = response.status();
+            if (status === 200) {
+                testLogger.info(`Stream '${streamName}' deleted successfully`);
+            } else if (status === 404) {
+                testLogger.info(`Stream '${streamName}' not found (already deleted)`);
+            }
+
+            return { status: status };
         } catch (error) {
             testLogger.error('Stream deletion failed:', { error: error.message });
             throw error;
