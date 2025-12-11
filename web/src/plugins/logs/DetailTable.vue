@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </q-card-section>
     <q-separator />
+    <!-- Single Tab Row -->
     <div class="row justify-between q-pt-sm">
       <div class="col-10">
         <q-tabs v-model="tab" shrink align="left">
@@ -52,9 +53,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="table"
             :label="t('common.table')"
           />
+          <!-- Correlation Tabs (only visible when service streams enabled) -->
+          <q-tab
+            v-if="serviceStreamsEnabled"
+            name="correlated-logs"
+            :label="t('correlation.correlatedLogs')"
+          />
+          <q-tab
+            v-if="serviceStreamsEnabled"
+            name="correlated-metrics"
+            :label="t('correlation.correlatedMetrics')"
+          />
+          <q-tab
+            v-if="serviceStreamsEnabled"
+            name="correlated-traces"
+            :label="t('correlation.correlatedTraces')"
+          />
           <!-- o2 ai context add button in the detail table -->
-          <O2AIContextAddBtn 
-            class="tw-px-2 tw-py-2" 
+          <O2AIContextAddBtn
+            class="tw-px-2 tw-py-2"
             @sendToAiChat="sendToAiChat(JSON.stringify(rowData))"
              />
         </q-tabs>
@@ -84,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <q-tab-panels
       data-test="log-detail-tab-container"
-      class="tab-panels-container"
+      :class="['tab-panels-container', tab.startsWith('correlated-') ? 'full-height-panels' : '']"
       v-model="tab"
       animated
     >
@@ -97,6 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :value="rowData"
             show-copy-button
             mode="sidebar"
+            hide-view-related
             :highlight-query="highlightQuery"
             @copy="copyContentToClipboard"
             @add-field-to-table="addFieldToTable"
@@ -104,6 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @view-trace="viewTrace"
             @send-to-ai-chat="sendToAiChat"
             @closeTable="closeTable"
+            @show-correlation="showCorrelation"
           />
         </q-card-section>
       </q-tab-panel>
@@ -124,6 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :row-key="(row) => 'field_' + row.field"
             :rows-per-page-options="[0]"
             class="q-table o2-quasar-table o2-row-md o2-schema-table tw-w-full tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
+            :class="store.state.theme === 'dark' && 'dark'"
             dense
           >
             <template v-slot:body-cell-field="props">
@@ -275,10 +295,94 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-table>
         </q-card-section>
       </q-tab-panel>
+      <!-- Correlated Logs Tab Panel -->
+      <q-tab-panel name="correlated-logs" class="q-pa-none full-height">
+        <TelemetryCorrelationDashboard
+          v-if="correlationProps"
+          mode="embedded-tabs"
+          external-active-tab="logs"
+          :service-name="correlationProps.serviceName"
+          :matched-dimensions="correlationProps.matchedDimensions"
+          :metric-streams="correlationProps.metricStreams"
+          :log-streams="correlationProps.logStreams"
+          :trace-streams="correlationProps.traceStreams"
+          :source-stream="correlationProps.sourceStream"
+          :source-type="correlationProps.sourceType"
+          :available-dimensions="correlationProps.availableDimensions"
+          :fts-fields="correlationProps.ftsFields"
+          :time-range="correlationProps.timeRange"
+          @close="tab = 'json'"
+        />
+        <!-- Loading/Empty state when no data -->
+        <div v-else class="tw-flex tw-items-center tw-justify-center tw-h-full tw-py-20">
+          <div class="tw-text-center">
+            <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw-mb-4" />
+            <div v-else-if="correlationError" class="tw-text-base tw-text-red-500">{{ correlationError }}</div>
+            <div v-else class="tw-text-base tw-text-gray-500">{{ t('correlation.clickToLoadLogs') }}</div>
+          </div>
+        </div>
+      </q-tab-panel>
+
+      <!-- Correlated Metrics Tab Panel -->
+      <q-tab-panel name="correlated-metrics" class="q-pa-none full-height">
+        <TelemetryCorrelationDashboard
+          v-if="correlationProps"
+          mode="embedded-tabs"
+          external-active-tab="metrics"
+          :service-name="correlationProps.serviceName"
+          :matched-dimensions="correlationProps.matchedDimensions"
+          :metric-streams="correlationProps.metricStreams"
+          :log-streams="correlationProps.logStreams"
+          :trace-streams="correlationProps.traceStreams"
+          :source-stream="correlationProps.sourceStream"
+          :source-type="correlationProps.sourceType"
+          :available-dimensions="correlationProps.availableDimensions"
+          :fts-fields="correlationProps.ftsFields"
+          :time-range="correlationProps.timeRange"
+          @close="tab = 'json'"
+        />
+        <!-- Loading/Empty state when no data -->
+        <div v-else class="tw-flex tw-items-center tw-justify-center tw-h-full tw-py-20">
+          <div class="tw-text-center">
+            <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw-mb-4" />
+            <div v-else-if="correlationError" class="tw-text-base tw-text-red-500">{{ correlationError }}</div>
+            <div v-else class="tw-text-base tw-text-gray-500">{{ t('correlation.clickToLoadMetrics') }}</div>
+          </div>
+        </div>
+      </q-tab-panel>
+
+      <!-- Correlated Traces Tab Panel -->
+      <q-tab-panel name="correlated-traces" class="q-pa-none full-height">
+        <TelemetryCorrelationDashboard
+          v-if="correlationProps"
+          mode="embedded-tabs"
+          external-active-tab="traces"
+          :service-name="correlationProps.serviceName"
+          :matched-dimensions="correlationProps.matchedDimensions"
+          :metric-streams="correlationProps.metricStreams"
+          :log-streams="correlationProps.logStreams"
+          :trace-streams="correlationProps.traceStreams"
+          :source-stream="correlationProps.sourceStream"
+          :source-type="correlationProps.sourceType"
+          :available-dimensions="correlationProps.availableDimensions"
+          :fts-fields="correlationProps.ftsFields"
+          :time-range="correlationProps.timeRange"
+          @close="tab = 'json'"
+        />
+        <!-- Loading/Empty state when no data -->
+        <div v-else class="tw-flex tw-items-center tw-justify-center tw-h-full tw-py-20">
+          <div class="tw-text-center">
+            <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw-mb-4" />
+            <div v-else-if="correlationError" class="tw-text-base tw-text-red-500">{{ correlationError }}</div>
+            <div v-else class="tw-text-base tw-text-gray-500">{{ t('correlation.clickToLoadTraces') }}</div>
+          </div>
+        </div>
+      </q-tab-panel>
     </q-tab-panels>
 
-    <q-separator />
-    <q-card-section class="q-pa-md q-pb-md">
+    <!-- Navigation buttons for log details (show only on JSON/Table tabs) -->
+    <q-separator v-if="tab === 'json' || tab === 'table'" />
+    <q-card-section v-if="tab === 'json' || tab === 'table'" class="q-pa-md q-pb-md">
       <div class="row items-center no-wrap justify-between">
         <div class="col-2">
           <q-btn
@@ -340,7 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount, computed } from "vue";
+import { defineComponent, ref, onBeforeMount, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -354,6 +458,7 @@ import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
+import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 
 const defaultValue: any = () => {
   return {
@@ -363,7 +468,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "SearchDetail",
-  components: { EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting },
+  components: { EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, TelemetryCorrelationDashboard },
   emits: [
     "showPrevDetail",
     "showNextDetail",
@@ -373,7 +478,9 @@ export default defineComponent({
     "add:table",
     "view-trace",
     "sendToAiChat",
-    "closeTable"
+    "closeTable",
+    "show-correlation",
+    "load-correlation" // New event for lazy loading correlation data
   ],
   props: {
     modelValue: {
@@ -395,6 +502,18 @@ export default defineComponent({
     highlightQuery: {
       type: String,
       default: "",
+    },
+    correlationProps: {
+      type: Object,
+      default: null,
+    },
+    correlationLoading: {
+      type: Boolean,
+      default: false,
+    },
+    correlationError: {
+      type: String,
+      default: null,
     },
   },
   methods: {
@@ -434,6 +553,21 @@ export default defineComponent({
 
     const $q = useQuasar();
 
+    // Watch for tab changes - load correlation data when user clicks a correlation tab
+    watch(tab, (newTab, oldTab) => {
+      const isCorrelationTab = newTab.startsWith('correlated-');
+      const wasCorrelationTab = oldTab?.startsWith('correlated-');
+
+      // Only emit if switching TO a correlation tab AND we don't have data yet
+      if (isCorrelationTab && !props.correlationProps) {
+        console.log("[DetailTable] User clicked correlation tab, emitting load-correlation");
+        emit("load-correlation", rowData.value);
+      }
+
+      // If switching FROM correlation tab back to JSON/Table, we keep the data loaded
+      // (tabs persist, data persists until navigation)
+    });
+
     // Table columns for q-table
     const tableColumns = [
       {
@@ -471,6 +605,11 @@ export default defineComponent({
     // Compute status color for the top border
     const statusColor = computed(() => {
       return extractStatusFromLog(rowData.value).color;
+    });
+
+    // Check if service streams feature is enabled
+    const serviceStreamsEnabled = computed(() => {
+      return store.state.zoConfig.service_streams_enabled !== false;
     });
 
     onBeforeMount(() => {
@@ -537,7 +676,14 @@ export default defineComponent({
     };
     const closeTable = () => {
       emit("closeTable");
-    }
+    };
+
+    const showCorrelation = () => {
+      console.log("[DetailTable] showCorrelation called with rowData:", rowData.value);
+      console.log("[DetailTable] Emitting show-correlation event with log data");
+      emit("show-correlation", rowData.value);
+    };
+
     return {
       t,
       store,
@@ -558,10 +704,12 @@ export default defineComponent({
       hasAggregationQuery,
       sendToAiChat,
       closeTable,
+      showCorrelation,
       statusColor,
       tableColumns,
       tableRows,
       tablePagination,
+      serviceStreamsEnabled,
     };
   },
   async created() {
@@ -573,4 +721,19 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 @import "@/styles/logs/detail-table.scss";
+
+// Make correlation tab panels use full remaining height (no footer space)
+.full-height-panels {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  :deep(.q-tab-panel) {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+}
 </style>

@@ -207,6 +207,27 @@ const alerts = {
   get_dedup_summary: (org_identifier: string) => {
     return http().get(`/api/${org_identifier}/alerts/dedup/summary`);
   },
+  // Semantic field groups management
+  getSemanticGroups: (org_identifier: string) => {
+    return http().get(`/api/${org_identifier}/alerts/deduplication/semantic-groups`);
+  },
+  previewSemanticGroupsDiff: (org_identifier: string, groups: any[]) => {
+    return http().post(`/api/${org_identifier}/alerts/deduplication/semantic-groups/preview-diff`, groups);
+  },
+  saveSemanticGroups: (org_identifier: string, groups: any[]) => {
+    return http().put(`/api/${org_identifier}/alerts/deduplication/semantic-groups`, groups);
+  },
+  trigger_alert: (
+    org_identifier: string,
+    alert_id: string,
+    folder_id?: string,
+  ) => {
+    let url = `/api/v2/${org_identifier}/alerts/${alert_id}/trigger`;
+    if (folder_id) {
+      url += `?folder=${folder_id}`;
+    }
+    return http().patch(url);
+  },
 };
 
 export default alerts;

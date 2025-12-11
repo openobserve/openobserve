@@ -41,7 +41,7 @@ use crate::service::{
     db::enrichment_table,
     search::{
         SEARCH_SERVER,
-        cluster::flight::{check_work_group, get_online_querier_nodes, partition_file_list},
+        cluster::flight::{get_online_querier_nodes, partition_file_list},
         datafusion::{
             distributed_plan::{
                 NewEmptyExecVisitor,
@@ -52,7 +52,7 @@ use crate::service::{
             exec::{DataFusionContextBuilder, register_udf},
         },
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        utils::AsyncDefer,
+        work_group::DeferredLock,
     },
 };
 
@@ -70,10 +70,11 @@ pub async fn search(
 ) -> Result<(
     SessionContext,
     Arc<dyn ExecutionPlan>,
-    AsyncDefer,
+    DeferredLock,
     ScanStats,
 )> {
-    let start = std::time::Instant::now();
+    let mut took_watch = config::utils::took_watcher::TookWatcher::new();
+
     let cfg = config::get_config();
     let mut req: Request = (*flight_request).clone().into();
     let trace_id = trace_id.to_string();
@@ -116,7 +117,8 @@ pub async fn search(
         get_file_id_lists(&trace_id, &req.org_id, stream_type, &stream, req.time_range).await?;
     let file_id_list_vec = file_id_list.iter().collect::<Vec<_>>();
     let file_id_list_num = file_id_list_vec.len();
-    let file_id_list_took = start.elapsed().as_millis() as usize;
+
+    let file_id_list_took = took_watch.record_split("get_file_list").as_millis() as usize;
     log::info!(
         "{}",
         search_inspector_fields(
@@ -196,41 +198,24 @@ pub async fn search(
     );
 
     // check work group
-    let (took_wait, work_group_str, work_group) = check_work_group(
-        &req,
+    let _lock = crate::service::search::work_group::acquire_work_group_lock(
         &trace_id,
+        &req,
+        &mut took_watch,
+        "super_cluster_follower",
         &nodes,
         &file_id_list_vec,
-        start,
-        file_id_list_took,
-        "leader".to_string(),
     )
     .await?;
+
+    let took_wait = _lock.took_wait;
+    let work_group_str = _lock.work_group_str.clone();
+
     // add work_group
     req.add_work_group(Some(work_group_str.clone()));
     log::info!(
         "[trace_id {trace_id}] flight->follower_leader: add work_group: {work_group_str}, took: {took_wait} ms"
     );
-
-    // release work_group in flight follow search
-    let user_id = req.user_id.clone();
-    let trace_id_move = trace_id.to_string();
-    let defer = AsyncDefer::new({
-        async move {
-            let _ = work_group
-                .as_ref()
-                .unwrap()
-                .done(&trace_id_move, user_id.as_deref())
-                .await
-                .map_err(|e| {
-                    log::error!(
-                        "[trace_id {trace_id_move}] release work_group in flight follow search error: {e}",
-                    );
-                    e.to_string();
-                });
-            log::info!("[trace_id {trace_id_move}] release work_group in flight follow search");
-        }
-    });
 
     // partition file list
     let partition_file_lists = partition_file_list(file_id_list, &nodes, role_group).await?;
@@ -303,7 +288,7 @@ pub async fn search(
         ..Default::default()
     };
 
-    Ok((ctx, physical_plan, defer, scan_stats))
+    Ok((ctx, physical_plan, _lock, scan_stats))
 }
 
 #[tracing::instrument(

@@ -75,6 +75,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-pa-none o2-primary-button tw-h-[30px] element-box-shadow"
             data-test="metrics-apply"
             padding="sm"
+            :loading="disable"
+            :disable="disable"
             no-caps
             :label="t('metrics.runQuery')"
             @click="runQuery"
@@ -279,8 +281,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 dense
                                 style="padding: 2px 4px; z-index: 1"
                                 @click="addToDashboard"
-                                title="Add To Dashboard"
-                                >Add To Dashboard</q-btn
+                                :title="t('search.addToDashboard')"
+                                >{{ t("search.addToDashboard") }}</q-btn
                               >
                             </div>
                           </div>

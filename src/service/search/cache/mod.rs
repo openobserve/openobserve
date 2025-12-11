@@ -293,7 +293,10 @@ pub async fn search(
     log::info!(
         "{}",
         search_inspector_fields(
-            format!("[trace_id {trace_id}] cache done"),
+            format!(
+                "[trace_id {trace_id}] search for cache is done, took: {} ms",
+                start.elapsed().as_millis()
+            ),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("summary".to_string())
@@ -423,6 +426,10 @@ pub async fn search(
         && res.new_end_time.is_none()
         && res.function_error.is_empty()
         && !res.hits.is_empty();
+    log::info!(
+        "[trace_id {trace_id}] should_cache_results: {should_cache_results}, is_http2_streaming: {is_http2_streaming}, hits: {}",
+        res.hits.len()
+    );
     if should_cache_results
         && (results.first().is_some_and(|res| !res.hits.is_empty())
             || results.last().is_some_and(|res| !res.hits.is_empty()))
@@ -583,27 +590,27 @@ pub async fn prepare_cache_response(
 #[allow(clippy::too_many_arguments)]
 pub fn merge_response(
     trace_id: &str,
-    cache_responses: &mut Vec<config::meta::search::Response>,
-    search_response: &mut Vec<config::meta::search::Response>,
+    cached_responses: &mut Vec<config::meta::search::Response>,
+    search_responses: &mut Vec<config::meta::search::Response>,
     ts_column: &str,
     limit: i64,
     is_descending: bool,
     cache_took: usize,
     order_by: Vec<(String, OrderBy)>,
 ) -> config::meta::search::Response {
-    cache_responses.retain(|res| !res.hits.is_empty());
-    search_response.retain(|res| !res.hits.is_empty());
+    cached_responses.retain(|res| !res.hits.is_empty());
+    search_responses.retain(|res| !res.hits.is_empty());
 
-    if cache_responses.is_empty() && search_response.is_empty() {
+    if cached_responses.is_empty() && search_responses.is_empty() {
         return config::meta::search::Response::default();
     }
     let mut fn_error = vec![];
 
-    let mut cache_response = if cache_responses.is_empty() {
+    let mut cache_response = if cached_responses.is_empty() {
         config::meta::search::Response::default()
     } else {
         let mut resp = config::meta::search::Response::default();
-        for res in cache_responses {
+        for res in cached_responses {
             resp.total += res.total;
             resp.scan_size += res.scan_size;
             resp.scan_records += res.scan_records;
@@ -621,13 +628,15 @@ pub fn merge_response(
     };
 
     if cache_response.hits.is_empty()
-        && !search_response.is_empty()
-        && search_response
+        && !search_responses.is_empty()
+        && search_responses
             .first()
             .is_none_or(|res| res.hits.is_empty())
-        && search_response.last().is_none_or(|res| res.hits.is_empty())
+        && search_responses
+            .last()
+            .is_none_or(|res| res.hits.is_empty())
     {
-        for res in search_response {
+        for res in search_responses {
             cache_response.total += res.total;
             cache_response.scan_size += res.scan_size;
             cache_response.took += res.took;
@@ -639,7 +648,7 @@ pub fn merge_response(
         cache_response.function_error = fn_error;
         return cache_response;
     }
-    let cache_hits_len = cache_response.hits.len();
+    let cached_hits_len = cache_response.hits.len();
 
     cache_response.scan_size = 0;
 
@@ -648,7 +657,7 @@ pub fn merge_response(
 
     let mut res_took = ResponseTook::default();
 
-    for res in search_response.clone() {
+    for res in search_responses.clone() {
         cache_response.total += res.total;
         cache_response.scan_size += res.scan_size;
         cache_response.took += res.took;
@@ -682,32 +691,32 @@ pub fn merge_response(
         cache_response.total = cache_response.hits.len();
     }
 
-    if !search_response.is_empty() {
-        cache_response.cached_ratio = files_cache_ratio / search_response.len();
+    if !search_responses.is_empty() {
+        cache_response.cached_ratio = files_cache_ratio / search_responses.len();
     }
     cache_response.size = cache_response.hits.len() as i64;
     log::info!(
-        "[trace_id {trace_id}] cache_response.hits.len: {}, Result cache len: {}",
-        cache_hits_len,
+        "[trace_id {trace_id}] cached hits len: {}, result cache len: {}",
+        cached_hits_len,
         result_cache_len
     );
     cache_response.took_detail = res_took;
-    cache_response.order_by = search_response
+    cache_response.order_by = search_responses
         .first()
         .map(|res| res.order_by)
         .unwrap_or_default();
-    cache_response.order_by_metadata = search_response
+    cache_response.order_by_metadata = search_responses
         .first()
         .map(|res| res.order_by_metadata.clone())
         .unwrap_or_default();
-    cache_response.result_cache_ratio = (((cache_hits_len as f64) * 100_f64)
-        / ((result_cache_len + cache_hits_len) as f64))
+    cache_response.result_cache_ratio = (((cached_hits_len as f64) * 100_f64)
+        / ((result_cache_len + cached_hits_len) as f64))
         as usize;
     if !fn_error.is_empty() {
         cache_response.function_error.extend(fn_error);
         cache_response.is_partial = true;
     }
-    cache_response.is_histogram_eligible = search_response
+    cache_response.is_histogram_eligible = search_responses
         .first()
         .map(|res| res.is_histogram_eligible)
         .unwrap_or_default();
@@ -836,6 +845,7 @@ pub async fn write_results(
     // 1. alignment time range for incomplete records for histogram
     let mut accept_start_time = req_query_start_time;
     let mut accept_end_time = req_query_end_time;
+    let mut need_adjust_end_time = false;
     if is_aggregate
         && let Some(interval) = res.histogram_interval
         && interval > 0
@@ -847,6 +857,7 @@ pub async fn write_results(
         }
         // previous interval of end_time
         if (accept_end_time % interval) != 0 {
+            need_adjust_end_time = true;
             accept_end_time = accept_end_time - (accept_end_time % interval) - interval;
         }
     }
@@ -858,12 +869,9 @@ pub async fn write_results(
     let (data_start_time, data_end_time) =
         extract_timestamp_range(&res.hits, ts_column, is_time_ordered);
     let delay_ts = second_micros(get_config().limit.cache_delay_secs);
-    let accept_end_time = std::cmp::min(Utc::now().timestamp_micros() - delay_ts, accept_end_time);
-
-    // Track if we need to recalculate timestamp range after filtering
-    let needs_filtering = data_start_time < accept_start_time || data_end_time > accept_end_time;
-
-    if needs_filtering {
+    let mut accept_end_time =
+        std::cmp::min(Utc::now().timestamp_micros() - delay_ts, accept_end_time);
+    if data_start_time < accept_start_time || data_end_time > accept_end_time {
         res.hits.retain(|hit| {
             if let Some(hit_ts) = hit.get(ts_column)
                 && let Some(hit_ts_datetime) = convert_ts_value_to_datetime(hit_ts)
@@ -885,27 +893,26 @@ pub async fn write_results(
         return;
     }
 
-    // 3.5. Determine final time range for cache filename
-    // If we filtered data, recalculate; otherwise use the original data range
-    let (final_start_time, final_end_time) = if needs_filtering {
-        // Recalculate after filtering - only happens when data was actually filtered
-        extract_timestamp_range(&res.hits, ts_column, is_time_ordered)
-    } else {
-        // No filtering occurred, use the original data range
-        (data_start_time, data_end_time)
-    };
-
     // 4. check if the time range is less than discard_duration
-    if (final_end_time - final_start_time) < delay_ts {
+    if (accept_end_time - accept_start_time) < delay_ts {
         log::info!("[trace_id {trace_id}] Time range is too short for caching, skipping caching");
         return;
     }
 
-    // 5. cache to disk
+    // 5. adjust the cache time range
+    if need_adjust_end_time
+        && is_aggregate
+        && let Some(interval) = res.histogram_interval
+        && interval > 0
+    {
+        accept_end_time += interval * 1000 * 1000;
+    }
+
+    // 6. cache to disk
     let file_name = format!(
         "{}_{}_{}_{}.json",
-        final_start_time,
-        final_end_time,
+        accept_start_time,
+        accept_end_time,
         if is_aggregate { 1 } else { 0 },
         if is_descending { 1 } else { 0 }
     );
@@ -919,8 +926,8 @@ pub async fn write_results(
             &file_name,
             res_cache,
             clear_cache,
-            Some(final_start_time),
-            Some(final_end_time),
+            Some(accept_start_time),
+            Some(accept_end_time),
         )
         .await
         {
@@ -934,8 +941,8 @@ pub async fn write_results(
                         .entry(query_key)
                         .or_insert_with(Vec::new)
                         .push(ResultCacheMeta {
-                            start_time: final_start_time,
-                            end_time: final_end_time,
+                            start_time: accept_start_time,
+                            end_time: accept_end_time,
                             is_aggregate,
                             is_descending,
                         });

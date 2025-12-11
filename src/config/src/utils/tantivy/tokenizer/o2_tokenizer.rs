@@ -47,7 +47,7 @@ pub struct O2TokenStream<'a> {
     token: &'a mut Token,
     buffer: Vec<&'a str>,
     buffer_offset: usize,
-    collect_type: CollectType,
+    collect_type: &'a CollectType,
 }
 
 impl Tokenizer for O2Tokenizer {
@@ -60,7 +60,7 @@ impl Tokenizer for O2Tokenizer {
             token: &mut self.token,
             buffer: Vec::new(),
             buffer_offset: 0,
-            collect_type: self.collect_type.clone(),
+            collect_type: &self.collect_type,
         }
     }
 }

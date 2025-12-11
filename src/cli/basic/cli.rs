@@ -115,6 +115,9 @@ fn create_cli_app() -> Command {
                     arg!("metrics", 'm', "metrics", "show node metrics", false).action(ArgAction::SetTrue),
                 ]),
                 Command::new("metrics").about("show local node metrics"),
+                Command::new("reload").about("reload cache from database").args([
+                    arg!("module", 'm', "module", "comma-separated list of modules to reload (e.g., schema,user,functions)", true),
+                ]),
             ]),
             Command::new("sql").about("query data").args([
                 arg!("org", 'o', "org", "org name").default_value("default"),
@@ -243,14 +246,24 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                             r#"
 ------------------------------------------------------------------------------
 Warning: !!! 
+Please stop compactor node first, if you are running single node, please set
+ZO_COMPACT_ENABLED=false and then restart node.
+
 calculate_stats_step_limit_secs good to be at least 3600 for stats reset,
 suggested to run again with:
 
 ZO_CALCULATE_STATS_STEP_LIMIT_SECS=3600 ./openobserve reset -c stream-stats
+
+After reset done, you can start compactor node again,
+If you are single node, please set ZO_COMPACT_ENABLED=true and restart node.
 ------------------------------------------------------------------------------
 "#
                         );
                     }
+                    // get max updated_at
+                    let max_updated_at = infra_file_list::get_max_update_at().await?;
+                    // reset stream stats reset offset
+                    db::compact::stats::set_reset(max_updated_at).await?;
                     // reset stream stats update offset
                     db::compact::stats::set_offset(0, None).await?;
                     // reset stream stats table data
@@ -392,6 +405,14 @@ ZO_CALCULATE_STATS_STEP_LIMIT_SECS=3600 ./openobserve reset -c stream-stats
                 }
                 Some(("metrics", _)) => {
                     super::http::local_node_metrics().await?;
+                }
+                Some(("reload", args)) => {
+                    let modules_str = args.get_one::<String>("module").unwrap();
+                    let modules: Vec<String> = modules_str
+                        .split(',')
+                        .map(|s| s.trim().to_string())
+                        .collect();
+                    super::http::node_reload(modules).await?;
                 }
                 Some(("node-list", _)) => {
                     super::http::refresh_nodes_list().await?;

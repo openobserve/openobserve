@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="stream-routing-title q-pb-sm q-pl-md tw-flex tw-items-center tw-justify-between ">
       {{ t("pipeline.conditionTitle") }}
       <div>
-          <q-btn v-close-popup="true" round flat icon="cancel" >
+          <q-btn round flat icon="cancel" @click="openCancelDialog">
           </q-btn>
         </div>
     </div>
@@ -40,12 +40,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Wrapper for FilterGroup with pipeline-specific styling -->
           <div class="pipeline-filter-group-wrapper" @submit.stop.prevent>
             <FilterGroup
-              v-if="conditionGroup && conditionGroup.items"
+              v-if="conditionGroup && (conditionGroup.conditions || conditionGroup.items)"
               :key="filterGroupKey"
               :stream-fields="filteredColumns"
               :group="conditionGroup"
               :depth="0"
-              condition-input-width="tw-w-[150px]"
+              condition-input-width="tw-w-[130px]"
+              :allow-custom-columns="true"
               @add-condition="(updatedGroup) => updateGroup(updatedGroup)"
               @add-group="(updatedGroup) => updateGroup(updatedGroup)"
               @remove-group="(groupId) => removeConditionGroup(groupId)"
@@ -62,15 +63,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-banner  inline dense class="note-info " >
               <div>
                 <q-icon name="info" color="orange" class="q-mr-sm" />
-                <span>To check for an empty value, use <span class="highlight">""</span>. Example: 
+                <span>To check for an empty value, use <span class="highlight">""</span>. Example:
                   <span class="code">app_name != ""</span>
                 </span>
               </div>
               <div>
                 <q-icon name="info" color="orange"class="q-mr-sm" />
-                <span>To check for an Null value, use <span class="highlight">null</span>. Example: 
+                <span>To check for an Null value, use <span class="highlight">null</span>. Example:
                   <span class="code">app_name != null</span>
                 </span>
+              </div>
+              <div>
+                <q-icon name="info" color="orange" class="q-mr-sm" />
+                <span>To add a custom column, type column name and press <span class="highlight">Enter</span>.</span>
               </div>
               <div>
                 <q-icon name="warning" color="red" class="q-mr-sm" />
@@ -163,8 +168,14 @@ import searchService from "@/services/search";
 import { convertDateToTimestamp } from "@/utils/date";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import {
-  transformFEToBE,
-  retransformBEToFE,
+  detectConditionsVersion,
+  convertV0ToV2,
+  convertV1ToV2,
+  convertV1BEToV2,
+  updateGroup as updateGroupUtil,
+  removeConditionGroup as removeConditionGroupUtil,
+  ensureIds,
+  type V2Group,
 } from "@/utils/alerts/alertDataTransforms";
 
 
@@ -172,6 +183,7 @@ const VariablesInput = defineAsyncComponent(
   () => import("@/components/alerts/VariablesInput.vue"),
 );
 
+// V1 interfaces (legacy support)
 interface FilterCondition {
   column: string;
   operator: string;
@@ -181,9 +193,14 @@ interface FilterCondition {
 }
 
 interface ConditionGroup {
-  groupId: string;
-  label: 'and' | 'or';
-  items: (FilterCondition | ConditionGroup)[];
+  // V2 properties
+  filterType?: 'group';
+  logicalOperator?: 'AND' | 'OR';
+  conditions?: (FilterCondition | ConditionGroup)[];
+  // V1 properties (legacy)
+  groupId?: string;
+  label?: 'and' | 'or';
+  items?: (FilterCondition | ConditionGroup)[];
 }
 
 interface StreamRoute {
@@ -285,31 +302,57 @@ const getDefaultStreamRoute: any = () => {
   };
 };
 
-// Initialize condition group - convert from backend format if editing
+// Initialize condition group - V2: Auto-convert V0/V1 to V2 format
+// Supports three versions:
+// - V0: Flat array of conditions with implicit AND between all (no groups)
+// - V1: Tree-based structure with {and: [...]} or {or: [...]} or {label, items, groupId}
+// - V2: Linear structure with filterType, logicalOperator per condition
 const getDefaultConditionGroup = (): ConditionGroup => {
   if (pipelineObj.isEditNode && pipelineObj.currentSelectedNodeData?.data?.conditions) {
     try {
-      // Convert backend ConditionList format to FilterGroup format
-      const converted = retransformBEToFE(pipelineObj.currentSelectedNodeData.data.conditions);
-      if (converted) {
-        return converted;
+      // Create a deep copy to avoid mutating the original pipelineObj data
+      const conditions = JSON.parse(JSON.stringify(pipelineObj.currentSelectedNodeData.data.conditions));
+      const version = detectConditionsVersion(conditions);
+
+      if (version === 0) {
+        // V0: Flat array format - convert to V2
+        // V0 had implicit AND between all conditions (no groups)
+        const converted = convertV0ToV2(conditions);
+        return ensureIds(converted) as any;
+      } else if (version === 1) {
+        // V1: Convert to V2
+        let converted;
+        if (conditions.and || conditions.or) {
+          // V1 Backend format
+          converted = convertV1BEToV2(conditions);
+        } else if (conditions.label && conditions.items) {
+          // V1 Frontend format
+          converted = convertV1ToV2(conditions);
+        }
+        return ensureIds(converted) as any;
+      } else {
+        // V2: Use as-is, but ensure all groupIds and ids exist recursively
+        return ensureIds(conditions) as any;
       }
     } catch (error) {
       console.error("Error converting condition to group format:", error);
     }
   }
-  // Default empty group
+  // Default empty V2 group
   return {
+    filterType: 'group',
+    logicalOperator: 'AND',
     groupId: getUUID(),
-    label: 'and',
-    items: [{
+    conditions: [{
+      filterType: 'condition',
       column: '',
       operator: '=',
       value: '',
-      ignore_case: true,
+      values: [],
+      logicalOperator: 'AND',
       id: getUUID(),
     }]
-  };
+  } as any;
 };
 
 onBeforeMount(async () => {
@@ -348,7 +391,8 @@ const originalStreamRouting: Ref<StreamRoute> = ref(getDefaultStreamRoute());
 
 const conditionGroup: Ref<ConditionGroup> = ref(getDefaultConditionGroup());
 
-const originalConditionGroup: Ref<ConditionGroup> = ref(getDefaultConditionGroup());
+// Create a deep copy to preserve the original state for comparison
+const originalConditionGroup: Ref<ConditionGroup> = ref(JSON.parse(JSON.stringify(getDefaultConditionGroup())));
 
 // Simple incrementing key to force re-render when needed
 const filterGroupKey = ref(0);
@@ -449,57 +493,43 @@ const getFields = async () => {
   }
 };
 
-// Group management functions
+// Group management functions - Using shared utilities from alertDataTransforms
+// These functions are called when FilterGroup emits add-condition, add-group, or remove-group events
+
 const updateGroup = (updatedGroup: any) => {
-  // If the updated group has the same groupId as the root, replace entirely
-  if (updatedGroup.groupId === conditionGroup.value.groupId) {
-    conditionGroup.value = updatedGroup;
-  } else {
-    // Otherwise, it's a nested group - find and update it recursively
-    const updateNestedGroup = (group: any, updated: any): boolean => {
-      if (!group.items || !Array.isArray(group.items)) return false;
-
-      for (let i = 0; i < group.items.length; i++) {
-        const item = group.items[i];
-        if (item.groupId && item.groupId === updated.groupId) {
-          group.items[i] = updated;
-          return true;
-        }
-        if (item.groupId && item.items) {
-          if (updateNestedGroup(item, updated)) {
-            return true;
-          }
-        }
+  // Create a context object that matches the alert utility's expected structure
+  // The utility expects: context.formData.query_condition.conditions
+  // We need to create a temporary wrapper and then extract the updated value
+  const tempContext = {
+    formData: {
+      query_condition: {
+        conditions: conditionGroup.value
       }
-      return false;
-    };
-
-    const updatedRoot = JSON.parse(JSON.stringify(conditionGroup.value));
-    if (updateNestedGroup(updatedRoot, updatedGroup)) {
-      conditionGroup.value = updatedRoot;
     }
-  }
+  };
+
+  // Call the shared utility
+  updateGroupUtil(updatedGroup, tempContext as any);
+
+  // Extract the updated value back
+  conditionGroup.value = tempContext.formData.query_condition.conditions;
 };
 
 const removeConditionGroup = (targetGroupId: string) => {
-  if (!conditionGroup.value?.items || !Array.isArray(conditionGroup.value.items)) return;
-
-  const filterEmptyGroups = (items: any[]): any[] => {
-    return items.filter((item: any) => {
-      if (item.groupId === targetGroupId) {
-        return false;
+  // Create a context object that matches the alert utility's expected structure
+  const tempContext = {
+    formData: {
+      query_condition: {
+        conditions: conditionGroup.value
       }
-
-      if (item.items && Array.isArray(item.items)) {
-        item.items = filterEmptyGroups(item.items);
-        return item.items.length > 0;
-      }
-
-      return true;
-    });
+    }
   };
 
-  conditionGroup.value.items = filterEmptyGroups(conditionGroup.value.items);
+  // Call the shared utility
+  removeConditionGroupUtil(targetGroupId, conditionGroup.value, tempContext as any);
+
+  // Extract the updated value back
+  conditionGroup.value = tempContext.formData.query_condition.conditions;
 };
 
 const onInputUpdate = (name: string, field: any) => {
@@ -507,8 +537,10 @@ const onInputUpdate = (name: string, field: any) => {
 };
 
 const closeDialog = () => {
+  // Restore the original condition group when canceling
+  conditionGroup.value = JSON.parse(JSON.stringify(originalConditionGroup.value));
   pipelineObj.userClickedNode = {};
-  pipelineObj.userSelectedNode = {};  
+  pipelineObj.userSelectedNode = {};
   emit("cancel:hideform");
 };
 
@@ -537,9 +569,12 @@ const openCancelDialog = () => {
 
 const saveCondition = async () => {
   try {
-    // Check if there are any valid conditions
-    const hasValidConditions = conditionGroup.value.items.some((item: any) => {
-      if (item.groupId && item.items) return true;
+    // V2: Check if there are any valid conditions (use 'conditions' array)
+    const conditionsArray = (conditionGroup.value as any).conditions || [];
+    const hasValidConditions = conditionsArray.some((item: any) => {
+      // Check for nested groups (V2 format)
+      if (item.filterType === 'group' && item.conditions) return true;
+      // Check for valid conditions
       return item.column && item.operator;
     });
 
@@ -552,12 +587,12 @@ const saveCondition = async () => {
       return;
     }
 
-    // Transform FilterGroup format to backend ConditionList format
-    const backendCondition = transformFEToBE(conditionGroup.value);
-
+    // V2: Send directly to backend (no transformation needed)
+    // The conditionGroup is already in V2 format which matches backend
     let conditionData = {
       node_type: "condition",
-      conditions: backendCondition,
+      version: 2, // Numeric version for consistency with alerts
+      conditions: conditionGroup.value,
     };
 
     // Ensure currentSelectedNodeData has proper structure
@@ -575,6 +610,8 @@ const saveCondition = async () => {
     }
 
     addNode(conditionData);
+    // Update originalConditionGroup to the newly saved state
+    originalConditionGroup.value = JSON.parse(JSON.stringify(conditionGroup.value));
     emit("cancel:hideform");
   } catch (error) {
     console.error("Error saving condition:", error);

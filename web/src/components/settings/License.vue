@@ -75,10 +75,10 @@
                   <td>{{ licenseData.license.license_id }}</td>
                 </tr>
                 <tr>
-                  <td class="text-weight-bold">Active</td>
+                  <td class="text-weight-bold">Status</td>
                   <td>
-                    <q-badge :color="licenseData.license.active ? 'green' : 'red'">
-                      {{ licenseData.license.active ? 'Yes' : 'No' }}
+                    <q-badge :color="licenseData?.expired ? 'red' : 'green'">
+                      {{ licenseData?.expired ? 'Expired' : 'Active' }}
                     </q-badge>
                   </td>
                 </tr>
@@ -88,14 +88,7 @@
                 </tr>
                 <tr>
                   <td class="text-weight-bold">Expires At</td>
-                  <td>
-                    <div class="tw-flex tw-items-center tw-justify-start tw-gap-4">
-                      <span>{{ formatDate(licenseData.license.expires_at) }}</span>
-                      <q-badge v-if="licenseData?.expired" color="red">
-                        Expired
-                      </q-badge>
-                    </div>
-                  </td>
+                  <td>{{ formatDate(licenseData.license.expires_at) }}</td>
                 </tr>
                 <tr>
                   <td class="text-weight-bold">Company</td>

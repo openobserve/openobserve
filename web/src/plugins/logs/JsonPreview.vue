@@ -19,6 +19,23 @@
         icon="content_copy"
         @click="copyLogToClipboard"
       />
+      <q-btn
+        v-if="showViewRelatedBtn"
+        :label="t('search.viewRelated')"
+        dense
+        size="sm"
+        no-caps
+        class="log-preview-btn q-px-sm q-mr-sm"
+        icon="link"
+        color="secondary"
+        outline
+        @click="openCorrelation"
+        data-test="log-correlation-btn"
+      >
+        <q-tooltip>
+          {{ t('search.viewRelatedTooltip') }}
+        </q-tooltip>
+      </q-btn>
       <div
         v-if="
           showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)
@@ -269,7 +286,11 @@ size="lg" color="primary" />
           </q-list>
         </q-btn-dropdown>
 
-        <span class="q-pl-xs" :data-test="`log-expand-detail-key-${key}`">
+        <span
+          class="q-pl-xs"
+          :data-test="`log-expand-detail-key-${key}`"
+          :class="store.state.theme === 'dark' ? 'dark' : ''"
+        >
           <LogsHighLighting
             :data="{ [key]: value[key] }"
             :show-braces="false"
@@ -385,6 +406,7 @@ import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import { searchState } from "@/composables/useLogs/searchState";
+import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 
 export default {
   name: "JsonPreview",
@@ -412,6 +434,10 @@ export default {
       default: "",
       required: false,
     },
+    hideViewRelated: {
+      type: Boolean,
+      default: false,
+    },
   },
   components: {
     NotEqualIcon,
@@ -429,6 +455,7 @@ export default {
     "view-trace",
     "sendToAiChat",
     "closeTable",
+    "show-correlation",
   ],
   setup(props: any, { emit }: any) {
     const { t } = useI18n();
@@ -497,6 +524,32 @@ export default {
     let multiStreamFields: any = ref([]);
 
     const showViewTraceBtn = ref(false);
+    const showViewRelatedBtn = ref(false);
+
+    // Initialize service correlation composable
+    const { isCorrelationAvailable } = useServiceCorrelation();
+
+    // Simple check: just verify correlation feature is available
+    // The actual metric availability check happens when the button is clicked (in SearchResult.vue)
+    onMounted(async () => {
+      try {
+        const available = await isCorrelationAvailable();
+        console.log("[JsonPreview] Correlation feature available:", available, "Mode:", props.mode);
+
+        // Show button if correlation is available AND we're in detail view (sidebar or expanded)
+        // AND service_streams is enabled in config
+        // AND hideViewRelated prop is not set (used by DetailTable drawer to hide the button)
+        // Mode can be 'sidebar' (when opened from sidebar) or 'expanded' (when log row is expanded in table)
+        const isDetailView = props.mode === 'sidebar' || props.mode === 'expanded';
+        const serviceStreamsEnabled = store.state.zoConfig.service_streams_enabled !== false; // Default to true if not set
+        showViewRelatedBtn.value = available && isDetailView && serviceStreamsEnabled && !props.hideViewRelated;
+
+        console.log("[JsonPreview] showViewRelatedBtn set to:", showViewRelatedBtn.value, "isDetailView:", isDetailView, "serviceStreamsEnabled:", serviceStreamsEnabled, "hideViewRelated:", props.hideViewRelated);
+      } catch (err) {
+        console.error("[JsonPreview] Error checking correlation availability:", err);
+        showViewRelatedBtn.value = false;
+      }
+    });
 
     const getTracesStreams = async () => {
       isTracesStreamsLoading.value = true;
@@ -693,6 +746,11 @@ export default {
       emit("view-trace");
     };
 
+    const openCorrelation = () => {
+      console.log("[JsonPreview] openCorrelation clicked, emitting show-correlation event");
+      emit("show-correlation");
+    };
+
     const handleTabChange = async () => {
       if (activeTab.value === "unflattened") {
         await nextTick();
@@ -821,11 +879,13 @@ export default {
       searchObj,
       multiStreamFields,
       redirectToTraces,
+      openCorrelation,
       filteredTracesStreamOptions,
       filterStreamFn,
       streamSearchValue,
       activeTab,
       showViewTraceBtn,
+      showViewRelatedBtn,
       queryEditorRef,
       previewId,
       loading,

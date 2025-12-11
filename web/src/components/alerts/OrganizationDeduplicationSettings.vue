@@ -15,14 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card flat class="tw-p-6">
+  <div class="tw-w-full org-dedup-settings">
     <div class="tw-mb-6">
-      <div class="text-h6 tw-mb-2">Alert Deduplication</div>
+      <div class="text-h6 tw-mb-2">Alert Correlation</div>
       <div class="text-body2 text-grey-7">
-        Configure organization-wide semantic field groups and default time windows.
-        Semantic groups define which field name variations represent the same dimension
-        (e.g., "host", "hostname", "node" all map to "host"). Each alert specifies which
-        fields to use for fingerprinting in its own configuration.
+        Configure how alerts are correlated and deduplicated across the organization.
+        Alerts with matching fingerprint values will be grouped together.
+      </div>
+      <div class="text-body2 text-grey-6 tw-mt-2 tw-italic">
+        Note: Semantic field mappings are configured in the Service Identity tab.
       </div>
     </div>
 
@@ -54,14 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Allow different alerts to deduplicate each other when they share the same fingerprint
         </q-tooltip>
       </q-checkbox>
-    </div>
-
-    <!-- Semantic Field Groups Configuration -->
-    <div class="tw-mb-6" v-if="localConfig.enabled">
-      <SemanticFieldGroupsConfig
-        v-model:semantic-field-groups="localSemanticGroups"
-        @update:semantic-field-groups="handleSemanticGroupsUpdate"
-      />
     </div>
 
     <!-- Cross-Alert Fingerprint Groups -->
@@ -157,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw-px-4"
       />
     </div>
-  </q-card>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -165,7 +158,6 @@ import { ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
-import SemanticFieldGroupsConfig from "./SemanticFieldGroupsConfig.vue";
 import alertsService from "@/services/alerts";
 
 const store = useStore();
@@ -174,6 +166,7 @@ const $q = useQuasar();
 interface SemanticFieldGroup {
   id: string;
   display: string;
+  group?: string;
   fields: string[];
   normalize: boolean;
 }
@@ -184,6 +177,7 @@ interface OrganizationDeduplicationConfig {
   alert_dedup_enabled?: boolean;
   alert_fingerprint_groups?: string[];
   time_window_minutes?: number;
+  fqn_priority_dimensions?: string[];
 }
 
 interface Props {
@@ -208,16 +202,12 @@ const localConfig = ref<OrganizationDeduplicationConfig>({
   alert_fingerprint_groups: props.config?.alert_fingerprint_groups ?? [],
   time_window_minutes: props.config?.time_window_minutes ?? undefined,
   semantic_field_groups: props.config?.semantic_field_groups ?? [],
+  fqn_priority_dimensions: props.config?.fqn_priority_dimensions,
 });
 
 const localSemanticGroups = ref<SemanticFieldGroup[]>(
   props.config?.semantic_field_groups ?? [],
 );
-
-const handleSemanticGroupsUpdate = (groups: SemanticFieldGroup[]) => {
-  localConfig.value.semantic_field_groups = groups;
-  localSemanticGroups.value = groups;
-};
 
 const toggleFingerprintGroup = (groupId: string, checked: boolean) => {
   if (!localConfig.value.alert_fingerprint_groups) {
@@ -283,6 +273,7 @@ const saveSettings = async () => {
 const loadConfig = async () => {
   if (!props.config) {
     try {
+      // Try to get existing config
       const response = await alertsService.getOrganizationDeduplicationConfig(props.orgId);
       const config = response.data;
       console.log("Loaded dedup config:", config);
@@ -292,10 +283,32 @@ const loadConfig = async () => {
         alert_fingerprint_groups: config.alert_fingerprint_groups ?? [],
         time_window_minutes: config.time_window_minutes ?? undefined,
         semantic_field_groups: config.semantic_field_groups ?? [],
+        fqn_priority_dimensions: config.fqn_priority_dimensions,
       };
       localSemanticGroups.value = config.semantic_field_groups ?? [];
     } catch (error) {
-      console.log("No existing config, using defaults", error);
+      console.log("No existing config, loading default semantic groups from backend", error);
+
+      // Load default semantic groups from backend
+      try {
+        const semanticGroupsResponse = await alertsService.getSemanticGroups(props.orgId);
+        const defaultGroups = semanticGroupsResponse.data;
+        console.log(`Loaded ${defaultGroups.length} default semantic groups from backend`);
+
+        localConfig.value = {
+          enabled: true,
+          alert_dedup_enabled: true,
+          alert_fingerprint_groups: [],
+          time_window_minutes: undefined,
+          semantic_field_groups: defaultGroups,
+          fqn_priority_dimensions: undefined,
+        };
+        localSemanticGroups.value = defaultGroups;
+      } catch (semanticError) {
+        console.error("Failed to load default semantic groups:", semanticError);
+        // Fallback to empty
+        localSemanticGroups.value = [];
+      }
     }
   } else {
     console.log("Using config from props:", props.config);
@@ -317,6 +330,7 @@ watch(
         alert_fingerprint_groups: newVal.alert_fingerprint_groups ?? [],
         time_window_minutes: newVal.time_window_minutes ?? undefined,
         semantic_field_groups: newVal.semantic_field_groups ?? [],
+        fqn_priority_dimensions: newVal.fqn_priority_dimensions,
       };
       localSemanticGroups.value = newVal.semantic_field_groups ?? [];
       console.log("Updated localConfig:", localConfig.value);
@@ -328,7 +342,8 @@ watch(
 </script>
 
 <style scoped lang="scss">
-.q-card {
-  max-width: 1200px;
+.org-dedup-settings {
+  // Match parent card-container background
+  background: var(--o2-card-bg);
 }
 </style>

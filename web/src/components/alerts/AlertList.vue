@@ -88,15 +88,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-ml-sm o2-secondary-button tw-h-[36px]"
             no-caps
             flat
-            :label="t('settings.header')"
-            @click="showCorrelationDrawer = true"
-            data-test="correlation-settings-btn"
-            icon="settings"
-          />
-          <q-btn
-            class="q-ml-sm o2-secondary-button tw-h-[36px]"
-            no-caps
-            flat
             :label="t(`dashboard.import`)"
             @click="importAlert"
             data-test="alert-import"
@@ -382,6 +373,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   </q-item-section>
                                   <q-item-section>Export</q-item-section>
                                 </q-item>
+                                <q-separator />
+                                <q-item
+                                  class="flex items-center justify-center"
+                                  clickable
+                                  v-close-popup
+                                  @click="triggerAlert(props.row)"
+                                >
+                                  <q-item-section dense avatar>
+                                     <q-icon size="16px" :name="symOutlinedSoundSampler" />
+                                  </q-item-section>
+                                  <q-item-section>{{
+                                    t("alerts.triggerAlert")
+                                  }}</q-item-section>
+                                </q-item>
                               </q-list>
                             </q-menu>
                           </q-btn>
@@ -555,47 +560,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:templates="getTemplates"
       />
     </template>
-
-    <!-- Correlation Settings Drawer -->
-    <q-drawer
-      v-model="showCorrelationDrawer"
-      side="right"
-      :width="800"
-      bordered
-      overlay
-      behavior="mobile"
-      data-test="correlation-settings-drawer"
-    >
-      <div class="tw-h-full tw-flex tw-flex-col">
-        <!-- Drawer Header -->
-        <div class="tw-px-6 tw-py-4 tw-border-b tw-flex tw-items-center tw-justify-between">
-          <div class="tw-flex tw-items-center">
-            <q-icon name="group_work" size="24px" class="tw-mr-2" />
-            <h6 class="tw-text-lg tw-font-semibold tw-m-0">
-              {{ t('settings.alertCorrelation') }}
-            </h6>
-          </div>
-          <q-btn
-            flat
-            round
-            dense
-            icon="close"
-            @click="showCorrelationDrawer = false"
-            data-test="close-correlation-drawer"
-          />
-        </div>
-
-        <!-- Drawer Content -->
-        <div class="tw-flex-1 tw-overflow-y-auto">
-          <OrganizationDeduplicationSettings
-            :org-id="store.state.selectedOrganization.identifier"
-            :config="store.state.organizationSettings?.deduplication_config"
-            @saved="onCorrelationSettingsSaved"
-            @cancel="showCorrelationDrawer = false"
-          />
-        </div>
-      </div>
-    </q-drawer>
 
     <ConfirmDialog
       title="Delete Alert"
@@ -856,7 +820,6 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import ImportAlert from "@/components/alerts/ImportAlert.vue";
-import OrganizationDeduplicationSettings from "@/components/alerts/OrganizationDeduplicationSettings.vue";
 import DedupSummaryCards from "@/components/alerts/DedupSummaryCards.vue";
 import {
   getImageURL,
@@ -881,6 +844,7 @@ import { nextTick } from "vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
+import { symOutlinedSoundSampler } from "@quasar/extras/material-symbols-outlined";
 // import alertList from "./alerts";
 
 export default defineComponent({
@@ -893,7 +857,6 @@ export default defineComponent({
     NoData,
     ConfirmDialog,
     ImportAlert,
-    OrganizationDeduplicationSettings,
     DedupSummaryCards,
     FolderList,
     MoveAcrossFolders,
@@ -931,7 +894,6 @@ export default defineComponent({
     const showHistoryDrawer = ref(false);
     const selectedHistoryAlertId = ref("");
     const selectedHistoryAlertName = ref("");
-    const showCorrelationDrawer = ref(false);
 
     const { getStreams } = useStreams();
 
@@ -1021,7 +983,9 @@ export default defineComponent({
       selectedAlertDetails.value = props.row;
       showAlertDetailsDrawer.value = true;
       // Fetch history for this alert
-      fetchAlertHistory(props.row.alert_id);
+      if(config.isCloud == "false"){
+        fetchAlertHistory(props.row.alert_id);
+      }
     };
 
     // Handle ESC key and click outside to close drawer
@@ -1254,9 +1218,9 @@ export default defineComponent({
 
           // Fetch alert history data and aggregate by alert name
           try {
-            // Get history for last 30 days
+            // Get history for last 12 hours
             const endTime = Date.now() * 1000; // Convert to microseconds
-            const startTime = endTime - (30 * 24 * 60 * 60 * 1000000); // 30 days ago in microseconds
+            const startTime = endTime - (12 * 60 * 60 * 1000000); // 12 hours ago in microseconds
 
             const historyRes = await alertsService.getHistory(
               store?.state?.selectedOrganization?.identifier,
@@ -1308,66 +1272,27 @@ export default defineComponent({
           //localAllAlerts is the alerts that we use to store
           localAllAlerts = localAllAlerts.map((data: any) => {
             let conditions = "--";
-            //this is deprecated because we are using the new condition format
-            //the new format looks like this
-            //             {
-            //     "or": [
-            //         {
-            //             "column": "_timestamp",
-            //             "operator": "<=",
-            //             "value": "100",
-            //             "ignore_case": false
-            //         },
-            //         {
-            //             "column": "job",
-            //             "operator": "not_contains",
-            //             "value": "12",
-            //             "ignore_case": true
-            //         },
-            //         {
-            //             "or": [
-            //                 {
-            //                     "column": "job",
-            //                     "operator": "contains",
-            //                     "value": "1222",
-            //                     "ignore_case": true
-            //                 },
-            //                 {
-            //                     "column": "level",
-            //                     "operator": "not_contains",
-            //                     "value": "dsff",
-            //                     "ignore_case": true
-            //                 },
-            //                 {
-            //                     "or": [
-            //                         {
-            //                             "column": "job",
-            //                             "operator": "=",
-            //                             "value": "111",
-            //                             "ignore_case": true
-            //                         },
-            //                         {
-            //                             "column": "level",
-            //                             "operator": "contains",
-            //                             "value": "1222",
-            //                             "ignore_case": true
-            //                         }
-            //                     ]
-            //                 },
-            //                 {
-            //                     "column": "log",
-            //                     "operator": "!=",
-            //                     "value": "33",
-            //                     "ignore_case": true
-            //                 }
-            //             ]
-            //         }
-            //     ]
-            // }  
-            //converted into 
-            // (_timestamp <= '100' OR job not_contains '12' OR (job contains '1222' OR level not_contains 'dsff' OR (job = '111' OR level contains '1222') OR log != '33')) 
+
+            // Handle different condition formats based on structure
             if (Object.keys(data.condition).length && data.condition.type == 'custom') {
-              conditions = transformToExpression(data.condition.conditions)
+              const conditionData = data.condition.conditions;
+
+              // Detect format by structure, not by version field (more reliable)
+              if (conditionData?.filterType === 'group') {
+                // V2 format: {filterType: "group", logicalOperator: "AND", conditions: [...]}
+                // This works whether or not there's a version field
+                conditions = transformV2ToExpression(conditionData);
+              } else if (conditionData?.version === 2 && conditionData?.conditions) {
+                // V2 format with version wrapper: {version: 2, conditions: {filterType: "group", ...}}
+                conditions = transformV2ToExpression(conditionData.conditions);
+              } else if (conditionData?.or || conditionData?.and) {
+                // V1 format: {or: [...]} or {and: [...]}
+                conditions = transformToExpression(conditionData);
+              } else {
+                // V0 format (legacy query_condition) or other formats
+                // Try to display as-is if it's a string, otherwise show placeholder
+                conditions = typeof conditionData === 'string' ? conditionData : '--';
+              }
             } else if (data.condition.sql) {
               conditions = data.condition.sql;
             } else if (data.condition.promql) {
@@ -2061,12 +1986,6 @@ export default defineComponent({
       });
     };
 
-    const onCorrelationSettingsSaved = async () => {
-      // Reload organization settings to get updated dedup config
-      await store.dispatch("getDefaultOrganizationSettings");
-      showCorrelationDrawer.value = false;
-    };
-
     const exportAlert = async (row: any) => {
       // Find the alert based on uuid
       const alertToBeExported = await getAlertById(row.alert_id);
@@ -2103,6 +2022,29 @@ export default defineComponent({
         console.error("Alert not found for UUID:", row.uuid);
       }
     };
+
+    const triggerAlert = async (row: any) => {
+      try {
+        console.log(row,'row here')
+        await alertsService.trigger_alert(
+          store.state.selectedOrganization.identifier,
+          row.alert_id,
+          row.folder_name?.id
+        );
+        $q.notify({
+          type: "positive",
+          message: t("alerts.alertTriggeredSuccess"),
+          timeout: 2000,
+        });
+      } catch (error: any) {
+        $q.notify({
+          type: "negative",
+          message: error?.response?.data?.message || "Failed to trigger alert",
+          timeout: 2000,
+        });
+      }
+    };
+
     const updateActiveFolderId = async (newVal: any) => {
       //this is the condition we kept because when we we click on the any folder that is there in the the row when we do search across folders
       //at that time if it is the same folder it wont trigger the watch and it will show the alerts of the filtered only 
@@ -2343,6 +2285,7 @@ export default defineComponent({
       folderIdToBeCloned.value = folderId.value;
     };
 
+    // V1 format: {or: [...]} or {and: [...]}
     function transformToExpression(data: any, wrap = true): any {
         if (!data) return null;
 
@@ -2365,6 +2308,46 @@ export default defineComponent({
 
         const joined = parts.join(` ${label} `);
         return wrap ? `(${joined})` : joined;
+      }
+
+      // V2 format: {filterType: "group", logicalOperator: "AND", conditions: [...]}
+      function transformV2ToExpression(group: any, isRoot = true): string {
+        if (!group || !group.conditions || group.conditions.length === 0) {
+          return '';
+        }
+
+        const parts: string[] = [];
+
+        group.conditions.forEach((item: any, index: number) => {
+          if (item.filterType === 'group') {
+            // Nested group - recursively build expression
+            const nestedExpr = transformV2ToExpression(item, false);
+            if (nestedExpr) {
+              // Use parent group's logicalOperator for the operator before nested groups
+              if (index > 0) {
+                parts.push(`${group.logicalOperator} (${nestedExpr})`);
+              } else {
+                parts.push(`(${nestedExpr})`);
+              }
+            }
+          } else {
+            // Condition
+            const column = item.column || 'field';
+            const operator = item.operator || '=';
+            const value = typeof item.value === 'string' ? `'${item.value}'` : item.value;
+            const conditionStr = `${column} ${operator} ${value}`;
+
+            // Add operator before condition (except for first item)
+            if (index > 0 && item.logicalOperator) {
+              parts.push(`${item.logicalOperator} ${conditionStr}`);
+            } else {
+              parts.push(conditionStr);
+            }
+          }
+        });
+
+        const joined = parts.join(' ');
+        return isRoot ? `(${joined})` : joined;
       }
       //this function is used to filter the alerts by the local search not the global search
       //this will be used when the user is searching for the alerts in the same folder
@@ -2521,6 +2504,7 @@ export default defineComponent({
       goToAlertHistory,
       getTemplates,
       exportAlert,
+      triggerAlert,
       updateActiveFolderId,
       activeFolderId,
       editAlert,
@@ -2558,14 +2542,13 @@ export default defineComponent({
       showHistoryDrawer,
       selectedHistoryAlertId,
       selectedHistoryAlertName,
-      showCorrelationDrawer,
-      onCorrelationSettingsSaved,
       refreshImportedAlerts,
       folderIdToBeCloned,
       updateFolderIdToBeCloned,
       transformToExpression,
       filterAlertsByQuery,
       bulkToggleAlerts,
+      symOutlinedSoundSampler
     };
   },
 });

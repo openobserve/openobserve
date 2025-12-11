@@ -42,8 +42,12 @@ pub mod re_pattern_stream_map;
 pub mod reports;
 pub mod search_job;
 pub mod search_queue;
+pub mod service_streams;
+pub mod service_streams_dimensions;
+pub mod sessions;
 pub mod short_urls;
 pub mod system_prompts;
+pub mod system_settings;
 pub mod templates;
 pub mod timed_annotation_panels;
 pub mod timed_annotations;
@@ -52,6 +56,8 @@ pub mod users;
 pub async fn init() -> Result<(), anyhow::Error> {
     distinct_values::init().await?;
     short_urls::init().await?;
+    service_streams::init().await?;
+    service_streams_dimensions::init().await?;
     Ok(())
 }
 

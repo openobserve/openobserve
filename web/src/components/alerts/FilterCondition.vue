@@ -1,9 +1,39 @@
 <template>
-    <div class=" tw-flex tw-items-start tw-gap-2 tw-flex-no-wrap ">
-      <div class="tw-text-sm tw-w-[20px] tw-mr-2 tw-mt-2">
-        {{
-        index == 0 ? 'if' : computedLabel
-           }}
+    <div class=" tw-flex tw-items-start tw-gap-1 tw-flex-no-wrap ">
+      <!-- V2: Fixed-width left column for alignment -->
+      <!-- All conditions have the same width for the operator/label section -->
+      <div class="tw-flex tw-items-center tw-justify-center tw-mt-2 tw-min-w-[60px]">
+        <!-- First condition in root group: show "if" centered -->
+        <template v-if="index === 0 && depth === 0">
+          <span class="tw-text-sm">if</span>
+        </template>
+
+        <!-- First condition in nested groups: empty space for alignment -->
+        <template v-else-if="isFirstInGroup">
+          <!-- Empty space to maintain alignment -->
+        </template>
+
+        <!-- Other conditions: show operator + toggle button -->
+        <template v-else>
+          <span class="tw-text-sm tw-font-medium tw-min-w-[30px] tw-lowercase">
+            {{ computedLabel }}
+          </span>
+          <!-- Toggle AND/OR button after label -->
+          <q-btn
+            data-test="alert-conditions-toggle-operator-btn"
+            flat
+            dense
+            round
+            size="sm"
+            icon="restart_alt"
+            class="tw-h-[26px] tw-flex-shrink-0 operator-toggle-btn"
+            @click="toggleOperator"
+          >
+            <q-tooltip>
+              Toggle between and/or
+            </q-tooltip>
+          </q-btn>
+        </template>
       </div>
         <div
           data-test="alert-conditions-select-column"
@@ -28,6 +58,7 @@
             :rules="[(val: any) => !!val || 'Field is required!']"
             :class="inputWidth ? inputWidth : ''"
             @update:model-value="emits('input:update', 'conditions', condition)"
+            :new-value-mode="props.allowCustomColumns ? 'add-unique' : undefined"
           >
           <q-tooltip v-if="condition.column && store.state.isAiChatEnabled">
             {{ condition.column }}
@@ -112,6 +143,16 @@
         default: '',
         required: false,
     },
+    isFirstInGroup: {
+        type: Boolean,
+        default: false,
+        required: false,
+    },
+    allowCustomColumns: {
+        type: Boolean,
+        default: false,
+        required: false,
+    },
     });
 
 import { ref, computed } from "vue";
@@ -151,8 +192,25 @@ const addGroupApiHeader = (groupId: string) => {
 };
 
 const computedLabel = computed(() => {
+  // V2: First condition in any group should not show AND/OR operator
+  // Only subsequent conditions show the operator
+  if (props.isFirstInGroup) {
+    return '';  // No operator for first condition in group
+  }
+  // V2: Use condition's logicalOperator if available
+  if (props.condition.logicalOperator) {
+    return props.condition.logicalOperator;
+  }
   return props.label;
 });
+
+// Toggle operator between AND/OR for this condition
+const toggleOperator = () => {
+  if (props.condition.logicalOperator) {
+    props.condition.logicalOperator = props.condition.logicalOperator === 'AND' ? 'OR' : 'AND';
+    emits('input:update', 'conditions', props.condition);
+  }
+};
 
 const computedInputWidth = computed(() => {
   // If custom width is provided, use it; otherwise use default responsive width
@@ -180,6 +238,13 @@ const filterColumns = (val: string, update: Function) => {
 };
   </script>
 
-  <style >
+  <style scoped>
+.operator-toggle-btn {
+  color: var(--o2-primary-btn-bg) !important;
+}
+
+.operator-toggle-btn:hover {
+  background-color: rgba(var(--o2-primary-btn-bg-rgb), 0.1) !important;
+}
 </style>
   

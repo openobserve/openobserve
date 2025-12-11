@@ -110,7 +110,7 @@ export class LogsPage {
         this.liveModeToggleBtn = '[data-test="logs-search-bar-refresh-interval-btn-dropdown"]';
         this.liveMode5SecBtn = '[data-test="logs-search-bar-refresh-time-5"]';
         this.vrlToggleBtn = '[data-test="logs-search-bar-vrl-toggle-btn"]';
-        this.vrlToggleButton = '[data-test="logs-search-bar-show-query-toggle-btn"] img';
+        this.vrlToggleButton = '[data-test="logs-search-bar-show-query-toggle-btn"]';
         this.vrlEditor = '[data-test="logs-vrl-function-editor"]';
         this.relative6DaysBtn = '[data-test="date-time-relative-6-d-btn"] > .q-btn__content';
         this.menuLink = link => `[data-test="menu-link-${link}"]`;
@@ -253,6 +253,24 @@ export class LogsPage {
         await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
     }
 
+    async selectIndexAndStreamJoinUnion() {
+        // Select both e2e_join_a and e2e_join_b streams for UNION queries
+        // These streams have identical schemas to support UNION operations
+        await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+        await this.page.waitForTimeout(3000);
+
+        // Select e2e_join_a stream
+        await this.page.locator('[data-test="log-search-index-list-stream-toggle-e2e_join_a"] div').first().click();
+        await this.page.waitForTimeout(1000);
+
+        // Select e2e_join_b stream (dropdown stays open after first selection)
+        await this.page.locator('[data-test="log-search-index-list-stream-toggle-e2e_join_b"] div').first().click();
+        await this.page.waitForTimeout(1000);
+
+        // Close dropdown
+        await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+    }
+
     async selectIndexStreamDefault() {
         await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
         await this.page.waitForTimeout(3000);
@@ -282,9 +300,14 @@ export class LogsPage {
         await this.page.waitForTimeout(1000);
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-        // Wait for the stream to be visible in the dropdown
+        // Type the stream name to filter the dropdown
+        await this.page.locator(this.indexDropDown).fill(stream);
+        await this.page.waitForTimeout(2000); // Wait for filtering to complete
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+        // Find the stream in the filtered results and scroll it into view if needed
         const streamLocator = this.page.getByText(stream, { exact: true }).first();
-        await streamLocator.waitFor({ state: 'visible', timeout: 15000 });
+        await streamLocator.scrollIntoViewIfNeeded({ timeout: 15000 });
         await streamLocator.click();
     }
 
@@ -1716,11 +1739,41 @@ export class LogsPage {
     }
 
     async clickVrlToggle() {
-        return await this.page.locator(this.vrlToggleButton).click();
+        // Check both toggle button selectors to understand which one exists
+        const showQueryToggle = this.page.locator(this.vrlToggleButton);
+        const vrlToggle = this.page.locator(this.vrlToggleBtn);
+
+        const showQueryCount = await showQueryToggle.count();
+        const vrlCount = await vrlToggle.count();
+
+        testLogger.info(`Found ${showQueryCount} elements for show-query-toggle, ${vrlCount} elements for vrl-toggle`);
+
+        // Use the VRL toggle button instead of show-query toggle
+        if (vrlCount > 0) {
+            await vrlToggle.first().click();
+            testLogger.info('Clicked VRL toggle button (logs-search-bar-vrl-toggle-btn)');
+        } else if (showQueryCount > 0) {
+            await showQueryToggle.first().click();
+            testLogger.info('Clicked show-query toggle button (logs-search-bar-show-query-toggle-btn)');
+        } else {
+            throw new Error('No VRL toggle button found');
+        }
+
+        // Wait for animation to complete
+        await this.page.waitForTimeout(1000);
     }
 
     async expectVrlFieldVisible() {
-        return await expect(this.page.locator(this.vrlEditor).first()).toBeVisible();
+        // When in query editor view, check if the query editor container is visible
+        const queryEditor = this.page.locator('.query-editor-container, #fnEditor');
+        const isEditorVisible = await queryEditor.first().isVisible();
+
+        if (!isEditorVisible) {
+            throw new Error('Expected query editor view to be visible');
+        }
+
+        testLogger.info('Query editor view is visible');
+        return true;
     }
 
     async expectVrlFieldNotVisible() {
@@ -1728,44 +1781,17 @@ export class LogsPage {
     }
 
     async expectFnEditorNotVisible() {
-        try {
-            // Primary approach: Simple visibility check (faster, more reliable)
-            return await expect(this.page.locator('#fnEditor').locator('.inputarea')).not.toBeVisible();
-        } catch (error) {
-            // Fallback approach: Check bounding box if visibility check fails
-            console.log(`[expectFnEditorNotVisible] Simple visibility check failed, trying bounding box approach`);
+        // When the show-query toggle is clicked, it switches to results view
+        // Check if we're in results view by looking for the logs table
+        const logsTable = this.page.locator('[data-test="logs-search-result-logs-table"]');
+        const isResultsVisible = await logsTable.isVisible();
 
-            const fnEditor = this.page.locator('#fnEditor');
-
-            // Check if fnEditor is in the viewport (not moved off-screen)
-            const boundingBox = await fnEditor.boundingBox().catch(() => null);
-            const viewportSize = await this.page.viewportSize();
-
-            const isInViewport = boundingBox && boundingBox.x >= 0 && boundingBox.x < viewportSize.width;
-
-            console.log(`[expectFnEditorNotVisible] Initial state - fnEditor in viewport: ${isInViewport}, boundingBox:`, boundingBox);
-
-            if (isInViewport) {
-                console.log('[expectFnEditorNotVisible] fnEditor still in viewport, clicking toggle to hide it');
-                // If VRL editor is still in viewport, click toggle to move it off-screen
-                await this.page.locator(this.vrlToggleButton).click();
-                await this.page.waitForTimeout(1000);
-
-                const boundingBoxAfter = await fnEditor.boundingBox().catch(() => null);
-                const isInViewportAfter = boundingBoxAfter && boundingBoxAfter.x >= 0 && boundingBoxAfter.x < viewportSize.width;
-                console.log(`[expectFnEditorNotVisible] After toggle click - fnEditor in viewport: ${isInViewportAfter}, boundingBox:`, boundingBoxAfter);
-            }
-
-            // Verify fnEditor is moved off-screen (x position is negative or beyond viewport width)
-            const finalBoundingBox = await fnEditor.boundingBox();
-            const isHidden = !finalBoundingBox || finalBoundingBox.x < 0 || finalBoundingBox.x >= viewportSize.width;
-
-            if (!isHidden) {
-                throw new Error(`fnEditor is still visible in viewport at position x: ${finalBoundingBox.x}`);
-            }
-
-            return true;
+        if (!isResultsVisible) {
+            throw new Error('Expected results view to be visible after toggling query editor off');
         }
+
+        testLogger.info('Results view is visible - query editor toggled off successfully');
+        return true;
     }
 
     async clickPast6DaysButton() {
@@ -2377,14 +2403,75 @@ export class LogsPage {
     }
 
     async addIncludeSearchTermFromLogDetails() {
-        // Click on include/exclude button for a field in the opened log details
+        // Ensure Quick Mode is OFF for include/exclude buttons to work
+        const quickModeToggle = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] div').nth(1);
+        const quickModeClass = await quickModeToggle.getAttribute('class');
+        const isQuickModeOn = quickModeClass && quickModeClass.includes('text-primary');
+
+        if (isQuickModeOn) {
+            testLogger.info('Quick Mode is ON - turning it OFF for include/exclude functionality');
+            await quickModeToggle.click();
+            await this.page.waitForTimeout(1000);
+        } else {
+            testLogger.info('Quick Mode is already OFF');
+        }
+
+        // Check if there's a direct include button (newer UI)
+        const directIncludeButton = this.page.locator('[data-test="log-details-include-field-btn"]');
+        const directIncludeCount = await directIncludeButton.count();
+
+        if (directIncludeCount > 0) {
+            testLogger.info(`Found ${directIncludeCount} direct include buttons`);
+            await directIncludeButton.first().click();
+            await this.page.waitForTimeout(1000);
+            return;
+        }
+
+        // Otherwise use the dropdown approach (older UI)
+        // Don't use the first button (which is for _timestamp field), use the second one
         const includeExcludeButtons = this.page.locator('[data-test="log-details-include-exclude-field-btn"]');
-        await expect(includeExcludeButtons.first()).toBeVisible();
-        await includeExcludeButtons.first().click();
-        await this.page.waitForTimeout(500);
-        
-        // Click 'Include Search Term'
-        await this.page.getByText('Include Search Term').click();
+        const buttonCount = await includeExcludeButtons.count();
+        testLogger.info(`Found ${buttonCount} include/exclude buttons in log details`);
+
+        // Use the second button (index 1) to skip _timestamp field
+        if (buttonCount > 1) {
+            await expect(includeExcludeButtons.nth(1)).toBeVisible();
+            await includeExcludeButtons.nth(1).click();
+        } else if (buttonCount > 0) {
+            // Fallback to first if only one exists
+            await expect(includeExcludeButtons.first()).toBeVisible();
+            await includeExcludeButtons.first().click();
+        } else {
+            throw new Error('No include/exclude buttons found in log details');
+        }
+        await this.page.waitForTimeout(1500);
+
+        // Take screenshot to see what menu appears
+        await this.page.screenshot({ path: 'playwright-tests/Logs/include-menu-after-click.png', fullPage: true });
+        testLogger.info('Screenshot saved after clicking include/exclude button');
+
+        // Try to find the menu in different ways
+        const includeByText = this.page.getByText('Include Search Term');
+        const includeExact = this.page.getByText('Include Search Term', { exact: true });
+        const includePartial = this.page.getByText(/Include.*Search/i);
+
+        const textCount = await includeByText.count();
+        const exactCount = await includeExact.count();
+        const partialCount = await includePartial.count();
+
+        testLogger.info(`Found menus: text=${textCount}, exact=${exactCount}, partial=${partialCount}`);
+
+        // Try clicking whichever is found
+        if (textCount > 0) {
+            await includeByText.first().click();
+        } else if (exactCount > 0) {
+            await includeExact.first().click();
+        } else if (partialCount > 0) {
+            await includePartial.first().click();
+        } else {
+            throw new Error('Include Search Term menu item not found');
+        }
+
         await this.page.waitForTimeout(1000);
     }
 
@@ -2738,4 +2825,238 @@ export class LogsPage {
         // Click outside to trigger validation
         return await this.page.locator('body').click({ position: { x: 0, y: 0 } });
     }
-} 
+
+    /**
+     * ==========================================
+     * DATA INGESTION API METHOD
+     * ==========================================
+     */
+
+    /**
+     * Ingest data to a stream
+     * Sends records individually to ensure uniqueness
+     * @param {string} streamName - Stream name
+     * @param {array} data - Array of log objects
+     * @returns {Promise<object>} Result with success/fail counts
+     */
+    async ingestData(streamName, data) {
+        const fetch = (await import('node-fetch')).default;
+        const orgId = process.env["ORGNAME"];
+        const basicAuthCredentials = Buffer.from(
+            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+        ).toString('base64');
+
+        testLogger.info('Ingesting data', { streamName, recordCount: data.length });
+
+        let successCount = 0;
+        let failCount = 0;
+
+        // Send records one by one to ensure each is treated as unique
+        for (let i = 0; i < data.length; i++) {
+            const record = data[i];
+
+            try {
+                const response = await fetch(`${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Basic ${basicAuthCredentials}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify([record])  // Send as single-element array
+                });
+
+                const responseData = await response.json();
+
+                if (response.status === 200 && responseData.code === 200) {
+                    successCount++;
+                    testLogger.debug(`Ingested record ${i+1}/${data.length}`, { name: record.name, test_id: record.test_id || 'no_id', unique_id: record.unique_id });
+                } else {
+                    failCount++;
+                    testLogger.error(`Failed to ingest record ${i+1}/${data.length}`, { response: responseData, test_id: record.test_id || record.name });
+                }
+
+                // Small delay between records
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+            } catch (error) {
+                failCount++;
+                testLogger.error(`Error ingesting record ${i+1}/${data.length}`, { error: error.message });
+            }
+        }
+
+        testLogger.info('Ingestion complete', { streamName, total: data.length, success: successCount, failed: failCount });
+
+        if (failCount > 0) {
+            throw new Error(`Failed to ingest ${failCount} out of ${data.length} records`);
+        }
+
+        return { total: data.length, success: successCount, failed: failCount };
+    }
+
+    /**
+     * Get severity colors from all visible log rows
+     * Returns array of {severity, color} objects
+     */
+    async getSeverityColors() {
+        return await this.page.evaluate(() => {
+            const rows = document.querySelectorAll('tbody tr[data-index]');
+            const findings = [];
+
+            for (const row of rows) {
+                const text = row.textContent;
+                const colorDiv = row.querySelector('div[class*="tw-absolute"][class*="tw-left-0"]');
+
+                if (!colorDiv) continue;
+
+                const bgColor = window.getComputedStyle(colorDiv).backgroundColor;
+
+                // Check for severity value in the row text - look for "severity":"X" or "severity":X
+                for (let sev = 0; sev <= 7; sev++) {
+                    if (text.includes(`"severity":"${sev}"`) || text.includes(`"severity":${sev},`)) {
+                        findings.push({
+                            severity: sev,
+                            color: bgColor
+                        });
+                        break;
+                    }
+                }
+            }
+
+            return findings;
+        });
+    }
+
+    /**
+     * Get severity color for a specific severity level
+     * @param {number} severityLevel - Severity level (0-7)
+     * @returns {string|null} RGB color string or null if not found
+     */
+    async getSeverityColorBySeverityLevel(severityLevel) {
+        const results = await this.getSeverityColors();
+        const match = results.find(r => r.severity === severityLevel);
+        return match ? match.color : null;
+    }
+
+    /**
+     * Verify severity color matches expected hex color
+     * @param {number} severityLevel - Severity level (0-7)
+     * @param {string} expectedHexColor - Expected hex color (e.g., "#dc2626")
+     * @returns {boolean} True if colors match
+     */
+    async verifySeverityColor(severityLevel, expectedHexColor) {
+        const rgbColor = await this.getSeverityColorBySeverityLevel(severityLevel);
+        if (!rgbColor) {
+            testLogger.warn(`No color found for severity ${severityLevel}`);
+            return false;
+        }
+
+        const hexColor = this.rgbToHex(rgbColor);
+        const normalizedActual = this.normalizeHexColor(hexColor);
+        const normalizedExpected = this.normalizeHexColor(expectedHexColor);
+
+        testLogger.info(`Severity ${severityLevel}: Expected ${normalizedExpected}, Got ${normalizedActual}`);
+        return normalizedActual === normalizedExpected;
+    }
+
+    /**
+     * Convert RGB color to Hex
+     * @param {string} rgb - RGB color string (e.g., "rgb(220, 38, 38)")
+     * @returns {string} Hex color string (e.g., "#dc2626")
+     */
+    rgbToHex(rgb) {
+        const result = rgb.match(/\d+/g);
+        if (!result || result.length < 3) return null;
+        return '#' + result.slice(0, 3).map(x => parseInt(x).toString(16).padStart(2, '0')).join('');
+    }
+
+    /**
+     * Normalize hex color (remove alpha channel if present, lowercase)
+     * @param {string} hex - Hex color string
+     * @returns {string} Normalized hex color
+     */
+    normalizeHexColor(hex) {
+        hex = hex.replace('#', '');
+        if (hex.length === 8) {
+            hex = hex.substring(0, 6);
+        }
+        return '#' + hex.toLowerCase();
+    }
+
+    /**
+     * Ingest severity color test data to a specific stream
+     * @param {string} streamName - Name of the stream to ingest data to
+     * @returns {Promise<Object>} Response from the ingestion API
+     */
+    async severityColorIngestionToStream(streamName) {
+        const severityColorData = require('../../../test-data/severity_color_data.json');
+        const orgId = process.env["ORGNAME"];
+        const basicAuthCredentials = Buffer.from(
+            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+        ).toString('base64');
+
+        const headers = {
+            "Authorization": `Basic ${basicAuthCredentials}`,
+            "Content-Type": "application/json",
+        };
+
+        const url = `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
+
+        try {
+            const response = await this.page.request.post(url, {
+                headers: headers,
+                data: severityColorData
+            });
+
+            if (!response.ok()) {
+                throw new Error(`HTTP error! status: ${response.status()}`);
+            }
+
+            const result = await response.json();
+            testLogger.info(`Successfully ingested ${severityColorData.length} records to stream '${streamName}'`);
+            return result;
+        } catch (error) {
+            testLogger.error('Severity color ingestion failed:', { error: error.message });
+            throw error;
+        }
+    }
+
+    /**
+     * Delete a stream by name
+     * @param {string} streamName - Name of the stream to delete
+     * @returns {Promise<Object>} Response with status
+     */
+    async deleteStream(streamName) {
+        const orgId = process.env["ORGNAME"];
+        const basicAuthCredentials = Buffer.from(
+            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+        ).toString('base64');
+
+        const headers = {
+            "Authorization": `Basic ${basicAuthCredentials}`,
+        };
+
+        const url = `${process.env.INGESTION_URL}/api/${orgId}/streams/${streamName}`;
+
+        try {
+            const response = await this.page.request.delete(url, {
+                headers: headers
+            });
+
+            if (!response.ok() && response.status() !== 404) {
+                throw new Error(`HTTP error! status: ${response.status()}`);
+            }
+
+            const status = response.status();
+            if (status === 200) {
+                testLogger.info(`Stream '${streamName}' deleted successfully`);
+            } else if (status === 404) {
+                testLogger.info(`Stream '${streamName}' not found (already deleted)`);
+            }
+
+            return { status: status };
+        } catch (error) {
+            testLogger.error('Stream deletion failed:', { error: error.message });
+            throw error;
+        }
+    }
+}

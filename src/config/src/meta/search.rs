@@ -1344,7 +1344,7 @@ const AGGREGATION_CACHE_INTERVALS: [(Option<Duration>, Interval); 6] = [
     (Duration::try_minutes(15), Interval::FiveMinutes),
 ];
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub enum Interval {
     Zero = 0,
     FiveMinutes = 5,

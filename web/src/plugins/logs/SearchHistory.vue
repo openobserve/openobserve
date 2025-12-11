@@ -23,9 +23,9 @@
       </div>
       <div class="tw-flex tw-items-center q-pr-md">
         <div>
-          <q-toggle 
-            v-model="wrapText" 
-            label="Wrap Text" 
+          <q-toggle
+            v-model="wrapText"
+            :label="t('search_history.wrapText')"
             class="o2-toggle-button-xs q-mr-md"
             size="xs"
             flat
@@ -38,7 +38,7 @@
         <div class="warning-text flex items-center q-px-sm q-mr-md tw-h-[36px] tw-rounded-md">
           <q-icon name="info" class="q-mr-xs" size="16px" />
           <div>
-            Search History might be delayed by <b> {{ delayMessage }}</b>
+            {{ t('search_history.delayMessage') }} <b>{{ delayMessage }}</b>
           </div>
         </div>
         <div style="height: 36px;"

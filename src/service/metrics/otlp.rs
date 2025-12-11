@@ -193,22 +193,22 @@ pub async fn handle_otlp_request(
         }
         for scope_metric in &resource_metric.scope_metrics {
             for metric in &scope_metric.metrics {
-                let metric_name = &format_stream_name(&metric.name);
+                let metric_name = format_stream_name(metric.name.to_string());
                 // check for schema
                 let schema_exists = stream_schema_exists(
                     org_id,
-                    metric_name,
+                    &metric_name,
                     StreamType::Metrics,
                     &mut metric_schema_map,
                 )
                 .await;
 
                 // get partition keys
-                if !stream_partitioning_map.contains_key(metric_name) {
+                if !stream_partitioning_map.contains_key(&metric_name) {
                     let partition_det = crate::service::ingestion::get_stream_partition_keys(
                         org_id,
                         &StreamType::Metrics,
-                        metric_name,
+                        &metric_name,
                     )
                     .await;
                     stream_partitioning_map
@@ -228,11 +228,11 @@ pub async fn handle_otlp_request(
                 // End get stream alert
 
                 // get stream pipeline
-                if !stream_executable_pipelines.contains_key(metric_name) {
+                if !stream_executable_pipelines.contains_key(&metric_name) {
                     let pipeline_params =
                         crate::service::ingestion::get_stream_executable_pipeline(
                             org_id,
-                            metric_name,
+                            &metric_name,
                             &StreamType::Metrics,
                         )
                         .await;
@@ -303,7 +303,7 @@ pub async fn handle_otlp_request(
                     if !prom_meta.contains_key(METADATA_LABEL) {
                         prom_meta.insert(
                             METADATA_LABEL.to_string(),
-                            json::to_string(&Metadata::new(metric_name)).unwrap(),
+                            json::to_string(&Metadata::new(&metric_name)).unwrap(),
                         );
                     }
                     log::info!(
@@ -311,7 +311,7 @@ pub async fn handle_otlp_request(
                     );
                     if let Err(e) = db::schema::update_setting(
                         org_id,
-                        metric_name,
+                        &metric_name,
                         StreamType::Metrics,
                         prom_meta,
                     )
@@ -328,30 +328,31 @@ pub async fn handle_otlp_request(
                     // flattening
                     rec = flatten::flatten(rec)?;
 
-                    let local_metric_name =
-                        &format_stream_name(rec.get(NAME_LABEL).unwrap().as_str().unwrap());
+                    let local_metric_name = format_stream_name(
+                        rec.get(NAME_LABEL).unwrap().as_str().unwrap().to_string(),
+                    );
 
                     if local_metric_name != metric_name {
                         // check for schema
                         stream_schema_exists(
                             org_id,
-                            local_metric_name,
+                            &local_metric_name,
                             StreamType::Metrics,
                             &mut metric_schema_map,
                         )
                         .await;
 
                         // get partition keys
-                        if !stream_partitioning_map.contains_key(local_metric_name) {
+                        if !stream_partitioning_map.contains_key(&local_metric_name) {
                             let partition_det =
                                 crate::service::ingestion::get_stream_partition_keys(
                                     org_id,
                                     &StreamType::Metrics,
-                                    local_metric_name,
+                                    &local_metric_name,
                                 )
                                 .await;
                             stream_partitioning_map
-                                .insert(local_metric_name.to_owned(), partition_det.clone());
+                                .insert(local_metric_name.clone(), partition_det.clone());
                         }
 
                         // Start get stream alerts
@@ -367,11 +368,11 @@ pub async fn handle_otlp_request(
                         // End get stream alert
 
                         // get stream pipeline
-                        if !stream_executable_pipelines.contains_key(local_metric_name) {
+                        if !stream_executable_pipelines.contains_key(&local_metric_name) {
                             let pipeline_params =
                                 crate::service::ingestion::get_stream_executable_pipeline(
                                     org_id,
-                                    local_metric_name,
+                                    &local_metric_name,
                                     &StreamType::Metrics,
                                 )
                                 .await;
@@ -396,12 +397,12 @@ pub async fn handle_otlp_request(
 
                     // ready to be buffered for downstream processing
                     if stream_executable_pipelines
-                        .get(local_metric_name)
+                        .get(&local_metric_name)
                         .unwrap()
                         .is_some()
                     {
                         stream_pipeline_inputs
-                            .entry(local_metric_name.to_string())
+                            .entry(local_metric_name.clone())
                             .or_default()
                             .push(rec);
                     } else {
@@ -411,14 +412,13 @@ pub async fn handle_otlp_request(
                             _ => unreachable!(),
                         };
 
-                        if let Some(Some(fields)) =
-                            user_defined_schema_map.get(local_metric_name.as_str())
+                        if let Some(Some(fields)) = user_defined_schema_map.get(&local_metric_name)
                         {
                             local_val = crate::service::ingestion::refactor_map(local_val, fields);
                         }
 
                         json_data_by_stream
-                            .entry(local_metric_name.to_string())
+                            .entry(local_metric_name.clone())
                             .or_default()
                             .push(local_val);
                     }

@@ -24,38 +24,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Preset Templates -->
+    <!-- Category Filter -->
     <div class="row q-col-gutter-md q-mb-md">
-      <div class="col-12 col-md-6">
+      <div class="col-12 col-md-4">
         <q-select
-          v-model="selectedPreset"
-          :options="presetOptions"
-          label="Load Preset Template"
-          hint="Quick start with common field groups"
+          v-model="selectedCategory"
+          :options="categoryOptions"
+          label="Category"
+          hint="Filter groups by category"
           dense
-          filled
-          color="input-border"
-          bg-color="input-bg"
+          borderless
+          stack-label
+          class="showLabelOnTop"
           emit-value
           map-options
-          clearable
-          @update:model-value="loadPreset"
           style="max-width: 100%"
         >
-          <template v-slot:selected>
-            <div
-              class="ellipsis"
-              style="max-width: 100%; overflow: hidden; text-overflow: ellipsis"
-            >
-              {{
-                presetOptions.find((p) => p.value === selectedPreset)?.label ||
-                "Select preset"
-              }}
-            </div>
+          <template v-slot:option="scope">
+            <q-item v-bind="scope.itemProps">
+              <q-item-section>
+                <q-item-label>{{ scope.opt.label }}</q-item-label>
+                <q-item-label caption>{{ scope.opt.count }} groups</q-item-label>
+              </q-item-section>
+            </q-item>
           </template>
         </q-select>
       </div>
-      <div class="col-12 col-md-6 flex items-center">
+      <div class="col-12 col-md-8 flex items-center justify-end q-gutter-sm">
+        <q-btn
+          outline
+          color="primary"
+          label="Import from JSON"
+          icon="upload_file"
+          size="sm"
+          @click="navigateToImport"
+        />
         <q-btn
           color="primary"
           label="Add Custom Group"
@@ -66,22 +69,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Semantic Groups List -->
-    <div v-if="localGroups.length > 0" class="groups-list q-mb-md">
+    <!-- Filtered Semantic Groups List -->
+    <div v-if="filteredGroups.length > 0" class="groups-list q-mb-md">
       <SemanticGroupItem
-        v-for="(group, index) in localGroups"
+        v-for="(group, index) in filteredGroups"
         :key="`${group.id}-${index}`"
         :group="group"
-        @update="updateGroup(index, $event)"
-        @delete="removeGroup(index)"
+        @update="updateGroupByFilter(index, $event)"
+        @delete="removeGroupByFilter(index)"
       />
     </div>
     <div v-else class="text-center q-pa-lg text-grey-7">
-      <q-icon name="info" size="md"
-class="q-mb-sm" />
+      <q-icon name="info" size="md" class="q-mb-sm" />
       <div>
-        No semantic groups defined. Add a group or load a preset template.
+        No semantic groups in this category. Select a different category or add a custom group.
       </div>
+    </div>
+
+    <!-- Total groups indicator -->
+    <div v-if="localGroups.length > 0" class="text-caption text-grey-6 q-mt-sm">
+      Showing {{ filteredGroups.length }} of {{ localGroups.length }} total groups
     </div>
 
     <!-- Fingerprint Fields Selection (only for per-alert, not org-level) -->
@@ -119,15 +126,23 @@ class="q-mb-sm" />
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onMounted, nextTick } from "vue";
+import { useRouter } from "vue-router";
 import SemanticGroupItem from "./SemanticGroupItem.vue";
+
+const router = useRouter();
 
 interface SemanticGroup {
   id: string;
   display: string;
+  group?: string;
   fields: string[];
   normalize: boolean;
 }
+
+// Reserved IDs that should not be used as semantic groups
+// service-fqn is the OUTPUT of correlation, not an input dimension
+const RESERVED_GROUP_IDS = ['service-fqn', 'servicefqn', 'fqn'];
 
 interface Props {
   semanticFieldGroups?: SemanticGroup[];
@@ -146,15 +161,27 @@ const emit = defineEmits<{
   (e: "update:fingerprintFields", fields: string[]): void;
 }>();
 
-const localGroups = ref<SemanticGroup[]>([...props.semanticFieldGroups]);
+// Filter out reserved IDs like service-fqn (it's the output, not an input)
+const localGroups = ref<SemanticGroup[]>(
+  props.semanticFieldGroups.filter(g => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()))
+);
 const localFingerprintFields = ref<string[]>([...props.fingerprintFields]);
-const selectedPreset = ref<string | null>(null);
+const selectedCategory = ref<string | null>(null);
 
-// Watch for external changes
+// Watch for external changes and auto-select first category
 watch(
   () => props.semanticFieldGroups,
   (newGroups) => {
-    localGroups.value = [...newGroups];
+    // Filter out reserved IDs like service-fqn (it's the output, not an input)
+    localGroups.value = newGroups.filter(g => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()));
+    // Auto-select first category if none selected
+    if (!selectedCategory.value && localGroups.value.length > 0) {
+      nextTick(() => {
+        if (categoryOptions.value.length > 0) {
+          selectedCategory.value = categoryOptions.value[0].value;
+        }
+      });
+    }
   },
   { deep: true },
 );
@@ -166,14 +193,39 @@ watch(
   },
 );
 
-// Preset options
-const presetOptions = [
-  { label: "Common", value: "common" },
-  { label: "Kubernetes", value: "kubernetes" },
-  { label: "AWS", value: "aws" },
-  { label: "GCP", value: "gcp" },
-  { label: "Azure", value: "azure" },
-];
+// Build category options from localGroups (the actual data)
+const categoryOptions = computed(() => {
+  if (localGroups.value.length === 0) {
+    return [];
+  }
+
+  // Group semantic groups by their 'group' field
+  const groupsMap = new Map<string, number>();
+
+  for (const group of localGroups.value) {
+    const category = group.group || "Other";
+    groupsMap.set(category, (groupsMap.get(category) || 0) + 1);
+  }
+
+  // Convert to options, sorted by category name
+  return Array.from(groupsMap.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([category, count]) => ({
+      label: category,
+      value: category,
+      count: count,
+    }));
+});
+
+// Filter groups by selected category
+const filteredGroups = computed(() => {
+  if (!selectedCategory.value) {
+    return localGroups.value;
+  }
+  return localGroups.value.filter(
+    group => (group.group || "Other") === selectedCategory.value
+  );
+});
 
 // Group ID options for fingerprint selection
 const groupIdOptions = computed(() => {
@@ -183,159 +235,12 @@ const groupIdOptions = computed(() => {
   }));
 });
 
-// Preset templates
-const presets: Record<
-  string,
-  { groups: SemanticGroup[]; fingerprint: string[] }
-> = {
-  common: {
-    groups: [
-      {
-        id: "host",
-        display: "Host",
-        fields: ["host", "hostname", "node", "server"],
-        normalize: true,
-      },
-      {
-        id: "service",
-        display: "Service",
-        fields: ["service", "service_name", "application", "app"],
-        normalize: true,
-      },
-      {
-        id: "environment",
-        display: "Environment",
-        fields: ["environment", "env", "stage"],
-        normalize: true,
-      },
-      {
-        id: "ip-address",
-        display: "IP Address",
-        fields: ["ip", "ip_address", "ipaddr", "client_ip"],
-        normalize: false,
-      },
-    ],
-    fingerprint: ["service", "host"],
-  },
-  kubernetes: {
-    groups: [
-      {
-        id: "k8s-cluster",
-        display: "K8s Cluster",
-        fields: ["cluster", "k8s_cluster", "kubernetes_cluster"],
-        normalize: true,
-      },
-      {
-        id: "k8s-namespace",
-        display: "K8s Namespace",
-        fields: ["namespace", "k8s_namespace", "kubernetes_namespace"],
-        normalize: true,
-      },
-      {
-        id: "k8s-pod",
-        display: "K8s Pod",
-        fields: ["pod", "pod_name", "k8s_pod"],
-        normalize: true,
-      },
-      {
-        id: "k8s-container",
-        display: "K8s Container",
-        fields: ["container", "container_name", "k8s_container"],
-        normalize: true,
-      },
-    ],
-    fingerprint: ["k8s-cluster", "k8s-namespace", "k8s-pod"],
-  },
-  aws: {
-    groups: [
-      {
-        id: "aws-account",
-        display: "AWS Account",
-        fields: ["account_id", "aws_account", "account"],
-        normalize: false,
-      },
-      {
-        id: "aws-region",
-        display: "AWS Region",
-        fields: ["region", "aws_region"],
-        normalize: true,
-      },
-      {
-        id: "aws-service",
-        display: "AWS Service",
-        fields: ["service", "aws_service", "service_name"],
-        normalize: true,
-      },
-    ],
-    fingerprint: ["aws-account", "aws-region", "aws-service"],
-  },
-  gcp: {
-    groups: [
-      {
-        id: "gcp-project",
-        display: "GCP Project",
-        fields: ["project_id", "gcp_project", "project"],
-        normalize: false,
-      },
-      {
-        id: "gcp-zone",
-        display: "GCP Zone",
-        fields: ["zone", "gcp_zone", "availability_zone"],
-        normalize: true,
-      },
-      {
-        id: "gcp-service",
-        display: "GCP Service",
-        fields: ["service", "gcp_service", "service_name"],
-        normalize: true,
-      },
-    ],
-    fingerprint: ["gcp-project", "gcp-zone", "gcp-service"],
-  },
-  azure: {
-    groups: [
-      {
-        id: "azure-subscription",
-        display: "Azure Subscription",
-        fields: ["subscription_id", "azure_subscription"],
-        normalize: false,
-      },
-      {
-        id: "azure-resource-group",
-        display: "Azure Resource Group",
-        fields: ["resource_group", "azure_resource_group", "rg"],
-        normalize: true,
-      },
-      {
-        id: "azure-service",
-        display: "Azure Service",
-        fields: ["service", "azure_service", "service_name"],
-        normalize: true,
-      },
-    ],
-    fingerprint: [
-      "azure-subscription",
-      "azure-resource-group",
-      "azure-service",
-    ],
-  },
-};
-
-const loadPreset = (presetKey: string | null) => {
-  if (!presetKey) return;
-
-  const preset = presets[presetKey];
-  if (preset) {
-    localGroups.value = [...preset.groups];
-    localFingerprintFields.value = [...preset.fingerprint];
-    emitUpdate();
-  }
-};
-
+// Add a new custom group (assign to current category if selected)
 const addGroup = () => {
   const newGroup: SemanticGroup = {
     id: "",
     display: "",
+    group: selectedCategory.value || "Other",
     fields: [],
     normalize: true,
   };
@@ -343,27 +248,52 @@ const addGroup = () => {
   emitUpdate();
 };
 
-const updateGroup = (index: number, updatedGroup: SemanticGroup) => {
-  localGroups.value[index] = updatedGroup;
-  emitUpdate();
+// Update group by filtered index - find actual index in localGroups
+const updateGroupByFilter = (filteredIndex: number, updatedGroup: SemanticGroup) => {
+  const group = filteredGroups.value[filteredIndex];
+  const actualIndex = localGroups.value.findIndex(g => g.id === group.id && g.display === group.display);
+  if (actualIndex !== -1) {
+    localGroups.value[actualIndex] = updatedGroup;
+    emitUpdate();
+  }
 };
 
-const removeGroup = (index: number) => {
-  const removedId = localGroups.value[index].id;
-  localGroups.value.splice(index, 1);
+// Remove group by filtered index - find actual index in localGroups
+const removeGroupByFilter = (filteredIndex: number) => {
+  const group = filteredGroups.value[filteredIndex];
+  const actualIndex = localGroups.value.findIndex(g => g.id === group.id && g.display === group.display);
+  if (actualIndex !== -1) {
+    const removedId = localGroups.value[actualIndex].id;
+    localGroups.value.splice(actualIndex, 1);
 
-  // Remove from fingerprint fields if present
-  localFingerprintFields.value = localFingerprintFields.value.filter(
-    (id) => id !== removedId,
-  );
+    // Remove from fingerprint fields if present
+    localFingerprintFields.value = localFingerprintFields.value.filter(
+      (id) => id !== removedId,
+    );
 
-  emitUpdate();
+    emitUpdate();
+  }
+};
+
+const navigateToImport = () => {
+  router.push({
+    name: "importSemanticGroups",
+  });
 };
 
 const emitUpdate = () => {
   emit("update:semanticFieldGroups", [...localGroups.value]);
   emit("update:fingerprintFields", [...localFingerprintFields.value]);
 };
+
+// Auto-select first category on mount
+onMounted(() => {
+  nextTick(() => {
+    if (categoryOptions.value.length > 0 && !selectedCategory.value) {
+      selectedCategory.value = categoryOptions.value[0].value;
+    }
+  });
+});
 </script>
 
 <style lang="scss" scoped>

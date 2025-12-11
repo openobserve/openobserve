@@ -36,14 +36,16 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
   const defaultProps = {
     group: {
       groupId: 'test-group-1',
-      label: 'and',
-      items: [
+      filterType: 'group',
+      logicalOperator: 'AND',
+      conditions: [
         {
           id: 'item-1',
+          filterType: 'condition',
           column: 'field1',
           operator: '=',
           value: 'test',
-          ignore_case: true,
+          logicalOperator: 'AND',
         }
       ],
     },
@@ -100,8 +102,9 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         ...defaultProps,
         group: {
           groupId: 'empty-group',
-          label: 'or',
-          items: [],
+          filterType: 'group',
+          logicalOperator: 'OR',
+          conditions: [],
         }
       };
 
@@ -118,7 +121,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         },
       });
 
-      expect(wrapper.vm.groups.items).toHaveLength(0);
+      expect(wrapper.vm.groups.conditions).toHaveLength(0);
     });
   });
 
@@ -248,16 +251,16 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         },
       });
 
-      const initialLength = wrapper.vm.groups.items.length;
+      const initialLength = wrapper.vm.groups.conditions.length;
       wrapper.vm.addCondition('test-group');
 
-      expect(wrapper.vm.groups.items).toHaveLength(initialLength + 1);
-      
-      const newCondition = wrapper.vm.groups.items[wrapper.vm.groups.items.length - 1];
+      expect(wrapper.vm.groups.conditions).toHaveLength(initialLength + 1);
+
+      const newCondition = wrapper.vm.groups.conditions[wrapper.vm.groups.conditions.length - 1];
       expect(newCondition.column).toBe('');
       expect(newCondition.operator).toBe('=');
       expect(newCondition.value).toBe('');
-      expect(newCondition.ignore_case).toBe(true);
+      expect(newCondition.ignore_case).toBeUndefined(); // No longer added to conditions
       expect(newCondition.id).toBe('mock-uuid-123');
     });
 
@@ -295,11 +298,11 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         },
       });
 
-      const initialLength = wrapper.vm.groups.items.length;
+      const initialLength = wrapper.vm.groups.conditions.length;
       wrapper.vm.addCondition('test-group');
       wrapper.vm.addCondition('test-group');
 
-      expect(wrapper.vm.groups.items).toHaveLength(initialLength + 2);
+      expect(wrapper.vm.groups.conditions).toHaveLength(initialLength + 2);
     });
   });
 
@@ -318,22 +321,25 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         },
       });
 
-      const initialLength = wrapper.vm.groups.items.length;
+      const initialLength = wrapper.vm.groups.conditions.length;
       wrapper.vm.addGroup('test-group');
 
-      expect(wrapper.vm.groups.items).toHaveLength(initialLength + 1);
+      expect(wrapper.vm.groups.conditions).toHaveLength(initialLength + 1);
       
-      const newGroup = wrapper.vm.groups.items[wrapper.vm.groups.items.length - 1];
+      const newGroup = wrapper.vm.groups.conditions[wrapper.vm.groups.conditions.length - 1];
       expect(newGroup.groupId).toBe('mock-uuid-123');
-      expect(newGroup.label).toBe('or');
-      expect(newGroup.items).toHaveLength(1);
-      
+      expect(newGroup.filterType).toBe('group');
+      expect(newGroup.logicalOperator).toBe('OR');
+      expect(newGroup.conditions).toHaveLength(1);
+
       // Check the default condition in the new group
-      const defaultCondition = newGroup.items[0];
+      const defaultCondition = newGroup.conditions[0];
+      expect(defaultCondition.filterType).toBe('condition');
       expect(defaultCondition.column).toBe('');
       expect(defaultCondition.operator).toBe('=');
       expect(defaultCondition.value).toBe('');
-      expect(defaultCondition.ignore_case).toBe(true);
+      expect(defaultCondition.logicalOperator).toBe('OR');
+      expect(defaultCondition.ignore_case).toBeUndefined(); // No longer added to conditions
     });
 
     it('should emit add-group event', () => {
@@ -371,19 +377,19 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       });
 
       wrapper.vm.addGroup('test-group');
-      const newGroup = wrapper.vm.groups.items[wrapper.vm.groups.items.length - 1];
-      
+      const newGroup = wrapper.vm.groups.conditions[wrapper.vm.groups.conditions.length - 1];
+
       expect(wrapper.vm.isGroup(newGroup)).toBe(true);
-      expect(newGroup.items[0].id).toBe('mock-uuid-123');
+      expect(newGroup.conditions[0].id).toBe('mock-uuid-123');
     });
   });
 
   describe('toggleLabel Function', () => {
-    it('should toggle from and to or', () => {
+    it('should toggle from AND to OR', () => {
       const wrapper = mount(FilterGroup, {
         props: {
           ...defaultProps,
-          group: { ...defaultProps.group, label: 'and' }
+          group: { ...defaultProps.group, logicalOperator: 'AND' }
         },
         global: {
           plugins: [Quasar, mockI18n],
@@ -396,16 +402,16 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         },
       });
 
-      expect(wrapper.vm.groups.label).toBe('and');
+      expect(wrapper.vm.groups.logicalOperator).toBe('AND');
       wrapper.vm.toggleLabel();
-      expect(wrapper.vm.groups.label).toBe('or');
+      expect(wrapper.vm.groups.logicalOperator).toBe('OR');
     });
 
-    it('should toggle from or to and', () => {
+    it('should toggle from OR to AND', () => {
       const wrapper = mount(FilterGroup, {
         props: {
           ...defaultProps,
-          group: { ...defaultProps.group, label: 'or' }
+          group: { ...defaultProps.group, logicalOperator: 'OR' }
         },
         global: {
           plugins: [Quasar, mockI18n],
@@ -418,9 +424,9 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         },
       });
 
-      expect(wrapper.vm.groups.label).toBe('or');
+      expect(wrapper.vm.groups.logicalOperator).toBe('OR');
       wrapper.vm.toggleLabel();
-      expect(wrapper.vm.groups.label).toBe('and');
+      expect(wrapper.vm.groups.logicalOperator).toBe('AND');
     });
 
     it('should emit add-group event when toggling', () => {
@@ -463,7 +469,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       expect(wrapper.emitted('input:update')?.[0]).toEqual(['conditions', wrapper.vm.groups]);
     });
 
-    it('should update label ref when toggling', () => {
+    it('should update logicalOperator ref when toggling', () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
@@ -477,9 +483,9 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         },
       });
 
-      const originalLabel = wrapper.vm.groups.label;
+      const originalOperator = wrapper.vm.groups.logicalOperator;
       wrapper.vm.toggleLabel();
-      expect(wrapper.vm.groups.label).not.toBe(originalLabel);
+      expect(wrapper.vm.groups.logicalOperator).not.toBe(originalOperator);
     });
   });
 
@@ -488,12 +494,18 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const multiItemProps = {
         ...defaultProps,
         group: {
+
           groupId: 'test-group',
-          label: 'and',
-          items: [
+
+          filterType: 'group',
+
+          logicalOperator: 'AND',
+
+          conditions: [
             { id: 'item-1', column: 'field1', operator: '=', value: 'test1' },
             { id: 'item-2', column: 'field2', operator: '=', value: 'test2' },
-          ]
+          ],
+
         }
       };
 
@@ -510,22 +522,28 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         },
       });
 
-      expect(wrapper.vm.groups.items).toHaveLength(2);
+      expect(wrapper.vm.groups.conditions).toHaveLength(2);
       wrapper.vm.removeCondition('item-1');
-      expect(wrapper.vm.groups.items).toHaveLength(1);
-      expect(wrapper.vm.groups.items[0].id).toBe('item-2');
+      expect(wrapper.vm.groups.conditions).toHaveLength(1);
+      expect(wrapper.vm.groups.conditions[0].id).toBe('item-2');
     });
 
     it('should emit add-group when removing non-last condition', () => {
       const multiItemProps = {
         ...defaultProps,
         group: {
+
           groupId: 'test-group',
-          label: 'and',
-          items: [
+
+          filterType: 'group',
+
+          logicalOperator: 'AND',
+
+          conditions: [
             { id: 'item-1', column: 'field1', operator: '=', value: 'test1' },
             { id: 'item-2', column: 'field2', operator: '=', value: 'test2' },
-          ]
+          ],
+
         }
       };
 
@@ -551,11 +569,17 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const singleItemProps = {
         ...defaultProps,
         group: {
+
           groupId: 'test-group',
-          label: 'and',
-          items: [
+
+          filterType: 'group',
+
+          logicalOperator: 'AND',
+
+          conditions: [
             { id: 'only-item', column: 'field1', operator: '=', value: 'test' }
-          ]
+          ],
+
         }
       };
 
@@ -592,10 +616,10 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         },
       });
 
-      const initialLength = wrapper.vm.groups.items.length;
+      const initialLength = wrapper.vm.groups.conditions.length;
       wrapper.vm.removeCondition('non-existent-id');
       
-      expect(wrapper.vm.groups.items).toHaveLength(initialLength);
+      expect(wrapper.vm.groups.conditions).toHaveLength(initialLength);
     });
   });
 
@@ -1191,17 +1215,23 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const propsWithSubGroup = {
         ...defaultProps,
         group: {
+
           groupId: 'test-group',
-          label: 'and',
-          items: [
+
+          filterType: 'group',
+
+          logicalOperator: 'AND',
+
+          conditions: [
             { id: 'only-condition', column: 'field1', operator: '=', value: 'test' },
             {
               groupId: 'sub-group-1',
               label: 'or',
               items: [
                 { id: 'nested-condition', column: 'field2', operator: '=', value: 'test2' }
-              ]
-            }
+              ],
+
+        }
           ]
         }
       };
@@ -1233,15 +1263,21 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const propsWithMultipleSubGroups = {
         ...defaultProps,
         group: {
+
           groupId: 'test-group',
-          label: 'and',
-          items: [
+
+          filterType: 'group',
+
+          logicalOperator: 'AND',
+
+          conditions: [
             { id: 'only-condition', column: 'field1', operator: '=', value: 'test' },
             {
               groupId: 'sub-group-1',
               label: 'or',
-              items: [{ id: 'nested-1', column: 'field2', operator: '=', value: 'test2' }]
-            },
+              items: [{ id: 'nested-1', column: 'field2', operator: '=', value: 'test2' }],
+
+        },
             {
               groupId: 'sub-group-2',
               label: 'and',
@@ -1275,12 +1311,18 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const propsWithoutSubGroups = {
         ...defaultProps,
         group: {
+
           groupId: 'test-group',
-          label: 'and',
-          items: [
+
+          filterType: 'group',
+
+          logicalOperator: 'AND',
+
+          conditions: [
             { id: 'condition-1', column: 'field1', operator: '=', value: 'test1' },
             { id: 'condition-2', column: 'field2', operator: '=', value: 'test2' }
-          ]
+          ],
+
         }
       };
 
@@ -1307,15 +1349,21 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const propsWithSubGroup = {
         ...defaultProps,
         group: {
+
           groupId: 'test-group',
-          label: 'and',
-          items: [
+
+          filterType: 'group',
+
+          logicalOperator: 'AND',
+
+          conditions: [
             { id: 'only-condition', column: 'field1', operator: '=', value: 'test' },
             {
               groupId: 'sub-group-1',
               label: 'or',
-              items: [{ id: 'nested', column: 'field2', operator: '=', value: 'test2' }]
-            }
+              items: [{ id: 'nested', column: 'field2', operator: '=', value: 'test2' }],
+
+        }
           ]
         }
       };
@@ -1352,11 +1400,17 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         props: {
           ...defaultProps,
           group: {
+
             groupId: 'test-group',
-            label: 'and',
-            items: [
+
+            filterType: 'group',
+
+            logicalOperator: 'AND',
+
+            conditions: [
               { id: 'only-item', column: 'field1', operator: '=', value: 'test' }
-            ]
+            ],
+
           }
         },
         global: {
@@ -1381,12 +1435,18 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         props: {
           ...defaultProps,
           group: {
+
             groupId: 'test-group',
-            label: 'and',
-            items: [
+
+            filterType: 'group',
+
+            logicalOperator: 'AND',
+
+            conditions: [
               { id: 'item-1', column: 'field1', operator: '=', value: 'test1' },
               { id: 'item-2', column: 'field2', operator: '=', value: 'test2' }
-            ]
+            ],
+
           }
         },
         global: {
@@ -1404,7 +1464,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
 
       expect(wrapper.emitted('add-group')).toBeTruthy();
       expect(wrapper.emitted('remove-group')).toBeFalsy();
-      expect(wrapper.vm.groups.items).toHaveLength(1);
+      expect(wrapper.vm.groups.conditions).toHaveLength(1);
     });
 
     it('should emit remove-group when only sub-groups remain after removing condition', () => {
@@ -1412,15 +1472,21 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         props: {
           ...defaultProps,
           group: {
+
             groupId: 'test-group',
-            label: 'and',
-            items: [
+
+            filterType: 'group',
+
+            logicalOperator: 'AND',
+
+            conditions: [
               { id: 'only-condition', column: 'field1', operator: '=', value: 'test' },
               {
                 groupId: 'sub-group',
                 label: 'or',
-                items: [{ id: 'nested', column: 'field2', operator: '=', value: 'test2' }]
-              }
+                items: [{ id: 'nested', column: 'field2', operator: '=', value: 'test2' }],
+
+          }
             ]
           }
         },
@@ -1458,9 +1524,17 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
 
       const newGroup = {
         groupId: 'new-group',
-        label: 'or',
-        items: [
-          { id: 'new-item', column: 'newfield', operator: '!=', value: 'newtest' }
+        filterType: 'group',
+        logicalOperator: 'OR',
+        conditions: [
+          {
+            id: 'new-item',
+            filterType: 'condition',
+            column: 'newfield',
+            operator: '!=',
+            value: 'newtest',
+            logicalOperator: 'OR',
+          }
         ]
       };
 
@@ -1471,11 +1545,11 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       expect(wrapper.vm.label).toBe('or');
     });
 
-    it('should update label when prop group label changes', async () => {
+    it('should update label when prop group logicalOperator changes', async () => {
       const wrapper = mount(FilterGroup, {
         props: {
           ...defaultProps,
-          group: { ...defaultProps.group, label: 'and' }
+          group: { ...defaultProps.group, logicalOperator: 'AND' }
         },
         global: {
           plugins: [Quasar, mockI18n],
@@ -1492,9 +1566,9 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       await nextTick();
       expect(wrapper.vm.label).toBe('and');
 
-      // Now change the label
+      // Now change the logicalOperator
       await wrapper.setProps({
-        group: { ...defaultProps.group, label: 'or' }
+        group: { ...defaultProps.group, logicalOperator: 'OR' }
       });
       await nextTick();
 
@@ -1507,15 +1581,21 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const mixedOrderProps = {
         ...defaultProps,
         group: {
+
           groupId: 'test-group',
-          label: 'and',
-          items: [
+
+          filterType: 'group',
+
+          logicalOperator: 'AND',
+
+          conditions: [
             { id: 'condition-1', column: 'field1', operator: '=', value: 'test1' },
             {
               groupId: 'sub-group-1',
               label: 'or',
-              items: [{ id: 'nested-1', column: 'field2', operator: '=', value: 'test2' }]
-            },
+              items: [{ id: 'nested-1', column: 'field2', operator: '=', value: 'test2' }],
+
+        },
             { id: 'condition-2', column: 'field3', operator: '!=', value: 'test3' },
             {
               groupId: 'sub-group-2',
@@ -1540,33 +1620,39 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       });
 
       // Before reorder: condition, group, condition, group
-      expect(wrapper.vm.groups.items[0].id).toBe('condition-1');
-      expect(wrapper.vm.groups.items[1].groupId).toBe('sub-group-1');
-      expect(wrapper.vm.groups.items[2].id).toBe('condition-2');
-      expect(wrapper.vm.groups.items[3].groupId).toBe('sub-group-2');
+      expect(wrapper.vm.groups.conditions[0].id).toBe('condition-1');
+      expect(wrapper.vm.groups.conditions[1].groupId).toBe('sub-group-1');
+      expect(wrapper.vm.groups.conditions[2].id).toBe('condition-2');
+      expect(wrapper.vm.groups.conditions[3].groupId).toBe('sub-group-2');
 
       // Call reorder
       wrapper.vm.reorderItems();
 
       // After reorder: condition, condition, group, group
-      expect(wrapper.vm.groups.items[0].id).toBe('condition-1');
-      expect(wrapper.vm.groups.items[1].id).toBe('condition-2');
-      expect(wrapper.vm.groups.items[2].groupId).toBe('sub-group-1');
-      expect(wrapper.vm.groups.items[3].groupId).toBe('sub-group-2');
+      expect(wrapper.vm.groups.conditions[0].id).toBe('condition-1');
+      expect(wrapper.vm.groups.conditions[1].id).toBe('condition-2');
+      expect(wrapper.vm.groups.conditions[2].groupId).toBe('sub-group-1');
+      expect(wrapper.vm.groups.conditions[3].groupId).toBe('sub-group-2');
     });
 
     it('should emit events when reordering', () => {
       const mixedOrderProps = {
         ...defaultProps,
         group: {
+
           groupId: 'test-group',
-          label: 'and',
-          items: [
+
+          filterType: 'group',
+
+          logicalOperator: 'AND',
+
+          conditions: [
             {
               groupId: 'sub-group',
               label: 'or',
-              items: [{ id: 'nested', column: 'field1', operator: '=', value: 'test1' }]
-            },
+              items: [{ id: 'nested', column: 'field1', operator: '=', value: 'test1' }],
+
+        },
             { id: 'condition-1', column: 'field2', operator: '=', value: 'test2' }
           ]
         }
@@ -1596,12 +1682,18 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const onlyConditionsProps = {
         ...defaultProps,
         group: {
+
           groupId: 'test-group',
-          label: 'and',
-          items: [
+
+          filterType: 'group',
+
+          logicalOperator: 'AND',
+
+          conditions: [
             { id: 'condition-1', column: 'field1', operator: '=', value: 'test1' },
             { id: 'condition-2', column: 'field2', operator: '!=', value: 'test2' }
-          ]
+          ],
+
         }
       };
 
@@ -1621,22 +1713,28 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       wrapper.vm.reorderItems();
 
       // Order should remain the same
-      expect(wrapper.vm.groups.items[0].id).toBe('condition-1');
-      expect(wrapper.vm.groups.items[1].id).toBe('condition-2');
+      expect(wrapper.vm.groups.conditions[0].id).toBe('condition-1');
+      expect(wrapper.vm.groups.conditions[1].id).toBe('condition-2');
     });
 
     it('should handle group with only sub-groups (no reordering needed)', () => {
       const onlyGroupsProps = {
         ...defaultProps,
         group: {
+
           groupId: 'test-group',
-          label: 'and',
-          items: [
+
+          filterType: 'group',
+
+          logicalOperator: 'AND',
+
+          conditions: [
             {
               groupId: 'sub-group-1',
               label: 'or',
-              items: [{ id: 'nested-1', column: 'field1', operator: '=', value: 'test1' }]
-            },
+              items: [{ id: 'nested-1', column: 'field1', operator: '=', value: 'test1' }],
+
+        },
             {
               groupId: 'sub-group-2',
               label: 'and',
@@ -1662,17 +1760,23 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       wrapper.vm.reorderItems();
 
       // Order should remain the same
-      expect(wrapper.vm.groups.items[0].groupId).toBe('sub-group-1');
-      expect(wrapper.vm.groups.items[1].groupId).toBe('sub-group-2');
+      expect(wrapper.vm.groups.conditions[0].groupId).toBe('sub-group-1');
+      expect(wrapper.vm.groups.conditions[1].groupId).toBe('sub-group-2');
     });
 
     it('should handle empty items array', () => {
       const emptyItemsProps = {
         ...defaultProps,
         group: {
+
           groupId: 'test-group',
-          label: 'and',
-          items: []
+
+          filterType: 'group',
+
+          logicalOperator: 'AND',
+
+          conditions: [],
+
         }
       };
 
@@ -1691,165 +1795,10 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
 
       // Should not throw error
       expect(() => wrapper.vm.reorderItems()).not.toThrow();
-      expect(wrapper.vm.groups.items).toHaveLength(0);
+      expect(wrapper.vm.groups.conditions).toHaveLength(0);
     });
   });
 
-  describe('Disable AND/OR Toggle for Single Condition', () => {
-    it('should return true when group has only one condition and no sub-groups', () => {
-      const singleConditionProps = {
-        ...defaultProps,
-        group: {
-          groupId: 'test-group',
-          label: 'and',
-          items: [
-            { id: 'only-condition', column: 'field1', operator: '=', value: 'test' }
-          ]
-        }
-      };
-
-      const wrapper = mount(FilterGroup, {
-        props: singleConditionProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'FilterCondition': true,
-          },
-        },
-      });
-
-      expect(wrapper.vm.hasOnlyOneCondition).toBe(true);
-    });
-
-    it('should return false when group has multiple conditions', () => {
-      const multipleConditionsProps = {
-        ...defaultProps,
-        group: {
-          groupId: 'test-group',
-          label: 'and',
-          items: [
-            { id: 'condition-1', column: 'field1', operator: '=', value: 'test1' },
-            { id: 'condition-2', column: 'field2', operator: '=', value: 'test2' }
-          ]
-        }
-      };
-
-      const wrapper = mount(FilterGroup, {
-        props: multipleConditionsProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'FilterCondition': true,
-          },
-        },
-      });
-
-      expect(wrapper.vm.hasOnlyOneCondition).toBe(false);
-    });
-
-    it('should return false when group has one condition and sub-groups (toggle is useful)', () => {
-      const oneConditionWithGroupsProps = {
-        ...defaultProps,
-        group: {
-          groupId: 'test-group',
-          label: 'and',
-          items: [
-            { id: 'only-condition', column: 'field1', operator: '=', value: 'test' },
-            {
-              groupId: 'sub-group',
-              label: 'or',
-              items: [{ id: 'nested', column: 'field2', operator: '=', value: 'test2' }]
-            }
-          ]
-        }
-      };
-
-      const wrapper = mount(FilterGroup, {
-        props: oneConditionWithGroupsProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'FilterCondition': true,
-          },
-        },
-      });
-
-      // Should be false because AND/OR toggle is useful when combining condition with sub-group
-      expect(wrapper.vm.hasOnlyOneCondition).toBe(false);
-    });
-
-    it('should return false when group has no conditions (only sub-groups)', () => {
-      const onlySubGroupsProps = {
-        ...defaultProps,
-        group: {
-          groupId: 'test-group',
-          label: 'and',
-          items: [
-            {
-              groupId: 'sub-group-1',
-              label: 'or',
-              items: [{ id: 'nested-1', column: 'field1', operator: '=', value: 'test1' }]
-            },
-            {
-              groupId: 'sub-group-2',
-              label: 'and',
-              items: [{ id: 'nested-2', column: 'field2', operator: '=', value: 'test2' }]
-            }
-          ]
-        }
-      };
-
-      const wrapper = mount(FilterGroup, {
-        props: onlySubGroupsProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'FilterCondition': true,
-          },
-        },
-      });
-
-      expect(wrapper.vm.hasOnlyOneCondition).toBe(false);
-    });
-
-    it('should return true when group has empty items array', () => {
-      const emptyItemsProps = {
-        ...defaultProps,
-        group: {
-          groupId: 'test-group',
-          label: 'and',
-          items: []
-        }
-      };
-
-      const wrapper = mount(FilterGroup, {
-        props: emptyItemsProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'FilterCondition': true,
-          },
-        },
-      });
-
-      expect(wrapper.vm.hasOnlyOneCondition).toBe(false);
-    });
-  });
 
   describe('conditionInputWidth Prop', () => {
     it('should accept conditionInputWidth prop', () => {
@@ -1887,101 +1836,6 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       });
 
       expect(wrapper.props('conditionInputWidth')).toBe('');
-    });
-  });
-
-  describe('disableFirstCondition Prop', () => {
-    it('should have false as default for disableFirstCondition', () => {
-      const wrapper = mount(FilterGroup, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'FilterCondition': true,
-          },
-        },
-      });
-
-      expect(wrapper.props('disableFirstCondition')).toBe(true);
-    });
-
-    it('should accept disableFirstCondition prop as true', () => {
-      const wrapper = mount(FilterGroup, {
-        props: {
-          ...defaultProps,
-          disableFirstCondition: true
-        },
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'FilterCondition': true,
-          },
-        },
-      });
-
-      expect(wrapper.props('disableFirstCondition')).toBe(true);
-    });
-
-    it('should show delete button for first condition when disableFirstCondition is false', () => {
-      const wrapper = mount(FilterGroup, {
-        props: {
-          ...defaultProps,
-          disableFirstCondition: false
-        },
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'FilterCondition': true,
-          },
-        },
-      });
-
-      // With disableFirstCondition=false, delete button should be visible
-      const deleteButtons = wrapper.findAll('[data-test="alert-conditions-delete-condition-btn"]');
-      expect(deleteButtons.length).toBeGreaterThan(0);
-    });
-
-    it('should hide delete button for first condition of root group when disableFirstCondition is true', () => {
-      const multiItemProps = {
-        ...defaultProps,
-        disableFirstCondition: true,
-        group: {
-          groupId: 'test-group',
-          label: 'and',
-          items: [
-            { id: 'item-1', column: 'field1', operator: '=', value: 'test1' },
-            { id: 'item-2', column: 'field2', operator: '=', value: 'test2' },
-          ]
-        }
-      };
-
-      const wrapper = mount(FilterGroup, {
-        props: multiItemProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'FilterCondition': true,
-          },
-        },
-      });
-
-      // First condition should not have delete button
-      // Second condition should have delete button
-      const deleteButtons = wrapper.findAll('[data-test="alert-conditions-delete-condition-btn"]');
-      // Should have 1 delete button (for the second condition only)
-      expect(deleteButtons.length).toBe(1);
     });
   });
 
@@ -2037,9 +1891,14 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const complexGroupProps = {
         ...defaultProps,
         group: {
+
           groupId: 'root',
-          label: 'and',
-          items: [
+
+          filterType: 'group',
+
+          logicalOperator: 'AND',
+
+          conditions: [
             {
               groupId: 'nested-1',
               label: 'or',
@@ -2050,8 +1909,9 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
                   label: 'and',
                   items: [
                     { id: 'condition-2', column: 'field2', operator: '!=', value: 'test2' }
-                  ]
-                }
+                  ],
+
+        }
               ]
             },
             { id: 'condition-3', column: 'field3', operator: '>', value: 'test3' }
@@ -2073,285 +1933,9 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       });
 
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm.groups.items).toHaveLength(2);
-      expect(wrapper.vm.isGroup(wrapper.vm.groups.items[0])).toBe(true);
-      expect(wrapper.vm.isGroup(wrapper.vm.groups.items[1])).toBeFalsy();
-    });
-  });
-
-  describe('Preview Functionality', () => {
-    it('should generate preview string for simple conditions', () => {
-      const simpleProps = {
-        ...defaultProps,
-        depth: 0,
-        group: {
-          groupId: 'root',
-          label: 'or',
-          items: [
-            { id: 'c1', column: 'field1', operator: '=', value: 'test1' },
-            { id: 'c2', column: 'field2', operator: '=', value: 'test2' },
-          ]
-        }
-      };
-
-      const wrapper = mount(FilterGroup, {
-        props: simpleProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'FilterCondition': true,
-          },
-        },
-      });
-
-      expect(wrapper.vm.previewString).toBe("(field1 = 'test1' OR field2 = 'test2')");
-    });
-
-    it('should generate preview string with AND operator', () => {
-      const andProps = {
-        ...defaultProps,
-        depth: 0,
-        group: {
-          groupId: 'root',
-          label: 'and',
-          items: [
-            { id: 'c1', column: 'name', operator: '=', value: 'John' },
-            { id: 'c2', column: 'age', operator: '>', value: '30' },
-          ]
-        }
-      };
-
-      const wrapper = mount(FilterGroup, {
-        props: andProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'FilterCondition': true,
-          },
-        },
-      });
-
-      expect(wrapper.vm.previewString).toBe("(name = 'John' AND age > '30')");
-    });
-
-    it('should generate preview string with nested groups', () => {
-      const nestedProps = {
-        ...defaultProps,
-        depth: 0,
-        group: {
-          groupId: 'root',
-          label: 'or',
-          items: [
-            { id: 'c1', column: 'field1', operator: '=', value: 'a' },
-            { id: 'c2', column: 'field2', operator: '=', value: 'b' },
-            {
-              groupId: 'nested',
-              label: 'and',
-              items: [
-                { id: 'c3', column: 'field3', operator: '=', value: 'c' },
-                { id: 'c4', column: 'field4', operator: '=', value: 'd' },
-              ]
-            }
-          ]
-        }
-      };
-
-      const wrapper = mount(FilterGroup, {
-        props: nestedProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'FilterCondition': true,
-          },
-        },
-      });
-
-      expect(wrapper.vm.previewString).toBe("(field1 = 'a' OR field2 = 'b' OR (field3 = 'c' AND field4 = 'd'))");
-    });
-
-    it('should use placeholder for empty column names', () => {
-      const emptyColumnProps = {
-        ...defaultProps,
-        depth: 0,
-        group: {
-          groupId: 'root',
-          label: 'or',
-          items: [
-            { id: 'c1', column: '', operator: '=', value: 'test' },
-            { id: 'c2', column: 'field2', operator: '=', value: 'test2' },
-          ]
-        }
-      };
-
-      const wrapper = mount(FilterGroup, {
-        props: emptyColumnProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'FilterCondition': true,
-          },
-        },
-      });
-
-      expect(wrapper.vm.previewString).toBe("(field = 'test' OR field2 = 'test2')");
-    });
-
-    it('should show preview section only at depth 0', async () => {
-      const rootProps = {
-        ...defaultProps,
-        depth: 0,
-        group: {
-          groupId: 'root',
-          label: 'or',
-          items: [
-            { id: 'c1', column: 'field1', operator: '=', value: 'test' },
-          ]
-        }
-      };
-
-      const wrapper = mount(FilterGroup, {
-        props: rootProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'FilterCondition': true,
-          },
-        },
-      });
-
-      // Should find preview section at depth 0
-      const previewSection = wrapper.find('.tw-mb-2.tw-p-2.tw-rounded.tw-border');
-      expect(previewSection.exists()).toBe(true);
-      expect(previewSection.text()).toContain('Preview');
-    });
-
-    it('should not show preview section at depth > 0', () => {
-      const nestedProps = {
-        ...defaultProps,
-        depth: 1,
-        group: {
-          groupId: 'nested',
-          label: 'or',
-          items: [
-            { id: 'c1', column: 'field1', operator: '=', value: 'test' },
-          ]
-        }
-      };
-
-      const wrapper = mount(FilterGroup, {
-        props: nestedProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'FilterCondition': true,
-          },
-        },
-      });
-
-      // Should not find preview section at depth > 0
-      const previewSection = wrapper.find('.tw-mb-2.tw-p-2.tw-rounded.tw-border');
-      expect(previewSection.exists()).toBe(false);
-    });
-
-    it('should toggle preview visibility when clicking header', async () => {
-      const rootProps = {
-        ...defaultProps,
-        depth: 0,
-        group: {
-          groupId: 'root',
-          label: 'or',
-          items: [
-            { id: 'c1', column: 'field1', operator: '=', value: 'test' },
-          ]
-        }
-      };
-
-      const wrapper = mount(FilterGroup, {
-        props: rootProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'FilterCondition': true,
-          },
-        },
-      });
-
-      expect(wrapper.vm.showPreview).toBe(true);
-
-      // Find and click the preview header
-      const previewHeader = wrapper.find('.tw-cursor-pointer');
-      await previewHeader.trigger('click');
-
-      expect(wrapper.vm.showPreview).toBe(false);
-
-      // Click again to show
-      await previewHeader.trigger('click');
-      expect(wrapper.vm.showPreview).toBe(true);
-    });
-
-    it('should handle deeply nested groups in preview', () => {
-      const deeplyNestedProps = {
-        ...defaultProps,
-        depth: 0,
-        group: {
-          groupId: 'root',
-          label: 'and',
-          items: [
-            { id: 'c1', column: 'a', operator: '=', value: 'test' },
-            {
-              groupId: 'level1',
-              label: 'or',
-              items: [
-                { id: 'c2', column: 'b', operator: '=', value: 'test' },
-                {
-                  groupId: 'level2',
-                  label: 'and',
-                  items: [
-                    { id: 'c3', column: 'c', operator: '=', value: 'test' },
-                    { id: 'c4', column: 'd', operator: '=', value: 'test' },
-                  ]
-                }
-              ]
-            }
-          ]
-        }
-      };
-
-      const wrapper = mount(FilterGroup, {
-        props: deeplyNestedProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'FilterCondition': true,
-          },
-        },
-      });
-
-      expect(wrapper.vm.previewString).toBe("(a = 'test' AND (b = 'test' OR (c = 'test' AND d = 'test')))");
+      expect(wrapper.vm.groups.conditions).toHaveLength(2);
+      expect(wrapper.vm.isGroup(wrapper.vm.groups.conditions[0])).toBe(true);
+      expect(wrapper.vm.isGroup(wrapper.vm.groups.conditions[1])).toBeFalsy();
     });
   });
 });

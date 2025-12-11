@@ -1,5 +1,7 @@
 // pipelinesPage.js
 const { expect } = require('@playwright/test')
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const fetch = require('node-fetch');
 
 const randomNodeName = `remote-node-${Math.floor(Math.random() * 1000)}`;
 
@@ -110,6 +112,36 @@ export class PipelinesPage {
         this.deletedSuccessfullyText = page.getByText('deleted successfully');
         this.conditionDropdown = page.locator("div:nth-child(2) > div:nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native");
         this.deleteButtonNth1 = page.locator("button").filter({ hasText: "delete" }).nth(1);
+
+        // Condition-specific locators for comprehensive testing
+        this.addConditionSection = page.locator('[data-test="add-condition-section"]');
+        this.addConditionGroupBtn = page.locator('[data-test="alert-conditions-add-condition-group-btn"]');
+        this.toggleOperatorBtn = page.locator('[data-test="alert-conditions-toggle-operator-btn"]');
+        this.deleteConditionBtn = page.locator('[data-test="alert-conditions-delete-condition-btn"]');
+        this.reorderBtn = page.locator('[data-test="alert-conditions-reorder-btn"]');
+        this.addConditionCancelBtn = page.locator('[data-test="add-condition-cancel-btn"]');
+        this.addConditionDeleteBtn = page.locator('[data-test="add-condition-delete-btn"]');
+        this.scheduledAlertTabs = page.locator('[data-test="scheduled-alert-tabs"]');
+        this.nestedGroups = page.locator('.el-border');
+        this.operatorLabels = page.locator('span.tw-lowercase');
+        this.firstConditionLabel = page.locator('.tw-flex.tw-items-start.tw-gap-1').first().locator('span').first();
+        this.noteContainer = page.locator('.note-container');
+        this.noteHeading = page.locator('.note-heading');
+        this.noteInfo = page.locator('.note-info');
+        this.qDialog = page.locator('.q-dialog');
+        this.qDialogBackdrop = page.locator('.q-dialog__backdrop');
+        this.qNotificationMessage = page.locator('.q-notification__message');
+        this.qMenu = page.locator('.q-menu');
+
+        // Pipeline node locators
+        this.pipelineNodeOutputStreamNode = page.locator('[data-test="pipeline-node-output-stream-node"]');
+        this.pipelineNodeOutputDeleteBtn = page.locator('[data-test="pipeline-node-output-delete-btn"]');
+        this.pipelineNodeDefaultConditionNode = page.locator('[data-test="pipeline-node-default-condition-node"]');
+        this.pipelineNodeInputOutputHandle = page.locator('[data-test="pipeline-node-input-output-handle"]');
+        this.pipelineNodeDefaultInputHandle = page.locator('[data-test="pipeline-node-default-input-handle"]');
+        this.pipelineNodeDefaultOutputHandle = page.locator('[data-test="pipeline-node-default-output-handle"]');
+        this.pipelineNodeOutputInputHandle = page.locator('[data-test="pipeline-node-output-input-handle"]');
+        this.addPipelineBackBtn = page.locator('[data-test="add-pipeline-back-btn"]');
     }
 
     // Methods from original PipelinesPage
@@ -390,7 +422,7 @@ export class PipelinesPage {
 
             if (functionName?.trim() === fileName) {
                 fileFound = true;
-                console.log("Uploaded file found:", functionName);
+                testLogger.debug("Uploaded file found", { functionName });
 
                 // Click the 'Delete Function' button
                 await row.locator('[title="Delete Function"]').click();
@@ -623,5 +655,424 @@ export class PipelinesPage {
         await deletePipelineButton.click();
         await this.confirmDeletePipeline();
         await this.verifyPipelineDeleted();
+    }
+
+    // ========== Condition-specific methods ==========
+
+    async fillCondition(columnName, operator, value, index = 0) {
+        const columnSelects = this.columnSelect;
+
+        // Try clicking the input first
+        await columnSelects.nth(index).locator('input').click();
+        await this.page.waitForTimeout(200);
+
+        // Check if dropdown opened, if not click the dropdown icon
+        let menuVisible = await this.qMenu.isVisible().catch(() => false);
+        if (!menuVisible) {
+            await columnSelects.nth(index).locator('i').click();
+            await this.page.waitForTimeout(200);
+        }
+
+        await columnSelects.nth(index).locator('input').fill(columnName);
+        await this.page.waitForTimeout(500);
+
+        // Select from dropdown
+        const options = this.qMenu.locator('.q-item');
+        await options.first().click();
+        await this.page.waitForTimeout(300);
+
+        // Select operator
+        await this.operatorSelect.nth(index).click();
+        await this.page.waitForTimeout(500);
+
+        // Scope to the visible dropdown menu and select the operator
+        const visibleMenu = this.qMenu.last();
+        await visibleMenu.locator('.q-item').getByText(operator, { exact: true }).click();
+        await this.page.waitForTimeout(300);
+
+        // Fill value
+        await this.valueInput.nth(index).locator('input').click();
+        await this.valueInput.nth(index).locator('input').fill(value);
+        await this.page.waitForTimeout(300);
+    }
+
+    async addNewCondition() {
+        await this.addConditionButton.first().click();
+        await this.page.waitForTimeout(500);
+    }
+
+    async addConditionGroup() {
+        await this.addConditionGroupBtn.first().click();
+        await this.page.waitForTimeout(500);
+    }
+
+    async toggleConditionOperator(index = 0) {
+        await this.toggleOperatorBtn.nth(index).click();
+        await this.page.waitForTimeout(300);
+    }
+
+    async deleteConditionByIndex(index) {
+        await this.deleteConditionBtn.nth(index).click();
+        await this.page.waitForTimeout(300);
+    }
+
+    async createPipelineWithCondition(streamName) {
+        await this.openPipelineMenu();
+        await this.page.waitForTimeout(1000);
+        await this.addPipeline();
+        await this.selectStream();
+        await this.dragStreamToTarget(this.streamButton);
+        await this.selectLogs();
+        await this.enterStreamName(streamName);
+        await this.page.waitForTimeout(2000);
+        await this.page.getByRole("option", { name: streamName, exact: true }).click();
+        await this.saveInputNodeStream();
+        await this.page.waitForTimeout(2000);
+
+        // Remove default output stream node
+        await this.pipelineNodeOutputStreamNode.first().hover();
+        await this.page.waitForTimeout(500);
+        await this.pipelineNodeOutputDeleteBtn.first().click();
+        await this.confirmButton.click();
+
+        // Add condition node
+        await this.selectAndDragCondition();
+        await this.page.waitForTimeout(1000);
+    }
+
+    async saveConditionAndCompletePipeline(pipelineName) {
+        await this.saveCondition();
+        await this.page.waitForTimeout(2000);
+
+        // Wait for the condition dialog to close and the condition node to appear on canvas
+        await this.page.waitForSelector('[data-test="add-condition-section"]', { state: 'hidden', timeout: 5000 }).catch(() => {});
+        await this.page.waitForTimeout(1000);
+
+        // Verify the condition node was created successfully
+        await expect(this.pipelineNodeDefaultConditionNode).toBeVisible({ timeout: 5000 });
+
+        // Add destination stream
+        await this.selectAndDragSecondStream();
+        await this.streamNameInput.click();
+        await this.streamNameInput.fill("destination-node");
+        await this.page.waitForTimeout(1000);
+        await this.clickInputNodeStreamSave();
+
+        await this.page.waitForTimeout(2000);
+        await this.page.waitForSelector('[data-test="pipeline-node-input-output-handle"]', { state: 'visible', timeout: 10000 });
+        await this.page.waitForSelector('[data-test="pipeline-node-default-input-handle"]', { state: 'visible', timeout: 10000 });
+        await this.page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible', timeout: 10000 });
+
+        await this.page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {});
+
+        // Connect nodes
+        await this.pipelineNodeInputOutputHandle.hover({ force: true });
+        await this.page.mouse.down();
+        await this.pipelineNodeDefaultInputHandle.hover({ force: true });
+        await this.page.mouse.up();
+        await this.page.waitForTimeout(500);
+
+        await this.pipelineNodeDefaultOutputHandle.hover({ force: true });
+        await this.page.mouse.down();
+        await this.pipelineNodeOutputInputHandle.hover({ force: true });
+        await this.page.mouse.up();
+        await this.page.waitForTimeout(1000);
+
+        await this.enterPipelineName(pipelineName);
+        await this.savePipeline();
+
+        // Wait for save to complete
+        await this.page.waitForTimeout(3000);
+    }
+
+    async deletePipelineByName(pipelineName) {
+        await this.searchPipeline(pipelineName);
+        await this.page.waitForTimeout(1000);
+        const deletePipelineButton = this.page.locator(
+          `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
+        );
+        await deletePipelineButton.waitFor({ state: "visible" });
+        await deletePipelineButton.click();
+        await this.confirmDeletePipeline();
+        await this.verifyPipelineDeleted();
+    }
+
+    async openPipelineForEdit(pipelineName) {
+        await this.page.locator(`[data-test="pipeline-list-${pipelineName}-update-pipeline"]`).click();
+        await this.page.waitForTimeout(2000);
+    }
+
+    async clickConditionNode() {
+        await this.pipelineNodeDefaultConditionNode.click();
+        await this.page.waitForTimeout(1000);
+    }
+
+    async reconnectSourceToDestination() {
+        await this.pipelineNodeInputOutputHandle.hover({ force: true });
+        await this.page.mouse.down();
+        await this.pipelineNodeOutputInputHandle.hover({ force: true });
+        await this.page.mouse.up();
+        await this.page.waitForTimeout(1000);
+    }
+
+    async verifyConditionDialogOpen() {
+        await expect(this.addConditionSection).toBeVisible();
+    }
+
+    async verifyConditionDialogClosed() {
+        await expect(this.addConditionSection).not.toBeVisible();
+    }
+
+    async verifyFirstConditionLabel(text) {
+        await expect(this.firstConditionLabel).toHaveText(text);
+    }
+
+    async verifyConditionCount(count) {
+        await expect(this.valueInput).toHaveCount(count);
+    }
+
+    async verifyNestedGroupsExist() {
+        const count = await this.nestedGroups.count();
+        expect(count).toBeGreaterThan(1);
+    }
+
+    async verifyScheduledAlertTabsVisible() {
+        await expect(this.scheduledAlertTabs.first()).toBeVisible();
+    }
+
+    async verifyOperatorLabel(text, index = 0) {
+        await expect(this.operatorLabels.nth(index)).toContainText(text);
+    }
+
+    async verifyNoteContainer() {
+        await expect(this.noteContainer).toBeVisible();
+        await expect(this.noteHeading).toContainText("Condition value Guidelines");
+    }
+
+    async captureConditionValues() {
+        const valueInputs = this.valueInput.locator('input');
+        const values = [];
+        const count = await valueInputs.count();
+        for (let i = 0; i < count; i++) {
+            const value = await valueInputs.nth(i).inputValue();
+            values.push(value);
+        }
+        return values;
+    }
+
+    async clickReorderButton(index = 1) {
+        await this.reorderBtn.nth(index).click();
+        await this.page.waitForTimeout(500);
+    }
+
+    async captureConditionScreenshot() {
+        return await this.addConditionSection.screenshot();
+    }
+
+    async cancelConditionDialog() {
+        await this.addConditionCancelBtn.click();
+        await this.page.waitForTimeout(500);
+    }
+
+    async clickDeleteConditionNode() {
+        const deleteButton = this.addConditionDeleteBtn;
+        if (await deleteButton.count() > 0) {
+            await deleteButton.click();
+            await this.page.waitForTimeout(500);
+            await this.confirmButton.click();
+            await this.page.waitForTimeout(1000);
+        }
+    }
+
+    async verifyConditionValueInputValue(value, index = 0) {
+        await expect(this.valueInput.nth(index).locator('input')).toHaveValue(value);
+    }
+
+    async clearAndFillConditionValue(value, index = 0) {
+        await this.valueInput.nth(index).locator('input').clear();
+        await this.valueInput.nth(index).locator('input').fill(value);
+    }
+
+    async verifyDeleteButtonCount(expectedCount) {
+        const count = await this.deleteConditionBtn.count();
+        expect(count).toBe(expectedCount);
+    }
+
+    async tryToSaveWithoutValidConditions() {
+        await this.addConditionSaveButton.click();
+        await this.page.waitForTimeout(1000);
+    }
+
+    async verifyNotificationVisible() {
+        const notification = this.qNotificationMessage;
+        if (await notification.count() > 0) {
+            await expect(notification.first()).toBeVisible();
+        }
+        await this.page.waitForTimeout(2000);
+    }
+
+    async fillPartialCondition(columnName) {
+        await this.columnSelect.first().locator('input').click();
+        await this.columnSelect.first().locator('input').fill(columnName);
+        await this.page.waitForTimeout(300);
+        const options = this.qMenu.locator('.q-item');
+        if (await options.count() > 0) {
+            await options.first().click();
+        }
+    }
+
+    async selectOperatorFromMenu(operator) {
+        await this.operatorSelect.first().click();
+        await this.page.waitForTimeout(500);
+        const visibleMenu = this.qMenu.last();
+        await visibleMenu.locator('.q-item').getByText(operator, { exact: true }).click();
+    }
+
+    async verifyConfirmationDialog() {
+        const dialog = this.qDialog;
+        if (await dialog.count() > 0) {
+            await expect(dialog.first()).toBeVisible();
+            await this.confirmButton.click();
+        }
+    }
+
+    /**
+     * ==========================================
+     * PIPELINE API METHODS
+     * ==========================================
+     */
+
+    /**
+     * Clean conditions for API (removes UI-only fields)
+     * This removes fields like 'id' and 'groupId' that are only used in UI
+     * @param {object} conditions - Condition configuration object with UI fields
+     * @returns {object} Cleaned conditions for API
+     */
+    cleanConditionsForAPI(conditions) {
+        if (conditions.filterType === "condition") {
+            // Remove UI-only fields: id, groupId
+            // KEEP values field as it's required by the backend
+            const { id, groupId, ...cleaned } = conditions;
+            return cleaned;
+        } else if (conditions.filterType === "group") {
+            // Recursively clean nested conditions
+            const { id, groupId, ...cleaned } = conditions;
+            cleaned.conditions = conditions.conditions.map(c => this.cleanConditionsForAPI(c));
+            return cleaned;
+        }
+        return conditions;
+    }
+
+    /**
+     * Create a pipeline via API
+     * @param {string} pipelineName - Name of the pipeline
+     * @param {string} sourceStream - Source stream name
+     * @param {string} destStream - Destination stream name
+     * @param {object} conditions - Condition configuration object
+     * @returns {Promise<object>} API response
+     */
+    async createPipeline(pipelineName, sourceStream, destStream, conditions) {
+        const orgId = process.env["ORGNAME"];
+        const basicAuthCredentials = Buffer.from(
+            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+        ).toString('base64');
+
+        const headers = {
+            "Authorization": `Basic ${basicAuthCredentials}`,
+            "Content-Type": "application/json",
+        };
+
+        // Clean conditions to remove UI-only fields
+        const cleanedConditions = this.cleanConditionsForAPI(conditions);
+        testLogger.info('Cleaned conditions', { cleaned: JSON.stringify(cleanedConditions, null, 2) });
+
+        // Generate unique node IDs
+        const inputNodeId = `input-${Date.now()}`;
+        const conditionNodeId = `condition-${Date.now()}`;
+        const outputNodeId = `output-${Date.now()}`;
+
+        const pipelinePayload = {
+            pipeline_id: "",
+            version: 0,
+            enabled: true,  // Enable pipeline for realtime processing
+            org: orgId,
+            name: pipelineName,
+            description: `Validation test pipeline for ${pipelineName}`,
+            source: {
+                source_type: "realtime"
+            },
+            paused_at: null,
+            nodes: [
+                {
+                    id: inputNodeId,
+                    position: { x: 100, y: 100 },
+                    data: {
+                        node_type: "stream",
+                        stream_type: "logs",
+                        stream_name: sourceStream,
+                        org_id: orgId
+                    },
+                    io_type: "input"
+                },
+                {
+                    id: conditionNodeId,
+                    position: { x: 300, y: 200 },
+                    data: {
+                        node_type: "condition",
+                        version: 2,
+                        conditions: cleanedConditions
+                    },
+                    io_type: "intermediate"
+                },
+                {
+                    id: outputNodeId,
+                    position: { x: 500, y: 100 },
+                    data: {
+                        node_type: "stream",
+                        stream_type: "logs",
+                        stream_name: destStream,
+                        org_id: orgId
+                    },
+                    io_type: "output"
+                }
+            ],
+            edges: [
+                {
+                    id: `${inputNodeId}-${conditionNodeId}`,
+                    source: inputNodeId,
+                    target: conditionNodeId,
+                    sourceHandle: "success"
+                },
+                {
+                    id: `${conditionNodeId}-${outputNodeId}`,
+                    source: conditionNodeId,
+                    target: outputNodeId,
+                    sourceHandle: "success"
+                }
+            ]
+        };
+
+        testLogger.info('Creating pipeline via API', { pipelineName, sourceStream, destStream });
+
+        try {
+            const response = await fetch(`${process.env.ZO_BASE_URL}/api/${orgId}/pipelines`, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(pipelinePayload)
+            });
+
+            const data = await response.json();
+
+            if (response.status === 200 && data.code === 200) {
+                testLogger.info('Pipeline created successfully', { pipelineName });
+            } else {
+                testLogger.warn('Pipeline creation returned non-200', { pipelineName, status: response.status, data });
+            }
+
+            return { status: response.status, data };
+        } catch (error) {
+            testLogger.error('Failed to create pipeline', { pipelineName, error: error.message });
+            return { status: 500, error: error.message };
+        }
     }
 }
