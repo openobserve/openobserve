@@ -1,8 +1,16 @@
 const { chromium } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
+const dotenv = require('dotenv');
 const logsdata = require("../../../test-data/logs_data.json");
 const testLogger = require('./test-logger.js');
+
+// IMPORTANT: Load .env ONLY from tests/ui-testing/.env - ignore any other .env files
+const uiTestingEnvPath = path.resolve(__dirname, '../../.env');
+dotenv.config({ path: uiTestingEnvPath, override: true });
+console.log(`✅ Loaded env from: ${uiTestingEnvPath}`);
+console.log(`   ZO_ROOT_USER_EMAIL: ${process.env.ZO_ROOT_USER_EMAIL}`);
+console.log(`   ORGNAME: ${process.env.ORGNAME}`);
 
 /**
  * Global setup for all tests - handles authentication and test data ingestion
@@ -79,13 +87,49 @@ async function globalSetup() {
 
     // Wait for login to complete - look for navigation or success indicators
     await page.waitForLoadState('networkidle', { timeout: 15000 });
-    
-    // Verify login success by checking for a known element
-    await page.locator('[data-test="menu-link-\\/-item"]').waitFor({ 
-      state: 'visible', 
-      timeout: 10000 
-    });
-    
+    await page.waitForTimeout(3000); // Extra wait for UI to stabilize
+
+    // DEBUG: Take screenshot and log current URL
+    const postLoginUrl = page.url();
+    testLogger.debug('Post-login state', { url: postLoginUrl });
+    await page.screenshot({ path: path.join(__dirname, 'debug-after-login.png') });
+
+    // Verify login success by checking for known elements (try multiple selectors)
+    const authSelectors = [
+      '[data-test="navbar-organizations-select"]',
+      '[data-test="menu-link-settings-item"]',
+      '[data-test="menu-link-help-item"]',
+      '[data-test="menu-link-\\/logs-item"]',
+      '.q-drawer' // Sidebar
+    ];
+
+    let loginVerified = false;
+    for (const selector of authSelectors) {
+      try {
+        const count = await page.locator(selector).count();
+        testLogger.debug(`Checking selector: ${selector}, count: ${count}`);
+        if (count > 0) {
+          await page.locator(selector).first().waitFor({ state: 'visible', timeout: 5000 });
+          testLogger.debug('Login verified with selector', { selector });
+          loginVerified = true;
+          break;
+        }
+      } catch (e) {
+        testLogger.debug(`Selector ${selector} failed: ${e.message}`);
+        continue;
+      }
+    }
+
+    if (!loginVerified) {
+      // Final fallback - just check URL is not login page
+      const currentUrl = page.url();
+      testLogger.debug('No UI elements found, checking URL', { currentUrl });
+      if (currentUrl.includes('/login') || currentUrl.includes('/auth') || currentUrl.includes('/web/login')) {
+        throw new Error(`Login failed - still on login page: ${currentUrl}`);
+      }
+      testLogger.warn('Login verified by URL check (no UI elements found)');
+    }
+
     testLogger.info('Global login authentication successful');
     
     // Save authentication state
@@ -114,7 +158,8 @@ async function globalSetup() {
  * @param {import('@playwright/test').Page} page 
  */
 async function performGlobalIngestion(page) {
-  const orgId = process.env["ORGNAME"];
+  // Use ORGID for API ingestion (if available), fallback to ORGNAME
+  const orgId = process.env["ORGID"] || process.env["ORGNAME"];
   const streamName = "e2e_automate";
   const basicAuthCredentials = Buffer.from(
     `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`

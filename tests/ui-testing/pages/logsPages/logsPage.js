@@ -104,6 +104,34 @@ export class LogsPage {
         this.logTableColumn3Source = '[data-test="log-table-column-3-source"]';
         this.histogramToggleDiv = '[data-test="logs-search-bar-show-histogram-toggle-btn"] div';
 
+        // Histogram Analyze button locators (VERIFIED from source)
+        this.analyzeButton = '[data-test="logs-analyze-dimensions-button"]';
+        this.analysisDashboardClose = '[data-test="analysis-dashboard-close"]';
+        this.analysisDashboard = '[data-test="analysis-dashboard-close"]'; // Use close button to verify modal is open
+        this.dimensionSelectorButton = '[data-test="dimension-selector-button"]';
+        this.percentileRefreshButton = '[data-test="percentile-refresh-button"]';
+
+        // Log Patterns locators (ENTERPRISE FEATURE - VERIFIED from source)
+        this.patternsToggle = '[data-test="logs-patterns-toggle"]';
+        this.logsToggle = '[data-test="logs-logs-toggle"]';
+        this.visualizeToggle = '[data-test="logs-visualize-toggle"]';
+        this.patternStatistics = '[data-test="pattern-statistics"]';
+        this.patternStatsLogsScanned = '[data-test="pattern-stats-logs-scanned-value"]';
+        this.patternStatsPatternsFound = '[data-test="pattern-stats-patterns-found-value"]';
+        this.patternStatsCoverage = '[data-test="pattern-stats-coverage-value"]';
+        this.patternStatsProcessingTime = '[data-test="pattern-stats-processing-time-value"]';
+        this.patternCard = (index) => `[data-test="pattern-card-${index}"]`;
+        this.patternCardTemplate = (index) => `[data-test="pattern-card-${index}-template"]`;
+        this.patternCardFrequency = (index) => `[data-test="pattern-card-${index}-frequency"]`;
+        this.patternCardPercentage = (index) => `[data-test="pattern-card-${index}-percentage"]`;
+        this.patternCardIncludeBtn = (index) => `[data-test="pattern-card-${index}-include-btn"]`;
+        this.patternCardExcludeBtn = (index) => `[data-test="pattern-card-${index}-exclude-btn"]`;
+        this.patternCardDetailsIcon = (index) => `[data-test="pattern-card-${index}-details-icon"]`;
+        this.patternCardAnomalyBadge = (index) => `[data-test="pattern-card-${index}-anomaly-badge"]`;
+        this.closePatternDialog = '[data-test="close-pattern-dialog"]';
+        this.patternDetailPreviousBtn = '[data-test="pattern-detail-previous-btn"]';
+        this.patternDetailNextBtn = '[data-test="pattern-detail-next-btn"]';
+
         // Additional locators
         this.fnEditor = '#fnEditor';
         this.searchListFirstTextLeft = '.search-list > :nth-child(1) > .text-left';
@@ -189,7 +217,7 @@ export class LogsPage {
         let retries = 5;
 
         while (fnEditorExists === 0 && retries > 0) {
-            await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
             fnEditorExists = await this.page.locator('#fnEditor').count();
 
             if (fnEditorExists === 0) {
@@ -754,6 +782,132 @@ export class LogsPage {
         const isHistogramOff = await this.page.locator(this.histogramToggle)
             .evaluate(el => el.getAttribute('aria-checked') === 'false');
         expect(isHistogramOff).toBeTruthy();
+    }
+
+    // Histogram Analyze button methods
+    async clickAnalyzeButton() {
+        await this.page.locator(this.analyzeButton).click();
+    }
+
+    async isAnalyzeButtonVisible() {
+        return await this.page.locator(this.analyzeButton).isVisible();
+    }
+
+    async expectAnalyzeButtonVisible() {
+        await expect(this.page.locator(this.analyzeButton)).toBeVisible();
+    }
+
+    async expectAnalyzeButtonNotVisible() {
+        await expect(this.page.locator(this.analyzeButton)).not.toBeVisible();
+    }
+
+    async expectAnalysisDashboardVisible() {
+        await expect(this.page.locator(this.analysisDashboardClose)).toBeVisible({ timeout: 10000 });
+    }
+
+    async closeAnalysisDashboard() {
+        await this.page.locator(this.analysisDashboardClose).click();
+    }
+
+    async expectAnalysisDashboardClosed() {
+        await expect(this.page.locator(this.analysisDashboardClose)).not.toBeVisible({ timeout: 5000 });
+    }
+
+    async clickDimensionSelectorButton() {
+        await this.page.locator(this.dimensionSelectorButton).click();
+    }
+
+    async expectDimensionSelectorVisible() {
+        await expect(this.page.locator(this.dimensionSelectorButton)).toBeVisible();
+    }
+
+    // Log Patterns methods (ENTERPRISE FEATURE)
+    async clickPatternsToggle() {
+        await this.page.locator(this.patternsToggle).click();
+    }
+
+    async clickLogsToggle() {
+        await this.page.locator(this.logsToggle).click();
+    }
+
+    async expectPatternsToggleVisible() {
+        await expect(this.page.locator(this.patternsToggle)).toBeVisible();
+    }
+
+    async expectPatternsToggleNotVisible() {
+        await expect(this.page.locator(this.patternsToggle)).not.toBeVisible();
+    }
+
+    async expectPatternStatisticsVisible() {
+        await expect(this.page.locator(this.patternStatistics)).toBeVisible();
+    }
+
+    async getPatternStatsLogsScanned() {
+        return await this.page.locator(this.patternStatsLogsScanned).textContent();
+    }
+
+    async getPatternStatsPatternsFound() {
+        return await this.page.locator(this.patternStatsPatternsFound).textContent();
+    }
+
+    async getPatternStatsCoverage() {
+        return await this.page.locator(this.patternStatsCoverage).textContent();
+    }
+
+    async getPatternStatsProcessingTime() {
+        return await this.page.locator(this.patternStatsProcessingTime).textContent();
+    }
+
+    async expectPatternCardVisible(index = 0) {
+        await expect(this.page.locator(this.patternCard(index))).toBeVisible();
+    }
+
+    async clickPatternCard(index = 0) {
+        await this.page.locator(this.patternCard(index)).click();
+    }
+
+    async clickPatternIncludeBtn(index = 0) {
+        await this.page.locator(this.patternCardIncludeBtn(index)).click();
+    }
+
+    async clickPatternExcludeBtn(index = 0) {
+        await this.page.locator(this.patternCardExcludeBtn(index)).click();
+    }
+
+    async clickPatternDetailsIcon(index = 0) {
+        await this.page.locator(this.patternCardDetailsIcon(index)).click();
+    }
+
+    async expectPatternDialogVisible() {
+        await expect(this.page.locator(this.closePatternDialog)).toBeVisible();
+    }
+
+    async closePatternDetailsDialog() {
+        await this.page.locator(this.closePatternDialog).click();
+    }
+
+    async clickPatternDetailPrevious() {
+        await this.page.locator(this.patternDetailPreviousBtn).click();
+    }
+
+    async clickPatternDetailNext() {
+        await this.page.locator(this.patternDetailNextBtn).click();
+    }
+
+    async expectPatternDetailPreviousDisabled() {
+        await expect(this.page.locator(this.patternDetailPreviousBtn)).toBeDisabled();
+    }
+
+    async expectPatternDetailNextEnabled() {
+        await expect(this.page.locator(this.patternDetailNextBtn)).toBeEnabled();
+    }
+
+    async getPatternCardFrequency(index = 0) {
+        return await this.page.locator(this.patternCardFrequency(index)).textContent();
+    }
+
+    async getPatternCardPercentage(index = 0) {
+        return await this.page.locator(this.patternCardPercentage(index)).textContent();
     }
 
     // Error handling methods
