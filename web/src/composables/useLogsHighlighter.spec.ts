@@ -411,9 +411,40 @@ describe("useLogsHighlighter", () => {
       expect(result).toBe("http-method");
     });
 
-    it("should detect status codes", () => {
-      const result = logsHighlighter.detectSemanticType("404");
-      expect(result).toBe("status-code");
+    it("should detect valid HTTP status codes", () => {
+      // Valid 2xx codes
+      expect(logsHighlighter.detectSemanticType("200")).toBe("status-code");
+      expect(logsHighlighter.detectSemanticType("201")).toBe("status-code");
+      expect(logsHighlighter.detectSemanticType("204")).toBe("status-code");
+
+      // Valid 3xx codes
+      expect(logsHighlighter.detectSemanticType("301")).toBe("status-code");
+      expect(logsHighlighter.detectSemanticType("302")).toBe("status-code");
+
+      // Valid 4xx codes
+      expect(logsHighlighter.detectSemanticType("400")).toBe("status-code");
+      expect(logsHighlighter.detectSemanticType("404")).toBe("status-code");
+      expect(logsHighlighter.detectSemanticType("429")).toBe("status-code");
+
+      // Valid 5xx codes
+      expect(logsHighlighter.detectSemanticType("500")).toBe("status-code");
+      expect(logsHighlighter.detectSemanticType("502")).toBe("status-code");
+      expect(logsHighlighter.detectSemanticType("503")).toBe("status-code");
+    });
+
+    it("should NOT detect invalid 3-digit numbers as status codes", () => {
+      // Address numbers (like "147 Birch Way")
+      expect(logsHighlighter.detectSemanticType("147")).not.toBe("status-code");
+      expect(logsHighlighter.detectSemanticType("189")).not.toBe("status-code");
+
+      // Invalid status code ranges
+      expect(logsHighlighter.detectSemanticType("104")).not.toBe("status-code"); // 1xx invalid
+      expect(logsHighlighter.detectSemanticType("209")).not.toBe("status-code"); // 2xx invalid
+      expect(logsHighlighter.detectSemanticType("309")).not.toBe("status-code"); // 3xx invalid
+      expect(logsHighlighter.detectSemanticType("432")).not.toBe("status-code"); // 4xx invalid
+      expect(logsHighlighter.detectSemanticType("512")).not.toBe("status-code"); // 5xx invalid
+      expect(logsHighlighter.detectSemanticType("600")).not.toBe("status-code"); // 6xx doesn't exist
+      expect(logsHighlighter.detectSemanticType("999")).not.toBe("status-code"); // way out of range
     });
 
     it("should detect UUIDs", () => {
