@@ -20,8 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dialog-box"
       :class="
         warningMessage && warningMessage.length > 0
-          ? 'tw-w-[600px]'
-          : 'tw-w-[400px]'
+          ? showQueryReplacementOption
+            ? 'tw-w-[600px]'
+            : 'tw-w-[500px]'
+          : showQueryReplacementOption
+            ? 'tw-w-[400px]'
+            : 'tw-w-[240px]'
       "
     >
       <q-card-section class="confirmBody">
