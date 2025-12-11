@@ -44,6 +44,7 @@ pub struct MergeJob {
     pub stream_name: String,
     pub job_id: i64,
     pub offset: i64,
+    pub stats_offset: i64,
 }
 
 /// JobScheduler is a worker that processes jobs
@@ -118,6 +119,7 @@ impl JobScheduler {
                                 &job.stream_name,
                                 job.job_id,
                                 job.offset,
+                                job.stats_offset,
                             )
                             .await
                             {
