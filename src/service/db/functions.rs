@@ -95,10 +95,40 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     }
                 };
                 QUERY_FUNCTIONS.insert(item_key.to_owned(), item_value);
+
+                // Update pipelines that use this function
+                // item_key format: "org_id/function_name"
+                if let Some((org_id, function_name)) = item_key.split_once('/') {
+                    log::info!(
+                        "[Functions] VRL function {}/{} updated, invalidating dependent pipelines",
+                        org_id,
+                        function_name
+                    );
+                    crate::service::db::pipeline::update_pipelines_on_function_change(
+                        org_id,
+                        function_name,
+                    )
+                    .await;
+                }
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 QUERY_FUNCTIONS.remove(item_key);
+
+                // Update pipelines that used this function (they will fail to compile and be removed)
+                // item_key format: "org_id/function_name"
+                if let Some((org_id, function_name)) = item_key.split_once('/') {
+                    log::info!(
+                        "[Functions] VRL function {}/{} deleted, invalidating dependent pipelines",
+                        org_id,
+                        function_name
+                    );
+                    crate::service::db::pipeline::update_pipelines_on_function_change(
+                        org_id,
+                        function_name,
+                    )
+                    .await;
+                }
             }
             db::Event::Empty => {}
         }

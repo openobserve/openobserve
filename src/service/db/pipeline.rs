@@ -157,6 +157,72 @@ pub async fn clear_scheduled_pipelines_cache() {
     log::info!("[Pipeline] Scheduled pipelines cache cleared");
 }
 
+/// Updates cached executable pipelines when a VRL function is modified.
+/// This ensures that pipelines using the updated function will use the new version.
+pub async fn update_pipelines_on_function_change(org_id: &str, function_name: &str) {
+    let mut stream_exec_pl = STREAM_EXECUTABLE_PIPELINES.write().await;
+    let mut pipeline_stream_mapping_cache = PIPELINE_STREAM_MAPPING.write().await;
+
+    // Collect pipelines that need to be updated
+    let mut pipelines_to_update = Vec::new();
+
+    for (pipeline_id, stream_params) in pipeline_stream_mapping_cache.iter() {
+        // Get the pipeline from database to check if it uses this function
+        if let Ok(pipeline) = infra_pipeline::get_by_id(pipeline_id).await {
+            if pipeline.org != org_id {
+                continue;
+            }
+
+            // Check if this pipeline uses the updated function
+            let uses_function = pipeline.nodes.iter().any(|node| {
+                if let config::meta::pipeline::components::NodeData::Function(func_params) = &node.data {
+                    func_params.name == function_name
+                } else {
+                    false
+                }
+            });
+
+            if uses_function {
+                pipelines_to_update.push((pipeline, stream_params.clone()));
+            }
+        }
+    }
+
+    // Update each affected pipeline
+    for (pipeline, stream_params) in pipelines_to_update {
+        log::info!(
+            "[Pipeline] Updating cached pipeline {}/{} due to function '{}' change",
+            pipeline.org,
+            pipeline.id,
+            function_name
+        );
+
+        match ExecutablePipeline::new(&pipeline).await {
+            Ok(exec_pl) => {
+                stream_exec_pl.insert(stream_params.clone(), exec_pl);
+                log::info!(
+                    "[Pipeline] Successfully updated pipeline {}/{} with new function '{}'",
+                    pipeline.org,
+                    pipeline.id,
+                    function_name
+                );
+            }
+            Err(e) => {
+                log::error!(
+                    "[Pipeline] Error updating pipeline {}/{} after function '{}' change: {}. Removing from cache.",
+                    pipeline.org,
+                    pipeline.id,
+                    function_name,
+                    e
+                );
+                // Remove the pipeline from cache if it fails to compile with the new function
+                stream_exec_pl.remove(&stream_params);
+                pipeline_stream_mapping_cache.remove(&pipeline.id);
+            }
+        }
+    }
+}
+
 /// Finds the pipeline with the same source
 ///
 /// Used to validate if a duplicate pipeline exists.
