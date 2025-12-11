@@ -195,6 +195,21 @@
         default: false,
         required: false,
     },
+    showSqlPreview: {
+        type: Boolean,
+        default: false,
+        required: false,
+    },
+    streamFieldsMap: {
+        type: Object,
+        default: () => ({}),
+        required: false,
+    },
+    sqlQuery: {
+        type: String,
+        default: '',
+        required: false,
+    },
     });
   
   const emit = defineEmits<{
@@ -422,12 +437,31 @@ const computedOpacity = computed(() => {
 });
 
 // Computed preview string
-// Uses shared buildConditionsString utility for consistency with SQL generation
+// Supports three modes:
+// 1. Display mode (default): lowercase operators, simple formatting, wrapped in parentheses - for pipelines
+// 2. SQL Query mode (when sqlQuery prop provided): shows full SQL query - for alerts
+// 3. WHERE clause mode (when showSqlPreview=true but no sqlQuery): shows just WHERE clause
 const previewString = computed(() => {
+  // Mode 1: Full SQL Query (for alerts with aggregation, etc.)
+  if (props.sqlQuery && props.sqlQuery.trim().length > 0) {
+    return props.sqlQuery;
+  }
+
+  // Mode 2: SQL WHERE clause only (fallback for alerts)
+  if (props.showSqlPreview) {
+    return buildConditionsString(groups.value, {
+      sqlMode: true,              // SQL format (uppercase AND/OR, LIKE operators)
+      addWherePrefix: true,        // Add "WHERE" prefix
+      formatValues: true,          // Type-aware formatting (Int64 no quotes, String with quotes)
+      streamFieldsMap: props.streamFieldsMap,
+    });
+  }
+
+  // Mode 3: Display format (for pipelines)
   const preview = buildConditionsString(groups.value, {
-    sqlMode: false, // Display format (lowercase operators)
+    sqlMode: false,            // Display format (lowercase operators)
     addWherePrefix: false,
-    formatValues: false, // Simple display format without type-aware formatting
+    formatValues: false,       // Simple display format without type-aware formatting
   });
   // Wrap the entire root expression in parentheses
   return preview ? `(${preview})` : '';

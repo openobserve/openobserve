@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div v-if="expandState.realTimeMode" class=" tw-w-full row alert-setup-containero2-alert-tab-border tw-px-4 tw-pt-2 tw-pb-3 ">
 
-            <FilterGroup :stream-fields="columns" :group="inputData" :depth="0" @add-condition="updateGroup" @add-group="updateGroup" @remove-group="removeConditionGroup" @input:update="(name, field) => emits('input:update', name, field)" />
+            <FilterGroup :stream-fields="columns" :stream-fields-map="streamFieldsMap" :show-sql-preview="true" :sql-query="generatedSqlQuery" :group="inputData" :depth="0" @add-condition="updateGroup" @add-group="updateGroup" @remove-group="removeConditionGroup" @input:update="(name, field) => emits('input:update', name, field)" />
             </div>
         </div>
       </div>
@@ -258,7 +258,7 @@ const store = useStore();
 
 const router = useRouter();
 
-const props = defineProps(["columns", "conditions","enableNewValueMode", "expandState", "trigger", "destinations", "formattedDestinations"]);
+const props = defineProps(["columns", "streamFieldsMap", "generatedSqlQuery", "conditions","enableNewValueMode", "expandState", "trigger", "destinations", "formattedDestinations"]);
 
 const emits = defineEmits(["field:add", "field:remove", "input:update", "update:expandState", "update:trigger", "refresh:destinations", "update:destinations", "update:group", "remove:group"]);
 

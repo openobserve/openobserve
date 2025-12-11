@@ -1044,6 +1044,9 @@ style=" margin-left: 8px;">
           class='q-pa-none q-ma-none'
           ">
           <FilterGroup :stream-fields="columns"
+            :stream-fields-map="streamFieldsMap"
+            :show-sql-preview="true"
+            :sql-query="generatedSqlQuery"
             :group="inputData "
             :depth="0"
             @add-condition="updateGroup"
@@ -1644,6 +1647,8 @@ const QueryEditor = defineAsyncComponent(
 
 const props = defineProps([
   "columns",
+  "streamFieldsMap",
+  "generatedSqlQuery",
   "conditions",
   "trigger",
   "sql",
