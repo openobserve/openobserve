@@ -874,8 +874,19 @@ SELECT date
         Ok(()) // do nothing
     }
 
-    async fn stats(&self, time_range: (i64, i64)) -> Result<Vec<(String, StreamStats)>> {
+    async fn stats(
+        &self,
+        time_range: (i64, i64),
+        need_deleted: bool,
+    ) -> Result<Vec<(String, StreamStats)>> {
         let (min, max) = time_range;
+        let deleted_filter = if need_deleted {
+            // if we need deleted files, we don't apply deleted filter
+            ""
+        } else {
+            // if we don't need deleted files, we filter non-deleted files
+            "AND deleted IS FALSE"
+        };
         let sql = format!(
             r#"
 SELECT 
@@ -908,7 +919,7 @@ SELECT
         ELSE 0
     END)::BIGINT AS index_size
 FROM file_list
-WHERE updated_at > {min} AND updated_at <= {max}
+WHERE updated_at > {min} AND updated_at <= {max} {deleted_filter}
 GROUP BY stream
             "#
         );
