@@ -1,0 +1,130 @@
+[
+  {
+    "level": "emergency",
+    "job": "test",
+    "log": "System is unusable - emergency level",
+    "severity": 0,
+    "expected_color": "#dc2626",
+    "priority": 0
+  },
+  {
+    "level": "emergency",
+    "job": "test",
+    "log": "System is unusable - emergency level string",
+    "severity": "0",
+    "expected_color": "#dc2626",
+    "priority": 0
+  },
+  {
+    "level": "alert",
+    "job": "test",
+    "log": "Action must be taken immediately",
+    "severity": 1,
+    "expected_color": "#ea580c",
+    "priority": 1
+  },
+  {
+    "level": "alert",
+    "job": "test",
+    "log": "Action must be taken immediately string",
+    "severity": "1",
+    "expected_color": "#ea580c",
+    "priority": 1
+  },
+  {
+    "level": "critical",
+    "job": "test",
+    "log": "Critical conditions detected",
+    "severity": 2,
+    "expected_color": "#d97706",
+    "priority": 2
+  },
+  {
+    "level": "critical",
+    "job": "test",
+    "log": "Critical conditions detected string",
+    "severity": "2",
+    "expected_color": "#d97706",
+    "priority": 2
+  },
+  {
+    "level": "error",
+    "job": "test",
+    "log": "Error conditions occurred",
+    "severity": 3,
+    "expected_color": "#dc2626",
+    "priority": 3
+  },
+  {
+    "level": "error",
+    "job": "test",
+    "log": "Error conditions occurred string",
+    "severity": "3",
+    "expected_color": "#dc2626",
+    "priority": 3
+  },
+  {
+    "level": "warning",
+    "job": "test",
+    "log": "Warning conditions present",
+    "severity": 4,
+    "expected_color": "#eab308",
+    "priority": 4
+  },
+  {
+    "level": "warning",
+    "job": "test",
+    "log": "Warning conditions present string",
+    "severity": "4",
+    "expected_color": "#eab308",
+    "priority": 4
+  },
+  {
+    "level": "notice",
+    "job": "test",
+    "log": "Normal but significant condition",
+    "severity": 5,
+    "expected_color": "#16a34a",
+    "priority": 5
+  },
+  {
+    "level": "notice",
+    "job": "test",
+    "log": "Normal but significant condition string",
+    "severity": "5",
+    "expected_color": "#16a34a",
+    "priority": 5
+  },
+  {
+    "level": "info",
+    "job": "test",
+    "log": "Informational messages",
+    "severity": 6,
+    "expected_color": "#84a8f6ff",
+    "priority": 6
+  },
+  {
+    "level": "info",
+    "job": "test",
+    "log": "Informational messages string",
+    "severity": "6",
+    "expected_color": "#84a8f6ff",
+    "priority": 6
+  },
+  {
+    "level": "debug",
+    "job": "test",
+    "log": "Debug-level messages",
+    "severity": 7,
+    "expected_color": "#6b7280",
+    "priority": 7
+  },
+  {
+    "level": "debug",
+    "job": "test",
+    "log": "Debug-level messages string",
+    "severity": "7",
+    "expected_color": "#6b7280",
+    "priority": 7
+  }
+]
