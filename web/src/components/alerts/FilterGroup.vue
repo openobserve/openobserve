@@ -161,6 +161,7 @@
     import { getUUID } from '@/utils/zincutils';
     import AppTabs from '../common/AppTabs.vue';
     import ConfirmDialog from '@/components/ConfirmDialog.vue';
+    import { buildConditionsString } from '@/utils/alerts/conditionsFormatter';
     const props = defineProps({
     group: {
         type: Object,
@@ -420,49 +421,14 @@ const computedOpacity = computed(() => {
   return props.depth + 10;
 });
 
-// Build preview string recursively
-const buildPreviewString = (group: any): string => {
-  // V2: Use conditions array instead of items
-  if (!group || !group.conditions || group.conditions.length === 0) {
-    return '';
-  }
-
-  const parts: string[] = [];
-
-  group.conditions.forEach((item: any, index: number) => {
-    let conditionStr = '';
-
-    if (isGroup(item)) {
-      // Nested group - recursively build its preview
-      const nestedPreview = buildPreviewString(item);
-      if (nestedPreview) {
-        conditionStr = `(${nestedPreview})`;
-      }
-    } else {
-      // Condition - show full condition: column operator value
-      const column = item.column || 'field';
-      const operator = item.operator || '=';
-      const value = item.value !== undefined && item.value !== null && item.value !== ''
-        ? `'${item.value}'`
-        : "''";
-      conditionStr = `${column} ${operator} ${value}`;
-    }
-
-    // Add logical operator before condition (except for first condition)
-    if (index > 0 && item.logicalOperator) {
-      parts.push(`${item.logicalOperator.toLowerCase()} ${conditionStr}`);
-    } else {
-      parts.push(conditionStr);
-    }
-  });
-
-  // Join all parts with spaces (operators are already included)
-  return parts.join(' ');
-};
-
 // Computed preview string
+// Uses shared buildConditionsString utility for consistency with SQL generation
 const previewString = computed(() => {
-  const preview = buildPreviewString(groups.value);
+  const preview = buildConditionsString(groups.value, {
+    sqlMode: false, // Display format (lowercase operators)
+    addWherePrefix: false,
+    formatValues: false, // Simple display format without type-aware formatting
+  });
   // Wrap the entire root expression in parentheses
   return preview ? `(${preview})` : '';
 });
