@@ -976,7 +976,7 @@ SELECT date
         time_range: (i64, i64),
         need_deleted: bool,
     ) -> Result<Vec<(String, StreamStats)>> {
-        let (min, max) = time_range;
+        let (min_ts, max_ts) = time_range;
         let deleted_filter = if need_deleted {
             // if we need deleted files, we don't apply deleted filter
             ""
