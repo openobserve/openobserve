@@ -481,6 +481,8 @@ pub struct RequestStats {
     pub node_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub dashboard_info: Option<DashboardInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub peak_memory_usage: Option<f64>,
 }
 impl Default for RequestStats {
     fn default() -> Self {
@@ -506,6 +508,7 @@ impl Default for RequestStats {
             work_group: None,
             node_name: Some(get_config().common.instance_name.clone()),
             dashboard_info: None,
+            peak_memory_usage: None,
         }
     }
 }
@@ -534,6 +537,7 @@ impl From<FileMeta> for RequestStats {
             work_group: None,
             node_name: None,
             dashboard_info: None,
+            peak_memory_usage: None,
         }
     }
 }
@@ -970,6 +974,7 @@ mod tests {
                 tab_id: "test_tab_id".to_string(),
                 tab_name: "test_tab_name".to_string(),
             }),
+            peak_memory_usage: Some(1024000.0),
         };
 
         let json = serde_json::to_string(&stats).unwrap();

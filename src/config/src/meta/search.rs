@@ -251,6 +251,8 @@ pub struct Response {
     pub is_histogram_eligible: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub query_index: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub peak_memory_usage: Option<f64>,
 }
 
 /// Iterator for Streaming response of search `Response`
@@ -419,6 +421,7 @@ impl Response {
             converted_histogram_query: None,
             is_histogram_eligible: None,
             query_index: None,
+            peak_memory_usage: None,
         }
     }
 
@@ -522,6 +525,10 @@ impl Response {
 
     pub fn set_order_by_metadata(&mut self, val: Vec<(String, OrderBy)>) {
         self.order_by_metadata = val;
+    }
+
+    pub fn set_peak_memory_usage(&mut self, val: f64) {
+        self.peak_memory_usage = Some(val);
     }
 }
 
