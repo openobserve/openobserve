@@ -409,6 +409,7 @@ pub async fn merge_by_stream(
     stream_name: &str,
     job_id: i64,
     offset: i64,
+    stats_offset: i64,
 ) -> Result<(), anyhow::Error> {
     let cfg = get_config();
     let start = std::time::Instant::now();
@@ -436,7 +437,7 @@ pub async fn merge_by_stream(
     let (date_start, date_end) = if partition_time_level == PartitionTimeLevel::Daily {
         (
             offset_time.format("%Y/%m/%d/00").to_string(),
-            offset_time.format("%Y/%m/%d/%H").to_string(),
+            offset_time.format("%Y/%m/%d/23").to_string(),
         )
     } else {
         (
@@ -448,6 +449,16 @@ pub async fn merge_by_stream(
         file_list::query_for_merge(org_id, stream_type, stream_name, &date_start, &date_end)
             .await
             .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
+
+    if !files.is_empty() && offset + hour_micros(1) > stats_offset {
+        // check stream stats update offset, if the merge offset greater than the stream stats
+        // offset, we need to wait for the stream stats to be updated first. here we just
+        // simple skip it, it will be retried in 10 minutes
+        log::warn!(
+            "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] offset: {offset}, skipped, it needs to wait stream_stats offset: {stats_offset}",
+        );
+        return Ok(());
+    }
 
     log::debug!(
         "[COMPACTOR] merge_by_stream [{}/{}/{}] date range: [{},{}], files: {}",

@@ -22,7 +22,6 @@ use config::{
         cluster::{CompactionJobType, Role},
         stream::{ALL_STREAM_TYPES, PartitionTimeLevel, StreamType},
     },
-    utils::time::hour_micros,
 };
 use infra::{
     file_list as infra_file_list,
@@ -363,19 +362,6 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
             continue;
         }
 
-        // check stream stats offset, if the merge offset greater than the stream stats offset, we
-        // need to wait for the stream stats to be updated first
-        if job.offsets + hour_micros(1) > stream_stats_offset {
-            // simple skip and don't release it, because release will cause it retry immediately, if
-            // we skip it, it need to wait for 10 minutes
-            log::warn!(
-                "[COMPACTOR] merge job stream {}, offset {}, skipped, it needs to wait stream_stats offset: {stream_stats_offset}",
-                job.stream,
-                job.offsets
-            );
-            continue;
-        }
-
         let columns = job.stream.split('/').collect::<Vec<&str>>();
         assert_eq!(columns.len(), 3);
         let org_id = columns[0].to_string();
@@ -428,6 +414,7 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
             stream_name,
             job_id: job.id,
             offset: job.offsets,
+            stats_offset: stream_stats_offset,
         });
     }
 

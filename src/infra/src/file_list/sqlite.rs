@@ -1195,7 +1195,7 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
         let sql = format!(
-            "UPDATE file_list_jobs SET status = $1, updated_at = $2, dumped = $3 WHERE id IN ({});",
+            "UPDATE file_list_jobs SET status = $1, updated_at = $2, dumped = $3, node = '' WHERE id IN ({});",
             ids.iter()
                 .map(|id| id.to_string())
                 .collect::<Vec<_>>()

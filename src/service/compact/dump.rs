@@ -247,6 +247,7 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
                 job.job_id,
             );
         }
+        log::debug!("[COMPACTOR::DUMP] no files to dump for offset [{start_time},{end_time}]");
         return Ok(());
     }
 
@@ -267,7 +268,7 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
             &dump_stream_name,
             StreamType::Filelist,
             &FILE_LIST_SCHEMA,
-            None,
+            Some(start_time),
         )
         .await
         {
@@ -307,11 +308,15 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
         infra_file_list::update_dump_records(&dump_file, &ids).await?;
         infra_file_list::set_job_dumped_status(&[job.job_id], true).await?;
         log::info!(
-            "[COMPACTOR::DUMP] successfully dumped file list for stream [{}/{}/{}] offset {start_time} records {records} to file {file_name}, took: {} ms",
+            "[COMPACTOR::DUMP] successfully dumped offset [{start_time},{end_time}] records {records} to file {file_name}, took: {} ms",
+            start.elapsed().as_millis(),
+        );
+    } else {
+        log::error!(
+            "[COMPACTOR::DUMP] failed to generate dump file for stream [{}/{}/{}] offset [{start_time},{end_time}]",
             job.org_id,
             job.stream_type,
             job.stream_name,
-            start.elapsed().as_millis(),
         );
     }
 

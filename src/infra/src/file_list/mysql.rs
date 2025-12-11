@@ -1561,7 +1561,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
             .with_label_values(&["update", "file_list_jobs"])
             .inc();
         let sql = format!(
-            "UPDATE file_list_jobs SET status = ?, updated_at = ?, dumped = ? WHERE id IN ({});",
+            "UPDATE file_list_jobs SET status = ?, updated_at = ?, dumped = ?, node = '' WHERE id IN ({});",
             ids.iter()
                 .map(|id| id.to_string())
                 .collect::<Vec<_>>()
