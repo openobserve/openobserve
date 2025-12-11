@@ -52,6 +52,7 @@ use crate::service::stream::get_stream;
 use crate::{
     common::meta::{
         http::HttpResponse as MetaHttpResponse,
+        ingestion::IngestUser,
         stream::SchemaRecords,
         traces::{Event, Span, SpanLink, SpanLinkContext, SpanRefType},
     },
@@ -90,7 +91,7 @@ pub async fn otlp_proto(
     org_id: &str,
     body: web::Bytes,
     in_stream_name: Option<&str>,
-    user_email: &str,
+    user: IngestUser,
 ) -> Result<HttpResponse, Error> {
     let request = match ExportTraceServiceRequest::decode(body) {
         Ok(v) => v,
@@ -107,7 +108,7 @@ pub async fn otlp_proto(
         request,
         OtlpRequestType::HttpProtobuf,
         in_stream_name,
-        user_email,
+        user,
     )
     .await
     {
@@ -125,7 +126,7 @@ pub async fn otlp_json(
     org_id: &str,
     body: web::Bytes,
     in_stream_name: Option<&str>,
-    user_email: &str,
+    user: IngestUser,
 ) -> Result<HttpResponse, Error> {
     let request = match serde_json::from_slice::<ExportTraceServiceRequest>(body.as_ref()) {
         Ok(req) => req,
@@ -142,7 +143,7 @@ pub async fn otlp_json(
         request,
         OtlpRequestType::HttpJson,
         in_stream_name,
-        user_email,
+        user,
     )
     .await
     {
@@ -159,7 +160,7 @@ pub async fn handle_otlp_request(
     request: ExportTraceServiceRequest,
     req_type: OtlpRequestType,
     in_stream_name: Option<&str>,
-    user_email: &str,
+    user: IngestUser,
 ) -> Result<HttpResponse, Error> {
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None).await {
@@ -534,7 +535,7 @@ pub async fn handle_otlp_request(
         org_id,
         (started_at, &start),
         json_data_by_stream,
-        user_email,
+        &user.to_email(),
     )
     .await
     {
@@ -581,7 +582,7 @@ pub async fn ingest_json(
     body: web::Bytes,
     req_type: OtlpRequestType,
     traces_stream_name: &str,
-    user_email: &str,
+    user: IngestUser,
 ) -> Result<HttpResponse, Error> {
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None).await {
@@ -687,7 +688,7 @@ pub async fn ingest_json(
         org_id,
         (started_at, &start),
         json_data_by_stream,
-        user_email,
+        &user.to_email(),
     )
     .await
     {

@@ -25,7 +25,8 @@ use utoipa::ToSchema;
 use crate::{
     common::{
         meta::{
-            http::HttpResponse as MetaHttpResponse, ingestion::IngestionRequest,
+            http::HttpResponse as MetaHttpResponse,
+            ingestion::{IngestUser, IngestionRequest},
             middleware_data::RumExtraData,
         },
         utils::auth::UserEmail,
@@ -133,7 +134,7 @@ pub async fn data(
             &org_id,
             RUM_DATA_STREAM,
             IngestionRequest::RUM(body),
-            user_email,
+            IngestUser::User(user_email.clone()),
             Some(extend_json),
             false,
         )
@@ -183,7 +184,7 @@ pub async fn log(
             &org_id,
             RUM_LOG_STREAM,
             IngestionRequest::RUM(body),
-            user_email,
+            IngestUser::User(user_email.clone()),
             Some(extend_json),
             false,
         )
@@ -253,7 +254,7 @@ pub async fn sessionreplay(
             &org_id,
             RUM_SESSION_REPLAY_STREAM,
             IngestionRequest::RUM(body.into()),
-            user_email,
+            IngestUser::User(user_email.clone()),
             Some(extend_json),
             false,
         )

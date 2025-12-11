@@ -34,7 +34,10 @@ use hashbrown::{HashMap, hash_map::Entry};
 use proto::cluster_rpc;
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 
-use crate::{common::meta::ingestion, service};
+use crate::{
+    common::meta::ingestion::{self, IngestUser, SystemJobType},
+    service,
+};
 
 pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
     if curr_usages.is_empty() {
@@ -227,7 +230,17 @@ pub(super) async fn ingest_reporting_data(
         );
         let bytes = bytes::Bytes::from(json::to_string(&reporting_data_json).unwrap());
         let req = ingestion::IngestionRequest::Usage(bytes);
-        match service::logs::ingest::ingest(0, &org_id, &stream_name, req, "", None, false).await {
+        match service::logs::ingest::ingest(
+            0,
+            &org_id,
+            &stream_name,
+            req,
+            IngestUser::SystemJob(SystemJobType::SelfReporting),
+            None,
+            false,
+        )
+        .await
+        {
             Ok(resp) if resp.code == 200 => {
                 log::debug!(
                     "[SELF-REPORTING] ReportingData successfully ingested to stream {org_id}/{stream_name}"

@@ -19,7 +19,7 @@ use opentelemetry_proto::tonic::collector::trace::v1::{
 };
 use tonic::{Response, Status};
 
-use crate::service::traces::handle_otlp_request;
+use crate::{common::meta::ingestion::IngestUser, service::traces::handle_otlp_request};
 
 #[derive(Default)]
 pub struct TraceServer;
@@ -57,14 +57,19 @@ impl TraceService for TraceServer {
         let user_email = metadata
             .get("user_id")
             .and_then(|id| id.to_str().ok())
-            .unwrap_or_default();
+            .unwrap_or_else(|| {
+                log::warn!("[gRPC Traces] user_id not found in metadata, using empty string");
+                ""
+            });
+
+        let user = IngestUser::from_user_email(user_email);
 
         let resp = handle_otlp_request(
             org_id.unwrap().to_str().unwrap(),
             in_req,
             OtlpRequestType::Grpc,
             in_stream_name,
-            user_email,
+            user,
         )
         .await;
         if resp.is_ok() {

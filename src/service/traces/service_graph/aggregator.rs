@@ -76,13 +76,20 @@ pub async fn write_sql_aggregated_edges(
 
     // Write to stream
     if !bulk_body.is_empty() {
+        use crate::common::meta::ingestion::{IngestUser, SystemJobType};
+
         let data = actix_web::web::Bytes::from(bulk_body.into_bytes());
 
-        crate::service::logs::bulk::ingest(0, org_id, data, "")
-            .await
-            .inspect_err(|e| {
-                log::error!("[ServiceGraph] Failed to write SQL-aggregated edges: {e}");
-            })?;
+        crate::service::logs::bulk::ingest(
+            0,
+            org_id,
+            data,
+            IngestUser::SystemJob(SystemJobType::ServiceGraph),
+        )
+        .await
+        .inspect_err(|e| {
+            log::error!("[ServiceGraph] Failed to write SQL-aggregated edges: {e}");
+        })?;
     }
 
     log::info!(

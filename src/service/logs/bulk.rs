@@ -51,7 +51,7 @@ pub async fn ingest(
     thread_id: usize,
     org_id: &str,
     body: web::Bytes,
-    user_email: &str,
+    user: crate::common::meta::ingestion::IngestUser,
 ) -> Result<BulkResponse> {
     let start = std::time::Instant::now();
 
@@ -240,7 +240,7 @@ pub async fn ingest(
             org_id,
             &stream_name,
             IngestionRequest::JsonValues(IngestionValueType::Bulk, records),
-            user_email,
+            user.clone(),
             None,
             false,
         )
@@ -360,6 +360,7 @@ pub fn add_record_status(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::meta::ingestion::IngestUser;
 
     #[test]
     fn test_add_record_status() {
@@ -389,11 +390,11 @@ mod tests {
         let body = web::Bytes::from(bulk_request);
         let thread_id = 1;
         let org_id = "test-org";
-        let user_email = "test@example.com";
+        let user = IngestUser::from_user_email("test@example.com");
 
         // Note: This test will likely fail due to missing infrastructure setup,
         // but it demonstrates the basic structure of testing the ingest function
-        let result = ingest(thread_id, org_id, body, user_email).await;
+        let result = ingest(thread_id, org_id, body, user).await;
 
         // The test should either succeed or fail with a specific error
         // (likely related to missing database connections or configuration)

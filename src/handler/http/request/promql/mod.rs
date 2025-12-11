@@ -28,7 +28,7 @@ use {config::meta::stream::StreamType, o2_openfga::meta::mapping::OFGA_MODELS};
 
 use crate::{
     common::{
-        meta::http::HttpResponse as MetaHttpResponse,
+        meta::{http::HttpResponse as MetaHttpResponse, ingestion::IngestUser},
         utils::{auth::UserEmail, http::get_or_create_trace_id},
     },
     handler::http::{
@@ -64,11 +64,11 @@ pub async fn remote_write(
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
-    let user_email = &user_email.user_id;
+    let user = IngestUser::from_user_email(&user_email.user_id);
     let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
     if content_type == "application/x-protobuf" {
         Ok(
-            match metrics::prom::remote_write(&org_id, body, user_email).await {
+            match metrics::prom::remote_write(&org_id, body, user).await {
                 Ok(_) => HttpResponse::Ok().into(),
                 Err(e) => HttpResponse::BadRequest()
                     .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e)),

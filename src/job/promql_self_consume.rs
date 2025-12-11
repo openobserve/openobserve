@@ -33,7 +33,10 @@ use tonic::{
     metadata::{MetadataKey, MetadataValue},
 };
 
-use crate::service::{self, grpc::get_ingester_channel};
+use crate::{
+    common::meta::ingestion::{IngestUser, SystemJobType},
+    service::{self, grpc::get_ingester_channel},
+};
 
 static METRICS_WHITELIST: Lazy<HashSet<String>> = Lazy::new(|| {
     config::get_config()
@@ -113,7 +116,13 @@ pub async fn run() -> Result<(), anyhow::Error> {
         if LOCAL_NODE.is_ingester() {
             let metrics = JsonEncoder::new().encode_to_string(&prom_data).unwrap();
             let bytes = bytes::Bytes::from(metrics);
-            match service::metrics::json::ingest(org, bytes, "").await {
+            match service::metrics::json::ingest(
+                org,
+                bytes,
+                IngestUser::SystemJob(SystemJobType::SelfMetricsPromql),
+            )
+            .await
+            {
                 Ok(_) => {
                     log::debug!("successfully ingested self-metrics");
                 }

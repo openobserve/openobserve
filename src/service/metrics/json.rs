@@ -60,7 +60,11 @@ use crate::{
     },
 };
 
-pub async fn ingest(org_id: &str, body: web::Bytes, user_email: &str) -> Result<IngestionResponse> {
+pub async fn ingest(
+    org_id: &str,
+    body: web::Bytes,
+    user: crate::common::meta::ingestion::IngestUser,
+) -> Result<IngestionResponse> {
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None).await {
         // we do not want to log trial period expired errors
@@ -504,10 +508,11 @@ pub async fn ingest(org_id: &str, body: web::Bytes, user_email: &str) -> Result<
         let fsync = false;
         let mut req_stats = write_file(&writer, org_id, &stream_name, stream_data, fsync).await?;
 
-        req_stats.user_email = if user_email.is_empty() {
+        let email_str = user.to_email();
+        req_stats.user_email = if email_str.is_empty() {
             None
         } else {
-            Some(user_email.to_string())
+            Some(email_str)
         };
         req_stats.response_time = start.elapsed().as_secs_f64();
         let fns_length: usize =
