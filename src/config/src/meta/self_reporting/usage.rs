@@ -236,6 +236,8 @@ pub struct UsageData {
     pub node_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub dashboard_info: Option<DashboardInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub peak_memory_usage: Option<f64>,
 }
 
 #[derive(Hash, PartialEq, Eq)]
@@ -822,6 +824,7 @@ mod tests {
                 tab_id: "test_tab_id".to_string(),
                 tab_name: "test_tab_name".to_string(),
             }),
+            peak_memory_usage: Some(1024000.0),
         };
 
         let json = serde_json::to_string(&usage_data).unwrap();
@@ -865,6 +868,7 @@ mod tests {
             work_group: None,
             node_name: None,
             dashboard_info: None,
+            peak_memory_usage: None,
         };
 
         let json = serde_json::to_string(&usage_data).unwrap();
@@ -878,6 +882,7 @@ mod tests {
         assert!(!json.contains("work_group"));
         assert!(!json.contains("node_name"));
         assert!(!json.contains("dashboard_info"));
+        assert!(!json.contains("peak_memory_usage"));
     }
 
     #[test]
@@ -1134,6 +1139,7 @@ mod tests {
             work_group: None,
             node_name: None,
             dashboard_info: None,
+            peak_memory_usage: None,
         };
 
         let aggregated = AggregatedData {

@@ -427,6 +427,7 @@ mod tests {
             work_group: None,
             node_name: None,
             dashboard_info: None,
+            peak_memory_usage: None,
         }
     }
 
