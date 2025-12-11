@@ -74,7 +74,8 @@ export const useSearchQuery = () => {
 
     // Update highlight query on run-query
     if (searchObj.meta.sqlMode) {
-      searchObj.data.highlightQuery = searchObj.data.query.toLowerCase().split("where")[1];
+      searchObj.data.highlightQuery =
+        searchObj.data.query.toLowerCase().split("where")?.[1] || "";
     } else {
       searchObj.data.highlightQuery = searchObj.data.query.toLowerCase();
     }
