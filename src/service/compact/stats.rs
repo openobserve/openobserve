@@ -36,11 +36,16 @@ pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow:
         return Ok(None);
     }
 
+    // get reset offset
+    let reset_offset = db::compact::stats::get_reset().await;
+
     // set the max_ts shouldn't greater than NOW-1m to avoid the latest data duplicated calculation
     let latest_update_at = std::cmp::min(latest_update_at, now_micros() - second_micros(60));
 
     loop {
-        let Some(time_range) = update_stats_from_file_list_inner(latest_update_at).await? else {
+        let Some(time_range) =
+            update_stats_from_file_list_inner(latest_update_at, reset_offset).await?
+        else {
             break;
         };
         log::info!("keep updating stream stats from file list, time range: {time_range:?} ...");
@@ -52,6 +57,7 @@ pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow:
 
 async fn update_stats_from_file_list_inner(
     latest_update_at: i64,
+    reset_offset: i64,
 ) -> Result<Option<(i64, i64)>, anyhow::Error> {
     // get last offset
     let (mut offset, node) = db::compact::stats::get_offset().await;
@@ -87,7 +93,10 @@ async fn update_stats_from_file_list_inner(
 
     // get stats from file_list
     let time_range = (offset, latest_update_at);
-    let stream_stats = infra_file_list::stats(time_range)
+    // if the latest_update_at < reset_offset, we skip deleted files, because thoese files we
+    // haven't calculated add, so we don't need to consider deleted here
+    let need_deleted = latest_update_at > reset_offset;
+    let stream_stats = infra_file_list::stats(time_range, need_deleted)
         .await
         .map_err(|e| anyhow::anyhow!("get add stream stats error: {e}"))?;
     // get stats from file_list_dump
@@ -157,19 +166,19 @@ mod tests {
     async fn test_update_stats_from_file_list() {
         setup().await;
         let latest_updated_at = 1755706810000000;
-        let ret = update_stats_from_file_list_inner(latest_updated_at)
+        let ret = update_stats_from_file_list_inner(latest_updated_at, 0)
             .await
             .unwrap();
         assert_eq!(ret, Some((1755705600000000, 1755706200000000)));
-        let ret = update_stats_from_file_list_inner(latest_updated_at)
+        let ret = update_stats_from_file_list_inner(latest_updated_at, 0)
             .await
             .unwrap();
         assert_eq!(ret, Some((1755706200000000, 1755706800000000)));
-        let ret = update_stats_from_file_list_inner(latest_updated_at)
+        let ret = update_stats_from_file_list_inner(latest_updated_at, 0)
             .await
             .unwrap();
         assert_eq!(ret, Some((1755706800000000, 1755706810000000)));
-        let ret = update_stats_from_file_list_inner(latest_updated_at)
+        let ret = update_stats_from_file_list_inner(latest_updated_at, 0)
             .await
             .unwrap();
         assert_eq!(ret, None);
