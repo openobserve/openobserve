@@ -410,8 +410,7 @@ pub async fn run_datafusion(
                     .build()
             )
         );
-        // Update scan stats to include aggregation cache ratio and peak memory usage
-        visit.scan_stats.aggs_cache_ratio = aggs_cache_ratio as i64;
+        visit.scan_stats.aggs_cache_ratio = aggs_cache_ratio;
         visit.scan_stats.peak_memory_usage = peak_memory.max(visit.peak_memory) as i64;
         ret.map(|data| {
             check_query_default_limit_exceeded(
