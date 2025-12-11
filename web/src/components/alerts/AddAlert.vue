@@ -221,6 +221,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <real-time-alert
                 ref="realTimeAlertRef"
                 :columns="filteredColumns"
+                :streamFieldsMap="streamFieldsMap"
+                :generatedSqlQuery="generatedSqlQuery"
                 :conditions="formData.query_condition?.conditions || {}"
                 @input:update="onInputUpdate"
                 :expandState = expandState
@@ -240,6 +242,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="!isLoadingPanelData"
                 ref="scheduledAlertRef"
                 :columns="filteredColumns"
+                :streamFieldsMap="streamFieldsMap"
+                :generatedSqlQuery="generatedSqlQuery"
                 :conditions="formData.query_condition?.conditions || {}"
                 :expandState = expandState
                 :alertData="formData"
@@ -937,6 +941,20 @@ export default defineComponent({
       );
     };
 
+    // Computed SQL query for preview in FilterGroup
+    // Only generate when in custom tab with conditions
+    const generatedSqlQuery = computed(() => {
+      try {
+        if (formData.value.query_condition?.conditions &&
+            Object.keys(formData.value.query_condition.conditions).length > 0) {
+          return generateSqlQueryLocal();
+        }
+      } catch (e) {
+        console.error('Error generating SQL query for preview:', e);
+      }
+      return '';
+    });
+
     const debouncedPreviewAlert = debounce(previewAlert, 500);
 
     const onInputUpdate = async (name: string, value: any) => {
@@ -1404,6 +1422,7 @@ export default defineComponent({
       showPreview,
       rowTemplatePlaceholder,
       streamFieldsMap,
+      generatedSqlQuery,
       previewQuery,
       previewAlertRef,
       outlinedInfo,
