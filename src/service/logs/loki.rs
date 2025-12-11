@@ -27,7 +27,7 @@ use promql_parser::{
 use proto::loki_rpc;
 
 use crate::common::meta::{
-    ingestion::{IngestionRequest, IngestionResponse, IngestionValueType},
+    ingestion::{IngestUser, IngestionRequest, IngestionResponse, IngestionValueType},
     loki::{LokiError, LokiPushRequest},
 };
 
@@ -55,7 +55,7 @@ pub async fn handle_request(
             org_id,
             &stream_name,
             IngestionRequest::JsonValues(IngestionValueType::Loki, records),
-            user_email,
+            IngestUser::User(user_email.to_string()),
             None,
             false,
         )

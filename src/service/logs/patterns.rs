@@ -21,7 +21,7 @@
 use anyhow::{Result, anyhow};
 use config::utils::json;
 
-use crate::common::meta::ingestion::IngestionRequest;
+use crate::common::meta::ingestion::{IngestUser, IngestionRequest};
 
 /// Ingest extracted patterns to a pattern stream
 ///
@@ -32,6 +32,7 @@ use crate::common::meta::ingestion::IngestionRequest;
 /// * `org_id` - Organization ID
 /// * `stream_name` - Original log stream name (without suffix)
 /// * `patterns` - Vector of pattern JSON objects to ingest
+/// * `user` - User identifier (real user email or system job type)
 ///
 /// # Returns
 /// `Ok(())` if ingestion succeeded, `Err` otherwise
@@ -39,6 +40,7 @@ pub async fn ingest_patterns(
     org_id: &str,
     stream_name: &str,
     patterns: Vec<json::Map<String, json::Value>>,
+    user: IngestUser,
 ) -> Result<()> {
     if patterns.is_empty() {
         log::debug!(
@@ -66,7 +68,7 @@ pub async fn ingest_patterns(
 
     // Use direct log ingestion (we're on ingester nodes)
     let req = IngestionRequest::JSON(bytes);
-    match super::ingest::ingest(0, org_id, &pattern_stream_name, req, "", None, false).await {
+    match super::ingest::ingest(0, org_id, &pattern_stream_name, req, user, None, false).await {
         Ok(resp) if resp.code == 200 => {
             log::debug!(
                 "[PatternIngestion] Successfully ingested patterns to {}/{}",
