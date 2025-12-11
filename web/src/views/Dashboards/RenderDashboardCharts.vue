@@ -600,39 +600,46 @@ export default defineComponent({
         }
       });
     }; // Optimized GridStack refresh function
+    // Optimized GridStack refresh function
+    // Optimized GridStack refresh function
     const refreshGridStack = async () => {
-      if (!gridStackInstance || !gridStackContainer.value) {
+      if (!gridStackContainer.value) {
         return;
       }
 
       gridStackUpdateInProgress = true;
 
-      // Wait for Vue to finish DOM updates
+      // Fully destroy existing instance if it exists
+      if (gridStackInstance) {
+        gridStackInstance.destroy(false); // false = do not remove DOM elements
+        gridStackInstance = null;
+      }
+
+      // Wait for Vue to update DOM with new panels
       await nextTick();
       await nextTick();
+
+      // Re-initialize GridStack
+      initGridStack();
 
       const grid = gridStackInstance;
+      if (!grid) {
+          gridStackUpdateInProgress = false;
+          return;
+      }
 
-      // IMPORTANT: Disable animation and floating during reconstruction for better performance
-      grid.float(false);
-      grid.setAnimation(false);
-
-      // Clear all existing widgets completely to prevent stale references
-      const existingElements = grid.getGridItems();
-
-      // Force clear any remaining grid state
+      grid.batchUpdate();
+      // Clear any auto-discovered widgets to ensure we add them explicitly with correct config
       grid.removeAll(false);
-      // Wait for DOM cleanup to complete
-      await nextTick(); // Ensure DOM is ready
 
       if (panels.value.length === 0) {
+        grid.commit();
+        gridStackUpdateInProgress = false;
         return;
       }
 
-      // Add panels in sorted order to maintain proper layout
+      // Explicitly add widgets with correct layout configuration
       for (const panel of panels.value) {
-        // Wait for the element to be available in DOM
-        await nextTick();
         const element = gridStackContainer.value.querySelector(
           `[gs-id="${panel.id}"]`,
         );
@@ -659,10 +666,8 @@ export default defineComponent({
         }
       }
 
-      // Wait for all widgets to be added
-      await nextTick(); // Ensure DOM is updated
+      grid.commit();
 
-      // Trigger window resize to ensure charts render correctly
       gridStackUpdateInProgress = false;
       window.dispatchEvent(new Event("resize"));
     };
