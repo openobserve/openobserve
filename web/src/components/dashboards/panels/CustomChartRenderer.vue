@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   ></div>
 </template>
 
-<script >
+<script>
 import {
   defineComponent,
   ref,
@@ -66,12 +66,7 @@ echarts.use([
 
 export default defineComponent({
   name: "CustomChartRenderer",
-  emits: [
-    "error",
-    "mousemove",
-    "mouseout",
-    "click",
-  ],
+  emits: ["error", "mousemove", "mouseout", "click"],
   props: {
     data: {
       required: true,
@@ -104,50 +99,55 @@ export default defineComponent({
         }
       }
 
-        if (Array.isArray(obj)) {
-          return obj.map(item => convertStringToFunction(item)); // Recursively handle arrays
-        }
-
-        if (typeof obj === 'object' && obj !== null) {
-          const result = {};
-          for (const key in obj) {
-            if (obj.hasOwnProperty(key)) {
-              result[key] = convertStringToFunction(obj[key]); // Recursively handle object properties
-            }
-          }
-          return result;
-        }
-
-        return obj; // If it's not a function string or an object, return it as is
-      };
-      function deepSanitize(obj) {
-        if (typeof obj === 'string') {
-          return DOMPurify.sanitize(obj);
-        } else if (Array.isArray(obj)) {
-          return obj.map(deepSanitize);
-        } else if (typeof obj === 'object' && obj !== null) {
-          return Object.fromEntries(
-            Object.entries(obj).map(([key, value]) => [key, deepSanitize(value)])
-          );
-        }
-        return obj;
+      if (Array.isArray(obj)) {
+        return obj.map((item) => convertStringToFunction(item)); // Recursively handle arrays
       }
 
+      if (typeof obj === "object" && obj !== null) {
+        const result = {};
+        for (const key in obj) {
+          if (obj.hasOwnProperty(key)) {
+            result[key] = convertStringToFunction(obj[key]); // Recursively handle object properties
+          }
+        }
+        return result;
+      }
+
+      return obj; // If it's not a function string or an object, return it as is
+    };
+    function deepSanitize(obj) {
+      if (typeof obj === "string") {
+        return DOMPurify.sanitize(obj);
+      } else if (Array.isArray(obj)) {
+        return obj.map(deepSanitize);
+      } else if (typeof obj === "object" && obj !== null) {
+        return Object.fromEntries(
+          Object.entries(obj).map(([key, value]) => [key, deepSanitize(value)]),
+        );
+      }
+      return obj;
+    }
 
     const initChart = async () => {
       if (!chartRef.value) return;
 
-      const echartsGL = await import('echarts-gl');
+      const echartsGL = await import("echarts-gl");
 
       // Initialize chart
-      chart = echarts.init(chartRef.value, undefined, {
-        renderer: "canvas",
-      });
+      if (!chart) {
+        chart = echarts.init(chartRef.value, undefined, {
+          renderer: "canvas",
+        });
+      } else {
+        // Clear previous chart data to prevent overlay of old and new charts
+        chart.clear();
+      }
 
-      try{
-      const convertedData = convertStringToFunction(props.data);
-      const safeChartOptions = deepSanitize(convertedData);
-      chart.setOption(safeChartOptions);
+      try {
+        const convertedData = convertStringToFunction(props.data);
+        const safeChartOptions = deepSanitize(convertedData);
+        // Use notMerge: true to replace the entire option instead of merging
+        chart.setOption(safeChartOptions, { notMerge: true });
 
         if (convertedData.o2_events) {
           // Add event listeners for custom interactions
