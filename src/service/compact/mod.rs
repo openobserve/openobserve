@@ -361,7 +361,6 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
             log::error!("[COMPACTOR] merge job offset error: {}", job.offsets);
             continue;
         }
-
         let columns = job.stream.split('/').collect::<Vec<&str>>();
         assert_eq!(columns.len(), 3);
         let org_id = columns[0].to_string();
