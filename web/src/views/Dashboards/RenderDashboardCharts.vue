@@ -287,6 +287,7 @@ import type { useVariablesManager } from "@/composables/dashboard/useVariablesMa
 import { useLoading } from "@/composables/useLoading";
 import { GridStack } from "gridstack";
 import "gridstack/dist/gridstack.min.css";
+import { useVariablesLoadingManager } from "@/composables/dashboard/useVariablesLoadingManager";
 
 const ViewPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/viewPanel/ViewPanel.vue");
@@ -649,7 +650,6 @@ export default defineComponent({
     });
 
     let needsVariablesAutoUpdate = true;
-
     const variablesDataUpdated = (data: any) => {
       try {
         // Update the live variables data (immediate UI state)
@@ -1103,6 +1103,7 @@ export default defineComponent({
     const openEditLayout = (id: string) => {
       emit("openEditLayout", id);
     };
+
     return {
       store,
       addPanelData,
