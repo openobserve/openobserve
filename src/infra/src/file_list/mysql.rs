@@ -941,7 +941,7 @@ SELECT date
             // if we need deleted files, we don't apply deleted filter
             ""
         } else {
-            // if we don't need deleted files, we filter non-deleted files
+            // if we don't need deleted files, we include only non-deleted files
             "AND deleted IS FALSE"
         };
         let sql = format!(

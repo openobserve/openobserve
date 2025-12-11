@@ -93,7 +93,7 @@ async fn update_stats_from_file_list_inner(
 
     // get stats from file_list
     let time_range = (offset, latest_update_at);
-    // if the latest_update_at < reset_offset, we skip deleted files, because thoese files we
+    // if the latest_update_at < reset_offset, we skip deleted files, because those files we
     // haven't calculated add, so we don't need to consider deleted here
     let need_deleted = latest_update_at > reset_offset;
     let stream_stats = infra_file_list::stats(time_range, need_deleted)
