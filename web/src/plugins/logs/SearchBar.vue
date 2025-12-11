@@ -1082,6 +1082,7 @@ class="q-pr-sm q-pt-xs" />
                 :class="config.isEnterprise == 'true' ? 'search-button-enterprise-border-radius' : 'search-button-normal-border-radius'"
                 no-caps
                 @click="handleRunQueryFn"
+                :loading="searchObj.loading || searchObj.loadingHistogram"
                 :disable="
                   searchObj.loading == true ||
                   searchObj.loadingHistogram == true

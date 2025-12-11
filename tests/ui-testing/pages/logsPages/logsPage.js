@@ -300,9 +300,14 @@ export class LogsPage {
         await this.page.waitForTimeout(1000);
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-        // Wait for the stream to be visible in the dropdown
+        // Type the stream name to filter the dropdown
+        await this.page.locator(this.indexDropDown).fill(stream);
+        await this.page.waitForTimeout(2000); // Wait for filtering to complete
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+        // Find the stream in the filtered results and scroll it into view if needed
         const streamLocator = this.page.getByText(stream, { exact: true }).first();
-        await streamLocator.waitFor({ state: 'visible', timeout: 15000 });
+        await streamLocator.scrollIntoViewIfNeeded({ timeout: 15000 });
         await streamLocator.click();
     }
 
@@ -2886,5 +2891,172 @@ export class LogsPage {
         }
 
         return { total: data.length, success: successCount, failed: failCount };
+    }
+
+    /**
+     * Get severity colors from all visible log rows
+     * Returns array of {severity, color} objects
+     */
+    async getSeverityColors() {
+        return await this.page.evaluate(() => {
+            const rows = document.querySelectorAll('tbody tr[data-index]');
+            const findings = [];
+
+            for (const row of rows) {
+                const text = row.textContent;
+                const colorDiv = row.querySelector('div[class*="tw-absolute"][class*="tw-left-0"]');
+
+                if (!colorDiv) continue;
+
+                const bgColor = window.getComputedStyle(colorDiv).backgroundColor;
+
+                // Check for severity value in the row text - look for "severity":"X" or "severity":X
+                for (let sev = 0; sev <= 7; sev++) {
+                    if (text.includes(`"severity":"${sev}"`) || text.includes(`"severity":${sev},`)) {
+                        findings.push({
+                            severity: sev,
+                            color: bgColor
+                        });
+                        break;
+                    }
+                }
+            }
+
+            return findings;
+        });
+    }
+
+    /**
+     * Get severity color for a specific severity level
+     * @param {number} severityLevel - Severity level (0-7)
+     * @returns {string|null} RGB color string or null if not found
+     */
+    async getSeverityColorBySeverityLevel(severityLevel) {
+        const results = await this.getSeverityColors();
+        const match = results.find(r => r.severity === severityLevel);
+        return match ? match.color : null;
+    }
+
+    /**
+     * Verify severity color matches expected hex color
+     * @param {number} severityLevel - Severity level (0-7)
+     * @param {string} expectedHexColor - Expected hex color (e.g., "#dc2626")
+     * @returns {boolean} True if colors match
+     */
+    async verifySeverityColor(severityLevel, expectedHexColor) {
+        const rgbColor = await this.getSeverityColorBySeverityLevel(severityLevel);
+        if (!rgbColor) {
+            testLogger.warn(`No color found for severity ${severityLevel}`);
+            return false;
+        }
+
+        const hexColor = this.rgbToHex(rgbColor);
+        const normalizedActual = this.normalizeHexColor(hexColor);
+        const normalizedExpected = this.normalizeHexColor(expectedHexColor);
+
+        testLogger.info(`Severity ${severityLevel}: Expected ${normalizedExpected}, Got ${normalizedActual}`);
+        return normalizedActual === normalizedExpected;
+    }
+
+    /**
+     * Convert RGB color to Hex
+     * @param {string} rgb - RGB color string (e.g., "rgb(220, 38, 38)")
+     * @returns {string} Hex color string (e.g., "#dc2626")
+     */
+    rgbToHex(rgb) {
+        const result = rgb.match(/\d+/g);
+        if (!result || result.length < 3) return null;
+        return '#' + result.slice(0, 3).map(x => parseInt(x).toString(16).padStart(2, '0')).join('');
+    }
+
+    /**
+     * Normalize hex color (remove alpha channel if present, lowercase)
+     * @param {string} hex - Hex color string
+     * @returns {string} Normalized hex color
+     */
+    normalizeHexColor(hex) {
+        hex = hex.replace('#', '');
+        if (hex.length === 8) {
+            hex = hex.substring(0, 6);
+        }
+        return '#' + hex.toLowerCase();
+    }
+
+    /**
+     * Ingest severity color test data to a specific stream
+     * @param {string} streamName - Name of the stream to ingest data to
+     * @returns {Promise<Object>} Response from the ingestion API
+     */
+    async severityColorIngestionToStream(streamName) {
+        const severityColorData = require('../../../test-data/severity_color_data.json');
+        const orgId = process.env["ORGNAME"];
+        const basicAuthCredentials = Buffer.from(
+            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+        ).toString('base64');
+
+        const headers = {
+            "Authorization": `Basic ${basicAuthCredentials}`,
+            "Content-Type": "application/json",
+        };
+
+        const url = `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
+
+        try {
+            const response = await this.page.request.post(url, {
+                headers: headers,
+                data: severityColorData
+            });
+
+            if (!response.ok()) {
+                throw new Error(`HTTP error! status: ${response.status()}`);
+            }
+
+            const result = await response.json();
+            testLogger.info(`Successfully ingested ${severityColorData.length} records to stream '${streamName}'`);
+            return result;
+        } catch (error) {
+            testLogger.error('Severity color ingestion failed:', { error: error.message });
+            throw error;
+        }
+    }
+
+    /**
+     * Delete a stream by name
+     * @param {string} streamName - Name of the stream to delete
+     * @returns {Promise<Object>} Response with status
+     */
+    async deleteStream(streamName) {
+        const orgId = process.env["ORGNAME"];
+        const basicAuthCredentials = Buffer.from(
+            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+        ).toString('base64');
+
+        const headers = {
+            "Authorization": `Basic ${basicAuthCredentials}`,
+        };
+
+        const url = `${process.env.INGESTION_URL}/api/${orgId}/streams/${streamName}`;
+
+        try {
+            const response = await this.page.request.delete(url, {
+                headers: headers
+            });
+
+            if (!response.ok() && response.status() !== 404) {
+                throw new Error(`HTTP error! status: ${response.status()}`);
+            }
+
+            const status = response.status();
+            if (status === 200) {
+                testLogger.info(`Stream '${streamName}' deleted successfully`);
+            } else if (status === 404) {
+                testLogger.info(`Stream '${streamName}' not found (already deleted)`);
+            }
+
+            return { status: status };
+        } catch (error) {
+            testLogger.error('Stream deletion failed:', { error: error.message });
+            throw error;
+        }
     }
 }

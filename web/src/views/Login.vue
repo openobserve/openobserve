@@ -179,13 +179,12 @@ export default defineComponent({
           //this will identify the user for reo.dev
           identify({
             username: store.state.userInfo.email,
-            type: "email"
+            type: "email",
           });
           // Check for pending invites
           setTimeout(() => {
             redirectUser();
           }, 800);
-
         })
         .catch((e: any) => {
           console.log("Error while fetching organizations", e);
@@ -250,6 +249,7 @@ export default defineComponent({
       showInvitations,
       handleInvitationsProcessed,
       getImageURL,
+      signout,
     };
   },
   data() {
@@ -298,15 +298,16 @@ export default defineComponent({
               : null;
 
           // Check for pending invites before login
-          if (
-            config.isCloud == "true" &&
-            checkCallBackValues(
-              this.router.currentRoute.value.hash,
-              "pending_invites",
-            ) == "true"
-          ) {
-            this.showInvitations = true;
-            return;
+          if (config.isCloud == "true") {
+            try {
+              const invitations = await usersService.getPendingInvites();
+              if (invitations.data?.data?.length) {
+                this.showInvitations = true;
+                return;
+              }
+            } catch (err) {
+              console.log("Failed to fetch pending invitations");
+            }
           }
 
           if (
@@ -337,36 +338,45 @@ export default defineComponent({
      * get the default organization for the user
      */
     VerifyAndCreateUser() {
-      usersService.verifyUser(this.userInfo.email as string).then((res) => {
-        useLocalCurrentUser(res.data.data);
-        this.store.dispatch("setCurrentUser", res.data.data);
+      usersService
+        .verifyUser(this.userInfo.email as string)
+        .then((res) => {
+          useLocalCurrentUser(res.data.data);
+          this.store.dispatch("setCurrentUser", res.data.data);
 
-        if (res.data.data.id == 0) {
-          const dismiss = this.q.notify({
-            spinner: true,
-            message: "Please wait while creating new user...",
-          });
+          if (res.data.data.id == 0) {
+            const dismiss = this.q.notify({
+              spinner: true,
+              message: "Please wait while creating new user...",
+            });
 
-          usersService.addNewUser(this.user).then((res) => {
+            usersService.addNewUser(this.user).then((res) => {
+              this.store.dispatch("login", {
+                loginState: true,
+                userInfo: this.userInfo,
+              });
+              dismiss();
+
+              this.getDefaultOrganization();
+              // this.redirectUser();
+            });
+          } else {
             this.store.dispatch("login", {
               loginState: true,
               userInfo: this.userInfo,
             });
-            dismiss();
 
             this.getDefaultOrganization();
             // this.redirectUser();
+          }
+        })
+        .catch((error) => {
+          this.q.notify({
+            spinner: true,
+            message: "Error while verifying user...",
           });
-        } else {
-          this.store.dispatch("login", {
-            loginState: true,
-            userInfo: this.userInfo,
-          });
-
-          this.getDefaultOrganization();
-          // this.redirectUser();
-        }
-      });
+          if (error.status === 403) this.signout();
+        });
     },
   },
 });
