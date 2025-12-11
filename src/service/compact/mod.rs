@@ -24,6 +24,7 @@ use config::{
         cluster::{CompactionJobType, Role},
         stream::{ALL_STREAM_TYPES, PartitionTimeLevel, StreamType},
     },
+    utils::time::hour_micros,
 };
 use infra::{
     file_list as infra_file_list,
@@ -352,11 +353,26 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
     let now = config::utils::time::now();
     let data_lifecycle_end = now - Duration::try_days(cfg.compact.data_retention_days).unwrap();
 
+    let (stream_stats_offset, _) = db::compact::stats::get_offset().await;
+
     // check the stream, if the stream partition_time_level is daily or compact step secs less than
     // 1 hour, we only allow one compactor to working on it
     let mut need_release_ids = Vec::new();
     let mut need_done_ids = Vec::new();
     for job in jobs.iter() {
+        // check stream stats offset, if the merge offset greater than the stream stats offset, we
+        // need to wait for the stream stats to be updated first
+        if job.offsets + hour_micros(1) > stream_stats_offset {
+            // simple skip and don't release it, because release will cause it retry immediately, if
+            // we skip it, it need to wait for 10 minutes
+            log::warn!(
+                "[COMPACTOR] merge job stream {}, offset {}, skipped, it needs to wait stream_stats offset: {stream_stats_offset}",
+                job.stream,
+                job.offsets
+            );
+            continue;
+        }
+
         let columns = job.stream.split('/').collect::<Vec<&str>>();
         assert_eq!(columns.len(), 3);
         let org_id = columns[0].to_string();
