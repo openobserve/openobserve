@@ -822,6 +822,7 @@ pub struct ScanStats {
     pub idx_took: i64,
     pub file_list_took: i64,
     pub aggs_cache_ratio: i64,
+    pub peak_memory_usage: i64,
 }
 
 impl ScanStats {
@@ -847,12 +848,14 @@ impl ScanStats {
         } else {
             std::cmp::min(self.aggs_cache_ratio, other.aggs_cache_ratio)
         };
+        self.peak_memory_usage = std::cmp::max(self.peak_memory_usage, other.peak_memory_usage);
     }
 
     pub fn format_to_mb(&mut self) {
         self.original_size = self.original_size / 1024 / 1024;
         self.compressed_size = self.compressed_size / 1024 / 1024;
         self.idx_scan_size = self.idx_scan_size / 1024 / 1024;
+        self.peak_memory_usage = self.peak_memory_usage / 1024 / 1024;
     }
 }
 
@@ -891,6 +894,7 @@ impl From<&ScanStats> for cluster_rpc::ScanStats {
             idx_took: req.idx_took,
             file_list_took: req.file_list_took,
             aggs_cache_ratio: req.aggs_cache_ratio,
+            peak_memory_usage: req.peak_memory_usage,
         }
     }
 }
@@ -909,6 +913,7 @@ impl From<&cluster_rpc::ScanStats> for ScanStats {
             idx_took: req.idx_took,
             file_list_took: req.file_list_took,
             aggs_cache_ratio: req.aggs_cache_ratio,
+            peak_memory_usage: req.peak_memory_usage,
         }
     }
 }
@@ -2224,6 +2229,7 @@ mod tests {
             idx_took: 50,
             file_list_took: 30,
             aggs_cache_ratio: 80,
+            peak_memory_usage: 1024000,
         };
 
         let stats2 = ScanStats {
@@ -2238,6 +2244,7 @@ mod tests {
             idx_took: 60,
             file_list_took: 40,
             aggs_cache_ratio: 90,
+            peak_memory_usage: 2048000,
         };
 
         stats1.add(&stats2);
@@ -2252,6 +2259,7 @@ mod tests {
         assert_eq!(stats1.idx_took, 60); // max
         assert_eq!(stats1.file_list_took, 40); // max
         assert_eq!(stats1.aggs_cache_ratio, 80); // min
+        assert_eq!(stats1.peak_memory_usage, 2048000); // max
     }
 
     #[test]
@@ -2414,6 +2422,7 @@ mod tests {
             idx_took: 50,
             file_list_took: 30,
             aggs_cache_ratio: 80,
+            peak_memory_usage: 1024000,
         };
 
         // Test conversion to cluster_rpc::ScanStats

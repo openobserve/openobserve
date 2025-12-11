@@ -38,6 +38,7 @@ message ScanStats {
     int64 idx_took                    = 9; // unit: ms
     int64 file_list_took             = 10; // unit: ms
     int64 aggs_cache_ratio           = 11; // unit: %
+    int64 peak_memory_usage          = 12; // unit: bytes
 }
 
 message FileList {

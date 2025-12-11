@@ -65,6 +65,9 @@ pub struct ScanStats {
     /// unit: %
     #[prost(int64, tag = "11")]
     pub aggs_cache_ratio: i64,
+    /// unit: bytes
+    #[prost(int64, tag = "12")]
+    pub peak_memory_usage: i64,
 }
 #[derive(serde::Serialize)]
 #[derive(Clone, PartialEq, ::prost::Message)]

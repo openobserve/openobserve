@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{Arc, atomic::AtomicUsize};
 
 use config::meta::search::ScanStats;
 use datafusion::{
@@ -22,13 +22,16 @@ use datafusion::{
         tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor},
     },
     physical_plan::ExecutionPlan,
+    prelude::SessionContext,
 };
 use flight::common::Metrics;
 use parking_lot::Mutex;
 
-use crate::service::search::datafusion::distributed_plan::remote_scan_exec::RemoteScanExec;
+use crate::service::search::datafusion::{
+    distributed_plan::remote_scan_exec::RemoteScanExec, peak_memory_pool::PeakMemoryPool,
+};
 
-pub fn get_scan_stats(plan: Arc<dyn ExecutionPlan>) -> Option<Arc<Mutex<ScanStats>>> {
+pub fn get_scan_stats(plan: &Arc<dyn ExecutionPlan>) -> Option<Arc<Mutex<ScanStats>>> {
     let mut visitor = RemoteScanVisitor::new();
     let _ = plan.visit(&mut visitor);
     visitor.scan_stats
@@ -59,7 +62,7 @@ impl<'n> TreeNodeVisitor<'n> for RemoteScanVisitor {
     }
 }
 
-pub fn get_cluster_metrics(plan: Arc<dyn ExecutionPlan>) -> Vec<Arc<Mutex<Vec<Metrics>>>> {
+pub fn get_cluster_metrics(plan: &Arc<dyn ExecutionPlan>) -> Vec<Arc<Mutex<Vec<Metrics>>>> {
     let mut visitor = MetricsVisitor::new();
     let _ = plan.visit(&mut visitor);
     visitor.metrics
@@ -87,5 +90,54 @@ impl<'n> TreeNodeVisitor<'n> for MetricsVisitor {
             self.metrics.push(remote_scan_exec.cluster_metrics());
         }
         Ok(TreeNodeRecursion::Continue)
+    }
+}
+
+pub fn get_peak_memory(plan: &Arc<dyn ExecutionPlan>) -> Option<Arc<AtomicUsize>> {
+    let mut visitor = PeakMemoryVisitor::new();
+    let _ = plan.visit(&mut visitor);
+    visitor.peak_memory
+}
+
+struct PeakMemoryVisitor {
+    peak_memory: Option<Arc<AtomicUsize>>,
+}
+
+impl PeakMemoryVisitor {
+    pub fn new() -> Self {
+        Self { peak_memory: None }
+    }
+}
+
+impl<'n> TreeNodeVisitor<'n> for PeakMemoryVisitor {
+    type Node = Arc<dyn ExecutionPlan>;
+
+    fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
+        let name = node.name();
+        if name == "RemoteScanExec" {
+            let remote_scan_exec = node.as_any().downcast_ref::<RemoteScanExec>().unwrap();
+            self.peak_memory = Some(remote_scan_exec.peak_memory());
+        }
+        Ok(TreeNodeRecursion::Continue)
+    }
+}
+
+/// Get the peak memory from the SessionContext's memory pool.
+/// This should be called after the query execution to get the peak memory usage.
+pub fn get_peak_memory_from_ctx(ctx: &SessionContext) -> Arc<AtomicUsize> {
+    let memory_pool = ctx.runtime_env().memory_pool.clone();
+
+    // Use unsafe to downcast Arc<dyn MemoryPool> to Arc<PeakMemoryPool>
+    // This is safe because we know the memory pool is created as PeakMemoryPool in datafusion
+    // context creation
+    unsafe {
+        let raw_ptr = Arc::into_raw(memory_pool);
+        let peak_pool_ptr = raw_ptr as *const PeakMemoryPool;
+        let peak_memory = (*peak_pool_ptr).peak_memory.clone();
+
+        // Reconstruct the Arc to prevent memory leak
+        let _ = Arc::from_raw(raw_ptr);
+
+        peak_memory
     }
 }

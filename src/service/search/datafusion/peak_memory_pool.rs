@@ -28,7 +28,7 @@ use datafusion::execution::memory_pool::{
 pub struct PeakMemoryPool {
     trace_id: String,
     inner: Arc<dyn MemoryPool>,
-    peak_memory: Arc<AtomicUsize>,
+    pub peak_memory: Arc<AtomicUsize>,
 }
 
 impl PeakMemoryPool {
