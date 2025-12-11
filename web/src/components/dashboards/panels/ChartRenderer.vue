@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="chart-renderer"
     ref="chartRef"
     id="chart1"
+    class="chart-container"
     @mouseover="
       () => {
         // if hoveredSeriesState is not null then set panelId
@@ -712,3 +713,35 @@ export default defineComponent({
   },
 });
 </script>
+
+<style>
+/**
+ * Print mode styles for ECharts
+ *
+ * These styles must be unscoped (global) to override ECharts' inline styles.
+ * ECharts sets fixed pixel dimensions via inline styles (e.g., width: 740px),
+ * which causes charts to overflow their containers in print mode when GridStack
+ * scales panels down to fit the page.
+ *
+ * The !important declarations override inline styles, forcing both the chart
+ * wrapper div and canvas elements to scale to 100% of their container size.
+ * This ensures charts fit properly when printing, regardless of their original
+ * render dimensions.
+ */
+@media print {
+  /* Clip the ECharts wrapper to prevent chart overflow but don't scale */
+  .chart-container > div[style*="position: relative"] {
+    overflow: hidden !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+  }
+
+  /* Prevent canvas from exceeding container size without scaling */
+  .chart-container canvas,
+  .chart-container svg {
+    max-width: 100% !important;
+    max-height: 100% !important;
+    object-fit: contain !important;
+  }
+}
+</style>

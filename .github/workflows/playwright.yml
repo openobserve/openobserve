@@ -38,8 +38,7 @@ env:
 jobs:
   build_binary:
     name: build_binary
-    runs-on:
-      labels: ubicloud-standard-16
+    runs-on: ubuntu-2204-8-cores
 
     steps:
       - name: Remove unused tools
@@ -55,7 +54,7 @@ jobs:
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-07-20
+          toolchain: nightly-2024-07-20
           targets: x86_64-unknown-linux-gnu
       - uses: Swatinem/rust-cache@v2
         with:
@@ -149,8 +148,23 @@ jobs:
       - name: Wait for start
         run: sleep 15
 
+      - name: Check if process is running
+        run: ps aux | grep openobserve || echo "Process not found"
+
       - name: Ensure we are getting a reply from the server
-        run: curl http://localhost:5080/web/login
+        shell: bash
+        run: |
+          for i in {1..30}; do
+            if curl -f http://localhost:5080/web/login; then
+              echo "Server is ready!"
+              exit 0
+            fi
+            echo "Attempt $i: Server not ready yet, waiting..."
+            sleep 2
+          done
+          echo "Server failed to start after 60 seconds"
+          cat o2.log
+          exit 1
 
       - name: Create coverage json folder
         run: mkdir -p tests/ui-testing/.nyc_output
@@ -173,9 +187,9 @@ jobs:
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci && npx playwright test ./playwright-tests/${{ matrix.testfilename }}
 
-      # - name: Check OpenObserve logs
-      #   if: always()
-      #   run: cat o2.log
+      - name: Check OpenObserve logs
+        if: failure()
+        run: cat o2.log
 
       - name: Sanitize Test Filename
         shell: bash
