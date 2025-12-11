@@ -451,7 +451,8 @@
     "roles": "Ruoli",
     "groups": "Gruppi",
     "customRole": "Ruoli personalizzati",
-    "description": "Descrizione"
+    "description": "Descrizione",
+    "revoke_invite": "Revoca l'invito"
   },
   "ticket": {
     "header": "Ticket di assistenza",
@@ -1578,7 +1579,8 @@
     "basicUsers": "Utenti",
     "quota": "Quote",
     "externalUserWarningTitle": "Avviso per l'utente esterno",
-    "externalUserWarningMessage": "L'aggiunta diretta di utenti esterni ai ruoli non concederà autorizzazioni. Aggiungili invece ai gruppi di utenti."
+    "externalUserWarningMessage": "L'aggiunta diretta di utenti esterni ai ruoli non concederà autorizzazioni. Aggiungili invece ai gruppi di utenti.",
+    "invitations": "Inviti"
   },
   "pipeline": {
     "header": "Oleodotti",

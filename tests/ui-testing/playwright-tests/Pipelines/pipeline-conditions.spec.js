@@ -109,7 +109,7 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     await page.waitForTimeout(500);
     await pageManager.pipelinesPage.verifyConditionCount(2);
 
-    // Test 8: Verify first condition cannot be deleted (Bug #9075)
+    // Test 8: Verify all conditions including first can be deleted (after fix for issue #9518)
     await pageManager.pipelinesPage.verifyDeleteButtonCount(2);
 
     // Save and complete pipeline

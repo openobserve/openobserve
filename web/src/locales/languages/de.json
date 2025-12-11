@@ -451,7 +451,8 @@
     "roles": "Rollen",
     "groups": "Gruppen",
     "customRole": "Benutzerdefinierte Rollen",
-    "description": "Beschreibung"
+    "description": "Beschreibung",
+    "revoke_invite": "Einladung widerrufen"
   },
   "ticket": {
     "header": "Tickets für den Support",
@@ -1578,7 +1579,8 @@
     "basicUsers": "Nutzer",
     "quota": "Kontingente",
     "externalUserWarningTitle": "Warnung für externe Benutzer",
-    "externalUserWarningMessage": "Wenn Sie externe Benutzer direkt zu Rollen hinzufügen, werden keine Berechtigungen erteilt. Fügen Sie sie stattdessen zu Benutzergruppen hinzu."
+    "externalUserWarningMessage": "Wenn Sie externe Benutzer direkt zu Rollen hinzufügen, werden keine Berechtigungen erteilt. Fügen Sie sie stattdessen zu Benutzergruppen hinzu.",
+    "invitations": "Einladungen"
   },
   "pipeline": {
     "header": "Rohrleitungen",
