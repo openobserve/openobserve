@@ -373,6 +373,19 @@ pub async fn delete_by_date(
         )
     };
 
+    // check stream stats offset, if the merge offset greater than the stream stats offset, we
+    // need to wait for the stream stats to be updated first
+    let (stream_stats_offset, _) = db::compact::stats::get_offset().await;
+    if time_range.1 > stream_stats_offset {
+        // simple skip and don't release it, because release will cause it retry immediately, if
+        // we skip it, it need to wait for 10 minutes
+        log::warn!(
+            "[COMPACTOR] delete_by_date: stream {org_id}/{stream_type}/{stream_name}, time range {:?}, skipped, it needs to wait stream_stats offset: {stream_stats_offset}",
+            time_range
+        );
+        return Ok(());
+    }
+
     if is_local_disk_storage() {
         let dirs_to_delete =
             generate_local_dirs(org_id, stream_type, stream_name, date_start, date_end);
