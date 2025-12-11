@@ -274,25 +274,38 @@ export const usePanelDataLoader = (
   const waitForTheVariablesToLoad = (signal: any) => {
     return new Promise<void>((resolve, reject) => {
       log("waitForTheVariablesToLoad: entering...");
-      // Immediately resolve if variables are already loaded
-      if (ifPanelVariablesCompletedLoading()) {
+
+      // CRITICAL: Check if variables are still loading
+      // This prevents premature API calls during initial dashboard load
+      if (variablesData.value?.isVariablesLoading === true) {
+        log("waitForTheVariablesToLoad: variables are loading (isVariablesLoading=true), waiting...");
+        // Don't resolve immediately - wait for them to finish loading
+      } else if (ifPanelVariablesCompletedLoading()) {
         log("waitForTheVariablesToLoad: variables are already loaded");
         resolve();
         return;
       }
 
-      // Watch for changes in isVisible
+      // Watch for changes in variables data
       const stopWatching = watch(
-        () => variablesData.value?.values,
-        () => {
+        () => variablesData.value,
+        (newVal) => {
+          // First check: are variables still marked as loading?
+          if (newVal?.isVariablesLoading === true) {
+            log("waitForTheVariablesToLoad: still loading (isVariablesLoading=true)...");
+            return; // Keep waiting
+          }
+
+          // Second check: are panel-specific variables ready?
           if (ifPanelVariablesCompletedLoading()) {
             log(
               "waitForTheVariablesToLoad: variables are loaded (inside watch)",
             );
             resolve();
-            stopWatching(); // Stop watching once isVisible is true
+            stopWatching(); // Stop watching once variables are loaded
           }
         },
+        { deep: true } // Watch nested properties
       );
 
       // Listen to the abort signal
@@ -978,8 +991,8 @@ export const usePanelDataLoader = (
         }
       } else {
     console.log("inside search api", JSON.stringify(variablesData.value?.values));
-        if(variablesData.value?.values.length === 0){
-          return}
+        // if(variablesData.value?.values.length === 0){
+        //   return}
         // copy of current abortController
         // which is used to check whether the current query has been aborted
         const abortControllerRef = abortController;
