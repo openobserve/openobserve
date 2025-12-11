@@ -212,6 +212,7 @@ export default defineComponent({
         }
       });
       this.onStreamChange("");
+      this.resetPagination();
     },
     handleSingleStreamSelect(opt: any) {
       if (this.searchObj.data.stream.selectedStream.indexOf(opt.value) == -1) {
@@ -236,6 +237,7 @@ export default defineComponent({
         }
       });
       this.onStreamChange("");
+      this.resetPagination();
     },
   },
   setup(props, { emit }) {
@@ -1453,6 +1455,7 @@ export default defineComponent({
       streamList,
       hasUserDefinedSchemas,
       setPage,
+      resetPagination,
     };
   },
 });

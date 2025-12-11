@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:is-hovered="isHovered = $event"
         @update-organization="updateOrganization"
         @go-to-home="goToHome"
+        @go-to-about="goToAbout"
         @toggleAIChat="toggleAIChat"
         @open-slack="openSlack"
         @navigateToOpenAPI="navigateToOpenAPI"
@@ -270,6 +271,14 @@ export default defineComponent({
     goToHome() {
       this.$router.push({
         path: "/",
+        query: {
+          org_identifier: this.store.state.selectedOrganization.identifier,
+        },
+      });
+    },
+    goToAbout() {
+      this.$router.push({
+        path: "/about",
         query: {
           org_identifier: this.store.state.selectedOrganization.identifier,
         },

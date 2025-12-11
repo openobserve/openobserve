@@ -275,11 +275,7 @@ color="warning" size="xs"></q-icon> Error while
           :expandedRows="expandedLogs"
           :highlight-timestamp="searchObj.data?.searchAround?.indexTimestamp"
           :selected-stream-fts-keys="selectedStreamFullTextSearchKeys"
-          :highlight-query="
-            searchObj.meta.sqlMode
-              ? searchObj.data.query.toLowerCase().split('where')[1]
-              : searchObj.data.query.toLowerCase()
-          "
+          :highlight-query="searchObj.data.highlightQuery"
           :default-columns="!searchObj.data.stream.selectedFields.length"
           class="col-12 tw-mt-[0.375rem]"
           :class="[
@@ -357,11 +353,7 @@ color="warning" size="xs"></q-icon> Error while
           class="detail-table-dialog"
           :currentIndex="searchObj.meta.resultGrid.navigation.currentRowIndex"
           :totalLength="parseInt(searchObj.data.queryResults.hits.length)"
-          :highlight-query="
-            searchObj.meta.sqlMode
-              ? searchObj.data.query.toLowerCase().split('where')[1]
-              : searchObj.data.query.toLowerCase()
-          "
+          :highlight-query="searchObj.data.highlightQuery"
           @showNextDetail="navigateRowDetail"
           @showPrevDetail="navigateRowDetail"
           @add:searchterm="addSearchTerm"
