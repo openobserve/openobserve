@@ -18,9 +18,38 @@ test.describe("Pre-Test Cleanup", () => {
     // Run complete cascade cleanup for alert destinations, templates, and folders
     await pm.apiCleanup.completeCascadeCleanup(
       // Destination prefixes to clean up
-      ['auto_', 'newdest_', 'sanitydest-'],
+      [
+        'auto_',
+        'newdest_',
+        'sanitydest-',
+        'rbac_basic_dest_',
+        'rbac_editor_create_dest_',
+        'rbac_403_test_dest_',
+        'rbac_sql_dest_',
+        'rbac_user_delete_dest_',
+        'rbac_user_update_dest_',
+        'rbac_viewer_delete_dest_',
+        'rbac_viewer_update_dest_'
+      ],
       // Template prefixes to clean up
-      ['auto_email_template_', 'auto_webhook_template_', 'auto_playwright_template_', 'auto_url_webhook_template_', 'sanitytemp-', 'newtemp_'],
+      [
+        'auto_email_template_',
+        'auto_webhook_template_',
+        'auto_playwright_template_',
+        'auto_url_webhook_template_',
+        'sanitytemp-',
+        'newtemp_',
+        'email_tmpl_',
+        'rbac_403_test_tmpl_',
+        'rbac_basic_tmpl_',
+        'rbac_del_tmpl_',
+        'rbac_editor_create_tmpl_',
+        'rbac_editor_update_tmpl_',
+        'rbac_sql_tmpl_',
+        'rbac_user_delete_tmpl_',
+        'rbac_viewer_delete_tmpl_',
+        'rbac_viewer_update_tmpl_'
+      ],
       // Folder prefixes to clean up
       ['auto_']
     );
