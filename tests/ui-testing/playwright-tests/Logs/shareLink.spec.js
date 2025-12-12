@@ -160,9 +160,10 @@ test.describe("Share Link Test Cases", () => {
     const redirectedState = await pm.logsPage.captureCurrentState();
     testLogger.info('Redirected state', redirectedState);
 
-    // Verify SQL mode is in URL or toggle state
+    // Verify SQL mode is preserved after redirect
     const sqlModeAfterRedirect = await pm.logsPage.isSqlModeEnabled();
     testLogger.info('SQL mode after redirect', { enabled: sqlModeAfterRedirect });
+    expect(sqlModeAfterRedirect).toBe(true);
 
     testLogger.info('SQL mode preservation test completed');
   });
@@ -304,11 +305,10 @@ test.describe("Share Link Test Cases", () => {
     // Share link button should still be visible
     await pm.logsPage.expectShareLinkButtonVisible();
 
-    // Click share link - should still work (generates URL with current state)
-    await pm.logsPage.clickShareLinkButton();
-
-    // Wait for response
-    await page.waitForTimeout(3000);
+    // Click share link and verify notification appears (success or error)
+    const result = await pm.logsPage.clickShareLinkAndExpectNotification();
+    expect(result.appeared).toBe(true);
+    testLogger.info('Share link notification received', { text: result.text });
 
     testLogger.info('No stream share link test completed');
   });
