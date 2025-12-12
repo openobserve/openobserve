@@ -616,7 +616,7 @@ size="20px" />
                       "
                       class="flex justify-center items-center"
                     >
-                      {{ t("alerts.times") }}
+                      {{ t("alerts.events") }}
                     </div>
                   </div>
                 </div>
