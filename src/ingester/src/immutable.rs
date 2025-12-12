@@ -68,6 +68,9 @@ pub async fn read_from_immutable(
                 i.memtable
                     .read(org_id, stream_name, time_range, partition_filters)?;
             if memtable_ids.contains(&id) {
+                log::debug!(
+                    "skip {org_id}/{stream_name}/{stream_name}, time_range: {time_range:?}, immutable memtable id: {id} already in memtable"
+                );
                 continue;
             }
             ids.push(id);

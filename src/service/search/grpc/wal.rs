@@ -544,6 +544,10 @@ async fn get_file_list(
 
             // filter out parquet file that already in memtable, because it will be duplicated
             if memtable_id > 0 && memtable_ids.contains(&memtable_id) {
+                log::debug!(
+                    "[trace_id {}] skip wal parquet file: {f} because memtable id: {memtable_id} already in memtable",
+                    query.trace_id,
+                );
                 return None;
             }
 
