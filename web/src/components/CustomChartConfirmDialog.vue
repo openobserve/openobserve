@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </q-banner>
         </div>
-        <div class="tw-mt-4">
+        <div v-if="hasQuery" class="tw-mt-4">
           <q-checkbox
             v-model="replaceQuery"
             label="Also replace query with example query"
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 
@@ -131,11 +131,18 @@ export default defineComponent({
       type: String,
       default: "",
     },
+    currentQuery: {
+      type: String,
+      default: "",
+    },
   },
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
-    const replaceQuery = ref(false); // Default to false (unchecked)
+
+    // If no query exists, default to true (auto-checked); otherwise false
+    const hasQuery = computed(() => props.currentQuery?.trim().length > 0);
+    const replaceQuery = ref(!hasQuery.value);
 
     const onCancel = () => {
       emit("update:cancel");
@@ -148,6 +155,7 @@ export default defineComponent({
       t,
       store,
       replaceQuery,
+      hasQuery,
       onCancel,
       onConfirm,
     };
