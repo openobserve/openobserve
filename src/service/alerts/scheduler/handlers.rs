@@ -2376,7 +2376,8 @@ async fn handle_backfill_triggers(
                 )
                 .await?;
             } else {
-                // Increment retries but don't update next_run_at - let scheduler pick it up immediately
+                // Increment retries but don't update next_run_at - let scheduler pick it up
+                // immediately
                 db::scheduler::update_trigger(
                     db::scheduler::Trigger {
                         retries: new_retries,
@@ -2425,7 +2426,8 @@ async fn handle_backfill_triggers(
                 )
                 .await?;
             } else {
-                // Increment retries but don't update next_run_at - let scheduler pick it up immediately
+                // Increment retries but don't update next_run_at - let scheduler pick it up
+                // immediately
                 db::scheduler::update_trigger(
                     db::scheduler::Trigger {
                         retries: new_retries,
@@ -2479,7 +2481,8 @@ async fn handle_backfill_triggers(
                 )
                 .await?;
             } else {
-                // Increment retries but don't update next_run_at - let scheduler pick it up immediately
+                // Increment retries but don't update next_run_at - let scheduler pick it up
+                // immediately
                 db::scheduler::update_trigger(
                     db::scheduler::Trigger {
                         retries: new_retries,
