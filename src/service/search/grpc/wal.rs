@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{path::Path, sync::Arc};
+use std::{collections::HashSet, path::Path, sync::Arc};
 
 use arrow::array::{ArrayRef, new_null_array};
 use arrow_schema::{DataType, Field};
@@ -44,7 +44,7 @@ use infra::{
     errors::{Error, ErrorCodes},
     schema::unwrap_partition_time_level,
 };
-use ingester::WAL_PARQUET_METADATA;
+use ingester::{WAL_PARQUET_METADATA, get_memtable_id_from_file_name};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::{
@@ -72,7 +72,7 @@ pub async fn search_parquet(
     file_stat_cache: Option<FileStatisticsCache>,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
-    snapshot_time: Option<i64>,
+    memtable_ids: HashSet<u64>,
 ) -> super::SearchTable {
     let load_start = std::time::Instant::now();
     let trace_id = &query.trace_id;
@@ -89,7 +89,7 @@ pub async fn search_parquet(
         query.time_range,
         search_partition_keys,
         partition_time_level,
-        snapshot_time,
+        memtable_ids,
     )
     .await?;
     log::info!(
@@ -98,10 +98,9 @@ pub async fn search_parquet(
         load_start.elapsed().as_millis()
     );
     if files.is_empty() {
-        return Ok((vec![], ScanStats::new()));
+        return Ok((vec![], ScanStats::new(), HashSet::new()));
     }
 
-    let mut scan_stats = ScanStats::new();
     let mut lock_files = files.iter().map(|f| f.key.clone()).collect::<Vec<_>>();
     let cfg = get_config();
     // get file metadata to build file_list
@@ -153,11 +152,12 @@ pub async fn search_parquet(
     }
     let files = new_files;
 
+    let mut scan_stats = ScanStats::new();
     scan_stats.files = files.len() as i64;
     if scan_stats.files == 0 {
         // release all files
         wal::release_files(&lock_files);
-        return Ok((vec![], scan_stats));
+        return Ok((vec![], scan_stats, HashSet::new()));
     }
 
     let scan_stats = match file_list::calculate_files_size(&files).await {
@@ -251,7 +251,7 @@ pub async fn search_parquet(
         )
     );
 
-    Ok((vec![table], scan_stats))
+    Ok((vec![table], scan_stats, HashSet::new()))
 }
 
 /// search in local WAL, which haven't been sync to object storage
@@ -284,7 +284,8 @@ pub async fn search_memtable(
         }
     }
 
-    let mut batches = ingester::read_from_memtable(
+    let start = std::time::Instant::now();
+    let (mut memtable_ids, mut batches) = ingester::read_from_memtable(
         &query.org_id,
         query.stream_type.as_str(),
         &query.stream_name,
@@ -293,20 +294,30 @@ pub async fn search_memtable(
     )
     .await
     .unwrap_or_default();
-    batches.extend(
-        ingester::read_from_immutable(
-            &query.org_id,
-            query.stream_type.as_str(),
-            &query.stream_name,
-            query.time_range,
-            &filters,
-        )
-        .await
-        .unwrap_or_default(),
+    let memtable_time = start.elapsed().as_millis();
+    let start = std::time::Instant::now();
+    let (im_ids, im_batches) = ingester::read_from_immutable(
+        &query.org_id,
+        query.stream_type.as_str(),
+        &query.stream_name,
+        query.time_range,
+        &filters,
+        &memtable_ids,
+    )
+    .await
+    .unwrap_or_default();
+    let immutable_time = start.elapsed().as_millis();
+    memtable_ids.extend(im_ids);
+    batches.extend(im_batches);
+
+    log::info!(
+        "[trace_id {}] wal->mem->search: read from metable took {memtable_time} ms, immutable took {immutable_time} ms",
+        query.trace_id,
     );
+
     scan_stats.files = batches.iter().map(|(_, k)| k.len()).sum::<usize>() as i64;
     if scan_stats.files == 0 {
-        return Ok((vec![], ScanStats::new()));
+        return Ok((vec![], ScanStats::new(), HashSet::new()));
     }
 
     let mut batch_groups: HashMap<Arc<Schema>, Vec<RecordBatch>> = HashMap::with_capacity(2);
@@ -468,7 +479,7 @@ pub async fn search_memtable(
                 .build()
         )
     );
-    Ok((tables, scan_stats))
+    Ok((tables, scan_stats, memtable_ids))
 }
 
 #[tracing::instrument(name = "service:search:grpc:wal:get_file_list", skip_all, fields(org_id = query.org_id, stream_name = query.stream_name))]
@@ -478,7 +489,7 @@ async fn get_file_list(
     time_range: Option<(i64, i64)>,
     search_partition_keys: &[(String, String)],
     partition_time_level: PartitionTimeLevel,
-    snapshot_time: Option<i64>,
+    memtable_ids: HashSet<u64>,
 ) -> Result<Vec<FileKey>, Error> {
     let wal_dir = match Path::new(&get_config().common.data_wal_dir).canonicalize() {
         Ok(path) => {
@@ -529,29 +540,21 @@ async fn get_file_list(
     let files = files
         .iter()
         .filter_map(|f| {
-            // If snapshot_time is set, filter out files created after snapshot_time to avoid duplicates
-            if let Some(snapshot_time) = snapshot_time
-            && let Ok(meta) =  config::utils::file::get_file_meta(f)
-            && let Ok(modified_time) = meta.modified() {
-                let modified_micros = modified_time
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_micros() as i64;
-                if modified_micros > snapshot_time {
-                    log::debug!(
-                        "[trace_id {}] skip wal parquet file created after snapshot_time: file: {f} snapshot_time: {snapshot_time} modified_time: {modified_micros}",
-                        query.trace_id,
-                    );
-                    return None;
-                }
+            let memtable_id = get_memtable_id_from_file_name(f);
+
+            // filter out parquet file that already in memtable, because it will be duplicated
+            if memtable_id > 0 && memtable_ids.contains(&memtable_id) {
+                return None;
             }
 
-            Some(f.strip_prefix(&wal_dir)
-                .unwrap()
-                .to_string()
-                .replace('\\', "/")
-                .trim_start_matches('/')
-                .to_string())
+            Some(
+                f.strip_prefix(&wal_dir)
+                    .unwrap()
+                    .to_string()
+                    .replace('\\', "/")
+                    .trim_start_matches('/')
+                    .to_string(),
+            )
         })
         .collect::<Vec<_>>();
 
@@ -570,9 +573,8 @@ async fn get_file_list(
     files.dedup();
     if files_num != files.len() {
         log::warn!(
-            "[trace_id {}] wal->parquet->search: found duplicate files from {} to {}",
+            "[trace_id {}] wal->parquet->search: found duplicate files from {files_num} to {}",
             query.trace_id,
-            files_num,
             files.len()
         );
     }
@@ -606,11 +608,8 @@ async fn get_file_list(
                 && ((max_ts > 0 && file_min_ts > max_ts) || (min_ts > 0 && file_max_ts < min_ts))
             {
                 log::debug!(
-                    "[trace_id {}] skip wal parquet file: {} time_range: [{},{})",
+                    "[trace_id {}] skip wal parquet file: {file} time_range: [{file_min_ts},{file_max_ts}]",
                     query.trace_id,
-                    &file,
-                    file_min_ts,
-                    file_max_ts
                 );
                 wal::release_files(std::slice::from_ref(file));
                 continue;
