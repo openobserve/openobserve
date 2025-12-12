@@ -1298,7 +1298,8 @@
       }
     },
     "triggerAlert": "Trigger",
-    "alertTriggeredSuccess": "Avviso attivato con successo"
+    "alertTriggeredSuccess": "Avviso attivato con successo",
+    "events": "Eventi"
   },
   "alert_templates": {
     "header": "Modelli",

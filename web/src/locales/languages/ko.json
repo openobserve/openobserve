@@ -1298,7 +1298,8 @@
       }
     },
     "triggerAlert": "트리거",
-    "alertTriggeredSuccess": "경고가 성공적으로 트리거됨"
+    "alertTriggeredSuccess": "경고가 성공적으로 트리거됨",
+    "events": "이벤트"
   },
   "alert_templates": {
     "header": "템플릿",

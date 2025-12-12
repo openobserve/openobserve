@@ -1308,7 +1308,8 @@
       }
     },
     "triggerAlert": "トリガー",
-    "alertTriggeredSuccess": "アラートは正常にトリガーされました"
+    "alertTriggeredSuccess": "アラートは正常にトリガーされました",
+    "events": "[イベント]"
   },
   "alert_templates": {
     "header": "テンプレート",

@@ -1298,7 +1298,8 @@
       }
     },
     "triggerAlert": "Trigger",
-    "alertTriggeredSuccess": "Waarschuwing succesvol geactiveerd"
+    "alertTriggeredSuccess": "Waarschuwing succesvol geactiveerd",
+    "events": "Evenementen"
   },
   "alert_templates": {
     "header": "Sjablonen",
