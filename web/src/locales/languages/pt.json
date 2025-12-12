@@ -1298,7 +1298,8 @@
       }
     },
     "triggerAlert": "Gatilho",
-    "alertTriggeredSuccess": "Alerta acionado com sucesso"
+    "alertTriggeredSuccess": "Alerta acionado com sucesso",
+    "events": "Eventos"
   },
   "alert_templates": {
     "header": "Modelos",

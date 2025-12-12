@@ -845,6 +845,7 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
 import { symOutlinedSoundSampler } from "@quasar/extras/material-symbols-outlined";
+import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 // import alertList from "./alerts";
 
 export default defineComponent({
@@ -980,7 +981,52 @@ export default defineComponent({
 
     const triggerExpand = (props: any) => {
       // Open drawer instead of inline expansion
-      selectedAlertDetails.value = props.row;
+      const alert = props.row;
+
+      // LAZY CONVERSION: Convert conditions on-demand only when expanding
+      // This improves performance by avoiding conversion of all alerts on list load
+      let displayConditions = "--";
+      if (alert.rawCondition && Object.keys(alert.rawCondition).length) {
+        if (alert.rawCondition.type == 'custom') {
+          const conditionData = alert.rawCondition.conditions;
+
+          // Detect format by structure, not by version field (more reliable)
+          if (conditionData?.filterType === 'group') {
+            // V2 format: {filterType: "group", logicalOperator: "AND", conditions: [...]}
+            displayConditions = transformV2ToExpression(conditionData);
+          } else if (conditionData?.version === 2 && conditionData?.conditions) {
+            // V2 format with version wrapper: {version: 2, conditions: {filterType: "group", ...}}
+            displayConditions = transformV2ToExpression(conditionData.conditions);
+          } else if (conditionData?.or || conditionData?.and) {
+            // V1 format: {or: [...]} or {and: [...]}
+            displayConditions = transformToExpression(conditionData);
+          } else if (Array.isArray(conditionData) && conditionData.length > 0) {
+            // V0 format (legacy): flat array [{column, operator, value}, ...]
+            // V0 had implicit AND between all conditions (no groups)
+            const parts = conditionData.map((item: any) => {
+              const column = item.column || 'field';
+              const operator = item.operator || '=';
+              const value = typeof item.value === 'string' ? `'${item.value}'` : item.value;
+              return `${column} ${operator} ${value}`;
+            });
+            displayConditions = parts.length > 0 ? `(${parts.join(' AND ')})` : '--';
+          } else {
+            // Unknown format or empty
+            displayConditions = typeof conditionData === 'string' ? conditionData : '--';
+          }
+        } else if (alert.rawCondition.sql) {
+          displayConditions = alert.rawCondition.sql;
+        } else if (alert.rawCondition.promql) {
+          displayConditions = alert.rawCondition.promql;
+        }
+      }
+
+      // Set selectedAlertDetails with converted conditions
+      selectedAlertDetails.value = {
+        ...alert,
+        conditions: displayConditions
+      };
+
       showAlertDetailsDrawer.value = true;
       // Fetch history for this alert
       if(config.isCloud == "false"){
@@ -1270,34 +1316,9 @@ export default defineComponent({
           }
           //general alerts that we use to display (formatting the alerts into the table format)
           //localAllAlerts is the alerts that we use to store
+          // PERFORMANCE OPTIMIZATION: Store raw condition data without conversion
+          // Conversion happens lazily only when user expands an alert (in triggerExpand)
           localAllAlerts = localAllAlerts.map((data: any) => {
-            let conditions = "--";
-
-            // Handle different condition formats based on structure
-            if (Object.keys(data.condition).length && data.condition.type == 'custom') {
-              const conditionData = data.condition.conditions;
-
-              // Detect format by structure, not by version field (more reliable)
-              if (conditionData?.filterType === 'group') {
-                // V2 format: {filterType: "group", logicalOperator: "AND", conditions: [...]}
-                // This works whether or not there's a version field
-                conditions = transformV2ToExpression(conditionData);
-              } else if (conditionData?.version === 2 && conditionData?.conditions) {
-                // V2 format with version wrapper: {version: 2, conditions: {filterType: "group", ...}}
-                conditions = transformV2ToExpression(conditionData.conditions);
-              } else if (conditionData?.or || conditionData?.and) {
-                // V1 format: {or: [...]} or {and: [...]}
-                conditions = transformToExpression(conditionData);
-              } else {
-                // V0 format (legacy query_condition) or other formats
-                // Try to display as-is if it's a string, otherwise show placeholder
-                conditions = typeof conditionData === 'string' ? conditionData : '--';
-              }
-            } else if (data.condition.sql) {
-              conditions = data.condition.sql;
-            } else if (data.condition.promql) {
-              conditions = data.condition.promql;
-            }
             let frequency = "";
             if (data.trigger_condition?.frequency_type == "cron") {
               frequency = data.trigger_condition.cron;
@@ -1313,7 +1334,8 @@ export default defineComponent({
               stream_name: data.stream_name ? data.stream_name : "--",
               stream_type: data.stream_type,
               enabled: data.enabled,
-              conditions: conditions,
+              conditions: "--", // Placeholder - will be converted on-demand in triggerExpand
+              rawCondition: data.condition, // Store raw condition for lazy conversion
               description: data.description,
               uuid: data.uuid,
               owner: data.owner,
@@ -2311,43 +2333,16 @@ export default defineComponent({
       }
 
       // V2 format: {filterType: "group", logicalOperator: "AND", conditions: [...]}
+      // Uses shared buildConditionsString utility for consistency
       function transformV2ToExpression(group: any, isRoot = true): string {
-        if (!group || !group.conditions || group.conditions.length === 0) {
-          return '';
-        }
-
-        const parts: string[] = [];
-
-        group.conditions.forEach((item: any, index: number) => {
-          if (item.filterType === 'group') {
-            // Nested group - recursively build expression
-            const nestedExpr = transformV2ToExpression(item, false);
-            if (nestedExpr) {
-              // Use parent group's logicalOperator for the operator before nested groups
-              if (index > 0) {
-                parts.push(`${group.logicalOperator} (${nestedExpr})`);
-              } else {
-                parts.push(`(${nestedExpr})`);
-              }
-            }
-          } else {
-            // Condition
-            const column = item.column || 'field';
-            const operator = item.operator || '=';
-            const value = typeof item.value === 'string' ? `'${item.value}'` : item.value;
-            const conditionStr = `${column} ${operator} ${value}`;
-
-            // Add operator before condition (except for first item)
-            if (index > 0 && item.logicalOperator) {
-              parts.push(`${item.logicalOperator} ${conditionStr}`);
-            } else {
-              parts.push(conditionStr);
-            }
-          }
+        const result = buildConditionsString(group, {
+          sqlMode: false,        // Display format (lowercase operators)
+          addWherePrefix: false,
+          formatValues: false,   // Simple display without type-aware formatting
         });
 
-        const joined = parts.join(' ');
-        return isRoot ? `(${joined})` : joined;
+        // Wrap in parentheses if it's the root level and has content
+        return isRoot && result ? `(${result})` : result;
       }
       //this function is used to filter the alerts by the local search not the global search
       //this will be used when the user is searching for the alerts in the same folder

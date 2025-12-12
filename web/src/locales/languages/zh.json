@@ -1294,7 +1294,8 @@
       }
     },
     "triggerAlert": "触发器",
-    "alertTriggeredSuccess": "警报成功触发"
+    "alertTriggeredSuccess": "警报成功触发",
+    "events": "活动"
   },
   "alert_templates": {
     "header": "模板",

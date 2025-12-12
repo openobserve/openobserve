@@ -1298,7 +1298,8 @@
       }
     },
     "triggerAlert": "Tetikleyici",
-    "alertTriggeredSuccess": "Uyarı başarıyla tetiklendi"
+    "alertTriggeredSuccess": "Uyarı başarıyla tetiklendi",
+    "events": "Olaylar"
   },
   "alert_templates": {
     "header": "Şablonlar",

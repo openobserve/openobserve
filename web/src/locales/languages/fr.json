@@ -1298,7 +1298,8 @@
       }
     },
     "triggerAlert": "Gâchette",
-    "alertTriggeredSuccess": "Alerte déclenchée avec succès"
+    "alertTriggeredSuccess": "Alerte déclenchée avec succès",
+    "events": "Évènements"
   },
   "alert_templates": {
     "header": "Modèles",
