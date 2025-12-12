@@ -687,7 +687,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Alert History Table -->
-          <div class="tw-mb-6">
+          <div v-if="config.isCloud == 'false'" class="tw-mb-6">
             <div class="tw-text-sm tw-font-semibold tw-mb-3" :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'">Evaluation History</div>
 
             <div v-if="isLoadingHistory" class="tw-text-center tw-py-8">
@@ -2611,7 +2611,8 @@ export default defineComponent({
       transformToExpression,
       filterAlertsByQuery,
       bulkToggleAlerts,
-      symOutlinedSoundSampler
+      symOutlinedSoundSampler,
+      config,
     };
   },
 });
