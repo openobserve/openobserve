@@ -1,4 +1,4 @@
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const { test, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 
@@ -7,16 +7,6 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
 
   let pm; // Page Manager instance
   const expectedOrgId = process.env["ORGNAME"] || "default";
-
-  /**
-   * Helper function to validate org_identifier in current URL
-   */
-  async function validateOrgIdentifier(page, context) {
-    const url = new URL(page.url());
-    const actualOrgId = url.searchParams.get('org_identifier');
-    expect(actualOrgId, `org_identifier should be "${expectedOrgId}" after ${context}. URL: ${page.url()}`).toBe(expectedOrgId);
-    testLogger.info(`✓ org_identifier preserved after ${context}`);
-  }
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
@@ -40,14 +30,14 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
     // Navigate to Logs
     await pm.navigationPage.clickLogs();
     await page.waitForTimeout(500);
-    await validateOrgIdentifier(page, 'navigating to Logs');
+    await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Click query/refresh button
     const queryButton = page.locator('[data-test="logs-search-bar-refresh-btn"]');
     if (await queryButton.isVisible({ timeout: 5000 })) {
       await queryButton.click();
       await page.waitForTimeout(1000);
-      await validateOrgIdentifier(page, 'clicking query button');
+      await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
     } else {
       testLogger.warn('Query button not visible - skipping interaction');
     }
@@ -62,14 +52,14 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
 
     await pm.navigationPage.clickLogs();
     await page.waitForTimeout(500);
-    await validateOrgIdentifier(page, 'navigating to Logs');
+    await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Click date/time button
     const dateTimeButton = page.locator('[data-test="date-time-btn"]');
     if (await dateTimeButton.isVisible({ timeout: 5000 })) {
       await dateTimeButton.click();
       await page.waitForTimeout(500);
-      await validateOrgIdentifier(page, 'opening date/time picker');
+      await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
       // Close picker by clicking button again
       await dateTimeButton.click();
@@ -88,14 +78,14 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
 
     await pm.navigationPage.clickLogs();
     await page.waitForTimeout(500);
-    await validateOrgIdentifier(page, 'navigating to Logs');
+    await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Toggle SQL mode
     const sqlModeToggle = page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]');
     if (await sqlModeToggle.isVisible({ timeout: 5000 })) {
       await sqlModeToggle.click();
       await page.waitForTimeout(500);
-      await validateOrgIdentifier(page, 'toggling SQL mode');
+      await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
     } else {
       testLogger.warn('SQL mode toggle not visible');
     }
@@ -110,14 +100,14 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
 
     await pm.navigationPage.clickLogs();
     await page.waitForTimeout(500);
-    await validateOrgIdentifier(page, 'navigating to Logs');
+    await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Toggle histogram
     const histogramToggle = page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"]');
     if (await histogramToggle.isVisible({ timeout: 5000 })) {
       await histogramToggle.click();
       await page.waitForTimeout(500);
-      await validateOrgIdentifier(page, 'toggling histogram');
+      await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
     } else {
       testLogger.warn('Histogram toggle not visible');
     }
@@ -134,14 +124,14 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
 
     await pm.navigationPage.clickMetrics();
     await page.waitForTimeout(500);
-    await validateOrgIdentifier(page, 'navigating to Metrics');
+    await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Click syntax guide button
     const syntaxGuideButton = page.locator('[data-cy="syntax-guide-button"]');
     if (await syntaxGuideButton.isVisible({ timeout: 5000 })) {
       await syntaxGuideButton.click();
       await page.waitForTimeout(500);
-      await validateOrgIdentifier(page, 'opening syntax guide');
+      await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
     } else {
       testLogger.warn('Syntax guide button not visible');
     }
@@ -158,14 +148,14 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
 
     await pm.navigationPage.clickTraces();
     await page.waitForTimeout(500);
-    await validateOrgIdentifier(page, 'navigating to Traces');
+    await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Click date/time button
     const dateTimeButton = page.locator('[data-test="date-time-btn"]');
     if (await dateTimeButton.isVisible({ timeout: 5000 })) {
       await dateTimeButton.click();
       await page.waitForTimeout(500);
-      await validateOrgIdentifier(page, 'opening date/time picker in Traces');
+      await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
     } else {
       testLogger.warn('Date/time button not visible in Traces');
     }
@@ -182,14 +172,14 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
 
     await pm.navigationPage.clickDashboards();
     await page.waitForTimeout(500);
-    await validateOrgIdentifier(page, 'navigating to Dashboards');
+    await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Click create dashboard button
     const createButton = page.locator('[data-test="dashboard-add"]');
     if (await createButton.isVisible({ timeout: 5000 })) {
       await createButton.click();
       await page.waitForTimeout(500);
-      await validateOrgIdentifier(page, 'opening create dashboard dialog');
+      await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
       // Close dialog by pressing Escape
       await page.keyboard.press('Escape');
@@ -208,18 +198,18 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
 
     await pm.navigationPage.clickDashboards();
     await page.waitForTimeout(500);
-    await validateOrgIdentifier(page, 'navigating to Dashboards');
+    await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Click and use search
     const searchInput = page.locator('[data-test="dashboard-search"]');
     if (await searchInput.isVisible({ timeout: 5000 })) {
       await searchInput.click();
       await page.waitForTimeout(300);
-      await validateOrgIdentifier(page, 'clicking search input');
+      await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
       await searchInput.fill('test');
       await page.waitForTimeout(500);
-      await validateOrgIdentifier(page, 'searching dashboards');
+      await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
     } else {
       testLogger.warn('Search input not visible');
     }
@@ -234,14 +224,14 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
 
     await pm.navigationPage.clickDashboards();
     await page.waitForTimeout(500);
-    await validateOrgIdentifier(page, 'navigating to Dashboards');
+    await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Click import button
     const importButton = page.locator('[data-test="dashboard-import"]');
     if (await importButton.isVisible({ timeout: 5000 })) {
       await importButton.click();
       await page.waitForTimeout(500);
-      await validateOrgIdentifier(page, 'opening import dialog');
+      await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
       // Close dialog
       await page.keyboard.press('Escape');
@@ -262,18 +252,18 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
 
     await pm.navigationPage.clickStreams();
     await page.waitForTimeout(500);
-    await validateOrgIdentifier(page, 'navigating to Streams');
+    await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Search for stream
     const searchInput = page.locator('[data-test="streams-search-stream-input"]').or(page.getByPlaceholder('Search Stream'));
     if (await searchInput.isVisible({ timeout: 5000 })) {
       await searchInput.click();
       await page.waitForTimeout(300);
-      await validateOrgIdentifier(page, 'clicking stream search');
+      await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
       await searchInput.fill('test');
       await page.waitForTimeout(500);
-      await validateOrgIdentifier(page, 'searching streams');
+      await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
     } else {
       testLogger.warn('Stream search not visible');
     }
@@ -290,14 +280,14 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
 
     await pm.navigationPage.clickAlerts();
     await page.waitForTimeout(500);
-    await validateOrgIdentifier(page, 'navigating to Alerts');
+    await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Click add alert button
     const addAlertButton = page.locator('[data-test="alert-list-add-alert-btn"]');
     if (await addAlertButton.isVisible({ timeout: 5000 })) {
       await addAlertButton.click();
       await page.waitForTimeout(500);
-      await validateOrgIdentifier(page, 'opening add alert dialog');
+      await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
       // Close dialog
       await page.keyboard.press('Escape');
@@ -316,21 +306,21 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
 
     await pm.navigationPage.clickAlerts();
     await page.waitForTimeout(500);
-    await validateOrgIdentifier(page, 'navigating to Alerts');
+    await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Click Scheduled tab
     const scheduledTab = page.locator('[data-test="tab-scheduled"]');
     if (await scheduledTab.isVisible({ timeout: 5000 })) {
       await scheduledTab.click();
       await page.waitForTimeout(500);
-      await validateOrgIdentifier(page, 'clicking Scheduled tab');
+      await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
       // Click Real-time tab
       const realtimeTab = page.locator('[data-test="tab-realTime"]');
       if (await realtimeTab.isVisible({ timeout: 5000 })) {
         await realtimeTab.click();
         await page.waitForTimeout(500);
-        await validateOrgIdentifier(page, 'clicking Real-time tab');
+        await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
       }
 
       // Click All tab
@@ -338,7 +328,7 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
       if (await allTab.isVisible({ timeout: 5000 })) {
         await allTab.click();
         await page.waitForTimeout(500);
-        await validateOrgIdentifier(page, 'clicking All tab');
+        await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
       }
     } else {
       testLogger.warn('Alert tabs not visible');
@@ -354,18 +344,18 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
 
     await pm.navigationPage.clickAlerts();
     await page.waitForTimeout(500);
-    await validateOrgIdentifier(page, 'navigating to Alerts');
+    await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Search alerts
     const searchInput = page.locator('[data-test="alert-list-search-input"]');
     if (await searchInput.isVisible({ timeout: 5000 })) {
       await searchInput.click();
       await page.waitForTimeout(300);
-      await validateOrgIdentifier(page, 'clicking alert search');
+      await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
       await searchInput.fill('test');
       await page.waitForTimeout(500);
-      await validateOrgIdentifier(page, 'searching alerts');
+      await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
     } else {
       testLogger.warn('Alert search not visible');
     }
@@ -390,14 +380,14 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
 
     await pm.navigationPage.clickIAM();
     await page.waitForTimeout(500);
-    await validateOrgIdentifier(page, 'navigating to IAM');
+    await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Click Service Accounts tab
     const serviceAccountsTab = page.locator('[data-test="iam-service-accounts-tab"]');
     if (await serviceAccountsTab.isVisible({ timeout: 5000 })) {
       await serviceAccountsTab.click();
       await page.waitForTimeout(500);
-      await validateOrgIdentifier(page, 'clicking Service Accounts tab');
+      await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
     } else {
       testLogger.warn('Service Accounts tab not visible');
     }
@@ -422,14 +412,14 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
 
     await pm.navigationPage.clickReports();
     await page.waitForTimeout(500);
-    await validateOrgIdentifier(page, 'navigating to Reports');
+    await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Click Scheduled tab
     const scheduledTab = page.getByTitle('Scheduled');
     if (await scheduledTab.isVisible({ timeout: 5000 })) {
       await scheduledTab.click();
       await page.waitForTimeout(500);
-      await validateOrgIdentifier(page, 'clicking Scheduled tab');
+      await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
     } else {
       testLogger.warn('Scheduled tab not visible');
     }
@@ -451,14 +441,14 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
 
     await pm.navigationPage.clickReports();
     await page.waitForTimeout(500);
-    await validateOrgIdentifier(page, 'navigating to Reports');
+    await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Click add report button
     const addReportButton = page.locator('[data-test="report-list-add-report-btn"]');
     if (await addReportButton.isVisible({ timeout: 5000 })) {
       await addReportButton.click();
       await page.waitForTimeout(500);
-      await validateOrgIdentifier(page, 'opening add report dialog');
+      await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
       // Close dialog
       await page.keyboard.press('Escape');
@@ -481,59 +471,59 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
     testLogger.info('Step 1: Logs page interaction');
     await pm.navigationPage.clickLogs();
     await page.waitForTimeout(500);
-    await validateOrgIdentifier(page, 'navigating to Logs');
+    await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     const logsQueryBtn = page.locator('[data-test="logs-search-bar-refresh-btn"]');
     if (await logsQueryBtn.isVisible({ timeout: 3000 })) {
       await logsQueryBtn.click();
       await page.waitForTimeout(500);
-      await validateOrgIdentifier(page, 'clicking Logs query button');
+      await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
     }
 
     // Dashboards: Navigate + interact
     testLogger.info('Step 2: Dashboards page interaction');
     await pm.navigationPage.clickDashboards();
     await page.waitForTimeout(500);
-    await validateOrgIdentifier(page, 'navigating to Dashboards');
+    await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     const dashboardSearch = page.locator('[data-test="dashboard-search"]');
     if (await dashboardSearch.isVisible({ timeout: 3000 })) {
       await dashboardSearch.click();
       await page.waitForTimeout(300);
-      await validateOrgIdentifier(page, 'clicking Dashboards search');
+      await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
     }
 
     // Alerts: Navigate + interact
     testLogger.info('Step 3: Alerts page interaction');
     await pm.navigationPage.clickAlerts();
     await page.waitForTimeout(500);
-    await validateOrgIdentifier(page, 'navigating to Alerts');
+    await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     const scheduledTab = page.locator('[data-test="tab-scheduled"]');
     if (await scheduledTab.isVisible({ timeout: 3000 })) {
       await scheduledTab.click();
       await page.waitForTimeout(500);
-      await validateOrgIdentifier(page, 'clicking Alerts Scheduled tab');
+      await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
     }
 
     // Streams: Navigate + interact
     testLogger.info('Step 4: Streams page interaction');
     await pm.navigationPage.clickStreams();
     await page.waitForTimeout(500);
-    await validateOrgIdentifier(page, 'navigating to Streams');
+    await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     const streamSearch = page.locator('[data-test="streams-search-stream-input"]').or(page.getByPlaceholder('Search Stream'));
     if (await streamSearch.isVisible({ timeout: 3000 })) {
       await streamSearch.click();
       await page.waitForTimeout(300);
-      await validateOrgIdentifier(page, 'clicking Streams search');
+      await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
     }
 
     // Return to Home
     testLogger.info('Step 5: Return to Home');
     await pm.navigationPage.clickHome();
     await page.waitForTimeout(500);
-    await validateOrgIdentifier(page, 'returning to Home');
+    await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     testLogger.info('Cross-page sequential interactions test completed successfully');
   });
