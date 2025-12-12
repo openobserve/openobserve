@@ -625,7 +625,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               @click="openCustomChartTypeSelector"
                               data-test="custom-chart-type-selector-btn"
                               no-caps
-                              size="sm"
+                              size="md"
                             />
                             <!-- Custom Chart Type Selector Dialog -->
                             <q-dialog v-model="showCustomChartTypeSelector">
