@@ -161,26 +161,26 @@ export const chartTypesData: { data: ChartCategory[] } = {
     //     // }
     //   ],
     // },
-    {
-      chartLabel: "Candlestick",
-      type: [
-        {
-          label: "Candlestick Brush",
-          value: "candlestick-brush",
-          asset: "/src/assets/dashboard/CustomChartAssets/candlestick-brush.webp",
-        },
-        // {
-        //   label: "Large Candlestick",
-        //   value: "candlestick-large",
-        //   asset: "https://echarts.apache.org/examples/data/thumb/candlestick-large.webp"
-        // },
-        {
-          label: "Axis Pointer Link and Touch",
-          value: "candlestick-touch",
-          asset: "/src/assets/dashboard/CustomChartAssets/candlestick-touch.webp",
-        },
-      ],
-    },
+    // {
+    //   chartLabel: "Candlestick",
+    //   type: [
+    //     {
+    //       label: "Candlestick Brush",
+    //       value: "candlestick-brush",
+    //       asset: "/src/assets/dashboard/CustomChartAssets/candlestick-brush.webp",
+    //     },
+    //     // {
+    //     //   label: "Large Candlestick",
+    //     //   value: "candlestick-large",
+    //     //   asset: "https://echarts.apache.org/examples/data/thumb/candlestick-large.webp"
+    //     // },
+    //     {
+    //       label: "Axis Pointer Link and Touch",
+    //       value: "candlestick-touch",
+    //       asset: "/src/assets/dashboard/CustomChartAssets/candlestick-touch.webp",
+    //     },
+    //   ],
+    // },
     {
       chartLabel: "Radar",
       type: [

@@ -37,40 +37,70 @@ const processData = (chartData, categoryKey, valueKey) => {
 
 const { categories, values } = processData(data[0], categoryAlias, valueAlias);
 
+// Generate multiple data snapshots for animation
+const generateRacingSnapshots = (baseValues, numSnapshots = 10) => {
+  const snapshots = [baseValues];
+  let currentValues = [...baseValues];
+  
+  for (let i = 0; i < numSnapshots; i++) {
+    currentValues = currentValues.map(val => val + Math.round(Math.random() * 100));
+    snapshots.push([...currentValues]);
+  }
+  
+  return snapshots;
+};
+
+const snapshots = generateRacingSnapshots(values);
+let currentSnapshot = 0;
+
 option = {
-  xAxis: {
-    max: 'dataMax'
+  timeline: {
+    axisType: 'category',
+    autoPlay: true,
+    playInterval: 3000,
+    loop: true,
+    data: snapshots.map((_, idx) => idx.toString()),
+    show: false
   },
-  yAxis: {
-    type: 'category',
-    data: categories,
-    inverse: true,
-    animationDuration: 300,
-    animationDurationUpdate: 300,
-    max: categories.length - 1
-  },
-  series: [
-    {
-      realtimeSort: true,
-      name: 'Value',
-      type: 'bar',
-      data: values,
-      label: {
-        show: true,
-        position: 'right',
-        valueAnimation: true
+  baseOption: {
+    xAxis: {
+      max: 'dataMax'
+    },
+    yAxis: {
+      type: 'category',
+      data: categories,
+      inverse: true,
+      animationDuration: 300,
+      animationDurationUpdate: 300,
+      max: categories.length - 1
+    },
+    series: [
+      {
+        realtimeSort: true,
+        name: 'Value',
+        type: 'bar',
+        label: {
+          show: true,
+          position: 'right',
+          valueAnimation: true
+        }
       }
-    }
-  ],
-  animationDuration: 0,
-  animationDurationUpdate: 3000,
-  animationEasing: 'linear',
-  animationEasingUpdate: 'linear'
+    ],
+    animationDuration: 0,
+    animationDurationUpdate: 3000,
+    animationEasing: 'linear',
+    animationEasingUpdate: 'linear'
+  },
+  options: snapshots.map(snapshot => ({
+    series: [{
+      data: snapshot
+    }]
+  }))
 };
 `;
 
 // Export with common name for consistency across all templates
 export const customChartExample = {
   code: chartCode,
-  query: exampleQuery
+  query: exampleQuery,
 };

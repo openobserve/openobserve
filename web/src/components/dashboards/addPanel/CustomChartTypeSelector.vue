@@ -173,6 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <CustomChartConfirmDialog
       title="Confirm Chart Type Selection"
       message="By selecting this chart type, the existing chart code will be replaced by the selected chart type's code. Do you want to continue?"
+      :currentQuery="currentQuery"
       @update:ok="confirmChartSelection"
       @update:cancel="cancelChartSelection"
       v-model="confirmChartSelectionDialog"
@@ -181,11 +182,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, nextTick, computed } from "vue";
+import {
+  defineComponent,
+  ref,
+  onMounted,
+  nextTick,
+  computed,
+  inject,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import type { ChartType, ChartCategory } from "./chartTypes";
 import { chartTypesData } from "./chartTypes";
 import CustomChartConfirmDialog from "@/components/CustomChartConfirmDialog.vue";
+import useDashboardPanelData from "@/composables/useDashboardPanel";
 
 export default defineComponent({
   name: "CustomChartTypeSelector",
@@ -195,6 +204,14 @@ export default defineComponent({
   emits: ["close", "select"],
   setup(props, { emit }) {
     const { t } = useI18n();
+    const dashboardPanelDataPageKey = inject(
+      "dashboardPanelDataPageKey",
+      "dashboard",
+    );
+    const { dashboardPanelData } = useDashboardPanelData(
+      dashboardPanelDataPageKey,
+    );
+
     const chartCategories = ref<ChartCategory[]>(chartTypesData.data);
     const selectedCategory = ref<string>(
       chartCategories.value[0]?.chartLabel || "",
@@ -204,6 +221,14 @@ export default defineComponent({
     const confirmChartSelectionDialog = ref<boolean>(false);
     const pendingChartSelection = ref<ChartType | null>(null);
     const searchQuery = ref<string>("");
+
+    // Get current query for the dialog
+    const currentQuery = computed(
+      () =>
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex || 0
+        ]?.query || "",
+    );
 
     // Computed property to filter categories and charts based on search query
     const filteredCategories = computed(() => {
@@ -321,6 +346,7 @@ export default defineComponent({
       closeDialog,
       searchQuery,
       filteredCategories,
+      currentQuery,
     };
   },
 });
