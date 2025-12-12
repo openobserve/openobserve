@@ -43,15 +43,19 @@ export interface BackfillJob {
   end_time: number; // microseconds
   current_position: number; // microseconds
   progress_percent: number; // 0-100
-  status: "running" | "completed" | "failed" | "pending" | "canceled";
+  status: "running" | "completed" | "failed" | "pending" | "canceled" | "paused" | "waiting";
   deletion_status?: DeletionStatus;
   deletion_job_id?: string;
   created_at?: number; // microseconds
+  last_triggered_at?: number; // microseconds
   chunks_completed?: number;
   chunks_total?: number;
+  chunk_period_minutes?: number;
+  delay_between_chunks_secs?: number;
+  delete_before_backfill?: boolean;
 }
 
-export interface CancelBackfillJobResponse {
+export interface BackfillJobActionResponse {
   message: string;
 }
 
@@ -102,15 +106,62 @@ const backfill = {
   },
 
   /**
-   * Cancel a running backfill job
+   * Pause a running backfill job
    */
-  cancelBackfillJob: async ({
+  pauseBackfillJob: async ({
     org_id,
     job_id,
   }: {
     org_id: string;
     job_id: string;
-  }): Promise<CancelBackfillJobResponse> => {
+  }): Promise<BackfillJobActionResponse> => {
+    const url = `/api/${org_id}/pipelines/backfill/${job_id}/pause`;
+    const response = await http().post(url);
+    return response.data;
+  },
+
+  /**
+   * Resume a paused backfill job
+   */
+  resumeBackfillJob: async ({
+    org_id,
+    job_id,
+  }: {
+    org_id: string;
+    job_id: string;
+  }): Promise<BackfillJobActionResponse> => {
+    const url = `/api/${org_id}/pipelines/backfill/${job_id}/resume`;
+    const response = await http().post(url);
+    return response.data;
+  },
+
+  /**
+   * Update an existing backfill job
+   */
+  updateBackfillJob: async ({
+    org_id,
+    job_id,
+    data,
+  }: {
+    org_id: string;
+    job_id: string;
+    data: CreateBackfillJobRequest;
+  }): Promise<BackfillJobActionResponse> => {
+    const url = `/api/${org_id}/pipelines/backfill/${job_id}`;
+    const response = await http().put(url, data);
+    return response.data;
+  },
+
+  /**
+   * Delete a backfill job permanently
+   */
+  deleteBackfillJob: async ({
+    org_id,
+    job_id,
+  }: {
+    org_id: string;
+    job_id: string;
+  }): Promise<BackfillJobActionResponse> => {
     const url = `/api/${org_id}/pipelines/backfill/${job_id}`;
     const response = await http().delete(url);
     return response.data;

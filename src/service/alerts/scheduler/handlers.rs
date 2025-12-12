@@ -2444,7 +2444,14 @@ async fn handle_backfill_triggers(
 
     // 8. Update progress or complete
     if chunk_end >= backfill_job.end_time {
-        // Backfill complete - mark trigger as completed
+        // Backfill complete - set current_position to end_time and mark trigger as completed
+        backfill_job.current_position = backfill_job.end_time;
+
+        let updated_trigger_data = ScheduledTriggerData {
+            backfill_job: Some(backfill_job.clone()),
+            ..trigger_data
+        };
+
         log::info!(
             "[BACKFILL trace_id {trace_id}] Backfill job completed for pipeline {}",
             backfill_job.source_pipeline_id
@@ -2452,6 +2459,7 @@ async fn handle_backfill_triggers(
         db::scheduler::update_trigger(
             db::scheduler::Trigger {
                 status: db::scheduler::TriggerStatus::Completed,
+                data: serde_json::to_string(&updated_trigger_data)?,
                 ..trigger
             },
             true,

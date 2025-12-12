@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Filters -->
       <div class="card-container tw-mb-[0.625rem] q-pa-md">
-        <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-3 tw-gap-4">
+        <div class="flex items-center tw-gap-4">
           <q-select
             v-model="filters.status"
             :options="statusOptions"
@@ -65,6 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             outlined
             dense
             clearable
+            style="width: 150px"
             data-test="status-filter"
           />
           <q-select
@@ -79,11 +80,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             use-input
             input-debounce="300"
             @filter="filterPipelines"
+            style="width: 250px"
             data-test="pipeline-filter"
           />
           <q-btn
             label="Clear Filters"
             outline
+            no-caps
+            padding="xs sm"
             :class="
               store.state.theme === 'dark'
                 ? 'o2-secondary-button-dark'
@@ -129,17 +133,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-td>
           </template>
 
-          <!-- Status Column -->
-          <template v-slot:body-cell-status="props">
-            <q-td :props="props">
-              <q-badge
-                :color="getStatusColor(props.row.status, props.row.deletion_status)"
-                :label="getStatusLabel(props.row.status, props.row.deletion_status)"
-                data-test="status-badge"
-              />
-            </q-td>
-          </template>
-
           <!-- Progress Column -->
           <template v-slot:body-cell-progress_percent="props">
             <q-td :props="props">
@@ -162,37 +155,87 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Created At Column -->
           <template v-slot:body-cell-created_at="props">
             <q-td :props="props">
-              <div class="text-caption">{{ formatTimestamp(props.row.created_at) }}</div>
+              <div class="text-caption">
+                {{ formatTimestamp(props.row.created_at) }}
+              </div>
+            </q-td>
+          </template>
+
+          <!-- Last Triggered At Column -->
+          <template v-slot:body-cell-last_triggered_at="props">
+            <q-td :props="props">
+              <div class="text-caption">
+                {{ formatTimestamp(props.row.last_triggered_at) }}
+              </div>
             </q-td>
           </template>
 
           <!-- Actions Column -->
           <template v-slot:body-cell-actions="props">
             <q-td :props="props">
-              <div class="flex tw-gap-2">
+              <div class="flex items-center justify-end tw-gap-1">
+                <q-btn
+                  v-if="canPauseJob(props.row.status)"
+                  flat
+                  dense
+                  round
+                  icon="pause"
+                  size="sm"
+                  color="warning"
+                  @click="confirmPauseJob(props.row)"
+                  data-test="pause-job-btn"
+                >
+                  <q-tooltip>Pause Job</q-tooltip>
+                </q-btn>
+                <q-btn
+                  v-if="canResumeJob(props.row.status)"
+                  flat
+                  dense
+                  round
+                  icon="play_arrow"
+                  size="sm"
+                  color="positive"
+                  @click="confirmResumeJob(props.row)"
+                  data-test="resume-job-btn"
+                >
+                  <q-tooltip>Resume Job</q-tooltip>
+                </q-btn>
+                <q-btn
+                  v-if="canEditJob(props.row.status)"
+                  flat
+                  dense
+                  round
+                  icon="edit"
+                  size="sm"
+                  color="primary"
+                  @click="editJob(props.row)"
+                  data-test="edit-job-btn"
+                >
+                  <q-tooltip>Edit Job</q-tooltip>
+                </q-btn>
+                <q-btn
+                  v-if="canDeleteJob(props.row.status)"
+                  flat
+                  dense
+                  round
+                  icon="delete"
+                  size="sm"
+                  color="negative"
+                  @click="confirmDeleteJob(props.row)"
+                  data-test="delete-job-btn"
+                >
+                  <q-tooltip>Delete Job</q-tooltip>
+                </q-btn>
                 <q-btn
                   flat
                   dense
                   round
-                  icon="visibility"
+                  icon="info"
                   size="sm"
                   @click="viewJob(props.row)"
                   data-test="view-job-btn"
                 >
                   <q-tooltip>View Details</q-tooltip>
-                </q-btn>
-                <q-btn
-                  v-if="canCancelJob(props.row.status)"
-                  flat
-                  dense
-                  round
-                  icon="cancel"
-                  size="sm"
-                  color="negative"
-                  @click="confirmCancelJob(props.row)"
-                  data-test="cancel-job-btn"
-                >
-                  <q-tooltip>Cancel Job</q-tooltip>
                 </q-btn>
               </div>
             </q-td>
@@ -207,17 +250,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :job-id="selectedJobId"
       @job-canceled="onJobCanceled"
     />
+
+    <!-- Edit Job Dialog -->
+    <EditBackfillJobDialog
+      v-model="showEditDialog"
+      :job="selectedJob"
+      @job-updated="onJobUpdated"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
+import { useQuasar, date } from "quasar";
 import { useStore } from "vuex";
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import BackfillJobDetails from "./BackfillJobDetails.vue";
-import { formatDistanceToNow } from "date-fns";
+import EditBackfillJobDialog from "./EditBackfillJobDialog.vue";
 
 const router = useRouter();
 const $q = useQuasar();
@@ -227,6 +277,8 @@ const loading = ref(false);
 const jobs = ref<BackfillJob[]>([]);
 const showDetailsDialog = ref(false);
 const selectedJobId = ref("");
+const showEditDialog = ref(false);
+const selectedJob = ref<BackfillJob | null>(null);
 
 const filters = ref({
   status: null as string | null,
@@ -248,13 +300,6 @@ const columns = [
     sortable: true,
   },
   {
-    name: "status",
-    label: "Status",
-    align: "left" as const,
-    field: "status",
-    sortable: true,
-  },
-  {
     name: "progress_percent",
     label: "Progress",
     align: "left" as const,
@@ -269,6 +314,13 @@ const columns = [
     sortable: true,
   },
   {
+    name: "last_triggered_at",
+    label: "Last Triggered",
+    align: "left" as const,
+    field: "last_triggered_at",
+    sortable: true,
+  },
+  {
     name: "actions",
     label: "Actions",
     align: "right" as const,
@@ -276,7 +328,7 @@ const columns = [
   },
 ];
 
-const statusOptions = ["running", "completed", "failed", "pending", "canceled"];
+const statusOptions = ["running", "completed", "paused"];
 const pipelineOptions = ref<any[]>([]);
 const allPipelineOptions = ref<any[]>([]);
 
@@ -333,7 +385,15 @@ const filteredJobs = computed(() => {
   let filtered = jobs.value;
 
   if (filters.value.status) {
-    filtered = filtered.filter((job) => job.status === filters.value.status);
+    filtered = filtered.filter((job) => {
+      // Map actual status to display status
+      let displayStatus = job.status;
+      if (job.status === "waiting" || job.status === "pending") {
+        displayStatus = "running";
+      }
+      // paused and completed stay as-is
+      return displayStatus === filters.value.status;
+    });
   }
 
   if (filters.value.pipelineId) {
@@ -367,40 +427,131 @@ const viewJob = (job: BackfillJob) => {
   showDetailsDialog.value = true;
 };
 
-const canCancelJob = (status: string) => {
-  return status === "running" || status === "pending";
+const editJob = (job: BackfillJob) => {
+  selectedJob.value = job;
+  showEditDialog.value = true;
 };
 
-const confirmCancelJob = (job: BackfillJob) => {
+const onJobUpdated = () => {
+  loadJobs();
+};
+
+const canPauseJob = (status: string) => {
+  return status === "running" || status === "waiting";
+};
+
+const canResumeJob = (status: string) => {
+  return status === "paused";
+};
+
+const canEditJob = (status: string) => {
+  return status === "paused" || status === "completed";
+};
+
+const canDeleteJob = (status: string) => {
+  return status === "completed" || status === "failed" || status === "canceled" || status === "paused";
+};
+
+const confirmPauseJob = (job: BackfillJob) => {
   $q.dialog({
-    title: "Cancel Backfill Job",
-    message: `Are you sure you want to cancel the backfill job for "${job.pipeline_name || job.pipeline_id}"?`,
+    title: "Pause Backfill Job",
+    message: `Are you sure you want to pause the backfill job for "${job.pipeline_name || job.pipeline_id}"? You can resume it later.`,
     cancel: true,
     persistent: true,
   }).onOk(async () => {
-    await cancelJob(job.job_id);
+    await pauseJob(job.job_id);
   });
 };
 
-const cancelJob = async (jobId: string) => {
+const confirmResumeJob = (job: BackfillJob) => {
+  $q.dialog({
+    title: "Resume Backfill Job",
+    message: `Are you sure you want to resume the backfill job for "${job.pipeline_name || job.pipeline_id}"?`,
+    cancel: true,
+    persistent: true,
+  }).onOk(async () => {
+    await resumeJob(job.job_id);
+  });
+};
+
+const confirmDeleteJob = (job: BackfillJob) => {
+  $q.dialog({
+    title: "Delete Backfill Job",
+    message: `Are you sure you want to delete the backfill job for "${job.pipeline_name || job.pipeline_id}"? This will remove the job from the list but will not affect the backfilled data.`,
+    cancel: true,
+    persistent: true,
+  }).onOk(async () => {
+    await deleteJob(job.job_id);
+  });
+};
+
+const pauseJob = async (jobId: string) => {
   try {
-    await backfillService.cancelBackfillJob({
+    await backfillService.pauseBackfillJob({
       org_id: store.state.selectedOrganization.identifier,
       job_id: jobId,
     });
 
     $q.notify({
       type: "positive",
-      message: "Backfill job canceled successfully",
+      message: "Backfill job paused successfully",
       timeout: 3000,
     });
 
     loadJobs();
   } catch (error: any) {
-    console.error("Error canceling backfill job:", error);
+    console.error("Error pausing backfill job:", error);
     $q.notify({
       type: "negative",
-      message: error?.response?.data?.error || "Failed to cancel backfill job",
+      message: error?.response?.data?.error || "Failed to pause backfill job",
+      timeout: 5000,
+    });
+  }
+};
+
+const resumeJob = async (jobId: string) => {
+  try {
+    await backfillService.resumeBackfillJob({
+      org_id: store.state.selectedOrganization.identifier,
+      job_id: jobId,
+    });
+
+    $q.notify({
+      type: "positive",
+      message: "Backfill job resumed successfully",
+      timeout: 3000,
+    });
+
+    loadJobs();
+  } catch (error: any) {
+    console.error("Error resuming backfill job:", error);
+    $q.notify({
+      type: "negative",
+      message: error?.response?.data?.error || "Failed to resume backfill job",
+      timeout: 5000,
+    });
+  }
+};
+
+const deleteJob = async (jobId: string) => {
+  try {
+    await backfillService.deleteBackfillJob({
+      org_id: store.state.selectedOrganization.identifier,
+      job_id: jobId,
+    });
+
+    $q.notify({
+      type: "positive",
+      message: "Backfill job deleted successfully",
+      timeout: 3000,
+    });
+
+    loadJobs();
+  } catch (error: any) {
+    console.error("Error deleting backfill job:", error);
+    $q.notify({
+      type: "negative",
+      message: error?.response?.data?.error || "Failed to delete backfill job",
       timeout: 5000,
     });
   }
@@ -411,44 +562,6 @@ const onJobCanceled = () => {
 };
 
 // Helper functions
-const getStatusColor = (status: string, deletionStatus?: any) => {
-  if (deletionStatus && typeof deletionStatus === "object" && "failed" in deletionStatus) {
-    return "negative";
-  }
-  if (deletionStatus && ["pending", "in_progress"].includes(deletionStatus)) {
-    return "blue";
-  }
-
-  switch (status) {
-    case "running":
-      return "positive";
-    case "completed":
-      return "positive";
-    case "failed":
-      return "negative";
-    case "pending":
-      return "warning";
-    case "canceled":
-      return "grey";
-    default:
-      return "grey";
-  }
-};
-
-const getStatusLabel = (status: string, deletionStatus?: any) => {
-  if (deletionStatus && typeof deletionStatus === "object" && "failed" in deletionStatus) {
-    return "Deletion Failed";
-  }
-  if (deletionStatus === "pending") {
-    return "Deleting (Pending)";
-  }
-  if (deletionStatus === "in_progress") {
-    return "Deleting";
-  }
-
-  return status.charAt(0).toUpperCase() + status.slice(1);
-};
-
 const getProgressColor = (deletionStatus?: any) => {
   if (deletionStatus && ["pending", "in_progress"].includes(deletionStatus)) {
     return "blue";
@@ -464,8 +577,10 @@ const formatTimeRange = (startTime: number, endTime: number) => {
 
 const formatTimestamp = (timestamp?: number) => {
   if (!timestamp) return "N/A";
-  const date = new Date(timestamp / 1000); // Convert from microseconds
-  return formatDistanceToNow(date, { addSuffix: true });
+  const unixSeconds = timestamp / 1e6; // Convert from microseconds to seconds
+  const dateToFormat = new Date(unixSeconds * 1000);
+  const formattedDate = dateToFormat.toISOString();
+  return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
 };
 </script>
 

@@ -114,3 +114,36 @@ pub async fn delete(org: &str, job_id: &str) -> Result<(), errors::Error> {
         Err(e) => orm_err!(format!("delete backfill job error: {e}")),
     }
 }
+
+pub async fn update(job: &BackfillJob) -> Result<(), errors::Error> {
+    let _lock = get_lock().await;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    
+    // Find existing model
+    let existing = Entity::find()
+        .filter(Column::Org.eq(&job.org))
+        .filter(Column::Id.eq(&job.id))
+        .one(client)
+        .await;
+    
+    match existing {
+        Ok(Some(model)) => {
+            let mut active: ActiveModel = model.into();
+            active.pipeline_id = Set(job.pipeline_id.clone());
+            active.start_time = Set(job.start_time);
+            active.end_time = Set(job.end_time);
+            active.chunk_period_minutes = Set(job.chunk_period_minutes);
+            active.delay_between_chunks_secs = Set(job.delay_between_chunks_secs);
+            active.delete_before_backfill = Set(job.delete_before_backfill);
+            
+            let res = active.update(client).await;
+            match res {
+                Ok(_) => Ok(()),
+                Err(e) => orm_err!(format!("update backfill job error: {e}")),
+            }
+        }
+        Ok(None) => orm_err!("backfill job not found"),
+        Err(e) => orm_err!(format!("find backfill job error: {e}")),
+    }
+}
