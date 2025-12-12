@@ -123,6 +123,8 @@ jobs:
                 "serviceAccount.spec.js",
                 "usersOrg.spec.js",
                 "org.spec.js",
+                "org-nav.spec.js",
+                "org-nav-deep.spec.js",
               ]
           - testfolder: "Logs-Core"
             browser: "chrome"
