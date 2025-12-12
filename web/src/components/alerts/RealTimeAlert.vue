@@ -35,7 +35,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div v-if="expandState.realTimeMode" class=" tw-w-full row alert-setup-containero2-alert-tab-border tw-px-4 tw-pt-2 tw-pb-3 ">
 
-            <FilterGroup :stream-fields="columns" :stream-fields-map="streamFieldsMap" :show-sql-preview="true" :sql-query="generatedSqlQuery" :group="inputData" :depth="0" @add-condition="updateGroup" @add-group="updateGroup" @remove-group="removeConditionGroup" @input:update="(name, field) => emits('input:update', name, field)" />
+            <FilterGroup
+              ref="conditionsFieldRef"
+              :stream-fields="columns"
+              :stream-fields-map="streamFieldsMap"
+              :show-sql-preview="true"
+              :sql-query="generatedSqlQuery"
+              :group="inputData"
+              :depth="0"
+              @add-condition="updateGroup"
+              @add-group="updateGroup"
+              @remove-group="removeConditionGroup"
+              @input:update="(name, field) => emits('input:update', name, field)" />
             </div>
         </div>
       </div>
@@ -103,6 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="silence-notification-input"
                       >
                         <q-input
+                          ref="silenceFieldRef"
                           v-model="triggerData.silence"
                           type="number"
                           dense
@@ -275,6 +287,10 @@ const destinationSelectRef = ref(null);
 
 const isDestinationDropdownOpen = ref(false);
 
+// Refs for focus manager - allows clicking on summary to scroll to these fields
+const silenceFieldRef = ref(null);
+const conditionsFieldRef = ref(null);
+
 watch(()=> destinations.value, (newVal, oldVal)=>{
   //check if the newVal length is greater than oldVal length
   //then if any filter is applied then clear the input
@@ -365,6 +381,9 @@ function updateGroup(updatedGroup:any) {
     removeConditionGroup,
     conditionsImage,
     filterDestinations,
+    // Focus manager refs
+    silenceFieldRef,
+    conditionsFieldRef,
   });
 </script>
 

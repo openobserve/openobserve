@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       class="tw-mb-2"
     >
-      <div class="row flex items-start" style="width: 100%">
+      <div class="row flex items-start" style="width: 100%;">
         <div class="col" :class="store.state.theme === 'dark' ? 'dark-mode1' : 'light-mode1'">
           <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
             <!-- alerts setup  section -->
@@ -159,6 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="padding-top: 0"
                   >
                     <q-select
+                      ref="streamFieldRef"
                       data-test="add-alert-stream-name-select-dropdown"
                       v-model="formData.stream_name"
                       :options="filteredStreams"
@@ -396,17 +397,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
         <div
-          style="width: 430px; height: 100%; position: sticky; top: 0 "
+          style="width: 430px; min-height: calc(100vh - 200px); position: sticky; top: 0 "
           class=" col-2"
         >
-          <preview-alert
-            style="border: 1px solid #ececec; height: 100%; width: 430px;"
-            ref="previewAlertRef"
-            :formData="formData"
-            :query="previewQuery"
-            :selectedTab="scheduledAlertRef?.tab || 'custom'"
-            :isAggregationEnabled="isAggregationEnabled"
-          />
+          <div style="height: calc(100vh - 194px); display: flex; flex-direction: column; gap: 8px;">
+            <!-- Preview Alert - Top Half -->
+            <preview-alert
+              style="height: calc(50% - 4px); width: 100%;"
+              ref="previewAlertRef"
+              :formData="formData"
+              :query="previewQuery"
+              :selectedTab="scheduledAlertRef?.tab || 'custom'"
+              :isAggregationEnabled="isAggregationEnabled"
+            />
+
+            <!-- Alert Summary - Bottom Half -->
+            <alert-summary
+              style="height: calc(50% - 4px);"
+              :formData="formData"
+              :destinations="formData.destinations"
+              :focusManager="focusManager"
+            />
+          </div>
 
         </div>
         
@@ -536,6 +548,7 @@ import {
   ensureIds,
   type TransformContext,
 } from "@/utils/alerts/alertDataTransforms";
+import { AlertFocusManager } from "@/utils/alerts/focusManager";
 
 const defaultValue: any = () => {
   return {
@@ -624,6 +637,7 @@ export default defineComponent({
     RealTimeAlert: defineAsyncComponent(() => import("./RealTimeAlert.vue")),
     VariablesInput: defineAsyncComponent(() => import("./VariablesInput.vue")),
     PreviewAlert: defineAsyncComponent(() => import("./PreviewAlert.vue")),
+    AlertSummary: defineAsyncComponent(() => import("./AlertSummary.vue")),
     SelectFolderDropDown,
     AlertsContainer,
     JsonEditor,
@@ -686,6 +700,10 @@ export default defineComponent({
     const { getStreams, getStream } = useStreams();
 
     const { buildQueryPayload } = useQuery();
+
+    // Focus manager for alert summary clickable fields
+    const focusManager = new AlertFocusManager();
+    const streamFieldRef = ref(null);
 
     const previewQuery = ref("");
 
@@ -760,12 +778,118 @@ export default defineComponent({
       const alertsProvider = createAlertsContextProvider(formData, store, props.isUpdated);
       contextRegistry.register('alerts', alertsProvider);
       contextRegistry.setActive('alerts');
+
+      // Register fields with focus manager for clickable summary
+      // Wait for next tick to ensure refs are available
+      await nextTick();
+      focusManager.registerField('stream', { ref: streamFieldRef });
     });
+
+    // Watch for scheduledAlertRef to become available and register its fields
+    watch(scheduledAlertRef, (newVal) => {
+      if (newVal) {
+        // Register ScheduledAlert fields once the component is mounted
+        nextTick(() => {
+          focusManager.registerField('frequency', {
+            ref: newVal.frequencyFieldRef,
+            onBeforeFocus: () => {
+              // Expand Query section if collapsed
+              expandState.value.queryMode = true;
+            }
+          });
+          focusManager.registerField('period', {
+            ref: newVal.periodFieldRef,
+            onBeforeFocus: () => {
+              // Expand Query section if collapsed
+              expandState.value.queryMode = true;
+            }
+          });
+          focusManager.registerField('threshold', {
+            ref: newVal.thresholdFieldRef,
+            onBeforeFocus: () => {
+              // Expand Thresholds section if collapsed
+              expandState.value.thresholds = true;
+            }
+          });
+          focusManager.registerField('operator', {
+            ref: newVal.operatorFieldRef,
+            onBeforeFocus: () => {
+              // Expand Thresholds section if collapsed
+              expandState.value.thresholds = true;
+            }
+          });
+          focusManager.registerField('silence', {
+            ref: newVal.silenceFieldRef,
+            onBeforeFocus: () => {
+              // Expand Thresholds section if collapsed
+              expandState.value.thresholds = true;
+            }
+          });
+          focusManager.registerField('conditions', {
+            ref: newVal.conditionsFieldRef,
+            onBeforeFocus: () => {
+              // Expand Query section if collapsed
+              expandState.value.queryMode = true;
+            }
+          });
+          // Register multiwindow field with additional delay to ensure ref is populated
+          setTimeout(() => {
+            focusManager.registerField('multiwindow', {
+              ref: newVal.multiWindowContainerRef,
+              onBeforeFocus: () => {
+                // Expand Multi Window section if collapsed
+                expandState.value.multiWindowSelection = true;
+              }
+            });
+          }, 100);
+          focusManager.registerField('destinations', {
+            ref: newVal.destinationSelectRef,
+            onBeforeFocus: () => {
+              // Expand Thresholds section if collapsed (destinations are in thresholds section)
+              expandState.value.thresholds = true;
+            }
+          });
+        });
+      }
+    }, { immediate: true });
+
+    // Watch for realTimeAlertRef to become available and register its fields
+    watch(realTimeAlertRef, (newVal) => {
+      if (newVal) {
+        // Register RealTimeAlert fields once the component is mounted
+        nextTick(() => {
+          focusManager.registerField('silence', {
+            ref: newVal.silenceFieldRef,
+            onBeforeFocus: () => {
+              // Expand Alert Settings section if collapsed
+              expandState.value.thresholds = true;
+            }
+          });
+          focusManager.registerField('conditions', {
+            ref: newVal.conditionsFieldRef,
+            onBeforeFocus: () => {
+              // Expand Conditions section if collapsed
+              expandState.value.realTimeMode = true;
+            }
+          });
+          focusManager.registerField('destinations', {
+            ref: newVal.destinationSelectRef,
+            onBeforeFocus: () => {
+              // Expand Alert Settings section if collapsed
+              expandState.value.thresholds = true;
+            }
+          });
+        });
+      }
+    }, { immediate: true });
 
     onUnmounted(() => {
       // Clean up alerts-specific context provider
       contextRegistry.unregister('alerts');
       contextRegistry.setActive('');
+
+      // Clean up focus manager
+      focusManager.clear();
     });
 
     const updateEditorContent = async (stream_name: string) => {
@@ -1464,6 +1588,8 @@ export default defineComponent({
       track,
       loadPanelDataIfPresent,
       isLoadingPanelData,
+      focusManager,
+      streamFieldRef,
     };
   },
 

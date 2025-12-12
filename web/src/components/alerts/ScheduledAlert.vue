@@ -33,7 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
     </div>
     <div v-if="expandState.queryMode"
-class="  tw-w-full row alert-setup-container tw-px-4 tw-pt-2 tw-pb-3 o2-alert-tab-border" 
+ref="conditionsContainerRef"
+class="  tw-w-full row alert-setup-container tw-px-4 tw-pt-2 tw-pb-3 o2-alert-tab-border"
 style=" margin-left: 8px;">
 
       <!-- query mode section -->
@@ -52,7 +53,8 @@ style=" margin-left: 8px;">
         <template v-if="tab === 'custom'"
           class='q-pa-none q-ma-none'
           ">
-          <FilterGroup :stream-fields="columns"
+          <FilterGroup
+            :stream-fields="columns"
             :stream-fields-map="streamFieldsMap"
             :show-sql-preview="true"
             :sql-query="generatedSqlQuery"
@@ -108,9 +110,9 @@ class="tw-flex tw-items-center tw-gap-2 tw-bg-gray-200 tw-rounded-full tw-px-1 t
 
        <!-- second section multi window selection -->
     <div class="tw-px-[0.625rem] tw-pb-[0.625rem] tw-w-full tw-h-full">
-         <div class="tw-w-full flex tw-justify-center tw-items-center card-container ">
-    <div class="tw-w-full tw-ml-2">
-        <AlertsContainer 
+         <div ref="multiWindowContainerRef" class="tw-w-full flex tw-justify-center tw-items-center card-container ">
+    <div class="tw-w-full tw-ml-2" >
+        <AlertsContainer
           name="Multi Window"
           v-model:is-expanded="expandState.multiWindowSelection"
           label="Multi Window"
@@ -119,10 +121,10 @@ class="tw-flex tw-items-center tw-gap-2 tw-bg-gray-200 tw-rounded-full tw-px-1 t
         :iconClass="'tw-mt-[2px]'"
           :image="multiWindowImage"
           @update:is-expanded="()=>emits('update:expandState', expandState)"
-        />  
+        />
     </div>
 
-      <div class="tw-w-full row alert-setup-container tw-px-4 tw-pt-2 tw-pb-3 o2-alert-tab-border" 
+      <div  class="tw-w-full row alert-setup-container tw-px-4 tw-pt-2 tw-pb-3 o2-alert-tab-border"
     v-if="expandState.multiWindowSelection"
     :class="store.state.theme === 'dark' ? 'dark-mode-multi-window' : 'light-mode-multi-window'"
     >
@@ -564,6 +566,7 @@ size="20px" />
                     data-test="scheduled-alert-threshold-operator-select"
                   >
                     <q-select
+                      ref="operatorFieldRef"
                       v-model="triggerData.operator"
                       :options="triggerOperators"
                       class="showLabelOnTop no-case q-py-none"
@@ -587,6 +590,7 @@ size="20px" />
                       data-test="scheduled-alert-threshold-value-input"
                     >
                       <q-input
+                        ref="thresholdFieldRef"
                         v-model="triggerData.threshold"
                         type="number"
                         dense
@@ -667,6 +671,7 @@ size="20px" />
                   class="period-input-container"
                 >
                   <q-input
+                    ref="periodFieldRef"
                     v-model="triggerData.period"
                     type="number"
                     dense
@@ -829,6 +834,7 @@ size="20px" />
                   "
                 >
                   <q-input
+                    ref="frequencyFieldRef"
                     data-test="scheduled-alert-frequency-input-field"
                     v-if="triggerData.frequency_type == 'minutes'"
                     v-model="triggerData.frequency"
@@ -963,6 +969,7 @@ size="20px" />
                           class=""
                         >
                           <q-input
+                            ref="silenceFieldRef"
                             v-model="triggerData.silence"
                             type="number"
                             dense
@@ -1744,6 +1751,20 @@ const tabOptions = computed(() => {
 
   return tabs;
 });
+
+// Refs for focus manager - allows clicking on summary to scroll to these fields
+const frequencyFieldRef = ref(null);
+const periodFieldRef = ref(null);
+const thresholdFieldRef = ref(null);
+const operatorFieldRef = ref(null);
+const silenceFieldRef = ref(null);
+const conditionsContainerRef = ref(null); // Points to the entire Conditions section container
+const multiWindowContainerRef = ref(null); // Points to the Multi Window section container
+
+// Use the conditions container ref directly (highlights the entire Conditions section)
+const conditionsFieldRef = conditionsContainerRef;
+
+// Note: destinationsFieldRef will be set to destinationSelectRef which is defined later
 
 const q = useQuasar();
 
@@ -2598,7 +2619,15 @@ defineExpose({
   destinationSelectRef,
   getBtnO2Logo,
   runFnQueryLoading,
-  isHavingError
+  isHavingError,
+  // Focus manager refs
+  frequencyFieldRef,
+  periodFieldRef,
+  thresholdFieldRef,
+  operatorFieldRef,
+  silenceFieldRef,
+  conditionsFieldRef,
+  multiWindowContainerRef,
 });
 </script>
 
