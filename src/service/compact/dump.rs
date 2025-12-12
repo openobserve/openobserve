@@ -243,11 +243,15 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
     if files.is_empty() {
         if let Err(e) = infra_file_list::set_job_dumped_status(&[job.job_id], true).await {
             log::error!(
-                "[COMPACTOR::DUMP] error in setting dumped = true for job with id {}, error : {e}",
+                "[COMPACTOR::DUMP] error in setting dumped = true for job with id {}, error: {e}",
                 job.job_id,
             );
         }
-        log::debug!("[COMPACTOR::DUMP] no files to dump for offset [{start_time},{end_time}]");
+        log::debug!("[COMPACTOR::DUMP] no files to dump for stream [{}/{}/{}] offset [{start_time},{end_time}]",
+            job.org_id,
+            job.stream_type,
+            job.stream_name,
+        );
         return Ok(());
     }
 

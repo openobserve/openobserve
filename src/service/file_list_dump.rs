@@ -386,7 +386,7 @@ pub async fn stats(time_range: (i64, i64)) -> Result<Vec<(String, StreamStats)>,
     let (deleted_files, added_files): (Vec<_>, Vec<_>) =
         dump_files.into_iter().partition(|file| file.deleted);
     // calculate the stats
-    let added_stats = stats_inner(added_files, time_range, true).await?;
+    let added_stats = stats_inner(added_files, time_range, false).await?;
     let deleted_stats = stats_inner(deleted_files, time_range, false).await?;
     // we need convert deleted stats to negative
     let deleted_stats = deleted_stats.into_iter().map(|(stream, stats)| {
