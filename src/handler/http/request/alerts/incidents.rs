@@ -480,3 +480,85 @@ pub async fn update_incident_status(
 pub async fn get_incident_stats(_path: web::Path<String>) -> HttpResponse {
     MetaHttpResponse::forbidden("Not Supported")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_limit() {
+        assert_eq!(default_limit(), 50);
+    }
+
+    #[test]
+    fn test_list_incidents_query_defaults() {
+        let query = ListIncidentsQuery {
+            status: None,
+            limit: default_limit(),
+            offset: 0,
+        };
+        assert_eq!(query.limit, 50);
+        assert_eq!(query.offset, 0);
+        assert!(query.status.is_none());
+    }
+
+    #[test]
+    fn test_list_incidents_query_with_status() {
+        let query = ListIncidentsQuery {
+            status: Some("open".to_string()),
+            limit: 100,
+            offset: 25,
+        };
+        assert_eq!(query.status.unwrap(), "open");
+        assert_eq!(query.limit, 100);
+        assert_eq!(query.offset, 25);
+    }
+
+    #[test]
+    fn test_update_incident_status_request() {
+        let request = UpdateIncidentStatusRequest {
+            status: "acknowledged".to_string(),
+        };
+        assert_eq!(request.status, "acknowledged");
+    }
+
+    #[test]
+    fn test_list_incidents_response_structure() {
+        let response = ListIncidentsResponse {
+            incidents: vec![],
+            total: 0,
+        };
+        assert_eq!(response.incidents.len(), 0);
+        assert_eq!(response.total, 0);
+    }
+
+    #[test]
+    fn test_list_incidents_response_with_data() {
+        let incident = config::meta::alerts::incidents::Incident {
+            id: "test-id".to_string(),
+            org_id: "default".to_string(),
+            correlation_key: "key123".to_string(),
+            status: config::meta::alerts::incidents::IncidentStatus::Open,
+            severity: config::meta::alerts::incidents::IncidentSeverity::P1,
+            stable_dimensions: std::collections::HashMap::new(),
+            topology_context: None,
+            first_alert_at: 1000,
+            last_alert_at: 2000,
+            resolved_at: None,
+            alert_count: 5,
+            title: Some("Test Incident".to_string()),
+            assigned_to: None,
+            created_at: 1000,
+            updated_at: 2000,
+        };
+
+        let response = ListIncidentsResponse {
+            incidents: vec![incident],
+            total: 1,
+        };
+        assert_eq!(response.incidents.len(), 1);
+        assert_eq!(response.total, 1);
+        assert_eq!(response.incidents[0].id, "test-id");
+        assert_eq!(response.incidents[0].alert_count, 5);
+    }
+}

@@ -20,7 +20,7 @@ use utoipa::ToSchema;
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 /// Request body for agent chat
-#[derive(Debug, Clone, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AgentChatRequest {
     /// Type of agent to query (e.g., "sre", "sre-rca", "security")
     pub agent_type: String,
@@ -257,5 +257,99 @@ pub async fn agent_chat_stream(
         HttpResponse::BadRequest().json(serde_json::json!({
             "error": "Agent chat is only available in enterprise version"
         }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_agent_chat_request_creation() {
+        let request = AgentChatRequest {
+            agent_type: "sre".to_string(),
+            message: "What's the issue?".to_string(),
+            context: serde_json::json!({"incident_id": "123"}),
+            history: vec![],
+        };
+        assert_eq!(request.agent_type, "sre");
+        assert_eq!(request.message, "What's the issue?");
+        assert!(request.history.is_empty());
+    }
+
+    #[test]
+    fn test_agent_chat_request_with_history() {
+        let request = AgentChatRequest {
+            agent_type: "sre-rca".to_string(),
+            message: "Explain more".to_string(),
+            context: serde_json::json!({}),
+            history: vec![
+                ChatMessage {
+                    role: "user".to_string(),
+                    content: "What happened?".to_string(),
+                },
+                ChatMessage {
+                    role: "assistant".to_string(),
+                    content: "There was an error.".to_string(),
+                },
+            ],
+        };
+        assert_eq!(request.history.len(), 2);
+        assert_eq!(request.history[0].role, "user");
+        assert_eq!(request.history[1].role, "assistant");
+    }
+
+    #[test]
+    fn test_chat_message_creation() {
+        let message = ChatMessage {
+            role: "user".to_string(),
+            content: "Hello agent".to_string(),
+        };
+        assert_eq!(message.role, "user");
+        assert_eq!(message.content, "Hello agent");
+    }
+
+    #[test]
+    fn test_agent_chat_request_default_fields() {
+        let json = serde_json::json!({
+            "agent_type": "sre",
+            "message": "Test"
+        });
+        let request: AgentChatRequest = serde_json::from_value(json).unwrap();
+        assert_eq!(request.agent_type, "sre");
+        assert_eq!(request.message, "Test");
+        assert_eq!(request.context, serde_json::Value::Null);
+        assert!(request.history.is_empty());
+    }
+
+    #[test]
+    fn test_chat_message_serialization() {
+        let message = ChatMessage {
+            role: "assistant".to_string(),
+            content: "Analysis complete".to_string(),
+        };
+        let json = serde_json::to_string(&message).unwrap();
+        assert!(json.contains("assistant"));
+        assert!(json.contains("Analysis complete"));
+    }
+
+    #[test]
+    fn test_agent_chat_request_full_serialization() {
+        let request = AgentChatRequest {
+            agent_type: "sre".to_string(),
+            message: "Check logs".to_string(),
+            context: serde_json::json!({"alert_id": "test-123"}),
+            history: vec![ChatMessage {
+                role: "user".to_string(),
+                content: "Previous question".to_string(),
+            }],
+        };
+
+        let json = serde_json::to_string(&request).unwrap();
+        let deserialized: AgentChatRequest = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.agent_type, "sre");
+        assert_eq!(deserialized.message, "Check logs");
+        assert_eq!(deserialized.history.len(), 1);
     }
 }
