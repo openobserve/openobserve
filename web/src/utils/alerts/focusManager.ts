@@ -75,46 +75,34 @@ export class AlertFocusManager {
     // Get the DOM element
     let element: HTMLElement | null = null;
 
-    console.log(`[FocusManager] Attempting to focus field: ${fieldId}`, field.ref);
-
     // Try different ways to access the Vue component's DOM element
     if (field.ref?.value?.$el) {
       // Vue 3 component ref with $el
       element = field.ref.value.$el;
-      console.log(`[FocusManager] Found element via ref.value.$el for ${fieldId}`, element);
     } else if (field.ref?.value) {
       // Vue 3 ref that might be a direct DOM element
       element = field.ref.value;
-      console.log(`[FocusManager] Found element via ref.value for ${fieldId}`, element);
     } else if (field.ref?.$el) {
       // Vue 2 component ref
       element = field.ref.$el;
-      console.log(`[FocusManager] Found element via ref.$el for ${fieldId}`, element);
     } else if (field.ref instanceof HTMLElement) {
       // Direct DOM element
       element = field.ref;
-      console.log(`[FocusManager] Found element as direct HTMLElement for ${fieldId}`, element);
     }
 
     if (!element) {
-      console.warn(`[FocusManager] Could not find DOM element for field "${fieldId}"`, field.ref);
       return;
     }
 
     // If we got a text node or comment node, try to find the parent element
     if (element.nodeType !== Node.ELEMENT_NODE) {
-      console.log(`[FocusManager] Got non-element node (${element.nodeType}), looking for parent element`, element);
       const parentElement = element.parentElement;
       if (parentElement) {
         element = parentElement;
-        console.log(`[FocusManager] Using parent element instead`, element);
       } else {
-        console.warn(`[FocusManager] Could not find parent element for field "${fieldId}"`);
         return;
       }
     }
-
-    console.log(`[FocusManager] Successfully found element for ${fieldId}, scrolling and highlighting`, element);
 
     // Find the input element within the component
     const inputElement = this.findFocusableElement(element);
@@ -129,7 +117,6 @@ export class AlertFocusManager {
 
       // Add highlight class
       element.classList.add('alert-field-highlight');
-      console.log(`[FocusManager] Added highlight class to element for ${fieldId}`);
     }, 50);
 
     // Clear any existing timeout
