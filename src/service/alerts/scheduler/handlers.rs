@@ -22,6 +22,7 @@ use config::{
     meta::{
         alerts::TriggerCondition,
         dashboards::reports::ReportFrequencyType,
+        pipeline::components::NodeData,
         self_reporting::{
             error::{ErrorData, ErrorSource, PipelineError},
             usage::{TriggerData, TriggerDataStatus, TriggerDataType},
@@ -70,9 +71,10 @@ pub async fn handle_triggers(
         db::scheduler::TriggerModule::DerivedStream => {
             handle_derived_stream_triggers(trace_id, trigger).await
         }
-        config::meta::triggers::TriggerModule::QueryRecommendations => {
+        db::scheduler::TriggerModule::QueryRecommendations => {
             handle_query_recommendations_triggers(trace_id, trigger).await
         }
+        db::scheduler::TriggerModule::Backfill => handle_backfill_triggers(trace_id, trigger).await,
     }
 }
 
@@ -379,6 +381,7 @@ async fn handle_alert_triggers(
             period_end_time: None,
             tolerance: 0,
             last_satisfied_at: None,
+            backfill_job: None,
         }
     };
 
@@ -1966,6 +1969,7 @@ async fn handle_derived_stream_triggers(
             period_end_time: Some(start_time),
             tolerance: 0,
             last_satisfied_at: None,
+            backfill_job: None,
         })
         .unwrap();
     }
@@ -2068,6 +2072,569 @@ pub fn get_pipeline_info_from_module_key(
         pipeline_name.to_string(),
         pipeline_id.to_string(),
     ))
+}
+
+async fn handle_backfill_triggers(
+    trace_id: &str,
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    use config::meta::{
+        pipeline::components::PipelineSource,
+        triggers::{DeletionStatus, ScheduledTriggerData},
+    };
+
+    let (_, max_retries) = get_scheduler_max_retries();
+    log::debug!(
+        "[SCHEDULER trace_id {trace_id}] Processing backfill trigger: {}",
+        &trigger.module_key
+    );
+
+    let now = Utc::now().timestamp_micros();
+    let _source_node = LOCAL_NODE.name.clone();
+
+    // 1. Parse backfill job data from trigger.data
+    let trigger_data = match ScheduledTriggerData::from_json_string(&trigger.data) {
+        Ok(data) => data,
+        Err(e) => {
+            log::error!(
+                "[SCHEDULER trace_id {trace_id}] Failed to parse backfill trigger data: {e}"
+            );
+            return Err(anyhow::anyhow!("Failed to parse trigger data: {}", e));
+        }
+    };
+
+    let mut backfill_job = match trigger_data.backfill_job {
+        Some(job) => job,
+        None => {
+            log::error!("[SCHEDULER trace_id {trace_id}] Missing backfill job data in trigger");
+            return Err(anyhow::anyhow!("Missing backfill job data"));
+        }
+    };
+
+    // 2. Fetch the source pipeline configuration
+    let pipeline =
+        match crate::service::db::pipeline::get_by_id(&backfill_job.source_pipeline_id).await {
+            Ok(pipeline) => pipeline,
+            Err(e) => {
+                log::error!(
+                    "[SCHEDULER trace_id {trace_id}] Failed to fetch pipeline {}: {e}",
+                    backfill_job.source_pipeline_id
+                );
+                if trigger.retries + 1 >= max_retries {
+                    // Delete the trigger after max retries
+                    let _ = db::scheduler::delete(
+                        &trigger.org,
+                        db::scheduler::TriggerModule::Backfill,
+                        &trigger.module_key,
+                    )
+                    .await;
+                } else {
+                    let _ = db::scheduler::update_status(
+                        &trigger.org,
+                        db::scheduler::TriggerModule::Backfill,
+                        &trigger.module_key,
+                        db::scheduler::TriggerStatus::Waiting,
+                        trigger.retries + 1,
+                        None,
+                        true,
+                        trace_id,
+                    )
+                    .await;
+                }
+                return Err(anyhow::anyhow!("Failed to fetch pipeline: {}", e));
+            }
+        };
+
+    // 3. Extract DerivedStream configuration
+    let derived_stream = match &pipeline.source {
+        PipelineSource::Scheduled(ds) => ds,
+        _ => {
+            log::error!(
+                "[SCHEDULER trace_id {trace_id}] Pipeline {} is not scheduled",
+                backfill_job.source_pipeline_id
+            );
+            // Delete the trigger as this is a configuration error
+            let _ = db::scheduler::delete(
+                &trigger.org,
+                db::scheduler::TriggerModule::Backfill,
+                &trigger.module_key,
+            )
+            .await;
+            return Err(anyhow::anyhow!("Pipeline is not scheduled"));
+        }
+    };
+
+    // Get destination stream from pipeline nodes
+    let destination_stream = match get_destination_stream_from_pipeline(&pipeline) {
+        Ok(stream) => stream,
+        Err(e) => {
+            log::error!("[SCHEDULER trace_id {trace_id}] Failed to get destination stream: {e}");
+            let _ = db::scheduler::delete(
+                &trigger.org,
+                db::scheduler::TriggerModule::Backfill,
+                &trigger.module_key,
+            )
+            .await;
+            return Err(e);
+        }
+    };
+
+    // 4. Handle deletion phase if required
+    if backfill_job.delete_before_backfill {
+        match &backfill_job.deletion_status {
+            DeletionStatus::NotRequired => {
+                // Should not happen, but handle gracefully
+                backfill_job.deletion_status = DeletionStatus::Pending;
+            }
+            DeletionStatus::Pending => {
+                // Initiate deletion
+                log::info!(
+                    "[BACKFILL trace_id {trace_id}] Starting deletion for stream {}/{} time range {}-{}",
+                    destination_stream.stream_type,
+                    destination_stream.stream_name,
+                    backfill_job.start_time,
+                    backfill_job.end_time
+                );
+
+                match initiate_stream_deletion(
+                    &trigger.org,
+                    &destination_stream,
+                    backfill_job.start_time,
+                    backfill_job.end_time,
+                )
+                .await
+                {
+                    Ok(deletion_job_id) => {
+                        backfill_job.deletion_status = DeletionStatus::InProgress;
+                        backfill_job.deletion_job_id = Some(deletion_job_id.clone());
+
+                        let updated_trigger_data = ScheduledTriggerData {
+                            backfill_job: Some(backfill_job),
+                            ..trigger_data
+                        };
+
+                        let next_run_at = now + Duration::seconds(30).num_microseconds().unwrap();
+
+                        db::scheduler::update_trigger(
+                            db::scheduler::Trigger {
+                                next_run_at,
+                                status: db::scheduler::TriggerStatus::Waiting,
+                                data: updated_trigger_data.to_json_string(),
+                                ..trigger
+                            },
+                            true,
+                            trace_id,
+                        )
+                        .await?;
+
+                        log::debug!(
+                            "[BACKFILL trace_id {trace_id}] Deletion job {} initiated, will check status in 30s",
+                            deletion_job_id
+                        );
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "[BACKFILL trace_id {trace_id}] Failed to initiate deletion: {e}"
+                        );
+                        backfill_job.deletion_status = DeletionStatus::Failed(e.to_string());
+                        let updated_trigger_data = ScheduledTriggerData {
+                            backfill_job: Some(backfill_job),
+                            ..trigger_data
+                        };
+                        db::scheduler::update_trigger(
+                            db::scheduler::Trigger {
+                                status: db::scheduler::TriggerStatus::Completed,
+                                data: updated_trigger_data.to_json_string(),
+                                ..trigger
+                            },
+                            true,
+                            trace_id,
+                        )
+                        .await?;
+                        return Err(anyhow::anyhow!("Failed to initiate deletion: {}", e));
+                    }
+                }
+            }
+            DeletionStatus::InProgress => {
+                // Check if deletion is complete
+                if let Some(deletion_job_id) = &backfill_job.deletion_job_id {
+                    match check_deletion_status(deletion_job_id).await {
+                        Ok(status) if status == "completed" => {
+                            log::info!(
+                                "[BACKFILL trace_id {trace_id}] Deletion completed, starting backfill"
+                            );
+                            backfill_job.deletion_status = DeletionStatus::Completed;
+                            // Continue to backfill phase below
+                        }
+                        Ok(status) if status == "failed" => {
+                            log::error!("[BACKFILL trace_id {trace_id}] Deletion job failed");
+                            backfill_job.deletion_status =
+                                DeletionStatus::Failed("Deletion job failed".to_string());
+                            let updated_trigger_data = ScheduledTriggerData {
+                                backfill_job: Some(backfill_job),
+                                ..trigger_data
+                            };
+                            db::scheduler::update_trigger(
+                                db::scheduler::Trigger {
+                                    status: db::scheduler::TriggerStatus::Completed,
+                                    data: updated_trigger_data.to_json_string(),
+                                    ..trigger
+                                },
+                                true,
+                                trace_id,
+                            )
+                            .await?;
+                            return Err(anyhow::anyhow!("Deletion job failed"));
+                        }
+                        _ => {
+                            // Still in progress, reschedule to check again
+                            let next_run_at =
+                                now + Duration::seconds(30).num_microseconds().unwrap();
+
+                            db::scheduler::update_trigger(
+                                db::scheduler::Trigger {
+                                    next_run_at,
+                                    status: db::scheduler::TriggerStatus::Waiting,
+                                    ..trigger
+                                },
+                                true,
+                                trace_id,
+                            )
+                            .await?;
+
+                            log::debug!(
+                                "[BACKFILL trace_id {trace_id}] Deletion still in progress, checking again in 30s"
+                            );
+                            return Ok(());
+                        }
+                    }
+                }
+            }
+            DeletionStatus::Completed => {
+                // Deletion already complete, proceed to backfill
+            }
+            DeletionStatus::Failed(error) => {
+                log::error!("[BACKFILL trace_id {trace_id}] Deletion failed: {error}");
+                return Err(anyhow::anyhow!("Deletion failed: {}", error));
+            }
+        }
+    }
+
+    // 5. Calculate current chunk to process
+    let chunk_period = backfill_job
+        .chunk_period_minutes
+        .unwrap_or(derived_stream.trigger_condition.period);
+    let chunk_end = std::cmp::min(
+        backfill_job.current_position + (chunk_period * 60 * 1_000_000),
+        backfill_job.end_time,
+    );
+
+    log::debug!(
+        "[BACKFILL trace_id {trace_id}] Processing chunk: {}-{}",
+        backfill_job.current_position,
+        chunk_end
+    );
+
+    // 6. Execute the pipeline for this chunk
+    let results = match derived_stream
+        .evaluate(
+            (Some(backfill_job.current_position), chunk_end),
+            &trigger.module_key,
+            Some(trace_id.to_string()),
+        )
+        .await
+    {
+        Ok(results) => results,
+        Err(e) => {
+            log::error!("[BACKFILL trace_id {trace_id}] Failed to evaluate pipeline: {e}");
+
+            // Increment retries
+            let new_retries = trigger.retries + 1;
+
+            if new_retries >= max_retries {
+                // Max retries reached, report error and reset retries for next scheduled run
+                log::warn!(
+                    "[BACKFILL trace_id {trace_id}] Backfill job for pipeline {} has reached maximum retries.",
+                    backfill_job.source_pipeline_id
+                );
+
+                // Calculate next run time with delay
+                let delay = backfill_job.delay_between_chunks_secs.unwrap_or(0);
+                let next_run_at = now + (delay * 1_000_000);
+
+                // Update trigger with reset retries and scheduled next run
+                db::scheduler::update_trigger(
+                    db::scheduler::Trigger {
+                        retries: 0, // Reset retries for next attempt
+                        next_run_at,
+                        status: db::scheduler::TriggerStatus::Waiting,
+                        ..trigger
+                    },
+                    true,
+                    trace_id,
+                )
+                .await?;
+            } else {
+                // Increment retries but don't update next_run_at - let scheduler pick it up
+                // immediately
+                db::scheduler::update_trigger(
+                    db::scheduler::Trigger {
+                        retries: new_retries,
+                        status: db::scheduler::TriggerStatus::Waiting,
+                        ..trigger
+                    },
+                    true,
+                    trace_id,
+                )
+                .await?;
+            }
+            return Err(anyhow::anyhow!("Failed to evaluate pipeline: {}", e));
+        }
+    };
+
+    // 7. Process results through pipeline
+    let executable_pipeline = match ExecutablePipeline::new(&pipeline).await {
+        Ok(ep) => ep,
+        Err(e) => {
+            log::error!("[BACKFILL trace_id {trace_id}] Failed to create executable pipeline: {e}");
+
+            // Increment retries
+            let new_retries = trigger.retries + 1;
+
+            if new_retries >= max_retries {
+                // Max retries reached, report error and reset retries for next scheduled run
+                log::warn!(
+                    "[BACKFILL trace_id {trace_id}] Backfill job for pipeline {} has reached maximum retries on pipeline creation.",
+                    backfill_job.source_pipeline_id
+                );
+
+                // Calculate next run time with delay
+                let delay = backfill_job.delay_between_chunks_secs.unwrap_or(0);
+                let next_run_at = now + (delay * 1_000_000);
+
+                // Update trigger with reset retries and scheduled next run
+                db::scheduler::update_trigger(
+                    db::scheduler::Trigger {
+                        retries: 0, // Reset retries for next attempt
+                        next_run_at,
+                        status: db::scheduler::TriggerStatus::Waiting,
+                        ..trigger
+                    },
+                    true,
+                    trace_id,
+                )
+                .await?;
+            } else {
+                // Increment retries but don't update next_run_at - let scheduler pick it up
+                // immediately
+                db::scheduler::update_trigger(
+                    db::scheduler::Trigger {
+                        retries: new_retries,
+                        status: db::scheduler::TriggerStatus::Waiting,
+                        ..trigger
+                    },
+                    true,
+                    trace_id,
+                )
+                .await?;
+            }
+            return Err(anyhow::anyhow!(
+                "Failed to create executable pipeline: {}",
+                e
+            ));
+        }
+    };
+
+    if let Some(data) = results.data {
+        let records: Vec<json::Value> = data.into_iter().map(json::Value::Object).collect();
+        if let Err(e) = executable_pipeline
+            .process_batch(&trigger.org, records, None)
+            .await
+        {
+            log::error!("[BACKFILL trace_id {trace_id}] Failed to process batch: {e}");
+
+            // Increment retries
+            let new_retries = trigger.retries + 1;
+
+            if new_retries >= max_retries {
+                // Max retries reached, report error and reset retries for next scheduled run
+                log::warn!(
+                    "[BACKFILL trace_id {trace_id}] Backfill job for pipeline {} has reached maximum retries on batch processing.",
+                    backfill_job.source_pipeline_id
+                );
+
+                // Calculate next run time with delay
+                let delay = backfill_job.delay_between_chunks_secs.unwrap_or(0);
+                let next_run_at = now + (delay * 1_000_000);
+
+                // Update trigger with reset retries and scheduled next run
+                db::scheduler::update_trigger(
+                    db::scheduler::Trigger {
+                        retries: 0, // Reset retries for next attempt
+                        next_run_at,
+                        status: db::scheduler::TriggerStatus::Waiting,
+                        ..trigger
+                    },
+                    true,
+                    trace_id,
+                )
+                .await?;
+            } else {
+                // Increment retries but don't update next_run_at - let scheduler pick it up
+                // immediately
+                db::scheduler::update_trigger(
+                    db::scheduler::Trigger {
+                        retries: new_retries,
+                        status: db::scheduler::TriggerStatus::Waiting,
+                        ..trigger
+                    },
+                    true,
+                    trace_id,
+                )
+                .await?;
+            }
+            return Err(anyhow::anyhow!("Failed to process batch: {}", e));
+        }
+    }
+
+    // 8. Update progress or complete
+    if chunk_end >= backfill_job.end_time {
+        // Backfill complete - set current_position to end_time and mark trigger as completed
+        backfill_job.current_position = backfill_job.end_time;
+
+        let updated_trigger_data = ScheduledTriggerData {
+            backfill_job: Some(backfill_job.clone()),
+            ..trigger_data
+        };
+
+        log::info!(
+            "[BACKFILL trace_id {trace_id}] Backfill job completed for pipeline {}",
+            backfill_job.source_pipeline_id
+        );
+        db::scheduler::update_trigger(
+            db::scheduler::Trigger {
+                status: db::scheduler::TriggerStatus::Completed,
+                data: serde_json::to_string(&updated_trigger_data)?,
+                ..trigger
+            },
+            true,
+            trace_id,
+        )
+        .await?;
+    } else {
+        // Update progress and schedule next chunk
+        backfill_job.current_position = chunk_end;
+
+        let delay = backfill_job.delay_between_chunks_secs.unwrap_or(0);
+        let next_run_at = now + (delay * 1_000_000);
+
+        let updated_trigger_data = ScheduledTriggerData {
+            backfill_job: Some(backfill_job.clone()),
+            ..trigger_data
+        };
+
+        db::scheduler::update_trigger(
+            db::scheduler::Trigger {
+                next_run_at,
+                status: db::scheduler::TriggerStatus::Waiting,
+                data: updated_trigger_data.to_json_string(),
+                retries: 0, // Reset retries on successful chunk
+                ..trigger
+            },
+            true,
+            trace_id,
+        )
+        .await?;
+
+        let progress = ((chunk_end - backfill_job.start_time) as f64
+            / (backfill_job.end_time - backfill_job.start_time) as f64
+            * 100.0) as u8;
+        log::debug!(
+            "[BACKFILL trace_id {trace_id}] Progress: {}%, next chunk in {}s",
+            progress,
+            delay
+        );
+    }
+
+    Ok(())
+}
+
+/// Helper function to get destination stream from pipeline
+fn get_destination_stream_from_pipeline(
+    pipeline: &config::meta::pipeline::Pipeline,
+) -> Result<StreamParams, anyhow::Error> {
+    for node in &pipeline.nodes {
+        if let NodeData::Stream(stream_params) = &node.data {
+            // Destination stream node (not the query source node)
+            let node_id = node.get_node_id();
+            if !matches!(node_id.as_str(), "source" | "query") {
+                return Ok(stream_params.clone());
+            }
+        }
+    }
+    Err(anyhow::anyhow!("No destination stream found in pipeline"))
+}
+
+/// Helper function to initiate stream deletion
+async fn initiate_stream_deletion(
+    org_id: &str,
+    stream: &StreamParams,
+    start_time: i64,
+    end_time: i64,
+) -> Result<String, anyhow::Error> {
+    use chrono::TimeZone;
+    use config::meta::stream::StreamType;
+
+    // Convert microseconds to formatted time range strings
+    let time_range_start = {
+        let ts = Utc.timestamp_nanos(start_time * 1000);
+        if stream.stream_type == StreamType::Logs {
+            ts.format("%Y-%m-%dT%H:00:00Z").to_string()
+        } else {
+            ts.format("%Y-%m-%d").to_string()
+        }
+    };
+    let time_range_end = {
+        let ts = Utc.timestamp_nanos(end_time * 1000);
+        if stream.stream_type == StreamType::Logs {
+            ts.format("%Y-%m-%dT%H:00:00Z").to_string()
+        } else {
+            ts.format("%Y-%m-%d").to_string()
+        }
+    };
+
+    // Create deletion job using existing retention service
+    let (key, _created) = crate::service::db::compact::retention::delete_stream(
+        org_id,
+        stream.stream_type,
+        &stream.stream_name,
+        Some((time_range_start.as_str(), time_range_end.as_str())),
+    )
+    .await?;
+
+    // Create a job in the compact manual jobs table
+    let job = infra::table::compactor_manual_jobs::CompactorManualJob {
+        id: config::ider::uuid(),
+        key: key.clone(),
+        status: infra::table::compactor_manual_jobs::Status::Pending,
+        created_at: Utc::now().timestamp_micros(),
+        ended_at: 0,
+    };
+
+    let job_id = crate::service::db::compact::compactor_manual_jobs::add_job(job).await?;
+    Ok(job_id)
+}
+
+/// Helper function to check deletion job status
+async fn check_deletion_status(job_id: &str) -> Result<String, anyhow::Error> {
+    let job = crate::service::db::compact::compactor_manual_jobs::get_job(job_id).await?;
+    let status_str = match job.status {
+        infra::table::compactor_manual_jobs::Status::Pending => "pending",
+        infra::table::compactor_manual_jobs::Status::Running => "running",
+        infra::table::compactor_manual_jobs::Status::Completed => "completed",
+    };
+    Ok(status_str.to_string())
 }
 
 #[cfg(test)]

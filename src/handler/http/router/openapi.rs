@@ -168,6 +168,13 @@ use crate::{common::meta, handler::http::request};
         request::pipeline::enable_pipeline,
         request::pipeline::enable_pipeline_bulk,
         request::pipelines::history::get_pipeline_history,
+        request::pipelines::backfill::create_backfill,
+        request::pipelines::backfill::list_backfills,
+        request::pipelines::backfill::get_backfill,
+        request::pipelines::backfill::pause_backfill,
+        request::pipelines::backfill::resume_backfill,
+        request::pipelines::backfill::update_backfill,
+        request::pipelines::backfill::delete_backfill,
         request::dashboards::reports::create_report,
         request::dashboards::reports::update_report,
         request::dashboards::reports::list_reports,
@@ -353,6 +360,10 @@ use crate::{common::meta, handler::http::request};
             config::meta::promql::Metadata,
             config::meta::promql::MetricType,
             // Functions
+            // Backfill
+            request::pipelines::backfill::BackfillRequest,
+            request::pipelines::backfill::BackfillResponse,
+            crate::service::alerts::backfill::BackfillJobStatus,
          ),
     ),
     modifiers(&SecurityAddon),
@@ -375,6 +386,7 @@ use crate::{common::meta, handler::http::request};
         (name = "Short Url", description = "Short Url Service"),
         (name = "Ratelimit", description = "Ratelimit operations"),
         (name = "Patterns", description = "Log pattern extraction operations (enterprise)"),
+        (name = "Backfill", description = "Pipeline backfill operations for gap filling"),
     ),
     info(
         description = "OpenObserve API documents [https://openobserve.ai/docs/](https://openobserve.ai/docs/)",
