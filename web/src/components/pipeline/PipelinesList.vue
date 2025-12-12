@@ -1208,12 +1208,7 @@ const openBackfillDialog = (pipeline: any) => {
 };
 
 const onBackfillSuccess = (jobId: string) => {
-  q.notify({
-    type: "positive",
-    message: "Backfill job created successfully",
-    timeout: 3000,
-  });
-  // Optionally navigate to backfill jobs page
+  // Navigate to backfill jobs page after successful creation
   goToBackfillJobs();
 };
 </script>

@@ -2348,20 +2348,27 @@ async fn handle_backfill_triggers(
         Ok(results) => results,
         Err(e) => {
             log::error!("[BACKFILL trace_id {trace_id}] Failed to evaluate pipeline: {e}");
-            if trigger.retries + 1 >= max_retries {
-                // Max retries reached, mark as failed
-                backfill_job.deletion_status = DeletionStatus::Failed(format!(
-                    "Evaluation failed after {} retries: {}",
-                    max_retries, e
-                ));
-                let updated_trigger_data = ScheduledTriggerData {
-                    backfill_job: Some(backfill_job),
-                    ..trigger_data
-                };
+
+            // Increment retries
+            let new_retries = trigger.retries + 1;
+
+            if new_retries >= max_retries {
+                // Max retries reached, report error and reset retries for next scheduled run
+                log::warn!(
+                    "[BACKFILL trace_id {trace_id}] Backfill job for pipeline {} has reached maximum retries.",
+                    backfill_job.source_pipeline_id
+                );
+
+                // Calculate next run time with delay
+                let delay = backfill_job.delay_between_chunks_secs.unwrap_or(0);
+                let next_run_at = now + (delay * 1_000_000);
+
+                // Update trigger with reset retries and scheduled next run
                 db::scheduler::update_trigger(
                     db::scheduler::Trigger {
-                        status: db::scheduler::TriggerStatus::Completed,
-                        data: updated_trigger_data.to_json_string(),
+                        retries: 0, // Reset retries for next attempt
+                        next_run_at,
+                        status: db::scheduler::TriggerStatus::Waiting,
                         ..trigger
                     },
                     true,
@@ -2369,18 +2376,17 @@ async fn handle_backfill_triggers(
                 )
                 .await?;
             } else {
-                // Retry
-                let _ = db::scheduler::update_status(
-                    &trigger.org,
-                    db::scheduler::TriggerModule::Backfill,
-                    &trigger.module_key,
-                    db::scheduler::TriggerStatus::Waiting,
-                    trigger.retries + 1,
-                    None,
+                // Increment retries but don't update next_run_at - let scheduler pick it up immediately
+                db::scheduler::update_trigger(
+                    db::scheduler::Trigger {
+                        retries: new_retries,
+                        status: db::scheduler::TriggerStatus::Waiting,
+                        ..trigger
+                    },
                     true,
                     trace_id,
                 )
-                .await;
+                .await?;
             }
             return Err(anyhow::anyhow!("Failed to evaluate pipeline: {}", e));
         }
@@ -2391,6 +2397,46 @@ async fn handle_backfill_triggers(
         Ok(ep) => ep,
         Err(e) => {
             log::error!("[BACKFILL trace_id {trace_id}] Failed to create executable pipeline: {e}");
+
+            // Increment retries
+            let new_retries = trigger.retries + 1;
+
+            if new_retries >= max_retries {
+                // Max retries reached, report error and reset retries for next scheduled run
+                log::warn!(
+                    "[BACKFILL trace_id {trace_id}] Backfill job for pipeline {} has reached maximum retries on pipeline creation.",
+                    backfill_job.source_pipeline_id
+                );
+
+                // Calculate next run time with delay
+                let delay = backfill_job.delay_between_chunks_secs.unwrap_or(0);
+                let next_run_at = now + (delay * 1_000_000);
+
+                // Update trigger with reset retries and scheduled next run
+                db::scheduler::update_trigger(
+                    db::scheduler::Trigger {
+                        retries: 0, // Reset retries for next attempt
+                        next_run_at,
+                        status: db::scheduler::TriggerStatus::Waiting,
+                        ..trigger
+                    },
+                    true,
+                    trace_id,
+                )
+                .await?;
+            } else {
+                // Increment retries but don't update next_run_at - let scheduler pick it up immediately
+                db::scheduler::update_trigger(
+                    db::scheduler::Trigger {
+                        retries: new_retries,
+                        status: db::scheduler::TriggerStatus::Waiting,
+                        ..trigger
+                    },
+                    true,
+                    trace_id,
+                )
+                .await?;
+            }
             return Err(anyhow::anyhow!(
                 "Failed to create executable pipeline: {}",
                 e
@@ -2405,25 +2451,45 @@ async fn handle_backfill_triggers(
             .await
         {
             log::error!("[BACKFILL trace_id {trace_id}] Failed to process batch: {e}");
-            if trigger.retries + 1 >= max_retries {
-                let _ = db::scheduler::delete(
-                    &trigger.org,
-                    db::scheduler::TriggerModule::Backfill,
-                    &trigger.module_key,
-                )
-                .await;
-            } else {
-                let _ = db::scheduler::update_status(
-                    &trigger.org,
-                    db::scheduler::TriggerModule::Backfill,
-                    &trigger.module_key,
-                    db::scheduler::TriggerStatus::Waiting,
-                    trigger.retries + 1,
-                    None,
+
+            // Increment retries
+            let new_retries = trigger.retries + 1;
+
+            if new_retries >= max_retries {
+                // Max retries reached, report error and reset retries for next scheduled run
+                log::warn!(
+                    "[BACKFILL trace_id {trace_id}] Backfill job for pipeline {} has reached maximum retries on batch processing.",
+                    backfill_job.source_pipeline_id
+                );
+
+                // Calculate next run time with delay
+                let delay = backfill_job.delay_between_chunks_secs.unwrap_or(0);
+                let next_run_at = now + (delay * 1_000_000);
+
+                // Update trigger with reset retries and scheduled next run
+                db::scheduler::update_trigger(
+                    db::scheduler::Trigger {
+                        retries: 0, // Reset retries for next attempt
+                        next_run_at,
+                        status: db::scheduler::TriggerStatus::Waiting,
+                        ..trigger
+                    },
                     true,
                     trace_id,
                 )
-                .await;
+                .await?;
+            } else {
+                // Increment retries but don't update next_run_at - let scheduler pick it up immediately
+                db::scheduler::update_trigger(
+                    db::scheduler::Trigger {
+                        retries: new_retries,
+                        status: db::scheduler::TriggerStatus::Waiting,
+                        ..trigger
+                    },
+                    true,
+                    trace_id,
+                )
+                .await?;
             }
             return Err(anyhow::anyhow!("Failed to process batch: {}", e));
         }

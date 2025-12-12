@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Progress -->
           <div class="tw-space-y-3">
             <div class="text-subtitle1 tw-font-semibold">Progress</div>
-            <div class="tw-p-4 tw-bg-gray-50 tw-rounded tw-border">
+            <q-card flat bordered class="q-pa-md">
               <div class="flex items-center justify-between q-mb-sm">
                 <div class="tw-font-medium">Overall Progress</div>
                 <div class="text-h6">{{ job.progress_percent }}%</div>
@@ -119,13 +119,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div>{{ estimatedCompletion }}</div>
                 </div>
               </div>
-            </div>
+            </q-card>
           </div>
 
           <!-- Deletion Details (if applicable) -->
           <div v-if="job.delete_before_backfill || job.deletion_status" class="tw-space-y-3">
             <div class="text-subtitle1 tw-font-semibold">Deletion Details</div>
-            <div class="tw-p-4 tw-bg-blue-50 tw-rounded tw-border tw-border-blue-200">
+            <q-card flat bordered class="q-pa-md">
               <div class="tw-grid tw-grid-cols-2 tw-gap-4 text-sm">
                 <div>
                   <div class="text-caption text-grey-6">Status</div>
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="text-caption text-grey-6">Error</div>
                 <div class="text-sm text-negative">{{ job.deletion_status.failed }}</div>
               </div>
-            </div>
+            </q-card>
           </div>
 
           <!-- Timeline -->

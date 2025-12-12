@@ -228,7 +228,7 @@ pub async fn list_backfill_jobs(org_id: &str) -> Result<Vec<BackfillJobStatus>, 
                 job_id: trigger
                     .module_key
                     .split('/')
-                    .last()
+                    .next_back()
                     .unwrap_or(&trigger.module_key)
                     .to_string(),
                 pipeline_id: backfill_job.source_pipeline_id,
@@ -445,87 +445,87 @@ pub async fn update_backfill_job(
     .await?;
 
     for trigger in triggers {
-        if let Ok(trigger_data) = serde_json::from_str::<ScheduledTriggerData>(&trigger.data) {
-            if let Some(mut backfill_job) = trigger_data.backfill_job {
-                let trigger_job_id = trigger
-                    .module_key
-                    .split('/')
-                    .last()
-                    .unwrap_or(&trigger.module_key);
+        if let Ok(trigger_data) = serde_json::from_str::<ScheduledTriggerData>(&trigger.data)
+            && let Some(mut backfill_job) = trigger_data.backfill_job
+        {
+            let trigger_job_id = trigger
+                .module_key
+                .split('/')
+                .next_back()
+                .unwrap_or(&trigger.module_key);
 
-                if trigger_job_id == job_id {
-                    // Only allow updating paused or completed jobs
-                    if trigger.status != db::scheduler::TriggerStatus::Completed {
-                        return Err(anyhow::anyhow!(
-                            "Can only update paused or completed backfill jobs. Current status: {:?}",
-                            trigger.status
-                        ));
-                    }
-
-                    // Update the backfill job fields
-                    backfill_job.start_time = req.start_time;
-                    backfill_job.end_time = req.end_time;
-                    backfill_job.chunk_period_minutes = req.chunk_period_minutes;
-                    backfill_job.delay_between_chunks_secs = req.delay_between_chunks_secs;
-                    backfill_job.delete_before_backfill = req.delete_before_backfill;
-
-                    // Reset current_position to start_time and reset deletion status for restart as
-                    // new job
-                    backfill_job.current_position = req.start_time;
-                    backfill_job.deletion_status = DeletionStatus::NotRequired;
-                    backfill_job.deletion_job_id = None;
-
-                    // Update backfill_jobs table
-                    let db_job = infra::table::backfill_jobs::BackfillJob {
-                        id: job_id.to_string(),
-                        org: org_id.to_string(),
-                        pipeline_id: backfill_job.source_pipeline_id.clone(),
-                        start_time: backfill_job.start_time,
-                        end_time: backfill_job.end_time,
-                        chunk_period_minutes: backfill_job.chunk_period_minutes,
-                        delay_between_chunks_secs: backfill_job.delay_between_chunks_secs,
-                        delete_before_backfill: backfill_job.delete_before_backfill,
-                        created_at: trigger
-                            .created_at
-                            .unwrap_or(chrono::Utc::now().timestamp_micros()),
-                    };
-                    infra::table::backfill_jobs::update(&db_job).await?;
-
-                    // Update trigger data and reset to Waiting status for re-execution
-                    let updated_trigger_data = ScheduledTriggerData {
-                        backfill_job: Some(backfill_job),
-                        ..trigger_data
-                    };
-
-                    let now = chrono::Utc::now().timestamp_micros();
-                    db::scheduler::update_trigger(
-                        db::scheduler::Trigger {
-                            id: trigger.id,
-                            org: trigger.org.clone(),
-                            module: trigger.module,
-                            module_key: trigger.module_key.clone(),
-                            next_run_at: now, // Schedule immediately
-                            is_realtime: trigger.is_realtime,
-                            is_silenced: trigger.is_silenced,
-                            status: db::scheduler::TriggerStatus::Waiting, /* Reset to Waiting
-                                                                            * for execution */
-                            start_time: trigger.start_time,
-                            end_time: trigger.end_time,
-                            retries: 0, // Reset retries
-                            data: serde_json::to_string(&updated_trigger_data)?,
-                        },
-                        true,
-                        &format!("update_backfill_{}", job_id),
-                    )
-                    .await?;
-
-                    log::info!(
-                        "[BACKFILL] Updated backfill job {} for org {}",
-                        job_id,
-                        org_id
-                    );
-                    return Ok(());
+            if trigger_job_id == job_id {
+                // Only allow updating paused or completed jobs
+                if trigger.status != db::scheduler::TriggerStatus::Completed {
+                    return Err(anyhow::anyhow!(
+                        "Can only update paused or completed backfill jobs. Current status: {:?}",
+                        trigger.status
+                    ));
                 }
+
+                // Update the backfill job fields
+                backfill_job.start_time = req.start_time;
+                backfill_job.end_time = req.end_time;
+                backfill_job.chunk_period_minutes = req.chunk_period_minutes;
+                backfill_job.delay_between_chunks_secs = req.delay_between_chunks_secs;
+                backfill_job.delete_before_backfill = req.delete_before_backfill;
+
+                // Reset current_position to start_time and reset deletion status for restart as
+                // new job
+                backfill_job.current_position = req.start_time;
+                backfill_job.deletion_status = DeletionStatus::NotRequired;
+                backfill_job.deletion_job_id = None;
+
+                // Update backfill_jobs table
+                let db_job = infra::table::backfill_jobs::BackfillJob {
+                    id: job_id.to_string(),
+                    org: org_id.to_string(),
+                    pipeline_id: backfill_job.source_pipeline_id.clone(),
+                    start_time: backfill_job.start_time,
+                    end_time: backfill_job.end_time,
+                    chunk_period_minutes: backfill_job.chunk_period_minutes,
+                    delay_between_chunks_secs: backfill_job.delay_between_chunks_secs,
+                    delete_before_backfill: backfill_job.delete_before_backfill,
+                    created_at: trigger
+                        .created_at
+                        .unwrap_or(chrono::Utc::now().timestamp_micros()),
+                };
+                infra::table::backfill_jobs::update(&db_job).await?;
+
+                // Update trigger data and reset to Waiting status for re-execution
+                let updated_trigger_data = ScheduledTriggerData {
+                    backfill_job: Some(backfill_job),
+                    ..trigger_data
+                };
+
+                let now = chrono::Utc::now().timestamp_micros();
+                db::scheduler::update_trigger(
+                    db::scheduler::Trigger {
+                        id: trigger.id,
+                        org: trigger.org.clone(),
+                        module: trigger.module,
+                        module_key: trigger.module_key.clone(),
+                        next_run_at: now, // Schedule immediately
+                        is_realtime: trigger.is_realtime,
+                        is_silenced: trigger.is_silenced,
+                        status: db::scheduler::TriggerStatus::Waiting, /* Reset to Waiting
+                                                                        * for execution */
+                        start_time: trigger.start_time,
+                        end_time: trigger.end_time,
+                        retries: 0, // Reset retries
+                        data: serde_json::to_string(&updated_trigger_data)?,
+                    },
+                    true,
+                    &format!("update_backfill_{}", job_id),
+                )
+                .await?;
+
+                log::info!(
+                    "[BACKFILL] Updated backfill job {} for org {}",
+                    job_id,
+                    org_id
+                );
+                return Ok(());
             }
         }
     }
