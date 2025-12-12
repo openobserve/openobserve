@@ -135,6 +135,7 @@ jobs:
                 "pagination.spec.js",
                 "unflattened.spec.js",
                 "logstable.spec.js",
+                "shareLink.spec.js",
               ]
           - testfolder: "Logs-Queries"
             browser: "chrome"
