@@ -137,6 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   >
                     <q-select
+                      ref="streamTypeFieldRef"
                       data-test="add-alert-stream-type-select-dropdown"
                       v-model="formData.stream_type"
                       :options="streamTypes"
@@ -704,6 +705,7 @@ export default defineComponent({
     // Focus manager for alert summary clickable fields
     const focusManager = new AlertFocusManager();
     const streamFieldRef = ref(null);
+    const streamTypeFieldRef = ref(null);
 
     const previewQuery = ref("");
 
@@ -782,11 +784,31 @@ export default defineComponent({
       // Register fields with focus manager for clickable summary
       // Wait for next tick to ensure refs are available
       await nextTick();
+      focusManager.registerField('streamType', { ref: streamTypeFieldRef });
       focusManager.registerField('stream', { ref: streamFieldRef });
     });
 
+    // Track setTimeout IDs to clean them up properly
+    let multiWindowTimeout: number | null = null;
+
+    // Track which fields are currently registered for each alert type
+    const scheduledFieldIds = ['frequency', 'period', 'threshold', 'operator', 'silence', 'conditions', 'multiwindow', 'destinations'];
+    const realTimeFieldIds = ['silence', 'conditions', 'destinations'];
+
     // Watch for scheduledAlertRef to become available and register its fields
-    watch(scheduledAlertRef, (newVal) => {
+    watch(scheduledAlertRef, (newVal, oldVal) => {
+      // Clean up old registrations if switching away from scheduled alert
+      if (oldVal && !newVal) {
+        scheduledFieldIds.forEach(fieldId => {
+          focusManager.unregisterField(fieldId);
+        });
+        // Clear any pending multiwindow timeout
+        if (multiWindowTimeout) {
+          clearTimeout(multiWindowTimeout);
+          multiWindowTimeout = null;
+        }
+      }
+
       if (newVal) {
         // Register ScheduledAlert fields once the component is mounted
         nextTick(() => {
@@ -833,14 +855,22 @@ export default defineComponent({
             }
           });
           // Register multiwindow field with additional delay to ensure ref is populated
-          setTimeout(() => {
-            focusManager.registerField('multiwindow', {
-              ref: newVal.multiWindowContainerRef,
-              onBeforeFocus: () => {
-                // Expand Multi Window section if collapsed
-                expandState.value.multiWindowSelection = true;
-              }
-            });
+          // Clear any existing timeout first
+          if (multiWindowTimeout) {
+            clearTimeout(multiWindowTimeout);
+          }
+          multiWindowTimeout = window.setTimeout(() => {
+            // Check if component still exists before registering
+            if (scheduledAlertRef.value && newVal.multiWindowContainerRef) {
+              focusManager.registerField('multiwindow', {
+                ref: newVal.multiWindowContainerRef,
+                onBeforeFocus: () => {
+                  // Expand Multi Window section if collapsed
+                  expandState.value.multiWindowSelection = true;
+                }
+              });
+            }
+            multiWindowTimeout = null;
           }, 100);
           focusManager.registerField('destinations', {
             ref: newVal.destinationSelectRef,
@@ -854,7 +884,14 @@ export default defineComponent({
     }, { immediate: true });
 
     // Watch for realTimeAlertRef to become available and register its fields
-    watch(realTimeAlertRef, (newVal) => {
+    watch(realTimeAlertRef, (newVal, oldVal) => {
+      // Clean up old registrations if switching away from real-time alert
+      if (oldVal && !newVal) {
+        realTimeFieldIds.forEach(fieldId => {
+          focusManager.unregisterField(fieldId);
+        });
+      }
+
       if (newVal) {
         // Register RealTimeAlert fields once the component is mounted
         nextTick(() => {
@@ -887,6 +924,12 @@ export default defineComponent({
       // Clean up alerts-specific context provider
       contextRegistry.unregister('alerts');
       contextRegistry.setActive('');
+
+      // Clear any pending multiwindow timeout
+      if (multiWindowTimeout) {
+        clearTimeout(multiWindowTimeout);
+        multiWindowTimeout = null;
+      }
 
       // Clean up focus manager
       focusManager.clear();
@@ -1590,6 +1633,7 @@ export default defineComponent({
       isLoadingPanelData,
       focusManager,
       streamFieldRef,
+      streamTypeFieldRef,
     };
   },
 

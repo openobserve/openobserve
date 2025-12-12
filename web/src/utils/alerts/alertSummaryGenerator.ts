@@ -28,10 +28,11 @@ export function generateAlertSummary(formData: any, destinations: any[]): string
 
   // Build the complete summary with labeled sections
   const streamType = formData.stream_type || 'logs';
+  const streamName = formData.stream_name || 'the selected stream';
 
   if (isRealTime) {
     // Real-time alert summary
-    parts.push(`**Evaluation:** The alert monitors ${clickable(streamType, 'stream')} in real-time and continuously evaluates incoming data.`);
+    parts.push(`**Evaluation:** The alert monitors ${clickable(streamType, 'streamType')} from ${clickable(streamName, 'stream')} in real-time and continuously evaluates incoming data.`);
     parts.push(`**Trigger Condition:** The alert triggers when ${clickable('the query conditions', 'conditions')} are met.`);
   } else {
     // Scheduled alert summary
