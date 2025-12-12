@@ -51,11 +51,7 @@ fn create_table_stmt() -> TableCreateStatement {
                 .not_null()
                 .primary_key(),
         )
-        .col(
-            ColumnDef::new(BackfillJobs::Org)
-                .string_len(100)
-                .not_null(),
-        )
+        .col(ColumnDef::new(BackfillJobs::Org).string_len(100).not_null())
         .col(
             ColumnDef::new(BackfillJobs::PipelineId)
                 .string_len(256)
