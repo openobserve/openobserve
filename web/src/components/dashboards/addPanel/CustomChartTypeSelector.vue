@@ -18,7 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     class="custom-chart-type-selector-popup"
     data-test="custom-chart-type-selector-popup"
-    style="padding: 0; width: 95vw; height: calc(100vh - 57px); max-width: 1800px"
+    style="
+      padding: 0;
+      width: 95vw;
+      height: calc(100vh - 57px);
+      max-width: 1800px;
+    "
   >
     <!-- Header -->
     <div
@@ -36,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
           borderless
           placeholder="Search charts..."
-          style="min-width: 250px; border-radius: 4px; padding: 2px 8px;"
+          style="min-width: 250px; border-radius: 4px; padding: 2px 8px"
           clearable
           @clear="searchQuery = ''"
         >
@@ -82,7 +87,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :active="selectedCategory === category.chartLabel"
             @click="scrollToCategory(category.chartLabel)"
             class="sidebar-item"
-            :class="{ 'active-category': selectedCategory === category.chartLabel }"
+            :class="{
+              'active-category': selectedCategory === category.chartLabel,
+            }"
             data-test="chart-category-item"
           >
             <q-item-section>
@@ -100,14 +107,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @scroll="handleScroll"
       >
         <!-- No Results Message -->
-        <div v-if="filteredCategories.length === 0" class="flex justify-center items-center" style="height: 100%">
+        <div
+          v-if="filteredCategories.length === 0"
+          class="flex justify-center items-center"
+          style="height: 100%"
+        >
           <div class="text-center">
             <q-icon name="search_off" size="4rem" color="grey-5" />
             <div class="text-h6 text-grey-7 q-mt-md">No results found</div>
-            <div class="text-body2 text-grey-6 q-mt-sm">Try searching with different keywords</div>
+            <div class="text-body2 text-grey-6 q-mt-sm">
+              Try searching with different keywords
+            </div>
           </div>
         </div>
-        
+
         <!-- Chart Categories -->
         <div
           v-for="(category, categoryIndex) in filteredCategories"
@@ -128,7 +141,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 flat
                 bordered
                 class="chart-card cursor-pointer"
-                :class="{ 'selected-chart': selectedChart?.value === chart.value }"
+                :class="{
+                  'selected-chart': selectedChart?.value === chart.value,
+                }"
                 @click="selectChart(chart)"
                 data-test="chart-type-card"
               >
@@ -155,10 +170,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Confirm Chart Selection Dialog -->
-    <ConfirmDialog
+    <CustomChartConfirmDialog
       title="Confirm Chart Type Selection"
       message="By selecting this chart type, the existing chart code will be replaced by the selected chart type's code. Do you want to continue?"
-      :showQueryReplacementOption="true"
       @update:ok="confirmChartSelection"
       @update:cancel="cancelChartSelection"
       v-model="confirmChartSelectionDialog"
@@ -171,18 +185,20 @@ import { defineComponent, ref, onMounted, nextTick, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ChartType, ChartCategory } from "./chartTypes";
 import { chartTypesData } from "./chartTypes";
-import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import CustomChartConfirmDialog from "@/components/CustomChartConfirmDialog.vue";
 
 export default defineComponent({
   name: "CustomChartTypeSelector",
   components: {
-    ConfirmDialog,
+    CustomChartConfirmDialog,
   },
   emits: ["close", "select"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const chartCategories = ref<ChartCategory[]>(chartTypesData.data);
-    const selectedCategory = ref<string>(chartCategories.value[0]?.chartLabel || "");
+    const selectedCategory = ref<string>(
+      chartCategories.value[0]?.chartLabel || "",
+    );
     const selectedChart = ref<ChartType | null>(null);
     const contentArea = ref<HTMLElement | null>(null);
     const confirmChartSelectionDialog = ref<boolean>(false);
@@ -200,7 +216,7 @@ export default defineComponent({
 
       chartCategories.value.forEach((category) => {
         const filteredCharts = category.type.filter((chart) =>
-          chart.label.toLowerCase().includes(query)
+          chart.label.toLowerCase().includes(query),
         );
 
         if (filteredCharts.length > 0) {
@@ -217,8 +233,10 @@ export default defineComponent({
     const scrollToCategory = (category: string) => {
       selectedCategory.value = category;
       if (!contentArea.value) return;
-      
-      const element = contentArea.value.querySelector(`[data-category="${category}"]`) as HTMLElement;
+
+      const element = contentArea.value.querySelector(
+        `[data-category="${category}"]`,
+      ) as HTMLElement;
       if (element) {
         element.scrollIntoView({ behavior: "smooth", block: "start" });
       }
@@ -228,12 +246,14 @@ export default defineComponent({
       if (!contentArea.value) return;
 
       const scrollTop = contentArea.value.scrollTop;
-      const sections = contentArea.value.querySelectorAll('.chart-category-section');
-      
+      const sections = contentArea.value.querySelectorAll(
+        ".chart-category-section",
+      );
+
       // Find which category is currently in view
       for (const section of Array.from(sections)) {
         const element = section as HTMLElement;
-        const category = element.getAttribute('data-category');
+        const category = element.getAttribute("data-category");
         if (!category) continue;
 
         const elementTop = element.offsetTop - contentArea.value.offsetTop;
