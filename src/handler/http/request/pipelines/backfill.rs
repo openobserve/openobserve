@@ -13,13 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{delete, get, post, put, web, HttpResponse};
+use actix_web::{HttpResponse, delete, get, post, put, web};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse, service::alerts::backfill,
-};
+use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::alerts::backfill};
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct BackfillRequest {
@@ -181,14 +179,16 @@ pub async fn create_backfill(
     ),
 )]
 #[get("/{org_id}/pipelines/backfill")]
-pub async fn list_backfills(
-    path: web::Path<String>,
-) -> Result<HttpResponse, actix_web::Error> {
+pub async fn list_backfills(path: web::Path<String>) -> Result<HttpResponse, actix_web::Error> {
     let org_id = path.into_inner();
 
     match backfill::list_backfill_jobs(&org_id).await {
         Ok(jobs) => {
-            log::debug!("[BACKFILL API] Listed {} backfill jobs for org {}", jobs.len(), org_id);
+            log::debug!(
+                "[BACKFILL API] Listed {} backfill jobs for org {}",
+                jobs.len(),
+                org_id
+            );
             Ok(HttpResponse::Ok().json(jobs))
         }
         Err(e) => {
@@ -197,10 +197,12 @@ pub async fn list_backfills(
                 org_id,
                 e
             );
-            Ok(HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
-                e.to_string(),
-            )))
+            Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                    actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    e.to_string(),
+                )),
+            )
         }
     }
 }
@@ -231,7 +233,11 @@ pub async fn get_backfill(
 
     match backfill::get_backfill_job(&org_id, &job_id).await {
         Ok(job) => {
-            log::debug!("[BACKFILL API] Retrieved backfill job {} for org {}", job_id, org_id);
+            log::debug!(
+                "[BACKFILL API] Retrieved backfill job {} for org {}",
+                job_id,
+                org_id
+            );
             Ok(HttpResponse::Ok().json(job))
         }
         Err(e) => {
@@ -480,4 +486,3 @@ pub async fn update_backfill(
         }
     }
 }
-

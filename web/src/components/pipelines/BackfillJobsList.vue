@@ -334,7 +334,6 @@ const allPipelineOptions = ref<any[]>([]);
 
 onMounted(() => {
   loadJobs();
-  loadPipelineOptions();
 });
 
 const loadJobs = async () => {
@@ -346,6 +345,7 @@ const loadJobs = async () => {
     });
     jobs.value = response;
     pagination.value.rowsNumber = response.length;
+    loadPipelineOptions();
   } catch (error: any) {
     console.error("Error loading backfill jobs:", error);
     $q.notify({

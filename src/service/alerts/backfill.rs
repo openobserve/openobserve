@@ -198,22 +198,24 @@ pub async fn list_backfill_jobs(org_id: &str) -> Result<Vec<BackfillJobStatus>, 
                 if total_duration == 0 {
                     100
                 } else {
-                    let completed_duration = backfill_job.current_position - backfill_job.start_time;
+                    let completed_duration =
+                        backfill_job.current_position - backfill_job.start_time;
                     (completed_duration as f64 / total_duration as f64 * 100.0) as u8
                 }
             };
 
             // Calculate chunks
             let chunk_period = backfill_job.chunk_period_minutes.unwrap_or(60);
-            let total_duration_minutes = (backfill_job.end_time - backfill_job.start_time)
-                / (60 * 1_000_000);
+            let total_duration_minutes =
+                (backfill_job.end_time - backfill_job.start_time) / (60 * 1_000_000);
             let chunks_total = (total_duration_minutes as f64 / chunk_period as f64).ceil() as u64;
             let completed_duration_minutes =
                 (backfill_job.current_position - backfill_job.start_time) / (60 * 1_000_000);
             let chunks_completed =
                 (completed_duration_minutes as f64 / chunk_period as f64).floor() as u64;
 
-            // Determine actual status: if trigger is Completed but job hasn't reached end_time, it's paused
+            // Determine actual status: if trigger is Completed but job hasn't reached end_time,
+            // it's paused
             let actual_status = if trigger.status == db::scheduler::TriggerStatus::Completed
                 && backfill_job.current_position < backfill_job.end_time
             {
@@ -282,10 +284,9 @@ pub async fn get_backfill_job(
                             } else {
                                 let completed_duration =
                                     backfill_job.current_position - backfill_job.start_time;
-                                let backfill_progress = (completed_duration as f64
-                                    / total_duration as f64
-                                    * 80.0)
-                                    as u8;
+                                let backfill_progress =
+                                    (completed_duration as f64 / total_duration as f64 * 80.0)
+                                        as u8;
                                 20 + backfill_progress
                             }
                         }
@@ -468,7 +469,8 @@ pub async fn update_backfill_job(
                     backfill_job.delay_between_chunks_secs = req.delay_between_chunks_secs;
                     backfill_job.delete_before_backfill = req.delete_before_backfill;
 
-                    // Reset current_position to start_time and reset deletion status for restart as new job
+                    // Reset current_position to start_time and reset deletion status for restart as
+                    // new job
                     backfill_job.current_position = req.start_time;
                     backfill_job.deletion_status = DeletionStatus::NotRequired;
                     backfill_job.deletion_job_id = None;
@@ -483,7 +485,9 @@ pub async fn update_backfill_job(
                         chunk_period_minutes: backfill_job.chunk_period_minutes,
                         delay_between_chunks_secs: backfill_job.delay_between_chunks_secs,
                         delete_before_backfill: backfill_job.delete_before_backfill,
-                        created_at: trigger.created_at.unwrap_or(chrono::Utc::now().timestamp_micros()),
+                        created_at: trigger
+                            .created_at
+                            .unwrap_or(chrono::Utc::now().timestamp_micros()),
                     };
                     infra::table::backfill_jobs::update(&db_job).await?;
 
@@ -503,7 +507,8 @@ pub async fn update_backfill_job(
                             next_run_at: now, // Schedule immediately
                             is_realtime: trigger.is_realtime,
                             is_silenced: trigger.is_silenced,
-                            status: db::scheduler::TriggerStatus::Waiting, // Reset to Waiting for execution
+                            status: db::scheduler::TriggerStatus::Waiting, /* Reset to Waiting
+                                                                            * for execution */
                             start_time: trigger.start_time,
                             end_time: trigger.end_time,
                             retries: 0, // Reset retries

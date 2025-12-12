@@ -18,19 +18,22 @@ use serde::{Deserialize, Serialize};
 
 use super::get_lock;
 pub use crate::table::entity::backfill_jobs::{ActiveModel, Column, Entity, Model, Relation};
-use crate::{db::{ORM_CLIENT, connect_to_orm}, errors, orm_err};
+use crate::{
+    db::{ORM_CLIENT, connect_to_orm},
+    errors, orm_err,
+};
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BackfillJob {
     pub id: String,
     pub org: String,
     pub pipeline_id: String,
-    pub start_time: i64,  // microseconds
-    pub end_time: i64,    // microseconds
+    pub start_time: i64, // microseconds
+    pub end_time: i64,   // microseconds
     pub chunk_period_minutes: Option<i64>,
     pub delay_between_chunks_secs: Option<i64>,
     pub delete_before_backfill: bool,
-    pub created_at: i64,  // microseconds
+    pub created_at: i64, // microseconds
 }
 
 impl From<Model> for BackfillJob {
@@ -67,10 +70,7 @@ pub async fn get(org: &str, job_id: &str) -> Result<BackfillJob, errors::Error> 
 
 pub async fn list_by_org(org: &str) -> Result<Vec<BackfillJob>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let res = Entity::find()
-        .filter(Column::Org.eq(org))
-        .all(client)
-        .await;
+    let res = Entity::find().filter(Column::Org.eq(org)).all(client).await;
     match res {
         Ok(models) => Ok(models.into_iter().map(|model| model.into()).collect()),
         Err(e) => orm_err!(format!("list backfill jobs error: {e}")),
@@ -119,14 +119,14 @@ pub async fn update(job: &BackfillJob) -> Result<(), errors::Error> {
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    
+
     // Find existing model
     let existing = Entity::find()
         .filter(Column::Org.eq(&job.org))
         .filter(Column::Id.eq(&job.id))
         .one(client)
         .await;
-    
+
     match existing {
         Ok(Some(model)) => {
             let mut active: ActiveModel = model.into();
@@ -136,7 +136,7 @@ pub async fn update(job: &BackfillJob) -> Result<(), errors::Error> {
             active.chunk_period_minutes = Set(job.chunk_period_minutes);
             active.delay_between_chunks_secs = Set(job.delay_between_chunks_secs);
             active.delete_before_backfill = Set(job.delete_before_backfill);
-            
+
             let res = active.update(client).await;
             match res {
                 Ok(_) => Ok(()),

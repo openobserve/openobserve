@@ -74,9 +74,7 @@ pub async fn handle_triggers(
         db::scheduler::TriggerModule::QueryRecommendations => {
             handle_query_recommendations_triggers(trace_id, trigger).await
         }
-        db::scheduler::TriggerModule::Backfill => {
-            handle_backfill_triggers(trace_id, trigger).await
-        }
+        db::scheduler::TriggerModule::Backfill => handle_backfill_triggers(trace_id, trigger).await,
     }
 }
 
@@ -2108,47 +2106,44 @@ async fn handle_backfill_triggers(
     let mut backfill_job = match trigger_data.backfill_job {
         Some(job) => job,
         None => {
-            log::error!(
-                "[SCHEDULER trace_id {trace_id}] Missing backfill job data in trigger"
-            );
+            log::error!("[SCHEDULER trace_id {trace_id}] Missing backfill job data in trigger");
             return Err(anyhow::anyhow!("Missing backfill job data"));
         }
     };
 
     // 2. Fetch the source pipeline configuration
-    let pipeline = match crate::service::db::pipeline::get_by_id(&backfill_job.source_pipeline_id)
-        .await
-    {
-        Ok(pipeline) => pipeline,
-        Err(e) => {
-            log::error!(
-                "[SCHEDULER trace_id {trace_id}] Failed to fetch pipeline {}: {e}",
-                backfill_job.source_pipeline_id
-            );
-            if trigger.retries + 1 >= max_retries {
-                // Delete the trigger after max retries
-                let _ = db::scheduler::delete(
-                    &trigger.org,
-                    db::scheduler::TriggerModule::Backfill,
-                    &trigger.module_key,
-                )
-                .await;
-            } else {
-                let _ = db::scheduler::update_status(
-                    &trigger.org,
-                    db::scheduler::TriggerModule::Backfill,
-                    &trigger.module_key,
-                    db::scheduler::TriggerStatus::Waiting,
-                    trigger.retries + 1,
-                    None,
-                    true,
-                    trace_id,
-                )
-                .await;
+    let pipeline =
+        match crate::service::db::pipeline::get_by_id(&backfill_job.source_pipeline_id).await {
+            Ok(pipeline) => pipeline,
+            Err(e) => {
+                log::error!(
+                    "[SCHEDULER trace_id {trace_id}] Failed to fetch pipeline {}: {e}",
+                    backfill_job.source_pipeline_id
+                );
+                if trigger.retries + 1 >= max_retries {
+                    // Delete the trigger after max retries
+                    let _ = db::scheduler::delete(
+                        &trigger.org,
+                        db::scheduler::TriggerModule::Backfill,
+                        &trigger.module_key,
+                    )
+                    .await;
+                } else {
+                    let _ = db::scheduler::update_status(
+                        &trigger.org,
+                        db::scheduler::TriggerModule::Backfill,
+                        &trigger.module_key,
+                        db::scheduler::TriggerStatus::Waiting,
+                        trigger.retries + 1,
+                        None,
+                        true,
+                        trace_id,
+                    )
+                    .await;
+                }
+                return Err(anyhow::anyhow!("Failed to fetch pipeline: {}", e));
             }
-            return Err(anyhow::anyhow!("Failed to fetch pipeline: {}", e));
-        }
-    };
+        };
 
     // 3. Extract DerivedStream configuration
     let derived_stream = match &pipeline.source {
@@ -2173,9 +2168,7 @@ async fn handle_backfill_triggers(
     let destination_stream = match get_destination_stream_from_pipeline(&pipeline) {
         Ok(stream) => stream,
         Err(e) => {
-            log::error!(
-                "[SCHEDULER trace_id {trace_id}] Failed to get destination stream: {e}"
-            );
+            log::error!("[SCHEDULER trace_id {trace_id}] Failed to get destination stream: {e}");
             let _ = db::scheduler::delete(
                 &trigger.org,
                 db::scheduler::TriggerModule::Backfill,
@@ -2220,8 +2213,7 @@ async fn handle_backfill_triggers(
                             ..trigger_data
                         };
 
-                        let next_run_at =
-                            now + Duration::seconds(30).num_microseconds().unwrap();
+                        let next_run_at = now + Duration::seconds(30).num_microseconds().unwrap();
 
                         db::scheduler::update_trigger(
                             db::scheduler::Trigger {
@@ -2245,8 +2237,7 @@ async fn handle_backfill_triggers(
                         log::error!(
                             "[BACKFILL trace_id {trace_id}] Failed to initiate deletion: {e}"
                         );
-                        backfill_job.deletion_status =
-                            DeletionStatus::Failed(e.to_string());
+                        backfill_job.deletion_status = DeletionStatus::Failed(e.to_string());
                         let updated_trigger_data = ScheduledTriggerData {
                             backfill_job: Some(backfill_job),
                             ..trigger_data
@@ -2277,9 +2268,7 @@ async fn handle_backfill_triggers(
                             // Continue to backfill phase below
                         }
                         Ok(status) if status == "failed" => {
-                            log::error!(
-                                "[BACKFILL trace_id {trace_id}] Deletion job failed"
-                            );
+                            log::error!("[BACKFILL trace_id {trace_id}] Deletion job failed");
                             backfill_job.deletion_status =
                                 DeletionStatus::Failed("Deletion job failed".to_string());
                             let updated_trigger_data = ScheduledTriggerData {
@@ -2326,9 +2315,7 @@ async fn handle_backfill_triggers(
                 // Deletion already complete, proceed to backfill
             }
             DeletionStatus::Failed(error) => {
-                log::error!(
-                    "[BACKFILL trace_id {trace_id}] Deletion failed: {error}"
-                );
+                log::error!("[BACKFILL trace_id {trace_id}] Deletion failed: {error}");
                 return Err(anyhow::anyhow!("Deletion failed: {}", error));
             }
         }
@@ -2360,12 +2347,13 @@ async fn handle_backfill_triggers(
     {
         Ok(results) => results,
         Err(e) => {
-            log::error!(
-                "[BACKFILL trace_id {trace_id}] Failed to evaluate pipeline: {e}"
-            );
+            log::error!("[BACKFILL trace_id {trace_id}] Failed to evaluate pipeline: {e}");
             if trigger.retries + 1 >= max_retries {
                 // Max retries reached, mark as failed
-                backfill_job.deletion_status = DeletionStatus::Failed(format!("Evaluation failed after {} retries: {}", max_retries, e));
+                backfill_job.deletion_status = DeletionStatus::Failed(format!(
+                    "Evaluation failed after {} retries: {}",
+                    max_retries, e
+                ));
                 let updated_trigger_data = ScheduledTriggerData {
                     backfill_job: Some(backfill_job),
                     ..trigger_data
@@ -2402,10 +2390,11 @@ async fn handle_backfill_triggers(
     let executable_pipeline = match ExecutablePipeline::new(&pipeline).await {
         Ok(ep) => ep,
         Err(e) => {
-            log::error!(
-                "[BACKFILL trace_id {trace_id}] Failed to create executable pipeline: {e}"
-            );
-            return Err(anyhow::anyhow!("Failed to create executable pipeline: {}", e));
+            log::error!("[BACKFILL trace_id {trace_id}] Failed to create executable pipeline: {e}");
+            return Err(anyhow::anyhow!(
+                "Failed to create executable pipeline: {}",
+                e
+            ));
         }
     };
 
@@ -2415,9 +2404,7 @@ async fn handle_backfill_triggers(
             .process_batch(&trigger.org, records, None)
             .await
         {
-            log::error!(
-                "[BACKFILL trace_id {trace_id}] Failed to process batch: {e}"
-            );
+            log::error!("[BACKFILL trace_id {trace_id}] Failed to process batch: {e}");
             if trigger.retries + 1 >= max_retries {
                 let _ = db::scheduler::delete(
                     &trigger.org,
@@ -2566,8 +2553,7 @@ async fn initiate_stream_deletion(
         ended_at: 0,
     };
 
-    let job_id =
-        crate::service::db::compact::compactor_manual_jobs::add_job(job).await?;
+    let job_id = crate::service::db::compact::compactor_manual_jobs::add_job(job).await?;
     Ok(job_id)
 }
 

@@ -119,8 +119,8 @@ pub struct BackfillJob {
     pub source_pipeline_id: String,
 
     /// Time range to backfill
-    pub start_time: i64,  // microseconds
-    pub end_time: i64,    // microseconds
+    pub start_time: i64, // microseconds
+    pub end_time: i64, // microseconds
 
     /// Optional: chunk size for processing large ranges
     #[serde(skip_serializing_if = "Option::is_none")]
