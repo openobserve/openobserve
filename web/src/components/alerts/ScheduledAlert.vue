@@ -17,7 +17,271 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div ref="scheduledAlertRef" class="scheduled-alerts q-pa-none q-ma-none">
 
-    <!-- first section -->
+       <!-- first section conditions -->
+    <div class="tw-px-[0.625rem] tw-pb-[0.625rem] tw-w-full tw-h-full">
+         <div class="tw-w-full flex tw-justify-center tw-items-center card-container">
+    <div class="tw-w-full tw-ml-2">
+      <AlertsContainer 
+          name="query"
+          v-model:is-expanded="expandState.queryMode"
+          label="Conditions"
+          :image="conditionsImage"
+          subLabel="What should trigger the alert."
+          class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
+          :iconClass="'tw-mt-[2px]'"
+          @update:is-expanded="()=>emits('update:expandState', expandState)"
+        />
+    </div>
+    <div v-if="expandState.queryMode"
+class="  tw-w-full row alert-setup-container tw-px-4 tw-pt-2 tw-pb-3 o2-alert-tab-border" 
+style=" margin-left: 8px;">
+
+      <!-- query mode section -->
+      <div class="tw-w-full" style="">
+        <div v-if="!disableQueryTypeSelection"
+        class="flex items-center app-tabs-container tw-h-[36px] q-mr-sm tw-w-fit tw-mt-2 tw-mb-8"
+        >
+          <AppTabs
+            data-test="scheduled-alert-tabs"
+            :tabs="tabOptions"
+            class="tabs-selection-container"
+            v-model:active-tab="tab"
+            @update:active-tab="updateTab"
+          />
+        </div>
+        <template v-if="tab === 'custom'"
+          class='q-pa-none q-ma-none'
+          ">
+          <FilterGroup :stream-fields="columns"
+            :stream-fields-map="streamFieldsMap"
+            :show-sql-preview="true"
+            :sql-query="generatedSqlQuery"
+            :group="inputData "
+            :depth="0"
+            @add-condition="updateGroup"
+            @add-group="updateGroup"
+            @remove-group="removeConditionGroup"
+            @input:update="(name, field) => emits('input:update', name, field)" />
+        </template>
+        <template v-else>
+          <!-- view section -->
+          <div class="tw-w-full tw-flex lg:tw-flex-col tw-flex-col tw-gap-2" :class="store.state.theme === 'dark' ? 'dark-mode-view' : 'light-mode-view'">
+            <div class="tw-flex tw-justify-between tw-items-center tw-w-full editor-container tw-px-2 tw-py-3 ">
+            <div class="tw-flex tw-items-start">
+              <div :class="[
+                store.state.theme === 'dark' ? 'tw-bg-gray-600' : 'tw-bg-gray-200'
+              ]"
+class="tw-flex tw-items-center tw-gap-2 tw-bg-gray-200 tw-rounded-full tw-px-1 tw-py-1 tw-mr-2" >
+                <img :src="sqlEditorImage" style="width: 16px; height: 16px;" />
+
+              </div>
+              <div class="tw-flex tw-flex-col">
+                <span style="font-size: 16px;">Editor</span>
+                <span style="font-size: 14px;">Create SQL and VRL triggers with specific conditions.</span>
+              </div>
+
+            </div>
+            <div>
+              <q-btn
+                data-test="alert-variables-add-btn"
+                label="View Editor"
+                size="sm"
+                class="text-bold add-variable no-border q-py-sm xl:tw-w-[130px] tw-w-[85px]"
+                color="primary"
+                style="
+                  border-radius: 4px;
+                  text-transform: capitalize;
+                  color: #fff !important;
+                  font-size: 12px;
+                "
+                @click="viewSqlEditor = true"
+                />
+            </div>
+          </div>
+          </div>
+
+        </template>
+      </div>
+    </div>
+        </div>
+    </div>
+
+       <!-- second section multi window selection -->
+    <div class="tw-px-[0.625rem] tw-pb-[0.625rem] tw-w-full tw-h-full">
+         <div class="tw-w-full flex tw-justify-center tw-items-center card-container ">
+    <div class="tw-w-full tw-ml-2">
+        <AlertsContainer 
+          name="Multi Window"
+          v-model:is-expanded="expandState.multiWindowSelection"
+          label="Multi Window"
+          subLabel="Set relative alerting system based on SQL query"
+        class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
+        :iconClass="'tw-mt-[2px]'"
+          :image="multiWindowImage"
+          @update:is-expanded="()=>emits('update:expandState', expandState)"
+        />  
+    </div>
+
+      <div class="tw-w-full row alert-setup-container tw-px-4 tw-pt-2 tw-pb-3 o2-alert-tab-border" 
+    v-if="expandState.multiWindowSelection"
+    :class="store.state.theme === 'dark' ? 'dark-mode-multi-window' : 'light-mode-multi-window'"
+    >
+
+      <div class=" q-mt-sm tw-w-full">
+
+        <!-- current window -->
+        <div class="multi-window-text tw-flex tw-items-center tw-gap-2 q-py-sm q-mt-md">
+            <span>Alert set for</span>
+            <div class=" tw-h-px border-line tw-flex-1"></div>
+          </div>
+          <div class="tw-flex tw-flex-col lg:tw-flex-row tw-justify-between tw-items-start multi-window-container   q-px-md q-py-sm ">
+            <div class="multi-window-text tw-w-full tw-text-center lg:tw-w-auto lg:tw-text-left">
+              Current window 
+            </div>
+            <div class="tw-flex lg:tw-flex-col  tw-items-start tw-gap-2">
+              <div class="multi-window-text tw-w-full tw-text-center lg:tw-w-auto lg:tw-text-left">
+                Cycle
+                <span class="tw-cursor-pointer"> <q-icon :name="outlinedInfo"
+size="17px"
+class="q-ml-xs cursor-pointer"
+:class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">
+                  <q-tooltip anchor="center right"
+self="center left"
+max-width="300px"
+style="font-size: 12px;">
+                    Compare results with the same time in the previous cycle.
+                  </q-tooltip> 
+                  </q-icon>
+                </span>
+              </div>
+              <div class="tw-flex tw-justify-between tw-items-start tw-gap-4 ">
+                <div class="tw-w-full lg:tw-w-[300px] running-text">
+                  Running for {{ convertMinutesToDisplayValue(triggerData.period) }} in the interval of every {{
+                  triggerData.frequency_type == 'minutes' ? convertMinutesToDisplayValue(triggerData.frequency) : convertMinutesToDisplayValue(getCronIntervalInMinutes(triggerData.cron)) 
+                    }}
+                </div>
+                <div>
+                  <q-btn class="tw-rounded-full"
+flat
+dense
+icon="edit_outline"
+size="16px"
+@click="editCurrentWindow">
+                    <q-tooltip anchor="center right"
+self="center left"
+max-width="300px"
+style="font-size: 12px;">
+                      Edit Period and Frequency.
+                    </q-tooltip>
+                  </q-btn>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class=" q-mt-sm tw-w-full ">
+          <!-- current multi time range comparision window -->
+            <div v-if="dateTimePicker.length > 0"  class="multi-window-text tw-flex tw-items-center tw-gap-2 q-py-sm q-mt-sm">
+              <span>Comparing with</span>
+              <div class=" tw-h-px border-line tw-flex-1"></div>
+            </div>
+            <div  v-for="(picker, index) in dateTimePicker" 
+              :key="index" 
+              class="tw-flex  tw-flex-col lg:tw-flex-row tw-justify-between tw-items-start reference-window-container tw-mt-2  q-px-md q-py-sm  ">
+              <div class="multi-window-text tw-w-full tw-text-center lg:tw-w-auto lg:tw-text-left">
+                Reference Window {{ index + 1 }}
+              </div>
+              <div class="tw-flex lg:tw-flex-col tw-gap-2 lg:tw-gap-0 tw-items-start tw-justify-between tw-h-20">
+                <div class="tw-flex tw-items-center">
+                  <span class="tw-mr-1"><q-icon name="schedule" size="16px" /></span>
+                  Time Frame 
+                  <span class="tw-ml-2 tw-cursor-pointer"> <q-icon :name="outlinedInfo"
+size="17px"
+class="q-ml-xs cursor-pointer"
+:class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">
+                    <q-tooltip anchor="center right"
+self="center left"
+max-width="300px"
+style="font-size: 12px;">
+                      Time range for your query.
+                    </q-tooltip>
+                    </q-icon>
+                  </span>
+                </div>
+                <CustomDateTimePicker
+                      v-model="picker.offSet"
+                      :picker="picker"
+                      :isFirstEntry="false"
+                      @update:model-value="updateDateTimePicker"
+                      :changeStyle="true"
+                    />
+              </div>
+              <div class="tw-flex lg:tw-flex-col tw-items-start tw-gap-2">
+                <div class="multi-window-text tw-w-full tw-text-center lg:tw-w-auto lg:tw-text-left">
+                    Cycle
+                    <span class="tw-cursor-pointer"> <q-icon :name="outlinedInfo"
+size="17px"
+class="q-ml-xs cursor-pointer"
+:class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">
+                      <q-tooltip anchor="center right"
+self="center left"
+max-width="300px"
+style="font-size: 12px;">
+                      Compare results with the same time in the previous cycle.
+                    </q-tooltip>
+                    </q-icon>
+                    </span>
+                  </div>
+                <div class="tw-flex tw-justify-between tw-items-start tw-gap-4 ">
+                  <div class="tw-w-full lg:tw-w-[300px] reference-text">
+                    Comparing current window query result with query result from previous {{ getDisplayValue(picker.offSet) }}.
+                  </div>
+                  <div>
+                    <q-btn
+                      data-test="multi-time-range-alerts-delete-btn"
+                      :icon="outlinedDelete"
+                      class="iconHoverBtn q-ml-xs q-mr-sm"
+                      :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
+                      padding="xs"
+                      unelevated
+                      size="16px"
+                      round
+                      flat
+                      :title="t('alert_templates.delete')"
+                      @click="removeTimeShift(index)"
+                      style="min-width: auto"
+                    />
+                  </div>
+                </div>
+              </div>
+        </div>
+
+    <!-- add comparision window button -->
+      <div class="tw-w-full tw-flex tw-justify-center q-mt-sm ">
+        <div class="tw-w-fit tw-flex tw-justify-center tw-border tw-border-gray-200 ">
+        <q-btn
+          data-test="multi-time-range-alerts-add-btn"
+          label="Add Comparision Window"
+          size="sm"
+          class="text-semibold add-variable q-pa-sm multi-window-text no-border  "
+          style="font-size: 14px;"
+          no-caps
+          @click="addTimeShift"
+        >
+          <q-icon :class="store.state.theme === 'dark' ? 'tw-text-white  tw-font-bold q-ml-sm' : 'tw-text-black tw-font-bold q-ml-sm'"
+name="add"
+size="20px" />
+        </q-btn>
+      </div>
+      </div>
+
+    </div>
+      </div>
+        </div>
+    </div>
+
+    <!-- third section alert settings -->
             <div class="tw-px-[0.625rem] tw-pb-[0.625rem] tw-w-full tw-h-full">
             <div
               class="flex tw-justify-center tw-items-center card-container"
@@ -832,267 +1096,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
      </div>
 
 
-   <!-- second section multi window selection -->
-    <div class="tw-px-[0.625rem] tw-pb-[0.625rem] tw-w-full tw-h-full">
-         <div class="tw-w-full flex tw-justify-center tw-items-center card-container ">
-    <div class="tw-w-full tw-ml-2">
-        <AlertsContainer 
-          name="Multi Window"
-          v-model:is-expanded="expandState.multiWindowSelection"
-          label="Multi Window"
-          subLabel="Set relative alerting system based on SQL query"
-        class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
-        :iconClass="'tw-mt-[2px]'"
-          :image="multiWindowImage"
-          @update:is-expanded="()=>emits('update:expandState', expandState)"
-        />  
-    </div>
-
-      <div class="tw-w-full row alert-setup-container tw-px-4 tw-pt-2 tw-pb-3 o2-alert-tab-border" 
-    v-if="expandState.multiWindowSelection"
-    :class="store.state.theme === 'dark' ? 'dark-mode-multi-window' : 'light-mode-multi-window'"
-    >
-
-      <div class=" q-mt-sm tw-w-full">
-
-        <!-- current window -->
-        <div class="multi-window-text tw-flex tw-items-center tw-gap-2 q-py-sm q-mt-md">
-            <span>Alert set for</span>
-            <div class=" tw-h-px border-line tw-flex-1"></div>
-          </div>
-          <div class="tw-flex tw-flex-col lg:tw-flex-row tw-justify-between tw-items-start multi-window-container   q-px-md q-py-sm ">
-            <div class="multi-window-text tw-w-full tw-text-center lg:tw-w-auto lg:tw-text-left">
-              Current window 
-            </div>
-            <div class="tw-flex lg:tw-flex-col  tw-items-start tw-gap-2">
-              <div class="multi-window-text tw-w-full tw-text-center lg:tw-w-auto lg:tw-text-left">
-                Cycle
-                <span class="tw-cursor-pointer"> <q-icon :name="outlinedInfo"
-size="17px"
-class="q-ml-xs cursor-pointer"
-:class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">
-                  <q-tooltip anchor="center right"
-self="center left"
-max-width="300px"
-style="font-size: 12px;">
-                    Compare results with the same time in the previous cycle.
-                  </q-tooltip> 
-                  </q-icon>
-                </span>
-              </div>
-              <div class="tw-flex tw-justify-between tw-items-start tw-gap-4 ">
-                <div class="tw-w-full lg:tw-w-[300px] running-text">
-                  Running for {{ convertMinutesToDisplayValue(triggerData.period) }} in the interval of every {{
-                  triggerData.frequency_type == 'minutes' ? convertMinutesToDisplayValue(triggerData.frequency) : convertMinutesToDisplayValue(getCronIntervalInMinutes(triggerData.cron)) 
-                    }}
-                </div>
-                <div>
-                  <q-btn class="tw-rounded-full"
-flat
-dense
-icon="edit_outline"
-size="16px"
-@click="editCurrentWindow">
-                    <q-tooltip anchor="center right"
-self="center left"
-max-width="300px"
-style="font-size: 12px;">
-                      Edit Period and Frequency.
-                    </q-tooltip>
-                  </q-btn>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class=" q-mt-sm tw-w-full ">
-          <!-- current multi time range comparision window -->
-            <div v-if="dateTimePicker.length > 0"  class="multi-window-text tw-flex tw-items-center tw-gap-2 q-py-sm q-mt-sm">
-              <span>Comparing with</span>
-              <div class=" tw-h-px border-line tw-flex-1"></div>
-            </div>
-            <div  v-for="(picker, index) in dateTimePicker" 
-              :key="index" 
-              class="tw-flex  tw-flex-col lg:tw-flex-row tw-justify-between tw-items-start reference-window-container tw-mt-2  q-px-md q-py-sm  ">
-              <div class="multi-window-text tw-w-full tw-text-center lg:tw-w-auto lg:tw-text-left">
-                Reference Window {{ index + 1 }}
-              </div>
-              <div class="tw-flex lg:tw-flex-col tw-gap-2 lg:tw-gap-0 tw-items-start tw-justify-between tw-h-20">
-                <div class="tw-flex tw-items-center">
-                  <span class="tw-mr-1"><q-icon name="schedule" size="16px" /></span>
-                  Time Frame 
-                  <span class="tw-ml-2 tw-cursor-pointer"> <q-icon :name="outlinedInfo"
-size="17px"
-class="q-ml-xs cursor-pointer"
-:class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">
-                    <q-tooltip anchor="center right"
-self="center left"
-max-width="300px"
-style="font-size: 12px;">
-                      Time range for your query.
-                    </q-tooltip>
-                    </q-icon>
-                  </span>
-                </div>
-                <CustomDateTimePicker
-                      v-model="picker.offSet"
-                      :picker="picker"
-                      :isFirstEntry="false"
-                      @update:model-value="updateDateTimePicker"
-                      :changeStyle="true"
-                    />
-              </div>
-              <div class="tw-flex lg:tw-flex-col tw-items-start tw-gap-2">
-                <div class="multi-window-text tw-w-full tw-text-center lg:tw-w-auto lg:tw-text-left">
-                    Cycle
-                    <span class="tw-cursor-pointer"> <q-icon :name="outlinedInfo"
-size="17px"
-class="q-ml-xs cursor-pointer"
-:class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'">
-                      <q-tooltip anchor="center right"
-self="center left"
-max-width="300px"
-style="font-size: 12px;">
-                      Compare results with the same time in the previous cycle.
-                    </q-tooltip>
-                    </q-icon>
-                    </span>
-                  </div>
-                <div class="tw-flex tw-justify-between tw-items-start tw-gap-4 ">
-                  <div class="tw-w-full lg:tw-w-[300px] reference-text">
-                    Comparing current window query result with query result from previous {{ getDisplayValue(picker.offSet) }}.
-                  </div>
-                  <div>
-                    <q-btn
-                      data-test="multi-time-range-alerts-delete-btn"
-                      :icon="outlinedDelete"
-                      class="iconHoverBtn q-ml-xs q-mr-sm"
-                      :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-                      padding="xs"
-                      unelevated
-                      size="16px"
-                      round
-                      flat
-                      :title="t('alert_templates.delete')"
-                      @click="removeTimeShift(index)"
-                      style="min-width: auto"
-                    />
-                  </div>
-                </div>
-              </div>
-        </div>
-
-    <!-- add comparision window button -->
-      <div class="tw-w-full tw-flex tw-justify-center q-mt-sm ">
-        <div class="tw-w-fit tw-flex tw-justify-center tw-border tw-border-gray-200 ">
-        <q-btn
-          data-test="multi-time-range-alerts-add-btn"
-          label="Add Comparision Window"
-          size="sm"
-          class="text-semibold add-variable q-pa-sm multi-window-text no-border  "
-          style="font-size: 14px;"
-          no-caps
-          @click="addTimeShift"
-        >
-          <q-icon :class="store.state.theme === 'dark' ? 'tw-text-white  tw-font-bold q-ml-sm' : 'tw-text-black tw-font-bold q-ml-sm'"
-name="add"
-size="20px" />
-        </q-btn>
-      </div>
-      </div>
-
-    </div>
-      </div>
-        </div>
-    </div>
-
-
-   <!-- third section -->
-    <div class="tw-px-[0.625rem] tw-pb-[0.625rem] tw-w-full tw-h-full">
-         <div class="tw-w-full flex tw-justify-center tw-items-center card-container">
-    <div class="tw-w-full tw-ml-2">
-      <AlertsContainer 
-          name="query"
-          v-model:is-expanded="expandState.queryMode"
-          label="Conditions"
-          :image="conditionsImage"
-          subLabel="What should trigger the alert."
-          class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
-          :iconClass="'tw-mt-[2px]'"
-          @update:is-expanded="()=>emits('update:expandState', expandState)"
-        />
-    </div>
-    <div v-if="expandState.queryMode"
-class="  tw-w-full row alert-setup-container tw-px-4 tw-pt-2 tw-pb-3 o2-alert-tab-border" 
-style=" margin-left: 8px;">
-
-      <!-- query mode section -->
-      <div class="tw-w-full" style="">
-        <div v-if="!disableQueryTypeSelection"
-        class="flex items-center app-tabs-container tw-h-[36px] q-mr-sm tw-w-fit tw-mt-2 tw-mb-8"
-        >
-          <AppTabs
-            data-test="scheduled-alert-tabs"
-            :tabs="tabOptions"
-            class="tabs-selection-container"
-            v-model:active-tab="tab"
-            @update:active-tab="updateTab"
-          />
-        </div>
-        <template v-if="tab === 'custom'"
-          class='q-pa-none q-ma-none'
-          ">
-          <FilterGroup :stream-fields="columns"
-            :group="inputData "
-            :depth="0"
-            @add-condition="updateGroup"
-            @add-group="updateGroup"
-            @remove-group="removeConditionGroup"
-            @input:update="(name, field) => emits('input:update', name, field)" />
-        </template>
-        <template v-else>
-          <!-- view section -->
-          <div class="tw-w-full tw-flex lg:tw-flex-col tw-flex-col tw-gap-2" :class="store.state.theme === 'dark' ? 'dark-mode-view' : 'light-mode-view'">
-            <div class="tw-flex tw-justify-between tw-items-center tw-w-full editor-container tw-px-2 tw-py-3 ">
-            <div class="tw-flex tw-items-start">
-              <div :class="[
-                store.state.theme === 'dark' ? 'tw-bg-gray-600' : 'tw-bg-gray-200'
-              ]"
-class="tw-flex tw-items-center tw-gap-2 tw-bg-gray-200 tw-rounded-full tw-px-1 tw-py-1 tw-mr-2" >
-                <img :src="sqlEditorImage" style="width: 16px; height: 16px;" />
-
-              </div>
-              <div class="tw-flex tw-flex-col">
-                <span style="font-size: 16px;">Editor</span>
-                <span style="font-size: 14px;">Create SQL and VRL triggers with specific conditions.</span>
-              </div>
-
-            </div>
-            <div>
-              <q-btn
-                data-test="alert-variables-add-btn"
-                label="View Editor"
-                size="sm"
-                class="text-bold add-variable no-border q-py-sm xl:tw-w-[130px] tw-w-[85px]"
-                color="primary"
-                style="
-                  border-radius: 4px;
-                  text-transform: capitalize;
-                  color: #fff !important;
-                  font-size: 12px;
-                "
-                @click="viewSqlEditor = true"
-                />
-            </div>
-          </div>
-          </div>
-
-        </template>
-      </div>
-    </div>
-        </div>
-    </div>
 
   <!-- Deduplication section (fourth section) - Enterprise only -->
    <div v-if="config.isEnterprise == 'true'" class="tw-px-[0.625rem] tw-pb-[0.625rem] tw-w-full tw-h-full">
@@ -1644,6 +1647,8 @@ const QueryEditor = defineAsyncComponent(
 
 const props = defineProps([
   "columns",
+  "streamFieldsMap",
+  "generatedSqlQuery",
   "conditions",
   "trigger",
   "sql",

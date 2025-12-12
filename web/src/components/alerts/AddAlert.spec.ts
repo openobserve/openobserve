@@ -322,70 +322,104 @@ describe("AddAlert Component", () => {
       });
     });
 
-    describe('generateWhereClause function with all the possible combinations', () => {
+    describe('generateWhereClause function with all the possible combinations (V2 format)', () => {
+      let testStreamFieldsMap: any;
+
       beforeEach(() => {
-        wrapper.vm.streamFieldsMap = {
-          age: { type: 'Int64' },
-          city: { type: 'String' },
+        // Create streamFieldsMap for testing (don't use wrapper.vm.streamFieldsMap as it's computed)
+        testStreamFieldsMap = {
+          age: { label: 'age', value: 'age', type: 'Int64' },
+          city: { label: 'city', value: 'city', type: 'String' },
         };
         });
       it('generates a simple where clause', () => {
+        // V2 format: filterType, logicalOperator, conditions array
         const group = {
-          label: 'AND',
-          items: [
-            { column: 'age', operator: '>', value: 30 }
+          filterType: 'group',
+          logicalOperator: 'AND',
+          conditions: [
+            { filterType: 'condition', column: 'age', operator: '>', value: 30, logicalOperator: 'AND' }
           ]
         };
-    
-        const result = generateWhereClause(group, wrapper.vm.streamFieldsMap);
-        expect(result).toBe("WHERE age > '30'");
+
+        const result = generateWhereClause(group, testStreamFieldsMap);
+        // age is Int64 type, so no quotes around the value
+        expect(result).toBe("WHERE age > 30");
       });
-    
+
       it('handles string value with quotes', () => {
         const group = {
-          label: 'AND',
-          items: [
-            { column: 'city', operator: '=', value: 'delhi' }
+          filterType: 'group',
+          logicalOperator: 'AND',
+          conditions: [
+            { filterType: 'condition', column: 'city', operator: '=', value: 'delhi', logicalOperator: 'AND' }
           ]
         };
-    
-        const result = generateWhereClause(group, wrapper.vm.streamFieldsMap);
+
+        const result = generateWhereClause(group, testStreamFieldsMap);
         expect(result).toBe("WHERE city = 'delhi'");
       });
-    
+
       it('handles contains operator without quotes', () => {
         const group = {
-          label: 'AND',
-          items: [
-            { column: 'city', operator: 'contains', value: 'delhi' }
+          filterType: 'group',
+          logicalOperator: 'AND',
+          conditions: [
+            { filterType: 'condition', column: 'city', operator: 'contains', value: 'delhi', logicalOperator: 'AND' }
           ]
         };
-    
-        const result = generateWhereClause(group, wrapper.vm.streamFieldsMap);
+
+        const result = generateWhereClause(group, testStreamFieldsMap);
         expect(result).toBe("WHERE city LIKE '%delhi%'");
       });
-    
+
       it('handles nested groups with AND/OR', () => {
+        // V2 format with nested group
+        // In V2, each item (condition or group) has logicalOperator field
+        // The operator connects the item to the PREVIOUS sibling (not used for first item)
+        // For nested groups, the group's logicalOperator field is used for BOTH:
+        // 1. Connecting this group to the previous sibling item
+        // 2. As the default operator for new items added within this group
+        //
+        // In the UI: when you add a nested group, it defaults to logicalOperator: 'OR'
+        // So if added to an AND parent as the 2nd item, it would show: "age > 30 OR (nested group)"
+        //
+        // For this test, we're modeling a case where:
+        // - Parent group has AND
+        // - First condition has AND (inherited from parent when created)
+        // - Nested group has AND to connect to previous condition
+        // - Inside nested group, conditions use OR
         const group = {
-          label: 'AND',
-          items: [
-            { column: 'age', operator: '>', value: 30 },
+          filterType: 'group',
+          logicalOperator: 'AND', // Parent group uses AND
+          conditions: [
             {
-              label: 'OR',
-              items: [
-                { column: 'city', operator: '=', value: 'delhi' },
-                { column: 'city', operator: '=', value: 'mumbai' }
+              filterType: 'condition',
+              column: 'age',
+              operator: '>',
+              value: 30,
+              logicalOperator: 'AND' // Condition inherits parent's AND
+            },
+            {
+              filterType: 'group',
+              logicalOperator: 'AND', // This connects the group to previous condition with AND
+              groupId: 'nested-group-1',
+              conditions: [
+                // Conditions inside nested group use OR to join with each other
+                { filterType: 'condition', column: 'city', operator: '=', value: 'delhi', logicalOperator: 'OR' },
+                { filterType: 'condition', column: 'city', operator: '=', value: 'mumbai', logicalOperator: 'OR' }
               ]
             }
           ]
         };
-    
-        const result = generateWhereClause(group, wrapper.vm.streamFieldsMap);
-        expect(result).toBe("WHERE age > '30' AND (city = 'delhi' OR city = 'mumbai')");
+
+        const result = generateWhereClause(group, testStreamFieldsMap);
+        // Expected: age > 30 (first condition, Int64 no quotes) AND (nested group connected with AND) (city = delhi OR city = mumbai, String with quotes)
+        expect(result).toBe("WHERE age > 30 AND (city = 'delhi' OR city = 'mumbai')");
       });
-    
+
       it('returns empty string if group is invalid', () => {
-        const result = generateWhereClause(null, wrapper.vm.streamFieldsMap);
+        const result = generateWhereClause(null, testStreamFieldsMap);
         expect(result).toBe("");
       });
     })
@@ -394,14 +428,18 @@ describe("AddAlert Component", () => {
         wrapper.vm.originalStreamFields = [
           { value: 'geo_info_country', type: 'string', label: 'geo_info_country' }
         ];
-      
+
+        // V2 format conditions
         wrapper.vm.formData.query_condition.conditions = {
-          label: 'or',
-          items: [
+          filterType: 'group',
+          logicalOperator: 'OR',
+          conditions: [
             {
+              filterType: 'condition',
               column: 'geo_info_country',
               operator: '=',
               value: 'india',
+              logicalOperator: 'OR',
             },
           ],
         };
@@ -1020,7 +1058,7 @@ describe("AddAlert Component", () => {
 
   });
 
-  describe('getFormattedCondition and generateWhereClause edge cases', () => {
+  describe('getFormattedCondition and generateWhereClause edge cases (V2 format)', () => {
     let wrapper: any;
     beforeEach(() => {
       wrapper = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
@@ -1031,28 +1069,53 @@ describe("AddAlert Component", () => {
     });
 
     it('formats numeric types without quotes and string with quotes', () => {
-      const group = { label: 'AND', items: [ { column: 'n', operator: '>=', value: 10 }, { column: 's', operator: '=', value: 'x' } ] };
+      const group = {
+        filterType: 'group',
+        logicalOperator: 'AND',
+        conditions: [
+          { filterType: 'condition', column: 'n', operator: '>=', value: 10, logicalOperator: 'AND' },
+          { filterType: 'condition', column: 's', operator: '=', value: 'x', logicalOperator: 'AND' }
+        ]
+      };
       expect(generateWhereClause(group, wrapper.vm.streamFieldsMap)).toBe("WHERE n >= 10 AND s = 'x'");
     });
 
     it('supports not_contains/NotContains variations', () => {
-      const group = { label: 'OR', items: [ { column: 's', operator: 'not_contains', value: 'bad' }, { column: 's', operator: 'NotContains', value: 'worse' } ] };
+      const group = {
+        filterType: 'group',
+        logicalOperator: 'OR',
+        conditions: [
+          { filterType: 'condition', column: 's', operator: 'not_contains', value: 'bad', logicalOperator: 'OR' },
+          { filterType: 'condition', column: 's', operator: 'NotContains', value: 'worse', logicalOperator: 'OR' }
+        ]
+      };
       expect(generateWhereClause(group, wrapper.vm.streamFieldsMap)).toBe("WHERE s NOT LIKE '%bad%' OR s NOT LIKE '%worse%'");
     });
 
     it('returns empty for invalid items', () => {
-      const group = { label: 'AND', items: [ { foo: 1 } ] } as any;
+      const group = {
+        filterType: 'group',
+        logicalOperator: 'AND',
+        conditions: [{ foo: 1 }]
+      } as any;
       expect(generateWhereClause(group, wrapper.vm.streamFieldsMap)).toBe('');
     });
   });
 
-  describe('generateSqlQuery variations', () => {
+  describe('generateSqlQuery variations (V2 format)', () => {
     let wrapper: any;
     beforeEach(() => {
       wrapper = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
       wrapper.vm.formData.stream_name = '_rundata';
       wrapper.vm.formData.stream_type = 'logs';
-      wrapper.vm.formData.query_condition.conditions = { label: 'and', items: [ { column: 'status', operator: '=', value: '200' } ] };
+      // V2 format conditions
+      wrapper.vm.formData.query_condition.conditions = {
+        filterType: 'group',
+        logicalOperator: 'AND',
+        conditions: [
+          { filterType: 'condition', column: 'status', operator: '=', value: '200', logicalOperator: 'AND' }
+        ]
+      };
       wrapper.vm.generateWhereClause = vi.fn().mockReturnValue("WHERE status = '200'");
     });
 
