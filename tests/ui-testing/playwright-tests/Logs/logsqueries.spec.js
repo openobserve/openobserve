@@ -78,10 +78,9 @@ test.describe("Logs Queries testcases", () => {
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-    const allsearch = page.waitForResponse("**/api/default/_search**");
-    await pm.logsPage.selectStream("e2e_automate"); 
+    await pm.logsPage.selectStream("e2e_automate");
     await applyQueryButton(page);
-    
+
     testLogger.info('Logs queries test setup completed');
   });
 
@@ -319,20 +318,46 @@ test.describe("Logs Queries testcases", () => {
     tag: ['@histogramBarChart', '@histogram', '@all', '@logs']
   }, async ({ page }) => {
     testLogger.info('Testing bar chart display with histogram toggle');
+
+    // Ensure histogram is ON before testing bar chart
+    const isHistogramOn = await pm.logsPage.isHistogramOn();
+    if (!isHistogramOn) {
+      await pm.logsPage.toggleHistogram();
+      await pm.logsPage.waitForTimeout(1000);
+    }
+
     await pm.logsPage.clickLogSearchIndexListFieldSearchInput();
     await pm.logsPage.fillLogSearchIndexListFieldSearchInput('code');
     await pm.logsPage.waitForTimeout(4000);
     await pm.logsPage.clickExpandCode();
     await pm.logsPage.waitForTimeout(4000);
+
+    // Click refresh and wait for network to settle
     await pm.logsPage.clickRefreshButton();
+    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    await pm.logsPage.waitForTimeout(2000);
+
+    // Toggle SQL mode and refresh
     await pm.logsPage.clickSQLModeToggle();
     await pm.logsPage.clickRefreshButton();
+    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    await pm.logsPage.waitForTimeout(2000);
+
+    // Verify bar chart is visible in SQL mode then click
+    await pm.logsPage.expectBarChartCanvasVisible();
     await pm.logsPage.clickBarChartCanvas();
+
+    // Toggle SQL mode off and refresh
     await pm.logsPage.clickSQLModeToggle();
     await pm.logsPage.clickRefreshButton();
+    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    await pm.logsPage.waitForTimeout(2000);
+
+    // Verify bar chart is visible in non-SQL mode then click
+    await pm.logsPage.expectBarChartCanvasVisible();
     await pm.logsPage.clickBarChartCanvas();
     await pm.logsPage.clickHistogramToggleDiv();
-    
+
     testLogger.info('Histogram bar chart display test completed');
   });
 
