@@ -309,7 +309,7 @@ const cancelJob = async () => {
     });
 
     emit("job-canceled");
-    loadJobDetails(false);
+    loadJobDetails();
   } catch (error: any) {
     console.error("Error canceling backfill job:", error);
     $q.notify({
