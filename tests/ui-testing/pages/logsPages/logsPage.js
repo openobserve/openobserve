@@ -1587,7 +1587,8 @@ export class LogsPage {
                 // Wait for chart to stabilize - ECharts may re-render multiple times
                 await this.page.waitForTimeout(2000);
 
-                // Click with force:true to bypass actionability checks
+                // force:true required for ECharts canvas - canvas elements are interactive
+                // but fail Playwright's actionability checks (no pointer-events in traditional sense)
                 await canvasLocator.click({
                     position: { x: 182, y: 66 },
                     force: true,
