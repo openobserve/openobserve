@@ -1742,7 +1742,13 @@ const getRePatterns = async () => {
     store.state.selectedOrganization.identifier,
   );
 
-  updateResourceEntities("re_patterns", ["name"], [...data.data.patterns]);
+  updateResourceEntities(
+    "re_patterns",
+    ["id"],
+    [...data.data.patterns],
+    false,
+    "name",
+  );
 
   return new Promise((resolve, reject) => {
     resolve(true);
