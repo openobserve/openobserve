@@ -56,12 +56,12 @@
           }
         }
       ],
-      "layout": { "x": 0, "y": 0, "w": 4, "h": 8, "i": 2 }
+      "layout": { "x": 0, "y": 0, "w": 4, "h": 6, "i": 1 }
     },
     {
       "id": "Panel_ID3232610",
       "type": "bar",
-      "title": "First Input Delay ( FID )",
+      "title": "Interaction to Next Paint ( INP )",
       "description": "",
       "config": {
         "show_legends": false,
@@ -73,7 +73,7 @@
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_first_input_delay/1000000) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and env='$env' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_interaction_to_next_paint/1000000) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and env='$env' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1",
           "customQuery": true,
           "fields": {
             "stream": "_rumdata",
@@ -106,7 +106,7 @@
           }
         }
       ],
-      "layout": { "x": 4, "y": 0, "w": 4, "h": 8, "i": 4 }
+      "layout": { "x": 4, "y": 0, "w": 4, "h": 6, "i": 2 }
     },
     {
       "id": "Panel_ID4984310",
@@ -155,7 +155,158 @@
           }
         }
       ],
-      "layout": { "x": 8, "y": 0, "w": 4, "h": 8, "i": 5 }
+      "layout": { "x": 8, "y": 0, "w": 4, "h": 6, "i": 3 }
+    },
+    {
+      "id": "Panel_ID_FCP",
+      "type": "bar",
+      "title": "First Contentful Paint ( FCP )",
+      "description": "",
+      "config": {
+        "show_legends": false,
+        "legends_position": null,
+        "unit": "seconds",
+        "unit_custom": "",
+        "base_map": { "type": "osm" },
+        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_first_contentful_paint/1000000000) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and env='$env' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "customQuery": true,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [
+              {
+                "label": "Timestamp",
+                "alias": "x_axis_1",
+                "column": "x_axis_1",
+                "color": null,
+                "aggregationFunction": "histogram"
+              }
+            ],
+            "y": [
+              {
+                "label": " ",
+                "alias": "y_axis_1",
+                "column": "y_axis_1",
+                "color": null,
+                "aggregationFunction": "count"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": {
+            "promql_legend": "",
+            "layer_type": "scatter",
+            "weight_fixed": 1
+          }
+        }
+      ],
+      "layout": { "x": 4, "y": 8, "w": 4, "h": 6, "i": 5 }
+    },
+    {
+      "id": "Panel_ID_TTFB",
+      "type": "bar",
+      "title": "Time to First Byte ( TTFB )",
+      "description": "",
+      "config": {
+        "show_legends": false,
+        "legends_position": null,
+        "unit": "milliseconds",
+        "base_map": { "type": "osm" },
+        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_first_byte/1000000) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and env='$env' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "customQuery": true,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [
+              {
+                "label": "Timestamp",
+                "alias": "x_axis_1",
+                "column": "x_axis_1",
+                "color": null,
+                "aggregationFunction": "histogram"
+              }
+            ],
+            "y": [
+              {
+                "label": " ",
+                "alias": "y_axis_1",
+                "column": "y_axis_1",
+                "color": null,
+                "aggregationFunction": "count"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": {
+            "promql_legend": "",
+            "layer_type": "scatter",
+            "weight_fixed": 1
+          }
+        }
+      ],
+      "layout": { "x": 0, "y": 8, "w": 4, "h": 6, "i": 4 }
+    },
+    {
+      "id": "Panel_ID_LoadingTime",
+      "type": "bar",
+      "title": "Page Load Time",
+      "description": "",
+      "config": {
+        "show_legends": false,
+        "legends_position": null,
+        "unit": "seconds",
+        "base_map": { "type": "osm" },
+        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_loading_time/1000000000) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and env='$env' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "customQuery": true,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [
+              {
+                "label": "Timestamp",
+                "alias": "x_axis_1",
+                "column": "x_axis_1",
+                "color": null,
+                "aggregationFunction": "histogram"
+              }
+            ],
+            "y": [
+              {
+                "label": " ",
+                "alias": "y_axis_1",
+                "column": "y_axis_1",
+                "color": null,
+                "aggregationFunction": "count"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": {
+            "promql_legend": "",
+            "layer_type": "scatter",
+            "weight_fixed": 1
+          }
+        }
+      ],
+      "layout": { "x": 8, "y": 8, "w": 4, "h": 6, "i": 6 }
     }
   ],
   "variables": {
