@@ -111,14 +111,14 @@ pub async fn search(
         schema_versions.len()
     );
     if schema_versions.is_empty() {
-        return Ok((vec![], ScanStats::new()));
+        return Ok((vec![], ScanStats::new(), HashSet::new()));
     }
     let latest_schema_id = schema_versions.len() - 1;
 
     // get file list
     let mut files = file_list.to_vec();
     if files.is_empty() {
-        return Ok((vec![], ScanStats::default()));
+        return Ok((vec![], ScanStats::default(), HashSet::new()));
     }
     let original_files_len = files.len();
     log::info!(
@@ -380,7 +380,7 @@ pub async fn search(
                 .build()
         )
     );
-    Ok((tables, scan_stats))
+    Ok((tables, scan_stats, HashSet::new()))
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]

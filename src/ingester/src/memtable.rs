@@ -22,8 +22,9 @@ use std::{
 };
 
 use arrow_schema::Schema;
-use config::metrics;
+use config::{metrics, utils::time::now_micros};
 use hashbrown::HashMap;
+use once_cell::sync::Lazy;
 
 use crate::{
     ReadRecordBatchEntry,
@@ -32,7 +33,11 @@ use crate::{
     stream::Stream,
 };
 
+// a global counter for memtable id start by timestamp micros
+static MEMTABLE_ID_COUNTER: Lazy<AtomicU64> = Lazy::new(|| AtomicU64::new(now_micros() as u64));
+
 pub(crate) struct MemTable {
+    id: u64,
     streams: HashMap<Arc<str>, Stream>, // key: orgId/schemaName, val: stream
     json_bytes_written: AtomicU64,
     arrow_bytes_written: AtomicU64,
@@ -44,10 +49,15 @@ impl MemTable {
             .with_label_values::<&str>(&[])
             .inc();
         Self {
+            id: MEMTABLE_ID_COUNTER.fetch_add(1, Ordering::SeqCst),
             streams: HashMap::default(),
             json_bytes_written: AtomicU64::new(0),
             arrow_bytes_written: AtomicU64::new(0),
         }
+    }
+
+    pub(crate) fn id(&self) -> u64 {
+        self.id
     }
 
     pub(crate) fn write(
@@ -76,12 +86,13 @@ impl MemTable {
         stream_name: &str,
         time_range: Option<(i64, i64)>,
         partition_filters: &[(String, Vec<String>)],
-    ) -> Result<Vec<ReadRecordBatchEntry>> {
+    ) -> Result<(u64, Vec<ReadRecordBatchEntry>)> {
         let key = Arc::from(format!("{org_id}/{stream_name}"));
         let Some(stream) = self.streams.get(&key) else {
-            return Ok(vec![]);
+            return Ok((self.id, vec![]));
         };
-        stream.read(time_range, partition_filters)
+        let batches = stream.read(time_range, partition_filters)?;
+        Ok((self.id, batches))
     }
 
     pub(crate) async fn persist(

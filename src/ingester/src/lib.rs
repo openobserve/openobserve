@@ -28,7 +28,7 @@ use std::{fs::create_dir_all, path::PathBuf, sync::Arc};
 use arrow_schema::Schema;
 use config::RwAHashMap;
 pub use entry::Entry;
-pub use immutable::read_from_immutable;
+pub use immutable::{get_memtable_id_from_file_name, read_from_immutable};
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use tokio::sync::{Mutex, mpsc};
