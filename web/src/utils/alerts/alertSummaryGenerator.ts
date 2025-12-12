@@ -77,11 +77,7 @@ export function generateAlertSummary(formData: any, destinations: any[]): string
       return dest.name || 'Unknown';
     });
     const uniqueNames = Array.from(new Set(destNames));
-    const destText = uniqueNames.length === 1
-      ? uniqueNames[0]
-      : uniqueNames.length === 2
-      ? `${uniqueNames[0]} and ${uniqueNames[1]}`
-      : `${uniqueNames.slice(0, -1).join(', ')}, and ${uniqueNames[uniqueNames.length - 1]}`;
+    const destText = uniqueNames.join(', ');
 
     parts.push(`**Notification:** When triggered, the alert sends a notification to ${clickable(destText, 'destinations')} destination.`);
   }
