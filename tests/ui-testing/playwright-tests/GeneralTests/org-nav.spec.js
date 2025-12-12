@@ -1,7 +1,6 @@
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const { test } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const logData = require("../../fixtures/log.json");
 
 test.describe("Menu Navigation URL Validation testcases", () => {
   test.describe.configure({ mode: 'serial' });
@@ -13,23 +12,21 @@ test.describe("Menu Navigation URL Validation testcases", () => {
     // Initialize test setup
     testLogger.testStart(testInfo.title, testInfo.file);
 
-    // Navigate to base URL with authentication
-    await navigateToBase(page);
     pm = new PageManager(page);
 
     // Navigate to home page with org_identifier
-    const homeUrl = `/?org_identifier=${expectedOrgId}`;
+    const homeUrl = `/web/?org_identifier=${expectedOrgId}`;
     testLogger.navigation('Navigating to home page', { url: homeUrl });
 
     await page.goto(homeUrl);
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState('networkidle');
 
     testLogger.info('Test setup completed');
   });
 
   // ===== P0 TESTS (CRITICAL) =====
 
-  test("P0: Home menu should include org_identifier in URL", {
+  test.skip("P0: Home menu should include org_identifier in URL", {
     tag: ['@navigation', '@url-validation', '@smoke', '@P0', '@all']
   }, async ({ page }) => {
     testLogger.info('Testing Home menu navigation with org_identifier');

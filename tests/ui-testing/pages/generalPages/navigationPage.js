@@ -60,8 +60,10 @@ export class NavigationPage {
    * Click Logs menu item
    */
   async clickLogs() {
-    await this.page.locator(this.logsMenu).click();
-    await this.page.waitForLoadState('domcontentloaded');
+    await Promise.all([
+      this.page.waitForURL('**/logs**', { timeout: 5000 }),
+      this.page.locator(this.logsMenu).click()
+    ]);
   }
 
   /**

@@ -1,4 +1,4 @@
-const { test, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const { test } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 
@@ -10,13 +10,12 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
-    await navigateToBase(page);
     pm = new PageManager(page);
 
     // Navigate to home page with org_identifier
-    const homeUrl = `/?org_identifier=${expectedOrgId}`;
+    const homeUrl = `/web/?org_identifier=${expectedOrgId}`;
     await page.goto(homeUrl);
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState('networkidle');
     testLogger.info('Test setup completed');
   });
 
