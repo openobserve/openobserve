@@ -373,6 +373,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :span="spanMap[selectedSpanId as string]"
                   :baseTracePosition="baseTracePosition"
                   :search-query="searchQuery"
+                  :stream-name="currentTraceStreamName"
+                  :service-streams-enabled="serviceStreamsEnabled"
                   @view-logs="redirectToLogs"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
@@ -554,6 +556,18 @@ export default defineComponent({
     const selectedStreamsString = computed(() =>
       searchObj.data.traceDetails.selectedLogStreams.join(", "),
     );
+
+    // Current trace stream name for correlation
+    const currentTraceStreamName = computed(() => {
+      return (router.currentRoute.value.query.stream as string) ||
+        searchObj.data.stream.selectedStream.value ||
+        '';
+    });
+
+    // Check if service streams feature is enabled
+    const serviceStreamsEnabled = computed(() => {
+      return store.state.zoConfig.service_streams_enabled !== false;
+    });
 
     const showTraceDetails = ref(false);
     const currentIndex = ref(0);
@@ -1450,6 +1464,9 @@ export default defineComponent({
       validateSpan,
       calculateTracePosition,
       buildServiceTree,
+      // Correlation props
+      currentTraceStreamName,
+      serviceStreamsEnabled,
     };
   },
 });

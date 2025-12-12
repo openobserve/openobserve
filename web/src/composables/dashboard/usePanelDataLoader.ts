@@ -2157,7 +2157,15 @@ export const usePanelDataLoader = (
       threshold: 0, // Adjust as needed
     });
 
-    if (chartPanelRef?.value) observer.observe(chartPanelRef?.value);
+
+    // Keep the working solution - setTimeout ensures the element is fully rendered
+    // This is necessary because IntersectionObserver checks immediately after observe()
+    // but the element might not be fully laid out yet (especially in popups/drawers)
+    setTimeout(() => {
+      if (chartPanelRef?.value) {
+        observer.observe(chartPanelRef?.value);
+      }
+    }, 0);
   });
 
   // remove intersection observer

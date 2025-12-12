@@ -823,12 +823,9 @@ pub async fn update_stream_settings(
         )
         .await
         {
-            return Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Internal server error while updating pattern associations {e}",),
-                )),
-            );
+            return Ok(MetaHttpResponse::internal_error(format!(
+                "Internal server error while updating pattern associations {e}",
+            )));
         }
     }
 
