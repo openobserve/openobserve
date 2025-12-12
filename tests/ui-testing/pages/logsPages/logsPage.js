@@ -3252,8 +3252,8 @@ export class LogsPage {
         // Read the URL from clipboard
         let sharedUrl = await this.readClipboard();
 
-        // Convert HTTP to HTTPS to maintain authentication cookies
-        if (sharedUrl.startsWith('http://')) {
+        // Convert HTTP to HTTPS to maintain authentication cookies (skip for localhost)
+        if (sharedUrl.startsWith('http://') && !sharedUrl.includes('localhost')) {
             sharedUrl = sharedUrl.replace('http://', 'https://');
             testLogger.info('Converted HTTP to HTTPS', { url: sharedUrl });
         }
