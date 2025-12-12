@@ -307,4 +307,182 @@ mod tests {
         assert!(config.use_service_graph);
         assert!(config.root_cause_detection);
     }
+
+    #[test]
+    fn test_incident_status_from_str_case_insensitive() {
+        assert_eq!(
+            "OPEN".parse::<IncidentStatus>().unwrap(),
+            IncidentStatus::Open
+        );
+        assert_eq!(
+            "Open".parse::<IncidentStatus>().unwrap(),
+            IncidentStatus::Open
+        );
+        assert_eq!(
+            "open".parse::<IncidentStatus>().unwrap(),
+            IncidentStatus::Open
+        );
+        assert_eq!(
+            "ACKNOWLEDGED".parse::<IncidentStatus>().unwrap(),
+            IncidentStatus::Acknowledged
+        );
+        assert_eq!(
+            "resolved".parse::<IncidentStatus>().unwrap(),
+            IncidentStatus::Resolved
+        );
+    }
+
+    #[test]
+    fn test_incident_status_from_str_invalid() {
+        assert!("invalid".parse::<IncidentStatus>().is_err());
+        assert!("".parse::<IncidentStatus>().is_err());
+        assert!("pending".parse::<IncidentStatus>().is_err());
+    }
+
+    #[test]
+    fn test_incident_severity_from_str_case_insensitive() {
+        assert_eq!(
+            "p1".parse::<IncidentSeverity>().unwrap(),
+            IncidentSeverity::P1
+        );
+        assert_eq!(
+            "P1".parse::<IncidentSeverity>().unwrap(),
+            IncidentSeverity::P1
+        );
+        assert_eq!(
+            "p2".parse::<IncidentSeverity>().unwrap(),
+            IncidentSeverity::P2
+        );
+        assert_eq!(
+            "P3".parse::<IncidentSeverity>().unwrap(),
+            IncidentSeverity::P3
+        );
+        assert_eq!(
+            "p4".parse::<IncidentSeverity>().unwrap(),
+            IncidentSeverity::P4
+        );
+    }
+
+    #[test]
+    fn test_incident_severity_from_str_invalid() {
+        assert!("P0".parse::<IncidentSeverity>().is_err());
+        assert!("P5".parse::<IncidentSeverity>().is_err());
+        assert!("invalid".parse::<IncidentSeverity>().is_err());
+        assert!("".parse::<IncidentSeverity>().is_err());
+    }
+
+    #[test]
+    fn test_incident_status_default() {
+        let status = IncidentStatus::default();
+        assert_eq!(status, IncidentStatus::Open);
+    }
+
+    #[test]
+    fn test_incident_severity_default() {
+        let severity = IncidentSeverity::default();
+        assert_eq!(severity, IncidentSeverity::P3);
+    }
+
+    #[test]
+    fn test_correlation_reason_display() {
+        assert_eq!(
+            CorrelationReason::ServiceDiscovery.to_string(),
+            "service_discovery"
+        );
+        assert_eq!(
+            CorrelationReason::ManualExtraction.to_string(),
+            "manual_extraction"
+        );
+        assert_eq!(CorrelationReason::Temporal.to_string(), "temporal");
+    }
+
+    #[test]
+    fn test_incident_topology_default() {
+        let topology = IncidentTopology::default();
+        assert_eq!(topology.service, "");
+        assert!(topology.upstream_services.is_empty());
+        assert!(topology.downstream_services.is_empty());
+        assert!(topology.related_incident_ids.is_empty());
+        assert!(topology.suggested_root_cause.is_none());
+    }
+
+    #[test]
+    fn test_incident_status_equality() {
+        assert_eq!(IncidentStatus::Open, IncidentStatus::Open);
+        assert_ne!(IncidentStatus::Open, IncidentStatus::Acknowledged);
+        assert_ne!(IncidentStatus::Acknowledged, IncidentStatus::Resolved);
+    }
+
+    #[test]
+    fn test_incident_severity_ordering() {
+        // Test that different severities are not equal
+        assert_ne!(IncidentSeverity::P1, IncidentSeverity::P2);
+        assert_ne!(IncidentSeverity::P2, IncidentSeverity::P3);
+        assert_ne!(IncidentSeverity::P3, IncidentSeverity::P4);
+    }
+
+    #[test]
+    fn test_correlation_reason_equality() {
+        assert_eq!(
+            CorrelationReason::ServiceDiscovery,
+            CorrelationReason::ServiceDiscovery
+        );
+        assert_ne!(
+            CorrelationReason::ServiceDiscovery,
+            CorrelationReason::ManualExtraction
+        );
+        assert_ne!(
+            CorrelationReason::ManualExtraction,
+            CorrelationReason::Temporal
+        );
+    }
+
+    #[test]
+    fn test_incident_topology_with_values() {
+        let topology = IncidentTopology {
+            service: "api-gateway".to_string(),
+            upstream_services: vec!["frontend".to_string()],
+            downstream_services: vec!["database".to_string(), "cache".to_string()],
+            related_incident_ids: vec!["incident-1".to_string()],
+            suggested_root_cause: Some("High memory usage".to_string()),
+        };
+
+        assert_eq!(topology.service, "api-gateway");
+        assert_eq!(topology.upstream_services.len(), 1);
+        assert_eq!(topology.downstream_services.len(), 2);
+        assert_eq!(topology.related_incident_ids.len(), 1);
+        assert!(topology.suggested_root_cause.is_some());
+    }
+
+    #[test]
+    fn test_serde_incident_status() {
+        // Test serialization to lowercase
+        let status = IncidentStatus::Acknowledged;
+        let json = serde_json::to_string(&status).unwrap();
+        assert_eq!(json, "\"acknowledged\"");
+
+        // Test deserialization from lowercase
+        let deserialized: IncidentStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized, IncidentStatus::Acknowledged);
+    }
+
+    #[test]
+    fn test_serde_incident_severity() {
+        let severity = IncidentSeverity::P1;
+        let json = serde_json::to_string(&severity).unwrap();
+        assert_eq!(json, "\"P1\"");
+
+        let deserialized: IncidentSeverity = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized, IncidentSeverity::P1);
+    }
+
+    #[test]
+    fn test_serde_correlation_reason() {
+        let reason = CorrelationReason::ServiceDiscovery;
+        let json = serde_json::to_string(&reason).unwrap();
+        assert_eq!(json, "\"service_discovery\"");
+
+        let deserialized: CorrelationReason = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized, CorrelationReason::ServiceDiscovery);
+    }
 }
