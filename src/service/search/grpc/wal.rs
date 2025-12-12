@@ -297,6 +297,7 @@ pub async fn search_memtable(
     let memtable_time = start.elapsed().as_millis();
     let start = std::time::Instant::now();
     let (im_ids, im_batches) = ingester::read_from_immutable(
+        &query.trace_id,
         &query.org_id,
         query.stream_type.as_str(),
         &query.stream_name,

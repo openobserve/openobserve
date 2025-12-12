@@ -49,6 +49,7 @@ pub(crate) struct Immutable {
 }
 
 pub async fn read_from_immutable(
+    trace_id: &str,
     org_id: &str,
     stream_type: &str,
     stream_name: &str,
@@ -69,7 +70,7 @@ pub async fn read_from_immutable(
                     .read(org_id, stream_name, time_range, partition_filters)?;
             if memtable_ids.contains(&id) {
                 log::debug!(
-                    "skip {org_id}/{stream_name}/{stream_name}, time_range: {time_range:?}, immutable memtable id: {id} already in memtable"
+                    "[trace_id {trace_id}] skip immutable memtable id: {id} already in memtable",
                 );
                 continue;
             }
