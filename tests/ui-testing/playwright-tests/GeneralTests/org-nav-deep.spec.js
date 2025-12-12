@@ -26,16 +26,16 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
   }, async ({ page }) => {
     testLogger.info('Testing Logs page query interaction');
 
-    // Navigate to Logs
+    // Navigate to Logs (waits for page load)
     await pm.navigationPage.clickLogs();
-    await page.waitForTimeout(500);
     await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Click query/refresh button
     const queryButton = page.locator('[data-test="logs-search-bar-refresh-btn"]');
     if (await queryButton.isVisible({ timeout: 5000 })) {
       await queryButton.click();
-      await page.waitForTimeout(1000);
+      // Wait for any URL changes to settle
+      await page.waitForLoadState('networkidle');
       await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
     } else {
       testLogger.warn('Query button not visible - skipping interaction');
@@ -50,14 +50,13 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
     testLogger.info('Testing Logs page date/time interaction');
 
     await pm.navigationPage.clickLogs();
-    await page.waitForTimeout(500);
     await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Click date/time button
     const dateTimeButton = page.locator('[data-test="date-time-btn"]');
     if (await dateTimeButton.isVisible({ timeout: 5000 })) {
       await dateTimeButton.click();
-      await page.waitForTimeout(500);
+      // Verify org_identifier preserved after interaction
       await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
       // Close picker by clicking button again
@@ -76,14 +75,13 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
     testLogger.info('Testing Logs page SQL mode toggle');
 
     await pm.navigationPage.clickLogs();
-    await page.waitForTimeout(500);
     await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
-    // Toggle SQL mode
-    const sqlModeToggle = page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]');
+    // Toggle SQL mode - Use role="switch" to avoid duplicate data-test attributes
+    const sqlModeToggle = page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"][role="switch"]');
     if (await sqlModeToggle.isVisible({ timeout: 5000 })) {
       await sqlModeToggle.click();
-      await page.waitForTimeout(500);
+      // Verify org_identifier preserved after interaction
       await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
     } else {
       testLogger.warn('SQL mode toggle not visible');
@@ -98,14 +96,13 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
     testLogger.info('Testing Logs page histogram toggle');
 
     await pm.navigationPage.clickLogs();
-    await page.waitForTimeout(500);
     await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Toggle histogram
     const histogramToggle = page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"]');
     if (await histogramToggle.isVisible({ timeout: 5000 })) {
       await histogramToggle.click();
-      await page.waitForTimeout(500);
+      // Verify org_identifier preserved after interaction
       await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
     } else {
       testLogger.warn('Histogram toggle not visible');
@@ -122,14 +119,13 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
     testLogger.info('Testing Metrics page syntax guide interaction');
 
     await pm.navigationPage.clickMetrics();
-    await page.waitForTimeout(500);
     await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Click syntax guide button
     const syntaxGuideButton = page.locator('[data-cy="syntax-guide-button"]');
     if (await syntaxGuideButton.isVisible({ timeout: 5000 })) {
       await syntaxGuideButton.click();
-      await page.waitForTimeout(500);
+      // Verify org_identifier preserved after interaction
       await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
     } else {
       testLogger.warn('Syntax guide button not visible');
@@ -146,14 +142,13 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
     testLogger.info('Testing Traces page date/time interaction');
 
     await pm.navigationPage.clickTraces();
-    await page.waitForTimeout(500);
     await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Click date/time button
     const dateTimeButton = page.locator('[data-test="date-time-btn"]');
     if (await dateTimeButton.isVisible({ timeout: 5000 })) {
       await dateTimeButton.click();
-      await page.waitForTimeout(500);
+      // Verify org_identifier preserved after interaction
       await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
     } else {
       testLogger.warn('Date/time button not visible in Traces');
@@ -170,14 +165,13 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
     testLogger.info('Testing Dashboards page create interaction');
 
     await pm.navigationPage.clickDashboards();
-    await page.waitForTimeout(500);
     await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Click create dashboard button
     const createButton = page.locator('[data-test="dashboard-add"]');
     if (await createButton.isVisible({ timeout: 5000 })) {
       await createButton.click();
-      await page.waitForTimeout(500);
+      // Verify org_identifier preserved after interaction
       await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
       // Close dialog by pressing Escape
@@ -196,18 +190,18 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
     testLogger.info('Testing Dashboards page search interaction');
 
     await pm.navigationPage.clickDashboards();
-    await page.waitForTimeout(500);
     await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Click and use search
     const searchInput = page.locator('[data-test="dashboard-search"]');
     if (await searchInput.isVisible({ timeout: 5000 })) {
       await searchInput.click();
-      await page.waitForTimeout(300);
+      // Wait for UI to settle after modal/dialog interaction
+      await page.waitForLoadState('domcontentloaded');
       await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
       await searchInput.fill('test');
-      await page.waitForTimeout(500);
+      // Verify org_identifier preserved after interaction
       await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
     } else {
       testLogger.warn('Search input not visible');
@@ -222,14 +216,13 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
     testLogger.info('Testing Dashboards page import interaction');
 
     await pm.navigationPage.clickDashboards();
-    await page.waitForTimeout(500);
     await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Click import button
     const importButton = page.locator('[data-test="dashboard-import"]');
     if (await importButton.isVisible({ timeout: 5000 })) {
       await importButton.click();
-      await page.waitForTimeout(500);
+      // Verify org_identifier preserved after interaction
       await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
       // Close dialog
@@ -250,18 +243,18 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
     testLogger.info('Testing Streams page search interaction');
 
     await pm.navigationPage.clickStreams();
-    await page.waitForTimeout(500);
     await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
-    // Search for stream
-    const searchInput = page.locator('[data-test="streams-search-stream-input"]').or(page.getByPlaceholder('Search Stream'));
+    // Search for stream - Use getByPlaceholder which targets the actual input
+    const searchInput = page.getByPlaceholder('Search Stream');
     if (await searchInput.isVisible({ timeout: 5000 })) {
       await searchInput.click();
-      await page.waitForTimeout(300);
+      // Wait for UI to settle after modal/dialog interaction
+      await page.waitForLoadState('domcontentloaded');
       await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
       await searchInput.fill('test');
-      await page.waitForTimeout(500);
+      // Verify org_identifier preserved after interaction
       await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
     } else {
       testLogger.warn('Stream search not visible');
@@ -278,14 +271,13 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
     testLogger.info('Testing Alerts page add alert interaction');
 
     await pm.navigationPage.clickAlerts();
-    await page.waitForTimeout(500);
     await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Click add alert button
     const addAlertButton = page.locator('[data-test="alert-list-add-alert-btn"]');
     if (await addAlertButton.isVisible({ timeout: 5000 })) {
       await addAlertButton.click();
-      await page.waitForTimeout(500);
+      // Verify org_identifier preserved after interaction
       await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
       // Close dialog
@@ -304,21 +296,20 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
     testLogger.info('Testing Alerts page tab navigation');
 
     await pm.navigationPage.clickAlerts();
-    await page.waitForTimeout(500);
     await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Click Scheduled tab
     const scheduledTab = page.locator('[data-test="tab-scheduled"]');
     if (await scheduledTab.isVisible({ timeout: 5000 })) {
       await scheduledTab.click();
-      await page.waitForTimeout(500);
+      // Verify org_identifier preserved after interaction
       await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
       // Click Real-time tab
       const realtimeTab = page.locator('[data-test="tab-realTime"]');
       if (await realtimeTab.isVisible({ timeout: 5000 })) {
         await realtimeTab.click();
-        await page.waitForTimeout(500);
+        // Verify org_identifier preserved after interaction
         await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
       }
 
@@ -326,7 +317,7 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
       const allTab = page.locator('[data-test="tab-all"]');
       if (await allTab.isVisible({ timeout: 5000 })) {
         await allTab.click();
-        await page.waitForTimeout(500);
+        // Verify org_identifier preserved after interaction
         await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
       }
     } else {
@@ -342,18 +333,18 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
     testLogger.info('Testing Alerts page search interaction');
 
     await pm.navigationPage.clickAlerts();
-    await page.waitForTimeout(500);
     await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Search alerts
     const searchInput = page.locator('[data-test="alert-list-search-input"]');
     if (await searchInput.isVisible({ timeout: 5000 })) {
       await searchInput.click();
-      await page.waitForTimeout(300);
+      // Wait for UI to settle after modal/dialog interaction
+      await page.waitForLoadState('domcontentloaded');
       await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
       await searchInput.fill('test');
-      await page.waitForTimeout(500);
+      // Verify org_identifier preserved after interaction
       await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
     } else {
       testLogger.warn('Alert search not visible');
@@ -378,14 +369,13 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
     }
 
     await pm.navigationPage.clickIAM();
-    await page.waitForTimeout(500);
     await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Click Service Accounts tab
     const serviceAccountsTab = page.locator('[data-test="iam-service-accounts-tab"]');
     if (await serviceAccountsTab.isVisible({ timeout: 5000 })) {
       await serviceAccountsTab.click();
-      await page.waitForTimeout(500);
+      // Verify org_identifier preserved after interaction
       await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
     } else {
       testLogger.warn('Service Accounts tab not visible');
@@ -410,14 +400,13 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
     }
 
     await pm.navigationPage.clickReports();
-    await page.waitForTimeout(500);
     await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Click Scheduled tab
     const scheduledTab = page.getByTitle('Scheduled');
     if (await scheduledTab.isVisible({ timeout: 5000 })) {
       await scheduledTab.click();
-      await page.waitForTimeout(500);
+      // Verify org_identifier preserved after interaction
       await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
     } else {
       testLogger.warn('Scheduled tab not visible');
@@ -439,14 +428,13 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
     }
 
     await pm.navigationPage.clickReports();
-    await page.waitForTimeout(500);
     await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     // Click add report button
     const addReportButton = page.locator('[data-test="report-list-add-report-btn"]');
     if (await addReportButton.isVisible({ timeout: 5000 })) {
       await addReportButton.click();
-      await page.waitForTimeout(500);
+      // Verify org_identifier preserved after interaction
       await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
       // Close dialog
@@ -461,6 +449,8 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
 
   // ===== CROSS-PAGE INTERACTION TEST =====
 
+  // Testing sequential deep interactions across pages with improved wait strategy
+  // Fixed: Added proper waits before clicking Streams menu to avoid race conditions
   test("P0: Sequential deep interactions across multiple pages should preserve org_identifier", {
     tag: ['@navigation', '@url-validation', '@deep', '@cross-page', '@P0', '@all']
   }, async ({ page }) => {
@@ -469,52 +459,50 @@ test.describe("Deep Navigation URL Validation - org_identifier persistence", () 
     // Logs: Navigate + interact
     testLogger.info('Step 1: Logs page interaction');
     await pm.navigationPage.clickLogs();
-    await page.waitForTimeout(500);
     await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     const logsQueryBtn = page.locator('[data-test="logs-search-bar-refresh-btn"]');
     if (await logsQueryBtn.isVisible({ timeout: 3000 })) {
       await logsQueryBtn.click();
-      await page.waitForTimeout(500);
+      // Verify org_identifier preserved after interaction
       await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
     }
 
     // Dashboards: Navigate + interact
     testLogger.info('Step 2: Dashboards page interaction');
     await pm.navigationPage.clickDashboards();
-    await page.waitForTimeout(500);
     await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     const dashboardSearch = page.locator('[data-test="dashboard-search"]');
     if (await dashboardSearch.isVisible({ timeout: 3000 })) {
       await dashboardSearch.click();
-      await page.waitForTimeout(300);
+      // Wait for UI to settle after modal/dialog interaction
+      await page.waitForLoadState('domcontentloaded');
       await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
     }
 
     // Alerts: Navigate + interact
     testLogger.info('Step 3: Alerts page interaction');
     await pm.navigationPage.clickAlerts();
-    await page.waitForTimeout(500);
     await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     const scheduledTab = page.locator('[data-test="tab-scheduled"]');
     if (await scheduledTab.isVisible({ timeout: 3000 })) {
       await scheduledTab.click();
-      await page.waitForTimeout(500);
+      // Verify org_identifier preserved after interaction
       await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
     }
 
     // Streams: Navigate + interact
     testLogger.info('Step 4: Streams page interaction');
     await pm.navigationPage.clickStreams();
-    await page.waitForTimeout(500);
     await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
 
     const streamSearch = page.locator('[data-test="streams-search-stream-input"]').or(page.getByPlaceholder('Search Stream'));
     if (await streamSearch.isVisible({ timeout: 3000 })) {
       await streamSearch.click();
-      await page.waitForTimeout(300);
+      // Wait for UI to settle after modal/dialog interaction
+      await page.waitForLoadState('domcontentloaded');
       await pm.navigationPage.expectOrgIdentifierInURL(expectedOrgId);
     }
 

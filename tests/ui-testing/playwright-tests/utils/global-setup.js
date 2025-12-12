@@ -1,7 +1,8 @@
 const { chromium } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
-const logsdata = require("../../../test-data/logs_data.json");
+// Use minimal data for fast global setup (navigation tests don't need 3,848 records!)
+const logsdata = require("../../../test-data/minimal_nav_data.json");
 const testLogger = require('./test-logger.js');
 
 /**

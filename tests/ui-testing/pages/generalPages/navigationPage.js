@@ -52,8 +52,17 @@ export class NavigationPage {
    * Click Home menu item
    */
   async clickHome() {
-    await this.page.locator(this.homeMenu).click();
-    await this.page.waitForLoadState('domcontentloaded');
+    // Wait for page to be fully stable first
+    await this.page.waitForLoadState('networkidle');
+
+    const menu = this.page.locator(this.homeMenu);
+    await menu.waitFor({ state: 'visible', timeout: 5000 });
+
+    // Small delay for menu to be fully interactive
+    await this.page.waitForTimeout(500);
+
+    await menu.click();
+    await this.page.waitForURL('**/web/', { waitUntil: 'networkidle', timeout: 10000 });
   }
 
   /**
@@ -70,24 +79,30 @@ export class NavigationPage {
    * Click Metrics menu item
    */
   async clickMetrics() {
-    await this.page.locator(this.metricsMenu).click();
-    await this.page.waitForLoadState('domcontentloaded');
+    await Promise.all([
+      this.page.waitForURL('**/metrics**', { waitUntil: 'networkidle', timeout: 10000 }),
+      this.page.locator(this.metricsMenu).click()
+    ]);
   }
 
   /**
    * Click Traces menu item
    */
   async clickTraces() {
-    await this.page.locator(this.tracesMenu).click();
-    await this.page.waitForLoadState('domcontentloaded');
+    await Promise.all([
+      this.page.waitForURL('**/traces**', { waitUntil: 'networkidle', timeout: 10000 }),
+      this.page.locator(this.tracesMenu).click()
+    ]);
   }
 
   /**
    * Click RUM menu item
    */
   async clickRUM() {
-    await this.page.locator(this.rumMenu).click();
-    await this.page.waitForLoadState('domcontentloaded');
+    await Promise.all([
+      this.page.waitForURL('**/rum**', { waitUntil: 'networkidle', timeout: 10000 }),
+      this.page.locator(this.rumMenu).click()
+    ]);
   }
 
   /**
@@ -95,15 +110,26 @@ export class NavigationPage {
    */
   async clickDashboards() {
     await this.page.locator(this.dashboardsMenu).click();
-    await this.page.waitForLoadState('domcontentloaded');
+    await this.page.waitForURL('**/dashboards**', { waitUntil: 'networkidle', timeout: 10000 });
   }
 
   /**
    * Click Streams menu item
    */
   async clickStreams() {
-    await this.page.locator(this.streamsMenu).click();
-    await this.page.waitForLoadState('domcontentloaded');
+    // Wait for page to be fully stable first (important after navigating from other pages like Alerts)
+    await this.page.waitForLoadState('networkidle');
+
+    // Ensure menu is visible and attached to DOM
+    const menu = this.page.locator(this.streamsMenu);
+    await menu.waitFor({ state: 'visible', timeout: 5000 });
+    await menu.waitFor({ state: 'attached', timeout: 5000 });
+
+    // Longer delay to ensure menu is fully interactive and any router guards have completed
+    await this.page.waitForTimeout(1000);
+
+    await menu.click();
+    await this.page.waitForURL('**/streams**', { waitUntil: 'networkidle', timeout: 10000 });
   }
 
   /**
@@ -111,39 +137,47 @@ export class NavigationPage {
    */
   async clickAlerts() {
     await this.page.locator(this.alertsMenu).click();
-    await this.page.waitForLoadState('domcontentloaded');
+    await this.page.waitForURL('**/alerts**', { waitUntil: 'networkidle', timeout: 15000 });
   }
 
   /**
    * Click Ingestion menu item
    */
   async clickIngestion() {
-    await this.page.locator(this.ingestionMenu).click();
-    await this.page.waitForLoadState('domcontentloaded');
+    await Promise.all([
+      this.page.waitForURL('**/ingestion**', { waitUntil: 'networkidle', timeout: 15000 }),
+      this.page.locator(this.ingestionMenu).click()
+    ]);
   }
 
   /**
    * Click IAM menu item (admin only)
    */
   async clickIAM() {
-    await this.page.locator(this.iamMenu).click();
-    await this.page.waitForLoadState('domcontentloaded');
+    await Promise.all([
+      this.page.waitForURL('**/iam**', { waitUntil: 'networkidle', timeout: 10000 }),
+      this.page.locator(this.iamMenu).click()
+    ]);
   }
 
   /**
    * Click Reports menu item (OSS only)
    */
   async clickReports() {
-    await this.page.locator(this.reportsMenu).click();
-    await this.page.waitForLoadState('domcontentloaded');
+    await Promise.all([
+      this.page.waitForURL('**/reports**', { waitUntil: 'networkidle', timeout: 10000 }),
+      this.page.locator(this.reportsMenu).click()
+    ]);
   }
 
   /**
    * Click Actions menu item (if enabled)
    */
   async clickActions() {
-    await this.page.locator(this.actionsMenu).click();
-    await this.page.waitForLoadState('domcontentloaded');
+    await Promise.all([
+      this.page.waitForURL('**/actions**', { waitUntil: 'networkidle', timeout: 10000 }),
+      this.page.locator(this.actionsMenu).click()
+    ]);
   }
 
   /**
@@ -153,7 +187,7 @@ export class NavigationPage {
   async clickMenuItem(selector) {
     // Wait for navigation to complete after click
     await Promise.all([
-      this.page.waitForURL('**/web/**', { waitUntil: 'domcontentloaded', timeout: 10000 }),
+      this.page.waitForURL('**/web/**', { waitUntil: 'networkidle', timeout: 10000 }),
       this.page.locator(selector).click()
     ]);
   }
@@ -311,15 +345,36 @@ export class NavigationPage {
           continue;
         }
 
-        // Click menu item
-        await this.clickMenuItem(menuItem.selector);
-        await this.page.waitForTimeout(500);
+         // Click menu item and wait for specific path
+        const urlPattern = menuItem.path === '/web/' ? '**/web/' : `**${menuItem.path}**`;
+        await Promise.all([
+          this.page.waitForURL(urlPattern, { waitUntil: 'networkidle', timeout: 15000 }),
+          this.page.locator(menuItem.selector).click()
+        ]);
 
-        // Validate URL
+        // Validate URL after page loads
         const actualOrgId = await this.getOrgIdentifierFromURL();
         const actualPath = await this.getCurrentPath();
 
-        const success = actualOrgId === expectedOrgId && actualPath === menuItem.path;
+        // Ingestion page redirects to subpages, so check if path starts with expected path
+        const pathMatches = menuItem.name === 'Ingestion'
+          ? actualPath.startsWith(menuItem.path)
+          : actualPath === menuItem.path;
+        const orgMatches = actualOrgId === expectedOrgId;
+        const success = pathMatches && orgMatches;
+
+        // Build detailed error message showing both path and org mismatches
+        let errorMsg = null;
+        if (!success) {
+          const errors = [];
+          if (!pathMatches) {
+            errors.push(`Path: expected "${menuItem.path}", got "${actualPath}"`);
+          }
+          if (!orgMatches) {
+            errors.push(`Org: expected "${expectedOrgId}", got "${actualOrgId}"`);
+          }
+          errorMsg = errors.join('; ');
+        }
 
         results.push({
           name: menuItem.name,
@@ -329,7 +384,7 @@ export class NavigationPage {
           expectedOrgId: expectedOrgId,
           actualOrgId: actualOrgId,
           success: success,
-          error: success ? null : `Expected org=${expectedOrgId}, Got org=${actualOrgId}`,
+          error: errorMsg,
           skipped: false
         });
       } catch (error) {
@@ -344,6 +399,25 @@ export class NavigationPage {
     }
 
     return results;
+  }
+
+  /**
+   * Wait for URL to stabilize with expected path and org_identifier
+   * @param {string} expectedPath - Expected URL path
+   * @param {string} expectedOrgId - Expected organization identifier
+   * @param {number} timeout - Timeout in milliseconds (default: 15000)
+   */
+  async waitForURLWithOrg(expectedPath, expectedOrgId, timeout = 15000) {
+    await this.page.waitForFunction(
+      ({ path, orgId }) => {
+        const url = new URL(window.location.href);
+        const actualPath = url.pathname;
+        const actualOrgId = url.searchParams.get('org_identifier');
+        return actualPath === path && actualOrgId === orgId;
+      },
+      { path: expectedPath, orgId: expectedOrgId },
+      { timeout }
+    );
   }
 
   // ===== EXPECTATIONS/ASSERTIONS =====
