@@ -392,7 +392,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-separator />
 
             <!-- About page link -->
-            <q-item to="/about" data-test="menu-link-about-item">
+            <q-item clickable @click="goToAbout" data-test="menu-link-about-item">
               <q-item-section>
                 <q-item-label>
                   {{ t(`menu.about`) }}
@@ -670,6 +670,7 @@ export default defineComponent({
     "update:isHovered",
     "updateOrganization",
     "goToHome",
+    "goToAbout",
     "toggleAIChat",
     "openSlack",
     "navigateToOpenAPI",
@@ -698,6 +699,10 @@ export default defineComponent({
 
     const goToHome = () => {
       emit("goToHome");
+    };
+
+    const goToAbout = () => {
+      emit("goToAbout");
     };
 
     const toggleAIChat = () => {
@@ -751,6 +756,7 @@ export default defineComponent({
       ingestionQuotaColor,
       updateOrganization,
       goToHome,
+      goToAbout,
       toggleAIChat,
       openSlack,
       navigateToOpenAPI,
