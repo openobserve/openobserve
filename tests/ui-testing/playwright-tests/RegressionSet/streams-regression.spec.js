@@ -65,11 +65,14 @@ test.describe("Streams Regression Bugs", () => {
     await pm.logsPage.clickStreamsMenuItem();
     await pm.logsPage.clickSearchStreamInput();
     await pm.logsPage.fillSearchStreamInput("e2e_automate");
-    await page.waitForTimeout(1000); // Wait for search results
+    await page.waitForLoadState('networkidle'); // Wait for search results
 
-    // Click explore button
-    await pm.logsPage.clickExploreButton();
-    await page.waitForTimeout(2000); // Wait for navigation
+    // Click explore button and wait for navigation to logs page
+    await Promise.all([
+      page.waitForURL('**/logs**', { timeout: 30000 }),
+      pm.logsPage.clickExploreButton()
+    ]);
+    await page.waitForLoadState('networkidle');
 
     // Verify URL contains 'logs' to confirm navigation
     await pm.logsPage.expectUrlContainsLogs();

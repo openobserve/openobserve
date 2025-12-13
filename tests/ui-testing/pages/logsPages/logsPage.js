@@ -1933,7 +1933,7 @@ export class LogsPage {
     async toggleQueryEditorFullScreen() {
         const initialState = await this.isQueryEditorExpanded();
         await this.clickQueryEditorFullScreenBtn();
-        await this.page.waitForTimeout(1000); // Wait for animation
+        await this.page.waitForTimeout(500); // Wait for animation
         const newState = await this.isQueryEditorExpanded();
         return { initialState, newState, toggled: initialState !== newState };
     }

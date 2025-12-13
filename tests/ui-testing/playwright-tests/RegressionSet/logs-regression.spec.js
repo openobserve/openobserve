@@ -120,7 +120,7 @@ test.describe("Logs Regression Bugs", () => {
     await ingestTestData(page, streamA);
     testLogger.info(`Ingesting data to stream B: ${streamB}`);
     await ingestTestData(page, streamB);
-    await page.waitForTimeout(2000); // Wait for data to be indexed
+    await page.waitForLoadState('networkidle'); // Wait for data to be indexed
 
     // Navigate to logs page
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
