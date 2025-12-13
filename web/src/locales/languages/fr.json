@@ -1298,7 +1298,55 @@
       }
     },
     "triggerAlert": "Gâchette",
-    "alertTriggeredSuccess": "Alerte déclenchée avec succès"
+    "alertTriggeredSuccess": "Alerte déclenchée avec succès",
+    "incidents": {
+      "title": "Incidents",
+      "header": "Incidents d'alerte",
+      "noIncidents": "Aucun incident n'a été détecté",
+      "id": "IDENTIFIANT",
+      "status": "État",
+      "severity": "Gravité",
+      "alertCount": "Alertes",
+      "firstAlertAt": "Première alerte",
+      "lastAlertAt": "Dernière alerte",
+      "resolvedAt": "Résolu à",
+      "title_field": "Titre",
+      "correlationKey": "Clé de corrélation",
+      "stableDimensions": "Dimensions",
+      "topology": "Topologie",
+      "upstreamServices": "Services en amont",
+      "downstreamServices": "Services en aval",
+      "correlatedAlerts": "Alertes corrélées",
+      "alertName": "Nom de l'alerte",
+      "alertFiredAt": "Tiré sur",
+      "correlationReason": "Raison de la corrélation",
+      "actions": "Actions",
+      "acknowledge": "Reconnaître",
+      "resolve": "Résoudre",
+      "reopen": "Réouvrir",
+      "viewDetails": "Afficher les détails",
+      "statusOpen": "Ouvrir",
+      "statusAcknowledged": "Reconnu",
+      "statusResolved": "Résolu",
+      "severityP1": "P1 - Critique",
+      "severityP2": "P2 - Élevé",
+      "severityP3": "P3 - Moyen",
+      "severityP4": "P4 - Faible",
+      "correlationServiceDiscovery": "Découverte de services",
+      "correlationManualExtraction": "Extraction manuelle",
+      "correlationTemporal": "Temporel",
+      "filterByStatus": "Filtrer par statut",
+      "allStatuses": "Tous les statuts",
+      "loading": "Chargement des incidents...",
+      "errorLoading": "Impossible de charger les incidents",
+      "statusUpdated": "État de l'incident mis à jour",
+      "statusUpdateFailed": "Impossible de mettre à jour le statut de l'incident",
+      "rootCauseAnalysis": "Analyse des causes profondes",
+      "analyzeRca": "Analyser",
+      "rcaInProgress": "Analyse de la cause première...",
+      "rcaCompleted": "Analyse des causes profondes terminée",
+      "noRcaYet": "Aucune analyse des causes profondes n'est disponible. Cliquez sur « Analyser » pour commencer."
+    }
   },
   "alert_templates": {
     "header": "Modèles",
@@ -1651,7 +1699,8 @@
     "viewLogs": "Afficher les journaux",
     "backToLogs": "Retour aux journaux",
     "RedMetrics": "Métriques RED",
-    "loadingStream": "Chargement du flux..."
+    "loadingStream": "Chargement du flux...",
+    "viewRelated": "Afficher les articles connexes"
   },
   "invitation": {
     "pendingInvitations": "Invitations en attente",
@@ -1964,6 +2013,14 @@
     "tracesFromService": "Traces provenant du service : {service}",
     "noTracesFound": "Aucune trace corrélée n'a été trouvée",
     "noTracesDescription": "Aucune trace n'a été trouvée pour le service {service} dans la plage de temps sélectionnée",
-    "openTraceInNewWindow": "Ouvrir la trace dans une nouvelle fenêtre"
+    "openTraceInNewWindow": "Ouvrir la trace dans une nouvelle fenêtre",
+    "filters": "Filtres"
+  },
+  "sreChat": {
+    "emptyMessage": "Demandez-moi tout ce que vous voulez savoir sur vos alertes et incidents",
+    "inputPlaceholder": "Demandez à l'assistant SRE...",
+    "clearChatTitle": "Effacer le chat",
+    "clearChatMessage": "Êtes-vous sûr de vouloir effacer cette conversation ?",
+    "copiedToClipboard": "Copié dans le presse-papiers"
   }
 }

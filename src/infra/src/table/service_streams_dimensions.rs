@@ -169,35 +169,52 @@ pub async fn get_dimension_values(
 }
 
 /// Get cardinality (count of unique values) for all dimensions in an org
+///
+/// Uses SQL GROUP BY aggregation to avoid loading all records into memory.
+/// This is critical for orgs with 100K+ dimension values - loading all into
+/// memory would cause OOM on queriers.
 pub async fn get_all_dimension_stats(org_id: &str) -> Result<Vec<DimensionStats>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let backend = client.get_database_backend();
 
-    // Use Entity::find() with filters instead of raw SQL to avoid placeholder issues
-    let results = Entity::find()
-        .filter(Column::OrgId.eq(org_id))
+    // Use raw SQL with GROUP BY to aggregate in the database
+    // This avoids loading potentially 100K+ records into memory
+    let sql = match backend {
+        sea_orm::DatabaseBackend::Postgres => {
+            // PostgreSQL uses $1 for parameter placeholders
+            r#"
+                SELECT dimension_name, COUNT(DISTINCT value_hash) as value_count
+                FROM service_streams_dimensions
+                WHERE org_id = $1
+                GROUP BY dimension_name
+            "#
+        }
+        sea_orm::DatabaseBackend::MySql => {
+            // MySQL uses ? for parameter placeholders
+            r#"
+                SELECT dimension_name, COUNT(DISTINCT value_hash) as value_count
+                FROM service_streams_dimensions
+                WHERE org_id = ?
+                GROUP BY dimension_name
+            "#
+        }
+        sea_orm::DatabaseBackend::Sqlite => {
+            // SQLite uses ? for parameter placeholders
+            r#"
+                SELECT dimension_name, COUNT(DISTINCT value_hash) as value_count
+                FROM service_streams_dimensions
+                WHERE org_id = ?
+                GROUP BY dimension_name
+            "#
+        }
+    };
+
+    let stmt = sea_orm::Statement::from_sql_and_values(backend, sql, [org_id.into()]);
+
+    let stats = DimensionStats::find_by_statement(stmt)
         .all(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-
-    // Group by dimension_name and count unique value_hashes
-    let mut stats_map: std::collections::HashMap<String, std::collections::HashSet<String>> =
-        std::collections::HashMap::new();
-
-    for record in results {
-        stats_map
-            .entry(record.dimension_name)
-            .or_default()
-            .insert(record.value_hash);
-    }
-
-    // Convert to DimensionStats
-    let stats: Vec<DimensionStats> = stats_map
-        .into_iter()
-        .map(|(dimension_name, value_hashes)| DimensionStats {
-            dimension_name,
-            value_count: value_hashes.len() as i64,
-        })
-        .collect();
 
     Ok(stats)
 }
