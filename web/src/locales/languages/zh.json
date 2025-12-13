@@ -1064,7 +1064,15 @@
     "panelDuplicatedSuccessfully": "面板已成功复制",
     "panelDuplicationFailed": "面板复制失败",
     "mapname": "姓名",
-    "mapvalue": "价值"
+    "mapvalue": "价值",
+    "joins": "加入",
+    "addJoin": "添加加入",
+    "removeJoin": "移除加入",
+    "leftJoin": "向左加入",
+    "innerJoin": "内部加入",
+    "rightJoin": "右键加入",
+    "addClause": "添加条款",
+    "removeClause": "移除条款"
   },
   "home": {
     "streams": "数据流",

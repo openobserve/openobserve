@@ -1064,7 +1064,15 @@
     "panelDuplicatedSuccessfully": "패널 복제 성공",
     "panelDuplicationFailed": "패널 복제 실패",
     "mapname": "이름",
-    "mapvalue": "가치"
+    "mapvalue": "가치",
+    "joins": "참여하다",
+    "addJoin": "조인 추가",
+    "removeJoin": "제거 조인",
+    "leftJoin": "왼쪽 조인",
+    "innerJoin": "내부 조인",
+    "rightJoin": "오른쪽 조인",
+    "addClause": "조항 추가",
+    "removeClause": "조항 제거"
   },
   "home": {
     "streams": "스트림",

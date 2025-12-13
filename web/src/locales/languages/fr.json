@@ -1064,7 +1064,15 @@
     "panelDuplicatedSuccessfully": "Panneau dupliqué avec succès",
     "panelDuplicationFailed": "La duplication du panneau a échoué",
     "mapname": "Nom",
-    "mapvalue": "Valeur"
+    "mapvalue": "Valeur",
+    "joins": "Rejoint",
+    "addJoin": "Ajouter Rejoindre",
+    "removeJoin": "Supprimer Rejoindre",
+    "leftJoin": "Rejoindre à gauche",
+    "innerJoin": "Jointure intérieure",
+    "rightJoin": "Adhérez à droite",
+    "addClause": "Ajouter une clause",
+    "removeClause": "Supprimer la clause"
   },
   "home": {
     "streams": "Ruisseaux",

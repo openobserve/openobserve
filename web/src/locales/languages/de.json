@@ -1064,7 +1064,15 @@
     "panelDuplicatedSuccessfully": "Panel wurde erfolgreich dupliziert",
     "panelDuplicationFailed": "Fehler beim Duplizieren des Panels",
     "mapname": "Name",
-    "mapvalue": "Wert"
+    "mapvalue": "Wert",
+    "joins": "Tritt bei",
+    "addJoin": "Join hinzufügen",
+    "removeJoin": "Join entfernen",
+    "leftJoin": "Linker Join",
+    "innerJoin": "Innere Verbindung",
+    "rightJoin": "Richtiger Beitritt",
+    "addClause": "Klausel hinzufügen",
+    "removeClause": "Klausel entfernen"
   },
   "home": {
     "streams": "Streams",

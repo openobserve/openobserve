@@ -1064,7 +1064,15 @@
     "panelDuplicatedSuccessfully": "Painel duplicado com sucesso",
     "panelDuplicationFailed": "Falha na duplicação do painel",
     "mapname": "Nome",
-    "mapvalue": "Valor"
+    "mapvalue": "Valor",
+    "joins": "Junta-se",
+    "addJoin": "Adicionar junção",
+    "removeJoin": "Remover junção",
+    "leftJoin": "Junção à esquerda",
+    "innerJoin": "Junção interna",
+    "rightJoin": "Junção correta",
+    "addClause": "Adicionar cláusula",
+    "removeClause": "Remover cláusula"
   },
   "home": {
     "streams": "Transmissões",

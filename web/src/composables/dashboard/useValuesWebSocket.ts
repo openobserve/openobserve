@@ -112,9 +112,11 @@ const useValuesWebSocket = () => {
           dashboardPanelData.meta.filterValue = [];
         }
 
-        // Find existing entry for this column
+        // Find existing entry for this column and stream
         const existingIndex = dashboardPanelData.meta.filterValue.findIndex(
-          (item: any) => item.column === variableObject.name,
+          (item: any) =>
+            item.column === variableObject.name &&
+            item.stream === variableObject.stream,
         );
 
         // Get existing values or initialize empty array
@@ -138,6 +140,7 @@ const useValuesWebSocket = () => {
           // Add new entry
           dashboardPanelData.meta.filterValue.push({
             column: variableObject.name,
+            stream: variableObject.stream,
             value: mergedValues,
           });
         }
@@ -160,7 +163,7 @@ const useValuesWebSocket = () => {
   const fetchFieldValues = async (
     queryReq: any,
     dashboardPanelData: any,
-    name: any,
+    fieldObj: any,
   ) => {
     // Use HTTP2/streaming for all dashboard values requests
     const streamingPayload = {
@@ -185,7 +188,8 @@ const useValuesWebSocket = () => {
     };
 
     const res = initializeStreamingConnection(streamingPayload, {
-      name: name,
+      name: fieldObj.field,
+      stream: queryReq.stream_name,
       dashboardPanelData: dashboardPanelData,
     });
 

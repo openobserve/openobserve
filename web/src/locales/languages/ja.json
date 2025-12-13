@@ -1080,7 +1080,15 @@
     "panelQueryMustHaveStream": "パネルクエリにはストリームが設定されている必要があります",
     "unsupportedPanelTypeAlert": "{type} パネルからアラートを作成すると、期待どおりに動作しない場合があります",
     "panelDuplicatedSuccessfully": "パネルは正常に複製されました",
-    "panelDuplicationFailed": "パネルを複製できませんでした"
+    "panelDuplicationFailed": "パネルを複製できませんでした",
+    "joins": "参加します",
+    "addJoin": "追加ジョイン",
+    "removeJoin": "[結合を削除]",
+    "leftJoin": "レフト・ジョイン",
+    "innerJoin": "インナー・ジョイン",
+    "rightJoin": "右結合",
+    "addClause": "条項を追加",
+    "removeClause": "条項を削除"
   },
   "home": {
     "streams": "ストリーム",

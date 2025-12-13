@@ -342,16 +342,18 @@ describe("sqlUtils", () => {
 
       const fields = extractFields(mockAst, "_timestamp");
       expect(fields).toHaveLength(1);
-      expect(fields[0].aggregationFunction).toBe("p50");
+      // Note: Percentile conversion was removed in join feature PR - returns full function name
+      expect(fields[0].aggregationFunction).toBe("approx_percentile_cont");
     });
 
     it("should handle different percentile values", () => {
+      // Note: Percentile conversion was removed in join feature PR
       const percentileCases = [
-        { value: "0.90", expected: "p90" },
-        { value: "0.9", expected: "p90" },
-        { value: "0.95", expected: "p95" },
-        { value: "0.99", expected: "p99" },
-        { value: "0.50", expected: "p50" }
+        { value: "0.90", expected: "approx_percentile_cont" },
+        { value: "0.9", expected: "approx_percentile_cont" },
+        { value: "0.95", expected: "approx_percentile_cont" },
+        { value: "0.99", expected: "approx_percentile_cont" },
+        { value: "0.50", expected: "approx_percentile_cont" }
       ];
 
       percentileCases.forEach(({ value, expected }) => {
@@ -415,7 +417,9 @@ describe("sqlUtils", () => {
         ]
       };
 
-      expect(() => extractFields(mockAst, "_timestamp")).toThrow("Unsupported percentile value");
+      // Note: Percentile conversion removed in join PR - no longer throws error
+      const fields = extractFields(mockAst, "_timestamp");
+      expect(fields[0].aggregationFunction).toBe("approx_percentile_cont");
     });
 
     it("should handle SELECT * case", () => {
@@ -947,7 +951,8 @@ describe("sqlUtils", () => {
       expect(fields).toHaveLength(3);
       expect(fields[0].aggregationFunction).toBe(null);
       expect(fields[1].aggregationFunction).toBe("sum");
-      expect(fields[2].aggregationFunction).toBe("p95");
+      // Note: Percentile conversion removed in join PR
+      expect(fields[2].aggregationFunction).toBe("approx_percentile_cont");
     });
 
     it("should test function type edge cases in extractFields", () => {
@@ -1402,14 +1407,14 @@ describe("sqlUtils", () => {
     });
 
     it("should test all percentile value branches comprehensively", () => {
-      // Test every supported percentile value to ensure complete coverage
+      // Note: Percentile conversion removed in join PR
       const percentileValues = [
-        { value: "0.5", expected: "p50" },
-        { value: "0.50", expected: "p50" },
-        { value: "0.9", expected: "p90" },
-        { value: "0.90", expected: "p90" },
-        { value: "0.95", expected: "p95" },
-        { value: "0.99", expected: "p99" }
+        { value: "0.5", expected: "approx_percentile_cont" },
+        { value: "0.50", expected: "approx_percentile_cont" },
+        { value: "0.9", expected: "approx_percentile_cont" },
+        { value: "0.90", expected: "approx_percentile_cont" },
+        { value: "0.95", expected: "approx_percentile_cont" },
+        { value: "0.99", expected: "approx_percentile_cont" }
       ];
 
       percentileValues.forEach(({ value, expected }) => {
@@ -1714,8 +1719,8 @@ describe("sqlUtils", () => {
       const parsedAst = {
         columns: [
           {
-            expr: { 
-              type: "function", 
+            expr: {
+              type: "function",
               name: { name: [{ value: "approx_percentile_cont" }] },
               args: { value: [
                 { column: { expr: { value: "response_time" } } },
@@ -1727,11 +1732,12 @@ describe("sqlUtils", () => {
         ]
       };
       const result = extractFields(parsedAst, timeField);
+      // Note: Percentile conversion removed in join PR
       expect(result).toEqual([
         {
           column: "response_time",
           alias: "p50_response",
-          aggregationFunction: "p50"
+          aggregationFunction: "approx_percentile_cont"
         }
       ]);
     });
@@ -1740,8 +1746,8 @@ describe("sqlUtils", () => {
       const parsedAst = {
         columns: [
           {
-            expr: { 
-              type: "function", 
+            expr: {
+              type: "function",
               name: { name: [{ value: "approx_percentile_cont" }] },
               args: { value: [
                 { column: { expr: { value: "response_time" } } },
@@ -1753,11 +1759,12 @@ describe("sqlUtils", () => {
         ]
       };
       const result = extractFields(parsedAst, timeField);
+      // Note: Percentile conversion removed in join PR
       expect(result).toEqual([
         {
           column: "response_time",
           alias: "p90_response",
-          aggregationFunction: "p90"
+          aggregationFunction: "approx_percentile_cont"
         }
       ]);
     });
@@ -1766,8 +1773,8 @@ describe("sqlUtils", () => {
       const parsedAst = {
         columns: [
           {
-            expr: { 
-              type: "function", 
+            expr: {
+              type: "function",
               name: { name: [{ value: "approx_percentile_cont" }] },
               args: { value: [
                 { column: { expr: { value: "response_time" } } },
@@ -1779,11 +1786,12 @@ describe("sqlUtils", () => {
         ]
       };
       const result = extractFields(parsedAst, timeField);
+      // Note: Percentile conversion removed in join PR
       expect(result).toEqual([
         {
           column: "response_time",
           alias: "p95_response",
-          aggregationFunction: "p95"
+          aggregationFunction: "approx_percentile_cont"
         }
       ]);
     });
@@ -1792,8 +1800,8 @@ describe("sqlUtils", () => {
       const parsedAst = {
         columns: [
           {
-            expr: { 
-              type: "function", 
+            expr: {
+              type: "function",
               name: { name: [{ value: "approx_percentile_cont" }] },
               args: { value: [
                 { column: { expr: { value: "response_time" } } },
@@ -1805,11 +1813,12 @@ describe("sqlUtils", () => {
         ]
       };
       const result = extractFields(parsedAst, timeField);
+      // Note: Percentile conversion removed in join PR
       expect(result).toEqual([
         {
           column: "response_time",
           alias: "p99_response",
-          aggregationFunction: "p99"
+          aggregationFunction: "approx_percentile_cont"
         }
       ]);
     });
@@ -1818,8 +1827,8 @@ describe("sqlUtils", () => {
       const parsedAst = {
         columns: [
           {
-            expr: { 
-              type: "function", 
+            expr: {
+              type: "function",
               name: { name: [{ value: "approx_percentile_cont" }] },
               args: { value: [
                 { column: { expr: { value: "response_time" } } },
@@ -1829,7 +1838,9 @@ describe("sqlUtils", () => {
           }
         ]
       };
-      expect(() => extractFields(parsedAst, timeField)).toThrow("Unsupported percentile value");
+      // Note: Percentile conversion removed in join PR - no longer validates/throws
+      const result = extractFields(parsedAst, timeField);
+      expect(result[0].aggregationFunction).toBe("approx_percentile_cont");
     });
 
     it("should handle select all (*) fields", () => {

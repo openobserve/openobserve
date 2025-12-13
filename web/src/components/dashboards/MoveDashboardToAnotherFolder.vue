@@ -148,7 +148,7 @@ export default defineComponent({
           });
 
           emit("updated");
-          moveFolderForm.value.resetValidation();
+          moveFolderForm.value?.resetValidation();
         } catch (err: any) {
           //this condition is kept to handle if 403 error is thrown we are showing unautorized message and we dont need this error explicitly
           if(err.status !== 403){

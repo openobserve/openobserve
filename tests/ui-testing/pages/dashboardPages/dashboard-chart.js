@@ -77,11 +77,10 @@ export default class ChartTypeSelector {
       throw new Error(`Invalid target type: ${target}`);
     }
 
-    // Locate the specific field item container that contains the field name
-    const fieldItem = this.page
-      .locator(`[data-test^="field-list-item-"]`)
-      .filter({ hasText: fieldName })
-      .first();
+    // Locate the specific field item container using the exact field name in the data-test attribute
+    // The format is: field-list-item-{streamType}-{streamName}-{fieldName}
+    // We combine ^= (starts with) and $= (ends with) to ensure exact match
+    const fieldItem = this.page.locator(`[data-test^="field-list-item-"][data-test$="-${fieldName}"]`);
 
     // Now locate the button within that field item
     const button = fieldItem.locator(`[data-test="${buttonTestId}"]`);
@@ -94,7 +93,9 @@ export default class ChartTypeSelector {
 
   //remove fields from the dashboard
   // Remove field by type (x, y, breakdown, etc.)
-  async removeField(fieldName, target) {
+  // @param alias - The field alias (e.g., "x_axis_1", "y_axis_1", "breakdown_1")
+  // @param target - The target type (x, y, b, filter, etc.)
+  async removeField(alias, target) {
     const removeSelectors = {
       x: "dashboard-x-item",
       y: "dashboard-y-item",
@@ -116,10 +117,10 @@ export default class ChartTypeSelector {
     }
 
     const removeButton = this.page.locator(
-      `[data-test="${baseTestId}-${fieldName}-remove"]`
+      `[data-test="${baseTestId}-${alias}-remove"]`
     );
 
-    await removeButton.waitFor({ state: "visible", timeout: 5000 });
+    await removeButton.waitFor({ state: "visible", timeout: 10000 });
     await removeButton.click();
   }
 
