@@ -1,9 +1,8 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const testData = require("../../../test-data/sdr_test_data.json");
 
-async function ingestMultipleFields(page, streamName, dataObjects) {
+async function ingestMultipleFields(page, streamName, dataObjects, maxRetries = 5) {
   const orgId = process.env["ORGNAME"];
   const basicAuthCredentials = Buffer.from(
     `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
@@ -19,42 +18,54 @@ async function ingestMultipleFields(page, streamName, dataObjects) {
     level: "info",
     [fieldName]: fieldValue,
     log: `Test log with ${fieldName} field - entry ${index}`,
-    _timestamp: baseTimestamp + (index * 1000000) // Add 1ms offset for each log to ensure they're separate
+    _timestamp: baseTimestamp + (index * 1000000)
   }));
 
   testLogger.info(`Preparing to ingest ${logData.length} separate log entries`);
 
-  const response = await page.evaluate(async ({ url, headers, orgId, streamName, logData }) => {
-    const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-      method: 'POST',
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const response = await page.evaluate(async ({ url, headers, orgId, streamName, logData }) => {
+      const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(logData)
+      });
+      const responseJson = await fetchResponse.json();
+      return {
+        status: fetchResponse.status,
+        statusText: fetchResponse.statusText,
+        body: responseJson
+      };
+    }, {
+      url: process.env.INGESTION_URL,
       headers: headers,
-      body: JSON.stringify(logData)
+      orgId: orgId,
+      streamName: streamName,
+      logData: logData
     });
-    const responseJson = await fetchResponse.json();
-    return {
-      status: fetchResponse.status,
-      statusText: fetchResponse.statusText,
-      body: responseJson
-    };
-  }, {
-    url: process.env.INGESTION_URL,
-    headers: headers,
-    orgId: orgId,
-    streamName: streamName,
-    logData: logData
-  });
 
-  testLogger.info(`Ingestion API response - Status: ${response.status}, Body:`, response.body);
+    testLogger.info(`Ingestion API response (attempt ${attempt}/${maxRetries}) - Status: ${response.status}, Body:`, response.body);
 
-  if (response.status !== 200) {
+    if (response.status === 200) {
+      testLogger.info('Ingestion successful, waiting for stream to be indexed...');
+      await page.waitForTimeout(5000);
+      return;
+    }
+
+    const errorMessage = response.body?.message || JSON.stringify(response.body);
+    if (errorMessage.includes('being deleted') && attempt < maxRetries) {
+      const waitTime = attempt * 5000;
+      testLogger.info(`Stream is being deleted, waiting ${waitTime/1000}s before retry...`);
+      await page.waitForTimeout(waitTime);
+      continue;
+    }
+
     testLogger.error(`Ingestion failed! Status: ${response.status}, Response:`, response.body);
+    throw new Error(`Ingestion failed with status ${response.status}: ${JSON.stringify(response.body)}`);
   }
-
-  await page.waitForTimeout(2000);
 }
 
 async function closeStreamDetailSidebar(page) {
-  // Close stream detail sidebar if open
   const cancelButton = page.getByRole('button', { name: 'Cancel' });
   const cancelVisible = await cancelButton.isVisible({ timeout: 1000 }).catch(() => false);
   if (cancelVisible) {
@@ -65,7 +76,6 @@ async function closeStreamDetailSidebar(page) {
 }
 
 async function navigateToLogsQuick(page) {
-  // Quick navigation to logs without VRL editor wait
   await page.locator('[data-test="menu-link-\\/logs-item"]').click();
   await page.waitForLoadState('networkidle');
   testLogger.info('Navigated to Logs (fast - no VRL wait)');
@@ -81,19 +91,16 @@ async function verifyMultipleFieldsRedaction(page, pm, streamName, fieldsToVerif
   await pm.logsPage.clickRefreshButton();
   await page.waitForTimeout(2000);
 
-  // Try multiple selectors to find all log entries
   let logTableCell = page.locator('[data-test="log-table-column-0-source"]');
   let logCount = await logTableCell.count();
   testLogger.info(`Selector [data-test="log-table-column-0-source"] found ${logCount} entries`);
 
-  // If that doesn't work, try table rows
   if (logCount < fieldsToVerify.length) {
     logTableCell = page.locator('.logs-result-table tbody tr[role="row"]');
     logCount = await logTableCell.count();
     testLogger.info(`Selector .logs-result-table tbody tr[role="row"] found ${logCount} entries`);
   }
 
-  // Try another common selector
   if (logCount < fieldsToVerify.length) {
     logTableCell = page.locator('tbody tr');
     logCount = await logTableCell.count();
@@ -106,21 +113,18 @@ async function verifyMultipleFieldsRedaction(page, pm, streamName, fieldsToVerif
     throw new Error('No logs found in the stream');
   }
 
-  // Get all log texts
   const allLogTexts = [];
   for (let i = 0; i < logCount; i++) {
     const text = await logTableCell.nth(i).textContent();
     allLogTexts.push(text);
   }
 
-  // For each field we want to verify, search through all logs to find the one containing that field
   for (const { fieldName, shouldBeRedacted } of fieldsToVerify) {
     testLogger.info(`Searching for log containing field: ${fieldName}`);
 
     let foundLog = null;
     let foundIndex = -1;
 
-    // Search through all logs to find one containing this field
     for (let i = 0; i < allLogTexts.length; i++) {
       const logText = allLogTexts[i];
       const fieldAsJsonKey = `"${fieldName}":`;
@@ -158,15 +162,43 @@ test.describe("Query Time Redaction - Combined Test", { tag: '@enterprise' }, ()
   test.describe.configure({ mode: 'serial' });
   let pm;
 
-  // All patterns used in this spec file for QUERY TIME REDACTION tests
+  // Generate unique test run ID for isolation
+  const testRunId = Date.now().toString(36);
+
+  // All patterns used in this spec file - with full pattern definitions for uniqueness
   const patternsToTest = [
-    { name: 'email_format_query_redact', field: 'user_email', value: 'john.doe@example.com' },
-    { name: 'us_phone_query_redact', field: 'phone', value: '5551234567' },
-    { name: 'credit_card_query_redact', field: 'cc_number', value: '1234 5678 9012 3456' },
-    { name: 'ssn_query_redact', field: 'ssn', value: '123-45-6789' }
+    {
+      name: `email_format_query_redact_${testRunId}`,
+      description: 'Email address validation pattern (for query time redaction tests)',
+      pattern: '^[\\w\\.-]+@[\\w\\.-]+\\.\\w{2,}$',
+      field: 'user_email',
+      value: 'john.doe@example.com'
+    },
+    {
+      name: `us_phone_query_redact_${testRunId}`,
+      description: 'US phone number (10 digits) (for query time redaction tests)',
+      pattern: '^\\d{10}$',
+      field: 'phone',
+      value: '5551234567'
+    },
+    {
+      name: `credit_card_query_redact_${testRunId}`,
+      description: 'Credit card number pattern (for query time redaction tests)',
+      pattern: '^\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}$',
+      field: 'cc_number',
+      value: '1234 5678 9012 3456'
+    },
+    {
+      name: `ssn_query_redact_${testRunId}`,
+      description: 'Social Security Number pattern (for query time redaction tests)',
+      pattern: '^\\d{3}-\\d{2}-\\d{4}$',
+      field: 'ssn',
+      value: '123-45-6789'
+    }
   ];
 
-  const testStreamName = "sdr_query_redact_combined_test";
+  // Use unique stream name to avoid "stream being deleted" conflicts
+  const testStreamName = `sdr_query_redact_${testRunId}`;
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
@@ -200,7 +232,6 @@ test.describe("Query Time Redaction - Combined Test", { tag: '@enterprise' }, ()
             );
           }
 
-          // Delete again after unlinking
           await pm.sdrPatternsPage.navigateToRegexPatterns();
           await pm.sdrPatternsPage.deletePatternByName(pattern.name);
         }
@@ -242,20 +273,16 @@ test.describe("Query Time Redaction - Combined Test", { tag: '@enterprise' }, ()
     // STEP 2: Create all 4 SDR patterns
     testLogger.info('STEP 2: Create all 4 SDR patterns');
 
-    for (const pattern of patternsToTest) {
+    for (const patternConfig of patternsToTest) {
       await pm.sdrPatternsPage.navigateToRegexPatterns();
-      const patternData = testData.regexPatterns.find(p => p.name === pattern.name);
-      if (!patternData) {
-        throw new Error(`Pattern ${pattern.name} not found in test data`);
-      }
-      await pm.sdrPatternsPage.createPattern(patternData.name, patternData.description, patternData.pattern);
+      await pm.sdrPatternsPage.createPattern(patternConfig.name, patternConfig.description, patternConfig.pattern);
       await pm.sdrPatternsPage.verifyPatternCreatedSuccess();
 
       // Verify pattern was created
       await pm.sdrPatternsPage.navigateToRegexPatterns();
-      const exists = await pm.sdrPatternsPage.checkPatternExists(patternData.name);
+      const exists = await pm.sdrPatternsPage.checkPatternExists(patternConfig.name);
       expect(exists).toBeTruthy();
-      testLogger.info(`✓ Created and verified pattern: ${pattern.name}`);
+      testLogger.info(`✓ Created and verified pattern: ${patternConfig.name}`);
     }
 
     testLogger.info('✓ STEP 2 PASSED: All 4 patterns created and verified');
@@ -263,16 +290,15 @@ test.describe("Query Time Redaction - Combined Test", { tag: '@enterprise' }, ()
     // STEP 3: Link all 4 patterns to their respective fields with QUERY TIME redaction
     testLogger.info('STEP 3: Link all 4 patterns to their respective fields');
 
-    for (const pattern of patternsToTest) {
-      const patternData = testData.regexPatterns.find(p => p.name === pattern.name);
+    for (const patternConfig of patternsToTest) {
       await pm.streamAssociationPage.associatePatternWithStream(
         testStreamName,
-        pattern.name,
+        patternConfig.name,
         'redact',
         'query', // QUERY TIME - key difference from ingestion time
-        patternData.testField
+        patternConfig.field
       );
-      testLogger.info(`✓ Linked pattern ${pattern.name} to field ${pattern.field}`);
+      testLogger.info(`✓ Linked pattern ${patternConfig.name} to field ${patternConfig.field}`);
     }
 
     testLogger.info('✓ STEP 3 PASSED: All 4 patterns linked to fields');

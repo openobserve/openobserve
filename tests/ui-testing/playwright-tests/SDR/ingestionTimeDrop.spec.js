@@ -1,9 +1,8 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const testData = require("../../../test-data/sdr_test_data.json");
 
-async function ingestMultipleFields(page, streamName, dataObjects) {
+async function ingestMultipleFields(page, streamName, dataObjects, maxRetries = 5) {
   const orgId = process.env["ORGNAME"];
   const basicAuthCredentials = Buffer.from(
     `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
@@ -24,33 +23,49 @@ async function ingestMultipleFields(page, streamName, dataObjects) {
 
   testLogger.info(`Preparing to ingest ${logData.length} separate log entries`);
 
-  const response = await page.evaluate(async ({ url, headers, orgId, streamName, logData }) => {
-    const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-      method: 'POST',
+  // Retry ingestion with exponential backoff for "stream being deleted" errors
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const response = await page.evaluate(async ({ url, headers, orgId, streamName, logData }) => {
+      const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(logData)
+      });
+      const responseJson = await fetchResponse.json();
+      return {
+        status: fetchResponse.status,
+        statusText: fetchResponse.statusText,
+        body: responseJson
+      };
+    }, {
+      url: process.env.INGESTION_URL,
       headers: headers,
-      body: JSON.stringify(logData)
+      orgId: orgId,
+      streamName: streamName,
+      logData: logData
     });
-    const responseJson = await fetchResponse.json();
-    return {
-      status: fetchResponse.status,
-      statusText: fetchResponse.statusText,
-      body: responseJson
-    };
-  }, {
-    url: process.env.INGESTION_URL,
-    headers: headers,
-    orgId: orgId,
-    streamName: streamName,
-    logData: logData
-  });
 
-  testLogger.info(`Ingestion API response - Status: ${response.status}, Body:`, response.body);
+    testLogger.info(`Ingestion API response (attempt ${attempt}/${maxRetries}) - Status: ${response.status}, Body:`, response.body);
 
-  if (response.status !== 200) {
+    if (response.status === 200) {
+      // Wait for stream to be available after ingestion
+      testLogger.info('Ingestion successful, waiting for stream to be indexed...');
+      await page.waitForTimeout(5000);
+      return;
+    }
+
+    // Check for "stream being deleted" error - retry with backoff
+    const errorMessage = response.body?.message || JSON.stringify(response.body);
+    if (errorMessage.includes('being deleted') && attempt < maxRetries) {
+      const waitTime = attempt * 5000; // 5s, 10s, 15s, 20s backoff
+      testLogger.info(`Stream is being deleted, waiting ${waitTime/1000}s before retry...`);
+      await page.waitForTimeout(waitTime);
+      continue;
+    }
+
     testLogger.error(`Ingestion failed! Status: ${response.status}, Response:`, response.body);
+    throw new Error(`Ingestion failed with status ${response.status}: ${JSON.stringify(response.body)}`);
   }
-
-  await page.waitForTimeout(2000);
 }
 
 async function closeStreamDetailSidebar(page) {
@@ -214,15 +229,43 @@ test.describe("Ingestion Time Drop - Combined Test", { tag: '@enterprise' }, () 
   test.describe.configure({ mode: 'serial' });
   let pm;
 
-  // All patterns used in this spec file - using DROP-specific patterns with _drop suffix
+  // Generate unique test run ID for isolation
+  const testRunId = Date.now().toString(36);
+
+  // All patterns used in this spec file - with full pattern definitions for uniqueness
   const patternsToTest = [
-    { name: 'url_format_drop', field: 'website_url', value: 'https://example.com' },
-    { name: 'strong_password_drop', field: 'user_password', value: 'P@ssw0rd!123' },
-    { name: 'ipv4_address_drop', field: 'server_ip', value: '192.168.1.1' },
-    { name: 'hex_color_drop', field: 'theme_color', value: '#FF5733' }
+    {
+      name: `url_format_drop_${testRunId}`,
+      description: 'URL validation pattern (for drop tests)',
+      pattern: '^https?://[\\w.-]+\\.[\\w.-]+.*$',
+      field: 'website_url',
+      value: 'https://example.com'
+    },
+    {
+      name: `strong_password_drop_${testRunId}`,
+      description: 'Strong password pattern (for drop tests)',
+      pattern: '^[A-Za-z0-9@$!%*?&]{8,}$',
+      field: 'user_password',
+      value: 'P@ssw0rd!123'
+    },
+    {
+      name: `ipv4_address_drop_${testRunId}`,
+      description: 'IPv4 address format (for drop tests)',
+      pattern: '^(\\d{1,3}\\.){3}\\d{1,3}$',
+      field: 'server_ip',
+      value: '192.168.1.1'
+    },
+    {
+      name: `hex_color_drop_${testRunId}`,
+      description: 'Hexadecimal color code (for drop tests)',
+      pattern: '^#[0-9a-fA-F]{6}$',
+      field: 'theme_color',
+      value: '#FF5733'
+    }
   ];
 
-  const testStreamName = "sdr_combined_drop_test";
+  // Use unique stream name to avoid "stream being deleted" conflicts
+  const testStreamName = `sdr_drop_${testRunId}`;
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
@@ -298,34 +341,32 @@ test.describe("Ingestion Time Drop - Combined Test", { tag: '@enterprise' }, () 
     // STEP 2: Create all 4 SDR patterns
     testLogger.info('STEP 2: Create all 4 SDR patterns');
     for (const patternConfig of patternsToTest) {
-      const pattern = testData.regexPatterns.find(p => p.name === patternConfig.name);
       await pm.sdrPatternsPage.navigateToRegexPatterns();
-      await pm.sdrPatternsPage.createPattern(pattern.name, pattern.description, pattern.pattern);
+      await pm.sdrPatternsPage.createPattern(patternConfig.name, patternConfig.description, patternConfig.pattern);
       await pm.sdrPatternsPage.verifyPatternCreatedSuccess();
 
       // Verify the pattern actually exists in the list
       await pm.sdrPatternsPage.navigateToRegexPatterns();
-      const exists = await pm.sdrPatternsPage.checkPatternExists(pattern.name);
+      const exists = await pm.sdrPatternsPage.checkPatternExists(patternConfig.name);
       if (!exists) {
-        testLogger.error(`Pattern ${pattern.name} was not created successfully!`);
-        throw new Error(`Pattern ${pattern.name} creation failed - not found in list`);
+        testLogger.error(`Pattern ${patternConfig.name} was not created successfully!`);
+        throw new Error(`Pattern ${patternConfig.name} creation failed - not found in list`);
       }
-      testLogger.info(`✓ Created and verified pattern: ${pattern.name}`);
+      testLogger.info(`✓ Created and verified pattern: ${patternConfig.name}`);
     }
     testLogger.info('✓ STEP 2 PASSED: All 4 patterns created and verified');
 
     // STEP 3: Link all 4 patterns to their respective fields with DROP action
     testLogger.info('STEP 3: Link all 4 patterns to their respective fields with DROP action');
     for (const patternConfig of patternsToTest) {
-      const pattern = testData.regexPatterns.find(p => p.name === patternConfig.name);
       await pm.streamAssociationPage.associatePatternWithStream(
         testStreamName,
-        pattern.name,
+        patternConfig.name,
         'drop',
         'ingestion',
-        pattern.testField
+        patternConfig.field
       );
-      testLogger.info(`✓ Linked pattern ${pattern.name} to field ${pattern.testField} with DROP action`);
+      testLogger.info(`✓ Linked pattern ${patternConfig.name} to field ${patternConfig.field} with DROP action`);
     }
     testLogger.info('✓ STEP 3 PASSED: All 4 patterns linked to fields with DROP action');
 
