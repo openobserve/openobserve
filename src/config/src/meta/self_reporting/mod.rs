@@ -325,6 +325,7 @@ mod tests {
             work_group: None,
             node_name: None,
             dashboard_info: None,
+            peak_memory_usage: None,
         };
 
         let result = queue
@@ -518,6 +519,7 @@ mod tests {
             work_group: None,
             node_name: None,
             dashboard_info: None,
+            peak_memory_usage: None,
         };
 
         runner.push(ReportingData::Usage(Box::new(usage_data)));
@@ -574,6 +576,7 @@ mod tests {
                 work_group: None,
                 node_name: None,
                 dashboard_info: None,
+                peak_memory_usage: None,
             };
             runner.push(ReportingData::Usage(Box::new(usage_data)));
         }
@@ -620,6 +623,7 @@ mod tests {
             work_group: None,
             node_name: None,
             dashboard_info: None,
+            peak_memory_usage: None,
         };
         runner.push(ReportingData::Usage(Box::new(usage_data)));
 
@@ -672,6 +676,7 @@ mod tests {
                 work_group: None,
                 node_name: None,
                 dashboard_info: None,
+                peak_memory_usage: None,
             };
             runner.push(ReportingData::Usage(Box::new(usage_data)));
         }
@@ -730,6 +735,7 @@ mod tests {
             work_group: None,
             node_name: None,
             dashboard_info: None,
+            peak_memory_usage: None,
         };
 
         let message = ReportingMessage::Data(ReportingData::Usage(Box::new(usage_data)));
@@ -773,6 +779,7 @@ mod tests {
             work_group: None,
             node_name: None,
             dashboard_info: None,
+            peak_memory_usage: None,
         };
 
         let data = ReportingData::Usage(Box::new(usage_data));
@@ -821,6 +828,7 @@ mod tests {
             work_group: None,
             node_name: None,
             dashboard_info: None,
+            peak_memory_usage: None,
         };
 
         // First message should succeed
@@ -874,6 +882,7 @@ mod tests {
             work_group: None,
             node_name: None,
             dashboard_info: None,
+            peak_memory_usage: None,
         };
 
         let trigger_data = TriggerData {
