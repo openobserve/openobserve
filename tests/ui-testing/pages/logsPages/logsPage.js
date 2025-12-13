@@ -141,6 +141,11 @@ export class LogsPage {
         this.successNotification = '.q-notification__message';
         this.linkCopiedSuccessText = 'Link Copied Successfully';
         this.errorCopyingLinkText = 'Error while copy link';
+
+        // ===== QUERY EDITOR EXPAND/COLLAPSE SELECTORS =====
+        this.queryEditorFullScreenBtn = '[data-test="logs-query-editor-full_screen-btn"]';
+        this.queryEditorContainer = '.query-editor-container';
+        this.expandOnFocusClass = '.expand-on-focus';
     }
 
 
@@ -1909,6 +1914,28 @@ export class LogsPage {
 
     async expectQueryEditorContainsText(text) {
         return await expect(this.page.locator(this.queryEditor).locator('.monaco-editor')).toContainText(text);
+    }
+
+    // ===== QUERY EDITOR EXPAND/COLLAPSE METHODS =====
+    async clickQueryEditorFullScreenBtn() {
+        return await this.page.locator(this.queryEditorFullScreenBtn).click();
+    }
+
+    async expectQueryEditorFullScreenBtnVisible() {
+        return await expect(this.page.locator(this.queryEditorFullScreenBtn)).toBeVisible({ timeout: 10000 });
+    }
+
+    async isQueryEditorExpanded() {
+        const container = this.page.locator(this.queryEditorContainer);
+        return await container.locator(this.expandOnFocusClass).count() > 0;
+    }
+
+    async toggleQueryEditorFullScreen() {
+        const initialState = await this.isQueryEditorExpanded();
+        await this.clickQueryEditorFullScreenBtn();
+        await this.page.waitForTimeout(1000); // Wait for animation
+        const newState = await this.isQueryEditorExpanded();
+        return { initialState, newState, toggled: initialState !== newState };
     }
 
     async expectQueryEditorEmpty() {
