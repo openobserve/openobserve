@@ -2910,7 +2910,8 @@ export class LogsPage {
     }
 
     async expectErrorIconVisible() {
-        return await expect(this.page.getByText('error')).toBeVisible();
+        // Use specific selector for error icon (material-icons with text-negative class)
+        return await expect(this.page.locator('i.q-icon.text-negative.material-icons').filter({ hasText: 'error' })).toBeVisible();
     }
 
     async expectResultErrorDetailsButtonVisible() {
