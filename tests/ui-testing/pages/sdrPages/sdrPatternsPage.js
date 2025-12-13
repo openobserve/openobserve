@@ -287,16 +287,31 @@ export class SDRPatternsPage {
     return isVisible;
   }
 
-  async checkPatternExists(patternName) {
+  async checkPatternExists(patternName, maxRetries = 3) {
     testLogger.info(`Checking if pattern exists: ${patternName}`);
-    await this.searchPattern(patternName);
-    await this.page.waitForTimeout(1000);
 
-    const count = await this.page.locator(`text="${patternName}"`).count();
-    const exists = count > 0;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      await this.searchPattern(patternName);
+      await this.page.waitForTimeout(1000);
 
-    testLogger.info(`Pattern ${patternName} exists: ${exists}`);
-    return exists;
+      const count = await this.page.locator(`text="${patternName}"`).count();
+      const exists = count > 0;
+
+      if (exists) {
+        testLogger.info(`Pattern ${patternName} exists: true (found on attempt ${attempt})`);
+        return true;
+      }
+
+      if (attempt < maxRetries) {
+        testLogger.info(`Pattern ${patternName} not found on attempt ${attempt}, retrying in 2s...`);
+        await this.page.waitForTimeout(2000);
+        // Navigate back to refresh the list
+        await this.navigateToRegexPatterns();
+      }
+    }
+
+    testLogger.info(`Pattern ${patternName} exists: false (after ${maxRetries} attempts)`);
+    return false;
   }
 
   async getPatternIdByName(patternName) {

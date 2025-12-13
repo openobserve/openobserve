@@ -61,10 +61,22 @@ export class StreamAssociationPage {
     const streamRow = streamCell.locator('..');
     testLogger.info('Got parent row');
 
-    // Find the Stream Detail button in that row
-    const detailButton = streamRow.getByRole('button', { name: 'Stream Detail' });
-    const buttonCount = await detailButton.count();
-    testLogger.info(`Stream Detail button count: ${buttonCount}`);
+    // Wait for the row to be fully rendered
+    await this.page.waitForTimeout(500);
+
+    // Find the Stream Detail button in that row - try multiple times
+    let detailButton = streamRow.getByRole('button', { name: 'Stream Detail' });
+    let buttonCount = await detailButton.count();
+    testLogger.info(`Stream Detail button count (by role): ${buttonCount}`);
+
+    // If not found, wait and retry up to 3 times
+    for (let retry = 0; retry < 3 && buttonCount === 0; retry++) {
+      testLogger.info(`Waiting 1 second and retrying (attempt ${retry + 2})...`);
+      await this.page.waitForTimeout(1000);
+      detailButton = streamRow.getByRole('button', { name: 'Stream Detail' });
+      buttonCount = await detailButton.count();
+      testLogger.info(`Stream Detail button count (after wait ${retry + 1}): ${buttonCount}`);
+    }
 
     if (buttonCount === 0) {
       testLogger.error('Stream Detail button not found! Taking screenshot...');
