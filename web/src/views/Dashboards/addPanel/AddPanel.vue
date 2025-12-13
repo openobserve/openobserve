@@ -727,7 +727,7 @@ import {
 import PanelSidebar from "../../../components/dashboards/addPanel/PanelSidebar.vue";
 import ChartSelection from "../../../components/dashboards/addPanel/ChartSelection.vue";
 import FieldList from "../../../components/dashboards/addPanel/FieldList.vue";
-import CustomChartTypeSelector from "../../../components/dashboards/addPanel/CustomChartTypeSelector.vue";
+import CustomChartTypeSelector from "../../../components/dashboards/addPanel/customChartExamples/CustomChartTypeSelector.vue";
 
 import { useI18n } from "vue-i18n";
 import {
@@ -755,7 +755,7 @@ import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import useAiChat from "@/composables/useAiChat";
 import useStreams from "@/composables/useStreams";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
-import { loadCustomChartTemplate } from "@/components/dashboards/addPanel/customChartTemplates";
+import { loadCustomChartTemplate } from "@/components/dashboards/addPanel/customChartExamples/customChartTemplates";
 import {
   createDashboardsContextProvider,
   contextRegistry,
@@ -882,15 +882,12 @@ export default defineComponent({
               dashboardPanelData.data.queries[currentQueryIndex].query = template.query.trim();
               // Enable custom query mode for custom charts
               dashboardPanelData.data.queries[currentQueryIndex].customQuery = true;
-            } else {
-              // Clear the query if replacement option is not selected
-              dashboardPanelData.data.queries[currentQueryIndex].query = "";
-              dashboardPanelData.data.queries[currentQueryIndex].customQuery = true;
             }
+            // If replaceQuery is false, preserve the existing query (do nothing)
           }
         }
       } catch (error) {
-        console.error("Error loading chart template:", error);
+        console.error("There was an error applying the chart example code. Please try again");
       }
     };
 

@@ -17,108 +17,9 @@ import router from "src/router";
 import * as acorn from "acorn";
 import * as walk from "acorn-walk";
 import { ref } from 'vue';
-import { formatDate, isTimeSeries, isTimeStamp } from "./convertDataIntoUnitValue";
-import { toZonedTime } from "date-fns-tz";
 
 // Add at the top of the file
 export const panelIdToBeRefreshed = ref<string | null>(null);
-
-/**
- * Formats timestamp fields in the data array for custom charts.
- * Converts 16-digit microsecond timestamps to formatted date strings using timezone.
- * 
- * @param {any[]} data - The data array from query results
- * @param {string} timezone - The timezone to use for conversion
- * @returns {any[]} - Data array with formatted timestamps
- */
-const formatCustomChartTimestamps = (data: any[], timezone: string = 'UTC'): any[] => {
-  if (!Array.isArray(data) || data.length === 0) {
-    return data;
-  }
-
-  // Handle nested array structure [[...data...]]
-  const dataArray = Array.isArray(data[0]) ? data[0] : data;
-  
-  if (dataArray.length === 0 || typeof dataArray[0] !== 'object') {
-    return data;
-  }
-
-  // Get all keys from first object
-  const sampleKeys = Object.keys(dataArray[0]);
-  
-  // Check each key to see if it contains timestamp data
-  const timestampKeys: string[] = [];
-  const timeSeriesKeys: string[] = [];
-  
-  for (const key of sampleKeys) {
-    // Get sample values for this key (filter out null/undefined)
-    const sampleValues = dataArray
-      .slice(0, Math.min(10, dataArray.length))
-      .map((item: any) => item[key])
-      .filter((val: any) => val != null);
-    
-    if (sampleValues.length === 0) continue;
-    
-    // Check if this key contains timestamps (16-digit microseconds)
-    if (isTimeStamp(sampleValues, null)) {
-      timestampKeys.push(key);
-    }
-    // Check if this key contains ISO time series
-    else if (isTimeSeries(sampleValues)) {
-      timeSeriesKeys.push(key);
-    }
-  }
-
-  // If no timestamp keys found, return original data
-  if (timestampKeys.length === 0 && timeSeriesKeys.length === 0) {
-    return data;
-  }
-
-  // Format timestamps in the data
-  const formattedData = dataArray.map((item: any) => {
-    const formatted = { ...item };
-    
-    // Convert 16-digit timestamps to formatted dates with timezone
-    timestampKeys.forEach((key) => {
-      const value = item[key];
-      if (value != null) {
-        try {
-          // Convert microseconds to milliseconds, apply timezone, then format
-          const timestamp = parseInt(value.toString());
-          const dateInTimezone = toZonedTime(
-            new Date(timestamp / 1000),
-            timezone
-          );
-          formatted[key] = formatDate(dateInTimezone);
-        } catch (e) {
-          formatted[key] = value;
-        }
-      }
-    });
-    
-    // Convert ISO time series to formatted dates with timezone
-    timeSeriesKeys.forEach((key) => {
-      const value = item[key];
-      if (value != null && typeof value === 'string') {
-        try {
-          // Parse ISO string, add Z for UTC, apply timezone, then format
-          const dateInTimezone = toZonedTime(
-            new Date(value + 'Z'),
-            timezone
-          );
-          formatted[key] = formatDate(dateInTimezone);
-        } catch (e) {
-          formatted[key] = value;
-        }
-      }
-    });
-    
-    return formatted;
-  });
-
-  // Return in same structure as input
-  return Array.isArray(data[0]) ? [formattedData] : formattedData;
-};
 
 /**
  * Converts SQL data into a format suitable for rendering a chart.
@@ -130,7 +31,7 @@ const formatCustomChartTimestamps = (data: any[], timezone: string = 'UTC'): any
  */
 
 
-export const runJavaScriptCode = (panelSchema: any, searchQueryData: any, timezone: string = 'UTC') => {
+export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
   return new Promise((resolve, reject) => {
     // Skip if this panel is not the one to be refreshed
     if (panelIdToBeRefreshed.value && panelIdToBeRefreshed.value !== panelSchema.id) {
@@ -224,8 +125,6 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any, timezo
 
           (function(data, echarts) {
             try {
-              // Make queryResult available globally for template compatibility
-              window.queryResult = data;
               ${userCode};
             } catch (err) {
               parent.postMessage({ type: 'error', message: 'Execution Error: ' + err.message }, '*');
@@ -286,14 +185,11 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any, timezo
     });
 
     iframe.onload = () => {
-      // Format timestamps in the data before passing to custom chart
-      const formattedData = formatCustomChartTimestamps(searchQueryData, timezone);
-      
       iframe?.contentWindow?.postMessage(
         {
           type: "execute",
           code: userCode, 
-          data: JSON.stringify(formattedData),
+          data: JSON.stringify(searchQueryData),
         },
         "*"
       );
@@ -426,13 +322,4 @@ const validateUserCode = (code: string): string | null => {
   } catch (error) {
     return "Invalid JavaScript syntax.";
   }
-};
-
-
-
-
-
-
-
-
-
+};

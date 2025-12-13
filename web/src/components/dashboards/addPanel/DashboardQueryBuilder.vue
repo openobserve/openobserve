@@ -20,8 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       !promqlMode &&
       dashboardPanelData.data.type != 'geomap' &&
       dashboardPanelData.data.type != 'maps' &&
-      dashboardPanelData.data.type != 'sankey' &&
-      dashboardPanelData.data.type != 'custom_chart'
+      dashboardPanelData.data.type != 'sankey'
     "
   >
     <!-- x axis container -->
@@ -1155,8 +1154,7 @@ export default defineComponent({
     DashboardFiltersOption,
   },
   props: ["dashboardData"],
-  emits: ["custom-chart-template-selected"],
-  setup(props, { emit }) {
+  setup(props) {
     const showXAxis = ref(true);
     const panelName = ref("");
     const panelDesc = ref("");
@@ -1728,11 +1726,6 @@ export default defineComponent({
       );
     };
 
-    // Handler for custom chart template selection
-    const handleCustomChartTemplateSelected = (templateCode: string) => {
-      emit("custom-chart-template-selected", templateCode);
-    };
-
     return {
       showXAxis,
       t,
@@ -1786,7 +1779,6 @@ export default defineComponent({
       toggleHavingFilter,
       cancelHavingFilter,
       getHavingCondition,
-      handleCustomChartTemplateSelected,
     };
   },
 });
