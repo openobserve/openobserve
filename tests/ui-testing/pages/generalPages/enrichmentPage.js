@@ -46,6 +46,9 @@ class EnrichmentPage {
     async navigateToEnrichmentTable() {
         await this.page.locator(this.pipelineMenuItem).click();
         await this.page.locator(this.enrichmentTableTab).click();
+        await this.page.waitForLoadState('networkidle');
+        // Wait for the enrichment tables list to be visible
+        await this.page.locator('.q-table__title').filter({ hasText: 'Enrichment Tables' }).waitFor({ state: 'visible', timeout: 10000 });
     }
 
     async navigateToAddEnrichmentTable() {
@@ -65,6 +68,12 @@ class EnrichmentPage {
         // Click on 'Save'
         await this.page.getByText(this.saveButton).click({ force: true });
         await this.page.waitForLoadState('networkidle');
+
+        // Wait for the form to disappear (indicates save completed and returned to list)
+        await this.page.getByText('Add Enrichment Table').waitFor({ state: 'hidden', timeout: 15000 });
+
+        // Additional wait for page to stabilize
+        await this.page.waitForTimeout(2000);
     }
 
     async searchForEnrichmentTable(fileName) {
@@ -554,6 +563,93 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
     async testCSVValidationError() {
         await this.attemptSaveWithoutFile('test');
+    }
+
+    async attemptSaveWithoutName(filePath) {
+        // Upload file WITHOUT entering name
+        const inputFile = await this.page.locator(this.fileInput);
+        await inputFile.setInputFiles(filePath);
+
+        // Click save without entering name
+        await this.page.getByRole('button', { name: this.saveButton }).click();
+
+        // Wait for and verify error message
+        await this.page.getByText('Field is required!').waitFor({ state: 'visible' });
+    }
+
+    async clickCancelButton() {
+        await this.page.getByRole('button', { name: 'Cancel' }).click();
+        await this.page.waitForLoadState('networkidle');
+    }
+
+    async verifyBackOnEnrichmentList() {
+        // Verify we're back on enrichment tables list page by checking for unique element
+        await this.page.locator('.q-table__title').filter({ hasText: 'Enrichment Tables' }).waitFor({ state: 'visible' });
+    }
+
+    async searchEnrichmentTableInList(tableName) {
+        // Use getByRole to find the textbox input within the search wrapper
+        const searchInput = this.page.locator('[data-test="enrichment-tables-search-input"]').getByRole('textbox');
+        await searchInput.waitFor({ state: 'visible' });
+        await searchInput.fill(tableName);
+        await this.page.waitForLoadState('networkidle');
+    }
+
+    async verifyTableVisibleInList(tableName) {
+        const exploreBtn = this.page.locator(`[data-test="${tableName}-explore-btn"]`);
+        await expect(exploreBtn).toBeVisible();
+    }
+
+    async clickSchemaButton(tableName) {
+        // Find the row with the table and click schema button (2nd button, list_alt icon)
+        const row = this.page.locator('tbody tr').filter({ hasText: tableName });
+        // Buttons order: Explore (0), Schema (1), Edit (2), Delete (3)
+        await row.locator('button').nth(1).click();
+        await this.page.waitForLoadState('networkidle');
+    }
+
+    async verifySchemaModalVisible() {
+        await this.page.locator('[data-test="schema-title-text"]').waitFor({ state: 'visible' });
+    }
+
+    async clickEditButton(tableName) {
+        const row = this.page.locator('tbody tr').filter({ hasText: tableName });
+        // Buttons order: Explore (0), Schema (1), Edit (2), Delete (3)
+        await row.locator('button').nth(2).click();
+        await this.page.waitForLoadState('networkidle');
+    }
+
+    async verifyUpdateMode() {
+        await this.page.getByText('Update Enrichment Table').waitFor({ state: 'visible' });
+    }
+
+    async verifyNameFieldDisabled() {
+        const nameInput = this.page.locator(this.fileNameInput);
+        // Check if the input is disabled using Playwright's built-in method
+        await expect(nameInput).toBeDisabled();
+    }
+
+    async clickDeleteButton(tableName) {
+        const row = this.page.locator('tbody tr').filter({ hasText: tableName });
+        // Buttons order: Explore (0), Schema (1), Edit (2), Delete (3)
+        await row.locator('button').nth(3).click();
+        await this.page.waitForLoadState('domcontentloaded');
+    }
+
+    async verifyDeleteConfirmationDialog() {
+        // Use more specific selector to avoid duplicate text - look for the dialog container
+        await this.page.locator('.q-dialog').getByText('Delete Enrichment Table', { exact: true }).first().waitFor({ state: 'visible' });
+        await this.page.getByText('Are you sure you want to delete enrichment table?').waitFor({ state: 'visible' });
+    }
+
+    async clickDeleteCancel() {
+        await this.page.getByRole('button', { name: 'Cancel' }).click();
+        await this.page.waitForLoadState('domcontentloaded');
+    }
+
+    async clickDeleteOK() {
+        await this.page.getByRole('button', { name: 'OK' }).click();
+        await this.page.waitForLoadState('networkidle');
     }
 }
 

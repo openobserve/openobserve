@@ -14,6 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod actions;
+// #[cfg(feature = "enterprise")]
+pub mod agent;
 #[cfg(feature = "enterprise")]
 pub mod ai;
 pub mod alerts;
@@ -36,7 +38,6 @@ pub mod logs;
 pub mod mcp;
 pub mod metrics;
 pub mod organization;
-#[cfg(feature = "enterprise")]
 pub mod patterns;
 pub mod pipeline;
 pub mod pipelines;
@@ -49,7 +50,6 @@ pub mod rum;
 pub mod script_server;
 pub mod search;
 pub mod service_accounts;
-#[cfg(feature = "enterprise")]
 pub mod service_streams;
 pub mod short_url;
 pub mod status;

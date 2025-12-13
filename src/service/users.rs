@@ -162,12 +162,7 @@ pub async fn post_user(
 
             // Save the user in the database
             if db::user::add(&user).await.is_err() {
-                return Ok(
-                    HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                        http::StatusCode::INTERNAL_SERVER_ERROR,
-                        "Failed to save user",
-                    )),
-                );
+                return Ok(MetaHttpResponse::internal_error("Failed to save user"));
             }
             // Update OFGA
             #[cfg(feature = "enterprise")]
@@ -452,12 +447,7 @@ pub async fn update_user(
                     .await
                     .is_err()
                 {
-                    return Ok(
-                        HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                            http::StatusCode::INTERNAL_SERVER_ERROR,
-                            "Failed to update user",
-                        )),
-                    );
+                    return Ok(MetaHttpResponse::internal_error("Failed to update user"));
                 }
 
                 // Update the organization membership
@@ -689,12 +679,9 @@ pub async fn add_user_to_org(
                 .await
                 .is_err()
             {
-                return Ok(
-                    HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                        http::StatusCode::INTERNAL_SERVER_ERROR,
-                        "Failed to add user to org",
-                    )),
-                );
+                return Ok(MetaHttpResponse::internal_error(
+                    "Failed to add user to org",
+                ));
             }
 
             // Update OFGA

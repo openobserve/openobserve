@@ -42,6 +42,11 @@ export interface SemanticFieldGroup {
   fields: string[];
   normalize?: boolean;
   group?: string;
+  /** Whether this dimension is stable (persists across pod restarts, deployments, etc.)
+   * Stable dimensions: cluster, namespace, deployment, statefulset
+   * Unstable dimensions: pod-id, pod-start-time, container-id, node-id
+   * Used for correlation - unstable dimension mismatches are ignored */
+  is_stable?: boolean;
 }
 
 export interface StreamInfo {

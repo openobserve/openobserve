@@ -547,7 +547,10 @@ pub async fn generate_invitation(
             }
         }
 
-        if let Err(_) = o2_enterprise::enterprise::cloud::email::check_email(invitee).await {
+        if o2_enterprise::enterprise::cloud::email::check_email(invitee)
+            .await
+            .is_err()
+        {
             return Err(anyhow::anyhow!("Email Domain not allowed for {invitee}"));
         }
 
