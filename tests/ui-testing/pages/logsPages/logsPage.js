@@ -141,6 +141,11 @@ export class LogsPage {
         this.successNotification = '.q-notification__message';
         this.linkCopiedSuccessText = 'Link Copied Successfully';
         this.errorCopyingLinkText = 'Error while copy link';
+
+        // ===== QUERY EDITOR EXPAND/COLLAPSE SELECTORS =====
+        this.queryEditorFullScreenBtn = '[data-test="logs-query-editor-full_screen-btn"]';
+        this.queryEditorContainer = '.query-editor-container';
+        this.expandOnFocusClass = '.expand-on-focus';
     }
 
 
@@ -1911,6 +1916,28 @@ export class LogsPage {
         return await expect(this.page.locator(this.queryEditor).locator('.monaco-editor')).toContainText(text);
     }
 
+    // ===== QUERY EDITOR EXPAND/COLLAPSE METHODS =====
+    async clickQueryEditorFullScreenBtn() {
+        return await this.page.locator(this.queryEditorFullScreenBtn).click();
+    }
+
+    async expectQueryEditorFullScreenBtnVisible() {
+        return await expect(this.page.locator(this.queryEditorFullScreenBtn)).toBeVisible({ timeout: 10000 });
+    }
+
+    async isQueryEditorExpanded() {
+        const container = this.page.locator(this.queryEditorContainer);
+        return await container.locator(this.expandOnFocusClass).count() > 0;
+    }
+
+    async toggleQueryEditorFullScreen() {
+        const initialState = await this.isQueryEditorExpanded();
+        await this.clickQueryEditorFullScreenBtn();
+        await this.page.waitForTimeout(500); // Wait for animation
+        const newState = await this.isQueryEditorExpanded();
+        return { initialState, newState, toggled: initialState !== newState };
+    }
+
     async expectQueryEditorEmpty() {
         const text = await this.getQueryEditorText();
         return await expect(text).toEqual("");
@@ -2883,7 +2910,8 @@ export class LogsPage {
     }
 
     async expectErrorIconVisible() {
-        return await expect(this.page.getByText('error')).toBeVisible();
+        // Use specific selector for error icon (material-icons with text-negative class)
+        return await expect(this.page.locator('i.q-icon.text-negative.material-icons').filter({ hasText: 'error' })).toBeVisible();
     }
 
     async expectResultErrorDetailsButtonVisible() {
