@@ -1514,6 +1514,75 @@ export class LogsPage {
         return await this.page.locator(this.queryButton).click({ force: true });
     }
 
+    /**
+     * Ingest multiple log entries with retry logic for "stream being deleted" errors
+     * @param {string} streamName - Target stream name
+     * @param {Array<{fieldName: string, fieldValue: string}>} dataObjects - Array of field data to ingest
+     * @param {number} maxRetries - Maximum retry attempts (default: 5)
+     */
+    async ingestMultipleFields(streamName, dataObjects, maxRetries = 5) {
+        const orgId = process.env["ORGNAME"];
+        const basicAuthCredentials = Buffer.from(
+            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+        ).toString('base64');
+
+        const headers = {
+            "Authorization": `Basic ${basicAuthCredentials}`,
+            "Content-Type": "application/json",
+        };
+
+        const baseTimestamp = Date.now() * 1000;
+        const logData = dataObjects.map(({ fieldName, fieldValue }, index) => ({
+            level: "info",
+            [fieldName]: fieldValue,
+            log: `Test log with ${fieldName} field - entry ${index}`,
+            _timestamp: baseTimestamp + (index * 1000000)
+        }));
+
+        testLogger.info(`Preparing to ingest ${logData.length} separate log entries`);
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            const response = await this.page.evaluate(async ({ url, headers, orgId, streamName, logData }) => {
+                const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(logData)
+                });
+                const responseJson = await fetchResponse.json();
+                return {
+                    status: fetchResponse.status,
+                    statusText: fetchResponse.statusText,
+                    body: responseJson
+                };
+            }, {
+                url: process.env.INGESTION_URL,
+                headers: headers,
+                orgId: orgId,
+                streamName: streamName,
+                logData: logData
+            });
+
+            testLogger.info(`Ingestion API response (attempt ${attempt}/${maxRetries}) - Status: ${response.status}, Body:`, response.body);
+
+            if (response.status === 200) {
+                testLogger.info('Ingestion successful, waiting for stream to be indexed...');
+                await this.page.waitForTimeout(5000);
+                return;
+            }
+
+            const errorMessage = response.body?.message || JSON.stringify(response.body);
+            if (errorMessage.includes('being deleted') && attempt < maxRetries) {
+                const waitTime = attempt * 5000;
+                testLogger.info(`Stream is being deleted, waiting ${waitTime/1000}s before retry...`);
+                await this.page.waitForTimeout(waitTime);
+                continue;
+            }
+
+            testLogger.error(`Ingestion failed! Status: ${response.status}, Response:`, response.body);
+            throw new Error(`Ingestion failed with status ${response.status}: ${JSON.stringify(response.body)}`);
+        }
+    }
+
     async clickSearchBarRefreshButton() {
         return await this.page.locator(this.searchBarRefreshButton).click({ force: true });
     }

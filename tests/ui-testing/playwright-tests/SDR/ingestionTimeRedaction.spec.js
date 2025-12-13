@@ -2,72 +2,6 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 
-async function ingestMultipleFields(page, streamName, dataObjects, maxRetries = 5) {
-  const orgId = process.env["ORGNAME"];
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString('base64');
-
-  const headers = {
-    "Authorization": `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  };
-
-  const baseTimestamp = Date.now() * 1000;
-  const logData = dataObjects.map(({ fieldName, fieldValue }, index) => ({
-    level: "info",
-    [fieldName]: fieldValue,
-    log: `Test log with ${fieldName} field - entry ${index}`,
-    _timestamp: baseTimestamp + (index * 1000000) // Add 1ms offset for each log to ensure they're separate
-  }));
-
-  testLogger.info(`Preparing to ingest ${logData.length} separate log entries`);
-
-  // Retry ingestion with exponential backoff for "stream being deleted" errors
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    const response = await page.evaluate(async ({ url, headers, orgId, streamName, logData }) => {
-      const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify(logData)
-      });
-      const responseJson = await fetchResponse.json();
-      return {
-        status: fetchResponse.status,
-        statusText: fetchResponse.statusText,
-        body: responseJson
-      };
-    }, {
-      url: process.env.INGESTION_URL,
-      headers: headers,
-      orgId: orgId,
-      streamName: streamName,
-      logData: logData
-    });
-
-    testLogger.info(`Ingestion API response (attempt ${attempt}/${maxRetries}) - Status: ${response.status}, Body:`, response.body);
-
-    if (response.status === 200) {
-      // Wait for stream to be available after ingestion
-      testLogger.info('Ingestion successful, waiting for stream to be indexed...');
-      await page.waitForTimeout(5000);
-      return;
-    }
-
-    // Check for "stream being deleted" error - retry with backoff
-    const errorMessage = response.body?.message || JSON.stringify(response.body);
-    if (errorMessage.includes('being deleted') && attempt < maxRetries) {
-      const waitTime = attempt * 5000; // 5s, 10s, 15s, 20s backoff
-      testLogger.info(`Stream is being deleted, waiting ${waitTime/1000}s before retry...`);
-      await page.waitForTimeout(waitTime);
-      continue;
-    }
-
-    testLogger.error(`Ingestion failed! Status: ${response.status}, Response:`, response.body);
-    throw new Error(`Ingestion failed with status ${response.status}: ${JSON.stringify(response.body)}`);
-  }
-}
-
 async function closeStreamDetailSidebar(page) {
   // Close stream detail sidebar if open
   const cancelButton = page.getByRole('button', { name: 'Cancel' });
@@ -276,7 +210,7 @@ test.describe("Ingestion Time Redaction - Combined Test", { tag: '@enterprise' }
     // STEP 1: Ingest data WITHOUT any SDR patterns - all fields should be visible
     testLogger.info('STEP 1: Ingest 4 lines of data WITHOUT any SDR patterns linked');
     const dataToIngest = patternsToTest.map(p => ({ fieldName: p.field, fieldValue: p.value }));
-    await ingestMultipleFields(page, testStreamName, dataToIngest);
+    await pm.logsPage.ingestMultipleFields(testStreamName, dataToIngest);
 
     const fieldsToVerifyStep1 = patternsToTest.map(p => ({ fieldName: p.field, shouldBeRedacted: false }));
     await verifyMultipleFieldsRedaction(page, pm, testStreamName, fieldsToVerifyStep1);
@@ -316,7 +250,7 @@ test.describe("Ingestion Time Redaction - Combined Test", { tag: '@enterprise' }
 
     // STEP 4: Ingest data WITH SDR patterns linked - all fields should be REDACTED
     testLogger.info('STEP 4: Ingest 4 lines of data WITH SDR patterns linked');
-    await ingestMultipleFields(page, testStreamName, dataToIngest);
+    await pm.logsPage.ingestMultipleFields(testStreamName, dataToIngest);
 
     const fieldsToVerifyStep4 = patternsToTest.map(p => ({ fieldName: p.field, shouldBeRedacted: true }));
     await verifyMultipleFieldsRedaction(page, pm, testStreamName, fieldsToVerifyStep4);
