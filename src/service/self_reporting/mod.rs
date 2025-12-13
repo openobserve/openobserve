@@ -156,6 +156,7 @@ pub async fn report_request_usage_stats(
             work_group: None,
             node_name: stats.node_name.clone(),
             dashboard_info: stats.dashboard_info.clone(),
+            peak_memory_usage: stats.peak_memory_usage,
         });
     };
 
@@ -198,6 +199,7 @@ pub async fn report_request_usage_stats(
         work_group: stats.work_group,
         node_name: stats.node_name,
         dashboard_info: stats.dashboard_info,
+        peak_memory_usage: stats.peak_memory_usage,
     });
     if !usage.is_empty() {
         publish_usage(usage).await;

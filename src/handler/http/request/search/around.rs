@@ -260,6 +260,13 @@ pub(crate) async fn around(
             resp_forward.work_group.clone(),
             resp_backward.work_group.clone(),
         ]),
+        // get max peak memory usage from forward and backward
+        peak_memory_usage: Some(
+            resp_forward
+                .peak_memory_usage
+                .unwrap_or(0.0)
+                .max(resp_backward.peak_memory_usage.unwrap_or(0.0)),
+        ),
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
