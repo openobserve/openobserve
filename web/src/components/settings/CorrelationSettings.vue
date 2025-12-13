@@ -89,10 +89,9 @@ export default defineComponent({
     const { t } = useI18n();
     const activeTab = ref("identity");
 
-    const onCorrelationSettingsSaved = async () => {
-      // Reload organization settings to get updated dedup config
-      // Note: Child components show their own success notifications
-      await store.dispatch("getDefaultOrganizationSettings");
+    const onCorrelationSettingsSaved = () => {
+      // Child components handle their own notifications and data refresh
+      // No global store update needed as settings are managed via settings v2 API
     };
 
     return {

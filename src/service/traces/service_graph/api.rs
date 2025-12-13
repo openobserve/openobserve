@@ -64,7 +64,8 @@ pub async fn get_current_topology(
     use config::meta::service_graph::ServiceGraphData;
 
     // Query edges from stream (last 60 minutes by default)
-    let edges = match query_edges_from_stream(&org_id, query.stream_name.as_deref()).await {
+    let edges = match query_edges_from_stream_internal(&org_id, query.stream_name.as_deref()).await
+    {
         Ok(edges) => edges,
         Err(e) => {
             // Stream doesn't exist yet or query failed - return empty topology gracefully
@@ -110,7 +111,9 @@ pub async fn get_current_topology(
 
 #[cfg(feature = "enterprise")]
 /// Query edge records from the _o2_service_graph stream
-async fn query_edges_from_stream(
+///
+/// Internal version exposed for incident topology enrichment.
+pub async fn query_edges_from_stream_internal(
     org_id: &str,
     stream_filter: Option<&str>,
 ) -> Result<Vec<serde_json::Value>, infra::errors::Error> {
@@ -205,6 +208,26 @@ async fn query_edges_from_stream(
     Ok(resp.hits)
 }
 
+/// GetCurrentTopology (OSS - Not Supported)
+#[utoipa::path(
+    get,
+    path = "/{org_id}/traces/service_graph/topology/current",
+    context_path = "/api",
+    tag = "Traces",
+    operation_id = "GetCurrentServiceGraphTopology",
+    summary = "Get current service graph topology",
+    description = "Returns service graph topology from stream storage (last 60 minutes). Enterprise feature only.",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = Option<String>, Query, description = "Optional stream name to filter service graph topology"),
+    ),
+    responses(
+        (status = 403, description = "Forbidden - Enterprise feature"),
+    ),
+)]
 #[actix_web::get("/{org_id}/traces/service_graph/topology/current")]
 #[cfg(not(feature = "enterprise"))]
 pub async fn get_current_topology(

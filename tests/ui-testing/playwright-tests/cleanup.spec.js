@@ -144,10 +144,13 @@ test.describe("Pre-Test Cleanup", () => {
       [
         /^sanitylogstream_/,           // sanitylogstream_61hj, etc.
         /^test\d+$/,                   // test1, test2, test3, etc.
-        /^stress_test/,                // stress_test*, stress_test123, etc.
+        /^stress_test/,                // stress_test*, stress_test_<runId>_w0, stress_test1, etc.
         /^sdr_/,                       // sdr_* (SDR test streams)
         /^e2e_join_/,                  // e2e_join_* (UNION test streams)
         /^e2e_conditions_/,            // e2e_conditions_* (Pipeline conditions UI test streams)
+        /^e2e_streamcreation_/,        // e2e_streamcreation_* (Stream creation UI test streams)
+        /^e2e_MyUpperStream/i,         // e2e_MyUpperStream* (Stream name casing test streams)
+        /^e2e_mylowerstream/i,         // e2e_mylowerstream* (Stream name casing test streams)
         /^[a-z]{8,9}$/,                // Random 8-9 char lowercase strings
         /^e2e_cond_prec_(src|dest)_\d+$/,     // Test 1: Operator precedence test streams
         /^e2e_multiple_or_(src|dest)_\d+$/,   // Test 2: Multiple OR test streams
@@ -182,6 +185,12 @@ test.describe("Pre-Test Cleanup", () => {
 
     // Clean up saved views matching test patterns
     await pm.apiCleanup.cleanupSavedViews();
+
+    // Note: Stream deletion waiting is no longer needed here because:
+    // 1. Pipeline conditions tests now use worker-specific stream names (e.g., e2e_conditions_basic_<runId>_w0)
+    // 2. Schemaload/stress tests now use unique stream names (e.g., stress_test_<runId>_w0)
+    // This avoids conflicts both within a test run (parallelIndex) and across test runs (testRunId)
+    // The cleanup patterns above will clean up old test streams via regex matching
 
     testLogger.info('Pre-test cleanup completed successfully');
   });

@@ -76,6 +76,7 @@ mod m20251118_000002_create_sessions_table;
 mod m20251118_000003_delete_meta_sessions;
 mod m20251126_100001_create_service_streams_table;
 mod m20251126_100002_create_service_streams_dimensions_table;
+mod m20251204_000001_create_alert_incidents_table;
 mod m20251207_000001_create_system_settings_table;
 
 pub struct Migrator;
@@ -142,6 +143,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20251118_000003_delete_meta_sessions::Migration),
             Box::new(m20251126_100001_create_service_streams_table::Migration),
             Box::new(m20251126_100002_create_service_streams_dimensions_table::Migration),
+            Box::new(m20251204_000001_create_alert_incidents_table::Migration),
             Box::new(m20251207_000001_create_system_settings_table::Migration),
         ]
     }

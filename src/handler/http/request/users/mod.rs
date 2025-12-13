@@ -886,8 +886,8 @@ pub async fn decline_invitation(
                 )
                 .await;
             }
-            return Ok(HttpResponse::Ok()
-                    .json(serde_json::json!({"message":"Invitation declined successfully","remaining": remaining.len()})));
+            Ok(HttpResponse::Ok()
+                    .json(serde_json::json!({"message":"Invitation declined successfully","remaining": remaining.len()})))
         }
 
         Err(err) => {

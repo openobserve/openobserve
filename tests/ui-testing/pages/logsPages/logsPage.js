@@ -1572,9 +1572,42 @@ export class LogsPage {
     }
 
     async clickBarChartCanvas() {
-        return await this.page.locator(this.barChartCanvas).click({
-            position: { x: 182, y: 66 }
-        });
+        // Wait for network idle to ensure chart data has loaded
+        await this.page.waitForLoadState('networkidle');
+
+        const canvasLocator = this.page.locator(this.barChartCanvas);
+
+        // Retry mechanism to handle ECharts canvas re-rendering
+        const maxRetries = 3;
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                // Wait for the canvas to be visible
+                await canvasLocator.waitFor({ state: 'visible', timeout: 30000 });
+
+                // Wait for chart to stabilize - ECharts may re-render multiple times
+                await this.page.waitForTimeout(2000);
+
+                // force:true required for ECharts canvas - canvas elements are interactive
+                // but fail Playwright's actionability checks (no pointer-events in traditional sense)
+                await canvasLocator.click({
+                    position: { x: 182, y: 66 },
+                    force: true,
+                    timeout: 10000
+                });
+                return; // Success
+            } catch (error) {
+                if (attempt === maxRetries) {
+                    throw error;
+                }
+                // Wait before retry to allow chart to stabilize
+                await this.page.waitForTimeout(1000);
+            }
+        }
+    }
+
+    async expectBarChartCanvasVisible() {
+        const canvasLocator = this.page.locator(this.barChartCanvas);
+        return await expect(canvasLocator).toBeVisible({ timeout: 30000 });
     }
 
     async fillIndexFieldSearchInput(text) {
