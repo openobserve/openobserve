@@ -114,7 +114,10 @@ class SchemaLoadPage {
         
         // Wait for the search to complete
         await searchResponsePromise;
-        await this.page.waitForLoadState('networkidle', { timeout: 30000 });
+        // Use non-blocking wait for networkidle as the page may have long-polling connections
+        await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {
+            testLogger.debug('Network idle timeout after search - continuing with verification');
+        });
         
         // Check if results are present - if no results, that's still success for schema verification
         try {
@@ -240,7 +243,10 @@ class SchemaLoadPage {
             const streamLocator = this.page.getByText(streamName, { exact: false }).first();
             await streamLocator.scrollIntoViewIfNeeded({ timeout: 20000 });
             await streamLocator.click();
-            await this.page.waitForLoadState('networkidle', { timeout: 30000 });
+            // Use a non-blocking wait for networkidle as the page may have long-polling connections
+            await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {
+                testLogger.debug('Network idle timeout after stream click - continuing with verification');
+            });
             
             // Step 3: Basic verification - refresh and verify search functionality works
             await this.refreshLogs();
