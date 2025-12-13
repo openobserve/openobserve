@@ -258,6 +258,7 @@ mod tests {
             idx_took: 100,
             file_list_took: 50,
             aggs_cache_ratio: 80,
+            peak_memory_usage: 1024000,
         };
         CustomMessage::ScanStats(scan_stats)
     }
@@ -406,5 +407,30 @@ mod tests {
 
         // Should create at least 2 batches due to splitting
         assert!(batches.len() >= 2);
+    }
+
+    #[test]
+    fn test_encode_custom_peak_memory() {
+        let options = IpcWriteOptions::default();
+        let mut encoder = FlightDataEncoder::new(options, 8192);
+        let peak_memory = 1024 * 1024 * 100; // 100 MB
+        let custom_message = CustomMessage::PeakMemory(peak_memory);
+
+        let flight_data = encoder.encode_custom(&custom_message).unwrap();
+
+        assert!(!flight_data.data_header.is_empty());
+        assert!(!flight_data.app_metadata.is_empty());
+        assert!(flight_data.data_body.is_empty());
+
+        // Verify the custom message can be deserialized
+        let deserialized: CustomMessage =
+            serde_json::from_slice(&flight_data.app_metadata).unwrap();
+
+        match deserialized {
+            CustomMessage::PeakMemory(mem) => {
+                assert_eq!(mem, peak_memory);
+            }
+            _ => panic!("Expected PeakMemory variant"),
+        }
     }
 }

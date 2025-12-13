@@ -363,6 +363,7 @@ pub async fn search(
         work_group,
         result_cache_ratio: Some(res.result_cache_ratio),
         dashboard_info,
+        peak_memory_usage: res.peak_memory_usage,
         ..Default::default()
     };
     report_request_usage_stats(
@@ -679,6 +680,13 @@ pub fn merge_response(
         if !res.function_error.is_empty() {
             fn_error.extend(res.function_error.clone());
         }
+
+        cache_response.peak_memory_usage = Some(
+            cache_response
+                .peak_memory_usage
+                .unwrap_or(0.0)
+                .max(res.peak_memory_usage.unwrap_or(0.0)),
+        );
 
         cache_response.hits.extend(res.hits.clone());
     }
