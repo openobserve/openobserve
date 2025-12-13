@@ -1064,7 +1064,10 @@
     "panelDuplicatedSuccessfully": "Paneel met succes gedupliceerd",
     "panelDuplicationFailed": "Het dupliceren van het paneel is mislukt",
     "mapname": "Naam",
-    "mapvalue": "Waarde"
+    "mapvalue": "Waarde",
+    "customChartTypeSelector": "Aangepaste grafiektypekiezer",
+    "customChartTypeSelectorHint": "Selecteer een diagramtype uit de eCharts bibliotheek om aan de slag te gaan met een eenvoudige codestructuur",
+    "selectChartType": "Diagramtype selecteren"
   },
   "home": {
     "streams": "Streams",

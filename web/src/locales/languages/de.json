@@ -1064,7 +1064,10 @@
     "panelDuplicatedSuccessfully": "Panel wurde erfolgreich dupliziert",
     "panelDuplicationFailed": "Fehler beim Duplizieren des Panels",
     "mapname": "Name",
-    "mapvalue": "Wert"
+    "mapvalue": "Wert",
+    "customChartTypeSelector": "Benutzerdefinierter Diagrammtyp-Selektor",
+    "customChartTypeSelectorHint": "Wählen Sie einen Diagrammtyp aus der eCharts-Bibliothek aus, um mit einer grundlegenden Codestruktur zu beginnen",
+    "selectChartType": "Wählen Sie den Diagrammtyp"
   },
   "home": {
     "streams": "Streams",

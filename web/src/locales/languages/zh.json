@@ -1064,7 +1064,10 @@
     "panelDuplicatedSuccessfully": "面板已成功复制",
     "panelDuplicationFailed": "面板复制失败",
     "mapname": "姓名",
-    "mapvalue": "价值"
+    "mapvalue": "价值",
+    "customChartTypeSelector": "自定义图表类型选择器",
+    "customChartTypeSelectorHint": "从 ECharts 库中选择图表类型，开始使用基本代码结构",
+    "selectChartType": "选择图表类型"
   },
   "home": {
     "streams": "数据流",
