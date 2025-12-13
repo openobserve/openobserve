@@ -274,25 +274,38 @@ export const usePanelDataLoader = (
   const waitForTheVariablesToLoad = (signal: any) => {
     return new Promise<void>((resolve, reject) => {
       log("waitForTheVariablesToLoad: entering...");
-      // Immediately resolve if variables are already loaded
-      if (ifPanelVariablesCompletedLoading()) {
+
+      // CRITICAL: Check if variables are still loading
+      // This prevents premature API calls during initial dashboard load
+      if (variablesData.value?.isVariablesLoading === true) {
+        log("waitForTheVariablesToLoad: variables are loading (isVariablesLoading=true), waiting...");
+        // Don't resolve immediately - wait for them to finish loading
+      } else if (ifPanelVariablesCompletedLoading()) {
         log("waitForTheVariablesToLoad: variables are already loaded");
         resolve();
         return;
       }
 
-      // Watch for changes in isVisible
+      // Watch for changes in variables data
       const stopWatching = watch(
-        () => variablesData.value?.values,
-        () => {
+        () => variablesData.value,
+        (newVal) => {
+          // First check: are variables still marked as loading?
+          if (newVal?.isVariablesLoading === true) {
+            log("waitForTheVariablesToLoad: still loading (isVariablesLoading=true)...");
+            return; // Keep waiting
+          }
+
+          // Second check: are panel-specific variables ready?
           if (ifPanelVariablesCompletedLoading()) {
             log(
               "waitForTheVariablesToLoad: variables are loaded (inside watch)",
             );
             resolve();
-            stopWatching(); // Stop watching once isVisible is true
+            stopWatching(); // Stop watching once variables are loaded
           }
         },
+        { deep: true } // Watch nested properties
       );
 
       // Listen to the abort signal
@@ -756,6 +769,26 @@ export const usePanelDataLoader = (
   };
 
   const loadData = async () => {
+    // CRITICAL: Log EXACTLY what variablesData looks like
+    console.log('[usePanelDataLoader] ' + panelSchema?.value?.title + ' loadData() ENTRY:', {
+      hasVariablesData: !!variablesData?.value,
+      variablesDataType: typeof variablesData?.value,
+      isVariablesLoading: variablesData?.value?.isVariablesLoading,
+      valueCount: variablesData?.value?.values?.length || 0,
+      variablesSnapshot: variablesData?.value?.values?.map((v: any) => ({
+        name: v.name,
+        value: v.value
+      })) || []
+    });
+
+    // // CRITICAL: Final safety check at loadData entry point
+    // if (variablesData?.value?.isVariablesLoading === true) {
+    //   console.log('[usePanelDataLoader] ' + panelSchema?.value?.title + ': BLOCKED - variables still loading');
+    //   return;
+    // }
+
+    console.log('[usePanelDataLoader] ' + panelSchema?.value?.title + ': loadData() PROCEEDING');
+
     // Only reset isPartialData if we're starting a fresh load and not restoring from cache
     if (runCount > 0 && !state.isOperationCancelled) {
       state.isPartialData = false;
@@ -957,6 +990,9 @@ export const usePanelDataLoader = (
           state.loading = false;
         }
       } else {
+    console.log("inside search api", JSON.stringify(variablesData.value?.values));
+        // if(variablesData.value?.values.length === 0){
+        //   return}
         // copy of current abortController
         // which is used to check whether the current query has been aborted
         const abortControllerRef = abortController;
@@ -1018,6 +1054,13 @@ export const usePanelDataLoader = (
                     panelSchema.value.queryType,
                   );
                 const query = query2;
+
+                // LOG: Check if variables were properly replaced
+                console.log('[usePanelDataLoader] ' + panelSchema.value.title + ' QUERY AFTER applyDynamicVariables:', {
+                  hasUnreplacedVars: /\$\w+/.test(query),
+                  unreplacedVars: query.match(/\$\w+/g) || 'none',
+                  queryPreview: query.substring(0, 200)
+                });
 
                 // Validate that timestamp column is not used as an alias for other fields
                 if (!checkTimestampAlias(query)) {
@@ -1149,6 +1192,19 @@ export const usePanelDataLoader = (
                     timeShiftQueries,
                   },
                 };
+
+                // LOG: Final check before API call
+                console.log('[usePanelDataLoader] ' + panelSchema.value.title + ' ABOUT TO CALL API:', {
+                  sqlQueries: payload.queryReq.query.sql.map((q: any) => ({
+                    hasUnreplacedVars: /\$\w+/.test(q.sql),
+                    unreplacedVars: q.sql.match(/\$\w+/g) || 'none',
+                    preview: q.sql.substring(0, 150)
+                  })),
+                  variablesDataSnapshot: variablesData?.value?.values?.map((v: any) => ({
+                    name: v.name,
+                    value: v.value
+                  })) || []
+                });
 
                 fetchQueryDataWithHttpStream(payload, {
                   data: (payload: any, response: any) => {
@@ -1299,6 +1355,13 @@ export const usePanelDataLoader = (
 
               const query = query2;
 
+              // LOG: Check if variables were properly replaced
+              console.log('[usePanelDataLoader] ' + panelSchema.value.title + ' NON-TIMESHIFT QUERY AFTER applyDynamicVariables:', {
+                hasUnreplacedVars: /\$\w+/.test(query),
+                unreplacedVars: query.match(/\$\w+/g) || 'none',
+                queryPreview: query.substring(0, 200)
+              });
+
               // Validate that timestamp column is not used as an alias for other fields
               if (!checkTimestampAlias(query)) {
                 state.errorDetail = {
@@ -1394,6 +1457,17 @@ export const usePanelDataLoader = (
               state.data[panelQueryIndex] = [];
               state.resultMetaData[panelQueryIndex] = [];
 
+              // LOG: Final check before streaming API call
+              console.log('[usePanelDataLoader] ' + panelSchema.value.title + ' ABOUT TO CALL getDataThroughStreaming:', {
+                hasUnreplacedVars: /\$\w+/.test(query),
+                unreplacedVars: query.match(/\$\w+/g) || 'none',
+                queryPreview: query.substring(0, 150),
+                variablesDataSnapshot: variablesData?.value?.values?.map((v: any) => ({
+                  name: v.name,
+                  value: v.value
+                })) || []
+              });
+
               // Use HTTP2/streaming for all dashboard queries
               await getDataThroughStreaming(
                 query,
@@ -1441,6 +1515,13 @@ export const usePanelDataLoader = (
     () => [selectedTimeObj?.value, forceLoad?.value],
     async () => {
       log("PanelSchema/Time Wather: called");
+
+      // // CRITICAL: Don't load data if variables are still loading
+      // if (variablesData?.value?.isVariablesLoading === true) {
+      //   console.log(`[usePanelDataLoader] ${panelSchema?.value?.title}: ⏸ Skipping time/force load - variables still loading`);
+      //   return;
+      // }
+
       loadData(); // Loading the data
     },
   );
@@ -1459,6 +1540,12 @@ export const usePanelDataLoader = (
       if (!configNeedsApiCall) {
         return;
       }
+
+      // // CRITICAL: Don't load data if variables are still loading
+      // if (variablesData?.value?.isVariablesLoading === true) {
+      //   console.log(`[usePanelDataLoader] ${panelSchema?.value?.title}: ⏸ Skipping schema load - variables still loading`);
+      //   return;
+      // }
 
       loadData();
     },
@@ -1797,6 +1884,13 @@ export const usePanelDataLoader = (
       // if (!panelSchema.value.queries?.length) {
       //   return;
       // }
+
+      // // CRITICAL: Don't load data if variables are still loading (initial dashboard load)
+      // if (variablesData?.value?.isVariablesLoading === true) {
+      //   console.log(`[usePanelDataLoader] ${panelSchema?.value?.title}: ⏸ Skipping - variables still loading`);
+      //   return;
+      // }
+
       log("Variables Watcher: starting...");
 
       const newDependentVariablesData = getDependentVariablesData();
@@ -1931,6 +2025,8 @@ export const usePanelDataLoader = (
     });
 
   const ifPanelVariablesCompletedLoading = () => {
+    // console.log("variablesData", JSON.stringify(variablesData.value));
+
     // STEP 1: Check if there are any dynamic variables that are still loading
     log("Step1: checking if dynamic variables are loading, starting...");
     const newDynamicVariablesData = getDynamicVariablesData();
@@ -2215,6 +2311,12 @@ export const usePanelDataLoader = (
 
   onMounted(async () => {
     log("PanelSchema/Time Initial: should load the data");
+
+    // // CRITICAL: Don't load data on mount if variables are still loading
+    // if (variablesData?.value?.isVariablesLoading === true) {
+    //   console.log(`[usePanelDataLoader] ${panelSchema?.value?.title}: ⏸ Skipping mount load - variables still loading`);
+    //   return;
+    // }
 
     loadData(); // Loading the data
   });
