@@ -1,38 +1,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const logsdata = require("../../../test-data/logs_data.json");
-
-// Utility Functions
-
-async function ingestTestData(page, streamName = "e2e_automate") {
-  const orgId = process.env["ORGNAME"];
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString('base64');
-
-  const headers = {
-    "Authorization": `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  };
-
-  const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
-    const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify(logsdata)
-    });
-    return await fetchResponse.json();
-  }, {
-    url: process.env.INGESTION_URL,
-    headers: headers,
-    orgId: orgId,
-    streamName: streamName,
-    logsdata: logsdata
-  });
-
-  testLogger.debug('Test data ingestion response', { response, streamName });
-}
+const { ingestTestData } = require('../utils/data-ingestion.js');
 
 test.describe("Streams Regression Bugs", () => {
   test.describe.configure({ mode: 'parallel' });
