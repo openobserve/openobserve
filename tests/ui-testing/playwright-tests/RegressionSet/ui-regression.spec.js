@@ -6,9 +6,8 @@ const logData = require("../../fixtures/log.json");
 
 // Utility Functions
 
-async function ingestTestData(page) {
+async function ingestTestData(page, streamName = "e2e_automate") {
   const orgId = process.env["ORGNAME"];
-  const streamName = "e2e_automate";
   const basicAuthCredentials = Buffer.from(
     `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
   ).toString('base64');
@@ -33,7 +32,7 @@ async function ingestTestData(page) {
     logsdata: logsdata
   });
 
-  testLogger.debug('Test data ingestion response', { response });
+  testLogger.debug('Test data ingestion response', { response, streamName });
 }
 
 test.describe("UI Regression Bugs - P0 and P1", () => {
@@ -67,63 +66,45 @@ test.describe("UI Regression Bugs - P0 and P1", () => {
     await ingestTestData(page);
     await page.waitForLoadState('domcontentloaded');
 
-    // Navigate to streams page using logsPage method
-    await pm.logsPage.navigateToStreams();
-    await page.waitForLoadState('networkidle');
+    // Navigate to streams page using logsPage method (same pattern as working tests)
+    await pm.logsPage.clickStreamsMenuItem();
+    await pm.logsPage.clickSearchStreamInput();
+    await pm.logsPage.fillSearchStreamInput("e2e_automate");
+    await page.waitForTimeout(1000); // Wait for search results
 
-    // Search for e2e_automate stream
-    await pm.logsPage.searchStreamByPlaceholder("e2e_automate");
-    await page.waitForTimeout(1000);
+    // Click explore button
+    await pm.logsPage.clickExploreButton();
+    await page.waitForTimeout(2000); // Wait for navigation
 
-    // Click on stream explorer icon to navigate to logs
-    await pm.logsPage.clickFirstExploreButton();
-    await page.waitForTimeout(1000);
-    await page.waitForLoadState('networkidle');
+    // Verify URL contains 'logs' to confirm navigation
+    await pm.logsPage.expectUrlContainsLogs();
+    testLogger.info('Navigated to logs page after stream explorer click');
 
-    // Wait for logs page to load
-    await pm.logsPage.expectLogsTableVisible();
-    await page.waitForTimeout(2000); // Extra wait for UI to stabilize
-
-    // Find the query editor expand/collapse button above the histogram
-    const queryExpandButton = page.locator('[data-test="logs-query-editor-toggle-btn"]')
-      .or(page.locator('[data-test="logs-search-bar-query-editor-toggle-btn"]'))
-      .or(page.getByRole('button', { name: /expand|collapse/i }))
-      .first();
+    // Find the query editor expand/collapse button (the "Expand" button on the right side)
+    const queryExpandButton = page.locator('[data-test="logs-query-editor-full_screen-btn"]');
 
     // Verify button exists after stream explorer navigation
     await expect(queryExpandButton).toBeVisible({ timeout: 10000 });
     testLogger.info('Query expand button found after stream explorer navigation');
 
-    // Get initial state of query editor
-    const queryEditor = page.locator('[data-test="logs-query-editor"]')
-      .or(page.locator('[data-test="logs-search-bar-query-editor"]'))
-      .or(page.locator('.monaco-editor'))
-      .first();
+    // Get the query editor container to check expanded state
+    const queryEditorContainer = page.locator('.query-editor-container');
 
-    const initiallyVisible = await queryEditor.isVisible().catch(() => false);
-    testLogger.debug('Query editor initial state', { visible: initiallyVisible });
+    // Check if expand-on-focus class exists (indicates expanded state)
+    const isInitiallyExpanded = await queryEditorContainer.locator('.expand-on-focus').count() > 0;
+    testLogger.debug('Query editor initial expanded state', { expanded: isInitiallyExpanded });
 
     // Click the expand button
     await queryExpandButton.click();
-    await page.waitForTimeout(1000); // Wait for expand animation
+    await page.waitForTimeout(1000); // Wait for animation
 
-    // Verify query editor state changed after click
-    const afterClickVisible = await queryEditor.isVisible().catch(() => false);
-    testLogger.debug('Query editor state after click', { visible: afterClickVisible });
+    // Check if the state changed after clicking
+    const isExpandedAfterClick = await queryEditorContainer.locator('.expand-on-focus').count() > 0;
+    testLogger.debug('Query editor expanded state after click', { expanded: isExpandedAfterClick });
 
-    // The button should toggle the editor visibility
-    // If initially hidden, it should be visible after click (or vice versa)
-    if (initiallyVisible) {
-      // If editor was visible, clicking should hide it (or keep it visible with changes)
-      testLogger.info('Query editor was initially visible, clicked expand button');
-    } else {
-      // If editor was hidden, clicking should show it - THIS IS THE BUG
-      expect(afterClickVisible).toBe(true);
-      testLogger.info('Query expand icon test completed - button successfully expanded editor after stream explorer navigation');
-    }
-
-    // Test passes if we got here without timeout/errors
-    testLogger.info('Query expand icon is functional after stream explorer navigation');
+    // The button should toggle the expanded state
+    expect(isInitiallyExpanded).not.toBe(isExpandedAfterClick);
+    testLogger.info(`Query expand icon test completed - button successfully ${isExpandedAfterClick ? 'expanded' : 'collapsed'} editor after stream explorer navigation`);
   });
 
   test("should display correct table fields when switching between saved views of different streams (#9388)", {
@@ -131,44 +112,145 @@ test.describe("UI Regression Bugs - P0 and P1", () => {
   }, async ({ page }) => {
     testLogger.info('Testing stream field persistence when switching saved views');
 
-    // Data ingestion
-    await ingestTestData(page);
+    // Generate unique names for streams and saved views
+    const uniqueId = Date.now();
+    const streamA = `e2e_stream_a_${uniqueId}`;
+    const streamB = `e2e_stream_b_${uniqueId}`;
+    const savedViewA = `view_a_${uniqueId}`;
+    const savedViewB = `view_b_${uniqueId}`;
+    const fieldForStreamA = 'kubernetes_container_name';
+    const fieldForStreamB = 'log';
+
+    // Ingest data to both streams
+    testLogger.info(`Ingesting data to stream A: ${streamA}`);
+    await ingestTestData(page, streamA);
+    testLogger.info(`Ingesting data to stream B: ${streamB}`);
+    await ingestTestData(page, streamB);
+    await page.waitForTimeout(2000); // Wait for data to be indexed
 
     // Navigate to logs page
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
     await page.waitForLoadState('networkidle');
 
-    // Select stream A (e2e_automate)
-    await pm.logsPage.selectStream("e2e_automate");
+    // ===== STREAM A SETUP =====
+    testLogger.info(`Setting up Stream A (${streamA}) with saved view`);
+
+    // Select stream A
+    await pm.logsPage.selectStream(streamA);
     await page.waitForLoadState('networkidle');
 
-    // Get fields from stream A
-    const streamAFields = await page.locator('[data-test="log-table-column"]').allTextContents();
-    testLogger.debug('Stream A fields', { fields: streamAFields });
+    // Click refresh to load data
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(2000);
 
-    // Create saved view for stream A (if views functionality exists)
-    // Note: This may require specific page object methods
+    // Search for the field first to make it visible in sidebar
+    await pm.logsPage.fillIndexFieldSearchInput(fieldForStreamA);
+    await page.waitForTimeout(500);
+
+    // Add field to table for stream A
+    await pm.logsPage.hoverOnFieldExpandButton(fieldForStreamA);
+    await pm.logsPage.clickAddFieldToTableButton(fieldForStreamA);
+    await page.waitForTimeout(1000);
+
+    // Clear field search
+    await pm.logsPage.fillIndexFieldSearchInput('');
+    await page.waitForTimeout(300);
+
+    // Verify field is in table
+    await pm.logsPage.expectFieldInTableHeader(fieldForStreamA);
+    testLogger.info(`Added ${fieldForStreamA} to table for stream A`);
+
+    // Create saved view for stream A
+    await pm.logsPage.clickSavedViewsExpand();
+    await pm.logsPage.clickSaveViewButton();
+    await pm.logsPage.fillSavedViewName(savedViewA);
+    await pm.logsPage.clickSavedViewDialogSave();
+    await page.waitForTimeout(2000);
+    testLogger.info(`Created saved view: ${savedViewA}`);
+
+    // ===== STREAM B SETUP =====
+    testLogger.info(`Setting up Stream B (${streamB}) with saved view`);
 
     // Switch to stream B
-    await pm.logsPage.selectStream("default");
+    await pm.logsPage.selectStream(streamB);
     await page.waitForLoadState('networkidle');
 
-    // Verify stream B fields do NOT contain stream A specific fields
-    const streamBFields = await page.locator('[data-test="log-table-column"]').allTextContents();
-    testLogger.debug('Stream B fields', { fields: streamBFields });
+    // Click refresh to load data
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(2000);
 
-    // Verify stream A specific fields (like k8s_event_*) don't appear in stream B
-    const streamASpecificFields = streamAFields.filter(field =>
-      field.includes('k8s_event_start_time') ||
-      field.includes('k8s_event_count') ||
-      field.includes('k8s_event_reason')
-    );
+    // Search for the field first to make it visible in sidebar
+    await pm.logsPage.fillIndexFieldSearchInput(fieldForStreamB);
+    await page.waitForTimeout(500);
 
-    for (const field of streamASpecificFields) {
-      expect(streamBFields).not.toContain(field);
-    }
+    // Add different field to table for stream B
+    await pm.logsPage.hoverOnFieldExpandButton(fieldForStreamB);
+    await pm.logsPage.clickAddFieldToTableButton(fieldForStreamB);
+    await page.waitForTimeout(1000);
 
-    testLogger.info('Stream switching test completed - fields correctly isolated per stream');
+    // Clear field search
+    await pm.logsPage.fillIndexFieldSearchInput('');
+    await page.waitForTimeout(300);
+
+    // Verify field is in table
+    await pm.logsPage.expectFieldInTableHeader(fieldForStreamB);
+    testLogger.info(`Added ${fieldForStreamB} to table for stream B`);
+
+    // Create saved view for stream B
+    await pm.logsPage.clickSavedViewsExpand();
+    await pm.logsPage.clickSaveViewButton();
+    await pm.logsPage.fillSavedViewName(savedViewB);
+    await pm.logsPage.clickSavedViewDialogSave();
+    await page.waitForTimeout(2000);
+    testLogger.info(`Created saved view: ${savedViewB}`);
+
+    // ===== VERIFY SAVED VIEW SWITCHING =====
+    testLogger.info('Verifying saved view switching maintains correct fields');
+
+    // Switch to saved view A
+    await pm.logsPage.clickSavedViewsExpand();
+    await pm.logsPage.clickSavedViewSearchInput();
+    await pm.logsPage.fillSavedViewSearchInput(savedViewA);
+    await page.waitForTimeout(1000);
+    await pm.logsPage.clickSavedViewByText(savedViewA);
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(2000);
+
+    // Verify stream A field is present
+    await pm.logsPage.expectFieldInTableHeader(fieldForStreamA);
+    testLogger.info(`Verified ${fieldForStreamA} present in saved view A`);
+
+    // Switch to saved view B
+    await pm.logsPage.clickSavedViewsExpand();
+    await pm.logsPage.clickSavedViewSearchInput();
+    await pm.logsPage.fillSavedViewSearchInput(savedViewB);
+    await page.waitForTimeout(1000);
+    await pm.logsPage.clickSavedViewByText(savedViewB);
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(2000);
+
+    // Verify stream B field is present
+    await pm.logsPage.expectFieldInTableHeader(fieldForStreamB);
+    testLogger.info(`Verified ${fieldForStreamB} present in saved view B`);
+
+    // ===== CLEANUP: Delete saved views =====
+    testLogger.info('Cleaning up saved views');
+
+    // Delete saved view A
+    await pm.logsPage.clickDeleteSavedViewButton(savedViewA);
+    await page.waitForTimeout(500);
+    await pm.logsPage.clickConfirmButton();
+    await page.waitForTimeout(1000);
+
+    // Delete saved view B
+    await pm.logsPage.clickDeleteSavedViewButton(savedViewB);
+    await page.waitForTimeout(500);
+    await pm.logsPage.clickConfirmButton();
+    await page.waitForTimeout(1000);
+
+    testLogger.info('Stream switching test completed - saved views maintain correct fields for each stream');
   });
 
   // ========================================
@@ -281,14 +363,12 @@ test.describe("UI Regression Bugs - P0 and P1", () => {
     const csvButton = page.getByText('CSV', { exact: true });
     const isCSVVisible = await csvButton.isVisible().catch(() => false);
 
-    if (isCSVVisible) {
-      await csvButton.click();
-      await page.waitForTimeout(1000); // Wait for notification
-    } else {
-      testLogger.warn('CSV button not visible without stream selection');
-      test.skip();
-      return;
+    if (!isCSVVisible) {
+      throw new Error('CSV button not visible without stream selection - cannot test download validation');
     }
+
+    await csvButton.click();
+    await page.waitForTimeout(1000); // Wait for notification
 
     // Verify notification appears
     const notification = page.locator('.q-notification__message');
@@ -325,9 +405,7 @@ test.describe("UI Regression Bugs - P0 and P1", () => {
 
     if (!isOpenAPIVisible) {
       testLogger.warn('OpenAPI option not visible - may be cloud deployment or hidden via config');
-      testLogger.info('Skipping test - OpenAPI is only available in non-cloud deployments');
-      test.skip();
-      return;
+      throw new Error('OpenAPI option not found in Help menu - feature may be disabled for cloud deployments');
     }
 
     testLogger.info('OpenAPI option found in Help menu');
@@ -403,16 +481,39 @@ test.describe("UI Regression Bugs - P0 and P1", () => {
     const tableRow = page.locator(`[data-test="enrichment-table-list-item"]:has-text("${enrichmentTableName}")`);
 
     if (await tableRow.isVisible()) {
-      // Get computed background color
-      const bgColor = await tableRow.evaluate(el => {
-        return window.getComputedStyle(el).backgroundColor;
+      // Get computed background color and verify it's not problematic
+      const { bgColor, isReadable, colorDetails } = await tableRow.evaluate(el => {
+        const bg = window.getComputedStyle(el).backgroundColor;
+
+        // Parse RGB values
+        const rgbMatch = bg.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+        let readable = true;
+        let details = { r: 0, g: 0, b: 0, isYellowish: false };
+
+        if (rgbMatch) {
+          const [_, r, g, b] = rgbMatch.map(Number);
+          details = { r, g, b };
+
+          // Check if color is problematic yellow using threshold-based validation
+          // Yellow has high R and G values (both > 240) and low B value (< 50)
+          const isYellowish = r > 240 && g > 240 && b < 50;
+          details.isYellowish = isYellowish;
+
+          // Also check for colors with poor contrast (too bright/light)
+          // Calculate relative luminance to determine if background is too light
+          const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+          const isTooLight = luminance > 0.95; // Very light colors have luminance close to 1
+
+          readable = !isYellowish && !isTooLight;
+        }
+
+        return { bgColor: bg, isReadable: readable, colorDetails: details };
       });
 
-      testLogger.debug('Enrichment table background color', { bgColor });
+      testLogger.debug('Enrichment table background color', { bgColor, isReadable, colorDetails });
 
-      // Verify color is not yellow (rgb values for yellow are around 255, 255, 0)
-      // Acceptable colors should have reasonable contrast
-      expect(bgColor).not.toMatch(/rgb\(255,\s*255,\s*0\)/i);
+      // Verify color has reasonable contrast (not problematic yellow or too light)
+      expect(isReadable).toBe(true);
     }
 
     testLogger.info('Enrichment table color test completed - colors are readable in light mode');
