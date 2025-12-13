@@ -36,8 +36,11 @@ export class StreamAssociationPage {
   }
 
   async navigateToStreams() {
-    testLogger.info('Navigating to Streams page');
-    await this.streamsMenuItem.click();
+    const orgName = process.env.ORGNAME || 'default';
+    const baseUrl = process.env.ZO_BASE_URL;
+    const targetUrl = `${baseUrl}/web/streams?org_identifier=${orgName}`;
+    testLogger.info(`Navigating to Streams page with org: ${orgName}`);
+    await this.page.goto(targetUrl);
     await this.page.waitForLoadState('networkidle');
   }
 

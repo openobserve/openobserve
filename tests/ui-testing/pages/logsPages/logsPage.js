@@ -942,8 +942,9 @@ export class LogsPage {
     }
 
     async verifySearchPartitionResponse() {
-        const searchPartitionPromise = this.page.waitForResponse(response => 
-            response.url().includes('/api/default/_search_partition') && 
+        const orgName = process.env.ORGNAME || 'default';
+        const searchPartitionPromise = this.page.waitForResponse(response =>
+            response.url().includes(`/api/${orgName}/_search_partition`) &&
             response.request().method() === 'POST'
         );
         
@@ -959,10 +960,11 @@ export class LogsPage {
 
     async captureSearchCalls() {
         const searchCalls = [];
-        
+        const orgName = process.env.ORGNAME || 'default';
+
         // Create the event listener function
         const responseHandler = async response => {
-            if (response.url().includes('/api/default/_search') && 
+            if (response.url().includes(`/api/${orgName}/_search`) &&
                 response.request().method() === 'POST') {
                 const requestData = await response.request().postDataJSON();
                 searchCalls.push({
@@ -986,12 +988,13 @@ export class LogsPage {
     }
 
         async verifyStreamingModeResponse() {
+        const orgName = process.env.ORGNAME || 'default';
         testLogger.debug("[DEBUG] Waiting for search response...");
         const searchPromise = this.page.waitForResponse(response => {
             const url = response.url();
             const method = response.request().method();
             testLogger.debug(`[DEBUG] Response: ${method} ${url}`);
-            return url.includes('/api/default/_search') && method === 'POST';
+            return url.includes(`/api/${orgName}/_search`) && method === 'POST';
         });
         
         const searchResponse = await searchPromise;
@@ -1019,12 +1022,13 @@ export class LogsPage {
     }
 
     async clickRunQueryButtonAndVerifyStreamingResponse() {
+        const orgName = process.env.ORGNAME || 'default';
         testLogger.debug("[DEBUG] Setting up response listener before clicking run query button");
         const searchPromise = this.page.waitForResponse(response => {
             const url = response.url();
             const method = response.request().method();
             testLogger.debug(`[DEBUG] Response: ${method} ${url}`);
-            return url.includes('/api/default/_search') && method === 'POST';
+            return url.includes(`/api/${orgName}/_search`) && method === 'POST';
         });
         
         await this.clickRunQueryButton();

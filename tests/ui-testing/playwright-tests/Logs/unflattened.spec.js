@@ -143,7 +143,8 @@ test.describe("Unflattened testcases", () => {
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-    const allsearch = page.waitForResponse("**/api/default/_search**");
+    const orgName = process.env.ORGNAME || 'default';
+    const allsearch = page.waitForResponse(`**/api/${orgName}/_search**`);
     await pageManager.logsPage.selectStream("e2e_automate");
     await applyQueryButton(page);
   });
