@@ -78,11 +78,12 @@ test.describe("dashboard max query testcases", () => {
     await waitForDateTimeButtonToBeEnabled(page);
     await pm.dateTimeHelper.setRelativeTimeRange("6-w");
 
+    const orgName = process.env.ORGNAME || 'default';
     const response = await page.waitForResponse(
       (response) =>
         response
           .url()
-          .includes("/api/default/_search?type=logs&search_type=dashboards") &&
+          .includes(`/api/${orgName}/_search?type=logs&search_type=dashboards`) &&
         response.status() === 200
     );
     const data = await response.json();

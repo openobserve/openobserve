@@ -16,7 +16,7 @@ function generateRandomStreamName() {
 test.describe("Pagination for logs", () => {
     let pageManager;
 
-    const orgId = "default";
+    const orgId = process.env.ORGNAME || "default";
     const streamName = generateRandomStreamName();
 
     test.beforeEach(async ({ page }) => {

@@ -31,10 +31,11 @@ export class RegexPatternsPage {
   }
 
   async navigateToRegexPatterns() {
-    testLogger.info('Navigating to Regex Patterns settings');
-    await this.settingsMenuItem.click();
-    await this.regexPatternsTab.waitFor({ state: 'visible' });
-    await this.regexPatternsTab.click();
+    const orgName = process.env.ORGNAME || 'default';
+    const baseUrl = process.env.ZO_BASE_URL;
+    const targetUrl = `${baseUrl}/web/settings/regex_patterns?org_identifier=${orgName}`;
+    testLogger.info(`Navigating to Regex Patterns settings with org: ${orgName}`);
+    await this.page.goto(targetUrl);
     await this.page.waitForLoadState('networkidle');
   }
 

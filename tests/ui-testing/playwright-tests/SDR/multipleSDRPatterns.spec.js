@@ -3,8 +3,8 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const path = require('path');
 
-// Helper function to ingest a SINGLE log entry
-async function ingestSingleLog(page, streamName, fieldName, fieldValue) {
+// Helper function to ingest a SINGLE log entry with retry logic
+async function ingestSingleLog(page, streamName, fieldName, fieldValue, maxRetries = 5) {
   const orgId = process.env["ORGNAME"];
   const basicAuthCredentials = Buffer.from(
     `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
@@ -24,33 +24,48 @@ async function ingestSingleLog(page, streamName, fieldName, fieldValue) {
 
   testLogger.info(`Ingesting single log with ${fieldName}: ${fieldValue}`);
 
-  const response = await page.evaluate(async ({ url, headers, orgId, streamName, logData }) => {
-    const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-      method: 'POST',
+  // Retry ingestion with exponential backoff for "stream being deleted" errors
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const response = await page.evaluate(async ({ url, headers, orgId, streamName, logData }) => {
+      const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify([logData])
+      });
+      const responseJson = await fetchResponse.json();
+      return {
+        status: fetchResponse.status,
+        statusText: fetchResponse.statusText,
+        body: responseJson
+      };
+    }, {
+      url: process.env.INGESTION_URL,
       headers: headers,
-      body: JSON.stringify([logData])
+      orgId: orgId,
+      streamName: streamName,
+      logData: logEntry
     });
-    const responseJson = await fetchResponse.json();
-    return {
-      status: fetchResponse.status,
-      statusText: fetchResponse.statusText,
-      body: responseJson
-    };
-  }, {
-    url: process.env.INGESTION_URL,
-    headers: headers,
-    orgId: orgId,
-    streamName: streamName,
-    logData: logEntry
-  });
 
-  testLogger.info(`Ingestion API response - Status: ${response.status}, Body:`, response.body);
+    testLogger.info(`Ingestion API response (attempt ${attempt}/${maxRetries}) - Status: ${response.status}, Body:`, response.body);
 
-  if (response.status !== 200) {
+    if (response.status === 200) {
+      testLogger.info('Ingestion successful, waiting for stream to be indexed...');
+      await page.waitForTimeout(3000);
+      return;
+    }
+
+    // Check for "stream being deleted" error - retry with backoff
+    const errorMessage = response.body?.message || JSON.stringify(response.body);
+    if (errorMessage.includes('being deleted') && attempt < maxRetries) {
+      const waitTime = attempt * 5000;
+      testLogger.info(`Stream is being deleted, waiting ${waitTime/1000}s before retry...`);
+      await page.waitForTimeout(waitTime);
+      continue;
+    }
+
     testLogger.error(`Ingestion failed! Status: ${response.status}, Response:`, response.body);
+    throw new Error(`Ingestion failed with status ${response.status}: ${JSON.stringify(response.body)}`);
   }
-
-  await page.waitForTimeout(2000);
 }
 
 async function closeStreamDetailSidebar(page) {
@@ -141,6 +156,9 @@ test.describe("Import POC - Multiple Patterns on One Field", { tag: '@enterprise
   let pm;
   let cleanupPerformedInSetup = false;
 
+  // Generate unique test run ID for isolation
+  const testRunId = Date.now().toString(36);
+
   // All 6 patterns from import file (for cleanup purposes)
   const allImportedPatterns = [
     'ifsc_code',
@@ -164,7 +182,8 @@ test.describe("Import POC - Multiple Patterns on One Field", { tag: '@enterprise
   ];
 
   const fieldName = "multi_data"; // Single field for all patterns
-  const testStreamName = "sdr_poc_multi_pattern_test";
+  // Use unique stream name to avoid "stream being deleted" conflicts
+  const testStreamName = `sdr_poc_multi_${testRunId}`;
   const importFilePath = path.resolve(__dirname, '../../../test-data/regex_patterns_import.json');
 
   test.beforeEach(async ({ page }, testInfo) => {

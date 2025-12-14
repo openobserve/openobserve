@@ -1,57 +1,6 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const testData = require("../../../test-data/sdr_test_data.json");
-
-async function ingestMultipleFields(page, streamName, dataObjects) {
-  const orgId = process.env["ORGNAME"];
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString('base64');
-
-  const headers = {
-    "Authorization": `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  };
-
-  const baseTimestamp = Date.now() * 1000;
-  const logData = dataObjects.map(({ fieldName, fieldValue }, index) => ({
-    level: "info",
-    [fieldName]: fieldValue,
-    log: `Test log with ${fieldName} field - entry ${index}`,
-    _timestamp: baseTimestamp + (index * 1000000) // Add 1ms offset for each log to ensure they're separate
-  }));
-
-  testLogger.info(`Preparing to ingest ${logData.length} separate log entries`);
-
-  const response = await page.evaluate(async ({ url, headers, orgId, streamName, logData }) => {
-    const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify(logData)
-    });
-    const responseJson = await fetchResponse.json();
-    return {
-      status: fetchResponse.status,
-      statusText: fetchResponse.statusText,
-      body: responseJson
-    };
-  }, {
-    url: process.env.INGESTION_URL,
-    headers: headers,
-    orgId: orgId,
-    streamName: streamName,
-    logData: logData
-  });
-
-  testLogger.info(`Ingestion API response - Status: ${response.status}, Body:`, response.body);
-
-  if (response.status !== 200) {
-    testLogger.error(`Ingestion failed! Status: ${response.status}, Response:`, response.body);
-  }
-
-  await page.waitForTimeout(2000);
-}
 
 async function closeStreamDetailSidebar(page) {
   // Close stream detail sidebar if open
@@ -158,15 +107,43 @@ test.describe("Ingestion Time Redaction - Combined Test", { tag: '@enterprise' }
   test.describe.configure({ mode: 'serial' });
   let pm;
 
-  // All patterns used in this spec file
+  // Generate unique test run ID for isolation
+  const testRunId = Date.now().toString(36);
+
+  // All patterns used in this spec file - with full pattern definitions for uniqueness
   const patternsToTest = [
-    { name: 'email_format_redact', field: 'user_email', value: 'john.doe@example.com' },
-    { name: 'us_phone_redact', field: 'phone', value: '5551234567' },
-    { name: 'credit_card_redact', field: 'cc_number', value: '1234 5678 9012 3456' },
-    { name: 'ssn_redact', field: 'ssn', value: '123-45-6789' }
+    {
+      name: `email_format_redact_${testRunId}`,
+      description: 'Email address validation pattern (for redaction tests)',
+      pattern: '^[\\w\\.-]+@[\\w\\.-]+\\.\\w{2,}$',
+      field: 'user_email',
+      value: 'john.doe@example.com'
+    },
+    {
+      name: `us_phone_redact_${testRunId}`,
+      description: 'US phone number (10 digits) (for redaction tests)',
+      pattern: '^\\d{10}$',
+      field: 'phone',
+      value: '5551234567'
+    },
+    {
+      name: `credit_card_redact_${testRunId}`,
+      description: 'Credit card number pattern (for redaction tests)',
+      pattern: '^\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}$',
+      field: 'cc_number',
+      value: '1234 5678 9012 3456'
+    },
+    {
+      name: `ssn_redact_${testRunId}`,
+      description: 'Social Security Number pattern (for redaction tests)',
+      pattern: '^\\d{3}-\\d{2}-\\d{4}$',
+      field: 'ssn',
+      value: '123-45-6789'
+    }
   ];
 
-  const testStreamName = "sdr_combined_redact_test";
+  // Use unique stream name to avoid "stream being deleted" conflicts
+  const testStreamName = `sdr_redact_${testRunId}`;
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
@@ -233,7 +210,7 @@ test.describe("Ingestion Time Redaction - Combined Test", { tag: '@enterprise' }
     // STEP 1: Ingest data WITHOUT any SDR patterns - all fields should be visible
     testLogger.info('STEP 1: Ingest 4 lines of data WITHOUT any SDR patterns linked');
     const dataToIngest = patternsToTest.map(p => ({ fieldName: p.field, fieldValue: p.value }));
-    await ingestMultipleFields(page, testStreamName, dataToIngest);
+    await pm.logsPage.ingestMultipleFields(testStreamName, dataToIngest);
 
     const fieldsToVerifyStep1 = patternsToTest.map(p => ({ fieldName: p.field, shouldBeRedacted: false }));
     await verifyMultipleFieldsRedaction(page, pm, testStreamName, fieldsToVerifyStep1);
@@ -242,40 +219,38 @@ test.describe("Ingestion Time Redaction - Combined Test", { tag: '@enterprise' }
     // STEP 2: Create all 4 SDR patterns
     testLogger.info('STEP 2: Create all 4 SDR patterns');
     for (const patternConfig of patternsToTest) {
-      const pattern = testData.regexPatterns.find(p => p.name === patternConfig.name);
       await pm.sdrPatternsPage.navigateToRegexPatterns();
-      await pm.sdrPatternsPage.createPattern(pattern.name, pattern.description, pattern.pattern);
+      await pm.sdrPatternsPage.createPattern(patternConfig.name, patternConfig.description, patternConfig.pattern);
       await pm.sdrPatternsPage.verifyPatternCreatedSuccess();
 
       // Verify the pattern actually exists in the list
       await pm.sdrPatternsPage.navigateToRegexPatterns();
-      const exists = await pm.sdrPatternsPage.checkPatternExists(pattern.name);
+      const exists = await pm.sdrPatternsPage.checkPatternExists(patternConfig.name);
       if (!exists) {
-        testLogger.error(`Pattern ${pattern.name} was not created successfully!`);
-        throw new Error(`Pattern ${pattern.name} creation failed - not found in list`);
+        testLogger.error(`Pattern ${patternConfig.name} was not created successfully!`);
+        throw new Error(`Pattern ${patternConfig.name} creation failed - not found in list`);
       }
-      testLogger.info(`✓ Created and verified pattern: ${pattern.name}`);
+      testLogger.info(`✓ Created and verified pattern: ${patternConfig.name}`);
     }
     testLogger.info('✓ STEP 2 PASSED: All 4 patterns created and verified');
 
     // STEP 3: Link all 4 patterns to their respective fields
     testLogger.info('STEP 3: Link all 4 patterns to their respective fields');
     for (const patternConfig of patternsToTest) {
-      const pattern = testData.regexPatterns.find(p => p.name === patternConfig.name);
       await pm.streamAssociationPage.associatePatternWithStream(
         testStreamName,
-        pattern.name,
+        patternConfig.name,
         'redact',
         'ingestion',
-        pattern.testField
+        patternConfig.field
       );
-      testLogger.info(`✓ Linked pattern ${pattern.name} to field ${pattern.testField}`);
+      testLogger.info(`✓ Linked pattern ${patternConfig.name} to field ${patternConfig.field}`);
     }
     testLogger.info('✓ STEP 3 PASSED: All 4 patterns linked to fields');
 
     // STEP 4: Ingest data WITH SDR patterns linked - all fields should be REDACTED
     testLogger.info('STEP 4: Ingest 4 lines of data WITH SDR patterns linked');
-    await ingestMultipleFields(page, testStreamName, dataToIngest);
+    await pm.logsPage.ingestMultipleFields(testStreamName, dataToIngest);
 
     const fieldsToVerifyStep4 = patternsToTest.map(p => ({ fieldName: p.field, shouldBeRedacted: true }));
     await verifyMultipleFieldsRedaction(page, pm, testStreamName, fieldsToVerifyStep4);

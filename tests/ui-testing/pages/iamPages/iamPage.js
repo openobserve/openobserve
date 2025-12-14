@@ -141,9 +141,10 @@ export class IamPage {
     }
 
     async waitResEmailServiceAccount(emailName) {
+        const orgName = process.env.ORGNAME || 'default';
         await this.page.waitForResponse(
             (response) =>
-                response.url().includes("/api/default/service_accounts/${emailName}") && response.status() === 200
+                response.url().includes(`/api/${orgName}/service_accounts/${emailName}`) && response.status() === 200
         );
 
     }
