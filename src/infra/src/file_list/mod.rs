@@ -184,6 +184,11 @@ pub trait FileList: Sync + Send + 'static {
         limit: i64,
     ) -> Result<Vec<(i64, String, i64)>>;
     async fn set_job_dumped_status(&self, ids: &[i64], dumped: bool) -> Result<()>;
+
+    // file_list_dump_stats table methods
+    async fn insert_dump_stats(&self, file: &str, stats: &StreamStats) -> Result<()>;
+    async fn delete_dump_stats(&self, file: &str) -> Result<()>;
+    async fn query_dump_stats(&self, stream: &str) -> Result<StreamStats>;
 }
 
 pub async fn create_table() -> Result<()> {
@@ -523,6 +528,21 @@ pub async fn set_job_dumped_status(ids: &[i64], dumped: bool) -> Result<()> {
     CLIENT.set_job_dumped_status(ids, dumped).await
 }
 
+#[inline]
+pub async fn insert_dump_stats(file: &str, stats: &StreamStats) -> Result<()> {
+    CLIENT.insert_dump_stats(file, stats).await
+}
+
+#[inline]
+pub async fn delete_dump_stats(file: &str) -> Result<()> {
+    CLIENT.delete_dump_stats(file).await
+}
+
+#[inline]
+pub async fn query_dump_stats(stream: &str) -> Result<StreamStats> {
+    CLIENT.query_dump_stats(stream).await
+}
+
 pub async fn local_cache_gc() -> Result<()> {
     tokio::task::spawn(async move {
         let cfg = config::get_config();
@@ -634,6 +654,7 @@ impl From<&FileRecord> for FileMeta {
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct StatsRecord {
+    #[sqlx(default)]
     pub stream: String,
     pub file_num: i64,
     pub min_ts: Option<i64>,
@@ -656,6 +677,12 @@ impl From<&StatsRecord> for StreamStats {
             compressed_size: record.compressed_size as f64,
             index_size: record.index_size as f64,
         }
+    }
+}
+
+impl From<StatsRecord> for StreamStats {
+    fn from(record: StatsRecord) -> Self {
+        (&record).into()
     }
 }
 

@@ -376,7 +376,10 @@ async fn query_inner(
 // 2. group the files by deleted flag, one for added, one for deleted
 // 3. calculate the stats for each group
 // 4. return the stats
-pub async fn stats(time_range: (i64, i64)) -> Result<Vec<(String, StreamStats)>, errors::Error> {
+pub async fn stats(
+    time_range: (i64, i64),
+    need_apply_time_range: bool,
+) -> Result<Vec<(String, StreamStats)>, errors::Error> {
     if !get_config().compact.file_list_dump_enabled {
         return Ok(vec![]);
     }
@@ -386,7 +389,7 @@ pub async fn stats(time_range: (i64, i64)) -> Result<Vec<(String, StreamStats)>,
     let (deleted_files, added_files): (Vec<_>, Vec<_>) =
         dump_files.into_iter().partition(|file| file.deleted);
     // calculate the stats
-    let added_stats = stats_inner(added_files, time_range, false).await?;
+    let added_stats = stats_inner(added_files, time_range, need_apply_time_range).await?;
     let deleted_stats = stats_inner(deleted_files, time_range, false).await?;
     // we need convert deleted stats to negative
     let deleted_stats = deleted_stats.into_iter().map(|(stream, stats)| {

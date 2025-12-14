@@ -32,7 +32,7 @@ use sqlx::{Executor, Pool, QueryBuilder, Row, Sqlite};
 use crate::{
     db::{
         IndexStatement,
-        sqlite::{CLIENT_RO, CLIENT_RW, create_index},
+        sqlite::{CLIENT_RO, CLIENT_RW, create_index, delete_index},
     },
     errors::{Error, Result},
     file_list::FileRecord,
@@ -107,21 +107,21 @@ impl super::FileList for SqliteFileList {
         self.inner_batch_process("file_list", files).await
     }
 
-    async fn update_dump_records(&self, dump_file: &FileKey, dumped_ids: &[i64]) -> Result<()> {
+    async fn update_dump_records(&self, file: &FileKey, dumped_ids: &[i64]) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
         let mut tx = client.begin().await?;
 
         // insert the dump file into file_list table
         let (stream_key, date_key, file_name) =
-            parse_file_key_columns(&dump_file.key).map_err(|e| Error::Message(e.to_string()))?;
+            parse_file_key_columns(&file.key).map_err(|e| Error::Message(e.to_string()))?;
         let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
-        let meta = &dump_file.meta;
+        let meta = &file.meta;
         let now_ts = now_micros();
 
         if let Err(e) = sqlx::query(r#"INSERT INTO file_list (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15);"#)
-        .bind(&dump_file.account)
+        .bind(&file.account)
         .bind(org_id)
         .bind(stream_key)
         .bind(date_key)
@@ -1390,6 +1390,84 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         sqlx::query(&sql).bind(dumped).execute(&*client).await?;
         Ok(())
     }
+
+    async fn insert_dump_stats(&self, file: &str, stats: &StreamStats) -> Result<()> {
+        let (stream_key, date_key, file_name) =
+            parse_file_key_columns(file).expect("parse file key failed");
+        let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        sqlx::query(
+            r#"
+INSERT INTO file_list_dump_stats
+    (org, stream, date, file, file_num, records, original_size,
+     compressed_size, index_size, min_ts, max_ts)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+ON CONFLICT (stream, date, file)
+DO UPDATE SET
+    file_num = EXCLUDED.file_num,
+    records = EXCLUDED.records,
+    original_size = EXCLUDED.original_size,
+    compressed_size = EXCLUDED.compressed_size,
+    index_size = EXCLUDED.index_size,
+    min_ts = EXCLUDED.min_ts,
+    max_ts = EXCLUDED.max_ts;
+            "#,
+        )
+        .bind(org_id)
+        .bind(stream_key)
+        .bind(date_key)
+        .bind(file_name)
+        .bind(stats.file_num)
+        .bind(stats.doc_num)
+        .bind(stats.storage_size as i64)
+        .bind(stats.compressed_size as i64)
+        .bind(stats.index_size as i64)
+        .bind(stats.doc_time_min)
+        .bind(stats.doc_time_max)
+        .execute(&*client)
+        .await?;
+        Ok(())
+    }
+
+    async fn delete_dump_stats(&self, file: &str) -> Result<()> {
+        let (stream_key, date_key, file_name) =
+            parse_file_key_columns(file).expect("parse file key failed");
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        sqlx::query(
+            r#"DELETE FROM file_list_dump_stats WHERE stream = $1 AND date = $2 AND file = $3;"#,
+        )
+        .bind(stream_key)
+        .bind(date_key)
+        .bind(file_name)
+        .execute(&*client)
+        .await?;
+        Ok(())
+    }
+
+    async fn query_dump_stats(&self, stream: &str) -> Result<StreamStats> {
+        let pool = CLIENT_RO.clone();
+
+        let ret: Option<super::StatsRecord> = sqlx::query_as(
+            r#"
+SELECT
+    SUM(file_num) as file_num,
+    SUM(records) as records,
+    SUM(original_size) as original_size,
+    SUM(compressed_size) as compressed_size,
+    SUM(index_size) as index_size,
+    MIN(min_ts) as min_ts,
+    MAX(max_ts) as max_ts
+FROM file_list_dump_stats
+WHERE stream = $1;
+            "#,
+        )
+        .bind(stream)
+        .fetch_optional(&pool)
+        .await?;
+        Ok(ret.map(|r| r.into()).unwrap_or_default())
+    }
 }
 
 impl SqliteFileList {
@@ -1685,7 +1763,31 @@ CREATE TABLE IF NOT EXISTS stream_stats
     records  BIGINT not null,
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
-    index_size      BIGINT not null
+    index_size      BIGINT not null,
+    is_recent       BOOLEAN default false not null,
+    updated_at      BIGINT default 0 not null
+);
+        "#,
+    )
+    .execute(&*client)
+    .await?;
+
+    sqlx::query(
+        r#"
+CREATE TABLE IF NOT EXISTS file_list_dump_stats
+(
+    id              INTEGER not null primary key autoincrement,
+    org             VARCHAR not null,
+    stream          VARCHAR not null,
+    date            VARCHAR not null,
+    file            VARCHAR not null,
+    file_num        BIGINT default 0 not null,
+    records         BIGINT default 0 not null,
+    original_size   BIGINT default 0 not null,
+    compressed_size BIGINT default 0 not null,
+    index_size      BIGINT default 0 not null,
+    min_ts          BIGINT default 0 not null,
+    max_ts          BIGINT default 0 not null
 );
         "#,
     )
@@ -1756,6 +1858,22 @@ CREATE TABLE IF NOT EXISTS stream_stats
     add_column(&client, "file_list", column, data_type).await?;
     add_column(&client, "file_list_history", column, data_type).await?;
 
+    // create columns is_recent and updated_at for stream_stats for version >= 0.15.0
+    add_column(
+        &client,
+        "stream_stats",
+        "is_recent",
+        "BOOLEAN default false not null",
+    )
+    .await?;
+    add_column(
+        &client,
+        "stream_stats",
+        "updated_at",
+        "BIGINT default 0 not null",
+    )
+    .await?;
+
     Ok(())
 }
 
@@ -1804,6 +1922,11 @@ pub async fn create_table_index() -> Result<()> {
             &["status", "dumped"],
         ),
         ("stream_stats_org_idx", "stream_stats", &["org"]),
+        (
+            "file_list_dump_stats_org_idx",
+            "file_list_dump_stats",
+            &["org"],
+        ),
     ];
     for (idx, table, fields) in indices {
         create_index(IndexStatement::new(idx, table, false, fields)).await?;
@@ -1820,14 +1943,22 @@ pub async fn create_table_index() -> Result<()> {
             "file_list_jobs",
             &["stream", "offsets"],
         ),
-        ("stream_stats_stream_idx", "stream_stats", &["stream"]),
+        (
+            "stream_stats_org_stream_recent_idx",
+            "stream_stats",
+            &["stream", "is_recent"],
+        ),
+        (
+            "file_list_dump_stats_stream_file_idx",
+            "file_list_dump_stats",
+            &["stream", "date", "file"],
+        ),
     ];
     for (idx, table, fields) in unique_indices {
         create_index(IndexStatement::new(idx, table, true, fields)).await?;
     }
 
     // This is a case where we want to MAKE the index unique
-
     let res = create_index(IndexStatement::new(
         "file_list_stream_file_idx",
         "file_list",
@@ -1875,6 +2006,9 @@ pub async fn create_table_index() -> Result<()> {
         .await?;
         log::warn!("[SQLITE] create table index(file_list_stream_file_idx) successfully");
     }
+
+    // delete old index stream_stats_stream_idx for old version <= 0.30.0
+    delete_index("stream_stats_stream_idx", "stream_stats").await?;
 
     // delete trigger for old version
     // compatible for old version <= 0.6.4

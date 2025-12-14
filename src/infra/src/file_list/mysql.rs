@@ -34,7 +34,7 @@ use sqlx::{Executor, MySql, QueryBuilder, Row};
 use crate::{
     db::{
         IndexStatement,
-        mysql::{CLIENT, CLIENT_DDL, CLIENT_RO, create_index},
+        mysql::{CLIENT, CLIENT_DDL, CLIENT_RO, create_index, delete_index},
     },
     errors::{DbError, Error, Result},
     file_list::FileRecord,
@@ -1846,6 +1846,90 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
         sqlx::query(&sql).bind(dumped).execute(&pool).await?;
         Ok(())
     }
+
+    async fn insert_dump_stats(&self, file: &str, stats: &StreamStats) -> Result<()> {
+        let (stream_key, date_key, file_name) =
+            parse_file_key_columns(file).expect("parse file key failed");
+        let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
+        let pool = CLIENT.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["insert", "file_list_dump_stats"])
+            .inc();
+        sqlx::query(
+            r#"
+INSERT INTO file_list_dump_stats
+    (org, stream, date, file, file_num, records, original_size,
+     compressed_size, index_size, min_ts, max_ts)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON DUPLICATE KEY UPDATE
+    file_num = VALUES(file_num),
+    records = VALUES(records),
+    original_size = VALUES(original_size),
+    compressed_size = VALUES(compressed_size),
+    index_size = VALUES(index_size),
+    min_ts = VALUES(min_ts),
+    max_ts = VALUES(max_ts);
+            "#,
+        )
+        .bind(org_id)
+        .bind(stream_key)
+        .bind(date_key)
+        .bind(file_name)
+        .bind(stats.file_num)
+        .bind(stats.doc_num)
+        .bind(stats.storage_size as i64)
+        .bind(stats.compressed_size as i64)
+        .bind(stats.index_size as i64)
+        .bind(stats.doc_time_min)
+        .bind(stats.doc_time_max)
+        .execute(&pool)
+        .await?;
+        Ok(())
+    }
+
+    async fn delete_dump_stats(&self, file: &str) -> Result<()> {
+        let (stream_key, date_key, file_name) =
+            parse_file_key_columns(file).expect("parse file key failed");
+        let pool = CLIENT.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["delete", "file_list_dump_stats"])
+            .inc();
+        sqlx::query(
+            r#"DELETE FROM file_list_dump_stats WHERE stream = ? AND date = ? AND file = ?;"#,
+        )
+        .bind(stream_key)
+        .bind(date_key)
+        .bind(file_name)
+        .execute(&pool)
+        .await?;
+        Ok(())
+    }
+
+    async fn query_dump_stats(&self, stream: &str) -> Result<StreamStats> {
+        let pool = CLIENT_RO.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["select", "file_list_dump_stats"])
+            .inc();
+
+        let ret: Option<super::StatsRecord> = sqlx::query_as(
+            r#"
+SELECT
+    SUM(file_num) as file_num,
+    SUM(records) as records,
+    SUM(original_size) as original_size,
+    SUM(compressed_size) as compressed_size,
+    SUM(index_size) as index_size,
+    MIN(min_ts) as min_ts,
+    MAX(max_ts) as max_ts
+FROM file_list_dump_stats
+WHERE stream = ?;
+            "#,
+        )
+        .bind(stream)
+        .fetch_optional(&pool)
+        .await?;
+        Ok(ret.map(|r| r.into()).unwrap_or_default())
+    }
 }
 
 impl MysqlFileList {
@@ -2134,7 +2218,31 @@ CREATE TABLE IF NOT EXISTS stream_stats
     records  BIGINT not null,
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
-    index_size      BIGINT not null
+    index_size      BIGINT not null,
+    is_recent       BOOLEAN default false not null,
+    updated_at      BIGINT default 0 not null
+);
+        "#,
+    )
+    .execute(&pool)
+    .await?;
+
+    sqlx::query(
+        r#"
+CREATE TABLE IF NOT EXISTS file_list_dump_stats
+(
+    id              BIGINT not null primary key AUTO_INCREMENT,
+    org             VARCHAR(100) not null,
+    stream          VARCHAR(256) not null,
+    date            VARCHAR(16) not null,
+    file            VARCHAR(512) not null,
+    file_num        BIGINT default 0 not null,
+    records         BIGINT default 0 not null,
+    original_size   BIGINT default 0 not null,
+    compressed_size BIGINT default 0 not null,
+    index_size      BIGINT default 0 not null,
+    min_ts          BIGINT default 0 not null,
+    max_ts          BIGINT default 0 not null
 );
         "#,
     )
@@ -2191,6 +2299,15 @@ CREATE TABLE IF NOT EXISTS stream_stats
     add_column("file_list", column, data_type).await?;
     add_column("file_list_history", column, data_type).await?;
 
+    // create columns is_recent and updated_at for stream_stats for version >= 0.30.0
+    add_column(
+        "stream_stats",
+        "is_recent",
+        "BOOLEAN default false not null",
+    )
+    .await?;
+    add_column("stream_stats", "updated_at", "BIGINT default 0 not null").await?;
+
     Ok(())
 }
 
@@ -2241,6 +2358,11 @@ pub async fn create_table_index() -> Result<()> {
             &["status", "dumped"],
         ),
         ("stream_stats_org_idx", "stream_stats", &["org"]),
+        (
+            "file_list_dump_stats_org_idx",
+            "file_list_dump_stats",
+            &["org"],
+        ),
     ];
     for (idx, table, fields) in indices {
         create_index(IndexStatement::new(idx, table, false, fields)).await?;
@@ -2257,11 +2379,23 @@ pub async fn create_table_index() -> Result<()> {
             "file_list_jobs",
             &["stream", "offsets"],
         ),
-        ("stream_stats_stream_idx", "stream_stats", &["stream"]),
+        (
+            "stream_stats_stream_recent_idx",
+            "stream_stats",
+            &["stream", "is_recent"],
+        ),
+        (
+            "file_list_dump_stats_stream_file_idx",
+            "file_list_dump_stats",
+            &["stream", "date", "file"],
+        ),
     ];
     for (idx, table, fields) in unique_indices {
         create_index(IndexStatement::new(idx, table, true, fields)).await?;
     }
+
+    // delete old index stream_stats_stream_idx for old version <= 0.30.0
+    delete_index("stream_stats_stream_idx", "stream_stats").await?;
 
     // This is special case where we want to MAKE the index unique if it is not
     let res = create_index(IndexStatement::new(
@@ -2406,7 +2540,9 @@ mod tests {
                 records BIGINT not null,
                 original_size BIGINT not null,
                 compressed_size BIGINT not null,
-                index_size BIGINT not null
+                index_size BIGINT not null,
+                created_at BIGINT not null,
+                updated_at BIGINT not null
             )
             "#,
         )
@@ -2429,7 +2565,9 @@ mod tests {
                 records BIGINT not null,
                 original_size BIGINT not null,
                 compressed_size BIGINT not null,
-                index_size BIGINT not null
+                index_size BIGINT not null,
+                created_at BIGINT not null,
+                updated_at BIGINT not null
             )
             "#,
         )
@@ -2484,7 +2622,9 @@ mod tests {
                 records BIGINT not null,
                 original_size BIGINT not null,
                 compressed_size BIGINT not null,
-                index_size BIGINT not null
+                index_size BIGINT not null,
+                is_recent BOOLEAN default false not null,
+                updated_at BIGINT not null
             )
             "#,
         )
