@@ -115,8 +115,8 @@ pub async fn populate_file_meta(
 /// Get the default maximum query range in hours considering the stream setting max query range
 /// and the environment variable ZO_DEFAULT_MAX_QUERY_RANGE_DAYS
 pub fn get_default_max_query_range(stream_max_query_range: i64) -> i64 {
-    let config = get_config();
-    let default_max_query_range = config.limit.default_max_query_range_days * 24;
+    let cfg = get_config();
+    let default_max_query_range = cfg.limit.default_max_query_range_days * 24;
 
     // This will allow the stream setting to override the global setting
     if stream_max_query_range > 0 {
@@ -149,11 +149,11 @@ pub async fn get_settings_max_query_range(
 
 /// Get the maximum query range with service account specific restrictions
 pub fn get_max_query_range_by_user_role(stream_max_query_range: i64, user: &User) -> i64 {
-    let config = get_config();
+    let cfg = get_config();
     let effective_max_query_range = get_default_max_query_range(stream_max_query_range);
     // Then apply service account specific restrictions if applicable
     if user.role == UserRole::ServiceAccount {
-        let max_query_range_sa = config.limit.max_query_range_for_sa;
+        let max_query_range_sa = cfg.limit.max_query_range_for_sa;
         return if max_query_range_sa > 0 && effective_max_query_range > 0 {
             std::cmp::min(effective_max_query_range, max_query_range_sa)
         } else if max_query_range_sa > 0 {

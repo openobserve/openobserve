@@ -51,8 +51,8 @@ pub(crate) fn default() -> Box<dyn ObjectStoreExt> {
 /// It is used to manage multiple storage clients for different accounts.
 impl StorageClientFactory {
     pub fn new() -> Self {
-        let config = get_config();
-        Self::new_with_config(&config.s3, is_local_disk_storage())
+        let cfg = get_config();
+        Self::new_with_config(&cfg.s3, is_local_disk_storage())
     }
 
     pub fn new_with_config(config: &config::S3, local_mode: bool) -> Self {

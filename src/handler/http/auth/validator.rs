@@ -334,8 +334,8 @@ pub async fn validate_credentials_ext(
     path: &str,
     auth_token: AuthTokensExt,
 ) -> Result<TokenValidationResponse, Error> {
-    let config = get_config();
-    let password_ext_salt = config.auth.ext_auth_salt.as_str();
+    let cfg = get_config();
+    let password_ext_salt = cfg.auth.ext_auth_salt.as_str();
     let mut path_columns = path.split('/').collect::<Vec<&str>>();
     if let Some(v) = path_columns.last()
         && v.is_empty()
@@ -418,7 +418,7 @@ pub async fn validate_credentials_ext(
 /// - The user is a root user
 /// - This is a ingestion POST endpoint
 async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Result<(), Error> {
-    let config = get_config();
+    let cfg = get_config();
     let mut path_columns = path.split('/').collect::<Vec<&str>>();
     if let Some(v) = path_columns.first()
         && v.is_empty()
@@ -447,7 +447,7 @@ async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Res
         .await
         .is_none()
     {
-        if !config.common.create_org_through_ingestion {
+        if !cfg.common.create_org_through_ingestion {
             Err(ErrorNotFound("Organization not found"))
         } else if is_root_user(user_id)
             && method.eq(&Method::POST)
@@ -539,8 +539,8 @@ pub async fn validate_user(
     let db_user = db::user::get_user_record(user_id)
         .await
         .map(|user| DBUser::from(&user));
-    let config = get_config();
-    validate_user_from_db(db_user, user_password, None, 0, &config.auth.ext_auth_salt).await
+    let cfg = get_config();
+    validate_user_from_db(db_user, user_password, None, 0, &cfg.auth.ext_auth_salt).await
 }
 
 pub async fn validate_user_for_query_params(
@@ -550,13 +550,13 @@ pub async fn validate_user_for_query_params(
     exp_in: i64,
 ) -> Result<TokenValidationResponse, Error> {
     let db_user = db::user::get_db_user(user_id).await;
-    let config = get_config();
+    let cfg = get_config();
     validate_user_from_db(
         db_user,
         user_password,
         req_time,
         exp_in,
-        &config.auth.ext_auth_salt,
+        &cfg.auth.ext_auth_salt,
     )
     .await
 }

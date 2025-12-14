@@ -25,8 +25,8 @@ use crate::service::db;
 const SHORT_URL_WEB_PATH: &str = "short/";
 
 pub fn get_base_url() -> String {
-    let config = get_config();
-    format!("{}{}", config.common.web_url, config.common.base_uri)
+    let cfg = get_config();
+    format!("{}{}", cfg.common.web_url, cfg.common.base_uri)
 }
 
 pub fn construct_short_url(org_id: &str, short_id: &str) -> String {

@@ -21,7 +21,6 @@ use actix_web::{
     post, put,
     web::{self, Query},
 };
-use chrono::{TimeZone, Utc};
 use config::{
     meta::stream::{StreamType, TimeRange, UpdateStreamSettings},
     utils::schema::format_stream_name,
@@ -44,9 +43,7 @@ use crate::{
             http::{get_stream_type_from_request, get_ts_from_request_with_key},
         },
     },
-    handler::http::{
-        extractors::Headers, request::search::error_utils::map_error_to_http_response,
-    },
+    handler::http::extractors::Headers,
     service::stream,
 };
 
@@ -680,78 +677,23 @@ async fn delete_stream_data_by_time_range(
         }
     };
     let time_range = TimeRange::new(start, end);
-
-    if time_range.start > time_range.end {
-        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST,
-            "Start time must be less than end time".to_string(),
-        )));
-    }
-
-    // Convert the time range to RFC3339 format
-    // If this is a log stream, we use the hour part of the timestamp
-    // If the timestamp is 10:15:00, we use only the hour part
-    // If this is a non-log stream, we use only the day part of the timestamp
-    let time_range_start = {
-        let ts = Utc.timestamp_nanos(time_range.start * 1000);
-        if stream_type.eq(&StreamType::Logs) {
-            ts.format("%Y-%m-%dT%H:00:00Z").to_string()
-        } else {
-            ts.format("%Y-%m-%d").to_string()
-        }
-    };
-    let time_range_end = {
-        let ts = Utc.timestamp_nanos(time_range.end * 1000);
-        if stream_type.eq(&StreamType::Logs) {
-            ts.format("%Y-%m-%dT%H:00:00Z").to_string()
-        } else {
-            ts.format("%Y-%m-%d").to_string()
-        }
-    };
-    if time_range_start >= time_range_end {
-        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST,
-            "Invalid time range".to_string(),
-        )));
-    }
-
-    log::debug!(
-        "[COMPACTOR] delete_by_stream {org_id}/{stream_type}/{stream_name}/{time_range_start},{time_range_end}",
-    );
-
-    // Create a job to delete the data by the time range
-    let (key, _created) = match crate::service::db::compact::retention::delete_stream(
+    let job_id = match crate::service::stream::delete_stream_data_by_time_range(
         &org_id,
         stream_type,
         &stream_name,
-        Some((time_range_start.as_str(), time_range_end.as_str())),
+        time_range.clone(),
     )
     .await
     {
-        Ok(key) => key,
+        Ok(v) => v,
         Err(e) => {
             log::error!(
-                "delete_by_stream {org_id}/{stream_type}/{stream_name}/{time_range_start},{time_range_end} error: {e}"
+                "delete_stream_data_by_time_range {org_id}/{stream_type}/{stream_name}/{time_range} error: {e}",
             );
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST,
                 e.to_string(),
             )));
-        }
-    };
-
-    // Create a job in the compact manual jobs table
-    let job = infra::table::compactor_manual_jobs::CompactorManualJob {
-        id: config::ider::uuid(),
-        key,
-        status: CompactorManualJobStatus::Pending,
-        created_at: Utc::now().timestamp_micros(),
-        ended_at: 0,
-    };
-    let job_id = match crate::service::db::compact::compactor_manual_jobs::add_job(job).await {
-        Ok(id) => id,
-        Err(e) => {
-            return Ok(map_error_to_http_response(&e, None));
         }
     };
 

@@ -303,7 +303,7 @@ pub async fn delete_all(
 
     // delete from file list
     delete_from_file_list(org_id, stream_type, stream_name, (start_time, end_time)).await?;
-    super::super::file_list_dump::delete_all_for_stream(org_id, stream_type, stream_name).await?;
+    super::dump::delete_all(org_id, stream_type, stream_name).await?;
     log::info!("deleted file list for: {org_id}/{stream_type}/{stream_name}/all");
 
     // mark delete done
@@ -352,7 +352,8 @@ pub async fn delete_by_date(
         return handle_delete_by_date_done(org_id, stream_type, stream_name, date_range).await;
     }
 
-    let mut date_start = if date_range.0.ends_with("00Z") {
+    let is_hourly = date_range.0.ends_with("00Z") || date_range.1.ends_with("00Z");
+    let mut date_start = if is_hourly {
         DateTime::parse_from_rfc3339(date_range.0)?.with_timezone(&Utc)
     } else {
         DateTime::parse_from_rfc3339(&format!("{}T00:00:00Z", date_range.0))?.with_timezone(&Utc)
@@ -361,7 +362,7 @@ pub async fn delete_by_date(
     if date_range.0.starts_with("1970-01-01") {
         date_start += Duration::try_milliseconds(1).unwrap();
     }
-    let date_end = if date_range.1.ends_with("00Z") {
+    let date_end = if is_hourly {
         DateTime::parse_from_rfc3339(date_range.1)?.with_timezone(&Utc)
     } else {
         DateTime::parse_from_rfc3339(&format!("{}T00:00:00Z", date_range.1))?.with_timezone(&Utc)
@@ -415,14 +416,18 @@ pub async fn delete_by_date(
             log::error!("[COMPACTOR] delete_by_date delete_from_file_list failed: {e}");
             e
         })?;
-
-    super::super::file_list_dump::delete_in_time_range(
+    super::dump::delete_by_time_range(
         org_id,
         stream_type,
         stream_name,
         (date_start.timestamp_micros(), date_end.timestamp_micros()),
+        is_hourly,
     )
-    .await?;
+    .await
+    .map_err(|e| {
+        log::error!("[COMPACTOR] delete_by_date delete_file_list_dump failed: {e}");
+        e
+    })?;
 
     // archive old schema versions
     let mut schema_versions =
@@ -477,8 +482,8 @@ pub async fn delete_from_file_list(
     let files = file_list::query(
         &fake_trace_id,
         org_id,
-        stream_name,
         stream_type,
+        stream_name,
         PartitionTimeLevel::Unset,
         time_range.0,
         time_range.1,
@@ -525,10 +530,18 @@ async fn write_file_list(
                 .compact
                 .file_list_deleted_mode
                 .eq(&FileListBookKeepMode::History.to_string())
-                && let Err(e) = infra_file_list::batch_add_history(&events).await
             {
-                log::error!("[COMPACTOR] file_list batch_add_history failed: {}", e);
-                return Err(e.into());
+                let events = events
+                    .iter()
+                    .map(|v| FileKey {
+                        deleted: false,
+                        ..v.clone()
+                    })
+                    .collect::<Vec<_>>();
+                if let Err(e) = infra_file_list::batch_add_history(&events).await {
+                    log::error!("[COMPACTOR] file_list batch_add_history failed: {}", e);
+                    return Err(e.into());
+                }
             }
             // delete from file_list table
             if let Err(e) = infra_file_list::batch_process(&events).await {

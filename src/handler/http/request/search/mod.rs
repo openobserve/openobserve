@@ -80,7 +80,7 @@ pub mod search_stream;
 pub(crate) mod utils;
 
 async fn can_use_distinct_stream(
-    org: &str,
+    org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
     fields: &[String],
@@ -91,7 +91,7 @@ async fn can_use_distinct_stream(
         return false;
     }
 
-    let stream_settings = infra::schema::get_settings(org, stream_name, stream_type)
+    let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type)
         .await
         .unwrap_or_default();
 
@@ -120,7 +120,7 @@ async fn can_use_distinct_stream(
     #[allow(deprecated)]
     let query_fields: Vec<String> = match crate::service::search::sql::Sql::new(
         &(query.clone().into()),
-        org,
+        org_id,
         stream_type,
         None,
     )

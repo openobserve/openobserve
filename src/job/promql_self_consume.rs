@@ -45,7 +45,7 @@ static METRICS_WHITELIST: Lazy<HashSet<String>> = Lazy::new(|| {
         .collect()
 });
 
-async fn send_metrics(config: &config::Config, metrics: Vec<Value>) -> Result<(), tonic::Status> {
+async fn send_metrics(cfg: &config::Config, metrics: Vec<Value>) -> Result<(), tonic::Status> {
     let org = META_ORG_ID;
     let req = IngestionRequest {
         org_id: org.to_owned(),
@@ -55,7 +55,7 @@ async fn send_metrics(config: &config::Config, metrics: Vec<Value>) -> Result<()
         ingestion_type: Some(IngestionType::Json.into()),
         metadata: None,
     };
-    let org_header_key: MetadataKey<_> = config.grpc.org_header_key.parse().unwrap();
+    let org_header_key: MetadataKey<_> = cfg.grpc.org_header_key.parse().unwrap();
     let token: MetadataValue<_> = get_internal_grpc_token().parse().unwrap();
     let (_, channel) = get_ingester_channel().await?;
     let mut client = IngestClient::with_interceptor(channel, move |mut req: Request<()>| {
@@ -67,22 +67,22 @@ async fn send_metrics(config: &config::Config, metrics: Vec<Value>) -> Result<()
     client = client
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(config.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(config.grpc.max_message_size * 1024 * 1024);
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     client.ingest(req).await?;
     Ok(())
 }
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    let config = get_config();
+    let cfg = get_config();
     let org = META_ORG_ID;
 
     log::debug!(
         "self-metrics consumption enabled status : {}",
-        config.common.self_metrics_consumption_enabled
+        cfg.common.self_metrics_consumption_enabled
     );
 
-    if !config.common.self_metrics_consumption_enabled {
+    if !cfg.common.self_metrics_consumption_enabled {
         return Ok(());
     }
     if METRICS_WHITELIST.is_empty() {
@@ -92,7 +92,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
 
     // Set up the interval timer for periodic fetching
-    let timeout = zero_or(config.common.self_metrics_consumption_interval, 60);
+    let timeout = zero_or(cfg.common.self_metrics_consumption_interval, 60);
     let mut interval = time::interval(Duration::from_secs(timeout));
     interval.tick().await; // Trigger the first run
 
@@ -123,7 +123,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             }
         } else {
             let metrics = JsonEncoder::new().encode_to_json(&prom_data);
-            match send_metrics(&config, metrics).await {
+            match send_metrics(&cfg, metrics).await {
                 Ok(_) => {
                     log::debug!("successfully sent self-metrics for ingestion");
                 }

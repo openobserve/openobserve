@@ -58,7 +58,7 @@ pub async fn run(from: &str, to: &str) -> Result<(), anyhow::Error> {
                         stream_type,
                         stream_name,
                         PartitionTimeLevel::Unset,
-                        Some((start_time, end_time)),
+                        (start_time, end_time),
                         None,
                     )
                     .await

@@ -743,9 +743,9 @@ async fn map_group_to_custom_role(
 }
 
 #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
-fn format_role_name(org: &str, role: &str) -> String {
+fn format_role_name(org_id: &str, role: &str) -> String {
     let role = format_role_name_only(role);
-    format!("{org}/{role}")
+    format!("{org_id}/{role}")
 }
 
 #[cfg(feature = "enterprise")]

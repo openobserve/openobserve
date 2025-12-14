@@ -34,9 +34,9 @@ pub enum EntryKind {
 // DBKey to set cipher keys
 pub const CIPHER_KEY_PREFIX: &str = "/cipher_keys/";
 static MASTER_KEY: Lazy<Algorithm> = Lazy::new(|| {
-    let config = get_config();
+    let cfg = get_config();
     // we currently only support one algorithm, so directly get key
-    let key = match BASE64_STANDARD.decode(&config.encryption.master_key) {
+    let key = match BASE64_STANDARD.decode(&cfg.encryption.master_key) {
         Ok(v) => v,
         Err(e) => {
             log::debug!("potential error in configuring master encryption for cipher table: {e}");
