@@ -1454,10 +1454,24 @@ class APICleanup {
 
             testLogger.info('Loaded test pattern names', { count: testPatternNames.size });
 
+            // Additional test prefixes that should always be cleaned up
+            const testPrefixes = [
+                'duplicate_test_',      // regexPatternManagement.spec.js
+                'log_filename_',        // multipleSDRPatterns.spec.js
+                'time_hh_mm_ss_',       // multipleSDRPatterns.spec.js
+                'ifsc_code_',           // multipleSDRPatterns.spec.js
+                'date_dd_mm_yyyy_',     // multipleSDRPatterns.spec.js
+                'email_format_',        // SDR tests
+                'us_phone_',            // SDR tests
+                'credit_card_',         // SDR tests
+                'ssn_'                  // SDR tests
+            ];
+
             // Filter patterns that match test data names (using prefix matching to catch patterns with unique suffixes)
             const basePatternNames = Array.from(testPatternNames);
             const matchingPatterns = patterns.filter(pattern =>
-                basePatternNames.some(baseName => pattern.name.startsWith(baseName))
+                basePatternNames.some(baseName => pattern.name.startsWith(baseName)) ||
+                testPrefixes.some(prefix => pattern.name.startsWith(prefix))
             );
             testLogger.info('Found patterns matching test data (prefix match)', { count: matchingPatterns.length });
 
