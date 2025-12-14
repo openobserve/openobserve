@@ -13,7 +13,7 @@ LIMIT 100`;
 const chartCode = `
 // Scatter3D Dataset
 
-//exapmle query:
+//example query:
 // SELECT 
 //   COUNT(DISTINCT kubernetes_pod_name) as x_value,
 //   COUNT(DISTINCT kubernetes_container_name) as y_value,
