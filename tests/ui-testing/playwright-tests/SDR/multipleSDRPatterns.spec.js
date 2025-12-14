@@ -23,7 +23,7 @@ async function ingestSingleLog(page, streamName, fieldName, fieldValue, maxRetri
 
   testLogger.info(`Ingesting single log with ${fieldName}: ${fieldValue}`);
 
-  // Retry ingestion with exponential backoff for "stream being deleted" errors
+  //Retry ingestion with exponential backoff for "stream being deleted" errors
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     const response = await page.evaluate(async ({ url, headers, orgId, streamName, logData }) => {
       const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
