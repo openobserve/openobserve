@@ -601,13 +601,13 @@ async fn delete_hourly_inner(
     // Handle dump_stats: delete old and insert new if needed
     // Delete dump_stats for old dump files
     for item in &items {
-        if item.deleted {
-            if let Err(e) = infra_file_list::delete_dump_stats(&item.key).await {
-                log::error!(
-                    "[FILE_LIST_DUMP] delete_dump_stats for {} failed: {e}",
-                    item.key
-                );
-            }
+        if item.deleted
+            && let Err(e) = infra_file_list::delete_dump_stats(&item.key).await
+        {
+            log::error!(
+                "[FILE_LIST_DUMP] delete_dump_stats for {} failed: {e}",
+                item.key
+            );
         }
     }
 

@@ -131,11 +131,13 @@ pub trait FileList: Sync + Send + 'static {
     async fn clean_by_min_update_at(&self, val: i64) -> Result<()>;
 
     // stream stats table
-    async fn stats(
+    async fn stats_by_date_range(
         &self,
-        time_range: (i64, i64),
-        need_deleted: bool,
-    ) -> Result<Vec<(String, StreamStats)>>;
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        date_range: (String, String),
+    ) -> Result<StreamStats>;
     async fn get_stream_stats(
         &self,
         org_id: &str,
@@ -150,8 +152,11 @@ pub trait FileList: Sync + Send + 'static {
     ) -> Result<()>;
     async fn set_stream_stats(
         &self,
-        streams: &[(String, StreamStats)],
-        time_range: (i64, i64),
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        stats: &StreamStats,
+        is_recent: bool,
     ) -> Result<()>;
     async fn reset_stream_stats(&self) -> Result<()>;
     async fn reset_stream_stats_min_ts(
@@ -188,7 +193,13 @@ pub trait FileList: Sync + Send + 'static {
     // file_list_dump_stats table methods
     async fn insert_dump_stats(&self, file: &str, stats: &StreamStats) -> Result<()>;
     async fn delete_dump_stats(&self, file: &str) -> Result<()>;
-    async fn query_dump_stats(&self, stream: &str) -> Result<StreamStats>;
+    async fn query_dump_stats_by_date_range(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        date_range: (String, String),
+    ) -> Result<StreamStats>;
 }
 
 pub async fn create_table() -> Result<()> {
@@ -409,11 +420,15 @@ pub async fn get_max_update_at() -> Result<i64> {
 }
 
 #[inline]
-pub async fn stats(
-    time_range: (i64, i64),
-    need_deleted: bool,
-) -> Result<Vec<(String, StreamStats)>> {
-    CLIENT.stats(time_range, need_deleted).await
+pub async fn stats_by_date_range(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    date_range: (String, String),
+) -> Result<StreamStats> {
+    CLIENT
+        .stats_by_date_range(org_id, stream_type, stream_name, date_range)
+        .await
 }
 
 #[inline]
@@ -440,10 +455,15 @@ pub async fn del_stream_stats(
 
 #[inline]
 pub async fn set_stream_stats(
-    streams: &[(String, StreamStats)],
-    time_range: (i64, i64),
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    stats: &StreamStats,
+    is_recent: bool,
 ) -> Result<()> {
-    CLIENT.set_stream_stats(streams, time_range).await
+    CLIENT
+        .set_stream_stats(org_id, stream_type, stream_name, stats, is_recent)
+        .await
 }
 
 #[inline]
@@ -539,8 +559,15 @@ pub async fn delete_dump_stats(file: &str) -> Result<()> {
 }
 
 #[inline]
-pub async fn query_dump_stats(stream: &str) -> Result<StreamStats> {
-    CLIENT.query_dump_stats(stream).await
+pub async fn query_dump_stats_by_date_range(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    date_range: (String, String),
+) -> Result<StreamStats> {
+    CLIENT
+        .query_dump_stats_by_date_range(org_id, stream_type, stream_name, date_range)
+        .await
 }
 
 pub async fn local_cache_gc() -> Result<()> {

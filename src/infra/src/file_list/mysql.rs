@@ -963,71 +963,43 @@ SELECT date
         Ok(()) // do nothing
     }
 
-    async fn stats(
+    async fn stats_by_date_range(
         &self,
-        time_range: (i64, i64),
-        need_deleted: bool,
-    ) -> Result<Vec<(String, StreamStats)>> {
-        let (min_ts, max_ts) = time_range;
-        let deleted_filter = if need_deleted {
-            // if we need deleted files, we don't apply deleted filter
-            ""
-        } else {
-            // if we don't need deleted files, we include only non-deleted files
-            "AND deleted IS FALSE"
-        };
-        let sql = format!(
-            r#"
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        date_range: (String, String),
+    ) -> Result<StreamStats> {
+        let (start_date, end_date) = date_range;
+        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+        let sql = r#"
 SELECT 
-    stream,
-    MIN(CASE WHEN deleted IS FALSE THEN min_ts END) AS min_ts,
-    MAX(CASE WHEN deleted IS FALSE THEN max_ts ELSE 0 END) AS max_ts,
-    CAST(SUM(CASE 
-        WHEN deleted IS TRUE AND created_at <= {min_ts} THEN -1
-        WHEN deleted IS FALSE THEN 1
-        ELSE 0
-    END) AS SIGNED) AS file_num,
-    CAST(SUM(CASE 
-        WHEN deleted IS TRUE AND created_at <= {min_ts} THEN -records
-        WHEN deleted IS FALSE THEN records
-        ELSE 0
-    END) AS SIGNED) AS records,
-    CAST(SUM(CASE 
-        WHEN deleted IS TRUE AND created_at <= {min_ts} THEN -original_size
-        WHEN deleted IS FALSE THEN original_size
-        ELSE 0
-    END) AS SIGNED) AS original_size,
-    CAST(SUM(CASE 
-        WHEN deleted IS TRUE AND created_at <= {min_ts} THEN -compressed_size
-        WHEN deleted IS FALSE THEN compressed_size
-        ELSE 0
-    END) AS SIGNED) AS compressed_size,
-    CAST(SUM(CASE 
-        WHEN deleted IS TRUE AND created_at <= {min_ts} THEN -index_size
-        WHEN deleted IS FALSE THEN index_size
-        ELSE 0
-    END) AS SIGNED) AS index_size
+    COUNT(*) AS file_num,
+    SUM(records) AS records,
+    SUM(original_size) AS original_size,
+    SUM(compressed_size) AS compressed_size,
+    SUM(index_size) AS index_size,
+    MIN(min_ts) AS min_ts,
+    MAX(max_ts) AS max_ts
 FROM file_list
-WHERE updated_at > {min_ts} AND updated_at <= {max_ts} {deleted_filter}
-GROUP BY stream
-            "#,
-        );
+WHERE stream = ? AND date >= ? AND date < ?;
+            "#;
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["stats", "file_list"])
             .inc();
         let start = std::time::Instant::now();
-        let ret = sqlx::query_as::<_, super::StatsRecord>(&sql)
-            .fetch_all(&pool)
+        let ret: Option<super::StatsRecord> = sqlx::query_as(sql)
+            .bind(stream_key)
+            .bind(start_date)
+            .bind(end_date)
+            .fetch_optional(&pool)
             .await?;
         let time = start.elapsed().as_secs_f64();
         DB_QUERY_TIME
             .with_label_values(&["stats", "file_list"])
             .observe(time);
-        Ok(ret
-            .iter()
-            .map(|r| (r.stream.to_owned(), r.into()))
-            .collect())
+        Ok(ret.map(|r| r.into()).unwrap_or_default())
     }
 
     async fn get_stream_stats(
@@ -1053,10 +1025,16 @@ GROUP BY stream
         let ret = sqlx::query_as::<_, super::StatsRecord>(&sql)
             .fetch_all(&pool)
             .await?;
-        Ok(ret
-            .iter()
-            .map(|r| (r.stream.to_owned(), r.into()))
-            .collect())
+        let mut stats: HashMap<String, StreamStats> = HashMap::with_capacity(ret.len() / 2);
+        for r in ret {
+            match stats.get_mut(&r.stream) {
+                Some(s) => s.merge(&r.into()),
+                None => {
+                    stats.insert(r.stream.to_owned(), r.into());
+                }
+            }
+        }
+        Ok(stats.into_iter().collect())
     }
 
     async fn del_stream_stats(
@@ -1078,138 +1056,90 @@ GROUP BY stream
 
     async fn set_stream_stats(
         &self,
-        streams: &[(String, StreamStats)],
-        time_range: (i64, i64),
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        stats: &StreamStats,
+        is_recent: bool,
     ) -> Result<()> {
         let pool = CLIENT.clone();
         // check if stream stats exist
         let mut tx = pool.begin().await?;
-        for (stream_key, _) in streams {
-            if crate::schema::STREAM_STATS_EXISTS.contains(stream_key) {
-                continue;
-            }
-            // stream stats not exist, check from stream_stats table again
-            let Some((org_id, stream_type, stream_name)) = super::parse_stream_key(stream_key)
-            else {
-                return Err(Error::Message(format!("invalid stream key: {stream_key}")));
-            };
+        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+        let now = now_micros();
+        if !crate::schema::STREAM_STATS_EXISTS.contains(&stream_key) {
             let ret = self
-                .get_stream_stats(&org_id, Some(stream_type), Some(&stream_name))
+                .get_stream_stats(org_id, Some(stream_type), Some(stream_name))
                 .await?;
             if !ret.is_empty() {
                 crate::schema::STREAM_STATS_EXISTS.insert(stream_key.clone());
-                continue;
-            }
-            // stream stats not exist, insert a new one
-            DB_QUERY_NUMS
-                .with_label_values(&["insert", "stream_stats"])
-                .inc();
-            if let Err(e) = sqlx::query(
-                r#"
+            } else {
+                // stream stats not exist, insert a new one
+                DB_QUERY_NUMS
+                    .with_label_values(&["insert", "stream_stats"])
+                    .inc();
+                if let Err(e) = sqlx::query(
+r#"
 INSERT INTO stream_stats
-    (org, stream, file_num, min_ts, max_ts, records, original_size, compressed_size, index_size)
-    VALUES (?, ?, 0, 0, 0, 0, 0, 0, 0);
-                "#,
-            )
-            .bind(org_id)
-            .bind(stream_key)
-            .execute(&mut *tx)
-            .await
-            {
-                if let Err(e) = tx.rollback().await {
-                    log::error!("[MYSQL] rollback insert stream stats error: {e}");
+    (org, stream, file_num, min_ts, max_ts, records, original_size, compressed_size, index_size, is_recent, updated_at)
+    VALUES (?, ?, 0, 0, 0, 0, 0, 0, 0, ?, ?);
+"#,
+)
+                    .bind(org_id)
+                    .bind(&stream_key)
+                    .bind(is_recent)
+                    .bind(now)
+                    .execute(&mut *tx)
+                    .await
+                    {
+                    if let Err(e) = tx.rollback().await {
+                        log::error!("[MYSQL] rollback insert stream stats error: {e}");
+                    }
+                    return Err(e.into());
                 }
-                return Err(e.into());
             }
-        }
-        if let Err(e) = tx.commit().await {
-            log::error!("[MYSQL] commit insert stream stats error: {e}");
-            return Err(e.into());
         }
 
         // update stats
-        let mut tx = pool.begin().await?;
-        for (stream_key, stats) in streams {
-            DB_QUERY_NUMS
-                .with_label_values(&["update", "stream_stats"])
-                .inc();
-            if let Err(e) = sqlx::query(
-                r#"
-UPDATE stream_stats
-    SET file_num = file_num + ?, 
-        min_ts = CASE WHEN ? = 0 THEN min_ts 
-                     WHEN min_ts = 0 OR ? < min_ts THEN ? 
-                     ELSE min_ts END,
-        max_ts = CASE WHEN ? = 0 THEN max_ts 
-                     WHEN max_ts = 0 OR ? > max_ts THEN ? 
-                     ELSE max_ts END,
-        records = records + ?, 
-        original_size = original_size + ?, 
-        compressed_size = compressed_size + ?, 
-        index_size = index_size + ?
-    WHERE stream = ?;
-                "#,
-            )
-            .bind(stats.file_num)
-            .bind(stats.doc_time_min)
-            .bind(stats.doc_time_min)
-            .bind(stats.doc_time_min)
-            .bind(stats.doc_time_max)
-            .bind(stats.doc_time_max)
-            .bind(stats.doc_time_max)
-            .bind(stats.doc_num)
-            .bind(stats.storage_size as i64)
-            .bind(stats.compressed_size as i64)
-            .bind(stats.index_size as i64)
-            .bind(stream_key)
-            .execute(&mut *tx)
-            .await
-            {
-                if let Err(e) = tx.rollback().await {
-                    log::error!("[MYSQL] rollback set stream stats error: {e}");
-                }
-                return Err(e.into());
-            }
-        }
-        // delete files which already marked deleted
-        let (min_ts, max_ts) = time_range;
-        DB_QUERY_NUMS
-            .with_label_values(&["clean_deleted", "file_list"])
-            .inc();
         let start = std::time::Instant::now();
-        loop {
-            let start = std::time::Instant::now();
-            match sqlx::query(
-                    r#"DELETE FROM file_list WHERE deleted IS TRUE AND updated_at > ? AND updated_at <= ?"#,
-                )
-                .bind(min_ts)
-                .bind(max_ts)
-                .execute(&mut *tx)
-                .await
-                {
-                    Ok(v) => {
-                        log::debug!(
-                            "[MYSQL] delete file list rows affected: {}, took: {} ms",
-                            v.rows_affected(),
-                            start.elapsed().as_millis()
-                        );
-                        if v.rows_affected() == 0 {
-                            break;
-                        }
-                    }
-                    Err(e) => {
-                        if let Err(e) = tx.rollback().await {
-                            log::error!(
-                                "[MYSQL] rollback set stream stats error for delete file list: {e}"
-                            );
-                        }
-                        return Err(e.into());
-                    }
-                }
+        DB_QUERY_NUMS
+            .with_label_values(&["update", "stream_stats"])
+            .inc();
+        if let Err(e) = sqlx::query(
+            r#"
+UPDATE stream_stats
+SET file_num = ?,
+    min_ts = ?,
+    max_ts = ?,
+    records = ?,
+    original_size = ?,
+    compressed_size = ?,
+    index_size = ?,
+    updated_at = ?
+WHERE stream = ? AND is_recent = ?;
+            "#,
+        )
+        .bind(stats.file_num)
+        .bind(stats.doc_time_min)
+        .bind(stats.doc_time_max)
+        .bind(stats.doc_num)
+        .bind(stats.storage_size as i64)
+        .bind(stats.compressed_size as i64)
+        .bind(stats.index_size as i64)
+        .bind(now)
+        .bind(&stream_key)
+        .bind(is_recent)
+        .execute(&mut *tx)
+        .await
+        {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[MYSQL] rollback set stream stats error: {e}");
+            }
+            return Err(e.into());
         }
         let time = start.elapsed().as_secs_f64();
         DB_QUERY_TIME
-            .with_label_values(&["clean_deleted", "file_list"])
+            .with_label_values(&["update", "stream_stats"])
             .observe(time);
 
         // commit
@@ -1897,12 +1827,21 @@ ON DUPLICATE KEY UPDATE
         Ok(())
     }
 
-    async fn query_dump_stats(&self, stream: &str) -> Result<StreamStats> {
+    async fn query_dump_stats_by_date_range(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        date_range: (String, String),
+    ) -> Result<StreamStats> {
+        let (start_date, end_date) = date_range;
+        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["select", "file_list_dump_stats"])
+            .with_label_values(&["stats", "file_list_dump_stats"])
             .inc();
 
+        let start = std::time::Instant::now();
         let ret: Option<super::StatsRecord> = sqlx::query_as(
             r#"
 SELECT
@@ -1914,12 +1853,19 @@ SELECT
     MIN(min_ts) as min_ts,
     MAX(max_ts) as max_ts
 FROM file_list_dump_stats
-WHERE stream = ?;
+WHERE stream = ? AND date >= ? AND date < ?;
             "#,
         )
-        .bind(stream)
+        .bind(&stream_key)
+        .bind(start_date)
+        .bind(end_date)
         .fetch_optional(&pool)
         .await?;
+        let time = start.elapsed().as_secs_f64();
+        DB_QUERY_TIME
+            .with_label_values(&["stats", "file_list_dump_stats"])
+            .observe(time);
+
         Ok(ret.map(|r| r.into()).unwrap_or_default())
     }
 }

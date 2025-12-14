@@ -15,118 +15,141 @@
 
 use config::{
     cluster::LOCAL_NODE,
-    meta::stream::{StreamStats, StreamType},
-    utils::time::{now_micros, second_micros},
+    meta::stream::{ALL_STREAM_TYPES, StreamType},
+    utils::time::{BASE_TIME, day_micros, get_ymdh_from_micros, now_micros},
 };
-use hashbrown::HashMap;
 use infra::{dist_lock, file_list as infra_file_list};
 
-use crate::{
-    common::infra::cluster::get_node_by_uuid,
-    service::{db, file_list_dump},
-};
+use crate::{common::infra::cluster::get_node_by_uuid, service::db};
 
-pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow::Error> {
-    let latest_update_at = infra_file_list::get_max_update_at()
+pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
+    let latest_updated_at = infra_file_list::get_max_update_at()
         .await
         .map_err(|e| anyhow::anyhow!("get latest update_at error: {:?}", e))?;
 
     // no data in file_list
-    if latest_update_at == 0 {
-        return Ok(None);
+    if latest_updated_at == 0 {
+        return Ok(());
     }
 
-    // get reset offset
-    let reset_offset = db::compact::stats::get_reset().await;
-
-    // set the max_ts shouldn't greater than NOW-1m to avoid the latest data duplicated calculation
-    let latest_update_at = std::cmp::min(latest_update_at, now_micros() - second_micros(60));
-
-    loop {
-        let Some(time_range) =
-            update_stats_from_file_list_inner(latest_update_at, reset_offset).await?
-        else {
-            break;
-        };
-        log::info!("keep updating stream stats from file list, time range: {time_range:?} ...");
-        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-    }
-    log::debug!("done updating stream stats from file list");
-    Ok(None)
-}
-
-async fn update_stats_from_file_list_inner(
-    latest_update_at: i64,
-    reset_offset: i64,
-) -> Result<Option<(i64, i64)>, anyhow::Error> {
     // get last offset
-    let (mut offset, node) = db::compact::stats::get_offset().await;
+    let (mut last_updated_at, node) = db::compact::stats::get_offset().await;
     if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
-        return Ok(None);
+        return Ok(());
     }
 
     // before starting, set current node to lock the job
     if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
-        offset = match update_stats_lock_node().await {
-            Ok(Some(offset)) => offset,
-            Ok(None) => return Ok(None),
+        last_updated_at = match update_stats_lock_node().await {
+            Ok(Some(v)) => v,
+            Ok(None) => return Ok(()),
             Err(e) => return Err(e),
         }
     }
 
-    // apply step limit
-    let step_limit = config::get_config().limit.calculate_stats_step_limit_secs;
-    // if the offset is 0, we use min_update_at to calculate the latest_update_at
-    // otherwise, we use the offset + step_limit to calculate the latest_update_at
-    let min_update_at = if offset == 0 {
-        infra_file_list::get_min_update_at().await?
-    } else {
-        offset
-    };
-    let latest_update_at =
-        std::cmp::min(min_update_at + second_micros(step_limit), latest_update_at);
+    log::info!(
+        "[STATS] update stats from file list, last updated: {last_updated_at}, latest updated: {latest_updated_at}"
+    );
 
-    // there is no new data to process
-    if offset == latest_update_at {
-        return Ok(None);
+    let orgs = db::schema::list_organizations_from_cache().await;
+    for org_id in orgs {
+        for stream_type in ALL_STREAM_TYPES {
+            let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
+            for stream_name in streams {
+                let start = std::time::Instant::now();
+                if let Err(e) = update_stats_from_file_list_inner(
+                    &org_id,
+                    stream_type,
+                    &stream_name,
+                    latest_updated_at,
+                    last_updated_at,
+                )
+                .await
+                {
+                    log::error!(
+                        "[STATS] update stats for {org_id}/{stream_type}/{stream_name} error: {e}"
+                    );
+                    return Err(e);
+                }
+                let took = start.elapsed().as_millis();
+                log::info!(
+                    "[STATS] update stats for {org_id}/{stream_type}/{stream_name} in {took} ms"
+                );
+            }
+        }
     }
 
-    // get stats from file_list
-    let time_range = (offset, latest_update_at);
-    // if the latest_update_at < reset_offset, we skip deleted files, because those files we
-    // haven't calculated add, so we don't need to consider deleted here
-    let need_deleted = latest_update_at > reset_offset;
-    let stream_stats = infra_file_list::stats(time_range, need_deleted)
-        .await
-        .map_err(|e| anyhow::anyhow!("get add stream stats error: {e}"))?;
-    // get stats from file_list_dump
-    let dumped_stats = file_list_dump::stats(time_range, true)
-        .await
-        .map_err(|e| anyhow::anyhow!("get dumped add stream stats error: {e}"))?;
-    let mut stream_stats = stream_stats
-        .into_iter()
-        .collect::<HashMap<String, StreamStats>>();
-    for (stream, stats) in dumped_stats {
-        let entry = stream_stats.entry(stream).or_insert(StreamStats::default());
-        *entry = &*entry + &stats;
-    }
-    // remove file_list_dump streams from stream_stats
-    let filter_key = format!("/{}/", StreamType::Filelist);
-    stream_stats.retain(|stream, _| !stream.contains(&filter_key));
-
-    if !stream_stats.is_empty() {
-        let stream_stats = stream_stats.into_iter().collect::<Vec<_>>();
-        infra_file_list::set_stream_stats(&stream_stats, time_range)
-            .await
-            .map_err(|e| anyhow::anyhow!("set stream stats error: {e}"))?;
-    }
-
-    // update offset
-    db::compact::stats::set_offset(latest_update_at, Some(&LOCAL_NODE.uuid.clone()))
+    // update offset to current time
+    let offset = now_micros();
+    db::compact::stats::set_offset(offset, Some(&LOCAL_NODE.uuid.clone()))
         .await
         .map_err(|e| anyhow::anyhow!("set offset error: {e}"))?;
 
-    Ok(Some(time_range))
+    Ok(())
+}
+
+async fn update_stats_from_file_list_inner(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    latest_updated_at: i64,
+    last_updated_at: i64,
+) -> Result<(), anyhow::Error> {
+    let yesterday_boundary = get_yesterday_boundary();
+
+    // check if we need to update old stats by comparing the last_updated and now is the same day
+    let no_need_update_old_stats = last_updated_at > 0
+        && get_ymdh_from_micros(last_updated_at) == get_ymdh_from_micros(now_micros());
+
+    // update latest stats
+    let new_data_range = (
+        yesterday_boundary.clone(),
+        get_ymdh_from_micros(latest_updated_at),
+    );
+
+    let mut stats = infra_file_list::stats_by_date_range(
+        org_id,
+        stream_type,
+        stream_name,
+        new_data_range.clone(),
+    )
+    .await?;
+    let dump_stats = infra_file_list::query_dump_stats_by_date_range(
+        org_id,
+        stream_type,
+        stream_name,
+        new_data_range.clone(),
+    )
+    .await?;
+    stats.merge(&dump_stats);
+    infra_file_list::set_stream_stats(org_id, stream_type, stream_name, &stats, true).await?;
+
+    // update old stats
+    if no_need_update_old_stats {
+        return Ok(());
+    }
+    let old_data_range = (
+        get_ymdh_from_micros(BASE_TIME.timestamp_micros()),
+        yesterday_boundary.clone(),
+    );
+    let mut stats = infra_file_list::stats_by_date_range(
+        org_id,
+        stream_type,
+        stream_name,
+        old_data_range.clone(),
+    )
+    .await?;
+    let dump_stats = infra_file_list::query_dump_stats_by_date_range(
+        org_id,
+        stream_type,
+        stream_name,
+        old_data_range.clone(),
+    )
+    .await?;
+    stats.merge(&dump_stats);
+    infra_file_list::set_stream_stats(org_id, stream_type, stream_name, &stats, false).await?;
+
+    Ok(())
 }
 
 async fn update_stats_lock_node() -> Result<Option<i64>, anyhow::Error> {
@@ -151,35 +174,8 @@ async fn update_stats_lock_node() -> Result<Option<i64>, anyhow::Error> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    async fn setup() {
-        infra::db::init().await.unwrap();
-        // setup the offset
-        _ = db::compact::stats::set_offset(1755705600000000, Some(&LOCAL_NODE.uuid.clone())).await;
-    }
-
-    #[tokio::test]
-    async fn test_update_stats_from_file_list() {
-        setup().await;
-        let latest_updated_at = 1755706810000000;
-        let ret = update_stats_from_file_list_inner(latest_updated_at, 0)
-            .await
-            .unwrap();
-        assert_eq!(ret, Some((1755705600000000, 1755706200000000)));
-        let ret = update_stats_from_file_list_inner(latest_updated_at, 0)
-            .await
-            .unwrap();
-        assert_eq!(ret, Some((1755706200000000, 1755706800000000)));
-        let ret = update_stats_from_file_list_inner(latest_updated_at, 0)
-            .await
-            .unwrap();
-        assert_eq!(ret, Some((1755706800000000, 1755706810000000)));
-        let ret = update_stats_from_file_list_inner(latest_updated_at, 0)
-            .await
-            .unwrap();
-        assert_eq!(ret, None);
-    }
+/// Get yesterday's boundary date (yesterday 00:00:00 in YYYY/MM/DD/HH)
+/// This is the boundary between "historical" and "recent" data
+fn get_yesterday_boundary() -> String {
+    get_ymdh_from_micros(now_micros() - day_micros(1))
 }
