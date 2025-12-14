@@ -480,6 +480,16 @@ async fn delete_daily_inner(
         break;
     }
 
+    // Delete dump_stats for deleted dump files
+    for item in &items {
+        if let Err(e) = infra_file_list::delete_dump_stats(&item.key).await {
+            log::error!(
+                "[FILE_LIST_DUMP] delete_dump_stats for {} failed: {e}",
+                item.key
+            );
+        }
+    }
+
     Ok(())
 }
 
@@ -563,8 +573,8 @@ async fn delete_hourly_inner(
         .collect();
 
     // insert the new dump file into file_list table
-    if let Some(new_dump_file) = new_dump_file {
-        items.push(new_dump_file);
+    if let Some(ref new_dump_file) = new_dump_file {
+        items.push(new_dump_file.clone());
     }
 
     // Insert deleted items into file_list_deleted table with retry logic
@@ -586,6 +596,41 @@ async fn delete_hourly_inner(
             continue;
         }
         break;
+    }
+
+    // Handle dump_stats: delete old and insert new if needed
+    // Delete dump_stats for old dump files
+    for item in &items {
+        if item.deleted {
+            if let Err(e) = infra_file_list::delete_dump_stats(&item.key).await {
+                log::error!(
+                    "[FILE_LIST_DUMP] delete_dump_stats for {} failed: {e}",
+                    item.key
+                );
+            }
+        }
+    }
+
+    // If a new dump file was created, calculate and insert its stats
+    if let Some(ref new_dump_file) = new_dump_file {
+        match calculate_dump_file_stats(&new_dump_file.account, &new_dump_file.key).await {
+            Ok(stats) => {
+                // Insert dump_stats for the new dump file
+                if let Err(e) = infra_file_list::insert_dump_stats(&new_dump_file.key, &stats).await
+                {
+                    log::error!(
+                        "[FILE_LIST_DUMP] insert_dump_stats for {} failed: {e}",
+                        new_dump_file.key
+                    );
+                }
+            }
+            Err(e) => {
+                log::error!(
+                    "[FILE_LIST_DUMP] failed to calculate stats for new dump file {}: {e}",
+                    new_dump_file.key
+                );
+            }
+        }
     }
 
     Ok(())
@@ -682,80 +727,80 @@ pub async fn handle_dump_stats_on_merge(deleted_files: &[&FileKey], new_files: &
         }
     }
 
-    // For each new merged file, read its contents and calculate stats
+    // For each new merged file, calculate and insert stats
     for file in new_files.iter() {
-        // Read the dump parquet file from storage
-        let file_data = match infra::cache::file_data::get(&file.account, &file.key, None).await {
-            Ok(data) => data,
+        match calculate_dump_file_stats(&file.account, &file.key).await {
+            Ok(stats) => {
+                // Insert dump_stats for this new merged file
+                if let Err(e) = infra_file_list::insert_dump_stats(&file.key, &stats).await {
+                    log::error!("[COMPACTOR] insert_dump_stats for {} failed: {e}", file.key);
+                }
+            }
             Err(e) => {
                 log::error!(
-                    "[COMPACTOR] failed to read dump file {} from storage: {e}",
+                    "[COMPACTOR] failed to calculate stats for dump file {}: {e}",
                     file.key
                 );
-                continue;
             }
-        };
-
-        // Parse the parquet file to get FileRecord list
-        let mut reader =
-            match config::utils::parquet::get_recordbatch_reader_from_bytes(&file_data).await {
-                Ok((_, reader)) => reader,
-                Err(e) => {
-                    log::error!(
-                        "[COMPACTOR] failed to parse dump file {} as parquet: {e}",
-                        file.key
-                    );
-                    continue;
-                }
-            };
-
-        // Calculate stats from all FileRecords in the dump file
-        let mut stats = StreamStats {
-            created_at: now_micros(),
-            doc_time_min: i64::MAX,
-            doc_time_max: 0,
-            doc_num: 0,
-            file_num: 0,
-            storage_size: 0.0,
-            compressed_size: 0.0,
-            index_size: 0.0,
-        };
-
-        while let Some(batch_result) = reader.next().await {
-            match batch_result {
-                Ok(batch) => {
-                    let file_records = record_batch_to_file_record(batch);
-                    for record in file_records {
-                        stats.file_num += 1;
-                        stats.doc_num += record.records;
-                        stats.storage_size += record.original_size as f64;
-                        stats.compressed_size += record.compressed_size as f64;
-                        stats.index_size += record.index_size as f64;
-                        if record.min_ts > 0 {
-                            stats.doc_time_min = stats.doc_time_min.min(record.min_ts);
-                        }
-                        stats.doc_time_max = stats.doc_time_max.max(record.max_ts);
-                    }
-                }
-                Err(e) => {
-                    log::error!(
-                        "[COMPACTOR] failed to read batch from dump file {}: {e}",
-                        file.key
-                    );
-                }
-            }
-        }
-
-        // Fix doc_time_min if no valid min was found
-        if stats.doc_time_min == i64::MAX {
-            stats.doc_time_min = 0;
-        }
-
-        // Insert dump_stats for this new merged file
-        if let Err(e) = infra_file_list::insert_dump_stats(&file.key, &stats).await {
-            log::error!("[COMPACTOR] insert_dump_stats for {} failed: {e}", file.key);
         }
     }
+}
+
+/// Calculate statistics from a dump file by reading its contents.
+/// This function reads a dump parquet file, parses all FileRecords in it,
+/// and calculates aggregated statistics.
+async fn calculate_dump_file_stats(account: &str, file_key: &str) -> Result<StreamStats, String> {
+    // Read the dump parquet file from storage
+    let file_data = infra::cache::file_data::get(account, file_key, None)
+        .await
+        .map_err(|e| format!("failed to read dump file from storage: {e}"))?;
+
+    // Parse the parquet file to get FileRecord list
+    let mut reader = config::utils::parquet::get_recordbatch_reader_from_bytes(&file_data)
+        .await
+        .map_err(|e| format!("failed to parse dump file as parquet: {e}"))?
+        .1;
+
+    // Calculate stats from all FileRecords in the dump file
+    let mut stats = StreamStats {
+        created_at: now_micros(),
+        doc_time_min: i64::MAX,
+        doc_time_max: 0,
+        doc_num: 0,
+        file_num: 0,
+        storage_size: 0.0,
+        compressed_size: 0.0,
+        index_size: 0.0,
+    };
+
+    while let Some(batch_result) = reader.next().await {
+        match batch_result {
+            Ok(batch) => {
+                let file_records = record_batch_to_file_record(batch);
+                for record in file_records {
+                    stats.file_num += 1;
+                    stats.doc_num += record.records;
+                    stats.storage_size += record.original_size as f64;
+                    stats.compressed_size += record.compressed_size as f64;
+                    stats.index_size += record.index_size as f64;
+                    if record.min_ts > 0 {
+                        stats.doc_time_min = stats.doc_time_min.min(record.min_ts);
+                    }
+                    stats.doc_time_max = stats.doc_time_max.max(record.max_ts);
+                }
+            }
+            Err(e) => {
+                return Err(format!("failed to read batch from dump file: {e}"));
+            }
+        }
+    }
+
+    // Fix doc_time_min if no valid min was found
+    if stats.doc_time_min == i64::MAX {
+        stats.doc_time_min = 0;
+    }
+
+    Ok(stats)
 }
 
 fn get_writer(
