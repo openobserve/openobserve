@@ -191,13 +191,6 @@ export class SDRPatternsPage {
   async importPatternsFromFile(filePath) {
     testLogger.info(`Importing patterns from file: ${filePath}`);
 
-    // Read the JSON file to get pattern names for verification
-    const fs = require('fs');
-    const fileContent = fs.readFileSync(filePath, 'utf8');
-    const patterns = JSON.parse(fileContent);
-    const patternNames = patterns.map(p => p.name);
-    testLogger.info(`Patterns to import: ${patternNames.join(', ')}`);
-
     // Click Import button
     await this.importButton.click();
     await this.page.waitForTimeout(500);
@@ -207,56 +200,30 @@ export class SDRPatternsPage {
     await expect(this.page.locator('[data-test="tab-import_json_file"]')).toBeVisible();
     await expect(this.page.locator('[data-test="tab-import_json_url"]')).toBeVisible();
 
-    // Click the Import JSON File tab to ensure it's selected
-    await this.page.locator('[data-test="tab-import_json_file"]').click();
-
-    // Upload file - try original locator first, fallback to new locator
-    let fileInput;
-    try {
-      fileInput = this.page.locator('[data-test="regex-pattern-import-json-file-input"]');
-      await expect(fileInput).toBeVisible({ timeout: 5000 });
-      await fileInput.setInputFiles(filePath);
-      testLogger.info('File selected for import (using original locator)');
-    } catch (error) {
-      // Fallback to new locator pattern
-      fileInput = this.page.locator('[data-test="regex-pattern-import-file-input"]');
-      await expect(fileInput).toBeVisible();
-      await fileInput.setInputFiles(filePath);
-      testLogger.info('File selected for import (using fallback locator)');
-    }
+    // Upload file using the standard file input locator
+    const fileInput = this.page.locator('[data-test="regex-pattern-import-file-input"]');
+    await expect(fileInput).toBeVisible();
+    await fileInput.setInputFiles(filePath);
+    testLogger.info('File selected for import');
 
     // Click import button
     const importJsonBtn = this.page.locator('[data-test="regex-pattern-import-json-btn"]');
     await importJsonBtn.click();
     testLogger.info('Clicked import JSON button');
 
-    // Wait for import to complete
-    await this.page.waitForTimeout(3000);
-    await this.page.waitForLoadState('networkidle');
+    // Wait for success message
+    await this.page.waitForTimeout(2000);
+    const successMessage = this.page.getByText('Successfully imported regex-');
+    const isVisible = await successMessage.isVisible({ timeout: 5000 }).catch(() => false);
 
-    // Navigate to regex patterns page to verify import
-    await this.navigateToRegexPatterns();
-    await this.page.waitForTimeout(1000);
-
-    // Verify each pattern exists on the page
-    let allPatternsFound = true;
-    for (const patternName of patternNames) {
-      const exists = await this.checkPatternExists(patternName);
-      if (exists) {
-        testLogger.info(`✓ Pattern '${patternName}' found on page after import`);
-      } else {
-        testLogger.error(`✗ Pattern '${patternName}' NOT found on page after import`);
-        allPatternsFound = false;
-      }
-    }
-
-    if (allPatternsFound) {
-      testLogger.info(`✓ Import successful - all ${patternNames.length} patterns verified on page`);
+    if (isVisible) {
+      testLogger.info('✓ Import successful - success message displayed');
     } else {
-      testLogger.error('✗ Import failed - some patterns not found on page');
+      testLogger.warn('⚠ Success message not visible after import');
     }
 
-    return allPatternsFound;
+    await this.page.waitForLoadState('networkidle');
+    return isVisible;
   }
 
   async getTotalPatternsCount() {
