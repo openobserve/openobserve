@@ -81,14 +81,12 @@ impl super::FileList for PostgresFileList {
         DB_QUERY_NUMS
             .with_label_values(&["delete", "file_list"])
             .inc();
-        sqlx::query(
-            r#"DELETE FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#,
-        )
-        .bind(stream_key)
-        .bind(date_key)
-        .bind(file_name)
-        .execute(&pool)
-        .await?;
+        sqlx::query(r#"DELETE FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#)
+            .bind(stream_key)
+            .bind(date_key)
+            .bind(file_name)
+            .execute(&pool)
+            .await?;
         Ok(())
     }
 

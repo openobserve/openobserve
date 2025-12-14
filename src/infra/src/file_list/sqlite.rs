@@ -78,14 +78,12 @@ impl super::FileList for SqliteFileList {
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
 
-        sqlx::query(
-            r#"DELETE FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#,
-        )
-        .bind(stream_key)
-        .bind(date_key)
-        .bind(file_name)
-        .execute(&pool)
-        .await?;
+        sqlx::query(r#"DELETE FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#)
+            .bind(stream_key)
+            .bind(date_key)
+            .bind(file_name)
+            .execute(&pool)
+            .await?;
         Ok(())
     }
 

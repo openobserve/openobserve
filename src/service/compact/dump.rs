@@ -430,16 +430,8 @@ async fn delete_daily_inner(
         .flat_map(record_batch_to_file_record)
         .collect::<Vec<_>>();
 
-    let items: Vec<_> = dump_files
-        .into_iter()
-        .map(|mut f| {
-            f.deleted = true;
-            f.segment_ids = None;
-            f
-        })
-        .collect();
-
-    let del_items: Vec<_> = files
+    // create deleted items for file_list_deleted table
+    let mut del_items: Vec<_> = files
         .iter()
         .map(|f| FileListDeleted {
             id: 0,
@@ -447,6 +439,24 @@ async fn delete_daily_inner(
             file: format!("files/{}/{}/{}", f.stream, f.date, f.file),
             index_file: false,
             flattened: false,
+        })
+        .collect();
+
+    // we also need to delete the dump files
+    del_items.extend(dump_files.iter().map(|f| FileListDeleted {
+        id: 0,
+        account: f.account.to_string(),
+        file: f.key.clone(),
+        index_file: false,
+        flattened: false,
+    }));
+
+    let items: Vec<_> = dump_files
+        .into_iter()
+        .map(|mut f| {
+            f.deleted = true;
+            f.segment_ids = None;
+            f
         })
         .collect();
 
@@ -521,22 +531,8 @@ async fn delete_hourly_inner(
         None
     };
 
-    // create deleted items for file_list table
-    let mut items: Vec<_> = dump_files
-        .into_iter()
-        .map(|mut f| {
-            f.deleted = true;
-            f.segment_ids = None;
-            f
-        })
-        .collect();
-    // insert the new dump file into file_list table
-    if let Some(new_dump_file) = new_dump_file {
-        items.push(new_dump_file);
-    }
-
     // Create deleted items for file_list_deleted table
-    let del_items: Vec<_> = files_to_delete
+    let mut del_items: Vec<_> = files_to_delete
         .iter()
         .map(|f| FileListDeleted {
             id: 0,
@@ -546,6 +542,30 @@ async fn delete_hourly_inner(
             flattened: false,
         })
         .collect();
+
+    // we also need to delete the dump files
+    del_items.extend(dump_files.iter().map(|f| FileListDeleted {
+        id: 0,
+        account: f.account.to_string(),
+        file: f.key.clone(),
+        index_file: false,
+        flattened: false,
+    }));
+
+    // create deleted items for file_list table
+    let mut items: Vec<_> = dump_files
+        .into_iter()
+        .map(|mut f| {
+            f.deleted = true;
+            f.segment_ids = None;
+            f
+        })
+        .collect();
+
+    // insert the new dump file into file_list table
+    if let Some(new_dump_file) = new_dump_file {
+        items.push(new_dump_file);
+    }
 
     // Insert deleted items into file_list_deleted table with retry logic
     let mut mark_deleted_done = false;
