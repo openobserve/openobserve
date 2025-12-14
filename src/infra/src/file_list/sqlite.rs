@@ -72,7 +72,6 @@ impl super::FileList for SqliteFileList {
     }
 
     async fn remove(&self, file: &str) -> Result<()> {
-        let now_ts = now_micros();
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
         let pool = client.clone();
@@ -80,9 +79,8 @@ impl super::FileList for SqliteFileList {
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
 
         sqlx::query(
-            r#"UPDATE file_list SET deleted = true, updated_at = $1 WHERE stream = $2 AND date = $3 AND file = $4;"#,
+            r#"DELETE FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#,
         )
-        .bind(now_ts)
         .bind(stream_key)
         .bind(date_key)
         .bind(file_name)
@@ -378,14 +376,13 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
                 r#"
 SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
     FROM file_list
-    WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4 AND deleted = $5;
+    WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;
                 "#,
             )
             .bind(stream_key)
             .bind(time_start)
             .bind(max_ts_upper_bound)
             .bind(time_end)
-            .bind(false)
             .fetch_all(&pool)
             .await
         };
@@ -410,13 +407,12 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
                 r#"
 SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
     FROM file_list
-    WHERE stream = $1 AND date >= $2 AND date <= $3 AND deleted = $4;
+    WHERE stream = $1 AND date >= $2 AND date <= $3;
                 "#,
             )
             .bind(stream_key)
             .bind(date_start)
             .bind(date_end)
-            .bind(false)
             .fetch_all(&pool)
             .await;
         Ok(ret?.iter().map(|r| r.into()).collect())
@@ -435,13 +431,12 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
         let pool = CLIENT_RO.clone();
         let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
         let ret = sqlx::query_as::<_, super::FileRecord>(
-            r#"SELECT * FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4 AND deleted = $5;"#,
+            r#"SELECT * FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;"#,
         )
         .bind(stream_key)
         .bind(time_start)
         .bind(max_ts_upper_bound)
         .bind(time_end)
-        .bind(false)
         .fetch_all(&pool)
         .await;
 
@@ -530,13 +525,12 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
             tasks.push(tokio::task::spawn(async move {
                 let pool = CLIENT_RO.clone();
                     let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
-                    let query = "SELECT id, records, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4 AND deleted = $5;";
+                    let query = "SELECT id, records, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;";
                     sqlx::query_as::<_, super::FileId>(query)
                     .bind(stream_key)
                     .bind(time_start)
                     .bind(max_ts_upper_bound)
                     .bind(time_end)
-                    .bind(false)
                     .fetch_all(&pool)
                     .await
             }));
@@ -1628,11 +1622,7 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
                 }
                 // delete files by ids
                 if !ids.is_empty() {
-                    let now_ts = now_micros();
-                    let sql = format!(
-                        "UPDATE file_list SET deleted = true, updated_at = {now_ts} WHERE id IN({});",
-                        ids.join(",")
-                    );
+                    let sql = format!("DELETE FROM file_list WHERE id IN({});", ids.join(","));
                     if let Err(e) = sqlx::query(sql.as_str()).execute(&mut *tx).await {
                         if let Err(e) = tx.rollback().await {
                             log::error!(

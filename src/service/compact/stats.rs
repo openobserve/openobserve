@@ -100,7 +100,7 @@ async fn update_stats_from_file_list_inner(
         .await
         .map_err(|e| anyhow::anyhow!("get add stream stats error: {e}"))?;
     // get stats from file_list_dump
-    let dumped_stats = file_list_dump::stats(time_range)
+    let dumped_stats = file_list_dump::stats(time_range, true)
         .await
         .map_err(|e| anyhow::anyhow!("get dumped add stream stats error: {e}"))?;
     let mut stream_stats = stream_stats

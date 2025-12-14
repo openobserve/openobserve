@@ -74,7 +74,6 @@ impl super::FileList for MysqlFileList {
     }
 
     async fn remove(&self, file: &str) -> Result<()> {
-        let now_ts = now_micros();
         let pool = CLIENT.clone();
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
@@ -82,9 +81,8 @@ impl super::FileList for MysqlFileList {
             .with_label_values(&["delete", "file_list"])
             .inc();
         sqlx::query(
-            r#"UPDATE file_list SET deleted = true, updated_at = ? WHERE stream = ? AND date = ? AND file = ?;"#,
+            r#"DELETE FROM file_list WHERE stream = ? AND date = ? AND file = ?;"#,
         )
-        .bind(now_ts)
         .bind(stream_key)
         .bind(date_key)
         .bind(file_name)
@@ -411,14 +409,13 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
                 r#"
 SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
     FROM file_list
-    WHERE stream = ? AND max_ts >= ? AND max_ts <= ? AND min_ts <= ? AND deleted = ?;
+    WHERE stream = ? AND max_ts >= ? AND max_ts <= ? AND min_ts <= ?;
                 "#,
             )
             .bind(stream_key)
             .bind(time_start)
             .bind(max_ts_upper_bound)
             .bind(time_end)
-            .bind(false)
             .fetch_all(&pool)
             .await
         };
@@ -452,13 +449,12 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
                 r#"
 SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
     FROM file_list
-    WHERE stream = ? AND date >= ? AND date <= ? AND deleted = ?;
+    WHERE stream = ? AND date >= ? AND date <= ?;
                 "#,
             )
             .bind(stream_key)
             .bind(date_start)
             .bind(date_end)
-            .bind(false)
             .fetch_all(&pool)
             .await;
         let time = start.elapsed().as_secs_f64();
@@ -485,13 +481,12 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
             .inc();
         let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
         let ret = sqlx::query_as::<_, super::FileRecord>(
-            r#"SELECT * FROM file_list WHERE stream = ? AND max_ts >= ? AND max_ts <= ? AND min_ts <= ? AND deleted = ?;"#,
+            r#"SELECT * FROM file_list WHERE stream = ? AND max_ts >= ? AND max_ts <= ? AND min_ts <= ?;"#,
         )
         .bind(stream_key)
         .bind(time_start)
         .bind(max_ts_upper_bound)
         .bind(time_end)
-        .bind(false)
         .fetch_all(&pool)
         .await;
 
@@ -603,13 +598,12 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
                 .with_label_values(&["query_ids", "file_list"])
                 .inc();
                     let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
-                    let query = "SELECT id, records, original_size FROM file_list WHERE stream = ? AND max_ts >= ? AND max_ts <= ? AND min_ts <= ? AND deleted = ?;";
+                    let query = "SELECT id, records, original_size FROM file_list WHERE stream = ? AND max_ts >= ? AND max_ts <= ? AND min_ts <= ?;";
                     sqlx::query_as::<_, super::FileId>(query)
                     .bind(stream_key)
                     .bind(time_start)
                     .bind(max_ts_upper_bound)
                     .bind(time_end)
-                    .bind(false)
                     .fetch_all(&pool)
                     .await
             }));
@@ -2079,11 +2073,7 @@ INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, m
                 }
                 // delete files by ids
                 if !ids.is_empty() {
-                    let now_ts = now_micros();
-                    let sql = format!(
-                        "UPDATE file_list SET deleted = true, updated_at = {now_ts} WHERE id IN({});",
-                        ids.join(",")
-                    );
+                    let sql = format!("DELETE FROM file_list WHERE id IN({});", ids.join(","));
                     DB_QUERY_NUMS
                         .with_label_values(&["delete_id", "file_list"])
                         .inc();

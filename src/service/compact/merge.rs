@@ -641,7 +641,7 @@ pub async fn merge_by_stream(
                 events.sort_by(|a, b| a.key.cmp(&b.key));
 
                 // write file list to storage
-                if let Err(e) = write_file_list(&org_id, &events).await {
+                if let Err(e) = write_file_list(&org_id, stream_type, &events).await {
                     log::error!("[COMPACTOR] write file list failed: {e}");
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                     continue;
@@ -1072,7 +1072,11 @@ async fn generate_inverted_index(
     Ok(())
 }
 
-async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow::Error> {
+async fn write_file_list(
+    org_id: &str,
+    stream_type: StreamType,
+    events: &[FileKey],
+) -> Result<(), anyhow::Error> {
     if events.is_empty() {
         return Ok(());
     }
@@ -1091,14 +1095,17 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
 
     // set to db
     // retry 5 times
+    let cfg = get_config();
     let mut success = false;
+    let mut mark_deleted_done = false;
     let created_at = config::utils::time::now_micros();
     for _ in 0..5 {
-        if let Err(e) = infra_file_list::batch_process(events).await {
+        if !mark_deleted_done && let Err(e) = infra::file_list::batch_process(events).await {
             log::error!("[COMPACTOR] batch_process to db failed, retrying: {e}");
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             continue;
         }
+        mark_deleted_done = true;
         if !del_items.is_empty()
             && let Err(e) = infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
         {
@@ -1110,9 +1117,15 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
         break;
     }
 
+    // handle dump_stats for file_list type streams
+    if success && stream_type == StreamType::Filelist && cfg.compact.file_list_dump_enabled {
+        let (deleted_files, new_files): (Vec<_>, Vec<_>) = events.iter().partition(|e| e.deleted);
+        super::dump::handle_dump_stats_on_merge(&deleted_files, &new_files).await;
+    }
+
     if success {
         // send broadcast to other nodes
-        if get_config().cache_latest_files.enabled {
+        if cfg.cache_latest_files.enabled {
             // get id for all the new files
             let file_ids = infra_file_list::query_ids_by_files(events).await?;
             let mut events = events.to_vec();
