@@ -16,6 +16,7 @@
 use config::{
     cluster::LOCAL_NODE,
     meta::stream::{ALL_STREAM_TYPES, StreamType},
+    metrics,
     utils::time::{BASE_TIME, day_micros, get_ymdh_from_micros, now_micros},
 };
 use infra::{dist_lock, file_list as infra_file_list};
@@ -57,23 +58,41 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
             let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
             for stream_name in streams {
                 let start = std::time::Instant::now();
-                if let Err(e) = update_stats_from_file_list_inner(
+                let result = update_stats_from_file_list_inner(
                     &org_id,
                     stream_type,
                     &stream_name,
                     latest_updated_at,
                     last_updated_at,
                 )
-                .await
-                {
+                .await;
+
+                // Record metrics
+                let duration = start.elapsed().as_secs_f64();
+                let stream_type_str = stream_type.to_string();
+
+                metrics::STREAM_STATS_SCAN_DURATION
+                    .with_label_values(&[&org_id, &stream_type_str])
+                    .observe(duration);
+
+                metrics::STREAM_STATS_SCAN_TOTAL
+                    .with_label_values(&[&org_id, &stream_type_str])
+                    .inc();
+
+                if let Err(e) = result {
+                    metrics::STREAM_STATS_SCAN_ERRORS_TOTAL
+                        .with_label_values(&[&org_id, &stream_type_str])
+                        .inc();
+
                     log::error!(
                         "[STATS] update stats for {org_id}/{stream_type}/{stream_name} error: {e}"
                     );
                     return Err(e);
                 }
-                let took = start.elapsed().as_millis();
+
                 log::info!(
-                    "[STATS] update stats for {org_id}/{stream_type}/{stream_name} in {took} ms"
+                    "[STATS] update stats for {org_id}/{stream_type}/{stream_name} in {} ms",
+                    (duration * 1000.0) as u64
                 );
             }
         }

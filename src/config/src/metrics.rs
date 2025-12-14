@@ -561,6 +561,48 @@ pub static COMPACT_PENDING_JOBS: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+
+// stream stats aggregation metrics
+pub static STREAM_STATS_SCAN_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "stream_stats_scan_duration_seconds",
+            "Stream stats aggregation task duration in seconds.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 10.0, 30.0, 60.0]),
+        &["organization", "stream_type"],
+    )
+    .expect("Metric created")
+});
+
+pub static STREAM_STATS_SCAN_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "stream_stats_scan_total",
+            "Total number of stream stats aggregation tasks executed.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type"],
+    )
+    .expect("Metric created")
+});
+
+pub static STREAM_STATS_SCAN_ERRORS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "stream_stats_scan_errors_total",
+            "Total number of stream stats aggregation task failures.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type"],
+    )
+    .expect("Metric created")
+});
+
 // TODO deletion / archiving stats
 
 // storage stats
@@ -1531,6 +1573,17 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(COMPACT_PENDING_JOBS.clone()))
+        .expect("Metric registered");
+
+    // stream stats aggregation metrics
+    registry
+        .register(Box::new(STREAM_STATS_SCAN_DURATION.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(STREAM_STATS_SCAN_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(STREAM_STATS_SCAN_ERRORS_TOTAL.clone()))
         .expect("Metric registered");
 
     // storage stats
