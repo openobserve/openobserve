@@ -603,6 +603,33 @@ pub static STREAM_STATS_SCAN_ERRORS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static STREAM_STATS_STREAMS_TOTAL: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "stream_stats_streams_total",
+            "Total number of streams being tracked.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static STREAM_STATS_LAST_SCAN_TIMESTAMP: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "stream_stats_last_scan_timestamp",
+            "Unix timestamp in microseconds of the last completed aggregation scan.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
 // TODO deletion / archiving stats
 
 // storage stats
@@ -1584,6 +1611,12 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(STREAM_STATS_SCAN_ERRORS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(STREAM_STATS_STREAMS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(STREAM_STATS_LAST_SCAN_TIMESTAMP.clone()))
         .expect("Metric registered");
 
     // storage stats

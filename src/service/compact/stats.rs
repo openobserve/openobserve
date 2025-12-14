@@ -53,9 +53,14 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
     );
 
     let orgs = db::schema::list_organizations_from_cache().await;
+    let mut total_streams = 0;
     for org_id in orgs {
         for stream_type in ALL_STREAM_TYPES {
+            if stream_type == StreamType::Index || stream_type == StreamType::Filelist {
+                continue;
+            }
             let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
+            total_streams += streams.len();
             for stream_name in streams {
                 let start = std::time::Instant::now();
                 let result = update_stats_from_file_list_inner(
@@ -97,6 +102,14 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
             }
         }
     }
+
+    // Update global metrics
+    metrics::STREAM_STATS_STREAMS_TOTAL
+        .with_label_values::<&str>(&[])
+        .set(total_streams as i64);
+    metrics::STREAM_STATS_LAST_SCAN_TIMESTAMP
+        .with_label_values::<&str>(&[])
+        .set(now_micros());
 
     // update offset to current time
     let offset = now_micros();
