@@ -513,7 +513,7 @@ async fn delete_hourly_inner(
     // Filter files based on the time range to find files to delete
     let start_date = get_ymdh_from_micros(range.0);
     let end_date = get_ymdh_from_micros(range.1);
-    let (files_to_delete, mut files_to_keep): (Vec<_>, Vec<_>) = files
+    let (files_to_delete, files_to_keep): (Vec<_>, Vec<_>) = files
         .into_iter()
         .partition(|f| f.date >= start_date && f.date <= end_date);
 
@@ -521,12 +521,6 @@ async fn delete_hourly_inner(
         return Ok(()); // nothing need to do
     }
 
-    // generate new dump file with files_to_keep and upload to storage
-    // we need reset updated_at for fix stream stats
-    let updated_at = now_micros();
-    files_to_keep
-        .iter_mut()
-        .for_each(|f| f.updated_at = updated_at);
     let new_dump_file = if !files_to_keep.is_empty() {
         match generate_dump(org_id, stream_type, stream_name, range, files_to_keep).await {
             Ok(v) => v,

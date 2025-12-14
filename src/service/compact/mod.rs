@@ -350,8 +350,6 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
     let now = config::utils::time::now();
     let data_lifecycle_end = now - Duration::try_days(cfg.compact.data_retention_days).unwrap();
 
-    let (stream_stats_offset, _) = db::compact::stats::get_offset().await;
-
     // if the stream partition_time_level is daily we only allow one compactor
     let mut need_release_ids = Vec::new();
     let mut need_done_ids = Vec::new();
@@ -413,7 +411,6 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
             stream_name,
             job_id: job.id,
             offset: job.offsets,
-            stats_offset: stream_stats_offset,
         });
     }
 
