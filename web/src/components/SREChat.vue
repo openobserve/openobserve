@@ -185,9 +185,9 @@
               </div>
             </div>
           </div>
-          <div v-if="isLoading" id="loading-indicator" class="">
+          <div v-if="isLoading" id="loading-indicator" class="tw-flex tw-items-center tw-gap-2 tw-p-4">
             <q-spinner-dots color="primary" size="2em" />
-            <span>Generating response...</span>
+            <span style="font-size: 14px; opacity: 0.7;">{{ currentObservingMessage }}</span>
           </div>
         </div>
         
@@ -369,7 +369,36 @@ export default defineComponent({
     
     // AbortController for managing request cancellation - allows users to stop ongoing AI requests
     const currentAbortController = ref<AbortController | null>(null);
-    
+
+    // Observing messages for loading indicator (OpenObserve branding)
+    const OBSERVING_MESSAGES = [
+      "Observing...",
+      "Keenly observing...",
+      "Carefully observing...",
+      "Deeply observing...",
+      "Patiently observing...",
+      "Thoroughly observing...",
+      "Meticulously observing...",
+      "Intently observing...",
+      "Actively observing...",
+      "Closely observing...",
+      "Observing some more...",
+      "Still observing...",
+      "Observing and thinking...",
+      "Observing and analyzing...",
+      "Observing carefully...",
+      "Observing thoughtfully...",
+      "Observing diligently...",
+      "Observing attentively...",
+      "Observing systematically...",
+      "Continuing to observe...",
+      "Observing further...",
+      "Observing in detail...",
+      "Perpetually observing..."
+    ];
+    const currentObservingMessage = ref(OBSERVING_MESSAGES[0]);
+    const observingRotationInterval = ref<NodeJS.Timeout | null>(null);
+
     // Query history functionality
     const queryHistory = ref<string[]>([]);
     const historyIndex = ref(-1);
@@ -493,7 +522,8 @@ export default defineComponent({
         
         // Update UI state to reflect cancellation
         isLoading.value = false;
-        
+        stopObservingRotation();
+
         // Handle partial message cleanup
         if (chatMessages.value.length > 0) {
           const lastMessage = chatMessages.value[chatMessages.value.length - 1];
@@ -533,6 +563,7 @@ export default defineComponent({
         console.error('Error fetching initial message:', error);
       }
       isLoading.value = false;
+      stopObservingRotation();
       scrollToBottom();
     };
 
@@ -540,7 +571,7 @@ export default defineComponent({
       const decoder = new TextDecoder();
       let buffer = '';
       let messageComplete = false;
-      
+
       try {
         while (true) {
           const { done, value } = await reader.read();
@@ -548,47 +579,57 @@ export default defineComponent({
 
           // Append new chunk to existing buffer
           buffer += decoder.decode(value, { stream: true });
-          
+
           // Process each line that starts with 'data: '
           const lines = buffer.split('\n');
           buffer = lines.pop() || ''; // Keep last potentially incomplete line
-          
+
           for (const line of lines) {
             if (line.trim().startsWith('data: ')) {
               try {
-                // Extract everything after 'data: ' and before any line break
+                // Extract everything after 'data: '
                 const jsonStr = line.substring(line.indexOf('{'));
-                
+
                 // Skip empty or invalid JSON strings
                 if (!jsonStr || !jsonStr.trim()) continue;
-                
-                // Try to parse the JSON, handling potential errors
+
+                // Try to parse the JSON
                 try {
                   const data = JSON.parse(jsonStr);
-                  if (data && typeof data.content === 'string') {
-                    // Format code blocks with proper line breaks
-                    let content = data.content;
-                    
-                    // Add line break after opening backticks if not present
-                    content = content.replace(/```(\w*)\s*([^`])/g, '```$1\n$2');
-                    
-                    // Add line break before closing backticks if not present
-                    content = content.replace(/([^`])\s*```/g, '$1\n```');
-                    
+
+                  // Handle different event types
+                  if (data.type === 'status' || data.status) {
+                    // Status/thinking events - just continue, already showing "Observing..."
+                    continue;
+                  } else if (data.type === 'tool_call' && data.message) {
+                    // Tool call event - show what tool is being called with spacing
+                    const toolMessage = `\n🔧 ${data.message}\n`;
+                    currentStreamingMessage.value += toolMessage;
+                    updateAssistantMessage();
+                    await scrollToBottom();
+                  } else if (data.type === 'tool_response' && data.message) {
+                    // Tool response event - skip, don't show completion messages
+                    continue;
+                  } else if (data.type === 'message' && typeof data.content === 'string') {
+                    // Message content - add spacing before content paragraphs
+                    const content = data.content + '\n';
                     currentStreamingMessage.value += content;
-                    
-                    // Check if we need to create the assistant message for the first time
-                    const lastMessage = chatMessages.value[chatMessages.value.length - 1];
-                    if (!lastMessage || lastMessage.role !== 'assistant') {
-                      // First content chunk - create assistant message
-                      chatMessages.value.push({
-                        role: 'assistant',
-                        content: currentStreamingMessage.value
-                      });
-                    } else {
-                      // Update existing assistant message
-                      lastMessage.content = currentStreamingMessage.value;
-                    }
+                    updateAssistantMessage();
+                    messageComplete = true;
+                    await scrollToBottom();
+                  } else if (data.type === 'complete') {
+                    // Complete event - stream finished
+                    messageComplete = true;
+                  } else if (data.type === 'error') {
+                    // Error event with spacing
+                    const errorMsg = `\n\n❌ Error: ${data.error}\n\n`;
+                    currentStreamingMessage.value += errorMsg;
+                    updateAssistantMessage();
+                    await scrollToBottom();
+                  } else if (typeof data.content === 'string') {
+                    // Legacy format - just content field
+                    currentStreamingMessage.value += data.content;
+                    updateAssistantMessage();
                     messageComplete = true;
                     await scrollToBottom();
                   }
@@ -612,32 +653,16 @@ export default defineComponent({
               try {
                 const jsonStr = line.substring(line.indexOf('{'));
                 if (!jsonStr || !jsonStr.trim()) continue;
-                
+
                 const data = JSON.parse(jsonStr);
-                if (data && typeof data.content === 'string') {
-                  // Format code blocks with proper line breaks
-                  let content = data.content;
-                  
-                  // Add line break after opening backticks if not present
-                  content = content.replace(/```(\w*)\s*([^`])/g, '```$1\n$2');
-                  
-                  // Add line break before closing backticks if not present
-                  content = content.replace(/([^`])\s*```/g, '$1\n```');
-                  
-                  currentStreamingMessage.value += content;
-                  
-                  // Check if we need to create the assistant message for the first time
-                  const lastMessage = chatMessages.value[chatMessages.value.length - 1];
-                  if (!lastMessage || lastMessage.role !== 'assistant') {
-                    // First content chunk - create assistant message
-                    chatMessages.value.push({
-                      role: 'assistant',
-                      content: currentStreamingMessage.value
-                    });
-                  } else {
-                    // Update existing assistant message
-                    lastMessage.content = currentStreamingMessage.value;
-                  }
+                if (data.type === 'message' && typeof data.content === 'string') {
+                  currentStreamingMessage.value += data.content;
+                  updateAssistantMessage();
+                  messageComplete = true;
+                  await scrollToBottom();
+                } else if (typeof data.content === 'string') {
+                  currentStreamingMessage.value += data.content;
+                  updateAssistantMessage();
                   messageComplete = true;
                   await scrollToBottom();
                 }
@@ -662,6 +687,21 @@ export default defineComponent({
           // Genuine error occurred during stream processing
           console.error('Error reading stream:', error);
         }
+      }
+    };
+
+    // Helper function to update assistant message
+    const updateAssistantMessage = () => {
+      const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+      if (!lastMessage || lastMessage.role !== 'assistant') {
+        // First content chunk - create assistant message
+        chatMessages.value.push({
+          role: 'assistant',
+          content: currentStreamingMessage.value
+        });
+      } else {
+        // Update existing assistant message
+        lastMessage.content = currentStreamingMessage.value;
       }
     };
 
@@ -843,6 +883,29 @@ export default defineComponent({
     };
 
     /**
+     * Start rotating the observing message every 7 seconds
+     */
+    const startObservingRotation = () => {
+      // Pick initial random message
+      currentObservingMessage.value = OBSERVING_MESSAGES[Math.floor(Math.random() * OBSERVING_MESSAGES.length)];
+
+      // Rotate every 7 seconds
+      observingRotationInterval.value = setInterval(() => {
+        currentObservingMessage.value = OBSERVING_MESSAGES[Math.floor(Math.random() * OBSERVING_MESSAGES.length)];
+      }, 7000);
+    };
+
+    /**
+     * Stop rotating the observing message
+     */
+    const stopObservingRotation = () => {
+      if (observingRotationInterval.value) {
+        clearInterval(observingRotationInterval.value);
+        observingRotationInterval.value = null;
+      }
+    };
+
+    /**
      * Sends a message to the AI chat service with streaming response handling
      * Creates a new AbortController for each request to enable cancellation
      * Manages the complete request lifecycle from user input to streaming response
@@ -866,7 +929,8 @@ export default defineComponent({
 
       isLoading.value = true;
       currentStreamingMessage.value = '';
-      
+      startObservingRotation(); // Start rotating "Observing..." messages
+
       // Create new AbortController for this request - enables cancellation via Stop button
       currentAbortController.value = new AbortController();
       
@@ -977,7 +1041,8 @@ export default defineComponent({
       }
 
       isLoading.value = false;
-      
+      stopObservingRotation();
+
       // Clean up AbortController after request completion (success or error)
       currentAbortController.value = null;
       
@@ -1111,7 +1176,10 @@ export default defineComponent({
         currentAbortController.value.abort();
         currentAbortController.value = null;
       }
-      
+
+      // Stop observing message rotation
+      stopObservingRotation();
+
       //this step is added because we are using seperate instances of o2 ai chat component to make sync between them
       //whenever a new chat is created or a new message is sent, the currentChatTimestamp is set to the chatId
       //so we need to make sure that the currentChatTimestamp is set to the correct chatId
@@ -1322,6 +1390,7 @@ export default defineComponent({
       showScrollToBottom,
       cancelCurrentRequest,
       currentAbortController,
+      currentObservingMessage,
       emit,
     }
   }
