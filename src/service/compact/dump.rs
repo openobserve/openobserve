@@ -344,7 +344,7 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
 
         infra_file_list::set_job_dumped_status(&[job.job_id], true).await?;
         log::info!(
-            "[COMPACTOR::DUMP] successfully dumped offset [{start_time},{end_time}] records {records} to file {file_name}, took: {} ms",
+            "[COMPACTOR::DUMP] successfully dumped {records} records to file {file_name}, took: {} ms",
             start.elapsed().as_millis(),
         );
     } else {
