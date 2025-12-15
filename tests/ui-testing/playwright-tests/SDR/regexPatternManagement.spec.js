@@ -8,6 +8,9 @@ test.describe("Regex Pattern Management Tests", { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'parallel' });
   let pm;
 
+  // Generate unique test run ID for isolation
+  const testRunId = Date.now().toString(36);
+
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
@@ -77,14 +80,17 @@ test.describe("Regex Pattern Management Tests", { tag: '@enterprise' }, () => {
   test("should handle duplicate pattern name and allow fixing", {
     tag: ['@sdr', '@regexPatterns', '@negative']
   }, async ({ page }) => {
-    testLogger.info('Testing duplicate pattern error and fixing by changing name');
+    const patternName = `duplicate_test_${testRunId}`;
+    const fixedPatternName = `duplicate_test_fixed_${testRunId}`;
+
+    testLogger.info(`Testing duplicate pattern error and fixing by changing name (pattern: ${patternName})`);
 
     await pm.sdrPatternsPage.navigateToRegexPatterns();
 
     // Create initial pattern
     testLogger.info('Creating initial pattern');
     await pm.sdrPatternsPage.createPatternWithDeleteIfExists(
-      'duplicate_test',
+      patternName,
       'First pattern',
       '^test$',
       pm.streamAssociationPage
@@ -95,7 +101,7 @@ test.describe("Regex Pattern Management Tests", { tag: '@enterprise' }, () => {
     testLogger.info('Attempting to create duplicate pattern');
     await pm.sdrPatternsPage.clickAddPattern();
     await pm.sdrPatternsPage.fillPatternDetails(
-      'duplicate_test',
+      patternName,
       'Duplicate pattern',
       '^test2$'
     );
@@ -105,7 +111,7 @@ test.describe("Regex Pattern Management Tests", { tag: '@enterprise' }, () => {
     // Fix by changing name - should succeed
     testLogger.info('Fixing duplicate by changing name');
     await pm.sdrPatternsPage.patternNameInput.click();
-    await pm.sdrPatternsPage.patternNameInput.fill('duplicate_test_fixed');
+    await pm.sdrPatternsPage.patternNameInput.fill(fixedPatternName);
     await pm.sdrPatternsPage.clickSavePattern();
     await pm.sdrPatternsPage.verifyPatternCreatedSuccess();
   });
