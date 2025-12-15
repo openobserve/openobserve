@@ -4,15 +4,9 @@ export class ThemePage {
     constructor(page) {
         this.page = page;
 
-        // Theme Switcher (header toggle button)
-        this.themeSwitcherBtn = '.header-icon'; // Light/Dark mode toggle in header
-        this.darkModeIcon = 'text=dark_mode';
-        this.lightModeIcon = 'text=light_mode';
-
         // Predefined Themes Dialog
         this.predefinedThemesMenuItem = '[data-test="menu-link-predefined-themes-item"]';
         this.predefinedThemesDialog = '.predefined-theme-card';
-        this.predefinedThemesTitle = 'text=Predefined Themes';
         this.resetThemeBtn = 'button:has-text("Reset")';
         this.closeDialogBtn = '.predefined-theme-card .q-btn--round.q-btn--flat';
 
@@ -55,17 +49,16 @@ export class ThemePage {
     async navigateToSettings() {
         await this.page.locator(this.settingsMenuItem).click();
         await this.page.waitForLoadState('domcontentloaded');
-        await this.page.waitForTimeout(500);
     }
 
     async openPredefinedThemesDialog() {
         // Click user profile menu first
         await this.page.locator(this.profileMenuBtn).click();
-        await this.page.waitForTimeout(500);
 
-        // Click predefined themes menu item ("Manage Theme")
-        await this.page.locator(this.predefinedThemesMenuItem).click();
-        await this.page.waitForTimeout(500);
+        // Wait for menu item to be visible and click it
+        const menuItem = this.page.locator(this.predefinedThemesMenuItem);
+        await expect(menuItem).toBeVisible({ timeout: 5000 });
+        await menuItem.click();
 
         // Wait for dialog to appear
         await expect(this.page.locator(this.predefinedThemesDialog)).toBeVisible({ timeout: 5000 });
@@ -73,22 +66,36 @@ export class ThemePage {
 
     async closePredefinedThemesDialog() {
         await this.page.locator(this.closeDialogBtn).click();
-        await this.page.waitForTimeout(300);
+        await expect(this.page.locator(this.predefinedThemesDialog)).not.toBeVisible({ timeout: 3000 });
     }
 
     // ==================== Theme Switcher (Header) ====================
 
     async toggleThemeMode() {
-        // Find and click the theme switcher button in header (has tooltip with "Switch to")
+        // Get current theme state before toggle
+        const wasDark = await this.isDarkMode();
+
+        // Find and click the theme switcher button in header
         const themeSwitcher = this.page.locator('button.q-btn--rounded.q-btn--flat').filter({
             has: this.page.locator('.q-icon.header-icon')
         }).first();
         await themeSwitcher.click();
-        await this.page.waitForTimeout(1000);
+
+        // Wait for theme to actually change by polling body class
+        const bodyDarkClass = this.bodyDarkClass;
+        await this.page.waitForFunction(
+            ([darkClass, expectedDark]) => {
+                const isDark = document.body.classList.contains(darkClass);
+                return isDark !== expectedDark;
+            },
+            [bodyDarkClass, wasDark],
+            { timeout: 5000 }
+        );
     }
 
     async isDarkMode() {
-        return await this.page.evaluate(() => document.body.classList.contains('body--dark'));
+        const bodyDarkClass = this.bodyDarkClass;
+        return await this.page.evaluate((darkClass) => document.body.classList.contains(darkClass), bodyDarkClass);
     }
 
     async isLightMode() {
@@ -111,13 +118,17 @@ export class ThemePage {
     // ==================== Predefined Themes Dialog ====================
 
     async selectLightModeTab() {
-        await this.page.locator(this.lightModeTab).click();
-        await this.page.waitForTimeout(300);
+        const tab = this.page.locator(this.lightModeTab);
+        await tab.click();
+        // Wait for tab to become active
+        await expect(tab).toHaveClass(/q-tab--active/, { timeout: 3000 });
     }
 
     async selectDarkModeTab() {
-        await this.page.locator(this.darkModeTab).click();
-        await this.page.waitForTimeout(300);
+        const tab = this.page.locator(this.darkModeTab);
+        await tab.click();
+        // Wait for tab to become active
+        await expect(tab).toHaveClass(/q-tab--active/, { timeout: 3000 });
     }
 
     async getThemeCards() {
@@ -127,7 +138,8 @@ export class ThemePage {
     async applyThemeByName(themeName) {
         const themeCard = this.page.locator(this.themeCard).filter({ hasText: themeName });
         await themeCard.locator(this.applyThemeBtn).click();
-        await this.page.waitForTimeout(500);
+        // Wait for Applied badge to appear on this theme card
+        await expect(themeCard.locator(this.appliedBadge)).toBeVisible({ timeout: 5000 });
     }
 
     async isThemeApplied(themeName) {
@@ -138,7 +150,8 @@ export class ThemePage {
 
     async resetToDefaultTheme() {
         await this.page.locator(this.resetThemeBtn).click();
-        await this.page.waitForTimeout(500);
+        // Wait for reset notification (filter by text as multiple notifications may exist)
+        await expect(this.page.locator(this.notification).filter({ hasText: 'reset' })).toBeVisible({ timeout: 5000 });
     }
 
     // ==================== Custom Color Picker ====================
@@ -146,13 +159,11 @@ export class ThemePage {
     async openCustomColorPicker() {
         // Ensure we're on the Light Mode tab where Custom Color is visible
         await this.selectLightModeTab();
-        await this.page.waitForTimeout(500);
 
         // Click the color preview to open color picker dialog
         const colorPreview = this.page.locator(this.customColorPreview);
         await expect(colorPreview).toBeVisible({ timeout: 5000 });
         await colorPreview.click();
-        await this.page.waitForTimeout(500);
 
         // Wait for color picker dialog to be visible
         await expect(this.page.locator(this.colorPickerDialog).first()).toBeVisible({ timeout: 10000 });
@@ -160,42 +171,39 @@ export class ThemePage {
 
     async closeColorPicker() {
         await this.page.locator(this.colorPickerClose).click();
-        await this.page.waitForTimeout(300);
+        // Wait for color picker dialog to close
+        await expect(this.page.locator(this.colorPickerDialog).first()).not.toBeVisible({ timeout: 3000 });
     }
 
     async applyCustomColor() {
         // Ensure we're on the Light Mode tab
         await this.selectLightModeTab();
-        await this.page.waitForTimeout(500);
 
         // Find the custom color card and click Apply
         const customCard = this.page.locator(this.customColorCard);
         await expect(customCard).toBeVisible({ timeout: 5000 });
         await customCard.locator(this.applyThemeBtn).click();
-        await this.page.waitForTimeout(500);
+        // Wait for notification to confirm application (filter by text as multiple notifications may exist)
+        await expect(this.page.locator(this.notification).filter({ hasText: 'Custom' })).toBeVisible({ timeout: 5000 });
     }
 
     // ==================== General Settings ====================
 
     async clickLightThemeChip() {
         await this.page.locator(this.themeLightChip).click();
-        await this.page.waitForTimeout(300);
     }
 
     async clickDarkThemeChip() {
         await this.page.locator(this.themeDarkChip).click();
-        await this.page.waitForTimeout(300);
     }
 
     async resetThemeColorsInSettings() {
         await this.page.locator(this.resetThemeColorsBtn).click();
-        await this.page.waitForTimeout(300);
     }
 
     async saveSettings() {
         await this.page.locator(this.saveSettingsBtn).click();
         await this.page.waitForLoadState('domcontentloaded');
-        await this.page.waitForTimeout(500);
     }
 
     async getLightThemeColor() {
@@ -231,7 +239,8 @@ export class ThemePage {
     }
 
     async expectNotificationContains(text) {
-        await expect(this.page.locator(this.notification)).toContainText(text, { timeout: 5000 });
+        // Filter to get notification containing the expected text (multiple notifications may be present)
+        await expect(this.page.locator(this.notification).filter({ hasText: text })).toBeVisible({ timeout: 5000 });
     }
 
     async expectThemeLightChipVisible() {

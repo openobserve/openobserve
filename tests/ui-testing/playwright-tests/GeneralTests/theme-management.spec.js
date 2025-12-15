@@ -21,11 +21,11 @@ test.describe("Theme Management Tests", () => {
     testLogger.info('Theme management test setup completed');
   });
 
-  test.describe("Theme Switcher Toggle", () => {
-    test("should toggle between light and dark mode using header button", {
-      tag: ['@theme', '@themeSwitcher', '@P1']
+  test.describe("Theme Switcher", () => {
+    test("should toggle between light and dark mode and persist after reload", {
+      tag: ['@theme', '@themeSwitcher', '@themePersistence', '@P1']
     }, async ({ page }) => {
-      testLogger.info('Testing theme mode toggle functionality');
+      testLogger.info('Testing theme mode toggle and persistence functionality');
 
       // Get initial theme state
       const initialIsDark = await pm.themePage.isDarkMode();
@@ -33,7 +33,6 @@ test.describe("Theme Management Tests", () => {
 
       // Toggle theme
       await pm.themePage.toggleThemeMode();
-      await page.waitForTimeout(500);
 
       // Verify theme changed
       const afterToggleIsDark = await pm.themePage.isDarkMode();
@@ -42,29 +41,27 @@ test.describe("Theme Management Tests", () => {
 
       // Toggle back to original
       await pm.themePage.toggleThemeMode();
-      await page.waitForTimeout(500);
 
       // Verify theme restored
       const finalIsDark = await pm.themePage.isDarkMode();
       expect(finalIsDark).toBe(initialIsDark);
-      testLogger.info('Theme toggle test completed successfully');
-    });
+      testLogger.info('Theme toggle test completed');
 
-    test("should persist theme preference after page reload", {
-      tag: ['@theme', '@themePersistence', '@P1']
-    }, async ({ page }) => {
-      testLogger.info('Testing theme persistence across page reload');
-
-      // Switch to dark mode
+      // Test persistence - switch to dark mode
       await pm.themePage.switchToDarkMode();
-      await page.waitForTimeout(500);
       await pm.themePage.expectDarkMode();
-      testLogger.info('Switched to dark mode');
+      testLogger.info('Switched to dark mode for persistence test');
 
       // Reload the page
       await page.reload();
       await page.waitForLoadState('domcontentloaded');
-      await page.waitForTimeout(2000);
+
+      // Wait for theme to be restored from storage (Vue/Quasar needs time to apply it)
+      await page.waitForFunction(
+        (darkClass) => document.body.classList.contains(darkClass),
+        'body--dark',
+        { timeout: 10000 }
+      );
 
       // Verify dark mode persisted
       await pm.themePage.expectDarkMode();
@@ -72,94 +69,62 @@ test.describe("Theme Management Tests", () => {
 
       // Switch back to light mode for cleanup
       await pm.themePage.switchToLightMode();
-      await page.waitForTimeout(500);
-      testLogger.info('Theme persistence test completed');
+      testLogger.info('Theme toggle and persistence test completed');
     });
   });
 
-  test.describe("Predefined Themes Dialog", () => {
-    test("should open and close predefined themes dialog", {
+  test.describe("Predefined Themes", () => {
+    test("should open dialog, display tabs and theme options, then close", {
       tag: ['@theme', '@predefinedThemes', '@P1']
     }, async ({ page }) => {
-      testLogger.info('Testing predefined themes dialog open/close');
+      testLogger.info('Testing predefined themes dialog functionality');
 
       // Open predefined themes dialog
       await pm.themePage.openPredefinedThemesDialog();
       await pm.themePage.expectPredefinedThemesDialogVisible();
       testLogger.info('Predefined themes dialog opened');
 
-      // Close dialog
-      await pm.themePage.closePredefinedThemesDialog();
-      await page.waitForTimeout(500);
-      await pm.themePage.expectPredefinedThemesDialogHidden();
-      testLogger.info('Predefined themes dialog closed');
-    });
-
-    test("should display light and dark mode tabs in predefined themes", {
-      tag: ['@theme', '@predefinedThemes', '@P2']
-    }, async ({ page }) => {
-      testLogger.info('Testing light/dark mode tabs in predefined themes');
-
-      // Open predefined themes dialog
-      await pm.themePage.openPredefinedThemesDialog();
-
       // Verify light mode tab is visible
-      await expect(page.locator('.q-tab:has-text("Light Mode")')).toBeVisible();
+      await expect(page.locator(pm.themePage.lightModeTab)).toBeVisible();
       testLogger.info('Light Mode tab visible');
 
       // Verify dark mode tab is visible
-      await expect(page.locator('.q-tab:has-text("Dark Mode")')).toBeVisible();
+      await expect(page.locator(pm.themePage.darkModeTab)).toBeVisible();
       testLogger.info('Dark Mode tab visible');
 
       // Switch between tabs
       await pm.themePage.selectDarkModeTab();
-      await page.waitForTimeout(300);
       testLogger.info('Switched to Dark Mode tab');
 
       await pm.themePage.selectLightModeTab();
-      await page.waitForTimeout(300);
       testLogger.info('Switched back to Light Mode tab');
 
-      // Close dialog
-      await pm.themePage.closePredefinedThemesDialog();
-      testLogger.info('Tabs test completed');
-    });
-
-    test("should display predefined theme options", {
-      tag: ['@theme', '@predefinedThemes', '@P2']
-    }, async ({ page }) => {
-      testLogger.info('Testing predefined theme options display');
-
-      // Open predefined themes dialog
-      await pm.themePage.openPredefinedThemesDialog();
-
-      // Expected theme names
+      // Verify predefined theme options (use .first() as themes exist in both Light and Dark tabs)
       const expectedThemes = ['Ocean Breeze', 'Purple Dream', 'Indigo Night', 'Sky Blue'];
-
       for (const themeName of expectedThemes) {
-        const themeCard = page.locator('.theme-card-compact').filter({ hasText: themeName });
+        const themeCard = page.locator(pm.themePage.themeCard).filter({ hasText: themeName }).first();
         await expect(themeCard).toBeVisible();
         testLogger.info(`Theme "${themeName}" is visible`);
       }
 
       // Verify Custom Color option exists
-      const customCard = page.locator('.theme-card-compact').filter({ hasText: 'Custom Color' });
+      const customCard = page.locator(pm.themePage.themeCard).filter({ hasText: 'Custom Color' }).first();
       await expect(customCard).toBeVisible();
       testLogger.info('Custom Color option is visible');
 
       // Close dialog
       await pm.themePage.closePredefinedThemesDialog();
-      testLogger.info('Predefined theme options test completed');
+      await pm.themePage.expectPredefinedThemesDialogHidden();
+      testLogger.info('Predefined themes dialog closed');
     });
 
-    test("should apply predefined theme and show Applied badge", {
-      tag: ['@theme', '@predefinedThemes', '@applyTheme', '@P1']
+    test("should apply predefined theme, show Applied badge, and reset to default", {
+      tag: ['@theme', '@predefinedThemes', '@applyTheme', '@resetTheme', '@P1']
     }, async ({ page }) => {
-      testLogger.info('Testing predefined theme application');
+      testLogger.info('Testing predefined theme application and reset');
 
       // Ensure we're in light mode first
       await pm.themePage.switchToLightMode();
-      await page.waitForTimeout(500);
 
       // Open predefined themes dialog
       await pm.themePage.openPredefinedThemesDialog();
@@ -177,53 +142,27 @@ test.describe("Theme Management Tests", () => {
       expect(isApplied).toBe(true);
       testLogger.info('Applied badge shown for Ocean Breeze');
 
-      // Reset to default for cleanup
-      await pm.themePage.resetToDefaultTheme();
-      await page.waitForTimeout(500);
-
-      // Close dialog
-      await pm.themePage.closePredefinedThemesDialog();
-      testLogger.info('Apply theme test completed');
-    });
-
-    test("should reset theme to default", {
-      tag: ['@theme', '@predefinedThemes', '@resetTheme', '@P1']
-    }, async ({ page }) => {
-      testLogger.info('Testing theme reset functionality');
-
-      // Ensure we're in light mode
-      await pm.themePage.switchToLightMode();
-      await page.waitForTimeout(500);
-
-      // Open predefined themes dialog
-      await pm.themePage.openPredefinedThemesDialog();
-
-      // Apply a theme first
+      // Now test reset - Apply a different theme first
       await pm.themePage.applyThemeByName('Purple Dream');
-      await page.waitForTimeout(500);
       testLogger.info('Applied Purple Dream theme');
 
       // Reset to default
       await pm.themePage.resetToDefaultTheme();
-      await page.waitForTimeout(1000);
       testLogger.info('Reset theme to default');
 
-      // Verify notification (may be quick so use try/catch)
+      // Verify reset notification
       try {
         await pm.themePage.expectNotificationContains('reset');
         testLogger.info('Reset notification shown');
       } catch (e) {
-        // Notification may have already disappeared, which is acceptable
         testLogger.info('Reset notification not captured (may have been transient)');
       }
 
       // Close dialog
       await pm.themePage.closePredefinedThemesDialog();
-      testLogger.info('Reset theme test completed');
+      testLogger.info('Apply and reset theme test completed');
     });
-  });
 
-  test.describe("Dark Mode Theme Application", () => {
     test("should apply theme in dark mode", {
       tag: ['@theme', '@darkMode', '@P2']
     }, async ({ page }) => {
@@ -231,16 +170,14 @@ test.describe("Theme Management Tests", () => {
 
       // Switch to dark mode
       await pm.themePage.switchToDarkMode();
-      await page.waitForTimeout(500);
       await pm.themePage.expectDarkMode();
       testLogger.info('Switched to dark mode');
 
       // Open predefined themes dialog
       await pm.themePage.openPredefinedThemesDialog();
 
-      // Verify we're on dark mode tab (should auto-select based on current mode)
+      // Select dark mode tab
       await pm.themePage.selectDarkModeTab();
-      await page.waitForTimeout(300);
 
       // Apply "Sky Blue" theme for dark mode
       await pm.themePage.applyThemeByName('Sky Blue');
@@ -251,7 +188,6 @@ test.describe("Theme Management Tests", () => {
 
       // Reset to default
       await pm.themePage.resetToDefaultTheme();
-      await page.waitForTimeout(500);
 
       // Close dialog and switch back to light mode
       await pm.themePage.closePredefinedThemesDialog();
@@ -261,55 +197,40 @@ test.describe("Theme Management Tests", () => {
   });
 
   test.describe("Custom Color Theme", () => {
-    test("should open custom color picker", {
+    test("should open color picker, close it, and apply custom color theme", {
       tag: ['@theme', '@customColor', '@P2']
     }, async ({ page }) => {
-      testLogger.info('Testing custom color picker');
+      testLogger.info('Testing custom color theme functionality');
 
       // Open predefined themes dialog
       await pm.themePage.openPredefinedThemesDialog();
 
-      // Click on custom color preview to open picker
+      // Open custom color picker
       await pm.themePage.openCustomColorPicker();
       testLogger.info('Custom color picker opened');
 
-      // Verify color picker is visible (Quasar renders as q-color-picker or q-color)
-      await expect(page.locator('.q-color-picker, .q-color').first()).toBeVisible();
+      // Verify color picker is visible
+      await expect(page.locator(pm.themePage.colorPickerDialog).first()).toBeVisible();
       testLogger.info('Color picker dialog is visible');
 
       // Close color picker
       await pm.themePage.closeColorPicker();
-      await page.waitForTimeout(300);
-
-      // Close predefined themes dialog
-      await pm.themePage.closePredefinedThemesDialog();
-      testLogger.info('Custom color picker test completed');
-    });
-
-    test("should apply custom color theme", {
-      tag: ['@theme', '@customColor', '@applyCustom', '@P2']
-    }, async ({ page }) => {
-      testLogger.info('Testing custom color theme application');
-
-      // Open predefined themes dialog
-      await pm.themePage.openPredefinedThemesDialog();
+      testLogger.info('Color picker closed');
 
       // Apply custom color theme
       await pm.themePage.applyCustomColor();
       testLogger.info('Applied custom color theme');
 
-      // Verify notification (message: "Custom color applied to light mode successfully!")
+      // Verify notification
       try {
         await pm.themePage.expectNotificationContains('Custom color applied');
         testLogger.info('Custom color notification shown');
       } catch (e) {
-        // Notification may have already disappeared
         testLogger.info('Custom color notification not captured (may have been transient)');
       }
 
       // Reset to default for cleanup
       await pm.themePage.resetToDefaultTheme();
-      await page.waitForTimeout(500);
 
       // Close dialog
       await pm.themePage.closePredefinedThemesDialog();
@@ -317,7 +238,7 @@ test.describe("Theme Management Tests", () => {
     });
   });
 
-  test.afterEach(async ({ page }) => {
+  test.afterEach(async () => {
     // Ensure we're back to light mode for next test
     try {
       await pm.themePage.switchToLightMode();
