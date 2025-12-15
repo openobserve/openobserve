@@ -85,6 +85,11 @@ roaring.workspace = true
 tonic.workspace = true
 tonic-prost.workspace = true
 tracing-opentelemetry.workspace = true
+vortex.workspace = true
+vortex-array.workspace = true
+vortex-file.workspace = true
+vortex-io.workspace = true
+vortex-session.workspace = true
 
 [dev-dependencies]
 expect-test.workspace = true

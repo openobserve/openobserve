@@ -64,6 +64,7 @@ anyhow.workspace = true
 argon2.workspace = true
 async-trait.workspace = true
 async-recursion.workspace = true
+async-fs = "2.2"
 async-walkdir.workspace = true
 awc = { version = "3.5", features = ["rustls-0_23"] }
 aws-sdk-sns.workspace = true
@@ -95,6 +96,14 @@ arrow-json.workspace = true
 arrow-schema.workspace = true
 parquet.workspace = true
 object_store.workspace = true
+vortex-array.workspace = true
+vortex-buffer.workspace = true
+vortex-file.workspace = true
+vortex-io.workspace = true
+vortex-session.workspace = true
+vortex.workspace = true
+vortex-datafusion.workspace = true
+vortex-scan.workspace = true
 env_logger.workspace = true
 faststr.workspace = true
 flate2.workspace = true
@@ -269,6 +278,18 @@ arrow-json = "57.0.0"
 arrow-schema = { version = "57.0.0", features = ["serde"] }
 parquet = { version = "57.0.0", features = ["arrow", "async", "object_store"] }
 object_store = { version = "0.12.4", features = ["aws", "azure", "gcp"] }
+vortex-array = { git = "https://github.com/haohuaijin/vortex", rev = "78e953e41a222f22cac9c1b91cad671649597619" }
+vortex-buffer = { git = "https://github.com/haohuaijin/vortex", rev = "78e953e41a222f22cac9c1b91cad671649597619" }
+vortex-file = { git = "https://github.com/haohuaijin/vortex", rev = "78e953e41a222f22cac9c1b91cad671649597619" }
+vortex-io = { git = "https://github.com/haohuaijin/vortex", rev = "78e953e41a222f22cac9c1b91cad671649597619" }
+vortex-session = { git = "https://github.com/haohuaijin/vortex", rev = "78e953e41a222f22cac9c1b91cad671649597619" }
+vortex = { git = "https://github.com/haohuaijin/vortex", rev = "78e953e41a222f22cac9c1b91cad671649597619", features = [
+    "tokio",
+] }
+vortex-datafusion = { git = "https://github.com/haohuaijin/vortex", rev = "78e953e41a222f22cac9c1b91cad671649597619" }
+vortex-scan = { git = "https://github.com/haohuaijin/vortex", rev = "78e953e41a222f22cac9c1b91cad671649597619", features = [
+    "roaring",
+] }
 sqlparser = { version = "0.59.0", features = ["serde", "visitor"] }
 dotenv_config = "0.2.2"
 dotenvy = "0.15.7"
@@ -396,6 +417,11 @@ utoipa = { version = "5", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "9", features = ["actix-web"] }
 uuid = { version = "1.18.1", features = ["v7"] }
 vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", branch = "v0.51" }
-vrl = { version = "0.28.1", features = ["arbitrary", "value", "compiler", "test"] }
+vrl = { version = "0.28.1", features = [
+    "arbitrary",
+    "value",
+    "compiler",
+    "test",
+] }
 zip = "6.0.0"
 zstd = "0.13"
