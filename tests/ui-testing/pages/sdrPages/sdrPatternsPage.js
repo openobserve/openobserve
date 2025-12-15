@@ -36,10 +36,11 @@ export class SDRPatternsPage {
   }
 
   async navigateToRegexPatterns() {
-    testLogger.info('Navigating to Regex Patterns settings');
-    await this.settingsMenuItem.click();
-    await this.regexPatternsTab.waitFor({ state: 'visible' });
-    await this.regexPatternsTab.click();
+    const orgName = process.env.ORGNAME || 'default';
+    const baseUrl = process.env.ZO_BASE_URL;
+    const targetUrl = `${baseUrl}/web/settings/regex_patterns?org_identifier=${orgName}`;
+    testLogger.info(`Navigating to Regex Patterns settings with org: ${orgName}`);
+    await this.page.goto(targetUrl);
     await this.page.waitForLoadState('networkidle');
   }
 
@@ -199,23 +200,11 @@ export class SDRPatternsPage {
     await expect(this.page.locator('[data-test="tab-import_json_file"]')).toBeVisible();
     await expect(this.page.locator('[data-test="tab-import_json_url"]')).toBeVisible();
 
-    // Click the Import JSON File tab to ensure it's selected
-    await this.page.locator('[data-test="tab-import_json_file"]').click();
-
-    // Upload file - try original locator first, fallback to new locator
-    let fileInput;
-    try {
-      fileInput = this.page.locator('[data-test="regex-pattern-import-json-file-input"]');
-      await expect(fileInput).toBeVisible({ timeout: 5000 });
-      await fileInput.setInputFiles(filePath);
-      testLogger.info('File selected for import (using original locator)');
-    } catch (error) {
-      // Fallback to new locator pattern
-      fileInput = this.page.locator('[data-test="regex-pattern-import-file-input"]');
-      await expect(fileInput).toBeVisible();
-      await fileInput.setInputFiles(filePath);
-      testLogger.info('File selected for import (using fallback locator)');
-    }
+    // Upload file using the standard file input locator
+    const fileInput = this.page.locator('[data-test="regex-pattern-import-file-input"]');
+    await expect(fileInput).toBeVisible();
+    await fileInput.setInputFiles(filePath);
+    testLogger.info('File selected for import');
 
     // Click import button
     const importJsonBtn = this.page.locator('[data-test="regex-pattern-import-json-btn"]');
@@ -224,7 +213,7 @@ export class SDRPatternsPage {
 
     // Wait for success message
     await this.page.waitForTimeout(2000);
-    const successMessage = this.page.getByText('Successfully imported');
+    const successMessage = this.page.getByText('Successfully imported regex-');
     const isVisible = await successMessage.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (isVisible) {
@@ -287,16 +276,31 @@ export class SDRPatternsPage {
     return isVisible;
   }
 
-  async checkPatternExists(patternName) {
+  async checkPatternExists(patternName, maxRetries = 3) {
     testLogger.info(`Checking if pattern exists: ${patternName}`);
-    await this.searchPattern(patternName);
-    await this.page.waitForTimeout(1000);
 
-    const count = await this.page.locator(`text="${patternName}"`).count();
-    const exists = count > 0;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      await this.searchPattern(patternName);
+      await this.page.waitForTimeout(1000);
 
-    testLogger.info(`Pattern ${patternName} exists: ${exists}`);
-    return exists;
+      const count = await this.page.locator(`text="${patternName}"`).count();
+      const exists = count > 0;
+
+      if (exists) {
+        testLogger.info(`Pattern ${patternName} exists: true (found on attempt ${attempt})`);
+        return true;
+      }
+
+      if (attempt < maxRetries) {
+        testLogger.info(`Pattern ${patternName} not found on attempt ${attempt}, retrying in 2s...`);
+        await this.page.waitForTimeout(2000);
+        // Navigate back to refresh the list
+        await this.navigateToRegexPatterns();
+      }
+    }
+
+    testLogger.info(`Pattern ${patternName} exists: false (after ${maxRetries} attempts)`);
+    return false;
   }
 
   async getPatternIdByName(patternName) {
