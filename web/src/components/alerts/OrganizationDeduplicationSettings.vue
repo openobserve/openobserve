@@ -169,6 +169,7 @@ interface SemanticFieldGroup {
   group?: string;
   fields: string[];
   normalize: boolean;
+  is_stable?: boolean;
 }
 
 interface OrganizationDeduplicationConfig {

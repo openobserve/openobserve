@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{future::Future, pin::Pin, sync::Arc};
+use std::{
+    future::Future,
+    pin::Pin,
+    sync::{Arc, atomic::Ordering},
+};
 
 use config::meta::{
     inverted_index::UNKNOWN_NAME,
@@ -58,6 +62,7 @@ impl Drop for AsyncDefer {
 #[derive(Debug)]
 pub struct ScanStatsVisitor {
     pub scan_stats: ScanStats,
+    pub peak_memory: usize,
     pub partial_err: String,
 }
 
@@ -65,6 +70,7 @@ impl ScanStatsVisitor {
     pub fn new() -> Self {
         ScanStatsVisitor {
             scan_stats: ScanStats::default(),
+            peak_memory: 0,
             partial_err: String::new(),
         }
     }
@@ -85,6 +91,10 @@ impl ExecutionPlanVisitor for ScanStatsVisitor {
                 let guard = remote_scan_exec.partial_err.lock();
                 let err = (*guard).clone();
                 self.partial_err.push_str(&err);
+            }
+            {
+                let peak_memory = remote_scan_exec.peak_memory().load(Ordering::Relaxed);
+                self.peak_memory = peak_memory.max(self.peak_memory);
             }
         }
         Ok(true)

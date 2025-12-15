@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{any::Any, sync::Arc};
+use std::{
+    any::Any,
+    sync::{Arc, atomic::AtomicUsize},
+};
 
 use arrow_schema::SchemaRef;
 use config::{
@@ -57,6 +60,7 @@ pub struct RemoteScanExec {
     partitions: usize,
     cache: PlanProperties,
     pub scan_stats: Arc<Mutex<ScanStats>>,
+    pub peak_memory: Arc<AtomicUsize>,
     pub partial_err: Arc<Mutex<String>>,
     pub cluster_metrics: Arc<Mutex<Vec<Metrics>>>,
     pub enrich_mode_node_idx: usize,
@@ -97,6 +101,7 @@ impl RemoteScanExec {
             scan_stats: Arc::new(Mutex::new(ScanStats::default())),
             partial_err: Arc::new(Mutex::new(String::new())),
             cluster_metrics: Arc::new(Mutex::new(Vec::new())),
+            peak_memory: Arc::new(AtomicUsize::new(0)),
             enrich_mode_node_idx,
             metrics: ExecutionPlanMetricsSet::new(),
         })
@@ -114,6 +119,10 @@ impl RemoteScanExec {
         self.cluster_metrics.clone()
     }
 
+    pub fn peak_memory(&self) -> Arc<AtomicUsize> {
+        self.peak_memory.clone()
+    }
+
     pub fn with_scan_stats(mut self, scan_stats: Arc<Mutex<ScanStats>>) -> Self {
         self.scan_stats = scan_stats;
         self
@@ -126,6 +135,11 @@ impl RemoteScanExec {
 
     pub fn with_cluster_metrics(mut self, cluster_metrics: Arc<Mutex<Vec<Metrics>>>) -> Self {
         self.cluster_metrics = cluster_metrics;
+        self
+    }
+
+    pub fn with_peak_memory(mut self, peak_memory: Arc<AtomicUsize>) -> Self {
+        self.peak_memory = peak_memory;
         self
     }
 
@@ -221,6 +235,7 @@ impl ExecutionPlan for RemoteScanExec {
             .with_scan_stats(self.scan_stats.clone())
             .with_partial_err(self.partial_err.clone())
             .with_cluster_metrics(self.cluster_metrics.clone())
+            .with_peak_memory(self.peak_memory.clone())
             .with_metrics(self.metrics.clone());
         Ok(Arc::new(remote_scan))
     }
@@ -239,6 +254,7 @@ impl ExecutionPlan for RemoteScanExec {
             self.scan_stats(),
             self.partial_err(),
             self.cluster_metrics(),
+            self.peak_memory(),
             baseline_metrics,
         );
         let stream = futures::stream::once(fut).try_flatten();
@@ -266,6 +282,7 @@ async fn get_remote_batch(
     scan_stats: Arc<Mutex<ScanStats>>,
     partial_err: Arc<Mutex<String>>,
     cluster_metrics: Arc<Mutex<Vec<Metrics>>>,
+    peak_memory: Arc<AtomicUsize>,
     metrics: RemoteScanMetrics,
 ) -> Result<SendableRecordBatchStream> {
     let start = std::time::Instant::now();
@@ -379,6 +396,7 @@ async fn get_remote_batch(
         .with_scan_stats(scan_stats)
         .with_partial_err(partial_err.clone())
         .with_cluster_metrics(cluster_metrics)
+        .with_peak_memory(peak_memory)
         .with_start_time(start);
 
     let mut stream = FlightDecoderStream::new(stream, schema.clone(), metrics, query_context);

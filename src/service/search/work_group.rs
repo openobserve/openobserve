@@ -200,7 +200,6 @@ pub async fn check_work_group(
         metrics::QUERY_RUNNING_NUMS
             .with_label_values(&[&org_id_owned])
             .dec();
-        log::info!("[trace_id {trace_id_owned}] search completed, metrics decremented");
     });
 
     Ok(DeferredLock {

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { StreamInfo } from "@/services/service_streams";
+import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 
 export interface MetricsCorrelationConfig {
   serviceName: string;
@@ -119,8 +120,17 @@ export function useMetricsCorrelationDashboard() {
 
     // Build WHERE clause from stream filters
     // Quote field names that contain special characters (hyphens, dots, etc.)
-    // Note: "_o2_all_" is a special value that the backend recognizes to skip filtering
+    // Skip filters with SELECT_ALL_VALUE (wildcard - means match all values)
+    console.log(`[useMetricsCorrelationDashboard] createMetricPanel - stream.filters for ${stream.stream_name}:`, stream.filters);
+
     const whereConditions = Object.entries(stream.filters)
+      .filter(([field, value]) => {
+        const skip = value === SELECT_ALL_VALUE;
+        if (skip) {
+          console.log(`[useMetricsCorrelationDashboard] Skipping filter ${field}=${value} (SELECT_ALL_VALUE)`);
+        }
+        return !skip;
+      })
       .map(([field, value]) => {
         // Quote field name if it contains special characters
         const quotedField = /[^a-zA-Z0-9_]/.test(field) ? `"${field}"` : field;
@@ -339,12 +349,13 @@ ORDER BY x_axis_1`;
     }
 
     // Build WHERE clause from filters
-    // Filter out non-string values and internal fields
-    // Note: "_o2_all_" is a special value that the backend recognizes to skip filtering
+    // Filter out non-string values, internal fields, and SELECT_ALL_VALUE wildcards
     const whereConditions = Object.entries(filters)
       .filter(([field, value]) => {
-        // Only include string values and skip internal fields
-        return typeof value === 'string' && !field.startsWith('_');
+        // Only include string values, skip internal fields, and skip SELECT_ALL_VALUE wildcards
+        return typeof value === 'string' &&
+               !field.startsWith('_') &&
+               value !== SELECT_ALL_VALUE;
       })
       .map(([field, value]) => {
         const quotedField = /[^a-zA-Z0-9_]/.test(field) ? `"${field}"` : field;
