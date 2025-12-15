@@ -3628,35 +3628,72 @@ export default defineComponent({
         shareURL += "?" + queryString;
       }
 
-      await shortURLService
-        .create(store.state.selectedOrganization.identifier, shareURL)
-        .then((res: any) => {
-          if (res.status == 200) {
-            shareURL = res.data.short_url;
-            copyToClipboard(shareURL)
-              .then(() => {
-                $q.notify({
-                  type: "positive",
-                  message: t("search.linkCopiedSuccessfully"),
-                  timeout: 5000,
-                });
-              })
-              .catch(() => {
-                $q.notify({
-                  type: "negative",
-                  message: t("search.errorCopyingLink"),
-                  timeout: 5000,
-                });
-              });
-          }
-        })
-        .catch(() => {
+      // Safari fix: Create a clipboard write promise BEFORE the async operation
+      // This maintains the user gesture context throughout the async operation
+      let clipboardItem: any = null;
+
+      // For Safari compatibility, we need to create the ClipboardItem synchronously
+      // before any async operations
+      if (navigator.clipboard && window.ClipboardItem) {
+        try {
+          // Create a promise that will resolve with the short URL text
+          const textPromise = shortURLService
+            .create(store.state.selectedOrganization.identifier, shareURL)
+            .then((res: any) => {
+              if (res.status == 200) {
+                return new Blob([res.data.short_url], { type: 'text/plain' });
+              }
+              // Fallback to long URL if short URL fails
+              return new Blob([shareURL], { type: 'text/plain' });
+            })
+            .catch(() => {
+              // Fallback to long URL on error
+              return new Blob([shareURL], { type: 'text/plain' });
+            });
+
+          clipboardItem = new ClipboardItem({
+            'text/plain': textPromise,
+          });
+
+          // Write to clipboard synchronously (the promise will resolve asynchronously)
+          await navigator.clipboard.write([clipboardItem]);
+
           $q.notify({
-            type: "negative",
-            message: t("search.errorShorteningLink"),
+            type: "positive",
+            message: t("search.linkCopiedSuccessfully"),
             timeout: 5000,
           });
+          return;
+        } catch (clipboardError) {
+          console.error("Clipboard API failed, trying fallback:", clipboardError);
+        }
+      }
+
+      // Fallback for browsers that don't support ClipboardItem or if clipboard API fails
+      try {
+        const res = await shortURLService.create(
+          store.state.selectedOrganization.identifier,
+          shareURL
+        );
+
+        if (res.status == 200) {
+          shareURL = res.data.short_url;
+        }
+
+        // Try to copy using Quasar's copyToClipboard
+        await copyToClipboard(shareURL);
+        $q.notify({
+          type: "positive",
+          message: t("search.linkCopiedSuccessfully"),
+          timeout: 5000,
         });
+      } catch (error) {
+        $q.notify({
+          type: "negative",
+          message: t("search.errorCopyingLink"),
+          timeout: 5000,
+        });
+      }
     });
     const showSearchHistoryfn = () => {
       emit("showSearchHistory");
@@ -4099,6 +4136,7 @@ export default defineComponent({
       );
       disable.value = panelsValues.some((item: any) => item === true);
     });
+
     const iconRight = computed(() => {
       return (
         "img:" +
