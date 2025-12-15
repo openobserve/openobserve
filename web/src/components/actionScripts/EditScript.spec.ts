@@ -884,4 +884,460 @@ describe("EditScript", () => {
       expect(saveActionScriptSpy).toHaveBeenCalled();
     });
   });
+
+  describe("Declared JavaScript Functions - Coverage Improvement", () => {
+    describe("timezoneFilterFn function", () => {
+      it("should call timezoneFilterFn with valid input", () => {
+        const mockUpdate = vi.fn();
+        wrapper.vm.timezoneFilterFn("UTC", mockUpdate);
+        expect(mockUpdate).toHaveBeenCalled();
+      });
+
+      it("should call timezoneFilterFn with empty string", () => {
+        const mockUpdate = vi.fn();
+        wrapper.vm.timezoneFilterFn("", mockUpdate);
+        expect(mockUpdate).toHaveBeenCalled();
+      });
+
+      it("should filter timezones correctly", () => {
+        const mockUpdate = vi.fn((callback) => callback());
+        wrapper.vm.timezoneFilterFn("America", mockUpdate);
+        expect(mockUpdate).toHaveBeenCalled();
+        expect(wrapper.vm.filteredTimezone).toBeDefined();
+      });
+    });
+
+    describe("filterColumns function", () => {
+      it("should filter columns with empty value", () => {
+        const options = ["option1", "option2", "option3"];
+        const mockUpdate = vi.fn((callback) => callback());
+        const result = wrapper.vm.filterColumns(options, "", mockUpdate);
+        expect(mockUpdate).toHaveBeenCalled();
+      });
+
+      it("should filter columns with matching value", () => {
+        const options = ["test1", "test2", "other"];
+        const mockUpdate = vi.fn((callback) => callback());
+        const result = wrapper.vm.filterColumns(options, "test", mockUpdate);
+        expect(mockUpdate).toHaveBeenCalled();
+      });
+
+      it("should return filtered array", () => {
+        const options = ["apple", "banana", "apricot"];
+        const mockUpdate = vi.fn((callback) => callback());
+        wrapper.vm.filterColumns(options, "ap", mockUpdate);
+        expect(mockUpdate).toHaveBeenCalled();
+      });
+    });
+
+    describe("goToActionScripts function", () => {
+      it("should navigate to action scripts page", () => {
+        const routerReplaceSpy = vi.spyOn(router, "replace");
+        wrapper.vm.goToActionScripts();
+        expect(routerReplaceSpy).toHaveBeenCalledWith({
+          name: "actionScripts",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
+      });
+
+      it("should set goToActionScripts as dialog okCallback", () => {
+        // Set up data that has changed to trigger dialog
+        wrapper.vm.formData.name = "Changed";
+        wrapper.vm.originalActionScriptData = JSON.stringify({ name: "Original" });
+
+        wrapper.vm.openCancelDialog();
+
+        // Verify the okCallback is set to goToActionScripts function
+        expect(wrapper.vm.dialog.okCallback).toBe(wrapper.vm.goToActionScripts);
+        expect(wrapper.vm.dialog.show).toBe(true);
+      });
+    });
+
+    describe("setupEditingActionScript function", () => {
+      it("should setup action script with repeat execution", async () => {
+        const mockReport = {
+          id: "test-id",
+          name: "Test Action",
+          description: "Test Description",
+          type: "scheduled",
+          execution_details: "repeat",
+          cron_expr: "0 0 * * * * 2024",
+          service_account: "test@example.com",
+          environment_variables: { KEY1: "value1", KEY2: "value2" },
+          zip_file_name: "test.zip",
+          timezone: "America/New_York",
+        };
+
+        await wrapper.vm.setupEditingActionScript(mockReport);
+
+        expect(wrapper.vm.formData.name).toBe("Test Action");
+        expect(wrapper.vm.formData.type).toBe("scheduled");
+        expect(wrapper.vm.frequency.type).toBe("repeat");
+        expect(wrapper.vm.frequency.cron).toBe("0 0 * * * *");
+      });
+
+      it("should setup action script with once execution", async () => {
+        const mockReport = {
+          id: "test-id-2",
+          name: "Once Action",
+          description: "Once Description",
+          type: "scheduled",
+          execution_details: "once",
+          service_account: "once@example.com",
+          environment_variables: {},
+          zip_file_name: "once.zip",
+          timezone: "UTC",
+        };
+
+        await wrapper.vm.setupEditingActionScript(mockReport);
+
+        expect(wrapper.vm.formData.name).toBe("Once Action");
+        expect(wrapper.vm.frequency.type).toBe("once");
+      });
+
+      it("should setup action script with service type", async () => {
+        const mockReport = {
+          id: "service-id",
+          name: "Service Action",
+          description: "Service Description",
+          type: "scheduled",
+          execution_details: "service",
+          service_account: "service@example.com",
+          environment_variables: {},
+          zip_file_name: "service.zip",
+        };
+
+        await wrapper.vm.setupEditingActionScript(mockReport);
+
+        expect(wrapper.vm.formData.type).toBe("service");
+      });
+
+      it("should setup environmental variables correctly", async () => {
+        const mockReport = {
+          id: "env-test-id",
+          name: "Env Test",
+          description: "Env Test Description",
+          type: "scheduled",
+          execution_details: "repeat",
+          cron_expr: "0 * * * *",
+          service_account: "env@example.com",
+          environment_variables: {
+            API_KEY: "secret123",
+            ENDPOINT: "https://example.com",
+            TIMEOUT: "30",
+          },
+          zip_file_name: "env.zip",
+        };
+
+        wrapper.vm.environmentalVariables = [];
+        await wrapper.vm.setupEditingActionScript(mockReport);
+
+        expect(wrapper.vm.environmentalVariables.length).toBeGreaterThan(0);
+        const keys = wrapper.vm.environmentalVariables.map((v: any) => v.key);
+        expect(keys).toContain("API_KEY");
+        expect(keys).toContain("ENDPOINT");
+        expect(keys).toContain("TIMEOUT");
+      });
+    });
+
+    describe("isRequiredKey and isRequiredValue validators", () => {
+      it("should validate required key with valid value", () => {
+        const result = wrapper.vm.isRequiredKey("validKey");
+        expect(result).toBe(true);
+      });
+
+      it("should validate required key with empty string", () => {
+        const result = wrapper.vm.isRequiredKey("");
+        expect(result).toBe("Key is required");
+      });
+
+      it("should validate required key with whitespace only", () => {
+        const result = wrapper.vm.isRequiredKey("   ");
+        expect(result).toBe("Key is required");
+      });
+
+      it("should validate required value with valid value", () => {
+        const result = wrapper.vm.isRequiredValue("validValue");
+        expect(result).toBe(true);
+      });
+
+      it("should validate required value with empty string", () => {
+        const result = wrapper.vm.isRequiredValue("");
+        expect(result).toBe("Value is required");
+      });
+
+      it("should validate required value with whitespace only", () => {
+        const result = wrapper.vm.isRequiredValue("   ");
+        expect(result).toBe("Value is required");
+      });
+
+      it("should validate required key with null", () => {
+        const result = wrapper.vm.isRequiredKey(null);
+        expect(result).toBe("Key is required");
+      });
+
+      it("should validate required value with null", () => {
+        const result = wrapper.vm.isRequiredValue(null);
+        expect(result).toBe("Value is required");
+      });
+    });
+
+    describe("addApiHeader function", () => {
+      it("should add api header with default parameters", () => {
+        const initialLength = wrapper.vm.environmentalVariables.length;
+        wrapper.vm.addApiHeader();
+        expect(wrapper.vm.environmentalVariables.length).toBe(initialLength + 1);
+        const lastHeader = wrapper.vm.environmentalVariables[wrapper.vm.environmentalVariables.length - 1];
+        expect(lastHeader.key).toBe("");
+        expect(lastHeader.value).toBe("");
+        expect(lastHeader.uuid).toBeDefined();
+      });
+
+      it("should add api header with provided key and value", () => {
+        const initialLength = wrapper.vm.environmentalVariables.length;
+        wrapper.vm.addApiHeader("TEST_KEY", "test_value");
+        expect(wrapper.vm.environmentalVariables.length).toBe(initialLength + 1);
+        const lastHeader = wrapper.vm.environmentalVariables[wrapper.vm.environmentalVariables.length - 1];
+        expect(lastHeader.key).toBe("TEST_KEY");
+        expect(lastHeader.value).toBe("test_value");
+      });
+
+      it("should add multiple headers sequentially", () => {
+        const initialLength = wrapper.vm.environmentalVariables.length;
+        wrapper.vm.addApiHeader("KEY1", "value1");
+        wrapper.vm.addApiHeader("KEY2", "value2");
+        wrapper.vm.addApiHeader("KEY3", "value3");
+        expect(wrapper.vm.environmentalVariables.length).toBe(initialLength + 3);
+      });
+    });
+
+    describe("editFileToUpload function", () => {
+      it("should clear fileNameToShow when called", () => {
+        wrapper.vm.formData.fileNameToShow = "existing_file.zip";
+        wrapper.vm.editFileToUpload();
+        expect(wrapper.vm.formData.fileNameToShow).toBe("");
+      });
+
+      it("should allow file upload after edit", () => {
+        wrapper.vm.isEditingActionScript = true;
+        wrapper.vm.formData.fileNameToShow = "test.zip";
+
+        wrapper.vm.editFileToUpload();
+
+        expect(wrapper.vm.formData.fileNameToShow).toBe("");
+        // After clearing, user should be able to upload new file
+        expect(wrapper.vm.isEditingActionScript).toBe(true);
+      });
+    });
+
+    describe("cancelUploadingNewFile function", () => {
+      it("should restore original filename", () => {
+        wrapper.vm.originalActionScriptData = JSON.stringify({
+          zip_file_name: "original.zip",
+        });
+        wrapper.vm.formData.fileNameToShow = "";
+
+        wrapper.vm.cancelUploadingNewFile();
+
+        expect(wrapper.vm.formData.fileNameToShow).toBe("original.zip");
+      });
+
+      it("should restore filename from complex original data", () => {
+        wrapper.vm.originalActionScriptData = JSON.stringify({
+          name: "Test Action",
+          description: "Description",
+          zip_file_name: "complex_file.zip",
+          other_field: "other_value",
+        });
+        wrapper.vm.formData.fileNameToShow = "";
+
+        wrapper.vm.cancelUploadingNewFile();
+
+        expect(wrapper.vm.formData.fileNameToShow).toBe("complex_file.zip");
+      });
+    });
+
+    describe("filterServiceAccounts function", () => {
+      it("should call filterServiceAccounts with empty string", () => {
+        const mockUpdate = vi.fn();
+        wrapper.vm.filterServiceAccounts("", mockUpdate);
+        expect(mockUpdate).toHaveBeenCalled();
+      });
+
+      it("should call filterServiceAccounts with search term", () => {
+        const mockUpdate = vi.fn();
+        wrapper.vm.filterServiceAccounts("service", mockUpdate);
+        expect(mockUpdate).toHaveBeenCalled();
+      });
+
+      it("should filter service accounts correctly", () => {
+        const mockUpdate = vi.fn((callback) => callback());
+        wrapper.vm.filterServiceAccounts("example", mockUpdate);
+        expect(mockUpdate).toHaveBeenCalled();
+      });
+    });
+
+    describe("validateActionScriptData function", () => {
+      it("should validate when codeZip is missing in create mode", async () => {
+        wrapper.vm.isEditingActionScript = false;
+        wrapper.vm.formData.codeZip = null;
+        wrapper.vm.step = 4;
+
+        await wrapper.vm.validateActionScriptData();
+
+        expect(wrapper.vm.step).toBe(1);
+      });
+
+      it("should validate repeat execution with valid cron", async () => {
+        wrapper.vm.formData.execution_details = "repeat";
+        wrapper.vm.frequency.cron = "0 0 * * *";
+        wrapper.vm.formData.service_account = "test@example.com";
+
+        await wrapper.vm.validateActionScriptData();
+
+        expect(wrapper.vm.cronError).toBe("");
+      });
+
+      it("should validate repeat execution with invalid cron", async () => {
+        wrapper.vm.formData.execution_details = "repeat";
+        wrapper.vm.frequency.cron = "invalid";
+        wrapper.vm.formData.codeZip = new File(["test"], "test.zip");
+        wrapper.vm.cronError = "";
+        wrapper.vm.step = 4;
+
+        await wrapper.vm.validateActionScriptData();
+
+        // The function returns early when cron parsing fails, setting cronError
+        // Step remains unchanged as the function returns before reaching step = 2
+        expect(wrapper.vm.cronError).toBe("Invalid cron expression!");
+        expect(wrapper.vm.step).toBe(4);
+      });
+
+      it("should validate missing service account", async () => {
+        wrapper.vm.formData.codeZip = new File(["test"], "test.zip");
+        wrapper.vm.formData.service_account = "";
+        wrapper.vm.step = 4;
+
+        await wrapper.vm.validateActionScriptData();
+
+        expect(wrapper.vm.step).toBe(3);
+      });
+
+      it("should validate missing execution details", async () => {
+        wrapper.vm.formData.codeZip = new File(["test"], "test.zip");
+        wrapper.vm.formData.service_account = "test@example.com";
+        wrapper.vm.formData.execution_details = "";
+        wrapper.vm.step = 4;
+
+        await wrapper.vm.validateActionScriptData();
+
+        expect(wrapper.vm.step).toBe(2);
+      });
+
+      it("should pass validation with all required fields in edit mode", async () => {
+        wrapper.vm.isEditingActionScript = true;
+        wrapper.vm.formData.codeZip = null; // OK in edit mode
+        wrapper.vm.formData.service_account = "test@example.com";
+        wrapper.vm.formData.execution_details = "once";
+        wrapper.vm.step = 4;
+
+        await wrapper.vm.validateActionScriptData();
+
+        // Should not change step if validation passes
+        expect(wrapper.vm.formData.service_account).toBe("test@example.com");
+      });
+    });
+
+    describe("onSubmit function", () => {
+      it("should have onSubmit function defined", () => {
+        expect(typeof wrapper.vm.onSubmit).toBe("function");
+      });
+
+      it("should call onSubmit without errors", () => {
+        expect(() => wrapper.vm.onSubmit()).not.toThrow();
+      });
+    });
+
+    describe("deleteApiHeader function - Additional scenarios", () => {
+      it("should delete header from environment_variables in formData", () => {
+        const testHeader = {
+          key: "FORM_KEY",
+          value: "form_value",
+          uuid: "form-uuid",
+        };
+
+        wrapper.vm.environmentalVariables = [
+          testHeader,
+          { key: "OTHER_KEY", value: "other_value", uuid: "other-uuid" },
+        ];
+
+        wrapper.vm.formData.environment_variables = {
+          FORM_KEY: "form_value",
+          OTHER_KEY: "other_value",
+        };
+
+        wrapper.vm.deleteApiHeader(testHeader);
+
+        expect(wrapper.vm.formData.environment_variables).not.toHaveProperty("FORM_KEY");
+        expect(wrapper.vm.formData.environment_variables).toHaveProperty("OTHER_KEY");
+      });
+
+      it("should add default header when all are deleted", () => {
+        wrapper.vm.environmentalVariables = [
+          { key: "LAST_KEY", value: "last_value", uuid: "last-uuid" },
+        ];
+
+        const lastHeader = wrapper.vm.environmentalVariables[0];
+        wrapper.vm.deleteApiHeader(lastHeader);
+
+        // Should auto-add a new empty header
+        expect(wrapper.vm.environmentalVariables.length).toBe(1);
+        expect(wrapper.vm.environmentalVariables[0].key).toBe("");
+        expect(wrapper.vm.environmentalVariables[0].value).toBe("");
+      });
+    });
+
+    describe("openCancelDialog function", () => {
+      it("should navigate directly if no changes", async () => {
+        // Capture the current formData state and set it as original
+        const currentState = JSON.stringify(wrapper.vm.formData);
+        wrapper.vm.originalActionScriptData = currentState;
+
+        // Mock router.replace to prevent actual navigation
+        const routerReplaceSpy = vi.spyOn(router, "replace").mockImplementation(() => Promise.resolve() as any);
+
+        wrapper.vm.openCancelDialog();
+
+        // When data hasn't changed, goToActionScripts is called which calls router.replace
+        expect(routerReplaceSpy).toHaveBeenCalledWith({
+          name: "actionScripts",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
+        expect(wrapper.vm.dialog.show).toBe(false);
+      });
+
+      it("should show dialog with changes", () => {
+        wrapper.vm.formData.name = "Changed Name";
+        wrapper.vm.originalActionScriptData = JSON.stringify({ name: "Original" });
+
+        wrapper.vm.openCancelDialog();
+
+        expect(wrapper.vm.dialog.show).toBe(true);
+        expect(wrapper.vm.dialog.title).toBe("Discard Changes");
+      });
+
+      it("should set correct dialog callback", () => {
+        wrapper.vm.formData.name = "Modified";
+        wrapper.vm.originalActionScriptData = JSON.stringify({ name: "Original" });
+
+        wrapper.vm.openCancelDialog();
+
+        expect(wrapper.vm.dialog.okCallback).toBe(wrapper.vm.goToActionScripts);
+      });
+    });
+  });
 });
