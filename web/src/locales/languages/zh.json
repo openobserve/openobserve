@@ -1295,7 +1295,9 @@
     },
     "triggerAlert": "触发器",
     "alertTriggeredSuccess": "警报成功触发",
-    "events": "活动"
+    "events": "活动",
+    "multiWindow": "与过去比较",
+    "multiWindowSubLabel": "将当前结果与其他时间段的数据进行比较"
   },
   "alert_templates": {
     "header": "模板",

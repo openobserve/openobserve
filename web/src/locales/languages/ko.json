@@ -1299,7 +1299,9 @@
     },
     "triggerAlert": "트리거",
     "alertTriggeredSuccess": "경고가 성공적으로 트리거됨",
-    "events": "이벤트"
+    "events": "이벤트",
+    "multiWindow": "과거와 비교하기",
+    "multiWindowSubLabel": "현재 결과를 다른 기간의 데이터와 비교"
   },
   "alert_templates": {
     "header": "템플릿",

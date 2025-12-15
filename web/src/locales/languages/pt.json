@@ -1299,7 +1299,9 @@
     },
     "triggerAlert": "Gatilho",
     "alertTriggeredSuccess": "Alerta acionado com sucesso",
-    "events": "Eventos"
+    "events": "Eventos",
+    "multiWindow": "Compare com o passado",
+    "multiWindowSubLabel": "Compare os resultados atuais com dados de outro período"
   },
   "alert_templates": {
     "header": "Modelos",

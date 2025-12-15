@@ -1299,7 +1299,9 @@
     },
     "triggerAlert": "Trigger",
     "alertTriggeredSuccess": "Avviso attivato con successo",
-    "events": "Eventi"
+    "events": "Eventi",
+    "multiWindow": "Confronta con il passato",
+    "multiWindowSubLabel": "Confronta i risultati attuali con i dati di un altro periodo di tempo"
   },
   "alert_templates": {
     "header": "Modelli",

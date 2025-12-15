@@ -1299,7 +1299,9 @@
     },
     "triggerAlert": "Trigger",
     "alertTriggeredSuccess": "Waarschuwing succesvol geactiveerd",
-    "events": "Evenementen"
+    "events": "Evenementen",
+    "multiWindow": "Vergelijk met het verleden",
+    "multiWindowSubLabel": "Vergelijk de huidige resultaten met gegevens uit een andere periode"
   },
   "alert_templates": {
     "header": "Sjablonen",
