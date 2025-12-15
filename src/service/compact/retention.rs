@@ -25,7 +25,7 @@ use config::{
     utils::time::{BASE_TIME, day_micros, get_ymdh_from_micros, hour_micros},
 };
 use infra::{
-    cache, dist_lock, file_list as infra_file_list,
+    dist_lock, file_list as infra_file_list,
     table::compactor_manual_jobs::Status as CompactorManualJobStatus,
 };
 use itertools::Itertools;
@@ -433,20 +433,22 @@ pub async fn delete_by_date(
         infra::schema::delete(org_id, stream_type, stream_name, Some(start_dt)).await?;
     }
 
-    // update stream stats retention time
-    let mut stats = cache::stats::get_stream_stats(org_id, stream_name, stream_type);
-    // we use date_end as the new min doc time
-    let min_ts = date_end.timestamp_micros();
-    infra_file_list::reset_stream_stats_min_ts(
+    // update stream stats retention time ;
+    let stats_data_range = (
+        get_ymdh_from_micros(BASE_TIME.timestamp_micros()),
+        super::stats::get_yesterday_boundary(),
+    );
+    if let Err(e) = super::stats::update_stats_from_file_list_inner(
         org_id,
-        format!("{org_id}/{stream_type}/{stream_name}").as_str(),
-        min_ts,
+        stream_type,
+        stream_name,
+        stats_data_range,
+        false,
     )
-    .await?;
-    // update stream stats in cache
-    if min_ts > stats.doc_time_min {
-        stats.doc_time_min = min_ts;
-        cache::stats::set_stream_stats(org_id, stream_name, stream_type, stats);
+    .await
+    {
+        log::error!("[COMPACTOR] delete_by_date update stats failed: {e}");
+        return Err(e);
     }
 
     // mark delete done

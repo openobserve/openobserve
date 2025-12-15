@@ -576,7 +576,7 @@ pub static STREAM_STATS_SCAN_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
         .namespace(NAMESPACE)
         .const_labels(create_const_labels())
         .buckets(vec![0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 10.0, 30.0, 60.0]),
-        &["organization", "stream_type"],
+        &["organization", "stream_type", "scan_type"],
     )
     .expect("Metric created")
 });
@@ -589,7 +589,7 @@ pub static STREAM_STATS_SCAN_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream_type"],
+        &["organization", "stream_type", "scan_type"],
     )
     .expect("Metric created")
 });
@@ -602,7 +602,7 @@ pub static STREAM_STATS_SCAN_ERRORS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream_type"],
+        &["organization", "stream_type", "scan_type"],
     )
     .expect("Metric created")
 });

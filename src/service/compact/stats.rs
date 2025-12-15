@@ -96,6 +96,18 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
         vec![]
     };
 
+    let yesterday_boundary = get_yesterday_boundary();
+    let new_data_range = (
+        yesterday_boundary.clone(),
+        get_ymdh_from_micros(latest_updated_at),
+    );
+    let old_data_range = (
+        get_ymdh_from_micros(BASE_TIME.timestamp_micros()),
+        yesterday_boundary.clone(),
+    );
+
+    let iter = [(new_data_range, true), (old_data_range, false)];
+
     let orgs = db::schema::list_organizations_from_cache().await;
     let mut total_streams = 0;
     for org_id in orgs {
@@ -105,47 +117,54 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
             }
             let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
             total_streams += streams.len();
+            let stream_type_str = stream_type.to_string();
             for stream_name in streams {
                 let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
                 if !updated_streams.is_empty() && !updated_streams.contains(&stream_key) {
                     continue;
                 }
+
                 let start = std::time::Instant::now();
-                let result = update_stats_from_file_list_inner(
-                    &org_id,
-                    stream_type,
-                    &stream_name,
-                    latest_updated_at,
-                    no_need_update_old_stats,
-                )
-                .await;
+                for (date_range, is_recent) in iter.iter() {
+                    if !is_recent && no_need_update_old_stats {
+                        continue;
+                    }
+                    let start = std::time::Instant::now();
+                    let result = update_stats_from_file_list_inner(
+                        &org_id,
+                        stream_type,
+                        &stream_name,
+                        date_range.clone(),
+                        *is_recent,
+                    )
+                    .await;
 
-                // Record metrics
-                let duration = start.elapsed().as_secs_f64();
-                let stream_type_str = stream_type.to_string();
+                    // Record metrics
+                    let duration = start.elapsed().as_secs_f64();
+                    let scan_type = if *is_recent { "recent" } else { "historical" }.to_string();
+                    metrics::STREAM_STATS_SCAN_DURATION
+                        .with_label_values(&[&org_id, &stream_type_str, &scan_type])
+                        .observe(duration);
 
-                metrics::STREAM_STATS_SCAN_DURATION
-                    .with_label_values(&[&org_id, &stream_type_str])
-                    .observe(duration);
-
-                metrics::STREAM_STATS_SCAN_TOTAL
-                    .with_label_values(&[&org_id, &stream_type_str])
-                    .inc();
-
-                if let Err(e) = result {
-                    metrics::STREAM_STATS_SCAN_ERRORS_TOTAL
-                        .with_label_values(&[&org_id, &stream_type_str])
+                    metrics::STREAM_STATS_SCAN_TOTAL
+                        .with_label_values(&[&org_id, &stream_type_str, &scan_type])
                         .inc();
 
-                    log::error!(
-                        "[STATS] update stats for {org_id}/{stream_type}/{stream_name} error: {e}"
-                    );
-                    return Err(e);
+                    if let Err(e) = result {
+                        metrics::STREAM_STATS_SCAN_ERRORS_TOTAL
+                            .with_label_values(&[&org_id, &stream_type_str, &scan_type])
+                            .inc();
+
+                        log::error!(
+                            "[STATS] update stats for {org_id}/{stream_type}/{stream_name} error: {e}"
+                        );
+                        return Err(e);
+                    }
                 }
 
                 log::info!(
                     "[STATS] update stats for {org_id}/{stream_type}/{stream_name} in {} ms",
-                    (duration * 1000.0) as u64
+                    start.elapsed().as_millis()
                 );
             }
         }
@@ -167,62 +186,25 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn update_stats_from_file_list_inner(
+pub async fn update_stats_from_file_list_inner(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    latest_updated_at: i64,
-    no_need_update_old_stats: bool,
+    date_range: (String, String),
+    is_recent: bool,
 ) -> Result<(), anyhow::Error> {
-    let yesterday_boundary = get_yesterday_boundary();
-
-    // update latest stats
-    let new_data_range = (
-        yesterday_boundary.clone(),
-        get_ymdh_from_micros(latest_updated_at),
-    );
-
-    let mut stats = infra_file_list::stats_by_date_range(
-        org_id,
-        stream_type,
-        stream_name,
-        new_data_range.clone(),
-    )
-    .await?;
+    let mut stats =
+        infra_file_list::stats_by_date_range(org_id, stream_type, stream_name, date_range.clone())
+            .await?;
     let dump_stats = infra_file_list::query_dump_stats_by_date_range(
         org_id,
         stream_type,
         stream_name,
-        new_data_range.clone(),
+        date_range.clone(),
     )
     .await?;
     stats.merge(&dump_stats);
-    infra_file_list::set_stream_stats(org_id, stream_type, stream_name, &stats, true).await?;
-
-    // update old stats
-    if no_need_update_old_stats {
-        return Ok(());
-    }
-    let old_data_range = (
-        get_ymdh_from_micros(BASE_TIME.timestamp_micros()),
-        yesterday_boundary.clone(),
-    );
-    let mut stats = infra_file_list::stats_by_date_range(
-        org_id,
-        stream_type,
-        stream_name,
-        old_data_range.clone(),
-    )
-    .await?;
-    let dump_stats = infra_file_list::query_dump_stats_by_date_range(
-        org_id,
-        stream_type,
-        stream_name,
-        old_data_range.clone(),
-    )
-    .await?;
-    stats.merge(&dump_stats);
-    infra_file_list::set_stream_stats(org_id, stream_type, stream_name, &stats, false).await?;
+    infra_file_list::set_stream_stats(org_id, stream_type, stream_name, &stats, is_recent).await?;
 
     Ok(())
 }
@@ -251,6 +233,6 @@ async fn update_stats_lock_node() -> Result<Option<i64>, anyhow::Error> {
 
 /// Get yesterday's boundary date (yesterday 00:00:00 in YYYY/MM/DD/HH)
 /// This is the boundary between "historical" and "recent" data
-fn get_yesterday_boundary() -> String {
+pub fn get_yesterday_boundary() -> String {
     get_ymdh_from_micros(now_micros() - day_micros(1))
 }
