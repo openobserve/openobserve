@@ -13,10 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use chrono::{Timelike, Utc};
 use config::{
     cluster::LOCAL_NODE,
-    get_config,
     meta::stream::{ALL_STREAM_TYPES, StreamType},
     metrics,
     utils::time::{day_micros, get_ymdh_from_micros, now_micros},
@@ -26,29 +24,6 @@ use infra::{dist_lock, file_list as infra_file_list};
 use crate::{common::infra::cluster::get_node_by_uuid, service::db};
 
 pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
-    let cfg = get_config();
-    // check if current hour is allowed for update stats
-    // this config for data retention, but we also use it for update stats
-    if !cfg.compact.retention_allowed_hours.is_empty() {
-        let current_hour = Utc::now().hour();
-        let allowed_hours: Vec<u32> = cfg
-            .compact
-            .retention_allowed_hours
-            .split(',')
-            .filter_map(|s| s.trim().parse::<u32>().ok())
-            .filter(|&h| h < 24)
-            .collect();
-
-        if !allowed_hours.is_empty() && !allowed_hours.contains(&current_hour) {
-            log::info!(
-                "[COMPACTOR] update stats skipped: current hour {} is not in allowed hours {:?}",
-                current_hour,
-                allowed_hours
-            );
-            return Ok(());
-        }
-    }
-
     let latest_updated_at = infra_file_list::get_max_update_at()
         .await
         .map_err(|e| anyhow::anyhow!("get latest update_at error: {:?}", e))?;
