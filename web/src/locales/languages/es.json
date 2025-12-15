@@ -1064,7 +1064,10 @@
     "panelDuplicatedSuccessfully": "El panel se duplicó correctamente",
     "panelDuplicationFailed": "Falló la duplicación del panel",
     "mapname": "Nombre",
-    "mapvalue": "Valor"
+    "mapvalue": "Valor",
+    "customChartTypeSelector": "Selector de tipo de gráfico personalizado",
+    "customChartTypeSelectorHint": "Seleccione un tipo de gráfico de la biblioteca ECharts para comenzar con una estructura de código básica",
+    "selectChartType": "Seleccione el tipo de gráfico"
   },
   "home": {
     "streams": "Transmisiones",
