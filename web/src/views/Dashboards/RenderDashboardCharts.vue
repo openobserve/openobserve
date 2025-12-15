@@ -739,9 +739,15 @@ export default defineComponent({
     // do it based on watcher on viewOnly and saveDashboardData.isLoading
     watch(
       () => props.viewOnly || saveDashboardData.isLoading.value,
-      (newValue) => {
+      async (newValue) => {
         if (gridStackInstance) {
           gridStackInstance.setStatic(newValue === true);
+        }
+
+        // If switching from viewOnly (print mode) to interactive, force a refresh
+        if (newValue === false) {
+           await nextTick();
+           await refreshGridStack();
         }
       },
       { immediate: true },
