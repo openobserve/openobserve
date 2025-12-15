@@ -2123,14 +2123,6 @@ export default defineComponent({
     onBeforeUnmount(() => {
       queryEditorRef.value = null;
       fnEditorRef.value = null;
-
-      // Clean up polling interval if still running
-      if (pollIntervalId) {
-        clearInterval(pollIntervalId);
-        pollIntervalId = null;
-      }
-      // Clear pending short URL from store
-      store.commit("clearPendingShortURL");
     });
 
     const transformsLabel = computed(() => {
