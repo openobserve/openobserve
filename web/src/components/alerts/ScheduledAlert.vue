@@ -340,7 +340,7 @@ size="20px" />
                   min="0"
                   borderless
                   style="background: none"
-                  placeholder="Value"
+                  :placeholder="t('alerts.placeholders.value')"
                   @update:model-value="updatePromqlCondition"
                 />
               </div>
@@ -396,7 +396,7 @@ size="20px" />
                       use-input
                       emit-value
                       hide-selected
-                      placeholder="Select column"
+                      :placeholder="t('alerts.placeholders.selectColumn')"
                       fill-input
                       :input-debounce="400"
                       hide-bottom-space
@@ -548,7 +548,7 @@ size="20px" />
                         dense
                         borderless
                         min="0"
-                        placeholder="Value"
+                        :placeholder="t('alerts.placeholders.value')"
                         @update:model-value="updateAggregation"
                         hide-bottom-space
                         :rules="[(val: any) => !!val || 'Field is required!']"
@@ -1237,7 +1237,7 @@ size="20px" />
                               (val: string, update: any) => filterFields(val, update)
                             "
                           @update:modelValue="onColumnSelect"
-                          placeholder="Search for a field"
+                          :placeholder="t('alerts.placeholders.searchField')"
                           style="width: 150px;"
                     >
                         <template #no-option>
@@ -1382,7 +1382,7 @@ data-test="scheduled-alert-promql-editor"
                           clearable
                           @clear="onFunctionClear"
                           style="width: 150px;"
-                          placeholder="Saved functions"
+                          :placeholder="t('alerts.placeholders.savedFunctions')"
                                                 >
                           <template #no-option>
                         <q-item>

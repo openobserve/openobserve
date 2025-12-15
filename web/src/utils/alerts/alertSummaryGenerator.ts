@@ -12,11 +12,34 @@ export interface SummarySegment {
 /**
  * Generates a natural language summary of the alert configuration
  * Returns HTML string with clickable spans that have data-focus-target attributes
+ * @param formData - The alert form data
+ * @param destinations - Array of destination objects
+ * @param t - Translation function (optional, for i18n support)
  */
-export function generateAlertSummary(formData: any, destinations: any[]): string {
+export function generateAlertSummary(formData: any, destinations: any[], t?: (key: string) => string): string {
   if (!formData || !formData.stream_name) {
     return '';
   }
+
+  // Default translation function if not provided (fallback for backward compatibility)
+  const translate = t || ((key: string) => {
+    const fallbacks: Record<string, string> = {
+      'alerts.summary.monitors': 'Monitors',
+      'alerts.summary.from': 'from',
+      'alerts.summary.inRealTime': 'in real-time',
+      'alerts.summary.ofData': 'of data',
+      'alerts.summary.triggersWhen': 'Triggers when',
+      'alerts.summary.queryConditions': 'query conditions',
+      'alerts.summary.areMet': 'are met',
+      'alerts.summary.eventsDetected': 'events detected',
+      'alerts.summary.sendsTo': 'Sends to',
+      'alerts.summary.noDestination': 'No destination',
+      'alerts.summary.notSetupYet': '(not set up yet)',
+      'alerts.summary.cooldown': 'Cooldown',
+      'alerts.summary.betweenAlerts': 'between alerts',
+    };
+    return fallbacks[key] || key;
+  });
 
   const parts: string[] = [];
   const isRealTime = formData.is_real_time === 'true' || formData.is_real_time === true;
@@ -26,51 +49,34 @@ export function generateAlertSummary(formData: any, destinations: any[]): string
     return `<span class="summary-clickable" data-focus-target="${fieldId}">${text}</span>`;
   };
 
-  // Build the complete summary with labeled sections
+  // Build the bullet-point summary
   const streamType = formData.stream_type || 'logs';
   const streamName = formData.stream_name || 'the selected stream';
 
   if (isRealTime) {
     // Real-time alert summary
-    parts.push(`**Evaluation:** The alert monitors ${clickable(streamType, 'streamType')} from ${clickable(streamName, 'stream')} in real-time and continuously evaluates incoming data.`);
-    parts.push(`**Trigger Condition:** The alert triggers when ${clickable('the query conditions', 'conditions')} are met.`);
+    parts.push(`✓ ${translate('alerts.summary.monitors')}: ${clickable(streamType, 'streamType')} ${translate('alerts.summary.from')} ${clickable(streamName, 'stream')} ${translate('alerts.summary.inRealTime')}`);
+    parts.push(`✓ ${translate('alerts.summary.triggersWhen')}: ${clickable(translate('alerts.summary.queryConditions'), 'conditions')} ${translate('alerts.summary.areMet')}`);
   } else {
     // Scheduled alert summary
-    const frequency = getFrequencyText(formData.trigger_condition);
-    const period = getPeriodText(formData.trigger_condition?.period);
+    const period = getPeriodText(formData.trigger_condition?.period, translate);
+    parts.push(`✓ ${translate('alerts.summary.monitors')}: ${clickable(period, 'period')} ${translate('alerts.summary.ofData')}`);
 
-    // Evaluation section
-    parts.push(`**Evaluation:** The alert evaluates ${clickable(frequency, 'frequency')} and analyzes data from ${clickable(period, 'period')}.`);
-
-    // Trigger condition section
+    // Trigger condition
     if (formData.query_condition && formData.trigger_condition?.operator && formData.trigger_condition?.threshold !== undefined) {
-      const operator = formData.trigger_condition.operator;
       const threshold = formData.trigger_condition.threshold;
-      const operatorText = getOperatorSymbol(operator);
-      const thresholdText = `${threshold} ${operatorText}`;
+      const operator = formData.trigger_condition.operator;
+      const operatorText = getOperatorSymbol(operator, translate);
 
-      // Check for multi-window time ranges
-      const multiTimeRange = formData.query_condition?.multi_time_range;
-      const hasMultiWindow = multiTimeRange && Array.isArray(multiTimeRange) && multiTimeRange.length > 0;
-
-      let triggerText = `**Trigger Condition:** The alert triggers when ${clickable('the query', 'conditions')} returns ${clickable(thresholdText, 'threshold')} events within the evaluation window`;
-
-      if (hasMultiWindow) {
-        // Include current window period + comparison windows
-        const currentPeriod = formData.trigger_condition?.period || 0;
-        const timeRangeText = getMultiTimeRangeText(multiTimeRange, currentPeriod);
-        triggerText += `, comparing across ${clickable(timeRangeText, 'multiwindow')}`;
-      }
-
-      parts.push(triggerText + '.');
+      parts.push(`✓ ${translate('alerts.summary.triggersWhen')}: ${clickable(`${threshold} ${operatorText}`, 'threshold')} ${translate('alerts.summary.eventsDetected')}`);
     } else {
-      parts.push(`**Trigger Condition:** The alert triggers when ${clickable('the query conditions', 'conditions')} are met.`);
+      parts.push(`✓ ${translate('alerts.summary.triggersWhen')}: ${clickable(translate('alerts.summary.queryConditions'), 'conditions')} ${translate('alerts.summary.areMet')}`);
     }
   }
 
   // Notification section
   if (!destinations || destinations.length === 0) {
-    parts.push(`**Notification:** When triggered, the alert sends a notification to ${clickable('no destination', 'destinations')} (not configured yet).`);
+    parts.push(`✓ ${translate('alerts.summary.sendsTo')}: ${clickable(translate('alerts.summary.noDestination'), 'destinations')} ${translate('alerts.summary.notSetupYet')} ⚠️`);
   } else {
     const destNames = destinations.map(dest => {
       if (typeof dest === 'string') return dest;
@@ -78,41 +84,39 @@ export function generateAlertSummary(formData: any, destinations: any[]): string
     });
     const uniqueNames = Array.from(new Set(destNames));
     const destText = uniqueNames.join(', ');
-
-    parts.push(`**Notification:** When triggered, the alert sends a notification to ${clickable(destText, 'destinations')} destination.`);
+    parts.push(`✓ ${translate('alerts.summary.sendsTo')}: ${clickable(destText, 'destinations')}`);
   }
 
-  // Silencing section (only if configured)
-  const silence = formData.trigger_condition?.silence;
-  if (silence && silence > 0) {
-    let timeText = '';
-    if (silence === 1) {
-      timeText = '1 minute';
-    } else if (silence < 60) {
-      timeText = `${silence} minutes`;
-    } else {
-      const hours = Math.floor(silence / 60);
-      timeText = hours === 1 ? '1 hour' : `${hours} hours`;
+  // Cooldown section (only if configured and not real-time)
+  if (!isRealTime) {
+    const silence = formData.trigger_condition?.silence;
+    if (silence !== undefined && silence >= 0) {
+      const timeText = getSilenceText(silence, translate);
+      parts.push(`✓ ${translate('alerts.summary.cooldown')}: ${clickable(timeText, 'silence')} ${translate('alerts.summary.betweenAlerts')}`);
     }
-    parts.push(`**Silencing:** After firing, the alert enters a ${clickable(timeText, 'silence')} silence period, during which it will not trigger again even if the condition remains true.`);
   }
 
-  // Convert markdown bold (**text**) to HTML <strong> tags
-  const result = parts.join('\n');
-  return result.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // Add plain English summary
+  const plainEnglish = generatePlainEnglishSummary(formData, destinations, isRealTime, translate);
+  if (plainEnglish) {
+    parts.push('');
+    parts.push(`<div class="plain-english-section">"${plainEnglish}"</div>`);
+  }
+
+  return parts.join('\n');
 }
 
 /**
  * Get operator symbol for readable text
  */
-function getOperatorSymbol(operator: string): string {
+function getOperatorSymbol(operator: string, t: (key: string) => string): string {
   const operatorMap: { [key: string]: string } = {
-    '=': '(=) equal to',
-    '!=': '(≠) not equal to',
-    '>': '(>) or more',
-    '>=': '(≥) or more',
-    '<': '(<) or less',
-    '<=': '(≤) or less',
+    '=': `(=) ${t('alerts.summary.equalTo') || 'equal to'}`,
+    '!=': `(≠) ${t('alerts.summary.notEqualTo') || 'not equal to'}`,
+    '>': `(>) ${t('alerts.summary.orMore') || 'or more'}`,
+    '>=': `(≥) ${t('alerts.summary.orMore') || 'or more'}`,
+    '<': `(<) ${t('alerts.summary.orLess') || 'or less'}`,
+    '<=': `(≤) ${t('alerts.summary.orLess') || 'or less'}`,
   };
 
   return operatorMap[operator] || operator;
@@ -149,18 +153,22 @@ function getFrequencyText(triggerCondition: any): string {
 /**
  * Get period text (e.g., "the last 30 minutes", "the last 1 hour")
  */
-function getPeriodText(period: number): string {
+function getPeriodText(period: number, t: (key: string) => string): string {
   if (!period) return 'recent data';
 
   const minutes = period;
+  const minuteText = t('alerts.summary.minute') || 'minute';
+  const minutesText = t('alerts.summary.minutes') || 'minutes';
+  const hourText = t('alerts.summary.hour') || 'hour';
+  const hoursText = t('alerts.summary.hours') || 'hours';
 
   if (minutes < 60) {
-    return minutes === 1 ? 'the last minute' : `the last ${minutes} minutes`;
+    return minutes === 1 ? `the last ${minuteText}` : `the last ${minutes} ${minutesText}`;
   }
 
   const hours = Math.floor(minutes / 60);
   if (hours < 24) {
-    return hours === 1 ? 'the last hour' : `the last ${hours} hours`;
+    return hours === 1 ? `the last ${hourText}` : `the last ${hours} ${hoursText}`;
   }
 
   const days = Math.floor(hours / 24);
@@ -219,3 +227,108 @@ function getMultiTimeRangeText(timeRanges: any[], currentPeriod: number): string
   return `${count} time ${count === 1 ? 'range' : 'ranges'} (${rangeList})`;
 }
 
+/**
+ * Get silence/cooldown text (e.g., "10 minutes", "2 hours")
+ */
+function getSilenceText(silence: number, t: (key: string) => string): string {
+  const noCooldown = t('alerts.summary.noCooldown') || 'No cooldown';
+  const minuteText = t('alerts.summary.minute') || 'minute';
+  const minutesText = t('alerts.summary.minutes') || 'minutes';
+  const hourText = t('alerts.summary.hour') || 'hour';
+  const hoursText = t('alerts.summary.hours') || 'hours';
+
+  if (silence === 0) return noCooldown;
+  if (silence === 1) return `1 ${minuteText}`;
+  if (silence < 60) return `${silence} ${minutesText}`;
+
+  const hours = Math.floor(silence / 60);
+  const remainingMinutes = silence % 60;
+
+  if (remainingMinutes === 0) {
+    return hours === 1 ? `1 ${hourText}` : `${hours} ${hoursText}`;
+  }
+
+  return `${hours}h ${remainingMinutes}m`;
+}
+
+/**
+ * Generate a plain English summary of the alert
+ */
+function generatePlainEnglishSummary(formData: any, destinations: any[], isRealTime: boolean, t: (key: string) => string): string {
+  if (!formData || !formData.stream_name) return '';
+
+  const parts: string[] = [];
+  const eventsPlural = t('alerts.summary.plainEnglish.eventsPlural') || 'events';
+  const eventSingular = t('alerts.summary.plainEnglish.eventSingular') || 'event';
+  const minuteText = t('alerts.summary.minute') || 'minute';
+  const minutesText = t('alerts.summary.minutes') || 'minutes';
+  const hourText = t('alerts.summary.hour') || 'hour';
+  const hoursText = t('alerts.summary.hours') || 'hours';
+
+  if (isRealTime) {
+    parts.push(t('alerts.summary.plainEnglish.realTime') || 'Alert me immediately when matching events occur in real-time');
+  } else {
+    // Get threshold and operator
+    const threshold = formData.trigger_condition?.threshold;
+    const operator = formData.trigger_condition?.operator;
+    const period = formData.trigger_condition?.period;
+
+    if (threshold !== undefined && operator && period) {
+      // Build the condition phrase
+      let conditionPhrase = '';
+
+      if (operator === '>=') {
+        conditionPhrase = `${threshold}+ ${eventsPlural}`;
+      } else if (operator === '>') {
+        const moreThan = t('alerts.summary.plainEnglish.moreThan') || 'more than';
+        conditionPhrase = `${moreThan} ${threshold} ${eventsPlural}`;
+      } else if (operator === '=') {
+        const exactly = t('alerts.summary.plainEnglish.exactly') || 'exactly';
+        conditionPhrase = `${exactly} ${threshold} ${threshold !== 1 ? eventsPlural : eventSingular}`;
+      } else if (operator === '<=') {
+        const orFewer = t('alerts.summary.plainEnglish.orFewer') || 'or fewer';
+        conditionPhrase = `${threshold} ${orFewer} ${eventsPlural}`;
+      } else if (operator === '<') {
+        const fewerThan = t('alerts.summary.plainEnglish.fewerThan') || 'fewer than';
+        conditionPhrase = `${fewerThan} ${threshold} ${eventsPlural}`;
+      } else if (operator === '!=') {
+        const not = t('alerts.summary.plainEnglish.not') || 'not';
+        conditionPhrase = `${not} ${threshold} ${eventsPlural}`;
+      } else {
+        conditionPhrase = `${threshold} ${eventsPlural} (${operator})`;
+      }
+
+      // Build the time period phrase
+      let periodPhrase = '';
+      if (period < 60) {
+        periodPhrase = period === 1 ? `1-${minuteText}` : `${period}-${minuteText}`;
+      } else {
+        const hours = Math.floor(period / 60);
+        periodPhrase = hours === 1 ? `1-${hourText}` : `${hours}-${hourText}`;
+      }
+
+      const occurInAny = t('alerts.summary.plainEnglish.occurInAny') || 'occur in any';
+      const periodWord = t('alerts.summary.plainEnglish.period') || 'period';
+      const alertMeWhen = t('alerts.summary.plainEnglish.alertMeWhen') || 'Alert me when';
+      parts.push(`${alertMeWhen} ${conditionPhrase} ${occurInAny} ${periodPhrase} ${periodWord}`);
+
+      // Add cooldown phrase if configured
+      const silence = formData.trigger_condition?.silence;
+      if (silence && silence > 0) {
+        const butNoMoreThan = t('alerts.summary.plainEnglish.butNoMoreThan') || ', but no more than once every';
+        if (silence < 60) {
+          const silenceText = silence === 1 ? `1 ${minuteText}` : `${silence} ${minutesText}`;
+          parts.push(`${butNoMoreThan} ${silenceText}`);
+        } else {
+          const hours = Math.floor(silence / 60);
+          const hoursCount = hours === 1 ? `1 ${hourText}` : `${hours} ${hoursText}`;
+          parts.push(`${butNoMoreThan} ${hoursCount}`);
+        }
+      }
+    } else {
+      parts.push(t('alerts.summary.plainEnglish.defaultConditions') || 'Alert me when the configured conditions are met');
+    }
+  }
+
+  return parts.join('');
+}

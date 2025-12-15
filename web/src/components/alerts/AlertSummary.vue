@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="summary-separator"></div>
     <div class="summary-content">
       <p v-if="summaryText" class="summary-text" v-html="summaryText" @click="handleSummaryClick"></p>
-      <p v-else class="summary-placeholder">Configure your alert to see a summary</p>
+      <p v-else class="summary-placeholder">{{ t('alerts.summary.configureAlert') }}</p>
     </div>
   </div>
 </template>
@@ -28,9 +28,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useStore } from 'vuex';
+import { useI18n } from 'vue-i18n';
 import { generateAlertSummary } from '@/utils/alerts/alertSummaryGenerator';
 
 const store = useStore();
+const { t } = useI18n();
 
 const props = defineProps({
   formData: {
@@ -48,7 +50,7 @@ const props = defineProps({
 });
 
 const summaryText = computed(() => {
-  return generateAlertSummary(props.formData, props.destinations);
+  return generateAlertSummary(props.formData, props.destinations, t);
 });
 
 const handleSummaryClick = (event: MouseEvent) => {
@@ -63,7 +65,7 @@ const handleSummaryClick = (event: MouseEvent) => {
 
 <style scoped lang="scss">
 .alert-summary {
-  padding: 16px;
+  padding: 0.75rem 1rem;
   height: 100%;
   overflow-y: auto;
   display: flex;
@@ -71,14 +73,14 @@ const handleSummaryClick = (event: MouseEvent) => {
 }
 
 .summary-header {
-  font-size: 16px;
+  font-size: 0.875rem;
   font-weight: 600;
-  margin-bottom: 12px;
+  margin-bottom: 0.5rem;
   flex-shrink: 0;
 }
 
 .summary-separator {
-  height: 1px;
+  height: 0.0625rem;
   background: linear-gradient(
     to right,
     transparent,
@@ -86,13 +88,13 @@ const handleSummaryClick = (event: MouseEvent) => {
     color-mix(in srgb, currentColor 15%, transparent) 90%,
     transparent
   );
-  margin-bottom: 16px;
+  margin-bottom: 0.75rem;
   flex-shrink: 0;
 }
 
 .summary-content {
-  font-size: 14px;
-  line-height: 1.7; // Balanced line height - not too cramped, not too spacious
+  font-size: 0.8125rem;
+  line-height: 1.8;
   flex: 1;
   overflow-y: auto;
 }
@@ -101,13 +103,13 @@ const handleSummaryClick = (event: MouseEvent) => {
   margin: 0;
   white-space: pre-wrap;
   word-wrap: break-word;
-  letter-spacing: 0.03em; // Increased letter spacing
+  letter-spacing: 0.03em;
 
   // Styles for bold section labels (using :deep for v-html content with markdown **text**)
   :deep(strong) {
     display: inline;
     font-weight: 700;
-    font-size: 14px;
+    font-size: 0.875rem;
   }
 
   // Styles for clickable spans (using :deep for v-html content)
@@ -115,9 +117,9 @@ const handleSummaryClick = (event: MouseEvent) => {
     cursor: pointer;
     color: var(--q-primary);
     font-weight: 600;
-    padding: 4px 10px; // More generous padding
-    margin: 0 3px; // More space between badges
-    border-radius: 6px;
+    padding: 0.25rem 0.625rem;
+    margin: 0 0.1875rem;
+    border-radius: 0.375rem;
     background: linear-gradient(
       135deg,
       color-mix(in srgb, var(--q-primary) 8%, transparent),
@@ -126,10 +128,10 @@ const handleSummaryClick = (event: MouseEvent) => {
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     display: inline-block;
     position: relative;
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--q-primary) 15%, transparent);
-    line-height: 1.4; // Specific line height for badges
-    vertical-align: baseline; // Better alignment with text
-    white-space: nowrap; // Prevent badges from breaking across lines
+    box-shadow: 0 0 0 0.0625rem color-mix(in srgb, var(--q-primary) 15%, transparent);
+    line-height: 1.4;
+    vertical-align: baseline;
+    white-space: nowrap;
 
     &:hover {
       background: linear-gradient(
@@ -137,19 +139,36 @@ const handleSummaryClick = (event: MouseEvent) => {
         color-mix(in srgb, var(--q-primary) 15%, transparent),
         color-mix(in srgb, var(--q-primary) 20%, transparent)
       );
-      transform: translateY(-1px);
+      transform: translateY(-0.0625rem);
       box-shadow:
-        0 0 0 1px color-mix(in srgb, var(--q-primary) 25%, transparent),
-        0 2px 8px color-mix(in srgb, var(--q-primary) 15%, transparent);
+        0 0 0 0.0625rem color-mix(in srgb, var(--q-primary) 25%, transparent),
+        0 0.125rem 0.5rem color-mix(in srgb, var(--q-primary) 15%, transparent);
     }
 
     &:active {
       transform: translateY(0) scale(0.98);
       background: color-mix(in srgb, var(--q-primary) 18%, transparent);
       box-shadow:
-        0 0 0 1px color-mix(in srgb, var(--q-primary) 30%, transparent),
-        inset 0 1px 2px rgba(0, 0, 0, 0.1);
+        0 0 0 0.0625rem color-mix(in srgb, var(--q-primary) 30%, transparent),
+        inset 0 0.0625rem 0.125rem rgba(0, 0, 0, 0.1);
     }
+  }
+
+  // Styles for plain English section
+  :deep(.plain-english-section) {
+    margin-top: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--q-primary) 5%, transparent),
+      color-mix(in srgb, var(--q-primary) 8%, transparent)
+    );
+    border-left: 0.1875rem solid var(--q-primary);
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    font-style: italic;
+    opacity: 0.9;
   }
 }
 

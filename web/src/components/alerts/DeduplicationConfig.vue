@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template v-slot:hint>
                   <div class="tw-text-xs">
-                    Auto-detection: SQL uses GROUP BY, PromQL uses labels, Custom uses conditions
+                    💡 Leave empty to auto-detect based on query (SQL: GROUP BY columns, PromQL: labels, Custom: condition fields)
                   </div>
                 </template>
               </q-select>
@@ -112,7 +112,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 filled
                 min="1"
-                placeholder="Use alert period by default"
+                suffix="minutes"
+                :placeholder="t('alerts.placeholders.autoUsesCheckInterval')"
                 :class="store.state.theme === 'dark' ? 'input-box-bg-dark input-border-dark' : 'input-box-bg-light input-border-light'"
                 @update:model-value="emitUpdate"
               />

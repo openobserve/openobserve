@@ -326,7 +326,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   tabindex="0"
                   style="width: 100%; resize: none;"
                   type="textarea"
-                  placeholder="Type something"
+                  :placeholder="t('alerts.placeholders.typeSomething')"
                   rows="5"
                 />
               </div>
