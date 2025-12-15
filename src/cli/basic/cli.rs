@@ -241,6 +241,8 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     db::functions::reset().await?;
                 }
                 "stream-stats" => {
+                    // reset stream stats update offset
+                    db::compact::stats::set_offset(0, None).await?;
                     // reset stream stats table data
                     infra_file_list::reset_stream_stats().await?;
                     // load stream list
