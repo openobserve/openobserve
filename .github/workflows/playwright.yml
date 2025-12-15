@@ -770,6 +770,7 @@ jobs:
             --json-report playwright-results/report.json \
             --html-report playwright-results/html-report \
             --upload-html \
+            --verbose \
             --token="${{ secrets.TESTDINO_API_TOKEN }}"
 
   generate_coverage_report:
