@@ -87,6 +87,9 @@ export default defineComponent({
     let pollIntervalId: number | null = null;
     let isPolling = false; // Flag to prevent multiple polling instances
 
+    // Detect if browser is Safari
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
     /**
      * Polling mechanism to check store for short URL without blocking main thread
      * Runs in a separate execution context via setInterval
@@ -162,15 +165,21 @@ export default defineComponent({
           isPolling = false;
           isLoading.value = false;
           store.commit("clearPendingShortURL");
-          // Don't show error - user already has long URL copied
+
+          // Show timeout notification
+          $q.notify({
+            type: "warning",
+            message: t("search.errorShorteningLink"),
+            timeout: 5000,
+          });
         }
       }, POLL_INTERVAL);
     };
 
     /**
-     * Non-async handler for share button click
-     * Copies long URL immediately (synchronous), then fetches short URL
-     * This ensures Safari compatibility by maintaining user gesture context
+     * Handler for share button click
+     * Safari: Uses polling mechanism to maintain user gesture context
+     * Chrome/Firefox: Copies directly in API response
      */
     const handleShareClick = () => {
       if (!props.url) {
@@ -182,67 +191,84 @@ export default defineComponent({
         return;
       }
 
-      // STEP 1: Copy long URL immediately (SYNCHRONOUS - works in Safari)
-      copyToClipboard(props.url)
-        .then(() => {
-          // $q.notify({
-          //   type: "positive",
-          //   message: t("search.linkCopiedSuccessfully"),
-          //   timeout: 5000,
-          // });
-          // emit("copy:success", { url: props.url, type: "long" });
+      // Start loading and fetch short URL
+      isLoading.value = true;
 
-          // STEP 2: Start loading and fetch short URL
-          isLoading.value = true;
+      // Safari: Start polling for short URL (non-blocking)
+      if (isSafari) {
+        startPollingForShortURL();
+      }
 
-          // STEP 3: Start polling for short URL (non-blocking)
-          startPollingForShortURL();
+      // Fetch short URL via API
+      shortURLService
+        .create(store.state.selectedOrganization.identifier, props.url)
+        .then((res: any) => {
+          if (res.status === 200) {
+            const shortUrl = res.data.short_url;
 
-          // STEP 4: Fetch short URL via API (non-async in this function)
-          shortURLService
-            .create(store.state.selectedOrganization.identifier, props.url)
-            .then((res: any) => {
-              if (res.status === 200) {
-                // Store the short URL - polling will pick it up
-                store.commit("setPendingShortURL", res.data.short_url);
-                emit("shorten:success", {
-                  longUrl: props.url,
-                  shortUrl: res.data.short_url,
+            if (isSafari) {
+              // Safari: Store the short URL - polling will pick it up and copy
+              store.commit("setPendingShortURL", shortUrl);
+            } else {
+              // Chrome/Firefox: Copy directly here
+              copyToClipboard(shortUrl)
+                .then(() => {
+                  $q.notify({
+                    type: "positive",
+                    message: t("search.linkCopiedSuccessfully"),
+                    timeout: 5000,
+                  });
+                  emit("copy:success", { url: shortUrl, type: "short" });
+                })
+                .catch((error) => {
+                  console.error("Failed to copy short URL:", error);
+                  $q.notify({
+                    type: "negative",
+                    message: t("search.errorCopyingLink"),
+                    timeout: 5000,
+                  });
+                  emit("copy:error", { error, type: "short" });
+                })
+                .finally(() => {
+                  isLoading.value = false;
                 });
-              } else {
-                // Failed to get short URL, stop polling
-                if (pollIntervalId) {
-                  clearInterval(pollIntervalId);
-                  pollIntervalId = null;
-                }
-                isLoading.value = false;
-                emit("shorten:error", { error: "Invalid response status" });
-              }
-            })
-            .catch((error: any) => {
-              console.error("Error creating short URL:", error);
-              // Failed to get short URL, stop polling
-              if (pollIntervalId) {
-                clearInterval(pollIntervalId);
-                pollIntervalId = null;
-              }
-              isLoading.value = false;
-              $q.notify({
-                type: "negative",
-                message: t("search.errorShorteningLink"),
-                timeout: 5000,
-              });
-              emit("shorten:error", { error });
+            }
+
+            emit("shorten:success", {
+              longUrl: props.url,
+              shortUrl: shortUrl,
             });
+          } else {
+            // Failed to get short URL
+            if (isSafari && pollIntervalId) {
+              clearInterval(pollIntervalId);
+              pollIntervalId = null;
+              isPolling = false;
+            }
+            isLoading.value = false;
+            $q.notify({
+              type: "negative",
+              message: t("search.errorShorteningLink"),
+              timeout: 5000,
+            });
+            emit("shorten:error", { error: "Invalid response status" });
+          }
         })
         .catch((error: any) => {
-          console.error("Failed to copy long URL:", error);
+          console.error("Error creating short URL:", error);
+          // Failed to get short URL
+          if (isSafari && pollIntervalId) {
+            clearInterval(pollIntervalId);
+            pollIntervalId = null;
+            isPolling = false;
+          }
+          isLoading.value = false;
           $q.notify({
             type: "negative",
-            message: t("search.errorCopyingLink"),
+            message: t("search.errorShorteningLink"),
             timeout: 5000,
           });
-          emit("copy:error", { error, type: "long" });
+          emit("shorten:error", { error });
         });
     };
 
