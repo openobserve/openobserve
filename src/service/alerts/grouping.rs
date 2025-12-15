@@ -167,7 +167,7 @@ pub fn add_to_batch(
 
     if is_new_batch {
         let batch_count = PENDING_BATCHES.len();
-        log::debug!("[grouping] Current pending batches count: {}", batch_count);
+        log::debug!("[grouping] Current pending batches count: {batch_count}");
 
         // Update gauge metric for pending batches
         // Use org_id from the batch we just inserted
@@ -237,13 +237,4 @@ pub fn get_pending_batch_count(org_id: &str) -> i64 {
         .iter()
         .filter(|entry| entry.org_id == org_id)
         .count() as i64
-}
-
-/// Clear all pending batches (for testing)
-pub fn clear_all_batches() {
-    let count = PENDING_BATCHES.len();
-    PENDING_BATCHES.clear();
-    if count > 0 {
-        log::info!("[grouping] Cleared {} pending batches (testing)", count);
-    }
 }

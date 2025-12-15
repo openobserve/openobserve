@@ -1428,6 +1428,55 @@
         "dashboardConfig": "Loading dashboard configuration...",
         "refreshing": "Refreshing dashboard..."
       }
+    },
+    "incidents": {
+      "title": "Incidents",
+      "header": "Alert Incidents",
+      "noIncidents": "No incidents found",
+      "id": "ID",
+      "status": "Status",
+      "severity": "Severity",
+      "alertCount": "Alerts",
+      "firstAlertAt": "First Alert",
+      "lastAlertAt": "Last Alert",
+      "resolvedAt": "Resolved At",
+      "title_field": "Title",
+      "correlationKey": "Correlation Key",
+      "stableDimensions": "Dimensions",
+      "topology": "Topology",
+      "upstreamServices": "Upstream Services",
+      "downstreamServices": "Downstream Services",
+      "correlatedAlerts": "Correlated Alerts",
+      "alertName": "Alert Name",
+      "alertFiredAt": "Fired At",
+      "correlationReason": "Correlation Reason",
+      "actions": "Actions",
+      "acknowledge": "Acknowledge",
+      "resolve": "Resolve",
+      "reopen": "Reopen",
+      "viewDetails": "View Details",
+      "statusOpen": "Open",
+      "statusAcknowledged": "Acknowledged",
+      "statusResolved": "Resolved",
+      "severityP1": "P1 - Critical",
+      "severityP2": "P2 - High",
+      "severityP3": "P3 - Medium",
+      "severityP4": "P4 - Low",
+      "correlationServiceDiscovery": "Service Discovery",
+      "correlationManualExtraction": "Manual Extraction",
+      "correlationTemporal": "Temporal",
+      "filterByStatus": "Filter by status",
+      "allStatuses": "All Statuses",
+      "loading": "Loading incidents...",
+      "errorLoading": "Failed to load incidents",
+      "statusUpdated": "Incident status updated",
+      "statusUpdateFailed": "Failed to update incident status",
+      "rootCauseAnalysis": "Root Cause Analysis",
+      "analyzeRca": "Analyze",
+      "rcaInProgress": "Analyzing root cause...",
+      "rcaCompleted": "Root cause analysis completed",
+      "noRcaYet": "No root cause analysis available. Click 'Analyze' to start.",
+      "sreChat": "Ask SRE Assistant"
     }
   },
   "alert_templates": {
@@ -1642,12 +1691,8 @@
       "resetToDefaults": "Reset to Defaults",
       "noDimensionsConfigured": "No dimensions configured. Click \"Reset to Defaults\" or add dimensions below.",
       "addDimensionLabel": "Add dimension to priority list",
-      "addDimensionHint": "Select a semantic group, then choose a field to add to the priority list.",
+      "addDimensionHint": "Select a semantic group to add to the priority list.",
       "selectSemanticGroup": "Select Semantic Group",
-      "selectField": "Select Field",
-      "fieldsAvailable": "fields available",
-      "allFieldsAdded": "All fields from this group are already added",
-      "selectGroupFirst": "Select a semantic group first",
       "noSemanticGroupsAvailable": "No semantic groups available. Configure field mappings below first.",
       "noSemanticGroupsConfigured": "No semantic groups configured. Add field mappings below to define available dimensions.",
       "configureSemanticGroupsFirst": "Configure semantic field mappings below to define available dimensions for FQN priority.",
@@ -1668,7 +1713,8 @@
       "logs": "Logs",
       "traces": "Traces",
       "metrics": "Metrics",
-      "retry": "Retry"
+      "retry": "Retry",
+      "filters": "Filters"
     }
   },
   "reports": {
@@ -1717,6 +1763,7 @@
   },
   "traces": {
     "viewLogs": "View Logs",
+    "viewRelated": "View Related",
     "backToLogs": "Back to Logs",
     "RedMetrics": "RED Metrics",
     "loadingStream": "Loading Stream..."
@@ -1888,7 +1935,8 @@
     "dimensionBasedCorrelation": "Dimension-based Correlation",
     "tracesFromService": "Traces from service: {service}",
     "noTracesFound": "No correlated traces found",
-    "noTracesDescription": "No traces found for service {service} in the selected time range"
+    "noTracesDescription": "No traces found for service {service} in the selected time range",
+    "filters": "Filters"
   },
   "search_scheduler_job": {
     "title": "Search Job Scheduler",
@@ -1952,6 +2000,13 @@
   },
   "alert_list":{
     "alert_details":"Alert Details"
+  },
+  "sreChat": {
+    "emptyMessage": "Ask me anything about your alerts and incidents",
+    "inputPlaceholder": "Ask SRE Assistant...",
+    "clearChatTitle": "Clear Chat",
+    "clearChatMessage": "Are you sure you want to clear this conversation?",
+    "copiedToClipboard": "Copied to clipboard"
   }
 
 }

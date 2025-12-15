@@ -27,7 +27,7 @@ use config::{
 };
 use datafusion::{
     common::{DataFusionError, Result},
-    physical_plan::{coalesce_batches::CoalesceBatchesExec, execute_stream},
+    physical_plan::{ExecutionPlan, coalesce_batches::CoalesceBatchesExec, execute_stream},
 };
 use flight::common::{MetricsInfo, PreCustomMessage};
 use futures::{StreamExt, stream::BoxStream};
@@ -47,7 +47,9 @@ use crate::{
         MetadataMap,
         flight::{
             stream::FlightEncoderStreamBuilder,
-            visitor::{get_cluster_metrics, get_scan_stats},
+            visitor::{
+                get_cluster_metrics, get_peak_memory, get_peak_memory_from_ctx, get_scan_stats,
+            },
         },
     },
     service::search::{
@@ -162,7 +164,8 @@ impl FlightService for FlightServiceImpl {
         // https://github.com/openobserve/openobserve/issues/8280
         // https://github.com/apache/datafusion/pull/11587
         // add coalesce batches exec to trigger StringView gc to reduce memory usage
-        let physical_plan = Arc::new(CoalesceBatchesExec::new(physical_plan, PARQUET_BATCH_SIZE));
+        let physical_plan: Arc<dyn ExecutionPlan> =
+            Arc::new(CoalesceBatchesExec::new(physical_plan, PARQUET_BATCH_SIZE));
 
         log::info!(
             "[trace_id {trace_id}] flight->search: executing stream, is super cluster: {is_super_cluster}"
@@ -190,9 +193,6 @@ impl FlightService for FlightServiceImpl {
                 Status::internal(e.to_string())
             })?;
 
-        // used for super cluster follower leader to get scan stats
-        let scan_stats_ref = get_scan_stats(physical_plan.clone());
-
         // used for EXPLAIN ANALYZE to collect metrics after stream is done
         let metrics = req.search_info.is_analyze.then_some(MetricsInfo {
             plan: physical_plan.clone(),
@@ -200,8 +200,14 @@ impl FlightService for FlightServiceImpl {
             func: Box::new(super_cluster_enabled),
         });
 
-        // used for super cluster follower leader to get metrics
-        let metrics_ref = get_cluster_metrics(physical_plan.clone());
+        // Get the peak memory usage from the memory pool
+        // Note: We get peak memory after stream execution, so we pass it via a shared reference
+        let peak_memory = get_peak_memory_from_ctx(&ctx);
+
+        // used for super cluster follower leader to get information from follower node
+        let scan_stats_ref = get_scan_stats(&physical_plan);
+        let metrics_ref = get_cluster_metrics(&physical_plan);
+        let peak_memory_ref = get_peak_memory(&physical_plan);
 
         let stream = execute_stream(physical_plan, ctx.task_ctx().clone()).map_err(|e| {
             // clear session data
@@ -221,6 +227,8 @@ impl FlightService for FlightServiceImpl {
             .with_custom_message(PreCustomMessage::ScanStatsRef(scan_stats_ref))
             .with_custom_message(PreCustomMessage::Metrics(metrics))
             .with_custom_message(PreCustomMessage::MetricsRef(metrics_ref))
+            .with_custom_message(PreCustomMessage::PeakMemoryRef(Some(peak_memory)))
+            .with_custom_message(PreCustomMessage::PeakMemoryRef(peak_memory_ref))
             .build(stream, span);
 
         let stream = async_stream::stream! {
