@@ -697,6 +697,7 @@ alt="Quick Mode" class="toolbar-icon" />
           @save:function="fnSavedFunctionDialog"
         />
         <q-btn
+          v-if="generatedLink == ''"
           data-test="logs-search-bar-share-link-btn"
           class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border"
           size="xs"
@@ -708,6 +709,19 @@ alt="Quick Mode" class="toolbar-icon" />
             {{ t("search.shareLink") }}
           </q-tooltip>
         </q-btn>
+        <q-btn
+          v-if="generatedLink !== ''"
+          data-test="logs-search-bar-copy-share-link-btn"
+          class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border"
+          size="xs"
+          @click="copyLinkToClipboard"
+          icon="content_copy"
+        >
+          <q-tooltip>
+            {{ t("search.copyLink") }}
+          </q-tooltip>
+        </q-btn>
+        
 
         <q-btn
           data-test="logs-search-bar-more-options-btn"
@@ -3610,6 +3624,7 @@ export default defineComponent({
       }
     };
 
+    const generatedLink = ref<string>("");
     const shareLink = useLoading(async () => {
       const queryObj = generateURLQuery(true, dashboardPanelData);
       // Removed the 'type' property from the object to avoid issues when navigating from the stream to the logs page,
@@ -3642,9 +3657,10 @@ export default defineComponent({
                 });
               })
               .catch(() => {
+                generatedLink.value = shareURL;
                 $q.notify({
-                  type: "negative",
-                  message: t("search.errorCopyingLink"),
+                  type: "positive",
+                  message: t("search.clickAgainToCopy"),
                   timeout: 5000,
                 });
               });
@@ -3658,6 +3674,29 @@ export default defineComponent({
           });
         });
     });
+
+    const copyLinkToClipboard = () => {
+      if (generatedLink.value != "") {
+        copyToClipboard(generatedLink.value)
+          .then(() => {
+            $q.notify({
+              type: "positive",
+              message: t("search.linkCopiedSuccessfully"),
+              timeout: 5000,
+            });
+          })
+          .catch(() => {
+            $q.notify({
+              type: "negative",
+              message: t("search.errorCopyingLink"),
+              timeout: 5000,
+            });
+          }).finally(() => {
+            generatedLink.value = "";
+          });
+      }
+    };
+
     const showSearchHistoryfn = () => {
       emit("showSearchHistory");
     };
@@ -4428,6 +4467,8 @@ export default defineComponent({
       showExplainDialog,
       openExplainDialog,
       outlinedShowChart,
+      generatedLink,
+      copyLinkToClipboard,
     };
   },
   computed: {

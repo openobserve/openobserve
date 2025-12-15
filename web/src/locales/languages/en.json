@@ -260,6 +260,8 @@
     "linkCopiedSuccessfully": "Link Copied Successfully!",
     "errorCopyingLink": "Error while copy link.",
     "errorShorteningLink": "Error while shortening link.",
+    "clickAgainToCopy": "Click again to copy the link to clipboard.",
+    "copyLink": "Copy Link",
     "maxViewsLimit": "You can only save 10 views.",
     "viewAddedToFavorites": "View added to favorites.",
     "viewRemovedFromFavorites": "View removed from favorites.",
