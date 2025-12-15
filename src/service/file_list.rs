@@ -191,7 +191,7 @@ pub async fn query_by_ids(
             org_id,
             stream_type,
             stream_name,
-            time_range.unwrap_or((0, 0)),
+            time_range.unwrap_or_default(),
             &ids,
         )
         .await?;

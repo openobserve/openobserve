@@ -525,7 +525,7 @@ pub async fn tantivy_search(
 
     let search_start = std::time::Instant::now();
     let mut is_add_filter_back = file_list_map.len() != index_file_names.len();
-    let time_range = query.time_range.unwrap_or((0, 0));
+    let time_range = query.time_range.unwrap_or_default();
     let index_parquet_files = index_file_names.into_iter().map(|(_, f)| f).collect_vec();
     let (index_parquet_files, query_limit) =
         partition_tantivy_files(index_parquet_files, &idx_optimize_mode, target_partitions);

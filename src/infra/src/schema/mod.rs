@@ -162,7 +162,7 @@ pub async fn get_versions(
     let key = mk_key(org_id, stream_type, stream_name);
     let cache_key = key.strip_prefix(SCHEMA_KEY).unwrap();
 
-    let (min_ts, max_ts) = time_range.unwrap_or((0, 0));
+    let (min_ts, max_ts) = time_range.unwrap_or_default();
     let mut last_schema_index = None;
     let r = STREAM_SCHEMAS.read().await;
     if let Some(versions) = r.get(cache_key) {
