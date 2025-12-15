@@ -397,38 +397,18 @@ describe("AlertList - filtering behaviors", () => {
     expect(wrapper.vm.filteredResults.every((r: any) => r.is_real_time)).toBe(true);
   });
 
-  it("resetting filterQuery to empty restores tab-based filtering", async () => {
+  it("filterAlertsByTab with false refreshResults parameter skips filtering", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
 
-    wrapper.vm.filterQuery = "Scheduled";
-    await flushPromises();
-    
-    // Manually implement the filtering logic since component method doesn't work in test environment
-    let tempResults = wrapper.vm.allAlerts.filter((alert: any) =>
-      alert.name.toLowerCase().includes("Scheduled".toLowerCase())
-    );
-    wrapper.vm.filteredResults = tempResults.filter((alert: any) => {
-      if(wrapper.vm.activeTab === "scheduled"){
-        return !alert.is_real_time;
-      } 
-      else if(wrapper.vm.activeTab === "realTime"){
-        return alert.is_real_time;
-      } 
-      else {
-        return true;
-      }
-    });
-    await flushPromises();
-    expect(wrapper.vm.filteredResults.length).toBeGreaterThan(0);
+    const initialLength = wrapper.vm.filteredResults.length;
+    expect(initialLength).toBe(alertsDB.length);
 
-    wrapper.vm.filterQuery = "";
+    // Call filterAlertsByTab with refreshResults=false should not change filteredResults
+    wrapper.vm.filterAlertsByTab(false);
     await flushPromises();
-    // Restore all alerts for "all" tab when query is empty
-    wrapper.vm.filteredResults = wrapper.vm.allAlerts;
-    await flushPromises();
-    // Should return all alerts (tab all)
-    expect(wrapper.vm.filteredResults.length).toBe(alertsDB.length);
+
+    expect(wrapper.vm.filteredResults.length).toBe(initialLength);
   });
 
   it("filterAlertsByQuery filters by name within current tab", async () => {

@@ -86,7 +86,7 @@ pub async fn search(
     // get file list
     let mut files = file_list.to_vec();
     if files.is_empty() {
-        return Ok((vec![], ScanStats::default()));
+        return Ok((vec![], ScanStats::default(), HashSet::new()));
     }
     let original_files_len = files.len();
     log::info!(
@@ -285,7 +285,7 @@ pub async fn search(
                 .build()
         )
     );
-    Ok((vec![table], scan_stats))
+    Ok((vec![table], scan_stats, HashSet::new()))
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]

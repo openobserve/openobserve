@@ -41,6 +41,8 @@ mod file_downloader;
 mod file_list_dump;
 pub(crate) mod files;
 mod flatten_compactor;
+#[cfg(feature = "enterprise")]
+mod incidents;
 pub mod metrics;
 mod mmdb_downloader;
 #[cfg(feature = "enterprise")]
@@ -328,6 +330,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(flatten_compactor::run());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(service_graph::run());
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(incidents::run());
     tokio::task::spawn(metrics::run());
     let _ = promql::run();
     tokio::task::spawn(alert_manager::run());

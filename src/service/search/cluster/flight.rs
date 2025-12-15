@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{Arc, atomic::Ordering};
 
 use arrow::array::RecordBatch;
 use async_recursion::async_recursion;
@@ -47,6 +47,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::service::search::SEARCH_SERVER;
 use crate::{
     common::infra::cluster as infra_cluster,
+    handler::grpc::flight::visitor::get_peak_memory_from_ctx,
     service::{
         db::enrichment_table,
         search::{
@@ -390,6 +391,7 @@ pub async fn run_datafusion(
     // run datafusion
     let datafusion_start = std::time::Instant::now();
     let ret = datafusion::physical_plan::collect(physical_plan.clone(), ctx.task_ctx()).await;
+    let peak_memory = get_peak_memory_from_ctx(&ctx).load(Ordering::Relaxed);
     let mut visit = ScanStatsVisitor::new();
     let _ = visit_execution_plan(physical_plan.as_ref(), &mut visit);
     if let Err(e) = ret {
@@ -408,8 +410,8 @@ pub async fn run_datafusion(
                     .build()
             )
         );
-        // Update scan stats to include aggregation cache ratio
         visit.scan_stats.aggs_cache_ratio = aggs_cache_ratio;
+        visit.scan_stats.peak_memory_usage = peak_memory.max(visit.peak_memory) as i64;
         ret.map(|data| {
             check_query_default_limit_exceeded(
                 data.iter().fold(0, |acc, batch| acc + batch.num_rows()),

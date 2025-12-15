@@ -17,8 +17,8 @@ use std::collections::HashMap;
 
 use once_cell::sync::Lazy;
 use prometheus::{
-    CounterVec, Encoder, HistogramOpts, HistogramVec, IntCounterVec, IntGaugeVec, Opts, Registry,
-    TextEncoder,
+    CounterVec, Encoder, HistogramOpts, HistogramVec, IntCounterVec, IntGauge, IntGaugeVec, Opts,
+    Registry, TextEncoder,
 };
 
 pub const NAMESPACE: &str = "zo";
@@ -309,28 +309,32 @@ pub static SERVICE_STREAMS_HIGH_CARDINALITY_BLOCKED: Lazy<IntCounterVec> = Lazy:
     .expect("Metric created")
 });
 
-pub static SERVICE_STREAMS_DIMENSION_CARDINALITY: Lazy<IntGaugeVec> = Lazy::new(|| {
-    IntGaugeVec::new(
-        Opts::new(
-            "service_streams_dimension_cardinality",
-            "Estimated unique value count per dimension",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization", "dimension"],
-    )
-    .expect("Metric created")
-});
+// NOTE: SERVICE_STREAMS_DIMENSION_CARDINALITY was removed because using dimension_name
+// as a label creates unbounded metric cardinality (500+ dimensions × 1000 orgs = OOM).
+// Use SERVICE_STREAMS_CACHE_ENTRIES with cache_type="dimensions" for aggregate stats.
 
 pub static SERVICE_STREAMS_HIGH_CARDINALITY_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
             "service_streams_high_cardinality_total",
-            "Count of high cardinality dimension detections",
+            "Count of high cardinality dimension detections (aggregate per org)",
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "dimension"],
+        &["organization"], // No dimension label - would cause unbounded cardinality
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_RECORDS_DROPPED: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "service_streams_records_dropped",
+            "Count of records dropped due to backpressure in service streams processing",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type"],
     )
     .expect("Metric created")
 });
@@ -1460,6 +1464,135 @@ pub static SERVICE_STREAMS_CACHE_ENTRIES: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// Pattern learner metrics (for OOM debugging)
+pub static SERVICE_STREAMS_PATTERN_LEARNER_ORGS: Lazy<IntGauge> = Lazy::new(|| {
+    IntGauge::with_opts(
+        Opts::new(
+            "service_streams_pattern_learner_orgs",
+            "Number of organizations with active pattern learners",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_PATTERN_LEARNER_FIELDS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "service_streams_pattern_learner_fields",
+            "Number of fields tracked by pattern learner",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_PATTERN_LEARNER_VALUES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "service_streams_pattern_learner_values",
+            "Total unique values tracked by pattern learner",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_PATTERN_LEARNER_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "service_streams_pattern_learner_bytes",
+            "Estimated memory usage of pattern learner in bytes",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+// Service queue metrics
+pub static SERVICE_STREAMS_QUEUE_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "service_streams_queue_size",
+            "Number of services queued for batch processing",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_QUEUE_ORGS: Lazy<IntGauge> = Lazy::new(|| {
+    IntGauge::with_opts(
+        Opts::new(
+            "service_streams_queue_orgs",
+            "Number of organizations with queued services",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_QUEUE_TOTAL: Lazy<IntGauge> = Lazy::new(|| {
+    IntGauge::with_opts(
+        Opts::new(
+            "service_streams_queue_total",
+            "Total number of services queued across all organizations",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_QUEUE_DROPPED: Lazy<IntGauge> = Lazy::new(|| {
+    IntGauge::with_opts(
+        Opts::new(
+            "service_streams_queue_dropped",
+            "Total services dropped due to queue limits",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+
+// Cleanup metrics
+pub static SERVICE_STREAMS_CLEANUP_RUNS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "service_streams_cleanup_runs_total",
+            "Number of cleanup runs by type",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["cleanup_type"], // "cache", "pattern_learner", "dimension_tracker"
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_CLEANUP_REMOVED: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "service_streams_cleanup_removed_total",
+            "Number of items removed during cleanup",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["cleanup_type"],
+    )
+    .expect("Metric created")
+});
+
 fn register_metrics(registry: &Registry) {
     // http latency
     registry
@@ -1526,11 +1659,12 @@ fn register_metrics(registry: &Registry) {
     registry
         .register(Box::new(SERVICE_STREAMS_HIGH_CARDINALITY_BLOCKED.clone()))
         .expect("Metric registered");
-    registry
-        .register(Box::new(SERVICE_STREAMS_DIMENSION_CARDINALITY.clone()))
-        .expect("Metric registered");
+    // SERVICE_STREAMS_DIMENSION_CARDINALITY removed - unbounded labels cause OOM
     registry
         .register(Box::new(SERVICE_STREAMS_HIGH_CARDINALITY_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_RECORDS_DROPPED.clone()))
         .expect("Metric registered");
 
     // querier stats
@@ -1839,6 +1973,42 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(SERVICE_STREAMS_CACHE_ENTRIES.clone()))
+        .expect("Metric registered");
+
+    // service streams pattern learner (OOM debugging)
+    registry
+        .register(Box::new(SERVICE_STREAMS_PATTERN_LEARNER_ORGS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_PATTERN_LEARNER_FIELDS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_PATTERN_LEARNER_VALUES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_PATTERN_LEARNER_BYTES.clone()))
+        .expect("Metric registered");
+
+    // service streams queue
+    registry
+        .register(Box::new(SERVICE_STREAMS_QUEUE_SIZE.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_QUEUE_ORGS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_QUEUE_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_QUEUE_DROPPED.clone()))
+        .expect("Metric registered");
+
+    // service streams cleanup
+    registry
+        .register(Box::new(SERVICE_STREAMS_CLEANUP_RUNS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_CLEANUP_REMOVED.clone()))
         .expect("Metric registered");
 }
 

@@ -166,13 +166,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-item>
       </q-list>
 
-      <!-- Add new dimension from semantic groups - Two step: 1) Select group 2) Select field -->
+      <!-- Add new semantic group to FQN priority -->
       <div class="tw-mt-3">
         <div class="tw-text-sm tw-text-gray-600 dark:tw-text-gray-400 tw-mb-2">
           {{ t("settings.correlation.addDimensionHint") }}
         </div>
         <div class="tw-flex tw-gap-2 tw-items-end">
-          <!-- Step 1: Select Semantic Group -->
           <q-select
             v-model="selectedSemanticGroup"
             :options="availableSemanticGroups"
@@ -190,8 +189,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-item v-bind="scope.itemProps">
                 <q-item-section>
                   <q-item-label>{{ scope.opt.label }}</q-item-label>
-                  <q-item-label caption class="tw-text-xs">
-                    {{ scope.opt.fieldCount }} {{ t("settings.correlation.fieldsAvailable") }}
+                  <q-item-label caption class="tw-text-xs tw-font-mono">
+                    {{ scope.opt.value }}
                   </q-item-label>
                 </q-item-section>
               </q-item>
@@ -205,42 +204,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </q-select>
 
-          <!-- Step 2: Select Field from Group -->
-          <q-select
-            v-model="newFqnDimension"
-            :options="availableFieldsFromGroup"
-            dense
-            borderless
-            stack-label
-            :label="t('settings.correlation.selectField')"
-            class="tw-flex-1 showLabelOnTop"
-            emit-value
-            map-options
-            clearable
-            :disable="!selectedSemanticGroup || availableFieldsFromGroup.length === 0"
-          >
-            <template v-slot:option="scope">
-              <q-item v-bind="scope.itemProps">
-                <q-item-section>
-                  <q-item-label class="tw-font-mono">{{ scope.opt.label }}</q-item-label>
-                </q-item-section>
-              </q-item>
-            </template>
-            <template v-slot:no-option>
-              <q-item>
-                <q-item-section class="text-grey">
-                  {{ selectedSemanticGroup ? t("settings.correlation.allFieldsAdded") : t("settings.correlation.selectGroupFirst") }}
-                </q-item-section>
-              </q-item>
-            </template>
-          </q-select>
-
           <q-btn
             flat
             dense
             icon="add"
             color="primary"
-            :disable="!newFqnDimension"
+            :disable="!selectedSemanticGroup"
             @click="addFqnDimension"
           >
             <q-tooltip>{{ t("settings.correlation.addDimensionLabel") }}</q-tooltip>
@@ -317,6 +286,7 @@ interface SemanticFieldGroup {
   group?: string;
   fields: string[];
   normalize: boolean;
+  is_stable?: boolean;
 }
 
 interface Props {
@@ -337,14 +307,12 @@ const semanticSectionExpanded = ref(true);
 const localFqnPriority = ref<string[]>([]);
 const localSemanticGroups = ref<SemanticFieldGroup[]>([]);
 const selectedSemanticGroup = ref<string | null>(null);
-const newFqnDimension = ref<string | null>(null);
 
 // Reserved IDs that should not be used as semantic groups
 // service-fqn is the OUTPUT of correlation, not an input dimension
 const RESERVED_GROUP_IDS = ['service-fqn', 'servicefqn', 'fqn'];
 
-// Computed: Get all semantic groups for the first dropdown
-// Shows groups that have at least one field not yet in the priority list
+// Computed: Get semantic groups not already in the priority list
 const availableSemanticGroups = computed(() => {
   return localSemanticGroups.value
     .filter(group => {
@@ -352,36 +320,12 @@ const availableSemanticGroups = computed(() => {
       if (RESERVED_GROUP_IDS.includes(group.id?.toLowerCase())) {
         return false;
       }
-      // Check if this group has any fields not already in the priority list
-      const availableFields = group.fields?.filter(field => !localFqnPriority.value.includes(field)) || [];
-      return availableFields.length > 0;
+      // Exclude groups already in the priority list
+      return !localFqnPriority.value.includes(group.id);
     })
     .map(group => ({
       label: group.display || group.id,
-      value: group.id,
-      fieldCount: (group.fields?.filter(field => !localFqnPriority.value.includes(field)) || []).length
-    }));
-});
-
-// Computed: Get fields from the selected semantic group that aren't already in priority list
-const availableFieldsFromGroup = computed(() => {
-  if (!selectedSemanticGroup.value) return [];
-
-  const group = localSemanticGroups.value.find(g => g.id === selectedSemanticGroup.value);
-  if (!group?.fields) return [];
-
-  // Filter out reserved IDs and fields already in the priority list
-  return group.fields
-    .filter(field => {
-      // Exclude reserved/computed field names
-      if (RESERVED_GROUP_IDS.includes(field?.toLowerCase())) {
-        return false;
-      }
-      return !localFqnPriority.value.includes(field);
-    })
-    .map(field => ({
-      label: field,
-      value: field
+      value: group.id
     }));
 });
 
@@ -396,15 +340,6 @@ const getDimensionDisplay = (dimId: string): string => {
     .split('-')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
-};
-
-// Get fields for a dimension from semantic groups (for description)
-const getFieldsForDimension = (dimId: string): string => {
-  const group = localSemanticGroups.value.find(g => g.id === dimId);
-  if (group?.fields?.length) {
-    return group.fields.slice(0, 3).join(", ") + (group.fields.length > 3 ? "..." : "");
-  }
-  return "";
 };
 
 const handleSemanticGroupsUpdate = (groups: SemanticFieldGroup[]) => {
@@ -433,13 +368,9 @@ const removeFqnDimension = (index: number) => {
 };
 
 const addFqnDimension = () => {
-  if (!newFqnDimension.value) return;
-  localFqnPriority.value.push(newFqnDimension.value);
-  newFqnDimension.value = null;
-  // Clear group selection if no more fields available from this group
-  if (availableFieldsFromGroup.value.length === 0) {
-    selectedSemanticGroup.value = null;
-  }
+  if (!selectedSemanticGroup.value) return;
+  localFqnPriority.value.push(selectedSemanticGroup.value);
+  selectedSemanticGroup.value = null;
 };
 
 const resetFqnPriority = () => {

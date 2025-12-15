@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    atomic::{AtomicUsize, Ordering},
+};
 
 use arrow::array::RecordBatch;
 use arrow_schema::SchemaRef;
@@ -77,6 +80,7 @@ pub enum FlightMessage {
 pub enum CustomMessage {
     ScanStats(ScanStats),
     Metrics(Vec<Metrics>),
+    PeakMemory(usize),
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
@@ -97,6 +101,8 @@ pub enum PreCustomMessage {
     Metrics(Option<MetricsInfo>),
     // use for super cluster follower leader
     MetricsRef(Vec<Arc<Mutex<Vec<Metrics>>>>),
+    // use for storing memory pool reference to extract peak later
+    PeakMemoryRef(Option<Arc<AtomicUsize>>),
 }
 
 pub struct MetricsInfo {
@@ -126,6 +132,9 @@ impl PreCustomMessage {
                 let metrics: Vec<Metrics> = metrics.iter().flat_map(|m| m.lock().clone()).collect();
                 (!metrics.is_empty()).then_some(CustomMessage::Metrics(metrics))
             }
+            PreCustomMessage::PeakMemoryRef(peak_memory_ref) => peak_memory_ref
+                .as_ref()
+                .map(|peak| CustomMessage::PeakMemory(peak.load(Ordering::Relaxed))),
         }
     }
 }
@@ -176,6 +185,7 @@ mod tests {
             idx_took: 100,
             file_list_took: 50,
             aggs_cache_ratio: 80,
+            peak_memory_usage: 1024000,
         }
     }
 
@@ -415,6 +425,22 @@ mod tests {
                 assert_eq!(metrics[0].metrics, "test_metrics");
             }
             _ => panic!("Expected Metrics variant"),
+        }
+    }
+
+    #[test]
+    fn test_custom_message_peak_memory_serialization() {
+        let peak_memory = 1024 * 1024 * 100; // 100 MB
+        let custom_msg = CustomMessage::PeakMemory(peak_memory);
+
+        let serialized = serde_json::to_string(&custom_msg).unwrap();
+        let deserialized: CustomMessage = serde_json::from_str(&serialized).unwrap();
+
+        match deserialized {
+            CustomMessage::PeakMemory(mem) => {
+                assert_eq!(mem, peak_memory);
+            }
+            _ => panic!("Expected PeakMemory variant"),
         }
     }
 }
