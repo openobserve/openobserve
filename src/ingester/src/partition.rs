@@ -20,14 +20,15 @@ use config::{
     meta::stream::FileMeta,
     metrics,
     utils::{
-        parquet::{generate_filename_with_time_range, new_parquet_writer},
+        file_writer::{WriteConfig, write_recordbatches_to_buf},
+        parquet::generate_filename_with_time_range,
         record_batch_ext::merge_record_batches,
         schema::filter_source_by_partition_key,
         schema_ext::SchemaExt,
     },
 };
 use hashbrown::HashSet;
-use snafu::ResultExt;
+use snafu::{IntoError, ResultExt};
 use tokio::{fs::OpenOptions, io::AsyncWriteExt};
 
 use crate::{
@@ -204,32 +205,35 @@ impl Partition {
                     })
                     .collect::<Vec<_>>();
 
-                let (schema, batches) =
+                let (schema, batch) =
                     merge_record_batches("INGESTER:PERSIST", 0, self.schema.clone(), batches)
                         .context(MergeRecordBatchSnafu)?;
 
-                let mut buf_parquet = Vec::new();
+                // Determine file format and compression
+                let file_format = cfg.common.file_format;
                 let compression = if cfg.common.feature_ingester_none_compression {
                     Some("none")
                 } else {
                     None
                 };
-                let mut writer = new_parquet_writer(
-                    &mut buf_parquet,
-                    &schema,
-                    &bloom_filter_fields,
-                    &file_meta,
-                    true,
+
+                // Write record batches using the configured file format
+                let write_config = WriteConfig {
+                    schema: &schema,
+                    bloom_filter_fields: &bloom_filter_fields,
+                    metadata: &file_meta,
+                    write_metadata: true,
                     compression,
-                );
+                };
 
-                writer
-                    .write(&batches)
+                let buf_file = write_recordbatches_to_buf(file_format, &[batch], write_config)
                     .await
-                    .context(WriteParquetRecordBatchSnafu)?;
+                    .map_err(|e| {
+                        let err: Box<dyn std::error::Error + Send + Sync> = e.into();
+                        WriteFileRecordBatchSnafu.into_error(err)
+                    })?;
 
-                writer.close().await.context(WriteParquetRecordBatchSnafu)?;
-                file_meta.compressed_size = buf_parquet.len() as i64;
+                file_meta.compressed_size = buf_file.len() as i64;
 
                 // write into local file
                 let file_name =
@@ -247,14 +251,14 @@ impl Partition {
                     .open(&path)
                     .await
                     .context(CreateFileSnafu { path: path.clone() })?;
-                f.write_all(&buf_parquet)
+                f.write_all(&buf_file)
                     .await
                     .context(WriteFileSnafu { path: path.clone() })?;
                 drop(f);
 
-                // set parquet metadata cache
+                // set file metadata cache
                 let mut file_key = path.clone();
-                file_key.set_extension("parquet");
+                file_key.set_extension(file_format.extension());
                 let file_key = file_key
                     .strip_prefix(base_path.clone())
                     .unwrap()
@@ -270,10 +274,10 @@ impl Partition {
                 // update metrics
                 metrics::INGEST_WAL_USED_BYTES
                     .with_label_values(&[org_id, stream_type])
-                    .add(buf_parquet.len() as i64);
+                    .add(buf_file.len() as i64);
                 metrics::INGEST_WAL_WRITE_BYTES
                     .with_label_values(&[org_id, stream_type])
-                    .inc_by(buf_parquet.len() as u64);
+                    .inc_by(buf_file.len() as u64);
 
                 paths.push((path, persist_stat));
             }

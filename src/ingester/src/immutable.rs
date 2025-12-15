@@ -112,8 +112,9 @@ impl Immutable {
         for (path, stat) in paths {
             persist_stat += stat;
             // Add memtable id to the parquet file name
+            let extension = config::get_config().common.file_format.extension();
             let parquet_path =
-                add_memtable_id_to_file_name(&path, self.memtable.id()).with_extension("parquet");
+                add_memtable_id_to_file_name(&path, self.memtable.id()).with_extension(extension);
             fs::rename(&path, &parquet_path)
                 .await
                 .context(RenameFileSnafu { path: &path })?;
