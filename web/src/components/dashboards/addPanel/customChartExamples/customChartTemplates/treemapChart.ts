@@ -46,22 +46,37 @@ const processData = (chartData, nameKey, parentKey, valueKey) => {
 
     if (!nodeMap.has(name)) {
       nodeMap.set(name, { name, value, children: [] });
+    } else {
+      // If node already exists, update its value (for parent aggregation)
+      nodeMap.get(name).value = value;
     }
 
     if (!parent || parent === name) {
       rootNodes.push(nodeMap.get(name));
     } else {
       if (!nodeMap.has(parent)) {
-        nodeMap.set(parent, { name: parent, children: [] });
+        nodeMap.set(parent, { name: parent, value: 0, children: [] });
       }
       nodeMap.get(parent).children.push(nodeMap.get(name));
     }
   });
 
+  // Aggregate parent values as the sum of their children's values
+  function aggregateValues(node) {
+    if (!node.children || node.children.length === 0) {
+      return node.value || 0;
+    }
+    node.value = node.children.reduce((sum, child) => sum + aggregateValues(child), 0);
+    return node.value;
+  }
+  rootNodes.forEach(aggregateValues);
+
   return { name: 'root', children: rootNodes };
 };
 
-const treeData = processData(data[0], nameAlias, parentAlias, valueAlias);
+const treeData = Array.isArray(data) && data.length > 0
+  ? processData(data[0], nameAlias, parentAlias, valueAlias)
+  : { name: 'root', children: [] };
 
 option = {
   tooltip: {},
@@ -83,5 +98,5 @@ option = {
 // Export with common name for consistency across all templates
 export const customChartExample = {
   code: chartCode,
-  query: exampleQuery
+  query: exampleQuery,
 };
