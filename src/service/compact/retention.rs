@@ -433,7 +433,7 @@ pub async fn delete_by_date(
         infra::schema::delete(org_id, stream_type, stream_name, Some(start_dt)).await?;
     }
 
-    // update stream stats retention time ;
+    // update stream stats retention time
     let stats_data_range = ("".to_string(), super::stats::get_yesterday_boundary());
     if let Err(e) = super::stats::update_stats_from_file_list_inner(
         org_id,
