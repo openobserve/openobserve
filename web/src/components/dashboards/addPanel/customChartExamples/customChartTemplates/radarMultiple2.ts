@@ -7,7 +7,7 @@ UNION ALL
 SELECT 'Metric C' as metric, 'Series 1' as series, 90 as value from default
 UNION ALL
 SELECT 'Metric D' as metric, 'Series 1' as series, 75 as value from default
-UNION ALL
+UNION ALL`;
 
 // Chart code template
 const chartCode = `
