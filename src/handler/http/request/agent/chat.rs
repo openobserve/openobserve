@@ -13,6 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#[cfg(feature = "enterprise")]
+use std::sync::Arc;
+
 use actix_web::{HttpResponse, Responder, post, web};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -41,6 +44,43 @@ pub struct ChatMessage {
     pub role: String,
     /// Message content
     pub content: String,
+}
+
+/// Global RCA agent client with connection pooling
+/// Created once and reused across all requests to avoid TCP/TLS handshake overhead
+#[cfg(feature = "enterprise")]
+static AGENT_CLIENT: once_cell::sync::OnceCell<
+    Option<Arc<o2_enterprise::enterprise::alerts::rca_agent::RcaAgentClient>>,
+> = once_cell::sync::OnceCell::new();
+
+/// Initialize the global agent client
+/// Should be called once during application startup
+#[cfg(feature = "enterprise")]
+pub fn init_agent_client() -> Result<(), String> {
+    use config::get_config;
+    use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+
+    let o2_config = get_o2_config();
+    let zo_config = get_config();
+
+    let client = if !o2_config.incidents.rca_enabled || o2_config.incidents.rca_agent_url.is_empty()
+    {
+        None
+    } else {
+        o2_enterprise::enterprise::alerts::rca_agent::RcaAgentClient::new(
+            &o2_config.incidents.rca_agent_url,
+            &zo_config.auth.root_user_email,
+            &zo_config.auth.root_user_password,
+        )
+        .ok()
+        .map(Arc::new)
+    };
+
+    AGENT_CLIENT
+        .set(client)
+        .map_err(|_| "Agent client already initialized".to_string())?;
+
+    Ok(())
 }
 
 /// Non-streaming agent chat endpoint
@@ -184,32 +224,17 @@ pub async fn agent_chat_stream(
 
     #[cfg(feature = "enterprise")]
     {
-        use config::get_config;
-        use o2_enterprise::enterprise::{
-            alerts::rca_agent::{QueryRequest, RcaAgentClient},
-            common::config::get_config as get_o2_config,
-        };
+        use async_stream::stream;
+        use futures::StreamExt;
+        use o2_enterprise::enterprise::alerts::rca_agent::QueryRequest;
+        use serde_json::json;
+        use web::Bytes;
 
-        // Get O2 config
-        let o2_config = get_o2_config();
-
-        // Check if agent is enabled
-        if !o2_config.incidents.rca_enabled || o2_config.incidents.rca_agent_url.is_empty() {
-            return MetaHttpResponse::bad_request("Agent chat not enabled");
-        }
-
-        // Create agent client
-        let zo_config = get_config();
-        let client = match RcaAgentClient::new(
-            &o2_config.incidents.rca_agent_url,
-            &zo_config.auth.root_user_email,
-            &zo_config.auth.root_user_password,
-        ) {
-            Ok(c) => c,
-            Err(e) => {
-                return MetaHttpResponse::internal_error(format!(
-                    "Failed to create agent client: {e}"
-                ));
+        // Get or create agent client (connection pooling)
+        let client = match AGENT_CLIENT.get() {
+            Some(Some(c)) => c.clone(),
+            _ => {
+                return MetaHttpResponse::bad_request("Agent chat not enabled");
             }
         };
 
@@ -225,7 +250,7 @@ pub async fn agent_chat_stream(
                     req.history
                         .iter()
                         .map(|msg| {
-                            serde_json::json!({
+                            json!({
                                 "role": msg.role,
                                 "content": msg.content
                             })
@@ -235,21 +260,49 @@ pub async fn agent_chat_stream(
             },
         };
 
-        // Query agent with streaming
-        match client.query_stream(&req.agent_type, query_req).await {
-            Ok(response) => {
-                // Convert reqwest::Response to actix-web streaming response
-                use futures::StreamExt;
-                let stream = response
-                    .bytes_stream()
-                    .map(|result| result.map_err(std::io::Error::other));
+        // Create streaming response with immediate feedback
+        let agent_type = req.agent_type.clone();
+        let s = stream! {
+            // Send immediate status event BEFORE calling agent service
+            let status_event = json!({
+                "role": "assistant",
+                "content": "",
+                "status": "processing"
+            });
+            yield Ok::<Bytes, std::io::Error>(Bytes::from(format!("data: {}\n\n", status_event)));
 
-                HttpResponse::Ok()
-                    .content_type("text/event-stream")
-                    .streaming(stream)
+            // Now call the external agent service
+            let response = match client.query_stream(&agent_type, query_req).await {
+                Ok(r) => r,
+                Err(e) => {
+                    let error_event = json!({
+                        "type": "error",
+                        "error": format!("Agent query failed: {}", e)
+                    });
+                    yield Ok(Bytes::from(format!("data: {}\n\n", error_event)));
+                    return;
+                }
+            };
+
+            // Forward the streaming response from agent service
+            let mut agent_stream = response.bytes_stream();
+
+            while let Some(chunk_result) = agent_stream.next().await {
+                match chunk_result {
+                    Ok(bytes) => {
+                        yield Ok(bytes);
+                    }
+                    Err(e) => {
+                        yield Err(std::io::Error::other(e));
+                        break;
+                    }
+                }
             }
-            Err(e) => MetaHttpResponse::internal_error(format!("Agent query failed: {e}")),
-        }
+        };
+
+        HttpResponse::Ok()
+            .content_type("text/event-stream")
+            .streaming(Box::pin(s))
     }
 
     #[cfg(not(feature = "enterprise"))]
