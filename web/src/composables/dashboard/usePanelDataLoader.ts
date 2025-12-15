@@ -770,16 +770,7 @@ export const usePanelDataLoader = (
 
   const loadData = async () => {
     // CRITICAL: Log EXACTLY what variablesData looks like
-    console.log('[usePanelDataLoader] ' + panelSchema?.value?.title + ' loadData() ENTRY:', {
-      hasVariablesData: !!variablesData?.value,
-      variablesDataType: typeof variablesData?.value,
-      isVariablesLoading: variablesData?.value?.isVariablesLoading,
-      valueCount: variablesData?.value?.values?.length || 0,
-      variablesSnapshot: variablesData?.value?.values?.map((v: any) => ({
-        name: v.name,
-        value: v.value
-      })) || []
-    });
+
 
     // // CRITICAL: Final safety check at loadData entry point
     // if (variablesData?.value?.isVariablesLoading === true) {
@@ -787,7 +778,7 @@ export const usePanelDataLoader = (
     //   return;
     // }
 
-    console.log('[usePanelDataLoader] ' + panelSchema?.value?.title + ': loadData() PROCEEDING');
+    log('[usePanelDataLoader] ' + panelSchema?.value?.title + ': loadData() PROCEEDING');
 
     // Only reset isPartialData if we're starting a fresh load and not restoring from cache
     if (runCount > 0 && !state.isOperationCancelled) {
@@ -990,7 +981,7 @@ export const usePanelDataLoader = (
           state.loading = false;
         }
       } else {
-    console.log("inside search api", JSON.stringify(variablesData.value?.values));
+        log("inside search api", JSON.stringify(variablesData.value?.values));
         // if(variablesData.value?.values.length === 0){
         //   return}
         // copy of current abortController
@@ -1056,11 +1047,7 @@ export const usePanelDataLoader = (
                 const query = query2;
 
                 // LOG: Check if variables were properly replaced
-                console.log('[usePanelDataLoader] ' + panelSchema.value.title + ' QUERY AFTER applyDynamicVariables:', {
-                  hasUnreplacedVars: /\$\w+/.test(query),
-                  unreplacedVars: query.match(/\$\w+/g) || 'none',
-                  queryPreview: query.substring(0, 200)
-                });
+
 
                 // Validate that timestamp column is not used as an alias for other fields
                 if (!checkTimestampAlias(query)) {
@@ -1194,17 +1181,7 @@ export const usePanelDataLoader = (
                 };
 
                 // LOG: Final check before API call
-                console.log('[usePanelDataLoader] ' + panelSchema.value.title + ' ABOUT TO CALL API:', {
-                  sqlQueries: payload.queryReq.query.sql.map((q: any) => ({
-                    hasUnreplacedVars: /\$\w+/.test(q.sql),
-                    unreplacedVars: q.sql.match(/\$\w+/g) || 'none',
-                    preview: q.sql.substring(0, 150)
-                  })),
-                  variablesDataSnapshot: variablesData?.value?.values?.map((v: any) => ({
-                    name: v.name,
-                    value: v.value
-                  })) || []
-                });
+
 
                 fetchQueryDataWithHttpStream(payload, {
                   data: (payload: any, response: any) => {
@@ -1458,15 +1435,7 @@ export const usePanelDataLoader = (
               state.resultMetaData[panelQueryIndex] = [];
 
               // LOG: Final check before streaming API call
-              console.log('[usePanelDataLoader] ' + panelSchema.value.title + ' ABOUT TO CALL getDataThroughStreaming:', {
-                hasUnreplacedVars: /\$\w+/.test(query),
-                unreplacedVars: query.match(/\$\w+/g) || 'none',
-                queryPreview: query.substring(0, 150),
-                variablesDataSnapshot: variablesData?.value?.values?.map((v: any) => ({
-                  name: v.name,
-                  value: v.value
-                })) || []
-              });
+
 
               // Use HTTP2/streaming for all dashboard queries
               await getDataThroughStreaming(

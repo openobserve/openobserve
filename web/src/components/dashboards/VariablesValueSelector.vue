@@ -658,13 +658,13 @@ export default defineComponent({
 
       // make list of variables using variables config list
       // set initial variables values from props
-      console.log("[VariablesValueSelector] initializeVariablesData:", {
-        propsInitialVariableValues: props.initialVariableValues,
-        valueObject: props.initialVariableValues?.value,
-        valueKeys: props.initialVariableValues?.value
-          ? Object.keys(props.initialVariableValues.value)
-          : [],
-      });
+
+      variableLog(
+        "init",
+        `Initial variable values from props: ${JSON.stringify(
+          props.initialVariableValues,
+        )}`,
+      );
 
       props?.variablesConfig?.list?.forEach((item: any) => {
         let initialValue =
@@ -817,10 +817,10 @@ export default defineComponent({
     const hasInitialLoadCompleted = ref(false);
 
     onMounted(() => {
-      console.log(
-        "[VariablesValueSelector] onMounted - initialVariableValues:",
-        JSON.stringify(props.initialVariableValues),
-      );
+      variableLog("init", `Component mounted, starting initialization...: ${JSON.stringify(
+          props.initialVariableValues,
+        )}`);
+
       // make list of variables using variables config list
       initializeVariablesData();
 
