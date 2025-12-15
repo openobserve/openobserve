@@ -599,8 +599,7 @@ export default defineComponent({
           panel.layout.h = item.h;
         }
       });
-    }; // Optimized GridStack refresh function
-    // Optimized GridStack refresh function
+    };
     // Optimized GridStack refresh function
     const refreshGridStack = async () => {
       if (!gridStackContainer.value) {
@@ -624,8 +623,8 @@ export default defineComponent({
 
       const grid = gridStackInstance;
       if (!grid) {
-          gridStackUpdateInProgress = false;
-          return;
+        gridStackUpdateInProgress = false;
+        return;
       }
 
       grid.batchUpdate();
@@ -746,8 +745,8 @@ export default defineComponent({
 
         // If switching from viewOnly (print mode) to interactive, force a refresh
         if (newValue === false) {
-           await nextTick();
-           await refreshGridStack();
+          await nextTick();
+          await refreshGridStack();
         }
       },
       { immediate: true },
