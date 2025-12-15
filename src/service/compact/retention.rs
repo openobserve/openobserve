@@ -435,7 +435,7 @@ pub async fn delete_by_date(
 
     // update stream stats retention time
     let stats_data_range = ("".to_string(), super::stats::get_yesterday_boundary());
-    if let Err(e) = super::stats::update_stats_from_file_list_inner(
+    if let Err(e) = super::stats::update_stats_from_file_list_for_stream(
         org_id,
         stream_type,
         stream_name,

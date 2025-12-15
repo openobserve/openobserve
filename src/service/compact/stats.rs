@@ -121,7 +121,7 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
                         continue;
                     }
                     let start = std::time::Instant::now();
-                    let result = update_stats_from_file_list_inner(
+                    let result = update_stats_from_file_list_for_stream(
                         &org_id,
                         stream_type,
                         &stream_name,
@@ -177,7 +177,7 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn update_stats_from_file_list_inner(
+pub async fn update_stats_from_file_list_for_stream(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
@@ -297,9 +297,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_update_stats_from_file_list_inner_with_empty_date_range() {
+    async fn test_update_stats_from_file_list_for_stream_with_empty_date_range() {
         // Test with empty date strings
-        let result = update_stats_from_file_list_inner(
+        let result = update_stats_from_file_list_for_stream(
             "test_org",
             StreamType::Logs,
             "test_stream",
