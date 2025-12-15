@@ -85,22 +85,31 @@ export default defineComponent({
 
     const isLoading = ref(false);
     let pollIntervalId: number | null = null;
+    let isPolling = false; // Flag to prevent multiple polling instances
 
     /**
      * Polling mechanism to check store for short URL without blocking main thread
      * Runs in a separate execution context via setInterval
-     * Includes safeguards against infinite loops
+     * Includes safeguards against infinite loops and race conditions
      */
     const startPollingForShortURL = () => {
       const MAX_ATTEMPTS = 30; // Max 30 attempts (15 seconds with 500ms interval)
       const POLL_INTERVAL = 500; // Check every 500ms
       let attempts = 0;
 
-      // Clear any existing polling interval
+      // Prevent multiple polling instances
+      if (isPolling) {
+        console.warn("Polling already in progress, skipping");
+        return;
+      }
+
+      // Clear any existing polling interval (safety check)
       if (pollIntervalId) {
         clearInterval(pollIntervalId);
         pollIntervalId = null;
       }
+
+      isPolling = true;
 
       // Start polling in a separate execution context (non-blocking)
       pollIntervalId = window.setInterval(() => {
@@ -110,6 +119,13 @@ export default defineComponent({
         const shortURL = store.state.pendingShortURL;
 
         if (shortURL) {
+          // CRITICAL: Stop polling IMMEDIATELY before async operations
+          if (pollIntervalId) {
+            clearInterval(pollIntervalId);
+            pollIntervalId = null;
+          }
+          isPolling = false;
+
           // Short URL is ready! Copy it to clipboard
           copyToClipboard(shortURL)
             .then(() => {
@@ -130,12 +146,8 @@ export default defineComponent({
               emit("copy:error", { error, type: "short" });
             })
             .finally(() => {
-              // Clean up: clear store and stop polling
+              // Clean up: clear store
               store.commit("clearPendingShortURL");
-              if (pollIntervalId) {
-                clearInterval(pollIntervalId);
-                pollIntervalId = null;
-              }
               isLoading.value = false;
             });
         } else if (attempts >= MAX_ATTEMPTS) {
@@ -147,6 +159,7 @@ export default defineComponent({
             clearInterval(pollIntervalId);
             pollIntervalId = null;
           }
+          isPolling = false;
           isLoading.value = false;
           store.commit("clearPendingShortURL");
           // Don't show error - user already has long URL copied
@@ -172,12 +185,12 @@ export default defineComponent({
       // STEP 1: Copy long URL immediately (SYNCHRONOUS - works in Safari)
       copyToClipboard(props.url)
         .then(() => {
-          $q.notify({
-            type: "positive",
-            message: t("search.linkCopiedSuccessfully"),
-            timeout: 5000,
-          });
-          emit("copy:success", { url: props.url, type: "long" });
+          // $q.notify({
+          //   type: "positive",
+          //   message: t("search.linkCopiedSuccessfully"),
+          //   timeout: 5000,
+          // });
+          // emit("copy:success", { url: props.url, type: "long" });
 
           // STEP 2: Start loading and fetch short URL
           isLoading.value = true;
@@ -189,7 +202,7 @@ export default defineComponent({
           shortURLService
             .create(store.state.selectedOrganization.identifier, props.url)
             .then((res: any) => {
-              if (res.status == 200) {
+              if (res.status === 200) {
                 // Store the short URL - polling will pick it up
                 store.commit("setPendingShortURL", res.data.short_url);
                 emit("shorten:success", {
