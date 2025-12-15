@@ -1454,9 +1454,26 @@ class APICleanup {
 
             testLogger.info('Loaded test pattern names', { count: testPatternNames.size });
 
-            // Filter patterns that match test data names
-            const matchingPatterns = patterns.filter(pattern => testPatternNames.has(pattern.name));
-            testLogger.info('Found patterns matching test data', { count: matchingPatterns.length });
+            // Additional test prefixes that should always be cleaned up
+            const testPrefixes = [
+                'duplicate_test_',      // regexPatternManagement.spec.js
+                'log_filename_',        // multipleSDRPatterns.spec.js
+                'time_hh_mm_ss_',       // multipleSDRPatterns.spec.js
+                'ifsc_code_',           // multipleSDRPatterns.spec.js
+                'date_dd_mm_yyyy_',     // multipleSDRPatterns.spec.js
+                'email_format_',        // SDR tests
+                'us_phone_',            // SDR tests
+                'credit_card_',         // SDR tests
+                'ssn_'                  // SDR tests
+            ];
+
+            // Filter patterns that match test data names (using prefix matching to catch patterns with unique suffixes)
+            const basePatternNames = Array.from(testPatternNames);
+            const matchingPatterns = patterns.filter(pattern =>
+                basePatternNames.some(baseName => pattern.name.startsWith(baseName)) ||
+                testPrefixes.some(prefix => pattern.name.startsWith(prefix))
+            );
+            testLogger.info('Found patterns matching test data (prefix match)', { count: matchingPatterns.length });
 
             if (matchingPatterns.length === 0) {
                 testLogger.info('No regex patterns to clean up');
@@ -2378,6 +2395,187 @@ class APICleanup {
         } catch (error) {
             testLogger.error('Failed to query stream', { streamName, error: error.message });
             throw error;
+        }
+    }
+
+    /**
+     * ==========================================
+     * SDR (Sensitive Data Redaction) CLEANUP METHODS
+     * ==========================================
+     */
+
+    /**
+     * Fetch all regex patterns via API
+     * @returns {Promise<Array>} Array of pattern objects with id, name, pattern, description
+     */
+    async fetchRegexPatterns() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/re_patterns`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                if (response.status === 404) {
+                    testLogger.info('Regex patterns endpoint not available (OSS edition)');
+                    return [];
+                }
+                testLogger.error('Failed to fetch regex patterns', { status: response.status });
+                return [];
+            }
+
+            const data = await response.json();
+            return data.patterns || [];
+        } catch (error) {
+            testLogger.error('Failed to fetch regex patterns', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Delete a single regex pattern by ID
+     * @param {string} patternId - The pattern ID
+     * @param {string} patternName - The pattern name (for logging)
+     * @returns {Promise<Object>} Deletion result
+     */
+    async deleteRegexPatternById(patternId, patternName = '') {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/re_patterns/${patternId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to delete regex pattern', { patternId, patternName, status: response.status });
+                return { code: response.status, message: 'Failed to delete regex pattern' };
+            }
+
+            const result = await response.json();
+            return { code: 200, ...result };
+        } catch (error) {
+            testLogger.error('Failed to delete regex pattern', { patternId, patternName, error: error.message });
+            return { code: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Delete regex patterns matching specified prefixes
+     * @param {Array<string>} prefixes - Array of pattern name prefixes to match (e.g., ['url_format_hash', 'strong_password_hash'])
+     * @returns {Promise<{deleted: number, failed: number}>} Deletion result counts
+     */
+    async deleteRegexPatternsByPrefix(prefixes = []) {
+        testLogger.info('Deleting regex patterns by prefix', { prefixes });
+
+        try {
+            const patterns = await this.fetchRegexPatterns();
+            testLogger.info('Fetched regex patterns', { total: patterns.length });
+
+            // Filter patterns matching prefixes
+            const matchingPatterns = patterns.filter(p =>
+                prefixes.some(prefix => p.name.startsWith(prefix) || p.name === prefix)
+            );
+
+            testLogger.info('Found patterns matching prefixes', { count: matchingPatterns.length });
+
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const pattern of matchingPatterns) {
+                const result = await this.deleteRegexPatternById(pattern.id, pattern.name);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.info('Deleted regex pattern', { name: pattern.name, id: pattern.id });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete regex pattern', { name: pattern.name, id: pattern.id, result });
+                }
+            }
+
+            testLogger.info('Regex patterns deletion completed', {
+                total: matchingPatterns.length,
+                deleted: deletedCount,
+                failed: failedCount
+            });
+
+            return { deleted: deletedCount, failed: failedCount };
+        } catch (error) {
+            testLogger.error('Regex patterns deletion failed', { error: error.message });
+            return { deleted: 0, failed: 0 };
+        }
+    }
+
+    /**
+     * Complete SDR test cleanup - deletes streams first (which removes pattern associations), then patterns
+     * This should be called in beforeAll hook of SDR tests
+     * @param {Array<string>} streamNames - Exact stream names to delete (e.g., ['sdr_combined_hash_test'])
+     * @param {Array<string>} patternPrefixes - Pattern name prefixes to delete (e.g., ['url_format_hash', 'strong_password_hash'])
+     * @param {Object} options - Optional configuration
+     * @param {boolean} options.waitForDeletion - Whether to wait for stream deletions to complete (default: true)
+     */
+    async cleanupSDRTestData(streamNames = [], patternPrefixes = [], options = {}) {
+        const { waitForDeletion = true } = options;
+
+        testLogger.info('=== Starting SDR Test Cleanup via API ===', {
+            streams: streamNames,
+            patternPrefixes
+        });
+
+        try {
+            // Step 1: Delete streams first (this automatically unlinks any pattern associations)
+            if (streamNames.length > 0) {
+                testLogger.info('Step 1: Deleting SDR test streams');
+
+                for (const streamName of streamNames) {
+                    testLogger.info(`Attempting to delete stream: ${streamName}`);
+                    const result = await this.deleteStream(streamName);
+
+                    if (result.code === 200) {
+                        testLogger.info(`✓ Stream deletion initiated: ${streamName}`);
+                    } else if (result.code === 404) {
+                        testLogger.info(`✓ Stream does not exist (OK): ${streamName}`);
+                    } else {
+                        testLogger.warn(`Failed to delete stream: ${streamName}`, { result });
+                    }
+                }
+
+                // Wait for stream deletions to complete if enabled
+                if (waitForDeletion) {
+                    testLogger.info('Waiting for stream deletions to complete...');
+                    for (const streamName of streamNames) {
+                        const completed = await this.waitForStreamDeletion(streamName, 60000, 2000);
+                        if (completed) {
+                            testLogger.info(`✓ Stream deletion complete: ${streamName}`);
+                        } else {
+                            testLogger.warn(`Stream deletion may still be in progress: ${streamName}`);
+                        }
+                    }
+                }
+            }
+
+            // Step 2: Delete patterns by prefix (they should now be unlinked from streams)
+            if (patternPrefixes.length > 0) {
+                testLogger.info('Step 2: Deleting SDR test patterns');
+                const patternResult = await this.deleteRegexPatternsByPrefix(patternPrefixes);
+                testLogger.info('Pattern deletion result', patternResult);
+            }
+
+            // Wait additional time to ensure backend fully processes deletions
+            // This prevents "stream is being deleted" errors when tests immediately try to recreate streams
+            testLogger.info('Waiting additional time for backend to finalize deletions...');
+            await new Promise(resolve => setTimeout(resolve, 5000));
+
+            testLogger.info('=== SDR Test Cleanup Complete ===');
+
+        } catch (error) {
+            testLogger.error('SDR Test Cleanup failed', { error: error.message });
+            // Don't throw - allow test to continue even if cleanup fails
         }
     }
 
