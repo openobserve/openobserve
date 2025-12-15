@@ -134,7 +134,7 @@ pub async fn data(
             &org_id,
             RUM_DATA_STREAM,
             IngestionRequest::RUM(body),
-            IngestUser::User(user_email.clone()),
+            IngestUser::from_user_email(user_email.clone()),
             Some(extend_json),
             false,
         )
@@ -184,7 +184,7 @@ pub async fn log(
             &org_id,
             RUM_LOG_STREAM,
             IngestionRequest::RUM(body),
-            IngestUser::User(user_email.clone()),
+            IngestUser::from_user_email(user_email.clone()),
             Some(extend_json),
             false,
         )
@@ -254,7 +254,7 @@ pub async fn sessionreplay(
             &org_id,
             RUM_SESSION_REPLAY_STREAM,
             IngestionRequest::RUM(body.into()),
-            IngestUser::User(user_email.clone()),
+            IngestUser::from_user_email(user_email.clone()),
             Some(extend_json),
             false,
         )

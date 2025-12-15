@@ -109,7 +109,7 @@ pub async fn ingest(
             org_id,
             &stream,
             in_req,
-            IngestUser::User(user_email.to_string()),
+            IngestUser::from_user_email(user_email.to_string()),
             None,
             false,
         )

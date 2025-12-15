@@ -55,7 +55,7 @@ pub async fn handle_request(
             org_id,
             &stream_name,
             IngestionRequest::JsonValues(IngestionValueType::Loki, records),
-            IngestUser::User(user_email.to_string()),
+            IngestUser::from_user_email(user_email.to_string()),
             None,
             false,
         )

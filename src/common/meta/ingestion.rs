@@ -78,7 +78,12 @@ impl IngestUser {
 
     /// Create from a user email string
     pub fn from_user_email(email: impl Into<String>) -> Self {
-        IngestUser::User(email.into())
+        // we use unknown@system.local if email is passed as empty string
+        let email = match email.into() {
+            email if email.is_empty() => "unknown@system.local".to_string(),
+            email => email,
+        };
+        IngestUser::User(email)
     }
 }
 

@@ -98,7 +98,7 @@ pub async fn bulk(
         **thread_id,
         &org_id,
         body,
-        IngestUser::User(user_email.clone()),
+        IngestUser::from_user_email(user_email.clone()),
     )
     .await
     {
@@ -188,7 +188,7 @@ pub async fn multi(
         &org_id,
         &stream_name,
         IngestionRequest::Multi(body),
-        IngestUser::User(user_email.clone()),
+        IngestUser::from_user_email(user_email.clone()),
         None,
         false,
     )
@@ -283,7 +283,7 @@ pub async fn json(
         &org_id,
         &stream_name,
         IngestionRequest::JSON(body),
-        IngestUser::User(user_email.clone()),
+        IngestUser::from_user_email(user_email.clone()),
         None,
         false,
     )
@@ -376,7 +376,7 @@ pub async fn handle_kinesis_request(
             &org_id,
             &stream_name,
             IngestionRequest::KinesisFH(post_data.into_inner()),
-            IngestUser::User(user_email.clone()),
+            IngestUser::from_user_email(user_email.clone()),
             None,
             false,
         )
@@ -440,7 +440,7 @@ pub async fn handle_gcp_request(
             &org_id,
             &stream_name,
             IngestionRequest::GCP(post_data.into_inner()),
-            IngestUser::User(user_email.clone()),
+            IngestUser::from_user_email(user_email.clone()),
             None,
             false,
         )
