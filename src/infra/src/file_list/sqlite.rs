@@ -756,7 +756,17 @@ SELECT date
     ) -> Result<StreamStats> {
         let (start_date, end_date) = date_range;
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
-        let sql = r#"
+        let time_filter = if !start_date.is_empty() && !end_date.is_empty() {
+            format!("AND date >= '{start_date}' AND date < '{end_date}'")
+        } else if start_date.is_empty() && !end_date.is_empty() {
+            format!("AND date < '{end_date}'")
+        } else if !start_date.is_empty() && end_date.is_empty() {
+            format!("AND date >= '{start_date}'")
+        } else {
+            "".to_string()
+        };
+        let sql = format!(
+            r#"
 SELECT 
     COUNT(*) AS file_num,
     MIN(min_ts) AS min_ts,
@@ -766,14 +776,12 @@ SELECT
     SUM(compressed_size) AS compressed_size,
     SUM(index_size) AS index_size
 FROM file_list
-WHERE stream = $1 AND date >= $2 AND date < $3
-GROUP BY stream;
-            "#;
+WHERE stream = $1 {time_filter};
+            "#
+        );
         let pool = CLIENT_RO.clone();
-        let ret: Option<super::StatsRecord> = sqlx::query_as(sql)
+        let ret: Option<super::StatsRecord> = sqlx::query_as(&sql)
             .bind(stream_key)
-            .bind(start_date)
-            .bind(end_date)
             .fetch_optional(&pool)
             .await?;
         Ok(ret.map(|r| r.into()).unwrap_or_default())
@@ -1367,29 +1375,38 @@ DO UPDATE SET
         date_range: (String, String),
     ) -> Result<StreamStats> {
         let (start_date, end_date) = date_range;
-        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
-        let pool = CLIENT_RO.clone();
-
-        let ret: Option<super::StatsRecord> = sqlx::query_as(
+        let stream_key = format!(
+            "{org_id}/{}/{stream_name}_{stream_type}",
+            StreamType::Filelist
+        );
+        let time_filter = if !start_date.is_empty() && !end_date.is_empty() {
+            format!("AND date >= '{start_date}' AND date < '{end_date}'")
+        } else if start_date.is_empty() && !end_date.is_empty() {
+            format!("AND date < '{end_date}'")
+        } else if !start_date.is_empty() && end_date.is_empty() {
+            format!("AND date >= '{start_date}'")
+        } else {
+            "".to_string()
+        };
+        let sql = format!(
             r#"
-SELECT
-    SUM(file_num) as file_num,
-    MIN(min_ts) as min_ts,
-    MAX(max_ts) as max_ts,
-    SUM(records) as records,
-    SUM(original_size) as original_size,
-    SUM(compressed_size) as compressed_size,
-    SUM(index_size) as index_size
+SELECT 
+    SUM(file_num) AS file_num,
+    MIN(min_ts) AS min_ts,
+    MAX(max_ts) AS max_ts,
+    SUM(records) AS records,
+    SUM(original_size) AS original_size,
+    SUM(compressed_size) AS compressed_size,
+    SUM(index_size) AS index_size
 FROM file_list_dump_stats
-WHERE stream = $1 AND date >= $2 AND date < $3
-GROUP BY stream;
-            "#,
-        )
-        .bind(&stream_key)
-        .bind(start_date)
-        .bind(end_date)
-        .fetch_optional(&pool)
-        .await?;
+WHERE stream = $1 {time_filter};
+            "#
+        );
+        let pool = CLIENT_RO.clone();
+        let ret: Option<super::StatsRecord> = sqlx::query_as(&sql)
+            .bind(stream_key)
+            .fetch_optional(&pool)
+            .await?;
         Ok(ret.map(|r| r.into()).unwrap_or_default())
     }
 }

@@ -19,7 +19,7 @@ use config::{
     get_config,
     meta::stream::{ALL_STREAM_TYPES, StreamType},
     metrics,
-    utils::time::{BASE_TIME, day_micros, get_ymdh_from_micros, now_micros},
+    utils::time::{day_micros, get_ymdh_from_micros, now_micros},
 };
 use infra::{dist_lock, file_list as infra_file_list};
 
@@ -94,14 +94,8 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
     };
 
     let yesterday_boundary = get_yesterday_boundary();
-    let new_data_range = (
-        yesterday_boundary.clone(),
-        get_ymdh_from_micros(latest_updated_at),
-    );
-    let old_data_range = (
-        get_ymdh_from_micros(BASE_TIME.timestamp_micros()),
-        yesterday_boundary.clone(),
-    );
+    let new_data_range = (yesterday_boundary.clone(), "".to_string());
+    let old_data_range = ("".to_string(), yesterday_boundary.clone());
 
     let iter = [(new_data_range, true), (old_data_range, false)];
 

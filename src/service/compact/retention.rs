@@ -434,10 +434,7 @@ pub async fn delete_by_date(
     }
 
     // update stream stats retention time ;
-    let stats_data_range = (
-        get_ymdh_from_micros(BASE_TIME.timestamp_micros()),
-        super::stats::get_yesterday_boundary(),
-    );
+    let stats_data_range = ("".to_string(), super::stats::get_yesterday_boundary());
     if let Err(e) = super::stats::update_stats_from_file_list_inner(
         org_id,
         stream_type,
