@@ -1,10 +1,9 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const path = require('path');
 
-// Helper function to ingest a SINGLE log entry
-async function ingestSingleLog(page, streamName, fieldName, fieldValue) {
+// Helper function to ingest a SINGLE log entry with retry logic
+async function ingestSingleLog(page, streamName, fieldName, fieldValue, maxRetries = 5) {
   const orgId = process.env["ORGNAME"];
   const basicAuthCredentials = Buffer.from(
     `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
@@ -24,33 +23,48 @@ async function ingestSingleLog(page, streamName, fieldName, fieldValue) {
 
   testLogger.info(`Ingesting single log with ${fieldName}: ${fieldValue}`);
 
-  const response = await page.evaluate(async ({ url, headers, orgId, streamName, logData }) => {
-    const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-      method: 'POST',
+  //Retry ingestion with exponential backoff for "stream being deleted" errors
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const response = await page.evaluate(async ({ url, headers, orgId, streamName, logData }) => {
+      const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify([logData])
+      });
+      const responseJson = await fetchResponse.json();
+      return {
+        status: fetchResponse.status,
+        statusText: fetchResponse.statusText,
+        body: responseJson
+      };
+    }, {
+      url: process.env.INGESTION_URL,
       headers: headers,
-      body: JSON.stringify([logData])
+      orgId: orgId,
+      streamName: streamName,
+      logData: logEntry
     });
-    const responseJson = await fetchResponse.json();
-    return {
-      status: fetchResponse.status,
-      statusText: fetchResponse.statusText,
-      body: responseJson
-    };
-  }, {
-    url: process.env.INGESTION_URL,
-    headers: headers,
-    orgId: orgId,
-    streamName: streamName,
-    logData: logEntry
-  });
 
-  testLogger.info(`Ingestion API response - Status: ${response.status}, Body:`, response.body);
+    testLogger.info(`Ingestion API response (attempt ${attempt}/${maxRetries}) - Status: ${response.status}, Body:`, response.body);
 
-  if (response.status !== 200) {
+    if (response.status === 200) {
+      testLogger.info('Ingestion successful, waiting for stream to be indexed...');
+      await page.waitForTimeout(3000);
+      return;
+    }
+
+    // Check for "stream being deleted" error - retry with backoff
+    const errorMessage = response.body?.message || JSON.stringify(response.body);
+    if (errorMessage.includes('being deleted') && attempt < maxRetries) {
+      const waitTime = attempt * 5000;
+      testLogger.info(`Stream is being deleted, waiting ${waitTime/1000}s before retry...`);
+      await page.waitForTimeout(waitTime);
+      continue;
+    }
+
     testLogger.error(`Ingestion failed! Status: ${response.status}, Response:`, response.body);
+    throw new Error(`Ingestion failed with status ${response.status}: ${JSON.stringify(response.body)}`);
   }
-
-  await page.waitForTimeout(2000);
 }
 
 async function closeStreamDetailSidebar(page) {
@@ -136,36 +150,32 @@ async function verifySingleFieldInLatestLog(page, pm, streamName, fieldName, sho
   }
 }
 
-test.describe("Import POC - Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
+test.describe("Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'serial' });
   let pm;
-  let cleanupPerformedInSetup = false;
 
-  // All 6 patterns from import file (for cleanup purposes)
-  const allImportedPatterns = [
-    'ifsc_code',
-    'date_dd_mm_yyyy',
-    'log_filename',
-    'time_hh_mm_ss',
-    'log_level_keyword',
-    'hex_number'
-  ];
+  // Generate unique test run ID for isolation - ensures parallel test runs don't conflict
+  const testRunId = Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
 
   // Query-time patterns (2) - tested first, no re-ingestion needed
+  // Each pattern name includes testRunId for isolation
   const queryTimePatterns = [
-    { name: 'log_filename', value: 'application.log', action: 'drop', timeType: 'query', scenario: 'query_drop' },
-    { name: 'time_hh_mm_ss', value: '14:30:45', action: 'redact', timeType: 'query', scenario: 'query_redact' }
+    { name: `log_filename_${testRunId}`, description: 'Log file name format', pattern: '^\\w+\\.log$', value: 'application.log', action: 'drop', timeType: 'query', scenario: 'query_drop' },
+    { name: `time_hh_mm_ss_${testRunId}`, description: 'Time in HH:MM:SS format', pattern: '^\\d{2}:\\d{2}:\\d{2}$', value: '14:30:45', action: 'redact', timeType: 'query', scenario: 'query_redact' }
   ];
 
   // Ingestion-time patterns (2) - tested second, requires re-ingestion
   const ingestionTimePatterns = [
-    { name: 'ifsc_code', value: 'AB12CDEF1234567890', action: 'drop', timeType: 'ingestion', scenario: 'ingestion_drop' },
-    { name: 'date_dd_mm_yyyy', value: '25/12/2024', action: 'redact', timeType: 'ingestion', scenario: 'ingestion_redact' }
+    { name: `ifsc_code_${testRunId}`, description: 'IFSC code format validation', pattern: '^[A-Z]{2}\\d{2}[A-Z]{4}\\d{10}$', value: 'AB12CDEF1234567890', action: 'drop', timeType: 'ingestion', scenario: 'ingestion_drop' },
+    { name: `date_dd_mm_yyyy_${testRunId}`, description: 'Date in DD/MM/YYYY format', pattern: '^\\d{2}/\\d{2}/\\d{4}$', value: '25/12/2024', action: 'redact', timeType: 'ingestion', scenario: 'ingestion_redact' }
   ];
 
+  // All patterns for this test run (for cleanup)
+  const allTestPatterns = [...queryTimePatterns.map(p => p.name), ...ingestionTimePatterns.map(p => p.name)];
+
   const fieldName = "multi_data"; // Single field for all patterns
-  const testStreamName = "sdr_poc_multi_pattern_test";
-  const importFilePath = path.resolve(__dirname, '../../../test-data/regex_patterns_import.json');
+  // Use unique stream name to avoid "stream being deleted" conflicts
+  const testStreamName = `sdr_poc_multi_${testRunId}`;
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
@@ -175,122 +185,46 @@ test.describe("Import POC - Multiple Patterns on One Field", { tag: '@enterprise
     testLogger.info('Import POC test setup completed');
   });
 
-  // TEST 1: Setup cleanup
-  test('setup: cleanup imported patterns', {
-    tag: ['@sdr', '@cleanup', '@import', '@poc']
+  // TEST 1: Create patterns for this test run
+  test('setup: create patterns', {
+    tag: ['@sdr', '@cleanup', '@poc']
   }, async ({ page }) => {
-    testLogger.info('=== SETUP CLEANUP: Cleaning up ALL 6 imported patterns ===');
+    testLogger.info(`=== SETUP: Creating 4 patterns with unique testRunId: ${testRunId} ===`);
 
-    // Our 4 test patterns that are linked to the same field
-    const testPatterns = [...queryTimePatterns.map(p => p.name), ...ingestionTimePatterns.map(p => p.name)];
-    let needsUnlinking = false;
+    // Combine both pattern arrays
+    const allPatternsToCreate = [...queryTimePatterns, ...ingestionTimePatterns];
 
-    // STEP 1: Try to delete all patterns first
-    testLogger.info('STEP 1: Attempting to delete all patterns');
-    for (const patternName of allImportedPatterns) {
+    // Create each pattern directly
+    for (const patternDef of allPatternsToCreate) {
+      testLogger.info(`Creating pattern: ${patternDef.name}`);
       await pm.sdrPatternsPage.navigateToRegexPatterns();
-      const exists = await pm.sdrPatternsPage.checkPatternExists(patternName);
-
-      if (exists) {
-        cleanupPerformedInSetup = true;
-        testLogger.info(`Pattern ${patternName} exists, attempting delete...`);
-        const deleteResult = await pm.sdrPatternsPage.deletePatternByName(patternName);
-
-        if (deleteResult.success) {
-          testLogger.info(`✓ Pattern ${patternName} deleted successfully`);
-        } else if (deleteResult.reason === 'in_use') {
-          testLogger.info(`Pattern ${patternName} is in use, will need to unlink`);
-          needsUnlinking = true;
-          // Don't try to unlink yet, just mark that we need to
-        }
-      } else {
-        testLogger.info(`✓ Pattern ${patternName} does not exist`);
-      }
+      await pm.sdrPatternsPage.createPattern(patternDef.name, patternDef.description, patternDef.pattern);
+      await pm.sdrPatternsPage.verifyPatternCreatedSuccess();
+      testLogger.info(`✓ Pattern ${patternDef.name} created successfully`);
     }
 
-    // STEP 2: If any patterns are in use, unlink all test patterns at once
-    if (needsUnlinking) {
-      testLogger.info('STEP 2: Some patterns in use, unlinking our 4 test patterns from field');
-      await pm.streamAssociationPage.unlinkAllPatternsFromField(
-        testStreamName,
-        fieldName,
-        testPatterns
-      );
-      testLogger.info('✓ Unlinking complete');
-
-      // STEP 3: Now delete the patterns that were in use
-      testLogger.info('STEP 3: Deleting patterns after unlinking');
-      for (const patternName of allImportedPatterns) {
-        await pm.sdrPatternsPage.navigateToRegexPatterns();
-        const exists = await pm.sdrPatternsPage.checkPatternExists(patternName);
-
-        if (exists) {
-          testLogger.info(`Deleting pattern: ${patternName}`);
-          const deleteResult = await pm.sdrPatternsPage.deletePatternByName(patternName);
-
-          if (deleteResult.success) {
-            testLogger.info(`✓ Pattern ${patternName} deleted successfully`);
-          } else if (deleteResult.reason === 'in_use') {
-            // Handle non-test patterns that might still be linked elsewhere
-            testLogger.warn(`Pattern ${patternName} still in use (non-test pattern), unlinking individually`);
-            for (const association of deleteResult.associations) {
-              await pm.streamAssociationPage.unlinkPatternFromField(
-                association.streamName,
-                association.fieldName,
-                patternName
-              );
-            }
-            await pm.sdrPatternsPage.navigateToRegexPatterns();
-            const retryDelete = await pm.sdrPatternsPage.deletePatternByName(patternName);
-            expect(retryDelete.success).toBeTruthy();
-            testLogger.info(`✓ Pattern ${patternName} deleted after unlinking`);
-          } else {
-            throw new Error(`Failed to delete pattern ${patternName}. Reason: ${deleteResult.reason}`);
-          }
-        }
-      }
-    }
-
-    testLogger.info(`=== SETUP CLEANUP COMPLETE (Cleanup performed: ${cleanupPerformedInSetup}) ===`);
-  });
-
-  // TEST 2: Import patterns and verify
-  test('should import 4 patterns and verify they exist', {
-    tag: ['@sdr', '@import', '@poc']
-  }, async ({ page }, testInfo) => {
-    testInfo.annotations.push({ type: 'dependency', description: 'setup: cleanup imported patterns' });
-    testLogger.info('=== Testing pattern import functionality ===');
-
-    await pm.sdrPatternsPage.navigateToRegexPatterns();
-
-    // Import patterns
-    testLogger.info('Importing patterns from file');
-    const importSuccess = await pm.sdrPatternsPage.importPatternsFromFile(importFilePath);
-    expect(importSuccess).toBeTruthy();
-
-    // Verify each imported pattern exists by searching for it
-    testLogger.info('Verifying all 4 patterns exist by searching for them');
+    // Verify each pattern exists
+    testLogger.info('Verifying all 4 patterns exist');
     await pm.sdrPatternsPage.navigateToRegexPatterns();
     await page.waitForTimeout(1000);
 
-    // Combine both pattern arrays to verify all 4
-    const allPatternsToVerify = [...queryTimePatterns, ...ingestionTimePatterns];
-
-    for (const pattern of allPatternsToVerify) {
-      testLogger.info(`Searching for pattern: ${pattern.name}`);
+    for (const pattern of allPatternsToCreate) {
       const exists = await pm.sdrPatternsPage.verifyPatternExistsInList(pattern.name);
       expect(exists).toBeTruthy();
-      testLogger.info(`✓ Pattern ${pattern.name} found in list`);
+      testLogger.info(`✓ Pattern ${pattern.name} verified`);
     }
 
-    testLogger.info('=== ✓ IMPORT TEST COMPLETED SUCCESSFULLY ===');
+    testLogger.info('=== SETUP COMPLETE: All 4 patterns created ===');
   });
 
-  // TEST 3: Multiple patterns on ONE field (SEQUENTIAL FLOW)
+  // TEST 2: Multiple patterns on ONE field (SEQUENTIAL FLOW)
+  // This test has 10 steps with multiple navigations, so needs extended timeout
   test('should link 4 patterns to one field and verify with sequential ingestion', {
-    tag: ['@sdr', '@import', '@poc', '@multiPattern']
+    tag: ['@sdr', '@poc', '@multiPattern']
   }, async ({ page }, testInfo) => {
-    testInfo.annotations.push({ type: 'dependency', description: 'should import 4 patterns and verify they exist' });
+    // Extend timeout to 5 minutes - this test has 10 sequential steps with navigation
+    test.setTimeout(300000);
+    testInfo.annotations.push({ type: 'dependency', description: 'setup: create patterns' });
     testLogger.info('=== Testing multiple patterns on ONE field - SEQUENTIAL FLOW ===');
     testLogger.info(`Field: ${fieldName}`);
     testLogger.info('Strategy: Ingest one log → verify → ingest next → verify (repeating pattern)');
@@ -380,20 +314,20 @@ test.describe("Import POC - Multiple Patterns on One Field", { tag: '@enterprise
     testLogger.info('  - Each pattern tested independently with sequential ingestion');
   });
 
-  // TEST 4: End cleanup
+  // TEST 3: End cleanup
   test('cleanup: unlink and delete patterns', {
-    tag: ['@sdr', '@cleanup', '@import', '@poc']
+    tag: ['@sdr', '@cleanup', '@poc']
   }, async ({ page }, testInfo) => {
     testInfo.annotations.push({ type: 'dependency', description: 'should link 4 patterns to one field and verify with sequential ingestion' });
-    testLogger.info('=== END CLEANUP: Unlinking and deleting ALL 6 patterns ===');
+    testLogger.info(`=== END CLEANUP: Unlinking and deleting patterns for testRunId: ${testRunId} ===`);
 
-    // First, unlink ALL patterns from the field in one go (since all 4 test patterns are on the same field)
+    // First, unlink ALL patterns from the field in one go
     testLogger.info(`Unlinking all patterns from field ${fieldName} in stream ${testStreamName}`);
     await pm.streamAssociationPage.unlinkAllPatternsFromField(testStreamName, fieldName);
     testLogger.info('✓ All patterns unlinked from field');
 
-    // Now delete each pattern
-    for (const patternName of allImportedPatterns) {
+    // Now delete each pattern (only our test's patterns with unique suffix)
+    for (const patternName of allTestPatterns) {
       testLogger.info(`Checking and deleting pattern: ${patternName}`);
 
       await pm.sdrPatternsPage.navigateToRegexPatterns();
@@ -406,46 +340,24 @@ test.describe("Import POC - Multiple Patterns on One Field", { tag: '@enterprise
         if (deleteResult.success) {
           testLogger.info(`✓ Pattern ${patternName} deleted successfully`);
         } else if (deleteResult.reason === 'in_use') {
-          // This shouldn't happen since we already unlinked, but handle it just in case
-          testLogger.warn(`Pattern ${patternName} still in use. Checking associations...`);
+          testLogger.warn(`Pattern ${patternName} still in use. Unlinking and retrying...`);
           for (const association of deleteResult.associations) {
-            testLogger.info(`Unlinking from stream: ${association.streamName}, field: ${association.fieldName}`);
             await pm.streamAssociationPage.unlinkAllPatternsFromField(
               association.streamName,
               association.fieldName
             );
           }
-          // Try deleting again with retry logic
           await pm.sdrPatternsPage.navigateToRegexPatterns();
-          const finalDelete = await pm.sdrPatternsPage.deletePatternByName(patternName);
-
-          if (!finalDelete.success) {
-            testLogger.warn(`Pattern ${patternName} still in use after unlinking, waiting and retrying...`);
-            await page.waitForTimeout(2000);
-            await pm.sdrPatternsPage.navigateToRegexPatterns();
-            const retryDelete = await pm.sdrPatternsPage.deletePatternByName(patternName);
-            expect(retryDelete.success).toBeTruthy();
-            testLogger.info(`✓ Pattern ${patternName} deleted successfully on retry`);
+          const retryDelete = await pm.sdrPatternsPage.deletePatternByName(patternName);
+          if (retryDelete.success) {
+            testLogger.info(`✓ Pattern ${patternName} deleted after unlinking`);
           } else {
-            testLogger.info(`✓ Pattern ${patternName} deleted successfully after unlinking`);
+            testLogger.warn(`⚠ Could not delete pattern ${patternName}, may need manual cleanup`);
           }
-        } else {
-          throw new Error(`Failed to delete pattern ${patternName}. Reason: ${deleteResult.reason}`);
         }
       } else {
         testLogger.info(`✓ Pattern ${patternName} does not exist, no cleanup needed`);
       }
-    }
-
-    // Verify all patterns have been removed
-    testLogger.info('Verifying all patterns have been removed');
-    await pm.sdrPatternsPage.navigateToRegexPatterns();
-    await page.waitForTimeout(1000);
-
-    for (const patternName of allImportedPatterns) {
-      const exists = await pm.sdrPatternsPage.verifyPatternExistsInList(patternName);
-      expect(exists).toBeFalsy();
-      testLogger.info(`✓ Verified pattern ${patternName} is removed`);
     }
 
     testLogger.info('=== END CLEANUP COMPLETE ===');

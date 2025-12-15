@@ -75,7 +75,8 @@ test.describe("Region testcases", () => {
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-    const allsearch = page.waitForResponse("**/api/default/_search**");
+    const orgName = process.env.ORGNAME || 'default';
+    const allsearch = page.waitForResponse(`**/api/${orgName}/_search**`);
     await selectStream(page, logData.Stream);
     await applyQueryButton(page);
     const searchBarRegionBtn = await page.locator('[data-test="logs-search-bar-region-btn"]');
