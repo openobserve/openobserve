@@ -381,7 +381,7 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
         }
         // check if we are allowed to merge or just skip
         if db::compact::retention::is_deleting_stream(&org_id, stream_type, &stream_name, None) {
-            need_done_ids.push(job.id); // the data will be deleted by retention, just skip 
+            need_done_ids.push(job.id); // the data will be deleted by retention, just skip
             continue;
         }
         if partition_time_level == PartitionTimeLevel::Daily {

@@ -105,7 +105,7 @@ pub async fn run(tx: mpsc::Sender<DumpJob>) -> Result<(), anyhow::Error> {
         }
         // check if we are allowed to merge or just skip
         if db::compact::retention::is_deleting_stream(&org_id, stream_type, &stream_name, None) {
-            need_done_ids.push(*job_id); // the data will be deleted by retention, just skip 
+            need_done_ids.push(*job_id); // the data will be deleted by retention, just skip
             continue;
         }
         if partition_time_level == PartitionTimeLevel::Daily {
@@ -268,7 +268,10 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
     let r = STREAM_SCHEMAS_LATEST.read().await;
     let schema = r.get(&dump_stream_key).cloned();
     drop(r);
-    if schema.is_none() || schema.unwrap().fields_map().len() != FILE_LIST_SCHEMA.fields().len() {
+    if schema
+        .as_ref()
+        .is_none_or(|s| s.fields_map().len() != FILE_LIST_SCHEMA.fields().len())
+    {
         if let Err(e) = super::db::schema::merge(
             &job.org_id,
             &dump_stream_name,
