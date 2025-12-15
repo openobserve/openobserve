@@ -731,6 +731,22 @@ SELECT date
         Ok(())
     }
 
+    async fn get_updated_streams(&self, time_range: (i64, i64)) -> Result<Vec<String>> {
+        let (time_start, time_end) = time_range;
+        let pool = CLIENT_RO.clone();
+        let ret = sqlx::query(
+            r#"SELECT DISTINCT stream FROM file_list WHERE updated_at >= $1 AND updated_at < $2;"#,
+        )
+        .bind(time_start)
+        .bind(time_end)
+        .fetch_all(&pool)
+        .await?
+        .into_iter()
+        .map(|r| r.try_get::<String, &str>("stream").unwrap_or_default())
+        .collect();
+        Ok(ret)
+    }
+
     async fn stats_by_date_range(
         &self,
         org_id: &str,
@@ -772,8 +788,7 @@ WHERE stream = $1 AND date >= $2 AND date < $3;
             && let Some(stream_name) = stream_name
         {
             format!(
-                "SELECT * FROM stream_stats WHERE stream = '{org_id}/{}/{}';",
-                stream_type, stream_name
+                "SELECT * FROM stream_stats WHERE stream = '{org_id}/{stream_type}/{stream_name}';",
             )
         } else {
             format!("SELECT * FROM stream_stats WHERE org = '{org_id}';")

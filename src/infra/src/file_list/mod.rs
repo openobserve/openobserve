@@ -131,6 +131,7 @@ pub trait FileList: Sync + Send + 'static {
     async fn clean_by_min_update_at(&self, val: i64) -> Result<()>;
 
     // stream stats table
+    async fn get_updated_streams(&self, time_range: (i64, i64)) -> Result<Vec<String>>;
     async fn stats_by_date_range(
         &self,
         org_id: &str,
@@ -417,6 +418,11 @@ pub async fn get_min_update_at() -> Result<i64> {
 #[inline]
 pub async fn get_max_update_at() -> Result<i64> {
     CLIENT.get_max_update_at().await
+}
+
+#[inline]
+pub async fn get_updated_streams(time_range: (i64, i64)) -> Result<Vec<String>> {
+    CLIENT.get_updated_streams(time_range).await
 }
 
 #[inline]

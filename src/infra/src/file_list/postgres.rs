@@ -905,6 +905,30 @@ SELECT date
         Ok(()) // do nothing
     }
 
+    async fn get_updated_streams(&self, time_range: (i64, i64)) -> Result<Vec<String>> {
+        let (time_start, time_end) = time_range;
+        let pool = CLIENT_RO.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["get_updated_streams", "file_list"])
+            .inc();
+        let start = std::time::Instant::now();
+        let ret = sqlx::query(
+            r#"SELECT DISTINCT stream FROM file_list WHERE updated_at >= $1 AND updated_at < $2;"#,
+        )
+        .bind(time_start)
+        .bind(time_end)
+        .fetch_all(&pool)
+        .await?
+        .into_iter()
+        .map(|r| r.try_get::<String, &str>("stream").unwrap_or_default())
+        .collect();
+        let time = start.elapsed().as_secs_f64();
+        DB_QUERY_TIME
+            .with_label_values(&["get_updated_streams", "file_list"])
+            .observe(time);
+        Ok(ret)
+    }
+
     async fn stats_by_date_range(
         &self,
         org_id: &str,
@@ -928,7 +952,7 @@ WHERE stream = $1 AND date >= $2 AND date < $3;
             "#;
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["stats", "file_list"])
+            .with_label_values(&["stats_by_date_range", "file_list"])
             .inc();
         let start = std::time::Instant::now();
         let ret: Option<super::StatsRecord> = sqlx::query_as(sql)
@@ -939,7 +963,7 @@ WHERE stream = $1 AND date >= $2 AND date < $3;
             .await?;
         let time = start.elapsed().as_secs_f64();
         DB_QUERY_TIME
-            .with_label_values(&["stats", "file_list"])
+            .with_label_values(&["stats_by_date_range", "file_list"])
             .observe(time);
         Ok(ret.map(|r| r.into()).unwrap_or_default())
     }
@@ -954,16 +978,16 @@ WHERE stream = $1 AND date >= $2 AND date < $3;
             && let Some(stream_name) = stream_name
         {
             format!(
-                "SELECT * FROM stream_stats WHERE stream = '{}/{}/{}';",
-                org_id, stream_type, stream_name
+                "SELECT * FROM stream_stats WHERE stream = '{org_id}/{stream_type}/{stream_name}';",
             )
         } else {
             format!("SELECT * FROM stream_stats WHERE org = '{org_id}';")
         };
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["select", "stream_stats"])
+            .with_label_values(&["get_stream_stats", "stream_stats"])
             .inc();
+        let start = std::time::Instant::now();
         let ret = sqlx::query_as::<_, super::StatsRecord>(&sql)
             .fetch_all(&pool)
             .await?;
@@ -976,6 +1000,11 @@ WHERE stream = $1 AND date >= $2 AND date < $3;
                 }
             }
         }
+        let time = start.elapsed().as_secs_f64();
+        DB_QUERY_TIME
+            .with_label_values(&["get_stream_stats", "stream_stats"])
+            .observe(time);
+
         Ok(stats.into_iter().collect())
     }
 

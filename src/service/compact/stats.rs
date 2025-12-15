@@ -13,8 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use chrono::{Timelike, Utc};
 use config::{
     cluster::LOCAL_NODE,
+    get_config,
     meta::stream::{ALL_STREAM_TYPES, StreamType},
     metrics,
     utils::time::{BASE_TIME, day_micros, get_ymdh_from_micros, now_micros},
@@ -24,6 +26,29 @@ use infra::{dist_lock, file_list as infra_file_list};
 use crate::{common::infra::cluster::get_node_by_uuid, service::db};
 
 pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
+    let cfg = get_config();
+    // check if current hour is allowed for update stats
+    // this config for data retention, but we also use it for update stats
+    if !cfg.compact.retention_allowed_hours.is_empty() {
+        let current_hour = Utc::now().hour();
+        let allowed_hours: Vec<u32> = cfg
+            .compact
+            .retention_allowed_hours
+            .split(',')
+            .filter_map(|s| s.trim().parse::<u32>().ok())
+            .filter(|&h| h < 24)
+            .collect();
+
+        if !allowed_hours.is_empty() && !allowed_hours.contains(&current_hour) {
+            log::info!(
+                "[COMPACTOR] update stats skipped: current hour {} is not in allowed hours {:?}",
+                current_hour,
+                allowed_hours
+            );
+            return Ok(());
+        }
+    }
+
     let latest_updated_at = infra_file_list::get_max_update_at()
         .await
         .map_err(|e| anyhow::anyhow!("get latest update_at error: {:?}", e))?;
@@ -48,9 +73,28 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
         }
     }
 
+    // no more data to update
+    if last_updated_at >= latest_updated_at {
+        return Ok(());
+    }
+
+    // check if we need to update old stats by comparing the last_updated and now is the same day
+    let no_need_update_old_stats = last_updated_at > 0
+        && get_ymdh_from_micros(last_updated_at) == get_ymdh_from_micros(now_micros());
+
     log::info!(
-        "[STATS] update stats from file list, last updated: {last_updated_at}, latest updated: {latest_updated_at}"
+        "[STATS] update stats from file list, last updated: {last_updated_at}, latest updated: {latest_updated_at}, no need update old stats: {no_need_update_old_stats}"
     );
+
+    // we need to init now before the loop, also need to update offset use this value
+    let now_ts = now_micros();
+
+    // get updated streams if we don't need to update old stats
+    let updated_streams = if no_need_update_old_stats {
+        infra_file_list::get_updated_streams((last_updated_at, latest_updated_at)).await?
+    } else {
+        vec![]
+    };
 
     let orgs = db::schema::list_organizations_from_cache().await;
     let mut total_streams = 0;
@@ -62,13 +106,17 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
             let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
             total_streams += streams.len();
             for stream_name in streams {
+                let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+                if !updated_streams.is_empty() && !updated_streams.contains(&stream_key) {
+                    continue;
+                }
                 let start = std::time::Instant::now();
                 let result = update_stats_from_file_list_inner(
                     &org_id,
                     stream_type,
                     &stream_name,
                     latest_updated_at,
-                    last_updated_at,
+                    no_need_update_old_stats,
                 )
                 .await;
 
@@ -112,8 +160,7 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
         .set(now_micros());
 
     // update offset to current time
-    let offset = now_micros();
-    db::compact::stats::set_offset(offset, Some(&LOCAL_NODE.uuid.clone()))
+    db::compact::stats::set_offset(now_ts, Some(&LOCAL_NODE.uuid.clone()))
         .await
         .map_err(|e| anyhow::anyhow!("set offset error: {e}"))?;
 
@@ -125,13 +172,9 @@ async fn update_stats_from_file_list_inner(
     stream_type: StreamType,
     stream_name: &str,
     latest_updated_at: i64,
-    last_updated_at: i64,
+    no_need_update_old_stats: bool,
 ) -> Result<(), anyhow::Error> {
     let yesterday_boundary = get_yesterday_boundary();
-
-    // check if we need to update old stats by comparing the last_updated and now is the same day
-    let no_need_update_old_stats = last_updated_at > 0
-        && get_ymdh_from_micros(last_updated_at) == get_ymdh_from_micros(now_micros());
 
     // update latest stats
     let new_data_range = (
