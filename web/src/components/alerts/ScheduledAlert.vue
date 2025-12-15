@@ -115,8 +115,8 @@ class="tw-flex tw-items-center tw-gap-2 tw-bg-gray-200 tw-rounded-full tw-px-1 t
         <AlertsContainer
           name="Multi Window"
           v-model:is-expanded="expandState.multiWindowSelection"
-          label="Multi Window"
-          subLabel="Set relative alerting system based on SQL query"
+          :label="t('alerts.multiWindow')"
+          :subLabel="t('alerts.multiWindowSubLabel')"
         class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
         :iconClass="'tw-mt-[2px]'"
           :image="multiWindowImage"
@@ -351,7 +351,7 @@ size="20px" />
             class="flex justify-start items-center tw-font-semibold tw-pb-1"
           >
             <div data-test="scheduled-alert-aggregation-title" style="width: 172px">
-              Aggregation
+              {{ t("common.aggregation") }}
             </div>
             <q-toggle
               data-test="scheduled-alert-aggregation-toggle"
