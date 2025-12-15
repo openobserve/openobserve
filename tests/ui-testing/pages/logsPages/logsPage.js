@@ -264,22 +264,70 @@ export class LogsPage {
         await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
     }
 
-    async selectIndexAndStreamJoinUnion() {
-        // Select both e2e_join_a and e2e_join_b streams for UNION queries
-        // These streams have identical schemas to support UNION operations
+    /**
+     * Select two streams for UNION query testing
+     * @param {string} streamA - First stream name (required)
+     * @param {string} streamB - Second stream name (required)
+     */
+    async selectIndexAndStreamJoinUnion(streamA, streamB) {
+        // Validate stream names are provided
+        if (!streamA || !streamB) {
+            throw new Error('selectIndexAndStreamJoinUnion: Both streamA and streamB are required parameters');
+        }
+
+        testLogger.info(`selectIndexAndStreamJoinUnion: Starting selection of ${streamA} and ${streamB} streams`);
+
+        // Wait for both streams to be available via API before attempting UI selection
+        testLogger.debug(`selectIndexAndStreamJoinUnion: Waiting for streams to be available via API...`);
+
+        const streamAAvailable = await this.waitForStreamAvailable(streamA, 30000, 3000);
+        if (!streamAAvailable) {
+            testLogger.error(`selectIndexAndStreamJoinUnion: Stream '${streamA}' NOT FOUND via API after 30s`);
+            throw new Error(`Stream '${streamA}' not available. Ingestion may have failed.`);
+        }
+        testLogger.info(`selectIndexAndStreamJoinUnion: Stream '${streamA}' confirmed available`);
+
+        const streamBAvailable = await this.waitForStreamAvailable(streamB, 30000, 3000);
+        if (!streamBAvailable) {
+            testLogger.error(`selectIndexAndStreamJoinUnion: Stream '${streamB}' NOT FOUND via API after 30s`);
+            throw new Error(`Stream '${streamB}' not available. Ingestion may have failed.`);
+        }
+        testLogger.info(`selectIndexAndStreamJoinUnion: Stream '${streamB}' confirmed available`);
+
+        // Navigate to logs page to ensure fresh stream list
+        const orgId = process.env.ORGNAME;
+        const logsUrl = `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId}`;
+        testLogger.debug(`selectIndexAndStreamJoinUnion: Navigating to logs page: ${logsUrl}`);
+        await this.page.goto(logsUrl, { waitUntil: 'networkidle', timeout: 30000 }).catch((e) => {
+            testLogger.warn(`selectIndexAndStreamJoinUnion: Navigation timeout, continuing... ${e.message}`);
+        });
+        await this.page.waitForTimeout(2000);
+
+        // Open dropdown
         await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
         await this.page.waitForTimeout(3000);
 
-        // Select e2e_join_a stream
-        await this.page.locator('[data-test="log-search-index-list-stream-toggle-e2e_join_a"] div').first().click();
+        // Select first stream with explicit wait
+        const streamASelector = `[data-test="log-search-index-list-stream-toggle-${streamA}"] div`;
+        testLogger.debug(`selectIndexAndStreamJoinUnion: Looking for stream toggle: ${streamASelector}`);
+        const streamAToggle = this.page.locator(streamASelector).first();
+        await streamAToggle.waitFor({ state: 'visible', timeout: 15000 });
+        await streamAToggle.click();
+        testLogger.debug(`selectIndexAndStreamJoinUnion: Selected stream ${streamA}`);
         await this.page.waitForTimeout(1000);
 
-        // Select e2e_join_b stream (dropdown stays open after first selection)
-        await this.page.locator('[data-test="log-search-index-list-stream-toggle-e2e_join_b"] div').first().click();
+        // Select second stream (dropdown stays open after first selection)
+        const streamBSelector = `[data-test="log-search-index-list-stream-toggle-${streamB}"] div`;
+        testLogger.debug(`selectIndexAndStreamJoinUnion: Looking for stream toggle: ${streamBSelector}`);
+        const streamBToggle = this.page.locator(streamBSelector).first();
+        await streamBToggle.waitFor({ state: 'visible', timeout: 15000 });
+        await streamBToggle.click();
+        testLogger.debug(`selectIndexAndStreamJoinUnion: Selected stream ${streamB}`);
         await this.page.waitForTimeout(1000);
 
         // Close dropdown
         await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+        testLogger.info(`selectIndexAndStreamJoinUnion: Successfully selected both streams`);
     }
 
     async selectIndexStreamDefault() {

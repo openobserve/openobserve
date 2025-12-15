@@ -54,11 +54,17 @@ test.describe("Join for logs", () => {
   test("Run query after selecting two streams, selecting field and SQL Mode On", async ({ page }) => {
     testLogger.info('Testing two streams with field selection and SQL Mode');
 
+    // Generate unique testRunId to avoid "stream being deleted" conflicts (SDR pattern)
+    const testRunId = Date.now().toString(36);
+    testLogger.info(`Using testRunId: ${testRunId}`);
+
     // Use dedicated UNION test ingestion and streams to ensure schema compatibility
-    await pm.ingestionPage.ingestionJoinUnion();
+    // Returns unique stream names that we pass to the selection method
+    const { streamA, streamB } = await pm.ingestionPage.ingestionJoinUnion(testRunId);
+    testLogger.info(`Created streams: ${streamA}, ${streamB}`);
 
     await pm.logsPage.navigateToLogs();
-    await pm.logsPage.selectIndexAndStreamJoinUnion();
+    await pm.logsPage.selectIndexAndStreamJoinUnion(streamA, streamB);
     await pm.logsPage.kubernetesContainerName();
     await pm.logsPage.enableSQLMode();
     await pm.logsPage.selectRunQuery();
