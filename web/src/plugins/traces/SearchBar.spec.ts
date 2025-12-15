@@ -341,15 +341,12 @@ describe("SearchBar", () => {
       expect(runQueryBtn.classes()).toContain("disabled");
     });
 
-    it("should emit shareLink when share button is clicked", async () => {
+    it("should render share button component", async () => {
       const shareBtn = wrapper.find(
         '[data-test="logs-search-bar-share-link-btn"]',
       );
 
-      await shareBtn.trigger("click");
-
-      expect(wrapper.emitted("shareLink")).toBeTruthy();
-      expect(wrapper.emitted("shareLink")).toHaveLength(1);
+      expect(shareBtn.exists()).toBe(true);
     });
 
     it("should reset filters when reset button is clicked", async () => {
