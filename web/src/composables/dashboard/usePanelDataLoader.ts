@@ -775,6 +775,7 @@ export const usePanelDataLoader = (
   const loadData = async () => {
     // CRITICAL: Log EXACTLY what variablesData looks like
 
+
     // // CRITICAL: Final safety check at loadData entry point
     // if (variablesData?.value?.isVariablesLoading === true) {
     //   console.log('[usePanelDataLoader] ' + panelSchema?.value?.title + ': BLOCKED - variables still loading');
@@ -1211,6 +1212,7 @@ export const usePanelDataLoader = (
 
                 // LOG: Check if variables were properly replaced
 
+
                 // Validate that timestamp column is not used as an alias for other fields
                 if (!checkTimestampAlias(query)) {
                   state.errorDetail = {
@@ -1343,6 +1345,7 @@ export const usePanelDataLoader = (
                 };
 
                 // LOG: Final check before API call
+
 
                 fetchQueryDataWithHttpStream(payload, {
                   data: (payload: any, response: any) => {
@@ -1602,6 +1605,7 @@ export const usePanelDataLoader = (
               state.resultMetaData[panelQueryIndex] = [];
 
               // LOG: Final check before streaming API call
+
 
               // Use HTTP2/streaming for all dashboard queries
               await getDataThroughStreaming(
