@@ -1765,11 +1765,15 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
                 format!("INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at)").as_str()
                 );
                 query_builder.push_values(files, |mut b, item| {
-                    let (stream_key, date_key, file_name) =
-                        parse_file_key_columns(&item.key).expect("parse file key failed");
+                    let Ok((stream_key, date_key, file_name)) = parse_file_key_columns(&item.key)
+                    else {
+                        log::error!("[POSTGRES] parse file key failed for file: {}", item.key);
+                        return;
+                    };
                     let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
                     if item.meta.min_ts == 0 || item.meta.max_ts == 0 {
                         log::warn!("[POSTGRES] min_ts or max_ts is 0 for file: {}", item.key);
+                        return;
                     }
                     b.push_bind(&item.account)
                         .push_bind(org_id)
@@ -2941,5 +2945,312 @@ mod tests {
                     || msg.contains("already exists")
             );
         }
+    }
+
+    // Tests for new functionality in fix/file_list_dump branch
+
+    #[tokio::test]
+    #[ignore = "Requires test PostgreSQL database setup"]
+    async fn test_remove_hard_delete_postgres() {
+        // Test that remove() performs hard delete (DELETE) instead of soft delete
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let postgres_list = PostgresFileList::new();
+        let meta = create_test_file_meta();
+        let file_key = "test_org/logs/test_stream/2021/01/01/00/pg_hard_delete_test.parquet";
+
+        // Add a file first
+        let _ = postgres_list.add("test_account", file_key, &meta).await;
+
+        // Verify file exists
+        let exists_before = postgres_list.contains(file_key).await;
+        assert!(exists_before.is_ok());
+
+        // Remove the file (should be hard delete now)
+        let result = postgres_list.remove(file_key).await;
+        assert!(result.is_ok());
+
+        // Verify file is completely removed (not just marked as deleted)
+        let exists_after = postgres_list.contains(file_key).await;
+        assert!(exists_after.is_ok());
+        assert!(!exists_after.unwrap());
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test PostgreSQL database setup"]
+    async fn test_batch_add_with_timestamps_postgres() {
+        // Test that batch_add now includes created_at and updated_at timestamps
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let postgres_list = PostgresFileList::new();
+        let files = vec![
+            create_test_file_key(
+                "account1",
+                "org1/logs/stream1/2021/01/01/00/pg_file1.parquet",
+                false,
+            ),
+            create_test_file_key(
+                "account1",
+                "org1/logs/stream1/2021/01/01/00/pg_file2.parquet",
+                false,
+            ),
+        ];
+
+        let result = postgres_list.batch_add(&files).await;
+        assert!(result.is_ok());
+
+        // Verify that files were added with timestamps
+        for file in &files {
+            let exists = postgres_list.contains(&file.key).await;
+            assert!(exists.is_ok());
+            assert!(exists.unwrap());
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test PostgreSQL database setup"]
+    async fn test_query_for_dump_postgres() {
+        // Test the new query_for_dump method
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let postgres_list = PostgresFileList::new();
+        let meta = create_test_file_meta();
+
+        // Add test files
+        let _ = postgres_list
+            .add(
+                "test_account",
+                "org1/logs/stream1/2021/01/01/00/pg_dump_file1.parquet",
+                &meta,
+            )
+            .await;
+
+        // Query for dump with time range
+        let time_range = (meta.min_ts - 1000, meta.max_ts + 1000);
+        let result = postgres_list
+            .query_for_dump("org1", StreamType::Logs, "stream1", time_range)
+            .await;
+
+        // Should return file records
+        assert!(result.is_ok());
+        let records = result.unwrap();
+        assert!(!records.is_empty());
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test PostgreSQL database setup"]
+    async fn test_query_for_dump_by_updated_at_postgres() {
+        // Test the new query_for_dump_by_updated_at method
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let postgres_list = PostgresFileList::new();
+        let meta = create_test_file_meta();
+
+        // Add a test file
+        let _ = postgres_list
+            .add(
+                "test_account",
+                "org1/filelist/stream1/2021/01/01/00/pg_dump_by_updated.parquet",
+                &meta,
+            )
+            .await;
+
+        // Query by updated_at with a wide time range
+        let now = config::utils::time::now_micros();
+        let time_range = (now - 60_000_000, now + 60_000_000);
+        let result = postgres_list.query_for_dump_by_updated_at(time_range).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test PostgreSQL database setup"]
+    async fn test_get_updated_streams_postgres() {
+        // Test the new get_updated_streams method
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let postgres_list = PostgresFileList::new();
+        let meta = create_test_file_meta();
+
+        // Add test files
+        let _ = postgres_list
+            .add(
+                "test_account",
+                "org1/logs/pg_updated_stream1/2021/01/01/00/file1.parquet",
+                &meta,
+            )
+            .await;
+        let _ = postgres_list
+            .add(
+                "test_account",
+                "org1/logs/pg_updated_stream2/2021/01/01/00/file2.parquet",
+                &meta,
+            )
+            .await;
+
+        // Query for updated streams
+        let now = config::utils::time::now_micros();
+        let time_range = (now - 60_000_000, now + 60_000_000);
+        let result = postgres_list.get_updated_streams(time_range).await;
+
+        assert!(result.is_ok());
+        let streams = result.unwrap();
+        assert!(!streams.is_empty());
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test PostgreSQL database setup"]
+    async fn test_stats_by_date_range_postgres() {
+        // Test the new stats_by_date_range method
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let postgres_list = PostgresFileList::new();
+        let meta = create_test_file_meta();
+
+        // Add test files
+        let _ = postgres_list
+            .add(
+                "test_account",
+                "org1/logs/pg_stats_stream/2021/01/01/00/stats_file.parquet",
+                &meta,
+            )
+            .await;
+
+        // Query stats by date range
+        let date_range = ("2021-01-01".to_string(), "2021-01-02".to_string());
+        let result = postgres_list
+            .stats_by_date_range("org1", StreamType::Logs, "pg_stats_stream", date_range)
+            .await;
+
+        assert!(result.is_ok());
+        let stats = result.unwrap();
+        assert!(stats.file_num >= 0);
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test PostgreSQL database setup"]
+    async fn test_set_stream_stats_full_update_postgres() {
+        // Test that set_stream_stats now performs a full update instead of incremental
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let postgres_list = PostgresFileList::new();
+
+        // Create test stats
+        let stats = StreamStats {
+            created_at: config::utils::time::now_micros(),
+            file_num: 10,
+            doc_time_min: 1000000,
+            doc_time_max: 2000000,
+            doc_num: 1000,
+            storage_size: 50000.0,
+            compressed_size: 10000.0,
+            index_size: 5000.0,
+        };
+
+        // Set stream stats (should use ON CONFLICT DO UPDATE now)
+        let result = postgres_list
+            .set_stream_stats("org1", StreamType::Logs, "pg_test_stream", &stats, true)
+            .await;
+
+        assert!(result.is_ok());
+
+        // Set different stats for the same stream (should replace, not increment)
+        let new_stats = StreamStats {
+            created_at: config::utils::time::now_micros(),
+            file_num: 5,
+            doc_time_min: 1500000,
+            doc_time_max: 2500000,
+            doc_num: 500,
+            storage_size: 25000.0,
+            compressed_size: 5000.0,
+            index_size: 2500.0,
+        };
+
+        let result2 = postgres_list
+            .set_stream_stats("org1", StreamType::Logs, "pg_test_stream", &new_stats, true)
+            .await;
+
+        assert!(result2.is_ok());
+
+        // Verify the stats were replaced, not incremented
+        let retrieved_stats = postgres_list
+            .get_stream_stats("org1", Some(StreamType::Logs), Some("pg_test_stream"))
+            .await;
+
+        assert!(retrieved_stats.is_ok());
+        let stats_map = retrieved_stats.unwrap();
+        if let Some((_stream_key, retrieved)) = stats_map.first() {
+            // The file_num should be 5 (replaced), not 15 (incremented)
+            assert_eq!(retrieved.file_num, new_stats.file_num);
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test PostgreSQL database setup"]
+    async fn test_query_without_deleted_filter_postgres() {
+        // Test that query methods no longer filter by deleted field
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let postgres_list = PostgresFileList::new();
+        let meta = create_test_file_meta();
+
+        // Add a file
+        let file_key = "org1/logs/pg_query_stream/2021/01/01/00/query_test.parquet";
+        let _ = postgres_list.add("test_account", file_key, &meta).await;
+
+        // Query files (no longer filters by deleted=false)
+        let time_range = (meta.min_ts - 1000, meta.max_ts + 1000);
+        let result = postgres_list
+            .query(
+                "org1",
+                StreamType::Logs,
+                "pg_query_stream",
+                PartitionTimeLevel::Daily,
+                time_range,
+                None,
+            )
+            .await;
+
+        assert!(result.is_ok());
+        let files = result.unwrap();
+        assert!(!files.is_empty());
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test PostgreSQL database setup"]
+    async fn test_query_ids_without_deleted_filter_postgres() {
+        // Test that query_ids no longer filters out deleted records
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let postgres_list = PostgresFileList::new();
+        let meta = create_test_file_meta();
+
+        // Add test files
+        let _ = postgres_list
+            .add(
+                "test_account",
+                "org1/logs/pg_ids_stream/2021/01/01/00/ids_file.parquet",
+                &meta,
+            )
+            .await;
+
+        // Query IDs (should not filter by deleted field)
+        let time_range = (meta.min_ts - 1000, meta.max_ts + 1000);
+        let result = postgres_list
+            .query_ids("org1", StreamType::Logs, "pg_ids_stream", time_range)
+            .await;
+
+        assert!(result.is_ok());
+        let ids = result.unwrap();
+        assert!(!ids.is_empty());
     }
 }

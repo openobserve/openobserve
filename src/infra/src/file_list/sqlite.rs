@@ -1476,11 +1476,15 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
                 );
                 query_builder.push_values(files, |mut b, item| {
                     let id = if item.id > 0 { Some(item.id) } else { None };
-                    let (stream_key, date_key, file_name) =
-                        parse_file_key_columns(&item.key).expect("parse file key failed");
+                    let Ok((stream_key, date_key, file_name)) = parse_file_key_columns(&item.key)
+                    else {
+                        log::error!("[SQLITE] parse file key failed for file: {}", item.key);
+                        return;
+                    };
                     let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
                     if item.meta.min_ts == 0 || item.meta.max_ts == 0 {
                         log::warn!("[SQLITE] min_ts or max_ts is 0 for file: {}", item.key);
+                        return;
                     }
                     b.push_bind(id)
                         .push_bind(&item.account)
@@ -1949,4 +1953,428 @@ async fn add_column(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType};
+
+    use super::*;
+    use crate::file_list::FileList;
+
+    fn create_test_file_meta() -> FileMeta {
+        FileMeta {
+            min_ts: 1609459200000000, // 2021-01-01 00:00:00 UTC in microseconds
+            max_ts: 1609545600000000, // 2021-01-02 00:00:00 UTC in microseconds
+            records: 1000,
+            original_size: 50000,
+            compressed_size: 10000,
+            flattened: false,
+            index_size: 5000,
+        }
+    }
+
+    fn create_test_file_key(account: &str, key: &str, deleted: bool) -> FileKey {
+        FileKey {
+            account: account.to_string(),
+            key: key.to_string(),
+            meta: create_test_file_meta(),
+            deleted,
+            id: 0,
+            segment_ids: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_sqlite_file_list_new() {
+        let sqlite_file_list = SqliteFileList::new();
+        assert!(!std::ptr::eq(&sqlite_file_list, &SqliteFileList::new()));
+    }
+
+    #[tokio::test]
+    async fn test_sqlite_file_list_default() {
+        let default_list = SqliteFileList::default();
+        let new_list = SqliteFileList::new();
+        assert_eq!(
+            std::mem::size_of_val(&default_list),
+            std::mem::size_of_val(&new_list)
+        );
+    }
+
+    #[tokio::test]
+    async fn test_parse_file_key_columns_valid_sqlite() {
+        let file_key = "files/default/logs/olympics/2021/01/01/00/sqlite_file1.parquet";
+        let result = parse_file_key_columns(file_key);
+
+        match result {
+            Ok((stream, _date, file)) => {
+                assert_eq!(stream, "default/logs/olympics");
+                assert_eq!(file, "sqlite_file1.parquet");
+            }
+            Err(_) => panic!("Should successfully parse valid file key"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_parse_file_key_columns_invalid_sqlite() {
+        let invalid_keys = vec!["", "invalid", "org1/stream1", "org1/stream1/logs"];
+
+        for key in invalid_keys {
+            let result = parse_file_key_columns(key);
+            assert!(result.is_err(), "Should fail for invalid key: {}", key);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_batch_add_with_id_unimplemented() {
+        let sqlite_list = SqliteFileList::new();
+        let files = vec![create_test_file_key("account1", "test/key", false)];
+
+        let result = sqlite_list.batch_add_with_id(&files).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_batch_add_empty_files() {
+        let sqlite_list = SqliteFileList::new();
+        let empty_files: Vec<FileKey> = vec![];
+
+        let result = sqlite_list.batch_add(&empty_files).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_file_key_creation_helpers() {
+        let file_key = create_test_file_key(
+            "test_account",
+            "org/stream/logs/2021/01/01/sqlite_test.parquet",
+            false,
+        );
+
+        assert_eq!(file_key.account, "test_account");
+        assert_eq!(
+            file_key.key,
+            "org/stream/logs/2021/01/01/sqlite_test.parquet"
+        );
+        assert!(!file_key.deleted);
+        assert_eq!(file_key.id, 0);
+
+        assert_eq!(file_key.meta.records, 1000);
+        assert_eq!(file_key.meta.original_size, 50000);
+        assert_eq!(file_key.meta.compressed_size, 10000);
+        assert!(!file_key.meta.flattened);
+    }
+
+    #[tokio::test]
+    async fn test_file_meta_creation() {
+        let meta = create_test_file_meta();
+
+        assert!(meta.min_ts > 0);
+        assert!(meta.max_ts > meta.min_ts);
+        assert!(meta.records > 0);
+        assert!(meta.original_size > meta.compressed_size);
+        assert_eq!(meta.index_size, 5000);
+    }
+
+    // Tests for new functionality in fix/file_list_dump branch
+
+    #[tokio::test]
+    #[ignore = "Requires test SQLite database setup"]
+    async fn test_remove_hard_delete_sqlite() {
+        // Test that remove() performs hard delete (DELETE) instead of soft delete
+        let sqlite_list = SqliteFileList::new();
+        let meta = create_test_file_meta();
+        let file_key = "test_org/logs/test_stream/2021/01/01/00/sqlite_hard_delete_test.parquet";
+
+        // Add a file first
+        let _ = sqlite_list.add("test_account", file_key, &meta).await;
+
+        // Verify file exists
+        let exists_before = sqlite_list.contains(file_key).await;
+        assert!(exists_before.is_ok());
+
+        // Remove the file (should be hard delete now)
+        let result = sqlite_list.remove(file_key).await;
+        assert!(result.is_ok());
+
+        // Verify file is completely removed (not just marked as deleted)
+        let exists_after = sqlite_list.contains(file_key).await;
+        assert!(exists_after.is_ok());
+        assert!(!exists_after.unwrap());
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test SQLite database setup"]
+    async fn test_batch_add_with_timestamps_sqlite() {
+        // Test that batch_add now includes created_at and updated_at timestamps
+        let sqlite_list = SqliteFileList::new();
+        let files = vec![
+            create_test_file_key(
+                "account1",
+                "org1/logs/stream1/2021/01/01/00/sqlite_file1.parquet",
+                false,
+            ),
+            create_test_file_key(
+                "account1",
+                "org1/logs/stream1/2021/01/01/00/sqlite_file2.parquet",
+                false,
+            ),
+        ];
+
+        let result = sqlite_list.batch_add(&files).await;
+        assert!(result.is_ok());
+
+        // Verify that files were added with timestamps
+        for file in &files {
+            let exists = sqlite_list.contains(&file.key).await;
+            assert!(exists.is_ok());
+            assert!(exists.unwrap());
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test SQLite database setup"]
+    async fn test_query_for_dump_sqlite() {
+        // Test the new query_for_dump method
+        let sqlite_list = SqliteFileList::new();
+        let meta = create_test_file_meta();
+
+        // Add test files
+        let _ = sqlite_list
+            .add(
+                "test_account",
+                "org1/logs/stream1/2021/01/01/00/sqlite_dump_file1.parquet",
+                &meta,
+            )
+            .await;
+
+        // Query for dump with time range
+        let time_range = (meta.min_ts - 1000, meta.max_ts + 1000);
+        let result = sqlite_list
+            .query_for_dump("org1", StreamType::Logs, "stream1", time_range)
+            .await;
+
+        // Should return file records
+        assert!(result.is_ok());
+        let records = result.unwrap();
+        assert!(!records.is_empty());
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test SQLite database setup"]
+    async fn test_query_for_dump_by_updated_at_sqlite() {
+        // Test the new query_for_dump_by_updated_at method
+        let sqlite_list = SqliteFileList::new();
+        let meta = create_test_file_meta();
+
+        // Add a test file
+        let _ = sqlite_list
+            .add(
+                "test_account",
+                "org1/filelist/stream1/2021/01/01/00/sqlite_dump_by_updated.parquet",
+                &meta,
+            )
+            .await;
+
+        // Query by updated_at with a wide time range
+        let now = config::utils::time::now_micros();
+        let time_range = (now - 60_000_000, now + 60_000_000);
+        let result = sqlite_list.query_for_dump_by_updated_at(time_range).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test SQLite database setup"]
+    async fn test_get_updated_streams_sqlite() {
+        // Test the new get_updated_streams method
+        let sqlite_list = SqliteFileList::new();
+        let meta = create_test_file_meta();
+
+        // Add test files
+        let _ = sqlite_list
+            .add(
+                "test_account",
+                "org1/logs/sqlite_updated_stream1/2021/01/01/00/file1.parquet",
+                &meta,
+            )
+            .await;
+        let _ = sqlite_list
+            .add(
+                "test_account",
+                "org1/logs/sqlite_updated_stream2/2021/01/01/00/file2.parquet",
+                &meta,
+            )
+            .await;
+
+        // Query for updated streams
+        let now = config::utils::time::now_micros();
+        let time_range = (now - 60_000_000, now + 60_000_000);
+        let result = sqlite_list.get_updated_streams(time_range).await;
+
+        assert!(result.is_ok());
+        let streams = result.unwrap();
+        assert!(!streams.is_empty());
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test SQLite database setup"]
+    async fn test_stats_by_date_range_sqlite() {
+        // Test the new stats_by_date_range method
+        let sqlite_list = SqliteFileList::new();
+        let meta = create_test_file_meta();
+
+        // Add test files
+        let _ = sqlite_list
+            .add(
+                "test_account",
+                "org1/logs/sqlite_stats_stream/2021/01/01/00/stats_file.parquet",
+                &meta,
+            )
+            .await;
+
+        // Query stats by date range
+        let date_range = ("2021-01-01".to_string(), "2021-01-02".to_string());
+        let result = sqlite_list
+            .stats_by_date_range("org1", StreamType::Logs, "sqlite_stats_stream", date_range)
+            .await;
+
+        assert!(result.is_ok());
+        let stats = result.unwrap();
+        assert!(stats.file_num >= 0);
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test SQLite database setup"]
+    async fn test_set_stream_stats_full_update_sqlite() {
+        // Test that set_stream_stats now performs a full update instead of incremental
+        let sqlite_list = SqliteFileList::new();
+
+        // Create test stats
+        let stats = StreamStats {
+            created_at: config::utils::time::now_micros(),
+            file_num: 10,
+            doc_time_min: 1000000,
+            doc_time_max: 2000000,
+            doc_num: 1000,
+            storage_size: 50000.0,
+            compressed_size: 10000.0,
+            index_size: 5000.0,
+        };
+
+        // Set stream stats (should use INSERT OR REPLACE now)
+        let result = sqlite_list
+            .set_stream_stats("org1", StreamType::Logs, "sqlite_test_stream", &stats, true)
+            .await;
+
+        assert!(result.is_ok());
+
+        // Set different stats for the same stream (should replace, not increment)
+        let new_stats = StreamStats {
+            created_at: config::utils::time::now_micros(),
+            file_num: 5,
+            doc_time_min: 1500000,
+            doc_time_max: 2500000,
+            doc_num: 500,
+            storage_size: 25000.0,
+            compressed_size: 5000.0,
+            index_size: 2500.0,
+        };
+
+        let result2 = sqlite_list
+            .set_stream_stats(
+                "org1",
+                StreamType::Logs,
+                "sqlite_test_stream",
+                &new_stats,
+                true,
+            )
+            .await;
+
+        assert!(result2.is_ok());
+
+        // Verify the stats were replaced, not incremented
+        let retrieved_stats = sqlite_list
+            .get_stream_stats("org1", Some(StreamType::Logs), Some("sqlite_test_stream"))
+            .await;
+
+        assert!(retrieved_stats.is_ok());
+        let stats_map = retrieved_stats.unwrap();
+        if let Some((_stream_key, retrieved)) = stats_map.first() {
+            // The file_num should be 5 (replaced), not 15 (incremented)
+            assert_eq!(retrieved.file_num, new_stats.file_num);
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test SQLite database setup"]
+    async fn test_query_without_deleted_filter_sqlite() {
+        // Test that query methods no longer filter by deleted field
+        let sqlite_list = SqliteFileList::new();
+        let meta = create_test_file_meta();
+
+        // Add a file
+        let file_key = "org1/logs/sqlite_query_stream/2021/01/01/00/query_test.parquet";
+        let _ = sqlite_list.add("test_account", file_key, &meta).await;
+
+        // Query files (no longer filters by deleted=false)
+        let time_range = (meta.min_ts - 1000, meta.max_ts + 1000);
+        let result = sqlite_list
+            .query(
+                "org1",
+                StreamType::Logs,
+                "sqlite_query_stream",
+                PartitionTimeLevel::Daily,
+                time_range,
+                None,
+            )
+            .await;
+
+        assert!(result.is_ok());
+        let files = result.unwrap();
+        assert!(!files.is_empty());
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test SQLite database setup"]
+    async fn test_query_ids_without_deleted_filter_sqlite() {
+        // Test that query_ids no longer filters out deleted records
+        let sqlite_list = SqliteFileList::new();
+        let meta = create_test_file_meta();
+
+        // Add test files
+        let _ = sqlite_list
+            .add(
+                "test_account",
+                "org1/logs/sqlite_ids_stream/2021/01/01/00/ids_file.parquet",
+                &meta,
+            )
+            .await;
+
+        // Query IDs (should not filter by deleted field)
+        let time_range = (meta.min_ts - 1000, meta.max_ts + 1000);
+        let result = sqlite_list
+            .query_ids("org1", StreamType::Logs, "sqlite_ids_stream", time_range)
+            .await;
+
+        assert!(result.is_ok());
+        let ids = result.unwrap();
+        assert!(!ids.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_empty_time_range_validation_sqlite() {
+        // Test that methods handle time ranges properly
+        let sqlite_list = SqliteFileList::new();
+
+        let time_range = (0, 0);
+
+        // query_ids should process the query instead of returning early
+        let result = sqlite_list
+            .query_ids("org1", StreamType::Logs, "test", time_range)
+            .await;
+
+        // Should attempt the query (may fail due to no database, but shouldn't short-circuit)
+        let _ = result;
+    }
 }

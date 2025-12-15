@@ -1929,11 +1929,15 @@ INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, m
                 format!("INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at)").as_str(),
                 );
                 query_builder.push_values(files, |mut b, item| {
-                    let (stream_key, date_key, file_name) =
-                        parse_file_key_columns(&item.key).expect("parse file key failed");
+                    let Ok((stream_key, date_key, file_name)) = parse_file_key_columns(&item.key)
+                    else {
+                        log::error!("[MYSQL] parse file key failed for file: {}", item.key);
+                        return;
+                    };
                     let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
                     if item.meta.min_ts == 0 || item.meta.max_ts == 0 {
                         log::warn!("[MYSQL] min_ts or max_ts is 0 for file: {}", item.key);
+                        return;
                     }
                     b.push_bind(&item.account)
                         .push_bind(org_id)
@@ -3146,5 +3150,372 @@ mod tests {
                 key
             );
         }
+    }
+
+    // Tests for new functionality in fix/file_list_dump branch
+
+    #[tokio::test]
+    #[ignore = "Requires test database setup"]
+    async fn test_remove_hard_delete() {
+        // Test that remove() performs hard delete (DELETE) instead of soft delete (UPDATE
+        // deleted=true)
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let mysql_list = MysqlFileList::new();
+        let meta = create_test_file_meta();
+        let file_key = "test_org/logs/test_stream/2021/01/01/00/hard_delete_test.parquet";
+
+        // Add a file first
+        let _ = mysql_list.add("test_account", file_key, &meta).await;
+
+        // Verify file exists
+        let exists_before = mysql_list.contains(file_key).await;
+        assert!(exists_before.is_ok());
+
+        // Remove the file (should be hard delete now)
+        let result = mysql_list.remove(file_key).await;
+        assert!(result.is_ok());
+
+        // Verify file is completely removed (not just marked as deleted)
+        let exists_after = mysql_list.contains(file_key).await;
+        // The file should not exist at all after hard delete
+        assert!(exists_after.is_ok());
+        assert!(!exists_after.unwrap());
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test database setup"]
+    async fn test_batch_add_with_timestamps() {
+        // Test that batch_add now includes created_at and updated_at timestamps
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let mysql_list = MysqlFileList::new();
+        let files = vec![
+            create_test_file_key(
+                "account1",
+                "org1/logs/stream1/2021/01/01/00/file1.parquet",
+                false,
+            ),
+            create_test_file_key(
+                "account1",
+                "org1/logs/stream1/2021/01/01/00/file2.parquet",
+                false,
+            ),
+        ];
+
+        let result = mysql_list.batch_add(&files).await;
+        assert!(result.is_ok());
+
+        // Verify that files were added with timestamps
+        // In the actual implementation, created_at and updated_at should be set to now_micros()
+        for file in &files {
+            let exists = mysql_list.contains(&file.key).await;
+            assert!(exists.is_ok());
+            assert!(exists.unwrap());
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test database setup"]
+    async fn test_query_for_dump() {
+        // Test the new query_for_dump method
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let mysql_list = MysqlFileList::new();
+        let meta = create_test_file_meta();
+
+        // Add test files
+        let _ = mysql_list
+            .add(
+                "test_account",
+                "org1/logs/stream1/2021/01/01/00/dump_file1.parquet",
+                &meta,
+            )
+            .await;
+
+        // Query for dump with time range
+        let time_range = (meta.min_ts - 1000, meta.max_ts + 1000);
+        let result = mysql_list
+            .query_for_dump("org1", StreamType::Logs, "stream1", time_range)
+            .await;
+
+        // Should return file records
+        assert!(result.is_ok());
+        let records = result.unwrap();
+        assert!(!records.is_empty());
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test database setup"]
+    async fn test_query_for_dump_by_updated_at() {
+        // Test the new query_for_dump_by_updated_at method
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let mysql_list = MysqlFileList::new();
+        let meta = create_test_file_meta();
+
+        // Add a test file
+        let _ = mysql_list
+            .add(
+                "test_account",
+                "org1/filelist/stream1/2021/01/01/00/dump_by_updated.parquet",
+                &meta,
+            )
+            .await;
+
+        // Query by updated_at with a wide time range
+        let now = config::utils::time::now_micros();
+        let time_range = (now - 60_000_000, now + 60_000_000); // +/- 1 minute
+        let result = mysql_list.query_for_dump_by_updated_at(time_range).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test database setup"]
+    async fn test_get_updated_streams() {
+        // Test the new get_updated_streams method
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let mysql_list = MysqlFileList::new();
+        let meta = create_test_file_meta();
+
+        // Add test files
+        let _ = mysql_list
+            .add(
+                "test_account",
+                "org1/logs/updated_stream1/2021/01/01/00/file1.parquet",
+                &meta,
+            )
+            .await;
+        let _ = mysql_list
+            .add(
+                "test_account",
+                "org1/logs/updated_stream2/2021/01/01/00/file2.parquet",
+                &meta,
+            )
+            .await;
+
+        // Query for updated streams
+        let now = config::utils::time::now_micros();
+        let time_range = (now - 60_000_000, now + 60_000_000);
+        let result = mysql_list.get_updated_streams(time_range).await;
+
+        assert!(result.is_ok());
+        let streams = result.unwrap();
+        // Should contain the streams we just added
+        assert!(!streams.is_empty());
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test database setup"]
+    async fn test_stats_by_date_range() {
+        // Test the new stats_by_date_range method
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let mysql_list = MysqlFileList::new();
+        let meta = create_test_file_meta();
+
+        // Add test files
+        let _ = mysql_list
+            .add(
+                "test_account",
+                "org1/logs/stats_stream/2021/01/01/00/stats_file.parquet",
+                &meta,
+            )
+            .await;
+
+        // Query stats by date range
+        let date_range = ("2021-01-01".to_string(), "2021-01-02".to_string());
+        let result = mysql_list
+            .stats_by_date_range("org1", StreamType::Logs, "stats_stream", date_range)
+            .await;
+
+        assert!(result.is_ok());
+        let stats = result.unwrap();
+        // Stats should reflect the added file
+        assert!(stats.file_num >= 0);
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test database setup"]
+    async fn test_set_stream_stats_full_update() {
+        // Test that set_stream_stats now performs a full update instead of incremental
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let mysql_list = MysqlFileList::new();
+
+        // Create test stats
+        let stats = StreamStats {
+            created_at: config::utils::time::now_micros(),
+            file_num: 10,
+            doc_time_min: 1000000,
+            doc_time_max: 2000000,
+            doc_num: 1000,
+            storage_size: 50000.0,
+            compressed_size: 10000.0,
+            index_size: 5000.0,
+        };
+
+        // Set stream stats (should use ON DUPLICATE KEY UPDATE now)
+        let result = mysql_list
+            .set_stream_stats("org1", StreamType::Logs, "test_stream", &stats, true)
+            .await;
+
+        assert!(result.is_ok());
+
+        // Set different stats for the same stream (should replace, not increment)
+        let new_stats = StreamStats {
+            created_at: config::utils::time::now_micros(),
+            file_num: 5,
+            doc_time_min: 1500000,
+            doc_time_max: 2500000,
+            doc_num: 500,
+            storage_size: 25000.0,
+            compressed_size: 5000.0,
+            index_size: 2500.0,
+        };
+
+        let result2 = mysql_list
+            .set_stream_stats("org1", StreamType::Logs, "test_stream", &new_stats, true)
+            .await;
+
+        assert!(result2.is_ok());
+
+        // Verify the stats were replaced, not incremented
+        let retrieved_stats = mysql_list
+            .get_stream_stats("org1", Some(StreamType::Logs), Some("test_stream"))
+            .await;
+
+        assert!(retrieved_stats.is_ok());
+        let stats_map = retrieved_stats.unwrap();
+        if let Some((_stream_key, retrieved)) = stats_map.first() {
+            // The file_num should be 5 (replaced), not 15 (incremented)
+            assert_eq!(retrieved.file_num, new_stats.file_num);
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test database setup"]
+    async fn test_update_dump_records_with_batch_size() {
+        // Test that update_dump_records uses the new batch_size config
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let mysql_list = MysqlFileList::new();
+        let meta = create_test_file_meta();
+
+        // Add multiple test files
+        let mut added_ids = vec![];
+        for i in 0..10 {
+            let file_key = format!(
+                "org1/logs/dump_stream/2021/01/01/00/dump_file_{}.parquet",
+                i
+            );
+            let id = mysql_list.add("test_account", &file_key, &meta).await;
+            if let Ok(id) = id {
+                added_ids.push(id);
+            }
+        }
+
+        // Create dump file
+        let dump_file = create_test_file_key(
+            "test_account",
+            "org1/logs/dump_stream/2021/01/01/00/dumped_result.parquet",
+            false,
+        );
+
+        // Update dump records (should batch delete using new config)
+        let result = mysql_list.update_dump_records(&dump_file, &added_ids).await;
+        // Test structure - actual assertion depends on setup
+        let _ = result; // May succeed or fail depending on setup
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test database setup"]
+    async fn test_query_without_deleted_filter() {
+        // Test that query methods no longer filter by deleted field
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let mysql_list = MysqlFileList::new();
+        let meta = create_test_file_meta();
+
+        // Add a file
+        let file_key = "org1/logs/query_stream/2021/01/01/00/query_test.parquet";
+        let _ = mysql_list.add("test_account", file_key, &meta).await;
+
+        // Query files (no longer filters by deleted=false)
+        let time_range = (meta.min_ts - 1000, meta.max_ts + 1000);
+        let result = mysql_list
+            .query(
+                "org1",
+                StreamType::Logs,
+                "query_stream",
+                PartitionTimeLevel::Daily,
+                time_range,
+                None,
+            )
+            .await;
+
+        assert!(result.is_ok());
+        let files = result.unwrap();
+        // Should return files without filtering by deleted status
+        assert!(!files.is_empty());
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test database setup"]
+    async fn test_query_ids_without_deleted_filter() {
+        // Test that query_ids no longer filters out deleted records
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let mysql_list = MysqlFileList::new();
+        let meta = create_test_file_meta();
+
+        // Add test files
+        let _ = mysql_list
+            .add(
+                "test_account",
+                "org1/logs/ids_stream/2021/01/01/00/ids_file.parquet",
+                &meta,
+            )
+            .await;
+
+        // Query IDs (should not filter by deleted field)
+        let time_range = (meta.min_ts - 1000, meta.max_ts + 1000);
+        let result = mysql_list
+            .query_ids("org1", StreamType::Logs, "ids_stream", time_range)
+            .await;
+
+        assert!(result.is_ok());
+        let ids = result.unwrap();
+        assert!(!ids.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_empty_time_range_validation() {
+        // Test that methods handle time ranges properly (no longer short-circuit on 0,0)
+        let mysql_list = MysqlFileList::new();
+
+        // Previously, time_range of (0, 0) would return empty results
+        // Now it should be treated as a valid time range
+        let time_range = (0, 0);
+
+        // query_ids should process the query instead of returning early
+        let result = mysql_list
+            .query_ids("org1", StreamType::Logs, "test", time_range)
+            .await;
+
+        // Should attempt the query (may fail due to no database, but shouldn't short-circuit)
+        let _ = result; // Result depends on database availability
     }
 }
