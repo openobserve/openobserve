@@ -759,14 +759,15 @@ SELECT date
         let sql = r#"
 SELECT 
     COUNT(*) AS file_num,
+    MIN(min_ts) AS min_ts,
+    MAX(max_ts) AS max_ts,
     SUM(records) AS records,
     SUM(original_size) AS original_size,
     SUM(compressed_size) AS compressed_size,
-    SUM(index_size) AS index_size,
-    MIN(min_ts) AS min_ts,
-    MAX(max_ts) AS max_ts
+    SUM(index_size) AS index_size
 FROM file_list
-WHERE stream = $1 AND date >= $2 AND date < $3;
+WHERE stream = $1 AND date >= $2 AND date < $3
+GROUP BY stream;
             "#;
         let pool = CLIENT_RO.clone();
         let ret: Option<super::StatsRecord> = sqlx::query_as(sql)
@@ -832,57 +833,28 @@ WHERE stream = $1 AND date >= $2 AND date < $3;
         stats: &StreamStats,
         is_recent: bool,
     ) -> Result<()> {
+        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
         let mut tx = client.begin().await?;
-        // check if stream stats exist
-        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
-        let now = now_micros();
-        if !crate::schema::STREAM_STATS_EXISTS.contains(&stream_key) {
-            let ret = self
-                .get_stream_stats(org_id, Some(stream_type), Some(stream_name))
-                .await?;
-            if !ret.is_empty() {
-                crate::schema::STREAM_STATS_EXISTS.insert(stream_key.clone());
-            } else {
-                // stream stats not exist, insert a new one
-                if let Err(e) = sqlx::query(
-r#"
-INSERT INTO stream_stats
-    (org, stream, file_num, min_ts, max_ts, records, original_size, compressed_size, index_size, is_recent, updated_at)
-    VALUES ($1, $2, 0, 0, 0, 0, 0, 0, 0, $3, $4);
-"#,
-)
-                    .bind(org_id)
-                    .bind(&stream_key)
-                    .bind(is_recent)
-                    .bind(now)
-                    .execute(&mut *tx)
-                    .await
-                    {
-                    if let Err(e) = tx.rollback().await {
-                        log::error!("[SQLITE] rollback insert stream stats error: {e}");
-                    }
-                    return Err(e.into());
-                }
-            }
-        }
-
-        // update stats
         if let Err(e) = sqlx::query(
             r#"
-UPDATE stream_stats
-SET file_num = $1,
-    min_ts = $2,
-    max_ts = $3,
-    records = $4,
-    original_size = $5,
-    compressed_size = $6,
-    index_size = $7,
-    updated_at = $8
-WHERE stream = $9 AND is_recent = $10;
+INSERT INTO stream_stats
+    (org, stream, file_num, min_ts, max_ts, records, original_size, compressed_size, index_size, is_recent)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+ON CONFLICT (stream, is_recent)
+DO UPDATE SET
+    file_num = EXCLUDED.file_num,
+    min_ts = EXCLUDED.min_ts,
+    max_ts = EXCLUDED.max_ts,
+    records = EXCLUDED.records,
+    original_size = EXCLUDED.original_size,
+    compressed_size = EXCLUDED.compressed_size,
+    index_size = EXCLUDED.index_size;
             "#,
         )
+        .bind(org_id)
+        .bind(&stream_key)
         .bind(stats.file_num)
         .bind(stats.doc_time_min)
         .bind(stats.doc_time_max)
@@ -890,8 +862,6 @@ WHERE stream = $9 AND is_recent = $10;
         .bind(stats.storage_size as i64)
         .bind(stats.compressed_size as i64)
         .bind(stats.index_size as i64)
-        .bind(now)
-        .bind(&stream_key)
         .bind(is_recent)
         .execute(&mut *tx)
         .await
@@ -1344,18 +1314,17 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         sqlx::query(
             r#"
 INSERT INTO file_list_dump_stats
-    (org, stream, date, file, file_num, records, original_size,
-     compressed_size, index_size, min_ts, max_ts)
+    (org, stream, date, file, file_num, min_ts, max_ts, records, original_size, compressed_size, index_size)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 ON CONFLICT (stream, date, file)
 DO UPDATE SET
     file_num = EXCLUDED.file_num,
+    min_ts = EXCLUDED.min_ts,
+    max_ts = EXCLUDED.max_ts,
     records = EXCLUDED.records,
     original_size = EXCLUDED.original_size,
     compressed_size = EXCLUDED.compressed_size,
-    index_size = EXCLUDED.index_size,
-    min_ts = EXCLUDED.min_ts,
-    max_ts = EXCLUDED.max_ts;
+    index_size = EXCLUDED.index_size;
             "#,
         )
         .bind(org_id)
@@ -1363,12 +1332,12 @@ DO UPDATE SET
         .bind(date_key)
         .bind(file_name)
         .bind(stats.file_num)
+        .bind(stats.doc_time_min)
+        .bind(stats.doc_time_max)
         .bind(stats.doc_num)
         .bind(stats.storage_size as i64)
         .bind(stats.compressed_size as i64)
         .bind(stats.index_size as i64)
-        .bind(stats.doc_time_min)
-        .bind(stats.doc_time_max)
         .execute(&*client)
         .await?;
         Ok(())
@@ -1405,14 +1374,15 @@ DO UPDATE SET
             r#"
 SELECT
     SUM(file_num) as file_num,
+    MIN(min_ts) as min_ts,
+    MAX(max_ts) as max_ts,
     SUM(records) as records,
     SUM(original_size) as original_size,
     SUM(compressed_size) as compressed_size,
-    SUM(index_size) as index_size,
-    MIN(min_ts) as min_ts,
-    MAX(max_ts) as max_ts
+    SUM(index_size) as index_size
 FROM file_list_dump_stats
-WHERE stream = $1 AND date >= $2 AND date < $3;
+WHERE stream = $1 AND date >= $2 AND date < $3
+GROUP BY stream;
             "#,
         )
         .bind(&stream_key)
@@ -1714,8 +1684,7 @@ CREATE TABLE IF NOT EXISTS stream_stats
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
     index_size      BIGINT not null,
-    is_recent       BOOLEAN default false not null,
-    updated_at      BIGINT default 0 not null
+    is_recent       BOOLEAN default false not null
 );
         "#,
     )
@@ -1732,12 +1701,12 @@ CREATE TABLE IF NOT EXISTS file_list_dump_stats
     date            VARCHAR not null,
     file            VARCHAR not null,
     file_num        BIGINT default 0 not null,
+    min_ts          BIGINT default 0 not null,
+    max_ts          BIGINT default 0 not null,
     records         BIGINT default 0 not null,
     original_size   BIGINT default 0 not null,
     compressed_size BIGINT default 0 not null,
-    index_size      BIGINT default 0 not null,
-    min_ts          BIGINT default 0 not null,
-    max_ts          BIGINT default 0 not null
+    index_size      BIGINT default 0 not null
 );
         "#,
     )
@@ -1808,19 +1777,12 @@ CREATE TABLE IF NOT EXISTS file_list_dump_stats
     add_column(&client, "file_list", column, data_type).await?;
     add_column(&client, "file_list_history", column, data_type).await?;
 
-    // create columns is_recent and updated_at for stream_stats for version >= 0.15.0
+    // create columns is_recent and updated_at for stream_stats for version >= 0.30.0
     add_column(
         &client,
         "stream_stats",
         "is_recent",
         "BOOLEAN default false not null",
-    )
-    .await?;
-    add_column(
-        &client,
-        "stream_stats",
-        "updated_at",
-        "BIGINT default 0 not null",
     )
     .await?;
 
