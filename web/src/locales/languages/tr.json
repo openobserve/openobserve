@@ -276,7 +276,9 @@
     "actionLabel": "Eylem",
     "transformLabel": "Dönüştürün",
     "addToDashboard": "Kontrol Paneline Ekle",
-    "selectStream": "Akışı Seç"
+    "selectStream": "Akışı Seç",
+    "clickAgainToCopy": "Bağlantıyı panoya kopyalamak için tekrar tıklayın.",
+    "copyLink": "Bağlantıyı Kopyala"
   },
   "menu": {
     "home": "Ana Sayfa",

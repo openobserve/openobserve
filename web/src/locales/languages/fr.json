@@ -276,7 +276,9 @@
     "actionLabel": "Action",
     "transformLabel": "Transformez",
     "addToDashboard": "Ajouter au tableau de bord",
-    "selectStream": "Sélectionnez Stream"
+    "selectStream": "Sélectionnez Stream",
+    "clickAgainToCopy": "Cliquez à nouveau pour copier le lien vers le presse-papiers.",
+    "copyLink": "Copier le lien"
   },
   "menu": {
     "home": "Accueil",

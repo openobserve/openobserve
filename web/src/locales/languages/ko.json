@@ -276,7 +276,9 @@
     "actionLabel": "액션",
     "transformLabel": "트랜스폼",
     "addToDashboard": "대시보드에 추가",
-    "selectStream": "스트림 선택"
+    "selectStream": "스트림 선택",
+    "clickAgainToCopy": "링크를 클립보드에 복사하려면 다시 클릭합니다.",
+    "copyLink": "링크 복사"
   },
   "menu": {
     "home": "홈",

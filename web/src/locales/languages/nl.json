@@ -276,7 +276,9 @@
     "actionLabel": "Actie",
     "transformLabel": "Transformeren",
     "addToDashboard": "Aan dashboard toevoegen",
-    "selectStream": "Selecteer Stream"
+    "selectStream": "Selecteer Stream",
+    "clickAgainToCopy": "Klik opnieuw om de link naar het klembord te kopiëren.",
+    "copyLink": "Link kopiëren"
   },
   "menu": {
     "home": "Home",

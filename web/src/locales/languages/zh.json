@@ -276,7 +276,9 @@
     "actionLabel": "行动",
     "transformLabel": "转型",
     "addToDashboard": "添加到控制面板",
-    "selectStream": "选择直播"
+    "selectStream": "选择直播",
+    "clickAgainToCopy": "再次单击将链接复制到剪贴板。",
+    "copyLink": "复制链接"
   },
   "menu": {
     "home": "主页",

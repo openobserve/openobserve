@@ -276,7 +276,9 @@
     "actionLabel": "アクション",
     "transformLabel": "トランスフォーム",
     "addToDashboard": "ダッシュボードに追加",
-    "selectStream": "[ストリーム] を選択"
+    "selectStream": "[ストリーム] を選択",
+    "clickAgainToCopy": "もう一度クリックすると、リンクがクリップボードにコピーされます。",
+    "copyLink": "[リンクをコピー]"
   },
   "menu": {
     "home": "ホーム",

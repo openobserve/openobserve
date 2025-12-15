@@ -276,7 +276,9 @@
     "actionLabel": "Aktion",
     "transformLabel": "Verwandeln",
     "addToDashboard": "Zum Dashboard hinzufügen",
-    "selectStream": "Wählen Sie Stream"
+    "selectStream": "Wählen Sie Stream",
+    "clickAgainToCopy": "Klicken Sie erneut, um den Link in die Zwischenablage zu kopieren.",
+    "copyLink": "Link kopieren"
   },
   "menu": {
     "home": "Startseite",
