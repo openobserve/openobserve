@@ -700,8 +700,8 @@ alt="Quick Mode" class="toolbar-icon" />
           data-test="logs-search-bar-share-link-btn"
           class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border"
           size="xs"
-          @click="shareLink.execute()"
-          :loading="shareLink.isLoading.value"
+          @click="handleShareLinkClick"
+          :loading="isShareLinkLoading"
           icon="share"
         >
           <q-tooltip>
@@ -2127,6 +2127,14 @@ export default defineComponent({
     onBeforeUnmount(() => {
       queryEditorRef.value = null;
       fnEditorRef.value = null;
+
+      // Clean up polling interval if still running
+      if (pollIntervalId) {
+        clearInterval(pollIntervalId);
+        pollIntervalId = null;
+      }
+      // Clear pending short URL from store
+      store.commit("clearPendingShortURL");
     });
 
     const transformsLabel = computed(() => {
@@ -3610,7 +3618,81 @@ export default defineComponent({
       }
     };
 
-    const shareLink = useLoading(async () => {
+    // Loading state for share link button
+    const isShareLinkLoading = ref(false);
+
+    // Polling interval reference to clean up
+    let pollIntervalId: number | null = null;
+
+    /**
+     * Polling mechanism to check store for short URL without blocking main thread
+     * This runs in a separate execution context via setInterval
+     * Includes safeguards against infinite loops
+     */
+    const startPollingForShortURL = () => {
+      const MAX_ATTEMPTS = 30; // Max 30 attempts (15 seconds with 500ms interval)
+      const POLL_INTERVAL = 500; // Check every 500ms
+      let attempts = 0;
+
+      // Clear any existing polling interval
+      if (pollIntervalId) {
+        clearInterval(pollIntervalId);
+        pollIntervalId = null;
+      }
+
+      // Start polling in a separate execution context (non-blocking)
+      pollIntervalId = window.setInterval(() => {
+        attempts++;
+
+        // Check if short URL is available in store
+        const shortURL = store.state.pendingShortURL;
+
+        if (shortURL) {
+          // Short URL is ready! Copy it to clipboard
+          copyToClipboard(shortURL)
+            .then(() => {
+              $q.notify({
+                type: "positive",
+                message: t("search.linkCopiedSuccessfully"),
+                timeout: 5000,
+              });
+            })
+            .catch((error) => {
+              console.error("Failed to copy short URL:", error);
+              $q.notify({
+                type: "negative",
+                message: t("search.errorCopyingLink"),
+                timeout: 5000,
+              });
+            })
+            .finally(() => {
+              // Clean up: clear store and stop polling
+              store.commit("clearPendingShortURL");
+              if (pollIntervalId) {
+                clearInterval(pollIntervalId);
+                pollIntervalId = null;
+              }
+              isShareLinkLoading.value = false;
+            });
+        } else if (attempts >= MAX_ATTEMPTS) {
+          // Timeout: Stop polling after max attempts
+          console.warn("Polling timeout: Short URL not received within time limit");
+          if (pollIntervalId) {
+            clearInterval(pollIntervalId);
+            pollIntervalId = null;
+          }
+          isShareLinkLoading.value = false;
+          store.commit("clearPendingShortURL");
+          // Don't show error - user already has long URL copied
+        }
+      }, POLL_INTERVAL);
+    };
+
+    /**
+     * Non-async handler for share link click
+     * Copies long URL immediately (synchronous), then fetches short URL
+     */
+    const handleShareLinkClick = () => {
       const queryObj = generateURLQuery(true, dashboardPanelData);
       // Removed the 'type' property from the object to avoid issues when navigating from the stream to the logs page,
       // especially when the user performs multi-select on streams and shares the URL.
@@ -3628,73 +3710,61 @@ export default defineComponent({
         shareURL += "?" + queryString;
       }
 
-      // Safari fix: Create a clipboard write promise BEFORE the async operation
-      // This maintains the user gesture context throughout the async operation
-      let clipboardItem: any = null;
-
-      // For Safari compatibility, we need to create the ClipboardItem synchronously
-      // before any async operations
-      if (navigator.clipboard && window.ClipboardItem) {
-        try {
-          // Create a promise that will resolve with the short URL text
-          const textPromise = shortURLService
-            .create(store.state.selectedOrganization.identifier, shareURL)
-            .then((res: any) => {
-              if (res.status == 200) {
-                return new Blob([res.data.short_url], { type: 'text/plain' });
-              }
-              // Fallback to long URL if short URL fails
-              return new Blob([shareURL], { type: 'text/plain' });
-            })
-            .catch(() => {
-              // Fallback to long URL on error
-              return new Blob([shareURL], { type: 'text/plain' });
-            });
-
-          clipboardItem = new ClipboardItem({
-            'text/plain': textPromise,
-          });
-
-          // Write to clipboard synchronously (the promise will resolve asynchronously)
-          await navigator.clipboard.write([clipboardItem]);
-
+      // STEP 1: Copy long URL immediately (SYNCHRONOUS - works in Safari)
+      copyToClipboard(shareURL)
+        .then(() => {
           $q.notify({
             type: "positive",
             message: t("search.linkCopiedSuccessfully"),
             timeout: 5000,
           });
-          return;
-        } catch (clipboardError) {
-          console.error("Clipboard API failed, trying fallback:", clipboardError);
-        }
-      }
 
-      // Fallback for browsers that don't support ClipboardItem or if clipboard API fails
-      try {
-        const res = await shortURLService.create(
-          store.state.selectedOrganization.identifier,
-          shareURL
-        );
+          // STEP 2: Start loading and fetch short URL
+          isShareLinkLoading.value = true;
 
-        if (res.status == 200) {
-          shareURL = res.data.short_url;
-        }
+          // STEP 3: Start polling for short URL (non-blocking)
+          startPollingForShortURL();
 
-        // Try to copy using Quasar's copyToClipboard
-        await copyToClipboard(shareURL);
-        $q.notify({
-          type: "positive",
-          message: t("search.linkCopiedSuccessfully"),
-          timeout: 5000,
+          // STEP 4: Fetch short URL via API (non-async in this function)
+          shortURLService
+            .create(store.state.selectedOrganization.identifier, shareURL)
+            .then((res: any) => {
+              if (res.status == 200) {
+                // Store the short URL - polling will pick it up
+                store.commit("setPendingShortURL", res.data.short_url);
+              } else {
+                // Failed to get short URL, stop polling
+                if (pollIntervalId) {
+                  clearInterval(pollIntervalId);
+                  pollIntervalId = null;
+                }
+                isShareLinkLoading.value = false;
+              }
+            })
+            .catch((error) => {
+              console.error("Error creating short URL:", error);
+              // Failed to get short URL, stop polling
+              if (pollIntervalId) {
+                clearInterval(pollIntervalId);
+                pollIntervalId = null;
+              }
+              isShareLinkLoading.value = false;
+              $q.notify({
+                type: "negative",
+                message: t("search.errorShorteningLink"),
+                timeout: 5000,
+              });
+            });
+        })
+        .catch((error) => {
+          console.error("Failed to copy long URL:", error);
+          $q.notify({
+            type: "negative",
+            message: t("search.errorCopyingLink"),
+            timeout: 5000,
+          });
         });
-      } catch (error) {
-        $q.notify({
-          type: "negative",
-          message: t("search.errorCopyingLink"),
-          timeout: 5000,
-        });
-      }
-    });
+    };
     const showSearchHistoryfn = () => {
       emit("showSearchHistory");
     };
@@ -4378,7 +4448,8 @@ export default defineComponent({
       savedFunctionName,
       savedFunctionSelectedName,
       saveFunctionLoader,
-      shareLink,
+      handleShareLinkClick,
+      isShareLinkLoading,
       showSearchHistoryfn,
       getImageURL,
       resetFilters,
