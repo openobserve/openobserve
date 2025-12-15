@@ -27,7 +27,7 @@ test.describe("Logs Regression Bugs", () => {
   });
 
   test("should display error icon and error message when entering invalid time in absolute time range", {
-    tag: ['@absoluteTimeError', '@regressionBugs', '@logs']
+    tag: ['@absoluteTimeError', '@regressionBugs', '@P0', '@logs']
   }, async () => {
     testLogger.info('Testing error validation for invalid absolute time input');
 
