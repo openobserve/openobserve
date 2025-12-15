@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { reactive } from "vue";
+import { reactive, computed } from "vue";
 import {
   b64EncodeStandard,
   b64EncodeUnicode,
@@ -307,6 +307,28 @@ const useTraces = () => {
     });
   };
 
+  /**
+   * Computed property for traces share URL
+   * Generates the full shareable URL with all query parameters
+   */
+  const tracesShareURL = computed(() => {
+    const queryParams = getUrlQueryParams(true);
+
+    const searchParams = new URLSearchParams();
+    for (const [key, value] of Object.entries(queryParams)) {
+      searchParams.append(key, String(value));
+    }
+    const queryString = searchParams.toString();
+
+    let shareURL = window.location.origin + window.location.pathname;
+
+    if (queryString != "") {
+      shareURL += "?" + queryString;
+    }
+
+    return shareURL;
+  });
+
   return {
     searchObj,
     resetSearchObj,
@@ -315,6 +337,7 @@ const useTraces = () => {
     copyTracesUrl,
     buildQueryDetails,
     navigateToLogs,
+    tracesShareURL,
   };
 };
 
