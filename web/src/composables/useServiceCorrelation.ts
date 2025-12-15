@@ -123,15 +123,16 @@ export function useServiceCorrelation() {
         return null;
       }
 
-      // Extract semantic dimensions from context
-      const dimensions = extractSemanticDimensions(context, semanticGroups);
+      // Extract ALL semantic dimensions from context (stable + unstable)
+      // Backend will categorize them into matched_dimensions (stable) and additional_dimensions (unstable)
+      // UI will use matched_dimensions with actual values, additional_dimensions with _o2_all wildcard
+      const dimensions = extractSemanticDimensions(context, semanticGroups, false);
 
-      console.log("[useServiceCorrelation] Semantic groups:", semanticGroups);
       console.log("[useServiceCorrelation] Context fields:", Object.keys(context.fields));
       console.log("[useServiceCorrelation] Extracted dimensions:", dimensions);
 
       if (Object.keys(dimensions).length === 0) {
-        error.value = "No recognizable dimensions found in context";
+        error.value = "No recognizable dimensions found in context for correlation";
         console.error("[useServiceCorrelation] No dimensions extracted. Check semantic groups configuration.");
         return null;
       }
@@ -147,7 +148,14 @@ export function useServiceCorrelation() {
 
       const response = await serviceStreamsApi.correlate(orgIdentifier.value, correlationRequest);
 
-      const correlationData: CorrelationResponse = response.data;
+      const correlationData: CorrelationResponse | null = response.data;
+
+      // Check if API returned null (no matching service found)
+      if (!correlationData) {
+        error.value = "No matching service found for this stream with the provided dimensions.";
+        console.warn("[useServiceCorrelation] Correlation API returned null - no matching service found");
+        return null;
+      }
 
       console.log("[useServiceCorrelation] Correlation response:", {
         service_name: correlationData.service_name,

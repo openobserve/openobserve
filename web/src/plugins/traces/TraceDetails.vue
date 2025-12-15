@@ -373,6 +373,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :span="spanMap[selectedSpanId as string]"
                   :baseTracePosition="baseTracePosition"
                   :search-query="searchQuery"
+                  :stream-name="currentTraceStreamName"
+                  :service-streams-enabled="serviceStreamsEnabled"
                   @view-logs="redirectToLogs"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
@@ -427,6 +429,7 @@ import {
   formatTimeWithSuffix,
   getImageURL,
   convertTimeFromNsToMs,
+  convertTimeFromNsToUs,
 } from "@/utils/zincutils";
 import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
 import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
@@ -553,6 +556,18 @@ export default defineComponent({
     const selectedStreamsString = computed(() =>
       searchObj.data.traceDetails.selectedLogStreams.join(", "),
     );
+
+    // Current trace stream name for correlation
+    const currentTraceStreamName = computed(() => {
+      return (router.currentRoute.value.query.stream as string) ||
+        searchObj.data.stream.selectedStream.value ||
+        '';
+    });
+
+    // Check if service streams feature is enabled
+    const serviceStreamsEnabled = computed(() => {
+      return store.state.zoConfig.service_streams_enabled !== false;
+    });
 
     const showTraceDetails = ref(false);
     const currentIndex = ref(0);
@@ -1130,8 +1145,10 @@ export default defineComponent({
       return {
         [store.state.zoConfig.timestamp_column]:
           span[store.state.zoConfig.timestamp_column],
+        startTimeUs: Math.floor(span.start_time / 1000),
         startTimeMs: convertTimeFromNsToMs(span.start_time),
         endTimeMs: convertTimeFromNsToMs(span.end_time),
+        endTimeUs: Math.floor(span.end_time / 1000),
         durationMs: span?.duration ? Number((span?.duration / 1000).toFixed(4)) : 0, // This key is standard, we use for calculating width of span block. This should always be in ms
         durationUs: span?.duration ? Number(span?.duration?.toFixed(4)) : 0, // This key is used for displaying duration in span block. We convert this us to ms, s in span block
         idleMs: span.idle_ns ? convertTime(span.idle_ns) : 0,
@@ -1447,6 +1464,9 @@ export default defineComponent({
       validateSpan,
       calculateTracePosition,
       buildServiceTree,
+      // Correlation props
+      currentTraceStreamName,
+      serviceStreamsEnabled,
     };
   },
 });
