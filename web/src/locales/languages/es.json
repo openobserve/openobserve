@@ -1299,7 +1299,9 @@
     },
     "triggerAlert": "Activar",
     "alertTriggeredSuccess": "La alerta se activó correctamente",
-    "events": "Eventos"
+    "events": "Eventos",
+    "multiWindow": "Comparar con el pasado",
+    "multiWindowSubLabel": "Compare los resultados actuales con los datos de otro período"
   },
   "alert_templates": {
     "header": "Plantillas",

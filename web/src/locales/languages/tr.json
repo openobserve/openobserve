@@ -1299,7 +1299,9 @@
     },
     "triggerAlert": "Tetikleyici",
     "alertTriggeredSuccess": "Uyarı başarıyla tetiklendi",
-    "events": "Olaylar"
+    "events": "Olaylar",
+    "multiWindow": "Geçmişle karşılaştırın",
+    "multiWindowSubLabel": "Mevcut sonuçları başka bir zaman dilimine ait verilerle karşılaştırın"
   },
   "alert_templates": {
     "header": "Şablonlar",

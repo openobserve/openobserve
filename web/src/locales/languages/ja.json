@@ -1309,7 +1309,9 @@
     },
     "triggerAlert": "トリガー",
     "alertTriggeredSuccess": "アラートは正常にトリガーされました",
-    "events": "[イベント]"
+    "events": "[イベント]",
+    "multiWindow": "過去と比較",
+    "multiWindowSubLabel": "現在の結果を別の期間のデータと比較する"
   },
   "alert_templates": {
     "header": "テンプレート",

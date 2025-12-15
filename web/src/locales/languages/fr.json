@@ -1299,7 +1299,9 @@
     },
     "triggerAlert": "Gâchette",
     "alertTriggeredSuccess": "Alerte déclenchée avec succès",
-    "events": "Évènements"
+    "events": "Évènements",
+    "multiWindow": "Comparez avec le passé",
+    "multiWindowSubLabel": "Comparez les résultats actuels avec les données d'une autre période"
   },
   "alert_templates": {
     "header": "Modèles",

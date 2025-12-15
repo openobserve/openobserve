@@ -1299,7 +1299,9 @@
     },
     "triggerAlert": "Auslösen",
     "alertTriggeredSuccess": "Warnung wurde erfolgreich ausgelöst",
-    "events": "Ereignisse"
+    "events": "Ereignisse",
+    "multiWindow": "Mit der Vergangenheit vergleichen",
+    "multiWindowSubLabel": "Aktuelle Ergebnisse mit Daten aus einem anderen Zeitraum vergleichen"
   },
   "alert_templates": {
     "header": "Vorlagen",
