@@ -1306,7 +1306,8 @@ export class LogsPage {
     }
 
     async addRemoveInteresting() {
-        await this.clickInterestingFields();
+        // Click the field button once to toggle it off (remove from query)
+        // Note: clickInterestingFields() was already called before this, which added the field
         await this.page.locator('[data-test="log-search-index-list-interesting-kubernetes_pod_name-field-btn"]').first().click();
     }
 
