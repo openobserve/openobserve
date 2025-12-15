@@ -887,7 +887,7 @@ export default defineComponent({
           }
         }
       } catch (error) {
-        console.error("There was an error applying the chart example code. Please try again");
+        showErrorNotification("There was an error applying the chart example code. Please try again");
       }
     };
 

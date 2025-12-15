@@ -44,7 +44,7 @@ const processData = (chartData, metricKey, valueKey) => {
   return { indicators, values };
 };
 
-const { indicators, values } = processData(data[0], metricAlias, valueAlias);
+const { indicators, values } = processData(data?.[0] || [], metricAlias, valueAlias);
 
 option = {
   tooltip: {

@@ -47,10 +47,13 @@ const processData = (chartData, xKey, yKey) => {
   return { xData, yData };
 };
 
-// Execute the function
+
+// Execute the function with null/empty check for data[0]
 // Note: 'data' is a global variable containing the query results.
 // We access 'data[0]' because the results are often nested in the first element.
-const { xData, yData } = processData(data[0], xAlias, yAlias);
+const { xData, yData } = Array.isArray(data) && Array.isArray(data[0])
+  ? processData(data[0], xAlias, yAlias)
+  : { xData: [], yData: [] };
 
 option = {
   xAxis: {

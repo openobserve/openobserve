@@ -49,7 +49,9 @@ const processData = (chartData, xKey, yKeys) => {
   return { xData, seriesData };
 };
 
-const { xData, seriesData } = processData(data[0], xAlias, yAliases);
+const { xData, seriesData } = Array.isArray(data) && Array.isArray(data[0])
+  ? processData(data[0], xAlias, yAliases)
+  : { xData: [], seriesData: [] };
 
 option = {
   tooltip: {

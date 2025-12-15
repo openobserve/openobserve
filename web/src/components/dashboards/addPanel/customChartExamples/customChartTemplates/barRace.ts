@@ -12,8 +12,8 @@ const chartCode = `
 // -----------------------------------------------------------
 // IMPORTANT: Update the aliases below to match your query!
 
-const categoryAlias = "category";
-const valueAlias = "value";
+const categoryAlias = "x_axis_1";
+const valueAlias = "y_axis_1";
 // -----------------------------------------------------------
 
 
@@ -51,7 +51,6 @@ const generateRacingSnapshots = (baseValues, numSnapshots = 10) => {
 };
 
 const snapshots = generateRacingSnapshots(values);
-let currentSnapshot = 0;
 
 option = {
   timeline: {

@@ -8,13 +8,6 @@ SELECT 'Metric C' as metric, 'Series 1' as series, 90 as value from default
 UNION ALL
 SELECT 'Metric D' as metric, 'Series 1' as series, 75 as value from default
 UNION ALL
-SELECT 'Metric A' as metric, 'Series 2' as series, 70 as value
-UNION ALL
-SELECT 'Metric B' as metric, 'Series 2' as series, 85 as value
-UNION ALL
-SELECT 'Metric C' as metric, 'Series 2' as series, 60 as value
-UNION ALL
-SELECT 'Metric D' as metric, 'Series 2' as series, 95 as value`;
 
 // Chart code template
 const chartCode = `
@@ -29,13 +22,6 @@ const chartCode = `
 // UNION ALL
 // SELECT 'Metric D' as metric, 'Series 1' as series, 75 as value from default
 // UNION ALL
-// SELECT 'Metric A' as metric, 'Series 2' as series, 70 as value
-// UNION ALL
-// SELECT 'Metric B' as metric, 'Series 2' as series, 85 as value
-// UNION ALL
-// SELECT 'Metric C' as metric, 'Series 2' as series, 60 as value
-// UNION ALL
-// SELECT 'Metric D' as metric, 'Series 2' as series, 95 as value
 
 // ---------------------------------------------------------
 // IMPORTANT: Update the aliases below to match your query!

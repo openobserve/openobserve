@@ -1,3 +1,8 @@
+// Interface for custom chart template modules
+export interface CustomChartTemplateModule {
+  code: string;
+  query: string;
+}
 // Pure Apache ECharts Examples
 // Source: https://github.com/apache/echarts-examples
 // All code is extracted verbatim from the official repository
@@ -41,9 +46,6 @@ const templateMap: Record<string, () => Promise<any>> = {
   // Funnel Charts
   "funnel-customize": () => import("./customChartTemplates/funnelCustomize"),
   
-  // Custom Charts
-  "custom-spiral-race": () => import("./customChartTemplates/customSpiralRace"),
-  
   // Dataset Charts
   "dataset-series-layout": () => import("./customChartTemplates/datasetSeriesLayout"),
   
@@ -56,13 +58,10 @@ const templateMap: Record<string, () => Promise<any>> = {
 
 /**
  * Lazily loads a custom chart template by its value key
- * @param chartValue - The chart value identifier (e.g., 'line-simple', 'area-stack-gradient')
+ * @param chartValue - The chart value identifier (e.g., 'line-simple', 'confidence-band')
  * @returns Promise resolving to the template object with code and query
  */
-export async function loadCustomChartTemplate(chartValue: string): Promise<{
-  code: string;
-  query: string;
-} | null> {
+export async function loadCustomChartTemplate(chartValue: string): Promise<CustomChartTemplateModule | null> {
   const loader = templateMap[chartValue];
   
   if (!loader) {

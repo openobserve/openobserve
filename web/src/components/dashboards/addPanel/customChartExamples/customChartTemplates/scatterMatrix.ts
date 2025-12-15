@@ -28,10 +28,14 @@ const processData = (chartData, dim1Key, dim2Key, dim3Key) => {
   const dim3 = [];
 
   chartData.forEach(row => {
-    if (row[dim1Key] !== undefined) {
+    if (
+      row[dim1Key] !== undefined &&
+      row[dim2Key] !== undefined &&
+      row[dim3Key] !== undefined
+    ) {
       dim1.push(row[dim1Key]);
-      dim2.push(row[dim2Key] || 0);
-      dim3.push(row[dim3Key] || 0);
+      dim2.push(row[dim2Key]);
+      dim3.push(row[dim3Key]);
     }
   });
 

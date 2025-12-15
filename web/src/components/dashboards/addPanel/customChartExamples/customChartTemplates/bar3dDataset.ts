@@ -23,7 +23,7 @@ const chartCode = `
 
 // -----------------------------------------------------------
 // IMPORTANT: Update the aliases below to match your query!
-// -----------------------------------------------------------
+
 const xAlias = 'x_category'; // First column: X-axis category
 const yAlias = 'y_category'; // Second column: Y-axis category
 const zAlias = 'value';      // Third column: Z-axis value (height)
@@ -33,7 +33,7 @@ const processData = (chartData) => {
 // -----------------------------------------------------------
 
   const yData = chartData.map(item => item[yAlias]);
-  const zData = chartData.map(item => item[zAlias] || Math.random() * 100);
+  const zData = chartData.map(item => item[zAlias] ?? 0);
   
   return { xData, yData, zData };
 };
@@ -62,7 +62,13 @@ option = {
   },
   series: [{
     type: 'bar3D',
-    data: xData.map((x, i) => [i, i % yData.length, zData[i]]),
+    data: data[0].map((item) => {
+      const uniqueX = [...new Set(xData)];
+      const uniqueY = [...new Set(yData)];
+      const xIndex = uniqueX.indexOf(item[xAlias]);
+      const yIndex = uniqueY.indexOf(item[yAlias]);
+      return [xIndex, yIndex, item[zAlias] ?? 0];
+    }),
     shading: 'lambert',
     label: {
       formatter: (param) => param.value[2]

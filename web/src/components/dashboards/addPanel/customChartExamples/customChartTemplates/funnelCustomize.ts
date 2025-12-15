@@ -34,19 +34,18 @@ const processData = (chartData, stageKey, valueKey) => {
   if (!chartData || !Array.isArray(chartData)) {
     return [];
   }
-
-  const result = [];
-
-  chartData.forEach(row => {
+  // Find the first value as the base (top of funnel)
+  const base = chartData.length > 0 ? Number(chartData[0][valueKey]) : 0;
+  if (!base) return [];
+  return chartData.map(row => {
     if (row[stageKey] !== undefined && row[valueKey] !== undefined) {
-      result.push({
+      return {
         name: row[stageKey],
-        value: row[valueKey]
-      });
+        value: Math.round((Number(row[valueKey]) / base) * 100)
+      };
     }
-  });
-
-  return result;
+    return null;
+  }).filter(Boolean);
 };
 
 const funnelData = processData(data[0], stageAlias, valueAlias);

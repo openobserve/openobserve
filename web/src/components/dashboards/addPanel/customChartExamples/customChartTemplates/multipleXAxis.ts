@@ -15,7 +15,6 @@ const chartCode = `
 
 // Example Query:
 // SELECT
-// SELECT
 // _timestamp as "date",
 // LENGTH(log) as "value1",
 // LENGTH(code) as "value2"

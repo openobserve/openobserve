@@ -48,7 +48,7 @@ const processData = (chartData) => {
   return { dimensions, source };
 };
 
-const { dimensions, source } = processData(data[0]);
+const { dimensions, source } = processData(data && data.length > 0 ? data[0] : null);
 
 option = {
   legend: {},

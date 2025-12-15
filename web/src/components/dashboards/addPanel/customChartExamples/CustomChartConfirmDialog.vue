@@ -116,7 +116,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 
 export default defineComponent({
-  name: "ConfirmDialog",
+  name: "CustomChartConfirmDialog",
   emits: ["update:ok", "update:cancel"],
   props: {
     title: {

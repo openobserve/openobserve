@@ -41,7 +41,7 @@ option = {
     radius: [30, '80%']
   },
   angleAxis: {
-    max: Math.max(...values) * 1.2,
+    max: (values.length ? Math.max(...values) * 1.2 : 1),
     startAngle: 90
   },
   radiusAxis: {

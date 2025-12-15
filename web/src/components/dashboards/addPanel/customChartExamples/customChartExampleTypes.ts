@@ -152,17 +152,6 @@ export const chartTypesData: { data: ChartCategory[] } = {
       ],
     },
     {
-      chartLabel: "Custom",
-      type: [
-        {
-          label: "Custom Spiral Race",
-          value: "custom-spiral-race",
-          asset:
-            "/src/assets/dashboard/CustomChartAssets/custom-spiral-race.webp",
-        },
-      ],
-    },
-    {
       chartLabel: "Dataset",
       type: [
         {

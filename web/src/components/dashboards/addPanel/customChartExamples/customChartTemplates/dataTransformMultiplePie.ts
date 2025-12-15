@@ -21,9 +21,9 @@ const chartCode = `
 // IMPORTANT: Update the aliases below to match your query!
 // -----------------------------------------------------------
 
-const categoryAlias = "category";
-const subcategoryAlias = "subcategory";
-const valueAlias = "value";
+const categoryAlias = "x_axis";
+const subcategoryAlias = "y_axis";
+const valueAlias = "z_axis";
 // -----------------------------------------------------------
 
 
