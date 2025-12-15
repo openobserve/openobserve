@@ -1,5 +1,6 @@
 
 import logsdata from "../../../test-data/logs_data.json";
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
 export class IngestionPage {
   constructor(page) {
     this.page = page;
@@ -178,14 +179,14 @@ export class IngestionPage {
 
     const results = { success: [], failed: [] };
 
-    console.log(`ingestionJoinUnion: Starting ingestion to UNIQUE streams: ${streams.join(", ")}`);
-    console.log(`ingestionJoinUnion: TestRunId: ${runId}`);
-    console.log(`ingestionJoinUnion: Using URL: ${ingestionUrl}/api/${orgId}/[stream]/_json`);
+    testLogger.info(`ingestionJoinUnion: Starting ingestion to UNIQUE streams: ${streams.join(", ")}`);
+    testLogger.debug(`ingestionJoinUnion: TestRunId: ${runId}`);
+    testLogger.debug(`ingestionJoinUnion: Using URL: ${ingestionUrl}/api/${orgId}/[stream]/_json`);
 
     // Ingest data to each stream
     for (const streamName of streams) {
       const url = `${ingestionUrl}/api/${orgId}/${streamName}/_json`;
-      console.log(`ingestionJoinUnion: Ingesting to stream '${streamName}' at ${url}`);
+      testLogger.debug(`ingestionJoinUnion: Ingesting to stream '${streamName}' at ${url}`);
 
       try {
         const response = await fetch(url, {
@@ -204,24 +205,24 @@ export class IngestionPage {
           responseBody = await response.text();
         }
 
-        console.log(`ingestionJoinUnion: Stream '${streamName}' - Status: ${statusCode}`);
-        console.log(`ingestionJoinUnion: Stream '${streamName}' - Response:`, JSON.stringify(responseBody));
+        testLogger.debug(`ingestionJoinUnion: Stream '${streamName}' - Status: ${statusCode}`);
+        testLogger.debug(`ingestionJoinUnion: Stream '${streamName}' - Response: ${JSON.stringify(responseBody)}`);
 
         if (statusCode >= 200 && statusCode < 300) {
           results.success.push({ stream: streamName, status: statusCode, response: responseBody });
-          console.log(`ingestionJoinUnion: ✓ Stream '${streamName}' ingestion SUCCEEDED`);
+          testLogger.debug(`ingestionJoinUnion: ✓ Stream '${streamName}' ingestion SUCCEEDED`);
         } else {
           results.failed.push({ stream: streamName, status: statusCode, response: responseBody });
-          console.error(`ingestionJoinUnion: ✗ Stream '${streamName}' ingestion FAILED with status ${statusCode}`);
+          testLogger.error(`ingestionJoinUnion: ✗ Stream '${streamName}' ingestion FAILED with status ${statusCode}`);
         }
       } catch (error) {
         results.failed.push({ stream: streamName, error: error.message });
-        console.error(`ingestionJoinUnion: ✗ Stream '${streamName}' ingestion ERROR: ${error.message}`);
+        testLogger.error(`ingestionJoinUnion: ✗ Stream '${streamName}' ingestion ERROR: ${error.message}`);
       }
     }
 
     // Summary
-    console.log(`ingestionJoinUnion: Results - Success: ${results.success.length}, Failed: ${results.failed.length}`);
+    testLogger.info(`ingestionJoinUnion: Results - Success: ${results.success.length}, Failed: ${results.failed.length}`);
 
     if (results.failed.length > 0) {
       const failedStreams = results.failed.map(f => `${f.stream} (${f.status || f.error})`).join(", ");
