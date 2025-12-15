@@ -26,16 +26,14 @@ export class IngestionPage {
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.includes("application/json")) {
         const jsonData = await response.json();
-        console.log(response.status);
-        console.log(response.url);
-        // Process JSON data here
+        testLogger.debug(`ingestion: Status ${response.status}`);
+        testLogger.debug(`ingestion: URL ${response.url}`);
       } else {
         const textData = await response.text();
-        console.log("Response is not JSON:", textData);
-        // Handle the non-JSON response here
+        testLogger.warn("ingestion: Response is not JSON:", textData);
       }
     } catch (error) {
-      console.error("Failed to parse JSON response:", error);
+      testLogger.error("ingestion: Failed to parse JSON response:", error);
     }
   }
 
@@ -64,16 +62,14 @@ export class IngestionPage {
         const contentType = response.headers.get("content-type");
         if (contentType && contentType.includes("application/json")) {
           const jsonData = await response.json();
-          console.log(response.status);
-          console.log(response.url);
-          // Process JSON data here
+          testLogger.debug(`ingestionJoin: Status ${response.status}`);
+          testLogger.debug(`ingestionJoin: URL ${response.url}`);
         } else {
           const textData = await response.text();
-          console.log("Response is not JSON:", textData);
-          // Handle the non-JSON response here
+          testLogger.warn("ingestionJoin: Response is not JSON:", textData);
         }
       } catch (error) {
-        console.error("Failed to parse JSON response:", error);
+        testLogger.error("ingestionJoin: Failed to parse JSON response:", error);
       }
     }
   }
@@ -98,16 +94,14 @@ export class IngestionPage {
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.includes("application/json")) {
         const jsonData = await response.json();
-        console.log(response.status);
-        console.log(response.url);
-        // Process JSON data here
+        testLogger.debug(`ingestionMultiOrg: Status ${response.status}`);
+        testLogger.debug(`ingestionMultiOrg: URL ${response.url}`);
       } else {
         const textData = await response.text();
-        console.log("Response is not JSON:", textData);
-        // Handle the non-JSON response here
+        testLogger.warn("ingestionMultiOrg: Response is not JSON:", textData);
       }
     } catch (error) {
-      console.error("Failed to parse JSON response:", error);
+      testLogger.error("ingestionMultiOrg: Failed to parse JSON response:", error);
     }
   }
 
@@ -130,16 +124,14 @@ export class IngestionPage {
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.includes("application/json")) {
         const jsonData = await response.json();
-        console.log(response.status);
-        console.log(response.url);
-        // Process JSON data here
+        testLogger.debug(`ingestionMultiOrgStream: Status ${response.status}`);
+        testLogger.debug(`ingestionMultiOrgStream: URL ${response.url}`);
       } else {
         const textData = await response.text();
-        console.log("Response is not JSON:", textData);
-        // Handle the non-JSON response here
+        testLogger.warn("ingestionMultiOrgStream: Response is not JSON:", textData);
       }
     } catch (error) {
-      console.error("Failed to parse JSON response:", error);
+      testLogger.error("ingestionMultiOrgStream: Failed to parse JSON response:", error);
     }
   }
 
