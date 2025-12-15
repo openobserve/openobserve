@@ -306,20 +306,185 @@ export class LogsPage {
         }
     }
 
-    async selectStream(stream) {
-        await this.page.locator(this.indexDropDown).click();
-        await this.page.waitForTimeout(1000);
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    /**
+     * Wait for a stream to be available via API before attempting UI selection
+     * @param {string} streamName - Name of the stream to wait for
+     * @param {number} maxWaitMs - Maximum time to wait in milliseconds
+     * @param {number} pollIntervalMs - Interval between checks
+     * @returns {Promise<boolean>} True if stream exists, false if timeout
+     */
+    async waitForStreamAvailable(streamName, maxWaitMs = 30000, pollIntervalMs = 3000) {
+        testLogger.debug(`waitForStreamAvailable: Waiting for stream ${streamName} to be available`);
+        const startTime = Date.now();
 
-        // Type the stream name to filter the dropdown
-        await this.page.locator(this.indexDropDown).fill(stream);
-        await this.page.waitForTimeout(2000); // Wait for filtering to complete
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        // Get credentials from env
+        const apiUrl = process.env.INGESTION_URL;
+        const orgId = process.env.ORGNAME;
+        const authHeader = `Basic ${Buffer.from(`${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`).toString('base64')}`;
 
-        // Find the stream in the filtered results and scroll it into view if needed
-        const streamLocator = this.page.getByText(stream, { exact: true }).first();
-        await streamLocator.scrollIntoViewIfNeeded({ timeout: 15000 });
-        await streamLocator.click();
+        while (Date.now() - startTime < maxWaitMs) {
+            try {
+                // Use dynamic import for node-fetch
+                const fetchModule = await import('node-fetch');
+                const fetch = fetchModule.default;
+
+                const response = await fetch(`${apiUrl}/api/${orgId}/streams`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': authHeader,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                if (response.status === 200 && data.list) {
+                    const streamExists = data.list.some(s => s.name === streamName);
+                    if (streamExists) {
+                        testLogger.debug(`waitForStreamAvailable: Stream ${streamName} found after ${Date.now() - startTime}ms`);
+                        return true;
+                    }
+                }
+
+                testLogger.debug(`waitForStreamAvailable: Stream ${streamName} not found yet, waiting ${pollIntervalMs}ms...`);
+                await this.page.waitForTimeout(pollIntervalMs);
+            } catch (e) {
+                testLogger.debug(`waitForStreamAvailable: Error checking stream: ${e.message}`);
+                await this.page.waitForTimeout(pollIntervalMs);
+            }
+        }
+
+        testLogger.warn(`waitForStreamAvailable: Stream ${streamName} not found after ${maxWaitMs}ms`);
+        return false;
+    }
+
+    async selectStream(stream, maxRetries = 3) {
+        testLogger.info(`selectStream: Selecting stream: ${stream}`);
+
+        // First, wait for the stream to be available via API
+        const streamAvailable = await this.waitForStreamAvailable(stream, 30000, 3000);
+        if (!streamAvailable) {
+            testLogger.warn(`selectStream: Stream ${stream} not found via API after 30s, will still try UI selection`);
+        } else {
+            testLogger.info(`selectStream: Stream ${stream} confirmed available via API`);
+        }
+
+        // Navigate to logs page via URL to ensure fresh stream list (no page.reload which can cause issues)
+        const orgId = process.env.ORGNAME;
+        const logsUrl = `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId}`;
+        testLogger.info(`selectStream: Navigating to logs page: ${logsUrl}`);
+        await this.page.goto(logsUrl, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+        await this.page.waitForTimeout(3000);
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            testLogger.info(`selectStream: Attempt ${attempt}/${maxRetries} for stream: ${stream}`);
+
+            try {
+                // Click the dropdown arrow to open the stream list
+                testLogger.info(`selectStream: Clicking dropdown arrow`);
+                const dropdownArrow = this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down');
+                await dropdownArrow.waitFor({ state: 'visible', timeout: 10000 });
+                await dropdownArrow.click();
+                await this.page.waitForTimeout(2000);
+
+                // Use search box to filter streams for faster finding
+                const searchInput = this.page.locator('[data-test="log-search-index-list-select-stream"]');
+                const searchVisible = await searchInput.isVisible({ timeout: 2000 }).catch(() => false);
+                if (searchVisible) {
+                    testLogger.info(`selectStream: Using search box to filter for: ${stream}`);
+                    await searchInput.click();
+                    await searchInput.fill(stream);
+                    await this.page.waitForTimeout(1500);
+                }
+
+                // Look for the dropdown menu with scroll capability
+                const dropdownMenu = this.page.locator('.q-menu.scroll, .q-menu .scroll, .q-virtual-scroll__content').first();
+
+                // Try to click the stream toggle div directly first
+                const streamToggleSelector = `[data-test="log-search-index-list-stream-toggle-${stream}"]`;
+                testLogger.info(`selectStream: Looking for: ${streamToggleSelector}`);
+
+                // Scroll through the dropdown to find the stream
+                let maxScrolls = 20;
+                let scrollAmount = 200;
+                let foundStream = false;
+
+                while (maxScrolls > 0 && !foundStream) {
+                    // Check if stream toggle is visible
+                    const streamToggleDiv = this.page.locator(`${streamToggleSelector} div`).first();
+                    const toggleDivVisible = await streamToggleDiv.isVisible({ timeout: 500 }).catch(() => false);
+
+                    if (toggleDivVisible) {
+                        await streamToggleDiv.click();
+                        testLogger.info(`selectStream: Selected stream: ${stream}`);
+                        foundStream = true;
+                        return;
+                    }
+
+                    // Try the toggle itself
+                    const streamToggle = this.page.locator(streamToggleSelector);
+                    const toggleVisible = await streamToggle.isVisible({ timeout: 500 }).catch(() => false);
+
+                    if (toggleVisible) {
+                        await streamToggle.click();
+                        testLogger.info(`selectStream: Selected stream via toggle: ${stream}`);
+                        foundStream = true;
+                        return;
+                    }
+
+                    // Try by text
+                    const streamByText = this.page.getByText(stream, { exact: true }).first();
+                    const textVisible = await streamByText.isVisible({ timeout: 500 }).catch(() => false);
+
+                    if (textVisible) {
+                        await streamByText.click();
+                        testLogger.info(`selectStream: Selected stream by text: ${stream}`);
+                        foundStream = true;
+                        return;
+                    }
+
+                    // Scroll down in the dropdown if stream not found yet
+                    const menuVisible = await dropdownMenu.isVisible({ timeout: 500 }).catch(() => false);
+                    if (menuVisible) {
+                        try {
+                            await dropdownMenu.evaluate((el, amount) => el.scrollTop += amount, scrollAmount);
+                            testLogger.debug(`selectStream: Scrolled dropdown by ${scrollAmount}px`);
+                        } catch (scrollError) {
+                            testLogger.debug(`selectStream: Scroll failed: ${scrollError.message}`);
+                        }
+                    }
+
+                    await this.page.waitForTimeout(300);
+                    maxScrolls--;
+                }
+
+                // Stream not found in this attempt, close dropdown and retry
+                testLogger.info(`selectStream: Stream ${stream} not found on attempt ${attempt}`);
+                await this.page.keyboard.press('Escape');
+                await this.page.waitForTimeout(500);
+
+                if (attempt < maxRetries) {
+                    testLogger.debug(`selectStream: Waiting 5s before retry...`);
+                    await this.page.waitForTimeout(5000); // Wait before retry for stream to be indexed
+
+                    // Navigate to logs page again to refresh stream list
+                    await this.page.goto(logsUrl, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+                    await this.page.waitForTimeout(3000);
+                }
+
+            } catch (e) {
+                testLogger.debug(`selectStream: Attempt ${attempt} failed with error: ${e.message}`);
+                await this.page.keyboard.press('Escape').catch(() => {});
+
+                if (attempt < maxRetries) {
+                    await this.page.waitForTimeout(5000);
+                    await this.page.goto(logsUrl, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+                    await this.page.waitForTimeout(3000);
+                }
+            }
+        }
+
+        // All retries exhausted
+        throw new Error(`selectStream: Failed to find stream "${stream}" after ${maxRetries} attempts`);
     }
 
     async selectIndexStreamOld(streamName) {
@@ -782,8 +947,9 @@ export class LogsPage {
     }
 
     async verifySearchPartitionResponse() {
-        const searchPartitionPromise = this.page.waitForResponse(response => 
-            response.url().includes('/api/default/_search_partition') && 
+        const orgName = process.env.ORGNAME || 'default';
+        const searchPartitionPromise = this.page.waitForResponse(response =>
+            response.url().includes(`/api/${orgName}/_search_partition`) &&
             response.request().method() === 'POST'
         );
         
@@ -799,10 +965,11 @@ export class LogsPage {
 
     async captureSearchCalls() {
         const searchCalls = [];
-        
+        const orgName = process.env.ORGNAME || 'default';
+
         // Create the event listener function
         const responseHandler = async response => {
-            if (response.url().includes('/api/default/_search') && 
+            if (response.url().includes(`/api/${orgName}/_search`) &&
                 response.request().method() === 'POST') {
                 const requestData = await response.request().postDataJSON();
                 searchCalls.push({
@@ -826,12 +993,13 @@ export class LogsPage {
     }
 
         async verifyStreamingModeResponse() {
+        const orgName = process.env.ORGNAME || 'default';
         testLogger.debug("[DEBUG] Waiting for search response...");
         const searchPromise = this.page.waitForResponse(response => {
             const url = response.url();
             const method = response.request().method();
             testLogger.debug(`[DEBUG] Response: ${method} ${url}`);
-            return url.includes('/api/default/_search') && method === 'POST';
+            return url.includes(`/api/${orgName}/_search`) && method === 'POST';
         });
         
         const searchResponse = await searchPromise;
@@ -859,12 +1027,13 @@ export class LogsPage {
     }
 
     async clickRunQueryButtonAndVerifyStreamingResponse() {
+        const orgName = process.env.ORGNAME || 'default';
         testLogger.debug("[DEBUG] Setting up response listener before clicking run query button");
         const searchPromise = this.page.waitForResponse(response => {
             const url = response.url();
             const method = response.request().method();
             testLogger.debug(`[DEBUG] Response: ${method} ${url}`);
-            return url.includes('/api/default/_search') && method === 'POST';
+            return url.includes(`/api/${orgName}/_search`) && method === 'POST';
         });
         
         await this.clickRunQueryButton();
@@ -1352,6 +1521,75 @@ export class LogsPage {
 
     async clickRefreshButton() {
         return await this.page.locator(this.queryButton).click({ force: true });
+    }
+
+    /**
+     * Ingest multiple log entries with retry logic for "stream being deleted" errors
+     * @param {string} streamName - Target stream name
+     * @param {Array<{fieldName: string, fieldValue: string}>} dataObjects - Array of field data to ingest
+     * @param {number} maxRetries - Maximum retry attempts (default: 5)
+     */
+    async ingestMultipleFields(streamName, dataObjects, maxRetries = 5) {
+        const orgId = process.env["ORGNAME"];
+        const basicAuthCredentials = Buffer.from(
+            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+        ).toString('base64');
+
+        const headers = {
+            "Authorization": `Basic ${basicAuthCredentials}`,
+            "Content-Type": "application/json",
+        };
+
+        const baseTimestamp = Date.now() * 1000;
+        const logData = dataObjects.map(({ fieldName, fieldValue }, index) => ({
+            level: "info",
+            [fieldName]: fieldValue,
+            log: `Test log with ${fieldName} field - entry ${index}`,
+            _timestamp: baseTimestamp + (index * 1000000)
+        }));
+
+        testLogger.info(`Preparing to ingest ${logData.length} separate log entries`);
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            const response = await this.page.evaluate(async ({ url, headers, orgId, streamName, logData }) => {
+                const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(logData)
+                });
+                const responseJson = await fetchResponse.json();
+                return {
+                    status: fetchResponse.status,
+                    statusText: fetchResponse.statusText,
+                    body: responseJson
+                };
+            }, {
+                url: process.env.INGESTION_URL,
+                headers: headers,
+                orgId: orgId,
+                streamName: streamName,
+                logData: logData
+            });
+
+            testLogger.info(`Ingestion API response (attempt ${attempt}/${maxRetries}) - Status: ${response.status}, Body:`, response.body);
+
+            if (response.status === 200) {
+                testLogger.info('Ingestion successful, waiting for stream to be indexed...');
+                await this.page.waitForTimeout(5000);
+                return;
+            }
+
+            const errorMessage = response.body?.message || JSON.stringify(response.body);
+            if (errorMessage.includes('being deleted') && attempt < maxRetries) {
+                const waitTime = attempt * 5000;
+                testLogger.info(`Stream is being deleted, waiting ${waitTime/1000}s before retry...`);
+                await this.page.waitForTimeout(waitTime);
+                continue;
+            }
+
+            testLogger.error(`Ingestion failed! Status: ${response.status}, Response:`, response.body);
+            throw new Error(`Ingestion failed with status ${response.status}: ${JSON.stringify(response.body)}`);
+        }
     }
 
     async clickSearchBarRefreshButton() {
