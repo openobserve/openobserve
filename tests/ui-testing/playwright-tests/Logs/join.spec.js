@@ -198,14 +198,14 @@ test.describe("Join for logs", () => {
     await pm.logsPage.clickInterestingFields();
 
     // Verify field was added to query editor
-    await expect(page.locator('[data-test="logs-search-bar-query-editor"]')).toContainText('kubernetes_pod_name');
+    await pm.logsPage.expectQueryEditorContainsText('kubernetes_pod_name');
     testLogger.info('Verified kubernetes_pod_name was added to query');
 
     // Step 2: Remove field from query
     await pm.logsPage.addRemoveInteresting();
 
     // Verify field was removed from query editor
-    await expect(page.locator('[data-test="logs-search-bar-query-editor"]')).not.toContainText('kubernetes_pod_name');
+    await pm.logsPage.expectQueryEditorNotContainsText('kubernetes_pod_name');
     testLogger.info('Verified kubernetes_pod_name was removed from query');
 
     testLogger.info('Add/remove interesting field functionality completed');
