@@ -98,7 +98,13 @@ pub async fn remove(org_id: &str, user_email: &str) -> Result<(), anyhow::Error>
     org_users::remove(org_id, &user_email)
         .await
         .map_err(|e| anyhow::anyhow!("Failed to remove user from org: {e}"))?;
-    let _ = delete_from_db_coordinator(&key, false, true, None).await;
+    delete_from_db_coordinator(&key, false, true, None)
+        .await
+        .inspect_err(|e| {
+            log::error!(
+                "error sending user single delete notification in nats for {org_id} {user_email} : {e}"
+            )
+        })?;
 
     #[cfg(feature = "enterprise")]
     super_cluster::org_user_remove(&key).await?;
@@ -111,7 +117,13 @@ pub async fn remove_by_user(email: &str) -> Result<(), anyhow::Error> {
     org_users::remove_by_user(&email)
         .await
         .map_err(|e| anyhow::anyhow!("Failed to remove user from org: {e}"))?;
-    let _ = delete_from_db_coordinator(&key, false, true, None).await;
+    delete_from_db_coordinator(&key, false, true, None)
+        .await
+        .inspect_err(|e| {
+            log::error!(
+                "error sending user many delete notification in nats for {email} : {e}"
+            )
+        })?;
 
     #[cfg(feature = "enterprise")]
     super_cluster::org_user_remove(&key).await?;

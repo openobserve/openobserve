@@ -970,7 +970,9 @@ pub async fn remove_user_from_org(
                     use o2_enterprise::enterprise::cloud::org_invites;
 
                     match org_invites::delete_invites_for_user(org_id, &email_id).await {
-                        Ok(_) => {}
+                        Ok(_) => {
+                            log::info!("successfully delete invites for {email_id}");
+                        }
                         Err(e) => {
                             log::error!(
                                 "error deleting invites when deleting user {email_id} from org {org_id} : {e}"
@@ -994,8 +996,17 @@ pub async fn remove_user_from_org(
                                 "Not Allowed",
                             )));
                         }
+                        log::info!("user {email_id} has single organization, deleting");
 
-                        let _ = db::user::delete(&email_id).await;
+                        if let Err(e) = db::user::delete(&email_id).await {
+                            log::error!("error deleting user from db : {e}");
+                            return Ok(HttpResponse::InternalServerError().json(
+                                MetaHttpResponse::error(
+                                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                                    e.to_string(),
+                                ),
+                            ));
+                        }
                         #[cfg(feature = "enterprise")]
                         {
                             use o2_openfga::authorizer::authz::delete_user_from_org;
@@ -1040,30 +1051,45 @@ pub async fn remove_user_from_org(
                                     };
                             }
                         }
+                        log::info!(
+                            "user {email_id} is part of multiple orgs, removing from {org_id}"
+                        );
                         orgs.retain(|x| !x.name.eq(org_id));
                         let resp = db::org_users::remove(org_id, &email_id).await;
                         // special case as we cache flattened user struct
-                        if resp.is_ok() {
-                            #[cfg(feature = "enterprise")]
-                            {
-                                use o2_openfga::authorizer::authz::delete_user_from_org;
-                                log::debug!(
-                                    "user_fga_role, multi org: {}",
-                                    _user_fga_role.as_ref().unwrap()
-                                );
-                                if get_openfga_config().enabled
-                                    && let Some(_user_fga_role) = _user_fga_role
+                        match resp {
+                            Ok(_) => {
+                                #[cfg(feature = "enterprise")]
                                 {
-                                    delete_user_from_org(
-                                        org_id,
-                                        &email_id,
-                                        _user_fga_role.as_str(),
-                                    )
-                                    .await;
-                                    if is_service_account {
-                                        delete_service_account_from_org(org_id, &email_id).await;
+                                    use o2_openfga::authorizer::authz::delete_user_from_org;
+                                    log::debug!(
+                                        "user_fga_role, multi org: {}",
+                                        _user_fga_role.as_ref().unwrap()
+                                    );
+                                    if get_openfga_config().enabled
+                                        && let Some(_user_fga_role) = _user_fga_role
+                                    {
+                                        delete_user_from_org(
+                                            org_id,
+                                            &email_id,
+                                            _user_fga_role.as_str(),
+                                        )
+                                        .await;
+                                        if is_service_account {
+                                            delete_service_account_from_org(org_id, &email_id)
+                                                .await;
+                                        }
                                     }
                                 }
+                            }
+                            Err(e) => {
+                                log::error!("error deleting user {email_id} from {org_id} : {e}");
+                                return Ok(HttpResponse::InternalServerError().json(
+                                    MetaHttpResponse::error(
+                                        http::StatusCode::INTERNAL_SERVER_ERROR,
+                                        e.to_string(),
+                                    ),
+                                ));
                             }
                         }
                     }
