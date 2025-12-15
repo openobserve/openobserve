@@ -674,17 +674,69 @@ jobs:
             echo "::notice::Test job results: $SUCCEEDED succeeded, $FAILED failed, $TOTAL total"
 
             if [ "$SUCCEEDED" -gt 0 ] && [ "$FAILED" -eq 0 ]; then
-              echo "::notice::✅ All test jobs succeeded - they likely skipped because tests already passed"
-              echo "::notice::This is VALID behavior for optimized reruns"
-              echo "::notice::Creating empty report structure for downstream jobs"
-              mkdir -p playwright-results/html-report
-              # Add stats object to make report compatible with TestDino
-              # startTime must be ISO 8601 string (not Unix timestamp number) for TestDino compatibility
-              START_TIME=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
-              echo '{"config":{},"suites":[],"errors":[],"stats":{"startTime":"'"$START_TIME"'","duration":0,"expected":0,"unexpected":0,"flaky":0,"skipped":0}}' > playwright-results/report.json
-              echo "<html><body><h1>No tests executed - all shards skipped</h1><p>All test shards exited early because tests had already passed in a previous attempt.</p></body></html>" > playwright-results/html-report/index.html
-              echo "::endgroup::"
-              exit 0
+              echo "::notice::✅ All test jobs succeeded in current attempt - checking if we can reuse previous attempt's reports"
+
+              # Check if this is a rerun and previous attempt had upload-only failure
+              # (all e2e jobs passed but merge_and_upload failed)
+              FOUND_PREVIOUS_REPORTS=false
+
+              if [ "${{ github.run_attempt }}" -gt 1 ]; then
+                # Try each previous attempt, starting from most recent
+                for PREV_ATTEMPT in $(seq $((${{ github.run_attempt }} - 1)) -1 1); do
+                  echo "::notice::Checking attempt #$PREV_ATTEMPT for reusable blob reports..."
+
+                  PREV_JOBS=$(curl -s -H "Authorization: token $GH_TOKEN" \
+                    -H "Accept: application/vnd.github.v3+json" \
+                    "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/$PREV_ATTEMPT/jobs")
+
+                  # Check if all e2e jobs succeeded in that attempt
+                  PREV_E2E_FAILED=$(echo "$PREV_JOBS" | jq -r '[.jobs[] | select(.name | startswith("e2e /")) | select(.conclusion == "failure")] | length')
+                  PREV_E2E_SUCCESS=$(echo "$PREV_JOBS" | jq -r '[.jobs[] | select(.name | startswith("e2e /")) | select(.conclusion == "success")] | length')
+
+                  # Check if merge_and_upload job failed in that attempt
+                  PREV_MERGE_STATUS=$(echo "$PREV_JOBS" | jq -r '.jobs[] | select(.name == "Merge Reports and Upload to TestDino") | .conclusion')
+
+                  echo "::notice::Attempt #$PREV_ATTEMPT: e2e_success=$PREV_E2E_SUCCESS, e2e_failed=$PREV_E2E_FAILED, merge_status=$PREV_MERGE_STATUS"
+
+                  # Condition: all e2e jobs passed AND merge/upload failed (upload-only failure)
+                  if [ "$PREV_E2E_SUCCESS" -gt 0 ] && [ "$PREV_E2E_FAILED" -eq 0 ] && [ "$PREV_MERGE_STATUS" = "failure" ]; then
+                    echo "::notice::✅ Attempt #$PREV_ATTEMPT had upload-only failure - downloading its blob reports"
+
+                    # Download artifacts from that attempt
+                    ARTIFACT_NAMES=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts" \
+                      --jq ".artifacts[] | select(.name | startswith(\"blob-report-\") and contains(\"attempt-$PREV_ATTEMPT\")) | .name" 2>/dev/null || echo "")
+
+                    if [ -n "$ARTIFACT_NAMES" ]; then
+                      mkdir -p all-blob-reports
+                      for ARTIFACT_NAME in $ARTIFACT_NAMES; do
+                        echo "Downloading: $ARTIFACT_NAME"
+                        gh run download ${{ github.run_id }} --name "$ARTIFACT_NAME" --dir "all-blob-reports" || true
+                      done
+
+                      if [ "$(ls -A all-blob-reports 2>/dev/null)" ]; then
+                        echo "::notice::✅ Successfully downloaded blob reports from attempt #$PREV_ATTEMPT"
+                        FOUND_PREVIOUS_REPORTS=true
+                        break
+                      fi
+                    fi
+                  fi
+                done
+              fi
+
+              if [ "$FOUND_PREVIOUS_REPORTS" = "true" ]; then
+                echo "::endgroup::"
+                # Continue to merge reports (don't exit, let the merge happen below)
+              else
+                echo "::notice::No reusable reports from previous attempts - creating empty report"
+                mkdir -p playwright-results/html-report
+                # Add stats object to make report compatible with TestDino
+                # startTime must be ISO 8601 string (not Unix timestamp number) for TestDino compatibility
+                START_TIME=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
+                echo '{"config":{},"suites":[],"errors":[],"stats":{"startTime":"'"$START_TIME"'","duration":0,"expected":0,"unexpected":0,"flaky":0,"skipped":0}}' > playwright-results/report.json
+                echo "<html><body><h1>No tests executed - all shards skipped</h1><p>All test shards exited early because tests had already passed in a previous attempt.</p></body></html>" > playwright-results/html-report/index.html
+                echo "::endgroup::"
+                exit 0
+              fi
             else
               echo "::error::❌ Some/all test jobs failed but no blob reports were found"
               echo "::error::This indicates a problem with test execution or blob reporter"
