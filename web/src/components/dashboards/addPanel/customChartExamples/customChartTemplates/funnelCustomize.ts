@@ -53,7 +53,7 @@ const funnelData = processData(data[0], stageAlias, valueAlias);
 option = {
   tooltip: {
     trigger: 'item',
-    formatter: '{a} <br/>{b} : {c}%'
+    formatter: '{a} <br/>{b} : {c}'
   },
   legend: {
     data: funnelData.map(d => d.name)
