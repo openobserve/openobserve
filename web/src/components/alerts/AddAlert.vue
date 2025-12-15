@@ -40,10 +40,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alerts.addTitle") }}
         </div>
         </div>
-        <div>
+        <div class="flex items-center tw-gap-2">
+          <!-- Wizard View Toggle -->
+          <q-btn-toggle
+            v-model="viewMode"
+            toggle-color="primary"
+            :options="[
+              { label: 'Classic', value: 'classic' },
+              { label: 'Wizard', value: 'wizard' }
+            ]"
+            dense
+            no-caps
+            unelevated
+            size="sm"
+            data-test="view-mode-toggle"
+          />
           <q-btn
             outline
-            class="pipeline-icons q-px-sm q-ml-sm hideOnPrintMode"
+            class="pipeline-icons q-px-sm hideOnPrintMode"
             size="sm"
             no-caps
             icon="code"
@@ -56,7 +70,351 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
+    <!-- WIZARD VIEW -->
     <div
+      v-if="viewMode === 'wizard'"
+      class="wizard-view-container tw-mb-2"
+      style="
+        max-height: calc(100vh - 194px);
+        overflow-y: auto;
+        scroll-behavior: smooth;
+      "
+    >
+      <div class="card-container tw-px-2 tw-mx-[0.675rem] tw-py-2">
+        <!-- Stepper Header (Full Width) -->
+        <q-stepper
+          v-model="wizardStep"
+          ref="wizardStepper"
+          color="primary"
+          animated
+          flat
+          class="alert-wizard-stepper"
+        >
+        <!-- Step 1: Alert Setup -->
+        <q-step
+          :name="1"
+          title="Alert Setup"
+          :caption="wizardStep === 1 ? 'Name, folder, stream selection, and alert type' : ''"
+          icon="settings"
+          :done="wizardStep > 1"
+          :header-nav="wizardStep > 1"
+        >
+          <!-- 70/30 Split Layout with Equal Heights -->
+          <div class="tw-flex tw-gap-4 tw-items-stretch" style="height: calc(100vh - 332px); overflow: hidden;">
+            <!-- Left Column: Step Content (70%) -->
+            <div class="tw-flex-[0_0_70%] tw-flex tw-flex-col" style="height: calc(100vh - 332px); overflow: hidden;">
+              <div class="tw-flex-1" style="overflow: auto;">
+                <Step1AlertSetup
+                  ref="step1Ref"
+                  :formData="formData"
+                  :beingUpdated="beingUpdated"
+                  :streamTypes="streamTypes"
+                  :filteredStreams="filteredStreams"
+                  :isFetchingStreams="isFetchingStreams"
+                  :activeFolderId="Array.isArray(activeFolderId) ? activeFolderId[0] : activeFolderId"
+                  :streamFieldRef="streamFieldRef"
+                  :streamTypeFieldRef="streamTypeFieldRef"
+                  @update:streams="updateStreams()"
+                  @filter:streams="filterStreams"
+                  @update:stream-name="updateStreamFields"
+                  @update:active-folder-id="updateActiveFolderId"
+                />
+              </div>
+
+            </div>
+
+            <!-- Right Column: Preview & Summary (30%) -->
+            <div class="tw-flex-[0_0_30%] tw-flex tw-flex-col tw-gap-2" style="height: calc(100vh - 332px); position: sticky; top: 0; overflow: hidden;">
+              <!-- Preview Alert -->
+              <preview-alert
+                style="flex: 1; height: 50%; overflow: auto;"
+                ref="previewAlertRef"
+                :formData="formData"
+                :query="previewQuery"
+                :selectedTab="scheduledAlertRef?.tab || 'custom'"
+                :isAggregationEnabled="isAggregationEnabled"
+              />
+
+              <!-- Alert Summary -->
+              <alert-summary
+                style="flex: 1; height: 50%; overflow: auto;"
+                :formData="formData"
+                :destinations="formData.destinations"
+                :focusManager="focusManager"
+              />
+            </div>
+          </div>
+        </q-step>
+
+        <!-- Step 2: Query Configuration -->
+        <q-step
+          :name="2"
+          title="Query"
+          :caption="wizardStep === 2 ? 'SQL/PromQL editor, conditions, and VRL functions' : ''"
+          icon="search"
+          :done="wizardStep > 2"
+          :header-nav="wizardStep > 2"
+        >
+          <!-- 70/30 Split Layout with Equal Heights -->
+          <div class="tw-flex tw-gap-4 tw-items-stretch" style="height: calc(100vh - 332px); overflow: hidden;">
+            <!-- Left Column: Step Content (70%) -->
+            <div class="tw-flex-[0_0_70%] tw-flex tw-flex-col" style="height: calc(100vh - 332px); overflow: hidden;">
+              <div class="tw-flex-1" style="overflow: auto;">
+                <Step2QueryConfig
+                  :tab="scheduledAlertRef?.tab || 'custom'"
+                  :disableQueryTypeSelection="false"
+                  :columns="filteredColumns"
+                  :streamFieldsMap="streamFieldsMap"
+                  :generatedSqlQuery="generatedSqlQuery"
+                  :inputData="formData.query_condition"
+                  :streamType="formData.stream_type"
+                  :isRealTime="formData.is_real_time"
+                  :sqlQuery="formData.query_condition.sql"
+                  :promqlQuery="formData.query_condition.promql"
+                  :vrlFunction="decodedVrlFunction"
+                  :streamName="formData.stream_name"
+                  @update:tab="updateTab"
+                  @update-group="updateGroup"
+                  @remove-group="removeConditionGroup"
+                  @input:update="onInputUpdate"
+                  @update:sqlQuery="(value) => formData.query_condition.sql = value"
+                  @update:promqlQuery="(value) => formData.query_condition.promql = value"
+                  @update:vrlFunction="(value) => formData.query_condition.vrl_function = value"
+                />
+              </div>
+
+            </div>
+
+            <!-- Right Column: Preview & Summary (30%) -->
+            <div class="tw-flex-[0_0_30%] tw-flex tw-flex-col tw-gap-2" style="height: calc(100vh - 332px); position: sticky; top: 0; overflow: hidden;">
+              <!-- Preview Alert -->
+              <preview-alert
+                style="flex: 1; height: 50%; overflow: auto;"
+                ref="previewAlertRef"
+                :formData="formData"
+                :query="previewQuery"
+                :selectedTab="scheduledAlertRef?.tab || 'custom'"
+                :isAggregationEnabled="isAggregationEnabled"
+              />
+
+              <!-- Alert Summary -->
+              <alert-summary
+                style="flex: 1; height: 50%; overflow: auto;"
+                :formData="formData"
+                :destinations="formData.destinations"
+                :focusManager="focusManager"
+              />
+            </div>
+          </div>
+        </q-step>
+
+        <!-- Step 3: Alert Settings -->
+        <q-step
+          :name="3"
+          title="Alert Settings"
+          :caption="wizardStep === 3 ? (formData.is_real_time === 'true' ? 'Silence notification and destinations' : 'Threshold, aggregation, period, frequency, cooldown, and destinations') : ''"
+          icon="tune"
+          :done="wizardStep > 3"
+          :header-nav="wizardStep > 3"
+        >
+          <!-- 70/30 Split Layout with Equal Heights -->
+          <div class="tw-flex tw-gap-4 tw-items-stretch" style="height: calc(100vh - 332px); overflow: hidden;">
+            <!-- Left Column: Step Content (70%) -->
+            <div class="tw-flex-[0_0_70%] tw-flex tw-flex-col" style="height: calc(100vh - 332px); overflow: hidden;">
+              <div class="tw-flex-1" style="overflow: auto;">
+                <Step3AlertConditions
+                  :formData="formData"
+                  :isRealTime="formData.is_real_time"
+                  :columns="filteredColumns"
+                  :isAggregationEnabled="isAggregationEnabled"
+                  :destinations="formData.destinations"
+                  :formattedDestinations="getFormattedDestinations"
+                  @update:trigger="(val) => formData.trigger_condition = val"
+                  @update:aggregation="(val) => formData.query_condition.aggregation = val"
+                  @update:isAggregationEnabled="(val) => isAggregationEnabled = val"
+                  @update:destinations="updateDestinations"
+                  @refresh:destinations="refreshDestinations"
+                />
+              </div>
+
+            </div>
+
+            <!-- Right Column: Preview & Summary (30%) -->
+            <div class="tw-flex-[0_0_30%] tw-flex tw-flex-col tw-gap-2" style="height: calc(100vh - 332px); position: sticky; top: 0; overflow: hidden;">
+              <!-- Preview Alert -->
+              <preview-alert
+                style="flex: 1; height: 50%; overflow: auto;"
+                ref="previewAlertRef"
+                :formData="formData"
+                :query="previewQuery"
+                :selectedTab="scheduledAlertRef?.tab || 'custom'"
+                :isAggregationEnabled="isAggregationEnabled"
+              />
+
+              <!-- Alert Summary -->
+              <alert-summary
+                style="flex: 1; height: 50%; overflow: auto;"
+                :formData="formData"
+                :destinations="formData.destinations"
+                :focusManager="focusManager"
+              />
+            </div>
+          </div>
+        </q-step>
+
+        <!-- Step 4: Compare with Past (Scheduled only) -->
+        <q-step
+          v-if="formData.is_real_time === 'false'"
+          :name="4"
+          title="Compare with Past"
+          :caption="wizardStep === 4 ? 'Multi-window comparison with historical data' : ''"
+          icon="compare_arrows"
+          :done="wizardStep > 4"
+          :header-nav="wizardStep > 4"
+        >
+          <!-- 70/30 Split Layout with Equal Heights -->
+          <div class="tw-flex tw-gap-4 tw-items-stretch" style="height: calc(100vh - 332px); overflow: hidden;">
+            <!-- Left Column: Step Content (70%) -->
+            <div class="tw-flex-[0_0_70%] tw-flex tw-flex-col" style="height: 100%; overflow: hidden;">
+              <div class="tw-flex-1" style="overflow: auto;">
+                <Step4CompareWithPast
+                  :multiTimeRange="formData.query_condition.multi_time_range"
+                  :period="formData.trigger_condition.period"
+                  :frequency="formData.trigger_condition.frequency"
+                  :frequencyType="formData.trigger_condition.frequency_type"
+                  :cron="formData.trigger_condition.cron"
+                  @update:multiTimeRange="(val) => formData.query_condition.multi_time_range = val"
+                />
+              </div>
+
+            </div>
+
+            <!-- Right Column: Preview & Summary (30%) -->
+            <div class="tw-flex-[0_0_30%] tw-flex tw-flex-col tw-gap-2" style="height: 100%; position: sticky; top: 0; overflow: hidden;">
+              <!-- Preview Alert -->
+              <preview-alert
+                style="flex: 1; height: 50%; overflow: auto;"
+                ref="previewAlertRef"
+                :formData="formData"
+                :query="previewQuery"
+                :selectedTab="scheduledAlertRef?.tab || 'custom'"
+                :isAggregationEnabled="isAggregationEnabled"
+              />
+
+              <!-- Alert Summary -->
+              <alert-summary
+                style="flex: 1; height: 50%; overflow: auto;"
+                :formData="formData"
+                :destinations="formData.destinations"
+                :focusManager="focusManager"
+              />
+            </div>
+          </div>
+        </q-step>
+
+        <!-- Step 5: Deduplication (Scheduled only) -->
+        <q-step
+          v-if="formData.is_real_time === 'false'"
+          :name="5"
+          title="Deduplication"
+          :caption="wizardStep === 5 ? 'Prevent duplicate alerts by grouping similar alerts' : ''"
+          icon="filter_list"
+          :done="wizardStep > 5"
+          :header-nav="wizardStep > 5"
+        >
+          <!-- 70/30 Split Layout with Equal Heights -->
+          <div class="tw-flex tw-gap-4 tw-items-stretch" style="height: calc(100vh - 332px); overflow: hidden;">
+            <!-- Left Column: Step Content (70%) -->
+            <div class="tw-flex-[0_0_70%] tw-flex tw-flex-col" style="height: calc(100vh - 332px); overflow: hidden;">
+              <div class="tw-flex-1" style="overflow: auto;">
+                <Step5Deduplication
+                  :deduplication="formData.deduplication"
+                  :columns="filteredColumns"
+                  @update:deduplication="(val) => formData.deduplication = val"
+                />
+              </div>
+
+            </div>
+
+            <!-- Right Column: Preview & Summary (30%) -->
+            <div class="tw-flex-[0_0_30%] tw-flex tw-flex-col tw-gap-2" style="height: calc(100vh - 332px); position: sticky; top: 0; overflow: hidden;">
+              <!-- Preview Alert -->
+              <preview-alert
+                style="flex: 1; height: 50%; overflow: auto;"
+                ref="previewAlertRef"
+                :formData="formData"
+                :query="previewQuery"
+                :selectedTab="scheduledAlertRef?.tab || 'custom'"
+                :isAggregationEnabled="isAggregationEnabled"
+              />
+
+              <!-- Alert Summary -->
+              <alert-summary
+                style="flex: 1; height: 50%; overflow: auto;"
+                :formData="formData"
+                :destinations="formData.destinations"
+                :focusManager="focusManager"
+              />
+            </div>
+          </div>
+        </q-step>
+
+        <!-- Step 6: Advanced Settings -->
+        <q-step
+          :name="6"
+          title="Advanced"
+          :caption="wizardStep === 6 ? 'Context variables, description, and row templates' : ''"
+          icon="settings_applications"
+          :done="false"
+        >
+          <!-- 70/30 Split Layout with Equal Heights -->
+          <div class="tw-flex tw-gap-4 tw-items-stretch" style="height: calc(100vh - 332px); overflow: hidden;">
+            <!-- Left Column: Step Content (70%) -->
+            <div class="tw-flex-[0_0_70%] tw-flex tw-flex-col" style="height: 100%; overflow: hidden;">
+              <div class="tw-flex-1" style="overflow: auto;">
+                <Step6Advanced
+                  :contextAttributes="formData.context_attributes"
+                  :description="formData.description"
+                  :rowTemplate="formData.row_template"
+                  :rowTemplateType="formData.row_template_type"
+                  @update:contextAttributes="(val) => formData.context_attributes = val"
+                  @update:description="(val) => formData.description = val"
+                  @update:rowTemplate="(val) => formData.row_template = val"
+                  @update:rowTemplateType="(val) => formData.row_template_type = val"
+                />
+              </div>
+
+            </div>
+
+            <!-- Right Column: Preview & Summary (30%) -->
+            <div class="tw-flex-[0_0_30%] tw-flex tw-flex-col tw-gap-2" style="height: 100%; position: sticky; top: 0; overflow: hidden;">
+              <!-- Preview Alert -->
+              <preview-alert
+                style="flex: 1; height: 50%; overflow: auto;"
+                ref="previewAlertRef"
+                :formData="formData"
+                :query="previewQuery"
+                :selectedTab="scheduledAlertRef?.tab || 'custom'"
+                :isAggregationEnabled="isAggregationEnabled"
+              />
+
+              <!-- Alert Summary -->
+              <alert-summary
+                style="flex: 1; height: 50%; overflow: auto;"
+                :formData="formData"
+                :destinations="formData.destinations"
+                :focusManager="focusManager"
+              />
+            </div>
+          </div>
+        </q-step>
+      </q-stepper>
+      </div>
+    </div>
+
+    <!-- CLASSIC VIEW (Original) -->
+    <div
+      v-else
       ref="addAlertFormRef"
       style="
         max-height: calc(100vh - 194px);
@@ -428,29 +786,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div class="tw-mx-2">
       <div
-          class="flex justify-end q-px-md full-width tw-py-3 card-container"
+          class="flex q-px-md full-width tw-py-3 card-container tw-justify-end"
           style="position: sticky; bottom: 0px; z-index: 2"
         >
-        <q-btn
-          data-test="add-alert-cancel-btn"
-          v-close-popup="true"
-          class="q-mr-md o2-secondary-button tw-h-[36px]"
-          :label="t('alerts.cancel')"
-          no-caps
-          flat
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-          @click="$emit('cancel:hideform')"
-        />
-        <q-btn
-          data-test="add-alert-submit-btn"
-          class="o2-primary-button no-border tw-h-[36px]"
-          :label="t('alerts.save')"
-          type="submit"
-          no-caps
-          flat
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-          @click="onSubmit"
-        />
+        <!-- All Buttons (Right Side) -->
+        <div class="tw-flex tw-items-center tw-gap-2">
+          <!-- Wizard Navigation Buttons -->
+          <template v-if="viewMode === 'wizard'">
+            <q-btn
+              flat
+              label="Back"
+              icon="arrow_back"
+              class="o2-secondary-button tw-h-[36px]"
+              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+              :disable="wizardStep === 1"
+              no-caps
+              @click="goToPreviousStep"
+            />
+            <q-btn
+              flat
+              label="Continue"
+              icon-right="arrow_forward"
+              class="o2-secondary-button tw-h-[36px]"
+              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+              :disable="isLastStep"
+              no-caps
+              @click="goToNextStep"
+            />
+            <q-separator vertical class="tw-mx-2" style="height: 36px;" />
+          </template>
+
+          <!-- Cancel and Save Buttons -->
+          <q-btn
+            data-test="add-alert-cancel-btn"
+            v-close-popup="true"
+            class="o2-secondary-button tw-h-[36px]"
+            :label="t('alerts.cancel')"
+            no-caps
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            @click="$emit('cancel:hideform')"
+          />
+          <q-btn
+            data-test="add-alert-submit-btn"
+            class="o2-primary-button no-border tw-h-[36px]"
+            :label="t('alerts.save')"
+            type="submit"
+            no-caps
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            @click="onSubmit"
+          />
+        </div>
       </div>
     </div>
 
@@ -474,6 +861,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </q-dialog>
 
+    <!-- Hidden ScheduledAlert for Editor Dialog Access -->
+    <scheduled-alert
+      v-show="false"
+      ref="scheduledAlertRef"
+      :columns="filteredColumns"
+      :streamFieldsMap="streamFieldsMap"
+      :generatedSqlQuery="generatedSqlQuery"
+      :conditions="formData.query_condition?.conditions || {}"
+      :expandState="expandState"
+      :alertData="formData"
+      :sqlQueryErrorMsg="sqlQueryErrorMsg"
+      :vrlFunctionError="vrlFunctionError"
+      :showTimezoneWarning="showTimezoneWarning"
+      :selectedStream="formData.stream_name"
+      :selected-stream-type="formData.stream_type"
+      :destinations="formData.destinations"
+      :formattedDestinations="getFormattedDestinations"
+      v-model:trigger="formData.trigger_condition"
+      v-model:sql="formData.query_condition.sql"
+      v-model:promql="formData.query_condition.promql"
+      v-model:query_type="formData.query_condition.type"
+      v-model:aggregation="formData.query_condition.aggregation"
+      v-model:silence="formData.trigger_condition.silence"
+      v-model:promql_condition="formData.query_condition.promql_condition"
+      v-model:multi_time_range="formData.query_condition.multi_time_range"
+      v-model:vrl_function="formData.query_condition.vrl_function"
+      @input:update="onInputUpdate"
+      @update:expandState="updateExpandState"
+      @update:formData="formData = $event"
+      @refresh:destinations="refreshDestinations"
+      @update:destinations="updateDestinations"
+      @update:group="updateGroup"
+      @remove:group="removeConditionGroup"
+      @update:silence="updateSilence"
+      @update:multi-time-range="updateMultiTimeRange"
+    />
 
 </template>
 
@@ -537,6 +960,13 @@ import AlertsContainer from "./AlertsContainer.vue";
 import JsonEditor from "../common/JsonEditor.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { createAlertsContextProvider, contextRegistry } from "@/composables/contextProviders";
+import HorizontalStepper from "./HorizontalStepper.vue";
+import Step1AlertSetup from "./steps/Step1AlertSetup.vue";
+import Step2QueryConfig from "./steps/Step2QueryConfig.vue";
+import Step3AlertConditions from "./steps/Step3AlertConditions.vue";
+import Step4CompareWithPast from "./steps/Step4CompareWithPast.vue";
+import Step5Deduplication from "./steps/Step5Deduplication.vue";
+import Step6Advanced from "./steps/Step6Advanced.vue";
 import {
   updateGroup as updateGroupUtil,
   removeConditionGroup as removeConditionGroupUtil,
@@ -563,17 +993,7 @@ const defaultValue: any = () => {
         filterType: "group",
         logicalOperator: "AND",
         groupId: "",
-        conditions: [
-            {
-                filterType: "condition",
-                column: "",
-                operator: ">",
-                value: "",
-                values: [],
-                logicalOperator: "AND",
-                id: ""
-            }
-        ]
+        conditions: []
         },
       sql: "",
       promql: "",
@@ -642,6 +1062,13 @@ export default defineComponent({
     SelectFolderDropDown,
     AlertsContainer,
     JsonEditor,
+    HorizontalStepper,
+    Step1AlertSetup,
+    Step2QueryConfig,
+    Step3AlertConditions,
+    Step4CompareWithPast,
+    Step5Deduplication,
+    Step6Advanced,
   },
   setup(props, { emit }) {
     const store: any = useStore();
@@ -717,6 +1144,7 @@ export default defineComponent({
 
     const router = useRouter();
     const scheduledAlertRef: any = ref(null);
+    const viewSqlEditorDialog = ref(false);
 
     const plotChart: any = ref(null);
 
@@ -739,6 +1167,26 @@ export default defineComponent({
 
     const updateActiveFolderId = (folderId: any) => {
       activeFolderId.value = folderId.value;
+    };
+
+    // View mode toggle: 'classic' or 'wizard'
+    const viewMode = ref('classic');
+
+    // Wizard step state
+    const wizardStep = ref(1);
+    const wizardStepper = ref(null);
+    const step1Ref = ref(null);
+
+    const goToStep2 = async () => {
+      // Validate step 1 before proceeding
+      if (step1Ref.value && typeof step1Ref.value.validate === 'function') {
+        const isValid = await step1Ref.value.validate();
+        if (isValid) {
+          wizardStep.value = 2;
+        }
+      } else {
+        wizardStep.value = 2;
+      }
     };
 
     onBeforeMount(async () => {
@@ -768,6 +1216,17 @@ export default defineComponent({
       return formData.value.row_template_type === 'Json'
         ? 'e.g - {"user": "{name}", "timestamp": "{timestamp}"}'
         : 'e.g - Alert was triggered at {timestamp}';
+    });
+
+    const decodedVrlFunction = computed(() => {
+      if (!formData.value.query_condition.vrl_function) {
+        return "";
+      }
+      try {
+        return b64DecodeUnicode(formData.value.query_condition.vrl_function);
+      } catch (e) {
+        return formData.value.query_condition.vrl_function;
+      }
     });
 
     const editorData = ref("");
@@ -1074,6 +1533,24 @@ export default defineComponent({
 
     const getSelectedTab = computed(() => {
       return scheduledAlertRef.value?.tab || null;
+    });
+
+    const openEditorDialog = () => {
+      viewSqlEditorDialog.value = true;
+    };
+
+    // Watch viewSqlEditorDialog and sync with ScheduledAlert
+    watch(viewSqlEditorDialog, (newValue) => {
+      if (scheduledAlertRef.value && scheduledAlertRef.value.viewSqlEditor) {
+        scheduledAlertRef.value.viewSqlEditor.value = newValue;
+      }
+    });
+
+    // Watch ScheduledAlert's viewSqlEditor and sync back
+    watch(() => scheduledAlertRef.value?.viewSqlEditor?.value, (newValue) => {
+      if (newValue !== undefined && newValue !== viewSqlEditorDialog.value) {
+        viewSqlEditorDialog.value = newValue;
+      }
     });
 
     const previewAlert = async () => {
@@ -1539,7 +2016,44 @@ export default defineComponent({
       );
     };
 
+    // Wizard step navigation logic
+    const goToNextStep = () => {
+      if (formData.value.is_real_time === 'true') {
+        // For real-time alerts: 1 -> 2 -> 3 -> 6 (skip 4 and 5)
+        if (wizardStep.value === 3) {
+          wizardStep.value = 6;
+        } else {
+          wizardStep.value = wizardStep.value + 1;
+        }
+      } else {
+        // For scheduled alerts: normal progression 1 -> 2 -> 3 -> 4 -> 5 -> 6
+        wizardStep.value = wizardStep.value + 1;
+      }
+    };
 
+    const goToPreviousStep = () => {
+      if (formData.value.is_real_time === 'true') {
+        // For real-time alerts: 6 -> 3 -> 2 -> 1 (skip 5 and 4)
+        if (wizardStep.value === 6) {
+          wizardStep.value = 3;
+        } else {
+          wizardStep.value = wizardStep.value - 1;
+        }
+      } else {
+        // For scheduled alerts: normal progression 6 -> 5 -> 4 -> 3 -> 2 -> 1
+        wizardStep.value = wizardStep.value - 1;
+      }
+    };
+
+    const isLastStep = computed(() => {
+      if (formData.value.is_real_time === 'true') {
+        // For real-time alerts, step 6 is the last step
+        return wizardStep.value === 6;
+      } else {
+        // For scheduled alerts, step 6 is also the last step
+        return wizardStep.value === 6;
+      }
+    });
 
     return {
       t,
@@ -1620,6 +2134,9 @@ export default defineComponent({
       transformFEToBE,
       retransformBEToFE,
       validateFormAndNavigateToErrorField,
+      openEditorDialog,
+      decodedVrlFunction,
+      viewSqlEditorDialog,
       navigateToErrorField,
       realTimeAlertRef,
       openJsonEditor,
@@ -1634,6 +2151,14 @@ export default defineComponent({
       focusManager,
       streamFieldRef,
       streamTypeFieldRef,
+      viewMode,
+      wizardStep,
+      wizardStepper,
+      step1Ref,
+      goToStep2,
+      goToNextStep,
+      goToPreviousStep,
+      isLastStep,
     };
   },
 
@@ -2131,7 +2656,76 @@ export default defineComponent({
 .o2-alert-tab-border{
   border-top: 0.0625rem solid var(--o2-border-color);
 }
-  
 
+// Wizard Stepper Styles
+.alert-wizard-stepper {
+  box-shadow: none;
+
+  :deep(.q-stepper__header) {
+    border-bottom: 1px solid #e0e0e0;
+  }
+
+  :deep(.q-stepper__tab) {
+    padding: 12px 16px;
+    min-height: 60px;
+  }
+
+  // Hide captions for inactive steps
+  :deep(.q-stepper__tab) {
+    .q-stepper__caption {
+      display: none !important;
+    }
+  }
+
+  // Show caption only on active step
+  :deep(.q-stepper__tab--active) {
+    .q-stepper__caption {
+      display: block !important;
+      opacity: 0.7;
+      font-size: 12px;
+      margin-top: 4px;
+    }
+  }
+
+  :deep(.q-stepper__tab--active) {
+    color: #1976d2;
+    font-weight: 600;
+  }
+
+  :deep(.q-stepper__tab--done) {
+    color: #4caf50;
+  }
+
+  :deep(.q-stepper__dot) {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+  }
+
+  .q-stepper--horizontal .q-stepper__step-inner {
+    padding: 8px !important;
+  }
+
+  // Make step titles more compact
+  :deep(.q-stepper__title) {
+    font-size: 14px;
+    line-height: 1.2;
+  }
+}
+
+.wizard-view-container {
+  .q-stepper {
+    background: transparent !important;
+  }
+}
+
+// Dark mode adjustments
+.dark-mode1 {
+  .alert-wizard-stepper {
+    :deep(.q-stepper__header) {
+      border-bottom-color: #424242;
+    }
+  }
+}
 
 </style>
