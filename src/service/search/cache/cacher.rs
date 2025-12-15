@@ -927,9 +927,7 @@ fn calculate_deltas_multi(
             .last()
             .is_some_and(|last_meta| !last_meta.cached_response.hits.is_empty())
     {
-        // Adding histogram interval to the current end time to ensure the next query
-        // fetches the data after the last cache result timestamp, thereby avoiding duplicates
-        let mut expected_delta_start_time = current_end_time + histogram_interval.abs();
+        let mut expected_delta_start_time = current_end_time;
         if expected_delta_start_time > end_time {
             expected_delta_start_time = current_end_time;
         }
@@ -938,9 +936,6 @@ fn calculate_deltas_multi(
             delta_end_time: end_time,
         });
     }
-
-    // remove all deltas that are within the cache duration
-    // deltas.retain(|d| d.delta_start_time >= new_start_time);
 
     deltas.sort(); // Sort the deltas to bring duplicates together
     deltas.dedup(); // Remove consecutive duplicates
