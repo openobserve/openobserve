@@ -135,6 +135,7 @@ jobs:
                 "pagination.spec.js",
                 "unflattened.spec.js",
                 "logstable.spec.js",
+                "shareLink.spec.js",
               ]
           - testfolder: "Logs-Queries"
             browser: "chrome"
@@ -217,7 +218,7 @@ jobs:
               ]
           - testfolder: "RegressionSet"
             browser: "chrome"
-            run_files: ["logs-regression.spec.js"]
+            run_files: ["logs-regression.spec.js", "streams-regression.spec.js"]
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5

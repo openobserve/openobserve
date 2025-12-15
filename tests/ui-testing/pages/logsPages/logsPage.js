@@ -135,6 +135,17 @@ export class LogsPage {
         this.errorIcon = 'text=error';
         this.resultErrorDetailsBtn = '[data-test="logs-page-result-error-details-btn"]';
         this.searchDetailErrorMessage = '[data-test="logs-search-detail-error-message"]';
+
+        // ===== SHARE LINK SELECTORS (VERIFIED) =====
+        this.shareLinkButton = '[data-test="logs-search-bar-share-link-btn"]';
+        this.successNotification = '.q-notification__message';
+        this.linkCopiedSuccessText = 'Link Copied Successfully';
+        this.errorCopyingLinkText = 'Error while copy link';
+
+        // ===== QUERY EDITOR EXPAND/COLLAPSE SELECTORS =====
+        this.queryEditorFullScreenBtn = '[data-test="logs-query-editor-full_screen-btn"]';
+        this.queryEditorContainer = '.query-editor-container';
+        this.expandOnFocusClass = '.expand-on-focus';
     }
 
 
@@ -977,12 +988,12 @@ export class LogsPage {
     // Validation methods
     async validateResult() {
         try {
-            // Wait for the logs table with a longer timeout for streaming mode
-            await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', { 
-                timeout: 45000, // Increased timeout for streaming mode
-                state: 'visible' 
+            // Wait for the logs table with a longer timeout for streaming mode and Firefox
+            await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', {
+                timeout: 90000, // Increased timeout for streaming mode and Firefox browser
+                state: 'visible'
             });
-            await expect(this.page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible();
+            await expect(this.page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible({ timeout: 30000 });
         } catch (error) {
             testLogger.error('Error in validateResult:', error);
             // Check if there's an error message visible
@@ -1091,45 +1102,33 @@ export class LogsPage {
     }
 
     async kubernetesContainerNameJoin() {
-        await this.page
-            .locator('[data-test="logs-search-bar-query-editor"]').locator('.inputarea')
-            .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
-        await this.page.waitForTimeout(5000);
+        await this.clearAndFillQueryEditor('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
+        await this.page.waitForTimeout(3000);
     }
 
     async kubernetesContainerNameJoinLimit() {
-        await this.page
-            .locator('[data-test="logs-search-bar-query-editor"]').locator('.inputarea')
-            .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a left join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name LIMIT 10');
-        await this.page.waitForTimeout(5000);
+        await this.clearAndFillQueryEditor('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a left join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name LIMIT 10');
+        await this.page.waitForTimeout(3000);
     }
 
     async kubernetesContainerNameJoinLike() {
-        await this.page
-            .locator('[data-test="logs-search-bar-query-editor"]').locator('.inputarea')
-            .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name WHERE a.kubernetes_container_name LIKE "%ziox%"');
-        await this.page.waitForTimeout(5000);
+        await this.clearAndFillQueryEditor('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name WHERE a.kubernetes_container_name LIKE "%ziox%"');
+        await this.page.waitForTimeout(3000);
     }
 
     async kubernetesContainerNameLeftJoin() {
-        await this.page
-            .locator('[data-test="logs-search-bar-query-editor"]').locator('.inputarea')
-            .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a LEFT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
-        await this.page.waitForTimeout(5000);
+        await this.clearAndFillQueryEditor('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a LEFT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
+        await this.page.waitForTimeout(3000);
     }
 
     async kubernetesContainerNameRightJoin() {
-        await this.page
-            .locator('[data-test="logs-search-bar-query-editor"]').locator('.inputarea')
-            .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a RIGHT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
-        await this.page.waitForTimeout(5000);
+        await this.clearAndFillQueryEditor('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a RIGHT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
+        await this.page.waitForTimeout(3000);
     }
 
     async kubernetesContainerNameFullJoin() {
-        await this.page
-            .locator('[data-test="logs-search-bar-query-editor"]').locator('.inputarea')
-            .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a FULL JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
-        await this.page.waitForTimeout(5000);
+        await this.clearAndFillQueryEditor('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a FULL JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
+        await this.page.waitForTimeout(3000);
     }
 
     // Log count ordering methods
@@ -1579,9 +1578,42 @@ export class LogsPage {
     }
 
     async clickBarChartCanvas() {
-        return await this.page.locator(this.barChartCanvas).click({
-            position: { x: 182, y: 66 }
-        });
+        // Wait for network idle to ensure chart data has loaded
+        await this.page.waitForLoadState('networkidle');
+
+        const canvasLocator = this.page.locator(this.barChartCanvas);
+
+        // Retry mechanism to handle ECharts canvas re-rendering
+        const maxRetries = 3;
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                // Wait for the canvas to be visible
+                await canvasLocator.waitFor({ state: 'visible', timeout: 30000 });
+
+                // Wait for chart to stabilize - ECharts may re-render multiple times
+                await this.page.waitForTimeout(2000);
+
+                // force:true required for ECharts canvas - canvas elements are interactive
+                // but fail Playwright's actionability checks (no pointer-events in traditional sense)
+                await canvasLocator.click({
+                    position: { x: 182, y: 66 },
+                    force: true,
+                    timeout: 10000
+                });
+                return; // Success
+            } catch (error) {
+                if (attempt === maxRetries) {
+                    throw error;
+                }
+                // Wait before retry to allow chart to stabilize
+                await this.page.waitForTimeout(1000);
+            }
+        }
+    }
+
+    async expectBarChartCanvasVisible() {
+        const canvasLocator = this.page.locator(this.barChartCanvas);
+        return await expect(canvasLocator).toBeVisible({ timeout: 30000 });
     }
 
     async fillIndexFieldSearchInput(text) {
@@ -1883,6 +1915,28 @@ export class LogsPage {
 
     async expectQueryEditorContainsText(text) {
         return await expect(this.page.locator(this.queryEditor).locator('.monaco-editor')).toContainText(text);
+    }
+
+    // ===== QUERY EDITOR EXPAND/COLLAPSE METHODS =====
+    async clickQueryEditorFullScreenBtn() {
+        return await this.page.locator(this.queryEditorFullScreenBtn).click();
+    }
+
+    async expectQueryEditorFullScreenBtnVisible() {
+        return await expect(this.page.locator(this.queryEditorFullScreenBtn)).toBeVisible({ timeout: 10000 });
+    }
+
+    async isQueryEditorExpanded() {
+        const container = this.page.locator(this.queryEditorContainer);
+        return await container.locator(this.expandOnFocusClass).count() > 0;
+    }
+
+    async toggleQueryEditorFullScreen() {
+        const initialState = await this.isQueryEditorExpanded();
+        await this.clickQueryEditorFullScreenBtn();
+        await this.page.waitForTimeout(500); // Wait for animation
+        const newState = await this.isQueryEditorExpanded();
+        return { initialState, newState, toggled: initialState !== newState };
     }
 
     async expectQueryEditorEmpty() {
@@ -2683,15 +2737,49 @@ export class LogsPage {
     }
 
     async toggleQueryModeEditor() {
-        return await this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] div').first().click();
+        await this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] div').first().click();
+        // Wait for the Monaco editor container to appear (Firefox needs this)
+        await this.page.waitForTimeout(2000);
+        await this.page.locator('#fnEditor').waitFor({ state: 'visible', timeout: 15000 });
     }
 
     async clickMonacoEditor() {
-        return await this.page.locator('#fnEditor').locator('.monaco-editor').click();
+        // Wait for Monaco editor to be fully rendered (Firefox needs longer)
+        const monacoEditor = this.page.locator('#fnEditor').locator('.monaco-editor');
+        await monacoEditor.waitFor({ state: 'visible', timeout: 30000 });
+        // Scroll into view for Firefox (element may be outside viewport)
+        await monacoEditor.scrollIntoViewIfNeeded();
+        await this.page.waitForTimeout(1500); // Extra stabilization for Firefox
+        return await monacoEditor.click({ force: true });
     }
 
     async fillMonacoEditor(text) {
-        return await this.page.locator('#fnEditor').locator('.inputarea').fill(text);
+        // Wait for Monaco editor to be visible (Firefox rendering is slower)
+        const fnEditorContainer = this.page.locator('#fnEditor');
+        const monacoEditor = fnEditorContainer.locator('.monaco-editor');
+        await monacoEditor.waitFor({ state: 'visible', timeout: 30000 });
+
+        // Use JavaScript to scroll the fnEditor into center of viewport (more reliable for Firefox)
+        await fnEditorContainer.evaluate(el => {
+            el.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' });
+        });
+        await this.page.waitForTimeout(2000); // Extra stabilization for Firefox
+
+        // Click on the Monaco editor container using coordinates (more reliable for Firefox viewport issues)
+        const editorBox = await monacoEditor.boundingBox();
+        if (editorBox) {
+            await this.page.mouse.click(editorBox.x + 50, editorBox.y + 20);
+        } else {
+            // Fallback: click with force
+            await monacoEditor.click({ force: true });
+        }
+        await this.page.waitForTimeout(500);
+
+        // Clear existing content and fill using keyboard (more reliable on Firefox)
+        await this.page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+        await this.page.keyboard.press('Backspace');
+        await this.page.waitForTimeout(200);
+        await this.page.keyboard.type(text, { delay: 50 });
     }
 
     async getCellByName(name) {
@@ -2785,7 +2873,31 @@ export class LogsPage {
     }
 
     async fillQueryEditorWithRole(text) {
-        return await this.page.locator(this.queryEditor).getByRole('textbox', { name: 'Editor content' }).fill(text);
+        // Wait for query editor to be visible and ready (Firefox needs longer)
+        const queryEditorContainer = this.page.locator(this.queryEditor);
+        await queryEditorContainer.waitFor({ state: 'visible', timeout: 30000 });
+
+        // Use JavaScript to scroll into center of viewport (more reliable for Firefox)
+        await queryEditorContainer.evaluate(el => {
+            el.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' });
+        });
+        await this.page.waitForTimeout(2000); // Extra stabilization for Firefox
+
+        // Click using coordinates (more reliable for Firefox viewport issues)
+        const editorBox = await queryEditorContainer.boundingBox();
+        if (editorBox) {
+            await this.page.mouse.click(editorBox.x + 50, editorBox.y + 20);
+        } else {
+            // Fallback: click with force
+            await queryEditorContainer.click({ force: true });
+        }
+        await this.page.waitForTimeout(500);
+
+        // Clear and type using keyboard (more reliable on Firefox)
+        await this.page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+        await this.page.keyboard.press('Backspace');
+        await this.page.waitForTimeout(200);
+        await this.page.keyboard.type(text, { delay: 30 });
     }
 
     async clickTimeCell() {
@@ -2799,7 +2911,8 @@ export class LogsPage {
     }
 
     async expectErrorIconVisible() {
-        return await expect(this.page.getByText('error')).toBeVisible();
+        // Use specific selector for error icon (material-icons with text-negative class)
+        return await expect(this.page.locator('i.q-icon.text-negative.material-icons').filter({ hasText: 'error' })).toBeVisible();
     }
 
     async expectResultErrorDetailsButtonVisible() {
@@ -3058,6 +3171,290 @@ export class LogsPage {
         } catch (error) {
             testLogger.error('Stream deletion failed:', { error: error.message });
             throw error;
+        }
+    }
+
+    // ===== SHARE LINK METHODS =====
+
+    /**
+     * Click the share link button on the logs search bar
+     */
+    async clickShareLinkButton() {
+        await this.page.locator(this.shareLinkButton).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.locator(this.shareLinkButton).click();
+        testLogger.info('Clicked share link button');
+    }
+
+    /**
+     * Verify the share link button is visible
+     */
+    async expectShareLinkButtonVisible() {
+        await expect(this.page.locator(this.shareLinkButton)).toBeVisible();
+        testLogger.info('Share link button is visible');
+    }
+
+    /**
+     * Click share link and wait for success notification
+     * @returns {Promise<boolean>} true if success notification appeared
+     */
+    async clickShareLinkAndExpectSuccess() {
+        await this.clickShareLinkButton();
+
+        // Wait for success notification
+        const notification = this.page.locator(this.successNotification);
+        await notification.waitFor({ state: 'visible', timeout: 15000 });
+
+        const notificationText = await notification.textContent();
+        const isSuccess = notificationText.includes(this.linkCopiedSuccessText);
+
+        if (isSuccess) {
+            testLogger.info('Share link success notification appeared');
+        } else {
+            testLogger.warn('Notification appeared but was not success message', { text: notificationText });
+        }
+
+        return isSuccess;
+    }
+
+    /**
+     * Verify share link success notification is visible
+     */
+    async expectShareLinkSuccessNotification() {
+        const notification = this.page.locator(this.successNotification).filter({ hasText: this.linkCopiedSuccessText });
+        await expect(notification).toBeVisible({ timeout: 15000 });
+        testLogger.info('Share link success notification verified');
+    }
+
+    /**
+     * Click share link and wait for any notification (success or error)
+     * This is more resilient for environments where the short URL API may not work
+     * @returns {Promise<{appeared: boolean, isSuccess: boolean, text: string}>}
+     */
+    async clickShareLinkAndExpectNotification() {
+        await this.clickShareLinkButton();
+
+        // Wait for any notification
+        const notification = this.page.locator(this.successNotification);
+        try {
+            await notification.waitFor({ state: 'visible', timeout: 15000 });
+            const notificationText = await notification.textContent();
+            const isSuccess = notificationText.includes(this.linkCopiedSuccessText);
+            const isError = notificationText.includes(this.errorCopyingLinkText);
+
+            testLogger.info('Share link notification appeared', {
+                text: notificationText,
+                isSuccess,
+                isError
+            });
+
+            return {
+                appeared: true,
+                isSuccess,
+                isError,
+                text: notificationText
+            };
+        } catch (e) {
+            testLogger.warn('No notification appeared after clicking share link');
+            return { appeared: false, isSuccess: false, isError: false, text: '' };
+        }
+    }
+
+    /**
+     * Verify any notification appears after clicking share link (success or error)
+     * This tests that the button is functional without requiring API success
+     */
+    async expectShareLinkTriggersNotification() {
+        const result = await this.clickShareLinkAndExpectNotification();
+        expect(result.appeared).toBe(true);
+        testLogger.info('Share link triggered notification', { text: result.text });
+        return result;
+    }
+
+    /**
+     * Get the current URL for verification after share link redirect
+     */
+    async getCurrentUrl() {
+        return this.page.url();
+    }
+
+    /**
+     * Verify the URL contains expected query parameters
+     * @param {string} param - Parameter name to check
+     */
+    async expectUrlContainsParam(param) {
+        const url = await this.getCurrentUrl();
+        expect(url).toContain(param);
+        testLogger.info(`URL contains parameter: ${param}`);
+    }
+
+    // ===== STATE PRESERVATION METHODS =====
+
+    /**
+     * Read the clipboard content (requires clipboard permissions in playwright config)
+     * @returns {Promise<string>} The clipboard text content
+     */
+    async readClipboard() {
+        const clipboardText = await this.page.evaluate(() => navigator.clipboard.readText());
+        testLogger.info('Read clipboard content', { length: clipboardText.length });
+        return clipboardText;
+    }
+
+    /**
+     * Click share link and get the copied URL from clipboard
+     * Automatically converts HTTP to HTTPS to maintain auth context
+     * @returns {Promise<string>} The shared URL
+     */
+    async clickShareLinkAndGetUrl() {
+        await this.clickShareLinkButton();
+
+        // Wait for success notification
+        const notification = this.page.locator(this.successNotification);
+        await notification.waitFor({ state: 'visible', timeout: 15000 });
+
+        // Read the URL from clipboard
+        let sharedUrl = await this.readClipboard();
+
+        // Convert HTTP to HTTPS to maintain authentication cookies (skip for localhost)
+        if (sharedUrl.startsWith('http://') && !sharedUrl.includes('localhost')) {
+            sharedUrl = sharedUrl.replace('http://', 'https://');
+            testLogger.info('Converted HTTP to HTTPS', { url: sharedUrl });
+        }
+
+        testLogger.info('Share link URL captured', { url: sharedUrl });
+
+        return sharedUrl;
+    }
+
+    /**
+     * Extract URL query parameters as an object
+     * @param {string} url - The URL to parse
+     * @returns {Object} Key-value pairs of query parameters
+     */
+    parseUrlParams(url) {
+        const urlObj = new URL(url);
+        const params = {};
+        urlObj.searchParams.forEach((value, key) => {
+            params[key] = value;
+        });
+        return params;
+    }
+
+    /**
+     * Capture the current search state from the URL
+     * @returns {Promise<Object>} The current search state
+     */
+    async captureCurrentState() {
+        const url = await this.getCurrentUrl();
+        const params = this.parseUrlParams(url);
+
+        const state = {
+            url: url,
+            stream: params.stream || null,
+            streamType: params.stream_type || 'logs',
+            period: params.period || null,
+            from: params.from || null,
+            to: params.to || null,
+            sqlMode: params.sql_mode || null,
+            quickMode: params.quick_mode || null,
+            showHistogram: params.show_histogram || null,
+            orgIdentifier: params.org_identifier || null,
+            query: params.sql || params.query || null,
+        };
+
+        testLogger.info('Captured current state', state);
+        return state;
+    }
+
+    /**
+     * Compare two search states and return differences
+     * @param {Object} state1 - First state
+     * @param {Object} state2 - Second state
+     * @param {Array<string>} keysToCompare - Keys to compare
+     * @returns {Object} Comparison result with matches and differences
+     */
+    compareStates(state1, state2, keysToCompare = ['stream', 'streamType', 'period', 'sqlMode', 'quickMode', 'showHistogram']) {
+        const result = {
+            isMatch: true,
+            matches: {},
+            differences: {}
+        };
+
+        for (const key of keysToCompare) {
+            const val1 = state1[key];
+            const val2 = state2[key];
+
+            if (val1 === val2) {
+                result.matches[key] = val1;
+            } else {
+                result.isMatch = false;
+                result.differences[key] = { before: val1, after: val2 };
+            }
+        }
+
+        testLogger.info('State comparison result', result);
+        return result;
+    }
+
+    /**
+     * Wait for the page to finish redirecting (URL stabilizes)
+     * @param {number} timeout - Max time to wait in ms
+     */
+    async waitForRedirectComplete(timeout = 15000) {
+        let previousUrl = '';
+        let currentUrl = await this.getCurrentUrl();
+        const startTime = Date.now();
+
+        // Wait for URL to stabilize (not changing for 1 second)
+        while (Date.now() - startTime < timeout) {
+            previousUrl = currentUrl;
+            await this.page.waitForTimeout(1000);
+            currentUrl = await this.getCurrentUrl();
+
+            if (previousUrl === currentUrl && !currentUrl.includes('/short/')) {
+                testLogger.info('Redirect complete', { finalUrl: currentUrl });
+                return;
+            }
+        }
+
+        testLogger.warn('Redirect timeout - URL may still be changing', { currentUrl });
+    }
+
+    /**
+     * Get the selected stream name from the UI
+     * @returns {Promise<string|null>} The selected stream name
+     */
+    async getSelectedStreamFromUI() {
+        try {
+            const streamSelector = this.page.locator('[data-test="log-search-index-list-select-stream"]');
+            await streamSelector.waitFor({ state: 'visible', timeout: 5000 });
+            const streamText = await streamSelector.textContent();
+            return streamText?.trim() || null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    /**
+     * Check if SQL mode is currently enabled
+     * @returns {Promise<boolean>} True if SQL mode is enabled
+     */
+    async isSqlModeEnabled() {
+        const sqlToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
+        const isChecked = await sqlToggle.getAttribute('aria-checked');
+        return isChecked === 'true';
+    }
+
+    /**
+     * Get the current query from the editor
+     * @returns {Promise<string>} The query text
+     */
+    async getQueryFromEditor() {
+        try {
+            const editor = this.page.locator(this.queryEditor);
+            const queryText = await editor.textContent();
+            return queryText?.trim() || '';
+        } catch (e) {
+            return '';
         }
     }
 }

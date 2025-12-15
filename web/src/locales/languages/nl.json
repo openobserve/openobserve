@@ -1306,7 +1306,55 @@
       }
     },
     "triggerAlert": "Trigger",
-    "alertTriggeredSuccess": "Waarschuwing succesvol geactiveerd"
+    "alertTriggeredSuccess": "Waarschuwing succesvol geactiveerd",
+    "incidents": {
+      "title": "Incidenten",
+      "header": "Waarschuwingsincidenten",
+      "noIncidents": "Geen incidenten gevonden",
+      "id": "ID",
+      "status": "Status",
+      "severity": "Ernst",
+      "alertCount": "Waarschuwingen",
+      "firstAlertAt": "Eerste waarschuwing",
+      "lastAlertAt": "Laatste waarschuwing",
+      "resolvedAt": "Opgelost bij",
+      "title_field": "Titel",
+      "correlationKey": "Correlatiesleutel",
+      "stableDimensions": "Dimensies",
+      "topology": "Topologie",
+      "upstreamServices": "Upstream-services",
+      "downstreamServices": "Downstream-services",
+      "correlatedAlerts": "Gecorreleerde waarschuwingen",
+      "alertName": "Naam van de waarschuwing",
+      "alertFiredAt": "Afgevuurd op",
+      "correlationReason": "Reden voor correlatie",
+      "actions": "Acties",
+      "acknowledge": "Erken",
+      "resolve": "Oplossen",
+      "reopen": "Heropenen",
+      "viewDetails": "Details bekijken",
+      "statusOpen": "Open",
+      "statusAcknowledged": "Erkend",
+      "statusResolved": "Opgelost",
+      "severityP1": "P1 - Kritiek",
+      "severityP2": "P2 - Hoog",
+      "severityP3": "P3 - Gemiddeld",
+      "severityP4": "P4 - Laag",
+      "correlationServiceDiscovery": "Ontdekking van diensten",
+      "correlationManualExtraction": "Handmatige extractie",
+      "correlationTemporal": "Temporeel",
+      "filterByStatus": "Filteren op status",
+      "allStatuses": "Alle statussen",
+      "loading": "Incidenten worden geladen...",
+      "errorLoading": "Het laden van incidenten is mislukt",
+      "statusUpdated": "Incidentstatus bijgewerkt",
+      "statusUpdateFailed": "Het bijwerken van de incidentstatus is mislukt",
+      "rootCauseAnalysis": "Analyse van de hoofdoorzaak",
+      "analyzeRca": "Analyseren",
+      "rcaInProgress": "De hoofdoorzaak analyseren...",
+      "rcaCompleted": "Analyse van de hoofdoorzaak voltooid",
+      "noRcaYet": "Geen analyse van de hoofdoorzaak beschikbaar. Klik op 'Analyseren' om te beginnen."
+    }
   },
   "alert_templates": {
     "header": "Sjablonen",
@@ -1659,7 +1707,8 @@
     "viewLogs": "Logboeken bekijken",
     "backToLogs": "Terug naar de logboeken",
     "RedMetrics": "RED-statistieken",
-    "loadingStream": "Stream wordt geladen..."
+    "loadingStream": "Stream wordt geladen...",
+    "viewRelated": "Gerelateerd bekijken"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",
@@ -1972,6 +2021,14 @@
     "tracesFromService": "Sporen van service: {service}",
     "noTracesFound": "Geen gecorreleerde sporen gevonden",
     "noTracesDescription": "Geen sporen gevonden voor service {service} in de geselecteerde periode",
-    "openTraceInNewWindow": "Open trace in nieuw venster"
+    "openTraceInNewWindow": "Open trace in nieuw venster",
+    "filters": "Filters"
+  },
+  "sreChat": {
+    "emptyMessage": "Vraag me alles over je meldingen en incidenten",
+    "inputPlaceholder": "Vraag het aan SRE Assistant...",
+    "clearChatTitle": "Chat wissen",
+    "clearChatMessage": "Weet je zeker dat je dit gesprek wilt beëindigen?",
+    "copiedToClipboard": "Gekopieerd naar klembord"
   }
 }

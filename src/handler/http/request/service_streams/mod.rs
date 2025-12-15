@@ -56,6 +56,7 @@ pub async fn get_dimension_analytics(
     org_id: web::Path<String>,
     Headers(_user_email): Headers<UserEmail>, // Require authentication
 ) -> Result<HttpResponse, Error> {
+    #[allow(unused_variables)]
     let org_id = org_id.into_inner();
     // Note: No stream-specific permissions needed - this is org-level analytics
 
@@ -66,20 +67,18 @@ pub async fn get_dimension_analytics(
         {
             Ok(analytics) => Ok(MetaHttpResponse::json(analytics)),
             Err(e) => Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    500u16,
-                    format!("Failed to calculate dimension analytics: {}", e),
-                )),
+                MetaHttpResponse::internal_error(
+                    format!("Failed to calculate dimension analytics: {e}")
+                ),
             ),
         }
     }
 
     #[cfg(not(feature = "enterprise"))]
     {
-        Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            403u16,
-            "Service Discovery is an enterprise-only feature".to_string(),
-        )))
+        Ok(MetaHttpResponse::forbidden(
+            "Service Discovery is an enterprise-only feature",
+        ))
     }
 }
 
@@ -131,9 +130,10 @@ pub async fn get_dimension_analytics(
 #[actix_web::post("/{org_id}/service_streams/_correlate")]
 pub async fn correlate_streams(
     org_id: web::Path<String>,
-    req: web::Json<CorrelationRequest>,
+    #[allow(unused_variables)] req: web::Json<CorrelationRequest>,
     Headers(_user_email): Headers<UserEmail>, // Require authentication
 ) -> Result<HttpResponse, Error> {
+    #[allow(unused_variables)]
     let org_id = org_id.into_inner();
     // Note: No stream-specific permissions needed - user already has access to source stream
 
@@ -164,12 +164,9 @@ pub async fn correlate_streams(
                 // Return 200 with null to indicate "no match" (not an error)
                 Ok(HttpResponse::Ok().json(serde_json::json!(null)))
             }
-            Err(e) => Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    500u16,
-                    format!("Failed to correlate streams: {}", e),
-                )),
-            ),
+            Err(e) => Ok(MetaHttpResponse::internal_error(format!(
+                "Failed to correlate streams: {e}"
+            ))),
         }
     }
 
@@ -223,13 +220,12 @@ pub struct CorrelationRequest {
 )]
 #[get("/{org_id}/service_streams/_grouped")]
 pub async fn get_services_grouped(
-    org_id: web::Path<String>,
+    _org_id: web::Path<String>,
     Headers(_user_email): Headers<UserEmail>, // Require authentication
 ) -> Result<HttpResponse, Error> {
-    let org_id = org_id.into_inner();
-
     #[cfg(feature = "enterprise")]
     {
+        let org_id = _org_id.into_inner();
         // Get FQN priority from DB/cache (org-level setting or system default)
         let fqn_priority =
             crate::service::db::system_settings::get_fqn_priority_dimensions(&org_id).await;
@@ -239,20 +235,19 @@ pub async fn get_services_grouped(
         {
             Ok(response) => Ok(MetaHttpResponse::json(response)),
             Err(e) => Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    500u16,
-                    format!("Failed to get grouped services: {}", e),
-                )),
+                MetaHttpResponse::internal_error(
+                    format!("Failed to get grouped services: {e}")
+                ),
             ),
         }
     }
 
     #[cfg(not(feature = "enterprise"))]
     {
-        Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            403u16,
-            "Service Discovery is an enterprise-only feature".to_string(),
-        )))
+        log::info!("Service Discovery is an enterprise-only feature");
+        Ok(MetaHttpResponse::forbidden(
+            "Service Discovery is an enterprise-only feature",
+        ))
     }
 }
 

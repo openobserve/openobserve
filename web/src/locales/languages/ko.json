@@ -1306,7 +1306,55 @@
       }
     },
     "triggerAlert": "트리거",
-    "alertTriggeredSuccess": "경고가 성공적으로 트리거됨"
+    "alertTriggeredSuccess": "경고가 성공적으로 트리거됨",
+    "incidents": {
+      "title": "인시던트",
+      "header": "경고 인시던트",
+      "noIncidents": "사건이 발견되지 않았습니다",
+      "id": "신분증",
+      "status": "상태",
+      "severity": "심각도",
+      "alertCount": "알림",
+      "firstAlertAt": "첫 번째 경고",
+      "lastAlertAt": "마지막 알림",
+      "resolvedAt": "해결 시간",
+      "title_field": "타이틀",
+      "correlationKey": "상관관계 키",
+      "stableDimensions": "치수",
+      "topology": "토폴로지",
+      "upstreamServices": "업스트림 서비스",
+      "downstreamServices": "다운스트림 서비스",
+      "correlatedAlerts": "상관관계가 있는 경고",
+      "alertName": "경고 이름",
+      "alertFiredAt": "파이어드 앳",
+      "correlationReason": "상관관계 이유",
+      "actions": "액션",
+      "acknowledge": "인정하다",
+      "resolve": "해결",
+      "reopen": "다시 엽니다",
+      "viewDetails": "세부 정보 보기",
+      "statusOpen": "열기",
+      "statusAcknowledged": "확인됨",
+      "statusResolved": "해결됨",
+      "severityP1": "P1 - 중요",
+      "severityP2": "P2 - 높음",
+      "severityP3": "P3 - 미디엄",
+      "severityP4": "P4 - 낮음",
+      "correlationServiceDiscovery": "서비스 디스커버리",
+      "correlationManualExtraction": "수동 추출",
+      "correlationTemporal": "일시적인",
+      "filterByStatus": "상태별 필터링",
+      "allStatuses": "모든 상태",
+      "loading": "인시던트 로드 중...",
+      "errorLoading": "인시던트 로드 실패",
+      "statusUpdated": "사고 상태 업데이트",
+      "statusUpdateFailed": "사고 상태를 업데이트하지 못했습니다.",
+      "rootCauseAnalysis": "근본 원인 분석",
+      "analyzeRca": "분석",
+      "rcaInProgress": "근본 원인 분석 중...",
+      "rcaCompleted": "근본 원인 분석 완료",
+      "noRcaYet": "근본 원인 분석이 없습니다.시작하려면 '분석'을 클릭하세요."
+    }
   },
   "alert_templates": {
     "header": "템플릿",
@@ -1659,7 +1707,8 @@
     "viewLogs": "로그 보기",
     "backToLogs": "로그로 돌아가기",
     "RedMetrics": "레드 메트릭스",
-    "loadingStream": "스트림 로드 중..."
+    "loadingStream": "스트림 로드 중...",
+    "viewRelated": "관련 보기"
   },
   "invitation": {
     "pendingInvitations": "보류 중인 초대",
@@ -1972,6 +2021,14 @@
     "tracesFromService": "서비스의 추적: {service}",
     "noTracesFound": "상관관계가 있는 흔적을 찾을 수 없습니다.",
     "noTracesDescription": "선택한 시간 범위에서 서비스 {service} 에 대한 추적을 찾을 수 없습니다.",
-    "openTraceInNewWindow": "트레이스를 새 창에서 열기"
+    "openTraceInNewWindow": "트레이스를 새 창에서 열기",
+    "filters": "필터"
+  },
+  "sreChat": {
+    "emptyMessage": "경고 및 사고에 대해 무엇이든 물어보세요.",
+    "inputPlaceholder": "SRE 어시스턴트에게 물어보세요",
+    "clearChatTitle": "채팅 지우기",
+    "clearChatMessage": "정말 이 대화를 지우고 싶으신가요?",
+    "copiedToClipboard": "클립보드에 복사됨"
   }
 }
