@@ -703,10 +703,20 @@ jobs:
                     echo "::notice::✅ Attempt #$PREV_ATTEMPT had upload-only failure - downloading its blob reports"
 
                     # Download artifacts from that attempt
-                    ARTIFACT_NAMES=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts" \
-                      --jq ".artifacts[] | select(.name | startswith(\"blob-report-\") and contains(\"attempt-$PREV_ATTEMPT\")) | .name" 2>/dev/null || echo "")
+                    echo "DEBUG: Fetching artifacts for run ${{ github.run_id }}"
 
-                    if [ -n "$ARTIFACT_NAMES" ]; then
+                    # List all artifacts first for debugging
+                    ALL_ARTIFACTS=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts" --jq '.artifacts[].name' 2>&1) || true
+                    echo "DEBUG: All artifacts in this run:"
+                    echo "$ALL_ARTIFACTS"
+
+                    ARTIFACT_NAMES=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts" \
+                      --jq ".artifacts[] | select(.name | startswith(\"blob-report-\") and contains(\"attempt-$PREV_ATTEMPT\")) | .name" 2>&1) || true
+
+                    echo "DEBUG: Matching artifacts for attempt-$PREV_ATTEMPT:"
+                    echo "$ARTIFACT_NAMES"
+
+                    if [ -n "$ARTIFACT_NAMES" ] && [ "$ARTIFACT_NAMES" != "" ]; then
                       mkdir -p all-blob-reports
                       for ARTIFACT_NAME in $ARTIFACT_NAMES; do
                         echo "Downloading: $ARTIFACT_NAME"
