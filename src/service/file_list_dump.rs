@@ -842,4 +842,186 @@ mod tests {
         assert_eq!(schema.field(7).name(), "flattened");
         assert_eq!(schema.field(7).data_type(), &DataType::Boolean);
     }
+
+    #[test]
+    fn test_record_batch_to_file_record_empty() {
+        let schema = FILE_LIST_SCHEMA.clone();
+        let empty_batch = RecordBatch::new_empty(schema);
+
+        let records = record_batch_to_file_record(empty_batch);
+        assert_eq!(records.len(), 0);
+    }
+
+    #[test]
+    fn test_record_batch_to_file_record_preserves_order() {
+        let rb = create_test_record_batch();
+        let records = record_batch_to_file_record(rb);
+
+        // Verify records are in the same order as input
+        assert_eq!(records[0].id, 1);
+        assert_eq!(records[1].id, 2);
+        assert_eq!(records[2].id, 3);
+
+        assert_eq!(records[0].org, "org1");
+        assert_eq!(records[1].org, "org2");
+        assert_eq!(records[2].org, "org3");
+    }
+
+    #[test]
+    fn test_record_batch_to_file_record_handles_boolean_fields() {
+        let rb = create_test_record_batch();
+        let records = record_batch_to_file_record(rb);
+
+        // Verify boolean fields
+        assert!(!records[0].deleted);
+        assert!(records[1].deleted);
+        assert!(!records[2].deleted);
+
+        assert!(records[0].flattened);
+        assert!(!records[1].flattened);
+        assert!(records[2].flattened);
+    }
+
+    #[test]
+    fn test_record_batch_to_file_record_handles_timestamps() {
+        let rb = create_test_record_batch();
+        let records = record_batch_to_file_record(rb);
+
+        // Verify timestamp fields
+        assert_eq!(records[0].min_ts, 1000);
+        assert_eq!(records[0].max_ts, 1100);
+        assert_eq!(records[1].min_ts, 2000);
+        assert_eq!(records[1].max_ts, 2100);
+        assert_eq!(records[2].min_ts, 3000);
+        assert_eq!(records[2].max_ts, 3100);
+    }
+
+    #[test]
+    fn test_record_batch_to_file_record_handles_sizes() {
+        let rb = create_test_record_batch();
+        let records = record_batch_to_file_record(rb);
+
+        // Verify size fields
+        assert_eq!(records[0].original_size, 1000);
+        assert_eq!(records[0].compressed_size, 500);
+        assert_eq!(records[0].index_size, 50);
+
+        assert_eq!(records[1].original_size, 2000);
+        assert_eq!(records[1].compressed_size, 1000);
+        assert_eq!(records[1].index_size, 100);
+
+        assert_eq!(records[2].original_size, 3000);
+        assert_eq!(records[2].compressed_size, 1500);
+        assert_eq!(records[2].index_size, 150);
+    }
+
+    #[test]
+    fn test_record_batch_to_file_record_all_fields() {
+        let rb = create_test_record_batch();
+        let records = record_batch_to_file_record(rb);
+
+        // Comprehensive test of first record
+        let first = &records[0];
+        assert_eq!(first.id, 1);
+        assert_eq!(first.account, "account1");
+        assert_eq!(first.org, "org1");
+        assert_eq!(first.stream, "stream1");
+        assert_eq!(first.date, "2024-01-01");
+        assert_eq!(first.file, "file1.parquet");
+        assert!(!first.deleted);
+        assert!(first.flattened);
+        assert_eq!(first.min_ts, 1000);
+        assert_eq!(first.max_ts, 1100);
+        assert_eq!(first.records, 100);
+        assert_eq!(first.original_size, 1000);
+        assert_eq!(first.compressed_size, 500);
+        assert_eq!(first.index_size, 50);
+        assert_eq!(first.created_at, 1000);
+        assert_eq!(first.updated_at, 1100);
+    }
+
+    #[test]
+    fn test_generate_dump_stream_name_with_various_stream_types() {
+        // Test all stream types
+        let stream_types = vec![
+            (StreamType::Logs, "logs"),
+            (StreamType::Metrics, "metrics"),
+            (StreamType::Traces, "traces"),
+        ];
+
+        for (stream_type, suffix) in stream_types {
+            let result = generate_dump_stream_name(stream_type, "test");
+            assert_eq!(result, format!("test_{}", suffix));
+        }
+    }
+
+    #[test]
+    fn test_file_list_schema_field_ordering() {
+        let schema = FILE_LIST_SCHEMA.clone();
+
+        // Verify the exact order of fields
+        let expected_fields = vec![
+            ("id", DataType::Int64),
+            ("account", DataType::Utf8),
+            ("org", DataType::Utf8),
+            ("stream", DataType::Utf8),
+            ("date", DataType::Utf8),
+            ("file", DataType::Utf8),
+            ("deleted", DataType::Boolean),
+            ("flattened", DataType::Boolean),
+            ("min_ts", DataType::Int64),
+            ("max_ts", DataType::Int64),
+            ("records", DataType::Int64),
+            ("original_size", DataType::Int64),
+            ("compressed_size", DataType::Int64),
+            ("index_size", DataType::Int64),
+            ("created_at", DataType::Int64),
+            ("updated_at", DataType::Int64),
+        ];
+
+        for (i, (name, dtype)) in expected_fields.iter().enumerate() {
+            assert_eq!(schema.field(i).name(), name);
+            assert_eq!(schema.field(i).data_type(), dtype);
+        }
+    }
+
+    #[test]
+    fn test_file_list_schema_nullability() {
+        let schema = FILE_LIST_SCHEMA.clone();
+
+        // All fields should be non-nullable
+        for field in schema.fields() {
+            assert!(
+                !field.is_nullable(),
+                "Field {} should not be nullable",
+                field.name()
+            );
+        }
+    }
+
+    #[test]
+    fn test_record_batch_to_file_record_consistency() {
+        // Create batch twice and verify results are consistent
+        let rb1 = create_test_record_batch();
+        let rb2 = create_test_record_batch();
+
+        let records1 = record_batch_to_file_record(rb1);
+        let records2 = record_batch_to_file_record(rb2);
+
+        assert_eq!(records1.len(), records2.len());
+        for (r1, r2) in records1.iter().zip(records2.iter()) {
+            assert_eq!(r1.id, r2.id);
+            assert_eq!(r1.account, r2.account);
+            assert_eq!(r1.org, r2.org);
+            assert_eq!(r1.stream, r2.stream);
+        }
+    }
+
+    #[test]
+    fn test_generate_dump_stream_name_idempotent() {
+        // Calling multiple times with same inputs should give same output
+        let result1 = generate_dump_stream_name(StreamType::Logs, "test_stream");
+        let result2 = generate_dump_stream_name(StreamType::Logs, "test_stream");
+        assert_eq!(result1, result2);
+    }
 }

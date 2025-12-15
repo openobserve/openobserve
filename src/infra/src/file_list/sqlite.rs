@@ -735,7 +735,7 @@ SELECT date
         let (time_start, time_end) = time_range;
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query(
-            r#"SELECT DISTINCT stream FROM file_list WHERE updated_at >= $1 AND updated_at < $2;"#,
+            r#"SELECT DISTINCT stream FROM file_list WHERE updated_at > $1 AND updated_at <= $2;"#,
         )
         .bind(time_start)
         .bind(time_end)

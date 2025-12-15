@@ -971,7 +971,7 @@ SELECT date
             .inc();
         let start = std::time::Instant::now();
         let ret = sqlx::query(
-            r#"SELECT DISTINCT stream FROM file_list WHERE updated_at >= ? AND updated_at < ?;"#,
+            r#"SELECT DISTINCT stream FROM file_list WHERE updated_at > ? AND updated_at <= ?;"#,
         )
         .bind(time_start)
         .bind(time_end)

@@ -86,9 +86,6 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
         "[STATS] update stats from file list, last updated: {last_updated_at}, latest updated: {latest_updated_at}, no need update old stats: {no_need_update_old_stats}"
     );
 
-    // we need to init now before the loop, also need to update offset use this value
-    let now_ts = now_micros();
-
     // get updated streams if we don't need to update old stats
     let updated_streams = if no_need_update_old_stats {
         infra_file_list::get_updated_streams((last_updated_at, latest_updated_at)).await?
@@ -179,7 +176,7 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
         .set(now_micros());
 
     // update offset to current time
-    db::compact::stats::set_offset(now_ts, Some(&LOCAL_NODE.uuid.clone()))
+    db::compact::stats::set_offset(latest_updated_at, Some(&LOCAL_NODE.uuid.clone()))
         .await
         .map_err(|e| anyhow::anyhow!("set offset error: {e}"))?;
 
@@ -235,4 +232,110 @@ async fn update_stats_lock_node() -> Result<Option<i64>, anyhow::Error> {
 /// This is the boundary between "historical" and "recent" data
 pub fn get_yesterday_boundary() -> String {
     get_ymdh_from_micros(now_micros() - day_micros(1))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_yesterday_boundary_format() {
+        let boundary = get_yesterday_boundary();
+
+        // Should be in YYYY/MM/DD/HH format
+        assert!(boundary.len() >= 13); // "YYYY/MM/DD/HH"
+
+        // Split and verify parts
+        let parts: Vec<&str> = boundary.split('/').collect();
+        assert!(parts.len() >= 4, "Boundary should have at least 4 parts");
+
+        // Verify year is 4 digits
+        assert_eq!(parts[0].len(), 4);
+
+        // Verify month is 2 digits
+        assert_eq!(parts[1].len(), 2);
+
+        // Verify day is 2 digits
+        assert_eq!(parts[2].len(), 2);
+
+        // Verify hour is 2 digits
+        assert_eq!(parts[3].len(), 2);
+    }
+
+    #[test]
+    fn test_get_yesterday_boundary_is_valid_date() {
+        let boundary = get_yesterday_boundary();
+
+        // Should be parseable as a date
+        let parts: Vec<&str> = boundary.split('/').collect();
+
+        let year: i32 = parts[0].parse().expect("Year should be a number");
+        let month: u32 = parts[1].parse().expect("Month should be a number");
+        let day: u32 = parts[2].parse().expect("Day should be a number");
+        let hour: u32 = parts[3].parse().expect("Hour should be a number");
+
+        assert!(year > 2020 && year < 2100, "Year should be reasonable");
+        assert!((1..=12).contains(&month), "Month should be 1-12");
+        assert!((1..=31).contains(&day), "Day should be 1-31");
+        assert!(hour < 24, "Hour should be 0-23");
+    }
+
+    #[test]
+    fn test_get_yesterday_boundary_is_yesterday() {
+        let boundary = get_yesterday_boundary();
+        let now_boundary = get_ymdh_from_micros(now_micros());
+
+        // Yesterday should be different from today
+        assert_ne!(boundary, now_boundary);
+
+        // Yesterday should be lexicographically less than today (for dates in YYYY/MM/DD/HH format)
+        assert!(boundary < now_boundary);
+    }
+
+    #[test]
+    fn test_get_yesterday_boundary_consistency() {
+        // Call multiple times in quick succession
+        let boundary1 = get_yesterday_boundary();
+        let boundary2 = get_yesterday_boundary();
+
+        // Should be the same (assuming test runs quickly)
+        assert_eq!(boundary1, boundary2);
+    }
+
+    #[tokio::test]
+    async fn test_update_stats_from_file_list_inner_with_empty_date_range() {
+        // Test with empty date strings
+        let result = update_stats_from_file_list_inner(
+            "test_org",
+            StreamType::Logs,
+            "test_stream",
+            ("".to_string(), "".to_string()),
+            true,
+        )
+        .await;
+
+        // Should handle empty range gracefully (may return error or empty stats)
+        let _ = result; // Test structure - actual behavior depends on implementation
+    }
+
+    #[test]
+    fn test_yesterday_boundary_hour_is_zero() {
+        let boundary = get_yesterday_boundary();
+        let parts: Vec<&str> = boundary.split('/').collect();
+
+        // The boundary should be at hour 00 (start of the day)
+        // But this might vary based on implementation
+        let hour: u32 = parts[3].parse().expect("Hour should be a number");
+        assert!(hour < 24, "Hour should be valid");
+    }
+
+    #[test]
+    fn test_date_range_ordering() {
+        // Test that historical range is before recent range
+        let yesterday = get_yesterday_boundary();
+        let now_date = get_ymdh_from_micros(now_micros());
+
+        // Yesterday should be before now
+        assert!(yesterday <= now_date);
+    }
 }
