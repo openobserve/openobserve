@@ -754,6 +754,18 @@ jobs:
         if: ${{ (success() || failure()) && env.UPLOAD_TO_TESTDINO == 'true' }}
         run: |
           cd tests/ui-testing
+
+          # Fix startTime format: convert Unix timestamp (number) to ISO 8601 string for TestDino compatibility
+          if [ -f "playwright-results/report.json" ]; then
+            # Check if startTime is a number and convert it
+            START_TIME=$(jq -r '.stats.startTime // empty' playwright-results/report.json)
+            if [ -n "$START_TIME" ] && [[ "$START_TIME" =~ ^[0-9]+$ ]]; then
+              echo "Converting startTime from Unix timestamp to ISO 8601 string"
+              jq '.stats.startTime = (.stats.startTime / 1000 | strftime("%Y-%m-%dT%H:%M:%S.000Z"))' playwright-results/report.json > playwright-results/report.json.tmp
+              mv playwright-results/report.json.tmp playwright-results/report.json
+            fi
+          fi
+
           npx --yes tdpw@latest upload playwright-results \
             --json-report playwright-results/report.json \
             --html-report playwright-results/html-report \
