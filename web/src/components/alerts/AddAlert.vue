@@ -133,26 +133,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             </div>
 
-            <!-- Right Column: Preview & Summary (30%) -->
-            <div class="tw-flex-[0_0_30%] tw-flex tw-flex-col tw-gap-2" style="height: calc(100vh - 302px); position: sticky; top: 0; overflow: hidden;">
-              <!-- Preview Alert -->
-              <preview-alert
-                style="flex: 1; height: 50%; overflow: auto;"
-                ref="previewAlertRef"
-                :formData="formData"
-                :query="previewQuery"
-                :selectedTab="scheduledAlertRef?.tab || 'custom'"
-                :isAggregationEnabled="isAggregationEnabled"
-              />
-
-              <!-- Alert Summary -->
-              <alert-summary
-                style="flex: 1; height: 50%; overflow: auto;"
-                :formData="formData"
-                :destinations="formData.destinations"
-                :focusManager="focusManager"
-              />
-            </div>
+            <AlertWizardRightColumn
+              ref="previewAlertRef"
+              :formData="formData"
+              :previewQuery="previewQuery"
+              :selectedTab="scheduledAlertRef?.tab || 'custom'"
+              :isAggregationEnabled="isAggregationEnabled"
+              :destinations="formData.destinations"
+              :focusManager="focusManager"
+            />
           </div>
         </q-step>
 
@@ -194,26 +183,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             </div>
 
-            <!-- Right Column: Preview & Summary (30%) -->
-            <div class="tw-flex-[0_0_30%] tw-flex tw-flex-col tw-gap-2" style="height: calc(100vh - 302px); position: sticky; top: 0; overflow: hidden;">
-              <!-- Preview Alert -->
-              <preview-alert
-                style="flex: 1; height: 50%; overflow: auto;"
-                ref="previewAlertRef"
-                :formData="formData"
-                :query="previewQuery"
-                :selectedTab="scheduledAlertRef?.tab || 'custom'"
-                :isAggregationEnabled="isAggregationEnabled"
-              />
-
-              <!-- Alert Summary -->
-              <alert-summary
-                style="flex: 1; height: 50%; overflow: auto;"
-                :formData="formData"
-                :destinations="formData.destinations"
-                :focusManager="focusManager"
-              />
-            </div>
+            <AlertWizardRightColumn
+              ref="previewAlertRef"
+              :formData="formData"
+              :previewQuery="previewQuery"
+              :selectedTab="scheduledAlertRef?.tab || 'custom'"
+              :isAggregationEnabled="isAggregationEnabled"
+              :destinations="formData.destinations"
+              :focusManager="focusManager"
+            />
           </div>
         </q-step>
 
@@ -247,26 +225,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             </div>
 
-            <!-- Right Column: Preview & Summary (30%) -->
-            <div class="tw-flex-[0_0_30%] tw-flex tw-flex-col tw-gap-2" style="height: calc(100vh - 302px); position: sticky; top: 0; overflow: hidden;">
-              <!-- Preview Alert -->
-              <preview-alert
-                style="flex: 1; height: 50%; overflow: auto;"
-                ref="previewAlertRef"
-                :formData="formData"
-                :query="previewQuery"
-                :selectedTab="scheduledAlertRef?.tab || 'custom'"
-                :isAggregationEnabled="isAggregationEnabled"
-              />
-
-              <!-- Alert Summary -->
-              <alert-summary
-                style="flex: 1; height: 50%; overflow: auto;"
-                :formData="formData"
-                :destinations="formData.destinations"
-                :focusManager="focusManager"
-              />
-            </div>
+            <AlertWizardRightColumn
+              ref="previewAlertRef"
+              :formData="formData"
+              :previewQuery="previewQuery"
+              :selectedTab="scheduledAlertRef?.tab || 'custom'"
+              :isAggregationEnabled="isAggregationEnabled"
+              :destinations="formData.destinations"
+              :focusManager="focusManager"
+            />
           </div>
         </q-step>
 
@@ -296,26 +263,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             </div>
 
-            <!-- Right Column: Preview & Summary (30%) -->
-            <div class="tw-flex-[0_0_30%] tw-flex tw-flex-col tw-gap-2" style="height: 100%; position: sticky; top: 0; overflow: hidden;">
-              <!-- Preview Alert -->
-              <preview-alert
-                style="flex: 1; height: 50%; overflow: auto;"
-                ref="previewAlertRef"
-                :formData="formData"
-                :query="previewQuery"
-                :selectedTab="scheduledAlertRef?.tab || 'custom'"
-                :isAggregationEnabled="isAggregationEnabled"
-              />
-
-              <!-- Alert Summary -->
-              <alert-summary
-                style="flex: 1; height: 50%; overflow: auto;"
-                :formData="formData"
-                :destinations="formData.destinations"
-                :focusManager="focusManager"
-              />
-            </div>
+            <AlertWizardRightColumn
+              ref="previewAlertRef"
+              :formData="formData"
+              :previewQuery="previewQuery"
+              :selectedTab="scheduledAlertRef?.tab || 'custom'"
+              :isAggregationEnabled="isAggregationEnabled"
+              :destinations="formData.destinations"
+              :focusManager="focusManager"
+            />
           </div>
         </q-step>
 
@@ -342,26 +298,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             </div>
 
-            <!-- Right Column: Preview & Summary (30%) -->
-            <div class="tw-flex-[0_0_30%] tw-flex tw-flex-col tw-gap-2" style="height: calc(100vh - 302px); position: sticky; top: 0; overflow: hidden;">
-              <!-- Preview Alert -->
-              <preview-alert
-                style="flex: 1; height: 50%; overflow: auto;"
-                ref="previewAlertRef"
-                :formData="formData"
-                :query="previewQuery"
-                :selectedTab="scheduledAlertRef?.tab || 'custom'"
-                :isAggregationEnabled="isAggregationEnabled"
-              />
-
-              <!-- Alert Summary -->
-              <alert-summary
-                style="flex: 1; height: 50%; overflow: auto;"
-                :formData="formData"
-                :destinations="formData.destinations"
-                :focusManager="focusManager"
-              />
-            </div>
+            <AlertWizardRightColumn
+              ref="previewAlertRef"
+              :formData="formData"
+              :previewQuery="previewQuery"
+              :selectedTab="scheduledAlertRef?.tab || 'custom'"
+              :isAggregationEnabled="isAggregationEnabled"
+              :destinations="formData.destinations"
+              :focusManager="focusManager"
+            />
           </div>
         </q-step>
 
@@ -392,26 +337,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             </div>
 
-            <!-- Right Column: Preview & Summary (30%) -->
-            <div class="tw-flex-[0_0_30%] tw-flex tw-flex-col tw-gap-2" style="height: 100%; position: sticky; top: 0; overflow: hidden;">
-              <!-- Preview Alert -->
-              <preview-alert
-                style="flex: 1; height: 50%; overflow: auto;"
-                ref="previewAlertRef"
-                :formData="formData"
-                :query="previewQuery"
-                :selectedTab="scheduledAlertRef?.tab || 'custom'"
-                :isAggregationEnabled="isAggregationEnabled"
-              />
-
-              <!-- Alert Summary -->
-              <alert-summary
-                style="flex: 1; height: 50%; overflow: auto;"
-                :formData="formData"
-                :destinations="formData.destinations"
-                :focusManager="focusManager"
-              />
-            </div>
+            <AlertWizardRightColumn
+              ref="previewAlertRef"
+              :formData="formData"
+              :previewQuery="previewQuery"
+              :selectedTab="scheduledAlertRef?.tab || 'custom'"
+              :isAggregationEnabled="isAggregationEnabled"
+              :destinations="formData.destinations"
+              :focusManager="focusManager"
+            />
           </div>
         </q-step>
       </q-stepper>
@@ -974,6 +908,7 @@ import Step3AlertConditions from "./steps/Step3AlertConditions.vue";
 import Step4CompareWithPast from "./steps/Step4CompareWithPast.vue";
 import Step5Deduplication from "./steps/Step5Deduplication.vue";
 import Step6Advanced from "./steps/Step6Advanced.vue";
+import AlertWizardRightColumn from "./AlertWizardRightColumn.vue";
 import {
   updateGroup as updateGroupUtil,
   removeConditionGroup as removeConditionGroupUtil,
@@ -1076,6 +1011,7 @@ export default defineComponent({
     Step4CompareWithPast,
     Step5Deduplication,
     Step6Advanced,
+    AlertWizardRightColumn,
   },
   setup(props, { emit }) {
     const store: any = useStore();
