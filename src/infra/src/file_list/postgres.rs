@@ -1427,7 +1427,7 @@ SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
 
         // reset dumping jobs node to empty
         let ret = sqlx::query(
-            r#"UPDATE file_list_jobs SET node = '' WHERE status = ? AND dumped = ? AND node != '' AND updated_at < ?;"#,
+            r#"UPDATE file_list_jobs SET node = '' WHERE status = $1 AND dumped = $2 AND node != '' AND updated_at < $3;"#,
         )
         .bind(super::FileListJobStatus::Done)
         .bind(false)
