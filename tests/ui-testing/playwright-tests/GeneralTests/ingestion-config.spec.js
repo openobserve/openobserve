@@ -173,8 +173,7 @@ test.describe("Ingestion Configuration Tests", () => {
     test("should validate ALL documentation links across all integrations", {
       tag: ['@ingestion', '@links', '@comprehensive', '@P1']
     }, async () => {
-      const { IngestionConfigPage } = require('../../pages/generalPages/ingestionConfigPage.js');
-      const allIntegrations = IngestionConfigPage.allIntegrations;
+      const allIntegrations = require('../../../test-data/ingestion_integrations.json');
 
       testLogger.info(`=== Starting comprehensive documentation link validation for ${allIntegrations.length} integrations ===`);
 
