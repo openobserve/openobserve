@@ -890,6 +890,7 @@ export const usePanelDataLoader = (
           // Initialize result data and metadata arrays
           const queryResults: any[] = [];
           const queryMetadata: any[] = [];
+          const completedQueries = new Set<number>(); // Track completed queries
 
           // Process each query using streaming
           for (const [queryIndex, it] of panelSchema.value.queries.entries()) {
@@ -917,7 +918,8 @@ export const usePanelDataLoader = (
             };
 
             queryMetadata[queryIndex] = metadata;
-            queryResults[queryIndex] = null; // Initialize with null
+            // Don't initialize queryResults[queryIndex] yet - let it be undefined
+            // This way we can detect the first chunk properly
 
             const { traceId } = generateTraceContext();
             const payload = {
@@ -954,14 +956,38 @@ export const usePanelDataLoader = (
 
             const handlePromQLResponse = (data: any, res: any) => {
               if (res?.type === "promql_response") {
-                // Accumulate results - handle partitioned responses
-                const currentResult = queryResults[queryIndex] || [];
-                const newData = res?.content?.results;
+                // Backend sends: { content: { results: { result_type, result }, trace_id } }
+                // result is the actual PromQL data (vector/matrix with values)
+                // We need to extract and accumulate the result.result part
 
-                if (Array.isArray(newData)) {
-                  queryResults[queryIndex] = [...currentResult, ...newData];
-                } else {
+                const newData = res?.content?.results; // This is { result_type, result }
+
+                // Debug logging
+                console.log(`[PromQL Streaming] Query ${queryIndex} received chunk:`, {
+                  result_type: newData?.result_type,
+                  result_length: Array.isArray(newData?.result) ? newData.result.length : 'not array',
+                  newData: newData
+                });
+
+                if (!queryResults[queryIndex]) {
+                  // First chunk - initialize with the structure
                   queryResults[queryIndex] = newData;
+                } else {
+                  // Subsequent chunks - merge the result arrays
+                  const currentResult = queryResults[queryIndex];
+
+                  // If both have result arrays, merge them
+                  if (currentResult?.result && Array.isArray(currentResult.result) &&
+                      newData?.result && Array.isArray(newData.result)) {
+                    // Merge the result arrays (time series data)
+                    queryResults[queryIndex] = {
+                      ...newData,
+                      result: [...currentResult.result, ...newData.result]
+                    };
+                  } else if (newData) {
+                    // Replace with new data if structure is different
+                    queryResults[queryIndex] = newData;
+                  }
                 }
 
                 // Update state with accumulated results
@@ -979,9 +1005,8 @@ export const usePanelDataLoader = (
             };
 
             const handlePromQLError = (data: any, err: any) => {
-              state.loading = false;
-              state.isOperationCancelled = false;
-              state.isPartialData = false;
+              // Mark this query as completed (even with error)
+              completedQueries.add(queryIndex);
 
               const errorMessage = err?.content?.message || err?.content?.error || "Unknown error";
               const errorCode = err?.content?.code || "";
@@ -992,12 +1017,22 @@ export const usePanelDataLoader = (
               };
 
               removeTraceId(traceId);
+
+              // Only mark loading as complete when ALL queries are done
+              if (completedQueries.size === panelSchema.value.queries.length) {
+                state.loading = false;
+                state.isOperationCancelled = false;
+                state.isPartialData = false;
+              }
             };
 
             const handlePromQLComplete = (data: any, _: any) => {
-              state.loading = false;
-              state.isOperationCancelled = false;
-              state.isPartialData = false;
+              // Mark this query as completed
+              completedQueries.add(queryIndex);
+
+              // Debug logging
+              console.log(`[PromQL Streaming] Query ${queryIndex} completed. Total queries: ${panelSchema.value.queries.length}, Completed: ${completedQueries.size}`);
+              console.log(`[PromQL Streaming] Final data for query ${queryIndex}:`, queryResults[queryIndex]);
 
               // Final update with complete results
               state.data = [...queryResults];
@@ -1007,8 +1042,16 @@ export const usePanelDataLoader = (
 
               removeTraceId(traceId);
 
-              // Save to cache after completion
-              saveCurrentStateToCache();
+              // Only mark loading as complete when ALL queries are done
+              if (completedQueries.size === panelSchema.value.queries.length) {
+                console.log('[PromQL Streaming] All queries completed. Final state.data:', state.data);
+                state.loading = false;
+                state.isOperationCancelled = false;
+                state.isPartialData = false;
+
+                // Save to cache after all queries complete
+                saveCurrentStateToCache();
+              }
             };
 
             const handlePromQLReset = (data: any, res: any) => {
