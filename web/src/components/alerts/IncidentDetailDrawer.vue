@@ -356,7 +356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Loading state with streaming content -->
-          <div v-if="rcaLoading" class="rca-container tw-rounded tw-p-3 tw-flex-1 tw-overflow-auto" :class="isDarkMode ? 'rca-container-dark' : 'rca-container-light'">
+          <div v-if="rcaLoading" class="rca-container tw-rounded tw-p-3 tw-flex-1 tw-overflow-auto tw-border" :class="isDarkMode ? 'tw-bg-gray-800 tw-border-gray-700' : 'tw-bg-blue-50 tw-border-blue-200'">
             <div class="tw-flex tw-items-center tw-gap-2 tw-mb-2">
               <q-spinner size="sm" color="primary" />
               <span class="tw-text-sm">Analysis in progress...</span>
@@ -369,7 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Existing analysis content -->
-          <div v-else-if="hasExistingRca" class="rca-container tw-rounded tw-p-3 tw-flex-1 tw-overflow-auto" :class="isDarkMode ? 'rca-container-dark' : 'rca-container-light'">
+          <div v-else-if="hasExistingRca" class="rca-container tw-rounded tw-p-3 tw-flex-1 tw-overflow-auto tw-border" :class="isDarkMode ? 'tw-bg-gray-800 tw-border-gray-700' : 'tw-bg-blue-50 tw-border-blue-200'">
             <div
               class="tw-text-sm tw-whitespace-pre-wrap rca-content"
               v-html="formatRcaContent(incidentDetails.topology_context.suggested_root_cause)"
@@ -377,7 +377,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- No analysis yet -->
-          <div v-else class="no-rca-container tw-rounded tw-p-3 tw-text-sm tw-flex-1" :class="isDarkMode ? 'no-rca-container-dark' : 'no-rca-container-light'">
+          <div v-else class="tw-rounded tw-p-3 tw-text-sm tw-flex-1 tw-border" :class="isDarkMode ? 'tw-bg-gray-700 tw-border-gray-600 tw-text-gray-300' : 'tw-bg-gray-50 tw-border-gray-200 tw-text-gray-500'">
             No analysis performed yet
           </div>
         </div>
@@ -865,76 +865,52 @@ body.body--dark .tile-content:hover {
   font-size: 14px;
 }
 
-/* RCA Container - Light Mode */
-.rca-container-light {
-  background-color: #eff6ff; /* blue-50 */
-  border: 1px solid #bfdbfe; /* blue-200 */
+/* RCA Content Styling - Dark Mode */
+body.body--dark .rca-content :deep(strong) {
+  font-weight: 600;
+  color: #cbd5e1; /* slate-300 - soft, readable */
 }
 
-.rca-container-light :deep(strong) {
+body.body--dark .rca-content :deep(.tw-text-blue-600) {
+  color: #94a3b8; /* slate-400 - muted */
+}
+
+body.body--dark .rca-content :deep(.tw-text-blue-500) {
+  color: #94a3b8; /* slate-400 - muted bullet */
+}
+
+body.body--dark .rca-content :deep(.tw-text-gray-800) {
+  color: #e5e7eb; /* gray-200 */
+}
+
+body.body--dark .rca-content :deep(.tw-text-gray-700) {
+  color: #d1d5db; /* gray-300 */
+}
+
+body.body--dark .rca-content :deep(.tw-text-gray-600) {
+  color: #9ca3af; /* gray-400 */
+}
+
+body.body--dark .rca-content :deep(.tw-text-gray-900) {
+  color: #f3f4f6; /* gray-100 */
+}
+
+body.body--dark .rca-content :deep(.tw-border-b) {
+  border-color: #4b5563; /* gray-600 border */
+}
+
+/* RCA Content Styling - Light Mode */
+.rca-content :deep(strong) {
   font-weight: 600;
   color: #1e40af; /* blue-800 */
 }
 
-.rca-container-light :deep(.tw-text-blue-600) {
-  color: #2563eb; /* blue-600 for light mode */
+.rca-content :deep(.tw-text-blue-600) {
+  color: #2563eb; /* blue-600 */
 }
 
-.rca-container-light :deep(.tw-border-b) {
+.rca-content :deep(.tw-border-b) {
   border-color: #bfdbfe; /* blue-200 */
-}
-
-/* RCA Container - Dark Mode */
-.rca-container-dark {
-  background-color: #1e3a5f; /* dark blue background */
-  border: 1px solid #3b5875; /* darker blue border */
-}
-
-.rca-container-dark :deep(strong) {
-  font-weight: 600;
-  color: #93c5fd; /* blue-300 - brighter for dark mode */
-}
-
-.rca-container-dark :deep(.tw-text-blue-600) {
-  color: #60a5fa; /* blue-400 for dark mode */
-}
-
-.rca-container-dark :deep(.tw-text-blue-500) {
-  color: #60a5fa; /* blue-400 for dark mode bullet */
-}
-
-.rca-container-dark :deep(.tw-text-gray-800) {
-  color: #e5e7eb; /* gray-200 for dark mode */
-}
-
-.rca-container-dark :deep(.tw-text-gray-700) {
-  color: #d1d5db; /* gray-300 for dark mode */
-}
-
-.rca-container-dark :deep(.tw-text-gray-600) {
-  color: #9ca3af; /* gray-400 for dark mode */
-}
-
-.rca-container-dark :deep(.tw-text-gray-900) {
-  color: #f3f4f6; /* gray-100 for dark mode */
-}
-
-.rca-container-dark :deep(.tw-border-b) {
-  border-color: #3b5875; /* darker blue border */
-}
-
-/* No RCA Container - Light Mode */
-.no-rca-container-light {
-  background-color: #f9fafb; /* gray-50 */
-  border: 1px solid #e5e7eb; /* gray-200 */
-  color: #6b7280; /* gray-500 */
-}
-
-/* No RCA Container - Dark Mode */
-.no-rca-container-dark {
-  background-color: #374151; /* gray-700 */
-  border: 1px solid #4b5563; /* gray-600 */
-  color: #d1d5db; /* gray-300 */
 }
 
 /* Info Box (Stable Dimensions, Topology) - Light Mode */
