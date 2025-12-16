@@ -118,6 +118,9 @@ export default createStore({
       light: null,  // Hex color string (e.g., "#FF0000") or null
       dark: null,   // Hex color string (e.g., "#0000FF") or null
     },
+    // Share URL state for Safari-compatible clipboard copy
+    // Polling mechanism checks this value and copies when available
+    pendingShortURL: null,
   },
   mutations: {
     login(state, payload) {
@@ -285,6 +288,20 @@ export default createStore({
     clearTempThemeColors(state) {
       state.tempThemeColors.light = null;
       state.tempThemeColors.dark = null;
+    },
+    /**
+     * Set pending short URL for polling-based clipboard copy
+     * Called after short URL API completes successfully
+     * @param payload - The short URL string to be copied
+     */
+    setPendingShortURL(state, payload) {
+      state.pendingShortURL = payload;
+    },
+    /**
+     * Clear pending short URL after successful copy
+     */
+    clearPendingShortURL(state) {
+      state.pendingShortURL = null;
     },
   },
   actions: {
