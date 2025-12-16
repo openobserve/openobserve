@@ -554,8 +554,11 @@ pub async fn prepare_cache_response(
         }
     };
 
-    let (ts_column, is_descending) =
+    let (ts_column, mut is_descending) =
         cacher::get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate).unwrap_or_default();
+
+    // Refine is_descending for histogram queries with non-timestamp ORDER BY
+    is_descending = cacher::refine_is_descending_for_histogram(&sql, &ts_column, is_descending);
 
     // Compute the complete file path once for both branches
     let base_file_path = format!("{org_id}/{stream_type}/{stream_name}/{hashed_query}");

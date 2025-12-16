@@ -93,7 +93,7 @@ pub async fn check_cache(
     is_aggregate: bool,
     sql: &Sql,
     result_ts_col: &str,
-    mut is_descending: bool,
+    is_descending: bool,
     should_exec_query: &mut bool,
 ) -> MultiCachedQueryResponse {
     let start = std::time::Instant::now();
@@ -174,23 +174,8 @@ pub async fn check_cache(
         histogram_interval = interval * 1000 * 1000; // in microseconds
     }
 
-    // For histogram queries with non-timestamp ORDER BY, refine is_descending
-    if is_histogram_query && !order_by.is_empty() {
-        let mut found_ts_order = false;
-        for (field, order) in order_by {
-            if is_timestamp_field(field, &result_ts_col) {
-                is_descending = order == &OrderBy::Desc;
-                found_ts_order = true;
-                break;
-            }
-        }
-
-        // For histogram queries ordered by non-timestamp columns (e.g., ORDER BY count),
-        // use ascending as default
-        if !found_ts_order {
-            is_descending = false;
-        }
-    }
+    // Note: is_descending refinement for histogram queries is now done in prepare_cache_response()
+    // before calling this function, so we use the pre-refined value directly
 
     if is_aggregate && order_by.is_empty() && result_ts_col.is_empty() {
         return MultiCachedQueryResponse::default();
@@ -699,6 +684,50 @@ pub fn compute_cache_file_path(
     }
 
     file_path
+}
+
+/// Refines is_descending for histogram queries with non-timestamp ORDER BY.
+///
+/// For histogram queries, if ORDER BY is not on the timestamp column,
+/// we use ascending as the default for cache operations.
+///
+/// # Arguments
+/// * `sql` - Parsed SQL query
+/// * `ts_column` - The timestamp column name
+/// * `initial_is_descending` - The initial is_descending value from ORDER BY
+///
+/// # Returns
+/// Refined is_descending value
+pub fn refine_is_descending_for_histogram(
+    sql: &Sql,
+    ts_column: &str,
+    initial_is_descending: bool,
+) -> bool {
+    let is_histogram_query = sql.histogram_interval.is_some();
+
+    if !is_histogram_query || sql.order_by.is_empty() {
+        return initial_is_descending;
+    }
+
+    // Check if ORDER BY includes the timestamp column
+    let mut found_ts_order = false;
+    let mut refined_is_descending = initial_is_descending;
+
+    for (field, order) in &sql.order_by {
+        if is_timestamp_field(field, ts_column) {
+            refined_is_descending = order == &OrderBy::Desc;
+            found_ts_order = true;
+            break;
+        }
+    }
+
+    // For histogram queries ordered by non-timestamp columns (e.g., ORDER BY count),
+    // use ascending as default
+    if !found_ts_order {
+        refined_is_descending = false;
+    }
+
+    refined_is_descending
 }
 
 enum DeletionCriteria {
