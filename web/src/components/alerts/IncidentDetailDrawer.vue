@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     :class="[store.state.theme === 'dark' ? 'bg-dark' : 'bg-white']"
     class="tw-h-full tw-flex tw-flex-col"
-    style="width: 90vw"
+    style="width: 94vw"
   >
     <!-- Header -->
     <div class="incident-detail-header row items-center no-wrap q-px-md tw-p-4">
