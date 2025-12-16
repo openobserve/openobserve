@@ -236,7 +236,7 @@ pub async fn merge_parquet_files(
             let writer_task = VORTEX_RUNTIME.spawn_blocking(move || {
                 VORTEX_RUNTIME.block_on(async move {
                     let mut buf = Vec::new();
-                    let session = VortexSession::default();
+                    let session = VortexSession::default().with_tokio();
                     let dtype = DType::from_arrow(schema_clone.as_ref());
                     let write_options = VortexWriteOptions::new(session.clone());
                     let mut writer = write_options.writer(&mut buf, dtype);

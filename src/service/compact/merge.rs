@@ -22,7 +22,7 @@ use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 #[cfg(feature = "enterprise")]
 use config::utils::parquet::read_recordbatch_from_bytes;
 use config::{
-    FILE_EXT_PARQUET, TIMESTAMP_COL_NAME,
+    FileFormat, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config, ider, is_local_disk_storage,
     meta::{
@@ -409,7 +409,7 @@ pub async fn merge_by_stream(
     stream_name: &str,
     job_id: i64,
     offset: i64,
-    stats_offset: i64,
+    _stats_offset: i64,
 ) -> Result<(), anyhow::Error> {
     let cfg = get_config();
     let start = std::time::Instant::now();
@@ -448,25 +448,21 @@ pub async fn merge_by_stream(
     let files =
         file_list::query_for_merge(org_id, stream_name, stream_type, &date_start, &date_end)
             .await
-            .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("query file list failed: {e}"))?;
 
-    if !files.is_empty() && offset + hour_micros(1) > stats_offset {
-        // check stream stats update offset, if the merge offset greater than the stream stats
-        // offset, we need to wait for the stream stats to be updated first. here we just
-        // simple skip it, it will be retried in 10 minutes
-        log::warn!(
-            "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] offset: {offset}, skipped, it needs to wait stream_stats offset: {stats_offset}",
-        );
-        return Ok(());
-    }
+    // TODO: recover this after testing
+    // if !files.is_empty() && offset + hour_micros(1) > stats_offset {
+    //     // check stream stats update offset, if the merge offset greater than the stream stats
+    //     // offset, we need to wait for the stream stats to be updated first. here we just
+    //     // simple skip it, it will be retried in 10 minutes
+    //     log::warn!(
+    //         "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] offset: {offset},
+    // skipped, it needs to wait stream_stats offset: {stats_offset}",     );
+    //     return Ok(());
+    // }
 
     log::debug!(
-        "[COMPACTOR] merge_by_stream [{}/{}/{}] date range: [{},{}], files: {}",
-        org_id,
-        stream_type,
-        stream_name,
-        date_start,
-        date_end,
+        "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] date range: [{date_start},{date_end}], files: {}",
         files.len(),
     );
 
@@ -775,9 +771,9 @@ pub async fn merge_files(
         flattened: false,
         index_size: 0,
     };
-    if new_file_meta.records == 0 {
-        return Err(anyhow::anyhow!("merge_files error: records is 0"));
-    }
+    // if new_file_meta.records == 0 {
+    //     return Err(anyhow::anyhow!("merge_files error: records is 0"));
+    // }
 
     // get latest version of schema
     let latest_schema = infra::schema::get(org_id, stream_name, stream_type).await?;
@@ -820,8 +816,11 @@ pub async fn merge_files(
             "[COMPACTOR:WORKER:{thread_id}:{fi}] merge small file: {}",
             &file.key
         );
+        // TODO: check if this read the total size of the file
         let buf = file_data::get(&file.account, &file.key, None).await?;
-        let schema = read_schema_from_bytes(&buf).await?;
+        let file_format = FileFormat::from_extension(&file.key)
+            .unwrap_or_else(|| panic!("invalid file format: {}", file.key));
+        let schema = read_schema_from_bytes(file_format, &buf).await?;
         let schema = schema.as_ref().clone().with_metadata(Default::default());
         let schema_key = schema.hash_key();
         if !schemas.contains_key(&schema_key) {
@@ -960,11 +959,11 @@ pub async fn merge_files(
             }
 
             let id = ider::generate_file_name();
-            let new_file_key = format!("{prefix}/{id}{FILE_EXT_PARQUET}");
+            let file_format = get_config().common.file_format.extension();
+            let new_file_key = format!("{prefix}/{id}{file_format}");
             log::info!(
-                "[COMPACTOR:WORKER:{thread_id}] merged {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {} ms",
+                "[COMPACTOR:WORKER:{thread_id}] merged {} files into a new file: {new_file_key}, original_size: {}, compressed_size: {}, took: {} ms",
                 retain_file_list.len(),
-                new_file_key,
                 new_file_meta.original_size,
                 new_file_meta.compressed_size,
                 start.elapsed().as_millis(),
@@ -1008,7 +1007,8 @@ pub async fn merge_files(
                 }
 
                 let id = ider::generate_file_name();
-                let new_file_key = format!("{prefix}/{id}{FILE_EXT_PARQUET}");
+                let file_format = get_config().common.file_format.extension();
+                let new_file_key = format!("{prefix}/{id}{file_format}");
 
                 // upload file to storage
                 let buf = Bytes::from(buf);

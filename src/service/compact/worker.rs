@@ -105,9 +105,8 @@ impl JobScheduler {
                                         infra::file_list::update_running_jobs(&[job.job_id]).await
                                     {
                                         log::error!(
-                                            "[COMPACTOR:SCHEDULER:{thread_id}] update_job_status[{}] failed: {}",
+                                            "[COMPACTOR:SCHEDULER:{thread_id}] update_job_status[{}] failed: {e}",
                                             job.job_id,
-                                            e
                                         );
                                     }
                                 }
@@ -124,11 +123,10 @@ impl JobScheduler {
                             .await
                             {
                                 log::error!(
-                                    "[COMPACTOR:SCHEDULER:{thread_id}] merge_by_stream [{}/{}/{}] error: {}",
+                                    "[COMPACTOR:SCHEDULER:{thread_id}] merge_by_stream [{}/{}/{}] error: {e}",
                                     job.org_id,
                                     job.stream_type,
                                     job.stream_name,
-                                    e
                                 );
                             }
                             // release locked stream

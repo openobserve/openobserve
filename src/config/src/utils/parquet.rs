@@ -32,7 +32,7 @@ use parquet::{
     basic::{Compression, Encoding},
     file::{metadata::KeyValue, properties::WriterProperties},
 };
-use vortex::VortexSessionDefault;
+use vortex::{VortexSessionDefault, buffer::Buffer};
 use vortex_file::OpenOptionsSessionExt;
 use vortex_io::session::RuntimeSessionExt;
 use vortex_session::VortexSession;
@@ -199,10 +199,24 @@ pub async fn read_schema_from_file(path: &PathBuf) -> Result<Arc<Schema>, anyhow
     }
 }
 
-pub async fn read_schema_from_bytes(data: &bytes::Bytes) -> Result<Arc<Schema>, anyhow::Error> {
-    let schema_reader = Cursor::new(data.clone());
-    let arrow_reader = ParquetRecordBatchStreamBuilder::new(schema_reader).await?;
-    Ok(arrow_reader.schema().clone())
+pub async fn read_schema_from_bytes(
+    file_format: FileFormat,
+    data: &bytes::Bytes,
+) -> Result<Arc<Schema>, anyhow::Error> {
+    match file_format {
+        FileFormat::Parquet => {
+            let schema_reader = Cursor::new(data.clone());
+            let arrow_reader = ParquetRecordBatchStreamBuilder::new(schema_reader).await?;
+            Ok(arrow_reader.schema().clone())
+        }
+        FileFormat::Vortex => {
+            let session = VortexSession::default().with_tokio();
+            let buf = Buffer::from(data.to_vec());
+            let vxf = session.open_options().open(buf).await?;
+            let schema = Arc::new(vxf.dtype().to_arrow_schema()?);
+            Ok(schema)
+        }
+    }
 }
 
 pub async fn read_metadata_from_bytes(data: &bytes::Bytes) -> Result<FileMeta, anyhow::Error> {

@@ -26,6 +26,7 @@ use vortex::{
     file::VortexWriteOptions,
     session::VortexSession,
 };
+use vortex_io::session::RuntimeSessionExt;
 
 use crate::{
     config::{self, FileFormat},
@@ -101,7 +102,7 @@ async fn write_recordbatches_to_vortex(
         .spawn_blocking(move || {
             VORTEX_RUNTIME.block_on(async move {
                 let mut buf = Vec::new();
-                let session = VortexSession::default();
+                let session = VortexSession::default().with_tokio();
                 let dtype = DType::from_arrow(schema.as_ref());
                 let write_options = VortexWriteOptions::new(session.clone());
                 let mut writer = write_options.writer(&mut buf, dtype);
