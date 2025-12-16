@@ -303,42 +303,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- Tabs -->
-        <div class="tw-mb-3 tw-flex tw-items-center tw-justify-between">
-          <q-tabs v-model="activeTab" inline-label dense no-caps align="left">
-            <q-tab
-              name="incidentAnalysis"
-              icon="psychology"
-              label="Incident Analysis"
-            />
-            <q-tab
-              name="alertTriggers"
-              icon="notifications_active"
-            >
-              <template #default>
-                <div class="tw-flex tw-items-center tw-gap-1.5">
-                  <span>Alert Triggers</span>
-                  <span class="tw-text-xs tw-opacity-70">({{ triggers.length }})</span>
-                </div>
-              </template>
-            </q-tab>
-          </q-tabs>
-          <!-- AI Chat Button -->
-          <q-btn
-            size="sm"
-            flat
-            dense
-            @click="openSREChat"
-            class="tw-ml-auto"
-          >
-            <img :src="getAIIconURL()" class="tw-w-5 tw-h-5" />
-            <q-tooltip :delay="500" style="width: 180px;">Chat with SRE Assistant</q-tooltip>
-          </q-btn>
-        </div>
-      </div>
+        <!-- Tabs and Content Wrapper with Fullscreen -->
+        <div class="tabs-content-container" :class="{ 'fullscreen-mode': isRcaExpanded }">
+          <!-- Tabs -->
+          <div class="tw-mb-3 tw-flex tw-items-center tw-justify-between tw-px-4 q-px-md">
+            <q-tabs v-model="activeTab" inline-label dense no-caps align="left">
+              <q-tab
+                name="incidentAnalysis"
+                icon="psychology"
+                label="Incident Analysis"
+              />
+              <q-tab
+                name="alertTriggers"
+                icon="notifications_active"
+              >
+                <template #default>
+                  <div class="tw-flex tw-items-center tw-gap-1.5">
+                    <span>Alert Triggers</span>
+                    <span class="tw-text-xs tw-opacity-70">({{ triggers.length }})</span>
+                  </div>
+                </template>
+              </q-tab>
+            </q-tabs>
+            <!-- Action Buttons -->
+            <div class="tw-flex tw-items-center tw-gap-1">
+              <!-- Fullscreen Button -->
+              <q-btn
+                flat
+                dense
+                round
+                size="sm"
+                :icon="isRcaExpanded ? 'fullscreen_exit' : 'fullscreen'"
+                @click="toggleRcaExpand"
+              >
+                <q-tooltip :delay="500">
+                  {{ isRcaExpanded ? 'Exit fullscreen' : 'View fullscreen' }}
+                </q-tooltip>
+              </q-btn>
+              <!-- AI Chat Button -->
+              <q-btn
+                size="sm"
+                flat
+                dense
+                @click="openSREChat"
+              >
+                <img :src="getAIIconURL()" class="tw-w-5 tw-h-5" />
+                <q-tooltip :delay="500" style="width: 180px;">Chat with SRE Assistant</q-tooltip>
+              </q-btn>
+            </div>
+          </div>
 
-      <!-- Tab Content Area -->
-      <div class="tw-flex-1 tw-flex tw-flex-col tw-px-4 tw-pb-4 q-px-md tw-overflow-hidden">
+          <!-- Tab Content Area -->
+          <div class="tab-content-wrapper tw-flex-1 tw-flex tw-flex-col tw-px-4 tw-pb-4 q-px-md tw-overflow-hidden">
         <!-- Incident Analysis Tab Content -->
         <div v-if="activeTab === 'incidentAnalysis'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
           <!-- Trigger button when no analysis exists and not loading -->
@@ -356,7 +372,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Loading state with streaming content -->
-          <div v-if="rcaLoading" class="rca-container tw-rounded tw-p-3 tw-flex-1 tw-overflow-auto tw-border" :class="isDarkMode ? 'tw-bg-gray-800 tw-border-gray-700' : 'tw-bg-blue-50 tw-border-blue-200'">
+          <div
+            v-if="rcaLoading"
+            class="rca-container tw-rounded tw-p-3 tw-border tw-flex-1 tw-overflow-auto"
+            :class="isDarkMode ? 'tw-bg-gray-800 tw-border-gray-700' : 'tw-bg-blue-50 tw-border-blue-200'"
+          >
             <div class="tw-flex tw-items-center tw-gap-2 tw-mb-2">
               <q-spinner size="sm" color="primary" />
               <span class="tw-text-sm">Analysis in progress...</span>
@@ -369,7 +389,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Existing analysis content -->
-          <div v-else-if="hasExistingRca" class="rca-container tw-rounded tw-p-3 tw-flex-1 tw-overflow-auto tw-border" :class="isDarkMode ? 'tw-bg-gray-800 tw-border-gray-700' : 'tw-bg-blue-50 tw-border-blue-200'">
+          <div
+            v-else-if="hasExistingRca"
+            class="rca-container tw-rounded tw-p-3 tw-border tw-flex-1 tw-overflow-auto"
+            :class="isDarkMode ? 'tw-bg-gray-800 tw-border-gray-700' : 'tw-bg-blue-50 tw-border-blue-200'"
+          >
             <div
               class="tw-text-sm tw-whitespace-pre-wrap rca-content"
               v-html="formatRcaContent(incidentDetails.topology_context.suggested_root_cause)"
@@ -409,6 +433,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item-section>
               </q-item>
             </q-list>
+          </div>
+        </div>
           </div>
         </div>
       </div>
@@ -454,6 +480,9 @@ export default defineComponent({
 
     // Tab management
     const activeTab = ref("incidentAnalysis");
+
+    // RCA expansion state
+    const isRcaExpanded = ref(false);
 
     // Computed to check if analysis already exists
     const hasExistingRca = computed(() => {
@@ -777,6 +806,10 @@ export default defineComponent({
         : getImageURL('images/common/ai_icon.svg');
     };
 
+    const toggleRcaExpand = () => {
+      isRcaExpanded.value = !isRcaExpanded.value;
+    };
+
     return {
       t,
       store,
@@ -790,12 +823,14 @@ export default defineComponent({
       hasExistingRca,
       isDarkMode,
       activeTab,
+      isRcaExpanded,
       close,
       acknowledgeIncident,
       resolveIncident,
       reopenIncident,
       triggerRca,
       openSREChat,
+      toggleRcaExpand,
       getStatusColor,
       getStatusDotColor,
       getStatusTextColor,
@@ -939,5 +974,42 @@ body.body--dark .label-text {
 
 body.body--dark .muted-text {
   color: #6b7280; /* gray-500 in dark mode */
+}
+
+/* Fullscreen Mode Styles */
+.tabs-content-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+.fullscreen-mode {
+  position: absolute !important;
+  top: 60px !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: calc(100% - 60px) !important;
+  z-index: 999 !important;
+  margin: 0 !important;
+  padding-top: 16px !important;
+  background-color: #ffffff !important;
+  overflow: hidden !important;
+}
+
+body.body--dark .fullscreen-mode {
+  background-color: #1d1d1d !important;
+}
+
+.fullscreen-mode .tab-content-wrapper {
+  overflow: auto !important;
+}
+
+/* Larger font in expanded mode */
+.fullscreen-mode .rca-content {
+  font-size: 15px !important;
+  line-height: 1.8 !important;
 }
 </style>
