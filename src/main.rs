@@ -1465,19 +1465,12 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
         openobserve::super_cluster_queue::init().await?;
     }
 
-    // Initialize OpenAPI spec for AI and MCP modules
+    // Initialize OpenAPI spec for AI and MCP modules (includes agent client)
     let api = openapi::ApiDoc::openapi();
     if let Err(e) = o2_enterprise::enterprise::ai::init_ai_components(api) {
-        log::error!("Failed to init AI/MCP: {e}");
+        log::error!("Failed to init AI/MCP/Agent: {e}");
     } else {
-        log::info!("Initialized AI and MCP components");
-    }
-
-    // Initialize agent client for connection pooling (part of AI subsystem)
-    if let Err(e) = openobserve::handler::http::request::agent::chat::init_agent_client() {
-        log::warn!("Failed to init agent client: {e}");
-    } else {
-        log::info!("Initialized agent client with connection pooling");
+        log::info!("Initialized AI, MCP, and Agent components");
     }
 
     // check ratelimit config

@@ -13,73 +13,36 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#[cfg(feature = "enterprise")]
-use std::sync::Arc;
-
 use actix_web::{HttpResponse, Responder, post, web};
-use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+// Re-export enterprise types for OpenAPI and route handlers
+#[cfg(feature = "enterprise")]
+pub use o2_enterprise::enterprise::alerts::rca_agent::{
+    AgentChatRequest, ChatMessage, get_agent_client, init_agent_client,
+};
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
-/// Request body for agent chat
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+// Stub types for non-enterprise builds (for compilation and OpenAPI generation)
+#[cfg(not(feature = "enterprise"))]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 pub struct AgentChatRequest {
-    /// Type of agent to query (e.g., "sre", "sre-rca", "security")
     pub agent_type: String,
-    /// User message/query
     pub message: String,
-    /// Generic context (opaque JSON interpreted by agent)
     #[serde(default)]
     pub context: serde_json::Value,
-    /// Conversation history
     #[serde(default)]
     pub history: Vec<ChatMessage>,
 }
 
-/// Chat message with role and content
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[cfg(not(feature = "enterprise"))]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 pub struct ChatMessage {
-    /// Role: "user" or "assistant"
     pub role: String,
-    /// Message content
     pub content: String,
 }
 
-/// Global RCA agent client with connection pooling
-/// Created once and reused across all requests to avoid TCP/TLS handshake overhead
-#[cfg(feature = "enterprise")]
-static AGENT_CLIENT: once_cell::sync::OnceCell<
-    Option<Arc<o2_enterprise::enterprise::alerts::rca_agent::RcaAgentClient>>,
-> = once_cell::sync::OnceCell::new();
-
-/// Initialize the global agent client
-/// Should be called once during application startup
-#[cfg(feature = "enterprise")]
+#[cfg(not(feature = "enterprise"))]
 pub fn init_agent_client() -> Result<(), String> {
-    use config::get_config;
-    use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
-
-    let o2_config = get_o2_config();
-    let zo_config = get_config();
-
-    let client = if !o2_config.incidents.rca_enabled || o2_config.incidents.rca_agent_url.is_empty()
-    {
-        None
-    } else {
-        o2_enterprise::enterprise::alerts::rca_agent::RcaAgentClient::new(
-            &o2_config.incidents.rca_agent_url,
-            &zo_config.auth.root_user_email,
-            &zo_config.auth.root_user_password,
-        )
-        .ok()
-        .map(Arc::new)
-    };
-
-    AGENT_CLIENT
-        .set(client)
-        .map_err(|_| "Agent client already initialized".to_string())?;
-
     Ok(())
 }
 
@@ -230,10 +193,10 @@ pub async fn agent_chat_stream(
         use serde_json::json;
         use web::Bytes;
 
-        // Get or create agent client (connection pooling)
-        let client = match AGENT_CLIENT.get() {
-            Some(Some(c)) => c.clone(),
-            _ => {
+        // Get global agent client (connection pooling)
+        let client = match get_agent_client() {
+            Some(c) => c,
+            None => {
                 return MetaHttpResponse::bad_request("Agent chat not enabled");
             }
         };
