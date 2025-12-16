@@ -36,10 +36,6 @@
       v-if="!customQuery && !fields.isDerived"
       style="width: calc(100% - 134px)"
     >
-      <!-- active-color="primary" -->
-      <!-- narrow-indicator -->
-      <!-- class="text-grey" -->
-      <!-- indicator-color="primary" -->
       <q-tabs
         v-model="fields.type"
         @update:modelValue="onFieldTypeChange"
@@ -195,14 +191,6 @@ export default {
   emits: ["update:modelValue"],
   setup(props, { emit }) {
     const { t } = useI18n();
-    //   const dashboardPanelDataPageKey = inject(
-    //     "dashboardPanelDataPageKey",
-    //     "dashboard",
-    //   );
-    //   const { dashboardPanelData } = useDashboardPanelData(
-    //     dashboardPanelDataPageKey
-    //   );
-
     const fields = ref(props.modelValue);
 
     // if functionName property is missing for build type, selected function Name will be None -> null

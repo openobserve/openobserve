@@ -19,19 +19,8 @@
       map-options
       class="tw-w-72 o2-custom-select-dashboard"
     >
-      <!-- <template v-slot:append>
-          <q-icon
-            name="close"
-            size="small"
-            @click.stop.prevent="fields.functionName = null"
-            class="cursor-pointer"
-          />
-        </template> -->
     </q-select>
     <div class="tw-w-full tw-p-3 tw-flex tw-gap-2">
-      <!-- <SubTaskArrow /> -->
-
-      <!-- {{ JSON.stringify(fields.args) }} -->
       <!-- Loop through the args for the first n-1 arguments -->
       <div class="tw-w-full">
         <div
@@ -45,13 +34,6 @@
               marginLeft: isChild ? '-60px' : '0px',
             }"
           >
-            <!-- <div class="tw-mr-2 tw-relative">
-              <SubTaskArrow class="tw-absolute" />
-              <div
-                v-if="argIndex !== fields.args.length - 1"
-                class="tw-border-l-[1px] tw-border-[#001495] tw-opacity-50 tw-relative tw-h-full"
-              ></div>
-            </div> -->
             <div class="tw-mr-2 tw-relative" style="min-height: 50px">
               <!-- Vertical Line using top & bottom instead of height -->
               <div
@@ -73,9 +55,9 @@
 
             <div>
               <div class="tw-flex tw-items-center tw-gap-x-2">
-                <label :for="'arg-' + argIndex"
-                  >{{ getParameterLabel(fields.functionName, argIndex) }}</label
-                >
+                <label :for="'arg-' + argIndex">{{
+                  getParameterLabel(fields.functionName, argIndex)
+                }}</label>
               </div>
               <div class="tw-flex">
                 <!-- type selector -->
@@ -107,26 +89,6 @@
                     />
                   </template>
                 </q-select>
-
-                <!-- Render different input types based on validation -->
-                <!-- <q-select
-            v-model="fields.args[argIndex].value"
-            :options="filteredSchemaOptions"
-            label="Select Field"
-            input-debounce="0"
-            behavior="menu"
-            dense
-            filled
-            use-input
-            borderless
-            hide-selected
-            fill-input
-            emit-value
-            @filter="filterStreamFn"
-            :required="isRequired(fields.functionName, argIndex)"
-            class="tw-w-52"
-             /> -->
-
                 <!-- Left field selector using StreamFieldSelect -->
                 <div
                   class="tw-w-52"
@@ -219,7 +181,6 @@
 import { ref, watch, toRef, computed, inject } from "vue";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
-import { useSelectAutoComplete } from "@/composables/useSelectAutocomplete";
 import HistogramIntervalDropDown from "../HistogramIntervalDropDown.vue";
 import { addMissingArgs } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import StreamFieldSelect from "@/components/dashboards/addPanel/StreamFieldSelect.vue";
@@ -271,9 +232,6 @@ export default {
         deep: true,
       },
     );
-
-    // const { filterFn: filterStreamFn, filteredOptions: filteredSchemaOptions } =
-    //   useSelectAutoComplete(toRef(schemaOptions), "label");
 
     const filteredFunctions: any = ref([]);
 
@@ -547,7 +505,9 @@ export default {
       );
 
       // Return the label from validation, or fallback to default
-      return argsValidation[adjustedIndex]?.label || `Parameter ${argIndex + 1}`;
+      return (
+        argsValidation[adjustedIndex]?.label || `Parameter ${argIndex + 1}`
+      );
     };
 
     return {
@@ -562,8 +522,6 @@ export default {
       getNonSeparatorArgs,
       getSeparatorArg,
       getSupportedTypeBasedOnFunctionNameAndIndex,
-      // filterStreamFn,
-      // filteredSchemaOptions,
       filteredFunctions,
       filterFunctionsOptions,
       initializeFunctions,

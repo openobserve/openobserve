@@ -9,14 +9,14 @@ let parserInitialized = false;
  * @returns true if the query is a SELECT * query, false otherwise
  */
 export const isSimpleSelectAllQuery = (query: string): boolean => {
-  if (!query || typeof query !== 'string') return false;
-  
+  if (!query || typeof query !== "string") return false;
+
   // Normalize the query by removing extra whitespace
-  const normalizedQuery = query.trim().replace(/\s+/g, ' ');
-  
+  const normalizedQuery = query.trim().replace(/\s+/g, " ");
+
   // Pattern to match: SELECT * FROM followed by anything (case insensitive)
   const selectAllPattern = /^select\s+\*\s+from\s+/i;
-  
+
   return selectAllPattern.test(normalizedQuery);
 };
 
@@ -114,7 +114,7 @@ export const addLabelToSQlQuery = async (
 
   if (operator === "match_all") {
     condition = `match_all(${formatValue(value)})`;
-  } else if (operator === "str_match") {
+  } else if (operator === "str_match" || operator === "Contains") {
     condition = `str_match(${label}, ${formatValue(value)})`;
   } else if (operator === "str_match_ignore_case") {
     condition = `str_match_ignore_case(${label}, ${formatValue(value)})`;
@@ -771,220 +771,85 @@ export const convertQueryIntoSingleLine = async (query: any) => {
   }
 };
 
-
-
 export const getStreamNameFromQuery = async (query: any) => {
   let streamName = null;
   try {
     await importSqlParser();
     try {
-      if(query && query != ""){
+      if (query && query != "") {
         const parsedQuery = parser?.astify(query);
         if (parsedQuery?.with) {
-            let withObj = parsedQuery.with;
-            // Ensure withObj is an array before iterating
-            if (!Array.isArray(withObj)) {
-              withObj = [withObj];
-            }
-            withObj.forEach((obj: any) => {
-              // Recursively extract table names from the WITH statement with depth protection
-              const MAX_RECURSION_DEPTH = 50; // Prevent stack overflow
-              const visitedNodes = new WeakSet(); // Prevent circular references - more efficient for objects
-              
-              const extractTablesFromNode = (node: any, depth: number = 0) => {
-                if (!node || depth > MAX_RECURSION_DEPTH) {
-                  if (depth > MAX_RECURSION_DEPTH) {
-                    console.warn("Maximum recursion depth reached while parsing SQL query");
-                  }
-                  return;
-                }
-                
-                // Use WeakSet for efficient circular reference detection
-                if (typeof node === 'object' && node !== null) {
-                  if (visitedNodes.has(node)) {
-                    return; // Skip already visited nodes
-                  }
-                  visitedNodes.add(node);
-                }
-                
-                // Check if current node has a from clause
-                if (node.from && Array.isArray(node.from)) {
-                  node.from.forEach((stream: any) => {
-                    if (stream.table) {
-                      streamName = stream.table;
-                    }
-                    // Handle subquery in FROM clause
-                    if (stream.expr && stream.expr.ast) {
-                      extractTablesFromNode(stream.expr.ast, depth + 1);
-                    }
-                  });
-                }
-                
-                // Check for nested subqueries in WHERE clause
-                if (node.where && node.where.right && node.where.right.ast) {
-                  extractTablesFromNode(node.where.right.ast, depth + 1);
-                }
-                
-                // Check for nested subqueries in SELECT expressions
-                if (node.columns && Array.isArray(node.columns)) {
-                  node.columns.forEach((col: any) => {
-                    if (col.expr && col.expr.ast) {
-                      extractTablesFromNode(col.expr.ast, depth + 1);
-                    }
-                  });
-                }
-              };
-              
-              // Start extraction from the WITH statement
-              extractTablesFromNode(obj?.stmt);
-            });
+          let withObj = parsedQuery.with;
+          // Ensure withObj is an array before iterating
+          if (!Array.isArray(withObj)) {
+            withObj = [withObj];
           }
-          else{
-            streamName = parsedQuery?.from[0]?.table;
-          }
+          withObj.forEach((obj: any) => {
+            // Recursively extract table names from the WITH statement with depth protection
+            const MAX_RECURSION_DEPTH = 50; // Prevent stack overflow
+            const visitedNodes = new WeakSet(); // Prevent circular references - more efficient for objects
+
+            const extractTablesFromNode = (node: any, depth: number = 0) => {
+              if (!node || depth > MAX_RECURSION_DEPTH) {
+                if (depth > MAX_RECURSION_DEPTH) {
+                  console.warn(
+                    "Maximum recursion depth reached while parsing SQL query",
+                  );
+                }
+                return;
+              }
+
+              // Use WeakSet for efficient circular reference detection
+              if (typeof node === "object" && node !== null) {
+                if (visitedNodes.has(node)) {
+                  return; // Skip already visited nodes
+                }
+                visitedNodes.add(node);
+              }
+
+              // Check if current node has a from clause
+              if (node.from && Array.isArray(node.from)) {
+                node.from.forEach((stream: any) => {
+                  if (stream.table) {
+                    streamName = stream.table;
+                  }
+                  // Handle subquery in FROM clause
+                  if (stream.expr && stream.expr.ast) {
+                    extractTablesFromNode(stream.expr.ast, depth + 1);
+                  }
+                });
+              }
+
+              // Check for nested subqueries in WHERE clause
+              if (node.where && node.where.right && node.where.right.ast) {
+                extractTablesFromNode(node.where.right.ast, depth + 1);
+              }
+
+              // Check for nested subqueries in SELECT expressions
+              if (node.columns && Array.isArray(node.columns)) {
+                node.columns.forEach((col: any) => {
+                  if (col.expr && col.expr.ast) {
+                    extractTablesFromNode(col.expr.ast, depth + 1);
+                  }
+                });
+              }
+            };
+
+            // Start extraction from the WITH statement
+            extractTablesFromNode(obj?.stmt);
+          });
+        } else {
+          streamName = parsedQuery?.from[0]?.table;
+        }
       }
     } catch (error) {
-      console.log(error,'error parsing sql query');
+      console.log(error, "error parsing sql query");
     }
     return streamName;
   } catch (error) {
     return null;
   }
 };
-
-// // List of known aggregation functions
-// const aggregationFunctions = new Set([
-//   "count",
-//   "count-distinct",
-//   "sum",
-//   "avg",
-//   "min",
-//   "max",
-//   "p50",
-//   "p90",
-//   "p95",
-//   "p99",
-// ]);
-
-// // Helper function to process function arguments
-// const processFunctionArgs = (args: any[]) => {
-//   return {
-//     type: "expr_list",
-//     value: args.map((arg) => {
-//       if (!arg || !arg.type)
-//         return { type: "default", value: "unknown_column" };
-
-//       switch (arg.type) {
-//         case "field":
-//           return {
-//             type: "column_ref",
-//             table: null,
-//             column: arg.value?.field || "unknown_column",
-//           };
-
-//         case "number":
-//           return {
-//             type: "number",
-//             value: arg.value ?? 0,
-//           };
-
-//         case "string":
-//           return {
-//             type: "string",
-//             value: arg.value || "",
-//           };
-
-//         case "function":
-//           return processField(arg.value); // Recursively process nested functions
-
-//         default:
-//           return { type: "default", value: "unknown_column" };
-//       }
-//     }),
-//   };
-// };
-
-// // Helper function to process fields for SELECT clause
-// const processField: any = (field: any) => {
-//   if (!field || !field.alias) return null; // Ignore invalid fields
-
-//   if (field.functionName) {
-//     const functionNameLower = field.functionName.toLowerCase();
-//     const isAggregation = aggregationFunctions.has(functionNameLower);
-
-//     console.log(isAggregation, "isAggregation", field);
-
-//     return {
-//       type: "expr",
-//       expr: {
-//         type: isAggregation ? "aggr_func" : "function",
-//         name: isAggregation
-//           ? field.functionName.toUpperCase()
-//           : { name: [{ type: "default", value: field.functionName }] },
-//         args: processFunctionArgs(field.args || []),
-//         over: null,
-//       },
-//       as: field.alias,
-//     };
-//   } else {
-//     return {
-//       type: "expr",
-//       expr: {
-//         type: "column_ref",
-//         table: null,
-//         column: field.column || "unknown_column",
-//       },
-//       as: field.alias,
-//     };
-//   }
-// };
-
-// // Main function to build SQL query using AST
-// export async function buildSQLQueryWithParser(
-//   fields: any,
-//   joins: any[],
-// ): Promise<string> {
-//   // import parser
-//   await importSqlParser();
-
-//   console.log(
-//     parser.astify(
-//       "select histogram(_timestamp) as x_axis_1, count(_timestamp) as y_axis_1 from default group by x_axis_1 order by x_axis_1",
-//     ),
-//     "parser.astify",
-//   );
-
-//   const ast: any = {
-//     type: "select",
-//     columns: [],
-//     from: [{ db: null, table: fields?.stream || "unknown_table", as: null }],
-//     where: null,
-//     groupby: null,
-//     orderby: null,
-//     joins: [],
-//   };
-
-//   // Process X-Axis Fields
-//   if (Array.isArray(fields?.x)) {
-//     fields.x.forEach((xField: any) => {
-//       const processedField = processField(xField);
-//       if (processedField) ast.columns.push(processedField);
-//     });
-//   }
-
-//   // Process Y-Axis Fields
-//   if (Array.isArray(fields?.y)) {
-//     fields.y.forEach((yField: any) => {
-//       const processedField = processField(yField);
-//       if (processedField) ast.columns.push(processedField);
-//     });
-//   }
-
-//   console.log(ast, "AST");
-
-//   const sql = parser.sqlify(ast);
-//   return sql.replace(/`/g, '"');
-// }
 
 // List of known aggregation functions
 const aggregationFunctions = new Set([
@@ -1235,4 +1100,10 @@ export async function buildSQLQueryWithParser(
 }
 
 // Export internal functions for testing
-export { formatValue, parseCondition, convertWhereToFilter, extractFilters, extractTableName };
+export {
+  formatValue,
+  parseCondition,
+  convertWhereToFilter,
+  extractFilters,
+  extractTableName,
+};

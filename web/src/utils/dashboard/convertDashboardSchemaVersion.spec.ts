@@ -30,7 +30,6 @@ describe("convertDashboardSchemaVersion", () => {
   // Test 1: Basic functionality - constants
   it("should have correct current schema version", () => {
     expect(CURRENT_DASHBOARD_SCHEMA_VERSION).toBe(8);
-    expect(CURRENT_DASHBOARD_SCHEMA_VERSION).toBe(8);
   });
 
   // Test 2: Edge cases - null/undefined data

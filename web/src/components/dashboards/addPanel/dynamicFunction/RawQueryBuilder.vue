@@ -38,14 +38,6 @@ export default {
   },
   emits: ["update:modelValue"],
   setup(props, { emit }) {
-    //   const dashboardPanelDataPageKey = inject(
-    //     "dashboardPanelDataPageKey",
-    //     "dashboard",
-    //   );
-    //   const { dashboardPanelData } = useDashboardPanelData(
-    //     dashboardPanelDataPageKey
-    //   );
-
     const store = useStore();
 
     const fields = ref(props.modelValue);

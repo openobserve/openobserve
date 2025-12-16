@@ -30,23 +30,6 @@
           @show="(e: any) => loadFilterItem(condition.column)"
         >
           <div style="display: flex">
-            <!-- <q-select
-              v-model="condition.column"
-              :options="filteredSchemaOptions"
-              label="Filters on Field"
-              input-debounce="0"
-              behavior="menu"
-              dense
-              style="width: 100%"
-              use-input
-              borderless
-              hide-bottom-space
-              hide-selected
-              fill-input
-              emit-value
-              @filter="filterStreamFn"
-              @update:model-value="handleFieldChange"
-              /> -->
             <StreamFieldSelect
               class="tw-w-full"
               :streams="getAllSelectedStreams()"
@@ -272,47 +255,6 @@ export default defineComponent({
     const filterOptions = ["AND", "OR"];
 
     const computedLabel = (condition: any) => {
-      // if (condition.operator === "match_all") {
-      //   return condition.operator + "(" + condition.value + ")";
-      // } else if (condition.operator === "str_match") {
-      //   return (
-      //     condition.operator +
-      //     "(" +
-      //     condition.column +
-      //     ", " +
-      //     condition.value +
-      //     ")"
-      //   );
-      // } else if (condition.operator === "str_match_ignore_case") {
-      //   return (
-      //     condition.operator +
-      //     "(" +
-      //     condition.column +
-      //     ", " +
-      //     condition.value +
-      //     ")"
-      //   );
-      // } else if (condition.operator === "re_match") {
-      //   return (
-      //     condition.operator +
-      //     "(" +
-      //     condition.column +
-      //     ", " +
-      //     condition.value +
-      //     ")"
-      //   );
-      // } else if (condition.operator === "re_not_match") {
-      //   return (
-      //     condition.operator +
-      //     "(" +
-      //     condition.column +
-      //     ", " +
-      //     condition.value +
-      //     ")"
-      //   );
-      // } else {
-      //   return props.condition.column;
-      // }
       const builtCondition = buildCondition(condition, dashboardPanelData);
 
       return builtCondition === ""

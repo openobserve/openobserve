@@ -560,12 +560,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
     const isDerived = checkIsDerivedField(row.name) ?? false;
 
-    // check for existing field
-    // if (
-    //   !dashboardPanelData.data.queries[
-    //     dashboardPanelData.layout.currentQueryIndex
-    //   ].fields.x.find((it: any) => it.column == row.name)
-    // ) {
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields.x.push({
@@ -584,7 +578,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             ].fields.x.length +
               1)
           : row.name,
-      // column: row.name,
       color: null,
       type: "build",
       functionName:
@@ -628,8 +621,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       showFieldAsJson: false,
     });
 
-    // }
-
     updateArrayAlias();
   };
 
@@ -653,12 +644,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
     const isDerived = checkIsDerivedField(row.name) ?? false;
 
-    // check for existing field
-    // if (
-    //   !dashboardPanelData.data.queries[
-    //     dashboardPanelData.layout.currentQueryIndex
-    //   ].fields.breakdown.find((it: any) => it.column == row.name)
-    // ) {
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields.breakdown.push({
@@ -677,7 +662,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             ].fields.breakdown.length +
               1)
           : row.name,
-      // column: row.name,
       color: null,
       type: "build",
       functionName:
@@ -717,7 +701,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       isDerived,
       havingConditions: [],
     });
-    // }
 
     updateArrayAlias();
   };

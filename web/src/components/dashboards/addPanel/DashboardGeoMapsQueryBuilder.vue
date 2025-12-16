@@ -655,53 +655,6 @@ export default defineComponent({
       return commonBtnLabel(weightField);
     });
 
-    const operators = ["=", "<>", ">=", "<=", ">", "<"];
-
-    const isHavingFilterVisible = () => {
-      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
-      const currentField =
-        dashboardPanelData.data.queries[currentQueryIndex].fields.weight;
-
-      const isVisible = !!currentField?.havingConditions?.length;
-      return isVisible;
-    };
-
-    const toggleHavingFilter = async () => {
-      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
-      const currentField =
-        dashboardPanelData.data.queries[currentQueryIndex].fields.weight;
-
-      if (!currentField.havingConditions) {
-        currentField.havingConditions = [];
-      }
-
-      if (!currentField.havingConditions.length) {
-        currentField.havingConditions.push({ operator: null, value: null });
-      }
-
-      await nextTick();
-    };
-
-    const cancelHavingFilter = async () => {
-      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
-      const currentField =
-        dashboardPanelData.data.queries[currentQueryIndex].fields.weight;
-
-      currentField.havingConditions = [];
-
-      await nextTick();
-    };
-
-    const getHavingCondition = () => {
-      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
-      const currentField =
-        dashboardPanelData.data.queries[currentQueryIndex].fields.weight;
-
-      return (
-        currentField.havingConditions?.[0] || { operator: null, value: null }
-      );
-    };
-
     return {
       t,
       dashboardPanelData,
@@ -728,24 +681,6 @@ export default defineComponent({
       longitudeLabel,
       weightLabel,
       onFieldDragStart,
-      operators,
-      isHavingFilterVisible,
-      toggleHavingFilter,
-      cancelHavingFilter,
-      getHavingCondition,
-      options: [
-        "=",
-        "<>",
-        ">=",
-        "<=",
-        ">",
-        "<",
-        "IN",
-        "Contains",
-        "Not Contains",
-        "Is Null",
-        "Is Not Null",
-      ],
     };
   },
 });

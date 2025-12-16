@@ -720,103 +720,6 @@ describe("DashboardGeoMapsQueryBuilder", () => {
     });
   });
 
-  describe("Having Conditions", () => {
-    beforeEach(() => {
-      mockDashboardPanelData.data.queries[0].fields.weight = {
-        column: "weight_field",
-        label: "Weight"
-      };
-    });
-
-    describe("isHavingFilterVisible", () => {
-      it("should return true when having conditions exist", () => {
-        mockDashboardPanelData.data.queries[0].fields.weight.havingConditions = [
-          { operator: "=", value: 10 }
-        ];
-        wrapper = createWrapper();
-
-        expect(wrapper.vm.isHavingFilterVisible()).toBe(true);
-      });
-
-      it("should return false when no having conditions", () => {
-        wrapper = createWrapper();
-
-        expect(wrapper.vm.isHavingFilterVisible()).toBe(false);
-      });
-
-      it("should return false when having conditions is empty array", () => {
-        mockDashboardPanelData.data.queries[0].fields.weight.havingConditions = [];
-        wrapper = createWrapper();
-
-        expect(wrapper.vm.isHavingFilterVisible()).toBe(false);
-      });
-    });
-
-    describe("toggleHavingFilter", () => {
-      it("should add having condition when none exist", async () => {
-        wrapper = createWrapper();
-
-        await wrapper.vm.toggleHavingFilter();
-
-        const weightField = mockDashboardPanelData.data.queries[0].fields.weight;
-        expect(weightField.havingConditions).toEqual([{ operator: null, value: null }]);
-      });
-
-      it("should initialize having conditions array if not exists", async () => {
-        wrapper = createWrapper();
-
-        await wrapper.vm.toggleHavingFilter();
-
-        const weightField = mockDashboardPanelData.data.queries[0].fields.weight;
-        expect(Array.isArray(weightField.havingConditions)).toBe(true);
-      });
-    });
-
-    describe("cancelHavingFilter", () => {
-      it("should clear having conditions", async () => {
-        mockDashboardPanelData.data.queries[0].fields.weight.havingConditions = [
-          { operator: "=", value: 10 }
-        ];
-        wrapper = createWrapper();
-
-        await wrapper.vm.cancelHavingFilter();
-
-        const weightField = mockDashboardPanelData.data.queries[0].fields.weight;
-        expect(weightField.havingConditions).toEqual([]);
-      });
-    });
-
-    describe("getHavingCondition", () => {
-      it("should return first having condition when exists", () => {
-        mockDashboardPanelData.data.queries[0].fields.weight.havingConditions = [
-          { operator: ">=", value: 5 }
-        ];
-        wrapper = createWrapper();
-
-        const condition = wrapper.vm.getHavingCondition();
-
-        expect(condition).toEqual({ operator: ">=", value: 5 });
-      });
-
-      it("should return default condition when none exist", () => {
-        wrapper = createWrapper();
-
-        const condition = wrapper.vm.getHavingCondition();
-
-        expect(condition).toEqual({ operator: null, value: null });
-      });
-
-      it("should return default condition when having conditions is empty", () => {
-        mockDashboardPanelData.data.queries[0].fields.weight.havingConditions = [];
-        wrapper = createWrapper();
-
-        const condition = wrapper.vm.getHavingCondition();
-
-        expect(condition).toEqual({ operator: null, value: null });
-      });
-    });
-  });
-
   describe("Watchers", () => {
     it("should expand all sections when dragging starts", async () => {
       wrapper = createWrapper();
@@ -1041,25 +944,6 @@ describe("DashboardGeoMapsQueryBuilder", () => {
       expect(mockUseDashboardPanelData.removeLatitude).toHaveBeenCalled();
     });
 
-    it("should handle having conditions workflow", async () => {
-      mockDashboardPanelData.data.queries[0].fields.weight = {
-        column: "weight_field",
-        label: "Weight"
-      };
-      wrapper = createWrapper();
-
-      // Add having condition
-      await wrapper.vm.toggleHavingFilter();
-      expect(wrapper.vm.isHavingFilterVisible()).toBe(true);
-
-      // Get condition
-      const condition = wrapper.vm.getHavingCondition();
-      expect(condition).toBeDefined();
-
-      // Cancel condition
-      await wrapper.vm.cancelHavingFilter();
-      expect(wrapper.vm.isHavingFilterVisible()).toBe(false);
-    });
   });
 
   describe("Component State Management", () => {

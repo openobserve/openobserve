@@ -1,16 +1,4 @@
 <template>
-  <!-- <q-select
-    v-if="groupIndex !== 0"
-    v-model="group.logicalOperator"
-    dense
-    options-dense
-    borderless
-    hide-bottom-space
-    :options="filterOptions"
-    @update:model-value="emitLogicalOperatorChange"
-    class="condition-logical-operator"
-    data-test="dashboard-add-group-logical-operator"
-  /> -->
   <div class="group" :style="`--group-index: ${groupNestedIndex}`">
     <div class="group-conditions">
       <div

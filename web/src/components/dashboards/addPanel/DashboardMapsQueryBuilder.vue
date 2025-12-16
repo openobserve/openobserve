@@ -534,57 +534,6 @@ export default defineComponent({
       return commonBtnLabel(valueField);
     });
 
-    const operators = ["=", "<>", ">=", "<=", ">", "<"];
-
-    const isHavingFilterVisible = () => {
-      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
-      const currentField =
-        dashboardPanelData.data.queries[currentQueryIndex].fields
-          .value_for_maps;
-
-      const isVisible = !!currentField?.havingConditions?.length;
-      return isVisible;
-    };
-
-    const toggleHavingFilter = async () => {
-      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
-      const currentField =
-        dashboardPanelData.data.queries[currentQueryIndex].fields
-          .value_for_maps;
-
-      if (!currentField.havingConditions) {
-        currentField.havingConditions = [];
-      }
-
-      if (!currentField.havingConditions.length) {
-        currentField.havingConditions.push({ operator: null, value: null });
-      }
-
-      await nextTick();
-    };
-
-    const cancelHavingFilter = async () => {
-      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
-      const currentField =
-        dashboardPanelData.data.queries[currentQueryIndex].fields
-          .value_for_maps;
-
-      currentField.havingConditions = [];
-
-      await nextTick();
-    };
-
-    const getHavingCondition = () => {
-      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
-      const currentField =
-        dashboardPanelData.data.queries[currentQueryIndex].fields
-          .value_for_maps;
-
-      return (
-        currentField.havingConditions?.[0] || { operator: null, value: null }
-      );
-    };
-
     return {
       t,
       dashboardPanelData,
@@ -608,24 +557,6 @@ export default defineComponent({
       Hint,
       promqlMode,
       onFieldDragStart,
-      operators,
-      isHavingFilterVisible,
-      toggleHavingFilter,
-      cancelHavingFilter,
-      getHavingCondition,
-      options: [
-        "=",
-        "<>",
-        ">=",
-        "<=",
-        ">",
-        "<",
-        "IN",
-        "Contains",
-        "Not Contains",
-        "Is Null",
-        "Is Not Null",
-      ],
     };
   },
 });
