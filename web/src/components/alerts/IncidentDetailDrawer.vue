@@ -47,57 +47,95 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Fixed Header Content -->
       <div class="tw-flex-shrink-0 tw-p-4 q-px-md">
         <!-- Status, Severity, Alerts row -->
-        <div class="tw-flex tw-items-center tw-gap-4 tw-mb-3">
-          <div class="tw-flex tw-flex-col tw-items-center">
-            <span class="tw-text-xs tw-text-gray-500 tw-mb-1">{{ t("alerts.incidents.status") }}</span>
-            <q-badge
-              :color="getStatusColor(incidentDetails.status)"
-              :label="getStatusLabel(incidentDetails.status)"
-              class="tw-text-sm"
-            />
+        <div class="tw-flex tw-items-stretch tw-gap-3 tw-mb-4">
+          <!-- Status Card -->
+          <div class="status-info-card tw-flex-1 tw-rounded-lg tw-p-3 tw-border" :class="isDarkMode ? 'status-card-dark' : 'status-card-light'">
+            <div class="tw-text-xs tw-font-medium tw-mb-2 tw-uppercase tw-tracking-wide" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-500'">
+              {{ t("alerts.incidents.status") }}
+            </div>
+            <div class="tw-flex tw-items-center tw-gap-2">
+              <div
+                class="tw-w-2 tw-h-2 tw-rounded-full"
+                :style="{ backgroundColor: getStatusDotColor(incidentDetails.status) }"
+              ></div>
+              <span class="tw-text-base tw-font-semibold" :style="{ color: getStatusTextColor(incidentDetails.status) }">
+                {{ getStatusLabel(incidentDetails.status) }}
+              </span>
+            </div>
           </div>
-          <div class="tw-flex tw-flex-col tw-items-center">
-            <span class="tw-text-xs tw-text-gray-500 tw-mb-1">{{ t("alerts.incidents.severity") }}</span>
-            <q-badge
-              :color="getSeverityColor(incidentDetails.severity)"
-              :label="incidentDetails.severity"
-              class="tw-text-sm"
-            />
+
+          <!-- Severity Card -->
+          <div class="status-info-card tw-flex-1 tw-rounded-lg tw-p-3 tw-border" :class="isDarkMode ? 'status-card-dark' : 'status-card-light'">
+            <div class="tw-text-xs tw-font-medium tw-mb-2 tw-uppercase tw-tracking-wide" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-500'">
+              {{ t("alerts.incidents.severity") }}
+            </div>
+            <div class="tw-flex tw-items-center tw-gap-2">
+              <div
+                class="tw-w-2 tw-h-2 tw-rounded-full"
+                :style="{ backgroundColor: getSeverityDotColor(incidentDetails.severity) }"
+              ></div>
+              <span class="tw-text-base tw-font-semibold" :style="{ color: getSeverityTextColor(incidentDetails.severity) }">
+                {{ incidentDetails.severity }}
+              </span>
+            </div>
           </div>
-          <div class="tw-flex tw-flex-col tw-items-center">
-            <span class="tw-text-xs tw-text-gray-500 tw-mb-1">{{ t("alerts.incidents.alertCount") }}</span>
-            <q-badge color="grey-7" :label="incidentDetails.alert_count" class="tw-text-sm" />
+
+          <!-- Alert Count Card -->
+          <div class="status-info-card tw-flex-1 tw-rounded-lg tw-p-3 tw-border" :class="isDarkMode ? 'status-card-dark' : 'status-card-light'">
+            <div class="tw-text-xs tw-font-medium tw-mb-2 tw-uppercase tw-tracking-wide" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-500'">
+              {{ t("alerts.incidents.alertCount") }}
+            </div>
+            <div class="tw-flex tw-items-center tw-gap-2">
+              <q-icon name="notifications_active" size="sm" :class="isDarkMode ? 'tw-text-blue-400' : 'tw-text-blue-600'" />
+              <span class="tw-text-lg tw-font-bold" :class="isDarkMode ? 'tw-text-gray-200' : 'tw-text-gray-800'">
+                {{ incidentDetails.alert_count }}
+              </span>
+            </div>
           </div>
-          <!-- Divider -->
-          <div class="tw-h-8 tw-w-px tw-bg-gray-300"></div>
+
           <!-- Action buttons -->
-          <div class="tw-flex tw-gap-2">
+          <div class="tw-flex tw-flex-col tw-justify-center tw-gap-2 tw-ml-auto tw-min-w-[160px]">
             <q-btn
               v-if="incidentDetails.status === 'open'"
               color="warning"
               no-caps
+              unelevated
               @click="acknowledgeIncident"
               :loading="updating"
+              align="left"
+              class="action-btn tw-justify-start"
             >
-              {{ t("alerts.incidents.acknowledge") }}
+              <q-icon name="check_circle" size="sm" class="tw-mr-2" />
+              <span class="tw-text-sm tw-font-medium">{{ t("alerts.incidents.acknowledge") }}</span>
+              <q-tooltip :delay="500">Mark incident as acknowledged and being worked on</q-tooltip>
             </q-btn>
             <q-btn
               v-if="incidentDetails.status !== 'resolved'"
               color="positive"
               no-caps
+              unelevated
               @click="resolveIncident"
               :loading="updating"
+              align="left"
+              class="action-btn tw-justify-start"
             >
-              {{ t("alerts.incidents.resolve") }}
+              <q-icon name="task_alt" size="sm" class="tw-mr-2" />
+              <span class="tw-text-sm tw-font-medium">{{ t("alerts.incidents.resolve") }}</span>
+              <q-tooltip :delay="500">Mark incident as resolved and close it</q-tooltip>
             </q-btn>
             <q-btn
               v-if="incidentDetails.status === 'resolved'"
               color="negative"
               no-caps
+              unelevated
               @click="reopenIncident"
               :loading="updating"
+              align="left"
+              class="action-btn tw-justify-start"
             >
-              {{ t("alerts.incidents.reopen") }}
+              <q-icon name="restart_alt" size="sm" class="tw-mr-2" />
+              <span class="tw-text-sm tw-font-medium">{{ t("alerts.incidents.reopen") }}</span>
+              <q-tooltip :delay="500">Reopen this resolved incident</q-tooltip>
             </q-btn>
           </div>
         </div>
@@ -221,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon="chat"
               @click="openSREChat"
             >
-              <q-tooltip>Chat with SRE Assistant</q-tooltip>
+              <q-tooltip :delay="500">Chat with SRE Assistant</q-tooltip>
             </q-btn>
           </div>
 
@@ -430,6 +468,32 @@ export default defineComponent({
       }
     };
 
+    const getStatusDotColor = (status: string) => {
+      switch (status) {
+        case "open":
+          return "#ef4444"; // red-500
+        case "acknowledged":
+          return "#f59e0b"; // amber-500
+        case "resolved":
+          return "#10b981"; // green-500
+        default:
+          return "#6b7280"; // gray-500
+      }
+    };
+
+    const getStatusTextColor = (status: string) => {
+      switch (status) {
+        case "open":
+          return "#dc2626"; // red-600
+        case "acknowledged":
+          return "#d97706"; // amber-600
+        case "resolved":
+          return "#059669"; // green-600
+        default:
+          return "#4b5563"; // gray-600
+      }
+    };
+
     const getStatusLabel = (status: string) => {
       switch (status) {
         case "open":
@@ -455,6 +519,36 @@ export default defineComponent({
           return "grey-7";
         default:
           return "grey";
+      }
+    };
+
+    const getSeverityDotColor = (severity: string) => {
+      switch (severity) {
+        case "P1":
+          return "#991b1b"; // red-900
+        case "P2":
+          return "#ea580c"; // orange-600
+        case "P3":
+          return "#f59e0b"; // amber-500
+        case "P4":
+          return "#6b7280"; // gray-500
+        default:
+          return "#9ca3af"; // gray-400
+      }
+    };
+
+    const getSeverityTextColor = (severity: string) => {
+      switch (severity) {
+        case "P1":
+          return "#b91c1c"; // red-700
+        case "P2":
+          return "#c2410c"; // orange-700
+        case "P3":
+          return "#d97706"; // amber-600
+        case "P4":
+          return "#6b7280"; // gray-500
+        default:
+          return "#6b7280"; // gray-500
       }
     };
 
@@ -594,8 +688,12 @@ export default defineComponent({
       triggerRca,
       openSREChat,
       getStatusColor,
+      getStatusDotColor,
+      getStatusTextColor,
       getStatusLabel,
       getSeverityColor,
+      getSeverityDotColor,
+      getSeverityTextColor,
       getReasonColor,
       getReasonLabel,
       formatTimestamp,
@@ -608,6 +706,50 @@ export default defineComponent({
 <style scoped>
 .incident-detail-header {
   min-height: 60px;
+}
+
+/* Status Info Cards */
+.status-card-light {
+  background-color: #f9fafb; /* gray-50 */
+  border-color: #e5e7eb; /* gray-200 */
+}
+
+.status-card-dark {
+  background-color: #1f2937; /* gray-800 */
+  border-color: #374151; /* gray-700 */
+}
+
+.status-info-card {
+  transition: all 0.2s ease;
+}
+
+.status-info-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+body.body--dark .status-info-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Action Buttons */
+.action-btn {
+  min-height: 36px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.action-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .rca-content {
