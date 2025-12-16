@@ -15,34 +15,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-drawer
-    v-model="isOpen"
-    side="right"
-    :width="900"
-    bordered
-    overlay
-    elevated
-    class="incident-detail-drawer"
-    data-test="incident-detail-drawer"
+  <div
+    :class="[store.state.theme === 'dark' ? 'bg-dark' : 'bg-white']"
+    class="tw-h-full tw-flex tw-flex-col"
+    style="width: 900px"
   >
-    <div v-if="incidentDetails" class="tw-h-full tw-flex tw-flex-col">
-      <!-- Header -->
-      <div class="tw-p-4 tw-border-b tw-flex tw-justify-between tw-items-center">
-        <div>
-          <div class="tw-text-lg tw-font-semibold">
-            {{ incidentDetails.title || t("alerts.incidents.header") }}
-          </div>
-          <div class="tw-text-sm tw-text-gray-500">
-            ID: {{ incidentDetails.id }}
-          </div>
+    <!-- Header -->
+    <div class="incident-detail-header row items-center no-wrap q-px-md tw-p-4">
+      <div class="col">
+        <div style="font-size: 18px" data-test="incident-detail-title" class="tw-font-semibold">
+          {{ incidentDetails?.title || t("alerts.incidents.header") }}
         </div>
-        <q-btn flat round icon="close" @click="close" />
+        <div v-if="incidentDetails" class="tw-text-sm tw-text-gray-500">
+          ID: {{ incidentDetails.id }}
+        </div>
       </div>
+      <div class="col-auto">
+        <q-btn
+          data-test="incident-detail-close-btn"
+          v-close-popup="true"
+          round
+          flat
+          icon="cancel"
+        />
+      </div>
+    </div>
+    <q-separator />
 
-      <!-- Content -->
-      <div class="tw-flex-1 tw-overflow-auto tw-p-4">
-        <!-- Status, Severity, Alerts row -->
-        <div class="tw-flex tw-items-center tw-gap-4 tw-mb-3">
+    <!-- Content -->
+    <div v-if="!loading && incidentDetails" class="tw-flex-1 tw-overflow-auto tw-p-4 q-px-md">
+      <!-- Status, Severity, Alerts row -->
+      <div class="tw-flex tw-items-center tw-gap-4 tw-mb-3">
           <div class="tw-flex tw-flex-col tw-items-center">
             <span class="tw-text-xs tw-text-gray-500 tw-mb-1">{{ t("alerts.incidents.status") }}</span>
             <q-badge
@@ -265,15 +268,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-item-section>
             </q-item>
           </q-list>
-        </div>
       </div>
     </div>
 
     <!-- Loading state -->
-    <div v-else-if="loading" class="tw-h-full tw-flex tw-items-center tw-justify-center">
-      <q-spinner size="lg" color="primary" />
+    <div v-else-if="loading" class="tw-flex-1 tw-flex tw-items-center tw-justify-center">
+      <q-spinner-hourglass size="lg" color="primary" />
     </div>
-  </q-drawer>
+  </div>
 </template>
 
 <script lang="ts">
@@ -287,16 +289,12 @@ import incidentsService, { Incident, IncidentWithAlerts, IncidentAlert } from "@
 export default defineComponent({
   name: "IncidentDetailDrawer",
   props: {
-    modelValue: {
-      type: Boolean,
-      required: true,
-    },
     incident: {
       type: Object as PropType<Incident | null>,
       default: null,
     },
   },
-  emits: ["update:modelValue", "status-updated"],
+  emits: ["close", "status-updated"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
@@ -310,8 +308,6 @@ export default defineComponent({
     const rcaLoading = ref(false);
     const rcaStreamContent = ref("");
 
-    const isOpen = ref(props.modelValue);
-
     // Computed to check if analysis already exists
     const hasExistingRca = computed(() => {
       return !!incidentDetails.value?.topology_context?.suggested_root_cause;
@@ -322,27 +318,13 @@ export default defineComponent({
       return store.state.theme === "dark";
     });
 
-    watch(
-      () => props.modelValue,
-      (val) => {
-        isOpen.value = val;
-        if (val && props.incident) {
-          loadDetails(props.incident.id);
-        }
-      }
-    );
-
-    watch(isOpen, (val) => {
-      emit("update:modelValue", val);
-    });
-
     const loadDetails = async (incidentId: string) => {
       loading.value = true;
       try {
         const org = store.state.selectedOrganization.identifier;
         const response = await incidentsService.get(org, incidentId);
         incidentDetails.value = response.data;
-        triggers.value = response.data.triggers || [];
+        triggers.value = (response.data as any).triggers || [];
         alerts.value = response.data.alerts || [];
       } catch (error) {
         console.error("Failed to load incident details:", error);
@@ -355,8 +337,18 @@ export default defineComponent({
       }
     };
 
+    watch(
+      () => props.incident,
+      (incident) => {
+        if (incident) {
+          loadDetails(incident.id);
+        }
+      },
+      { immediate: true }
+    );
+
     const close = () => {
-      isOpen.value = false;
+      emit("close");
     };
 
     const updateStatus = async (newStatus: "open" | "acknowledged" | "resolved") => {
@@ -544,7 +536,7 @@ export default defineComponent({
 
     return {
       t,
-      isOpen,
+      store,
       loading,
       updating,
       incidentDetails,
@@ -573,13 +565,8 @@ export default defineComponent({
 </script>
 
 <style scoped>
-.incident-detail-drawer {
-  background: white;
-}
-
-.incident-detail-drawer :deep(.q-drawer) {
-  top: 57px !important;
-  height: calc(100vh - 57px) !important;
+.incident-detail-header {
+  min-height: 60px;
 }
 
 .rca-content {
