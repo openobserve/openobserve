@@ -82,6 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="card-container tw-px-2 tw-mx-[0.675rem] tw-py-2">
         <!-- Stepper Header (Full Width) -->
+        <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
         <q-stepper
           v-model="wizardStep"
           ref="wizardStepper"
@@ -349,6 +350,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </q-step>
       </q-stepper>
+      </q-form>
       </div>
     </div>
 
@@ -1644,7 +1646,7 @@ export default defineComponent({
         console.log(err);
         q.notify({
           type: "negative",
-          message: err.response?.data?.message || err.response?.data?.error,
+          message: err.response?.data?.message || err.response?.data?.error || err.response?.data,
         });
       }
     };
