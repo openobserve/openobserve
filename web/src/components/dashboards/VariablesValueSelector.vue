@@ -426,18 +426,6 @@ export default defineComponent({
         );
       }
 
-      // IMPORTANT: After loading is complete, if value is still null and multiSelect is true,
-      // and selectAllValueForMultiSelect is 'all', set value to _o2_all_
-      if (
-        variableObject.value === null &&
-        variableObject.multiSelect &&
-        variableObject.selectAllValueForMultiSelect === 'all'
-      ) {
-        variableObject.value = [SELECT_ALL_VALUE];
-        variableObject.isVariablePartialLoaded = true;
-        emitVariablesData();
-      }
-
       removeTraceId(variableObject.name, payload.traceId);
     };
 
@@ -1224,6 +1212,24 @@ export default defineComponent({
         variablesDependencyGraph[currentVariable.name]?.parentVariables
           ?.length > 0;
 
+      // Check for URL values first
+      // const urlValue = props.initialVariableValues?.value[currentVariable.name];
+      // if (urlValue) {
+      //   // If URL value exists, use it
+      //   if (currentVariable.multiSelect) {
+      //     currentVariable.value = Array.isArray(urlValue)
+      //       ? urlValue
+      //       : [urlValue];
+      //   } else {
+      //     // For single select, if coming from multiSelect, take first value
+      //     currentVariable.value = Array.isArray(urlValue)
+      //       ? urlValue[0]
+      //       : urlValue;
+      //   }
+      //   currentVariable.isVariableLoadingPending = true;
+      //   return;
+      // }
+
       // Only apply custom values if no URL value exists
       if (
         !isChildVariable &&
@@ -1342,6 +1348,29 @@ export default defineComponent({
           currentVariable.value = null;
         }
       }
+    };
+
+    /**
+     * Check if any of the dependent variables are loading
+     * @param {object} variableObject - the variable object
+     * @returns {boolean} - true if any of the dependent variables are loading, false otherwise
+     */
+    const isDependentVariableLoading = (variableObject: any) => {
+      const parentVariables =
+        variablesDependencyGraph[variableObject.name]?.parentVariables || [];
+
+      // If no parent variables, dependencies can't be loading
+      if (parentVariables.length === 0) return false;
+
+      // Check if any of the parent variables are loading or pending
+      return parentVariables.some((parentName: string) => {
+        const parentVariable = variablesData.values.find(
+          (v: any) => v.name === parentName,
+        );
+        return (
+          parentVariable?.isLoading || parentVariable?.isVariableLoadingPending
+        );
+      });
     };
 
     /**
@@ -1813,6 +1842,140 @@ export default defineComponent({
     };
 
     /**
+     * Extract REST API implementation to separate function.
+     * @param variableObject - The variable object containing query data.
+     * @param queryContext - The context for the query as a string.
+     * @returns The response from the stream service containing field values.
+     */
+    const fetchFieldValuesREST = async (
+      variableObject: any,
+      queryContext: string,
+    ) => {
+      const payload = {
+        org_identifier: store.state.selectedOrganization.identifier, // Organization identifier
+        stream_name: variableObject.query_data.stream, // Name of the stream
+        start_time: new Date(
+          props.selectedTimeDate?.start_time?.toISOString(),
+        ).getTime(), // Start time in milliseconds
+        end_time: new Date(
+          props.selectedTimeDate?.end_time?.toISOString(),
+        ).getTime(), // End time in milliseconds
+        fields: [variableObject.query_data.field], // Fields to fetch
+        size: variableObject.query_data.max_record_size || 10, // Maximum number of records
+        type: variableObject.query_data.stream_type, // Type of the stream
+        query_context: queryContext, // Encoded query context
+        no_count: true, // Flag to omit count
+      };
+
+      // Fetch field values from the stream service
+      return await streamService.fieldValues(payload);
+    };
+
+    /**
+     * Updates the options for a variable based on the result of a query to fetch field values.
+     * @param variableObject - The variable object containing query data.
+     * @param hits - The result from the stream service containing field values.
+     */
+    const updateVariableOptions = (variableObject: any, hits: any[]) => {
+      const fieldHit = hits.find(
+        (field: any) => field.field === variableObject.query_data.field,
+      );
+
+      if (fieldHit) {
+        // Extract the values for the specified field from the result
+        const newOptions = fieldHit.values
+          .filter((value: any) => value.zo_sql_key || value.zo_sql_key === "")
+          .map((value: any) => ({
+            // Use the zo_sql_key as the label if it is not empty, otherwise use "<blank>"
+            label:
+              value.zo_sql_key !== "" ? value.zo_sql_key.toString() : "<blank>",
+            // Use the zo_sql_key as the value
+            value: value.zo_sql_key.toString(),
+          }));
+
+        // Efficiently add the selected value to options if not present
+        if (variableObject.multiSelect && Array.isArray(variableObject.value)) {
+          const val = variableObject.value[0];
+          if (
+            val !== undefined &&
+            val !== null &&
+            !newOptions.some((opt) => opt.value === val) &&
+            val !== SELECT_ALL_VALUE
+          ) {
+            newOptions.push({ label: val, value: val });
+          }
+        } else if (
+          !variableObject.multiSelect &&
+          variableObject.value !== null &&
+          variableObject.value !== undefined &&
+          !newOptions.some((opt) => opt.value === variableObject.value) &&
+          variableObject.value !== SELECT_ALL_VALUE
+        ) {
+          newOptions.push({
+            label: variableObject.value,
+            value: variableObject.value,
+          });
+        }
+
+        variableObject.options = newOptions;
+
+        // Set default value
+        if (oldVariablesData[variableObject.name] !== undefined) {
+          const oldValues = Array.isArray(oldVariablesData[variableObject.name])
+            ? oldVariablesData[variableObject.name]
+            : [oldVariablesData[variableObject.name]];
+
+          // Check if this is a child variable
+          const isChildVariable =
+            variablesDependencyGraph[variableObject.name]?.parentVariables
+              ?.length > 0;
+
+          if (isChildVariable) {
+            // For child variables, only keep old values that exist in new options
+            const validOldValues = oldValues.filter((value: string) =>
+              newOptions.some((opt: { value: string }) => opt.value === value),
+            );
+
+            if (validOldValues.length > 0) {
+              // If we have valid old values, use them
+              variableObject.value = variableObject.multiSelect
+                ? validOldValues
+                : validOldValues[0];
+            } else {
+              // If no valid old values, use first option
+              variableObject.value = variableObject.multiSelect
+                ? newOptions.length > 0
+                  ? [newOptions[0].value]
+                  : []
+                : newOptions.length > 0
+                  ? newOptions[0].value
+                  : null;
+            }
+          } else {
+            // For non-child variables, preserve old values as before
+            if (variableObject.type === "custom") {
+              handleCustomVariablesLogic(variableObject, oldValues);
+            } else {
+              handleQueryValuesLogic(variableObject, oldValues);
+            }
+          }
+        } else {
+          // Set default value to the first option if no old values are available
+          variableObject.value = variableObject.multiSelect
+            ? newOptions.length > 0
+              ? [newOptions[0].value]
+              : []
+            : newOptions.length > 0
+              ? newOptions[0].value
+              : null;
+        }
+      } else {
+        // Reset variable state if no field values are available
+        resetVariableState(variableObject);
+      }
+    };
+
+    /**
      * Finalizes the variable loading process for a single variable.
      * @param {object} variableObject - The variable object containing query data.
      * @param {boolean} success - Whether the variable load was successful or not.
@@ -1832,22 +1995,30 @@ export default defineComponent({
         variableObject.isVariablePartialLoaded = true;
         variableObject.isVariableLoadingPending = false;
 
-        // IMPORTANT: After loading is complete, if value is still null and multiSelect is true,
-        // and selectAllValueForMultiSelect is 'all', set value to _o2_all_
-        // This ensures API fires with _o2_all_ only after all loading is done
-        if (
-          variableObject.value === null &&
-          variableObject.multiSelect &&
-          variableObject.selectAllValueForMultiSelect === 'all'
-        ) {
-          variableObject.value = [SELECT_ALL_VALUE];
-        }
-
         // Update global loading state
         variablesData.isVariablesLoading = variablesData.values.some(
           (val: { isLoading: any; isVariableLoadingPending: any }) =>
             val.isLoading || val.isVariableLoadingPending,
         );
+
+        // Don't load child variables on dropdown open events
+        // Load child variables if any
+        // const childVariables =
+        //   variablesDependencyGraph[name]?.childVariables || [];
+        // if (childVariables.length > 0) {
+        //   const childVariableObjects = variablesData.values.filter(
+        //     (variable: any) => childVariables.includes(variable.name),
+        //   );
+
+        //   // Only load children if the parent value actually changed
+        //   if (oldVariablesData[name] !== variableObject.value) {
+        //     await Promise.all(
+        //       childVariableObjects.map((childVariable: any) =>
+        //         loadSingleVariableDataByName(childVariable),
+        //       ),
+        //     );
+        //   }
+        // }
 
         // Emit updated data
         emitVariablesData();
@@ -2008,6 +2179,47 @@ export default defineComponent({
           ),
         );
       }
+
+      // const loadDependentVariables = async () => {
+      //   for (const variable of dependentVariables) {
+      //     // Find all parent variables of the current variable
+      //     const parentVariables =
+      //       variablesDependencyGraph[variable.name].parentVariables;
+      //     // Check if all parent variables are loaded
+      //     const areParentsLoaded = parentVariables.every(
+      //       (parentName: string) => {
+      //         const parentVariable = variablesData.values.find(
+      //           (v: any) => v.name === parentName,
+      //         );
+      //         return (
+      //           parentVariable &&
+      //           !parentVariable.isLoading &&
+      //           !parentVariable.isVariableLoadingPending &&
+      //           parentVariable.value !== null
+      //         );
+      //       },
+      //     );
+
+      //     // If all parent variables are loaded, load the current variable
+      //     if (areParentsLoaded) {
+      //       await loadSingleVariableDataByName(variable);
+      //     }
+      //   }
+      // };
+
+      // // Attempt to load dependent variables up to 3 times
+      // for (let attempt = 0; attempt < 3; attempt++) {
+      //   await loadDependentVariables();
+
+      //   // Check if all variables are loaded
+      //   const allLoaded = variablesData.values.every(
+      //     (variable: any) =>
+      //       !variable.isLoading && !variable.isVariableLoadingPending,
+      //   );
+
+      //   // If all variables are loaded, break the loop
+      //   if (allLoaded) break;
+      // }
 
       isLoading = false;
     };
@@ -2287,13 +2499,6 @@ export default defineComponent({
         `[VariableSearchDEBUG] executing search API for ${variableName} with filter='${String(filterText)}'`,
       );
       await loadSingleVariableDataByName(variableItem, false, filterText);
-    };
-
-    /**
-     * Opens the Add Variable panel by emitting an event to the parent
-     */
-    const openAddVariable = () => {
-      emit("openAddVariable");
     };
 
     return {

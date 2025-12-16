@@ -290,7 +290,6 @@ import type { useVariablesManager } from "@/composables/dashboard/useVariablesMa
 import { useLoading } from "@/composables/useLoading";
 import { GridStack } from "gridstack";
 import "gridstack/dist/gridstack.min.css";
-import { useVariablesLoadingManager } from "@/composables/dashboard/useVariablesLoadingManager";
 
 const ViewPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/viewPanel/ViewPanel.vue");
@@ -789,6 +788,7 @@ export default defineComponent({
 
       // Handle layout changes (drag/resize) - only update layout data, don't save during operations
       gridStackInstance.on("change", async (event, items) => {
+
         // skip if viewOnly mode
         if (props.viewOnly) {
           return;
