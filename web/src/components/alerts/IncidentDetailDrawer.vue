@@ -43,9 +43,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator />
 
     <!-- Content -->
-    <div v-if="!loading && incidentDetails" class="tw-flex-1 tw-overflow-auto tw-p-4 q-px-md">
-      <!-- Status, Severity, Alerts row -->
-      <div class="tw-flex tw-items-center tw-gap-4 tw-mb-3">
+    <div v-if="!loading && incidentDetails" class="tw-flex-1 tw-flex tw-flex-col tw-overflow-hidden">
+      <!-- Fixed Header Content -->
+      <div class="tw-flex-shrink-0 tw-p-4 q-px-md">
+        <!-- Status, Severity, Alerts row -->
+        <div class="tw-flex tw-items-center tw-gap-4 tw-mb-3">
           <div class="tw-flex tw-flex-col tw-items-center">
             <span class="tw-text-xs tw-text-gray-500 tw-mb-1">{{ t("alerts.incidents.status") }}</span>
             <q-badge
@@ -117,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Dimensions & Topology - side by side -->
-        <div class="tw-flex tw-gap-3 tw-mb-3">
+        <div class="tw-flex tw-gap-3 tw-mb-4">
           <!-- Stable Dimensions -->
           <div class="tw-flex-1 tw-min-w-0">
             <div class="tw-text-xs tw-font-medium tw-mb-1">
@@ -181,9 +183,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- Incident Analysis -->
-        <div class="tw-mb-4">
-          <div class="tw-text-sm tw-font-medium tw-mb-2 tw-flex tw-items-center tw-gap-2">
+        <!-- Tabs -->
+        <div class="app-tabs-container tw-h-[36px] tw-mb-3 tw-w-fit">
+          <app-tabs
+            class="tabs-selection-container"
+            :tabs="tabs"
+            v-model:active-tab="activeTab"
+          />
+        </div>
+      </div>
+
+      <!-- Tab Content Area -->
+      <div class="tw-flex-1 tw-flex tw-flex-col tw-px-4 tw-pb-4 q-px-md tw-overflow-hidden">
+        <!-- Incident Analysis Tab Content -->
+        <div v-if="activeTab === 'incidentAnalysis'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
+          <div class="tw-text-sm tw-font-medium tw-mb-2 tw-flex tw-items-center tw-gap-2 tw-flex-shrink-0">
             <q-icon name="psychology" color="primary" />
             Incident Analysis
             <!-- Trigger button when no analysis exists and not loading -->
@@ -212,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Loading state with streaming content -->
-          <div v-if="rcaLoading" class="rca-container tw-rounded tw-p-3" :class="isDarkMode ? 'rca-container-dark' : 'rca-container-light'">
+          <div v-if="rcaLoading" class="rca-container tw-rounded tw-p-3 tw-flex-1 tw-overflow-auto" :class="isDarkMode ? 'rca-container-dark' : 'rca-container-light'">
             <div class="tw-flex tw-items-center tw-gap-2 tw-mb-2">
               <q-spinner size="sm" color="primary" />
               <span class="tw-text-sm">Analysis in progress...</span>
@@ -225,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Existing analysis content -->
-          <div v-else-if="hasExistingRca" class="rca-container tw-rounded tw-p-3" :class="isDarkMode ? 'rca-container-dark' : 'rca-container-light'">
+          <div v-else-if="hasExistingRca" class="rca-container tw-rounded tw-p-3 tw-flex-1 tw-overflow-auto" :class="isDarkMode ? 'rca-container-dark' : 'rca-container-light'">
             <div
               class="tw-text-sm tw-whitespace-pre-wrap rca-content"
               v-html="formatRcaContent(incidentDetails.topology_context.suggested_root_cause)"
@@ -233,41 +247,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- No analysis yet -->
-          <div v-else class="no-rca-container tw-rounded tw-p-3 tw-text-sm" :class="isDarkMode ? 'no-rca-container-dark' : 'no-rca-container-light'">
+          <div v-else class="no-rca-container tw-rounded tw-p-3 tw-text-sm tw-flex-1" :class="isDarkMode ? 'no-rca-container-dark' : 'no-rca-container-light'">
             No analysis performed yet
           </div>
         </div>
 
-        <!-- Alert Triggers -->
-        <div>
-          <div class="tw-text-sm tw-font-medium tw-mb-2">
+        <!-- Alert Triggers Tab Content -->
+        <div v-if="activeTab === 'alertTriggers'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
+          <div class="tw-text-sm tw-font-medium tw-mb-2 tw-flex-shrink-0">
             Alert Triggers
             <span class="tw-text-gray-500">({{ triggers.length }})</span>
           </div>
-          <q-list bordered separator class="tw-rounded">
-            <q-item v-for="trigger in triggers" :key="trigger.alert_id + trigger.alert_fired_at">
-              <q-item-section>
-                <q-item-label class="tw-font-medium">
-                  {{ trigger.alert_name }}
-                </q-item-label>
-                <q-item-label caption>
-                  {{ formatTimestamp(trigger.alert_fired_at) }}
-                </q-item-label>
-              </q-item-section>
-              <q-item-section side>
-                <q-badge
-                  :color="getReasonColor(trigger.correlation_reason)"
-                  :label="getReasonLabel(trigger.correlation_reason)"
-                  outline
-                />
-              </q-item-section>
-            </q-item>
-            <q-item v-if="triggers.length === 0">
-              <q-item-section class="tw-text-gray-400">
-                No triggers loaded
-              </q-item-section>
-            </q-item>
-          </q-list>
+          <div class="tw-flex-1 tw-overflow-auto">
+            <q-list bordered separator class="tw-rounded">
+              <q-item v-for="trigger in triggers" :key="trigger.alert_id + trigger.alert_fired_at">
+                <q-item-section>
+                  <q-item-label class="tw-font-medium">
+                    {{ trigger.alert_name }}
+                  </q-item-label>
+                  <q-item-label caption>
+                    {{ formatTimestamp(trigger.alert_fired_at) }}
+                  </q-item-label>
+                </q-item-section>
+                <q-item-section side>
+                  <q-badge
+                    :color="getReasonColor(trigger.correlation_reason)"
+                    :label="getReasonLabel(trigger.correlation_reason)"
+                    outline
+                  />
+                </q-item-section>
+              </q-item>
+              <q-item v-if="triggers.length === 0">
+                <q-item-section class="tw-text-gray-400">
+                  No triggers loaded
+                </q-item-section>
+              </q-item>
+            </q-list>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -285,9 +302,13 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { date } from "quasar";
 import incidentsService, { Incident, IncidentWithAlerts, IncidentAlert } from "@/services/incidents";
+import AppTabs from "@/components/common/AppTabs.vue";
 
 export default defineComponent({
   name: "IncidentDetailDrawer",
+  components: {
+    AppTabs,
+  },
   props: {
     incident: {
       type: Object as PropType<Incident | null>,
@@ -307,6 +328,19 @@ export default defineComponent({
     const alerts = ref<any[]>([]);
     const rcaLoading = ref(false);
     const rcaStreamContent = ref("");
+
+    // Tab management
+    const activeTab = ref("incidentAnalysis");
+    const tabs = [
+      {
+        label: "Incident Analysis",
+        value: "incidentAnalysis",
+      },
+      {
+        label: "Alert Triggers",
+        value: "alertTriggers",
+      },
+    ];
 
     // Computed to check if analysis already exists
     const hasExistingRca = computed(() => {
@@ -546,6 +580,8 @@ export default defineComponent({
       rcaStreamContent,
       hasExistingRca,
       isDarkMode,
+      activeTab,
+      tabs,
       close,
       acknowledgeIncident,
       resolveIncident,
@@ -571,8 +607,6 @@ export default defineComponent({
 
 .rca-content {
   line-height: 1.6;
-  max-height: 400px;
-  overflow-y: auto;
 }
 
 /* RCA Container - Light Mode */
