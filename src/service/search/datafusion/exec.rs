@@ -805,18 +805,8 @@ impl TableBuilder {
             tables.push(table);
         }
 
-        // If we have multiple tables, union them
-        match tables.len() {
-            0 => Err(DataFusionError::Execution(
-                "No files to process".to_string(),
-            )),
-            1 => Ok(tables.into_iter().next().unwrap()),
-            _ => {
-                // Multiple formats detected - create a union table
-                log::info!("Multiple file formats detected. Creating union table.");
-                Ok(Arc::new(NewUnionTable::new(schema, tables)))
-            }
-        }
+        // TODO: return the vec of tables
+        Ok(Arc::new(NewUnionTable::new(schema, tables)))
     }
 
     async fn build_table_for_format(

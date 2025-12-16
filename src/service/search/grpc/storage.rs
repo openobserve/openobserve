@@ -675,11 +675,8 @@ pub async fn tantivy_search(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {}] search->tantivy: total hits for index_condition: {:?} found {}, is_add_filter_back: {}, file_num: {}, took: {} ms",
+                "[trace_id {}] search->tantivy: total hits for index_condition: {index_condition:?} found {tantivy_result}, is_add_filter_back: {is_add_filter_back}, file_num: {}, took: {} ms",
                 query.trace_id,
-                index_condition,
-                tantivy_result,
-                is_add_filter_back,
                 file_list_map.len(),
                 search_start.elapsed().as_millis()
             ),
@@ -689,9 +686,7 @@ pub async fn tantivy_search(
                 .search_role("follower".to_string())
                 .duration(search_start.elapsed().as_millis() as usize)
                 .desc(format!(
-                    "found {}, is_add_filter_back: {}, file_num: {}",
-                    tantivy_result,
-                    is_add_filter_back,
+                    "found {tantivy_result}, is_add_filter_back: {is_add_filter_back}, file_num: {}",
                     file_list_map.len(),
                 ))
                 .build()
@@ -731,6 +726,7 @@ async fn search_tantivy_index(
     parquet_file: &FileKey,
 ) -> anyhow::Result<(String, TantivyResult)> {
     let file_account = parquet_file.account.clone();
+    // TODO: this convert happen two times, once before cache_files and once in search_tantivy_index
     let Some(ttv_file_name) = convert_parquet_file_name_to_tantivy_file(&parquet_file.key) else {
         return Err(anyhow::anyhow!(
             "[trace_id {trace_id}] search->storage: Unable to find tantivy index files for parquet file {}",
@@ -829,6 +825,7 @@ async fn search_tantivy_index(
     .await?;
 
     // search the index
+    let trace_id_clone = trace_id.to_string();
     let file_in_range =
         parquet_file.meta.min_ts >= time_range.0 && parquet_file.meta.max_ts < time_range.1;
     let res = tokio::task::spawn_blocking(move || match (file_in_range, idx_optimize_rule) {
@@ -842,7 +839,7 @@ async fn search_tantivy_index(
         (true, Some(IndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets))) => {
             // fail the function if field not in tantivy schema
             if tantivy_schema.get_field(TIMESTAMP_COL_NAME).is_err() {
-                log::warn!("_timestamp not index in tantivy file: {ttv_file_name}");
+                log::warn!("[trace_id {trace_id_clone}] search->tantivy: _timestamp not index in tantivy file: {ttv_file_name}");
                 return Ok(TantivyResult::Histogram(vec![]));
             }
             TantivyResult::handle_simple_histogram(
@@ -858,7 +855,7 @@ async fn search_tantivy_index(
         }
         (true, Some(IndexOptimizeMode::SimpleDistinct(field, limit, ascend))) => {
             if tantivy_schema.get_field(&field).is_err() {
-                log::warn!("search->tantivy: {field} not index in tantivy file: {ttv_file_name}");
+                log::warn!("[trace_id {trace_id_clone}] search->tantivy: {field} not index in tantivy file: {ttv_file_name}");
                 Ok(TantivyResult::Distinct(HashSet::new()))
             } else {
                 TantivyResult::handle_simple_distinct(&searcher, &condition, &field, limit, ascend)
@@ -884,7 +881,7 @@ async fn search_tantivy_index(
             if skip_threshold > 0 && row_ids_percent > skip_threshold as f64 {
                 // return empty file name means we need to add filter back and skip tantivy search
                 log::info!(
-                    "search->tantivy: file: {}, result percent {row_ids_percent}% is too large, back to datafusion",
+                    "[trace_id {trace_id}] search->tantivy: file: {}, result percent {row_ids_percent}% is too large, back to datafusion",
                     parquet_file.key
                 );
                 return Ok((
@@ -896,8 +893,7 @@ async fn search_tantivy_index(
             let max_doc_id = *row_ids.iter().max().unwrap_or(&0) as i64;
             if max_doc_id >= parquet_file.meta.records {
                 return Err(anyhow::anyhow!(
-                    "doc_id {} is out of range, records {}",
-                    max_doc_id,
+                    "doc_id {max_doc_id} is out of range, records {}",
                     parquet_file.meta.records,
                 ));
             }

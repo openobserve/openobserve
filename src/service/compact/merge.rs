@@ -159,8 +159,7 @@ pub async fn generate_job_by_stream(
     // generate merging job
     if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
         return Err(anyhow::anyhow!(
-            "[COMPACTOR] add file_list_jobs failed: {}",
-            e
+            "[COMPACTOR] add file_list_jobs failed: {e}"
         ));
     }
 
@@ -256,8 +255,7 @@ pub async fn generate_old_data_job_by_stream(
         let column = hour.split('/').collect::<Vec<_>>();
         if column.len() != 4 {
             return Err(anyhow::anyhow!(
-                "Unexpected hour format in {}, Expected format YYYY/MM/DD/HH",
-                hour
+                "Unexpected hour format in {hour}, Expected format YYYY/MM/DD/HH",
             ));
         }
         let offset = DateTime::parse_from_rfc3339(&format!(
@@ -271,8 +269,7 @@ pub async fn generate_old_data_job_by_stream(
         );
         if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
             return Err(anyhow::anyhow!(
-                "[COMPACTOR] add file_list_jobs for old data failed: {}",
-                e
+                "[COMPACTOR] add file_list_jobs for old data failed: {e}"
             ));
         }
     }
@@ -300,8 +297,8 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
 
     if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
         let lock_key = format!(
-            "/compact/downsampling/{}/{}/{}/{}/{}",
-            org_id, stream_type, stream_name, rule.0, rule.1
+            "/compact/downsampling/{org_id}/{stream_type}/{stream_name}/{}/{}",
+            rule.0, rule.1
         );
         let locker = dist_lock::lock(&lock_key, 0).await?;
         // check the working node again, maybe other node locked it first
@@ -370,8 +367,7 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
     // generate downsampling job
     if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
         return Err(anyhow::anyhow!(
-            "[DOWNSAMPLING] add file_list_jobs failed: {}",
-            e
+            "[DOWNSAMPLING] add file_list_jobs failed: {e}"
         ));
     }
 

@@ -60,7 +60,6 @@ pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessP
     // Determine sampling mode based on BitVec size:
     // - If BitVec size == row_group_count: row-group-level sampling (enterprise feature)
     // - If BitVec size == num_rows: row-level sampling (original behavior)
-
     #[cfg(feature = "enterprise")]
     if segment_ids.len() == row_group_count {
         // Row-group-level sampling: each bit represents a row group
@@ -116,10 +115,8 @@ pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessP
     }
 
     log::debug!(
-        "file path: file={:?}, row_group_count={}, access_plan={:?}",
-        file.path().as_ref(),
-        row_group_count,
-        access_plan
+        "file path: file={:?}, row_group_count={row_group_count}, access_plan={access_plan:?}",
+        file.path().as_ref()
     );
     Some(Arc::new(access_plan))
 }
