@@ -887,7 +887,7 @@ pub async fn merge_files(
     crate::service::search::datafusion::storage::file_list::clear(&trace_id);
 
     let files = new_file_list.into_iter().map(|f| f.key).collect::<Vec<_>>();
-    let (_new_schema, buf) = match merge_result {
+    let buf = match merge_result {
         Ok(v) => v,
         Err(e) => {
             log::error!(

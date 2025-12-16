@@ -15,22 +15,22 @@
 
 use std::{cmp::max, num::NonZero, str::FromStr, sync::Arc};
 
-use arrow::record_batch::RecordBatch;
+use arrow::array::RecordBatch;
 use arrow_schema::Field;
 use config::{
-    PARQUET_BATCH_SIZE, TIMESTAMP_COL_NAME, get_config,
+    FileFormat, PARQUET_BATCH_SIZE, TIMESTAMP_COL_NAME, get_config,
     meta::{
         search::{Session as SearchSession, StorageType},
         stream::{FileKey, FileMeta, StreamType},
     },
-    utils::{parquet::new_parquet_writer, schema_ext::SchemaExt},
+    utils::{file_writer::VORTEX_RUNTIME, parquet::new_parquet_writer, schema_ext::SchemaExt},
 };
 use datafusion::{
     arrow::datatypes::{DataType, Schema},
     catalog::TableProvider,
     config::Dialect,
     datasource::{
-        file_format::parquet::ParquetFormat,
+        file_format::{FileFormat as DataFusionFileFormat, parquet::ParquetFormat},
         listing::{ListingOptions, ListingTableConfig, ListingTableUrl},
         object_store::{DefaultObjectStoreRegistry, ObjectStoreRegistry},
     },
@@ -50,6 +50,15 @@ use datafusion::{
 };
 use futures::TryStreamExt;
 use parquet::{arrow::AsyncArrowWriter, file::metadata::KeyValue};
+use vortex::{
+    VortexSessionDefault,
+    array::{ArrayRef, arrow::FromArrowArray},
+    dtype::{DType, arrow::FromArrowType},
+    file::VortexWriteOptions,
+    session::VortexSession,
+};
+use vortex_datafusion::VortexFormat;
+use vortex_io::session::RuntimeSessionExt;
 #[cfg(feature = "enterprise")]
 use {
     arrow::array::Int64Array,
@@ -94,7 +103,7 @@ pub async fn merge_parquet_files(
     bloom_filter_fields: &[String],
     metadata: &FileMeta,
     is_ingester: bool,
-) -> Result<(Arc<Schema>, MergeParquetResult)> {
+) -> Result<MergeParquetResult> {
     let start = std::time::Instant::now();
     let cfg = get_config();
 
@@ -114,11 +123,7 @@ pub async fn merge_parquet_files(
     }
 
     // get all sorted data
-    let sql = if stream_type == StreamType::Index {
-        format!(
-            "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted IS TRUE ORDER BY {TIMESTAMP_COL_NAME} DESC) ORDER BY {TIMESTAMP_COL_NAME} DESC"
-        )
-    } else if cfg.limit.distinct_values_hourly
+    let sql = if cfg.limit.distinct_values_hourly
         && stream_type == StreamType::Metadata
         && stream_name.starts_with(DISTINCT_STREAM_PREFIX)
     {
@@ -140,13 +145,9 @@ pub async fn merge_parquet_files(
     };
     log::debug!("merge_parquet_files sql: {sql}");
 
-    // create datafusion context
-    let sort_by_timestamp_desc = true;
-    // force use DATAFUSION_MIN_PARTITION for each merge task
-    let target_partitions = DATAFUSION_MIN_PARTITION;
     let ctx = DataFusionContextBuilder::new()
-        .sorted_by_time(sort_by_timestamp_desc)
-        .build(target_partitions)
+        .sorted_by_time(true)
+        .build(DATAFUSION_MIN_PARTITION)
         .await?;
     // register union table
     let union_table = Arc::new(NewUnionTable::new(schema.clone(), tables));
@@ -167,29 +168,21 @@ pub async fn merge_parquet_files(
         println!("{plan}");
     }
 
-    // write result to parquet file
-    let mut buf = Vec::new();
+    // write result to file (parquet or vortex based on config)
+    let file_format = cfg.common.file_format;
     let compression = if is_ingester && cfg.common.feature_ingester_none_compression {
         Some("none")
     } else {
         None
     };
-    let mut writer = new_parquet_writer(
-        &mut buf,
-        &schema,
-        bloom_filter_fields,
-        metadata,
-        false,
-        compression,
-    );
-
-    // calculate the new file meta records
-    let mut new_file_meta = metadata.clone();
-    new_file_meta.records = 0;
 
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
+
+    // Create a shared channel for streaming batches
     let (tx, mut rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
-    let task = tokio::task::spawn(async move {
+
+    // Spawn task to read from batch_stream and send to channel
+    let read_task = tokio::task::spawn(async move {
         loop {
             match batch_stream.try_next().await {
                 Ok(None) => {
@@ -209,27 +202,78 @@ pub async fn merge_parquet_files(
         }
         Ok(())
     });
-    while let Some(batch) = rx.recv().await {
-        new_file_meta.records += batch.num_rows() as i64;
-        if let Err(e) = writer.write(&batch).await {
-            log::error!("merge_parquet_files write error: {e}");
-            return Err(e.into());
-        }
-    }
-    task.await
-        .map_err(|e| DataFusionError::External(Box::new(e)))??;
-    append_metadata(&mut writer, &new_file_meta)?;
-    writer.close().await?;
 
-    ctx.deregister_table("tbl")?;
-    drop(ctx);
+    // write batches to the appropriate format
+    let buf = match file_format {
+        FileFormat::Parquet => {
+            let mut buf = Vec::new();
+            let mut writer = new_parquet_writer(
+                &mut buf,
+                &schema,
+                bloom_filter_fields,
+                metadata,
+                false,
+                compression,
+            );
+
+            while let Some(batch) = rx.recv().await {
+                if let Err(e) = writer.write(&batch).await {
+                    log::error!("merge_parquet_files write error: {e}");
+                    return Err(e.into());
+                }
+            }
+
+            read_task
+                .await
+                .map_err(|e| DataFusionError::External(Box::new(e)))??;
+            writer.close().await?;
+            buf
+        }
+        FileFormat::Vortex => {
+            let schema_clone = schema.clone();
+
+            // Spawn writer task in VORTEX_RUNTIME
+            let writer_task = VORTEX_RUNTIME.spawn_blocking(move || {
+                VORTEX_RUNTIME.block_on(async move {
+                    let mut buf = Vec::new();
+                    let session = VortexSession::default();
+                    let dtype = DType::from_arrow(schema_clone.as_ref());
+                    let write_options = VortexWriteOptions::new(session.clone());
+                    let mut writer = write_options.writer(&mut buf, dtype);
+
+                    while let Some(batch) = rx.recv().await {
+                        let array: ArrayRef = ArrayRef::from_arrow(batch, false);
+                        writer.push(array).await?;
+                    }
+
+                    writer.finish().await?;
+
+                    Ok::<Vec<u8>, anyhow::Error>(buf)
+                })
+            });
+
+            // Wait for both tasks to complete
+            read_task
+                .await
+                .map_err(|e| DataFusionError::External(Box::new(e)))??;
+
+            writer_task
+                .await
+                .map_err(|e| {
+                    DataFusionError::Execution(format!("Vortex runtime task failed: {e}"))
+                })?
+                .map_err(|e| {
+                    DataFusionError::Execution(format!("Failed to write vortex file: {e}"))
+                })?
+        }
+    };
 
     log::debug!(
         "merge_parquet_files took {} ms",
         start.elapsed().as_millis()
     );
 
-    Ok((schema, MergeParquetResult::Single(buf)))
+    Ok(MergeParquetResult::Single(buf))
 }
 
 #[cfg(feature = "enterprise")]
@@ -357,6 +401,7 @@ pub async fn merge_parquet_files_with_downsampling(
     Ok((schema, MergeParquetResult::Multiple { bufs, file_metas }))
 }
 
+#[allow(dead_code)]
 fn append_metadata(
     writer: &mut AsyncArrowWriter<&mut Vec<u8>>,
     file_meta: &FileMeta,
@@ -720,9 +765,78 @@ impl TableBuilder {
         )
         .await?;
 
-        // Configure listing options
-        let file_format = ParquetFormat::default();
-        let mut listing_options = ListingOptions::new(Arc::new(file_format))
+        // Group files by format
+        let mut parquet_files = Vec::new();
+        let mut vortex_files = Vec::new();
+
+        for file in files {
+            match FileFormat::from_extension(&file.key) {
+                Some(FileFormat::Vortex) => vortex_files.push(file),
+                _ => parquet_files.push(file), // Default to parquet
+            }
+        }
+
+        // Build table providers for each format
+        let mut tables: Vec<Arc<dyn TableProvider>> = Vec::new();
+
+        if !parquet_files.is_empty() {
+            let table = self
+                .build_table_for_format(
+                    session.clone(),
+                    parquet_files,
+                    schema.clone(),
+                    FileFormat::Parquet,
+                    target_partitions,
+                )
+                .await?;
+            tables.push(table);
+        }
+
+        if !vortex_files.is_empty() {
+            let table = self
+                .build_table_for_format(
+                    session.clone(),
+                    vortex_files,
+                    schema.clone(),
+                    FileFormat::Vortex,
+                    target_partitions,
+                )
+                .await?;
+            tables.push(table);
+        }
+
+        // If we have multiple tables, union them
+        match tables.len() {
+            0 => Err(DataFusionError::Execution(
+                "No files to process".to_string(),
+            )),
+            1 => Ok(tables.into_iter().next().unwrap()),
+            _ => {
+                // Multiple formats detected - create a union table
+                log::info!("Multiple file formats detected. Creating union table.");
+                Ok(Arc::new(NewUnionTable::new(schema, tables)))
+            }
+        }
+    }
+
+    async fn build_table_for_format(
+        &self,
+        session: SearchSession,
+        files: Vec<FileKey>,
+        schema: Arc<Schema>,
+        format: FileFormat,
+        target_partitions: usize,
+    ) -> Result<Arc<dyn TableProvider>> {
+        // Configure listing options with the appropriate file format
+        let file_format: Arc<dyn DataFusionFileFormat> = match format {
+            FileFormat::Parquet => Arc::new(ParquetFormat::default()),
+            FileFormat::Vortex => {
+                let vortex_session = VortexSession::default().with_tokio();
+                Arc::new(VortexFormat::new(vortex_session))
+            }
+        };
+
+        let mut listing_options = ListingOptions::new(file_format)
             .with_target_partitions(target_partitions)
             .with_collect_stat(true); // current is default to true
 
@@ -780,11 +894,11 @@ impl TableBuilder {
         let mut table = ListingTableAdapter::try_new(
             config,
             session.id.clone(),
-            self.index_condition,
-            self.fst_fields,
+            self.index_condition.clone(),
+            self.fst_fields.clone(),
         )?;
         if self.file_stat_cache.is_some() {
-            table = table.with_cache(self.file_stat_cache);
+            table = table.with_cache(self.file_stat_cache.clone());
         }
         Ok(Arc::new(table))
     }
@@ -920,7 +1034,7 @@ fn get_min_timestamp(record_batch: &RecordBatch) -> i64 {
 mod tests {
     use std::sync::Arc;
 
-    use arrow::array::{Int64Array, StringArray};
+    use arrow::array::{Int64Array, RecordBatch, StringArray};
     use arrow_schema::{DataType, Field, Schema};
     use config::get_config;
 

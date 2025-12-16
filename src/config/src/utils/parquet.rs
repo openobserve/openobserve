@@ -32,8 +32,12 @@ use parquet::{
     basic::{Compression, Encoding},
     file::{metadata::KeyValue, properties::WriterProperties},
 };
+use vortex::VortexSessionDefault;
+use vortex_file::OpenOptionsSessionExt;
+use vortex_io::session::RuntimeSessionExt;
+use vortex_session::VortexSession;
 
-use crate::{config::*, ider, meta::stream::FileMeta};
+use crate::{FileFormat, config::*, ider, meta::stream::FileMeta};
 
 pub fn new_parquet_writer<'a>(
     buf: &'a mut Vec<u8>,
@@ -116,7 +120,7 @@ pub fn parse_file_key_columns(key: &str) -> Result<(String, String, String), any
     // eg: files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet
     let columns = key.splitn(9, '/').collect::<Vec<&str>>();
     if columns.len() < 9 {
-        return Err(anyhow::anyhow!("[file_list] Invalid file path: {}", key));
+        return Err(anyhow::anyhow!("[file_list] Invalid file path: {key}"));
     }
     // let _ = columns[0].to_string(); // files/
     let stream_key = format!("{}/{}/{}", columns[1], columns[2], columns[3]);
@@ -152,6 +156,7 @@ pub async fn get_recordbatch_reader_from_bytes(
     Ok((schema, reader))
 }
 
+// should not have such function in the config
 pub async fn read_recordbatch_from_bytes(
     data: &bytes::Bytes,
 ) -> Result<(Arc<Schema>, Vec<RecordBatch>), anyhow::Error> {
@@ -161,19 +166,37 @@ pub async fn read_recordbatch_from_bytes(
     Ok((schema, batches))
 }
 
-pub async fn read_recordbatch_from_file(
-    path: &PathBuf,
-) -> Result<(Arc<Schema>, Vec<RecordBatch>), anyhow::Error> {
-    let file = tokio::fs::File::open(path).await?;
-    let (schema, reader) = get_recordbatch_reader(file).await?;
-    let batches = reader.try_collect().await?;
-    Ok((schema, batches))
-}
+// should not have such function in the config
+// pub async fn read_recordbatch_from_file(
+//     path: &PathBuf,
+// ) -> Result<(Arc<Schema>, Vec<RecordBatch>), anyhow::Error> {
+//     let file = tokio::fs::File::open(path).await?;
+//     let (schema, reader) = get_recordbatch_reader(file).await?;
+//     let batches = reader.try_collect().await?;
+//     Ok((schema, batches))
+// }
 
 pub async fn read_schema_from_file(path: &PathBuf) -> Result<Arc<Schema>, anyhow::Error> {
-    let mut file = tokio::fs::File::open(path).await?;
-    let arrow_reader = ArrowReaderMetadata::load_async(&mut file, Default::default()).await?;
-    Ok(arrow_reader.schema().clone())
+    // Detect file format from extension
+    let path_str = path.to_str().unwrap_or("");
+    let format = FileFormat::from_extension(path_str);
+
+    match format {
+        Some(FileFormat::Vortex) => {
+            // Read vortex file
+            let session = VortexSession::default().with_tokio();
+            let vxf = session.open_options().open(path.clone()).await?;
+            let schema = Arc::new(vxf.dtype().to_arrow_schema()?);
+            Ok(schema)
+        }
+        _ => {
+            // Default to parquet
+            let mut file = tokio::fs::File::open(path).await?;
+            let arrow_reader =
+                ArrowReaderMetadata::load_async(&mut file, Default::default()).await?;
+            Ok(arrow_reader.schema().clone())
+        }
+    }
 }
 
 pub async fn read_schema_from_bytes(data: &bytes::Bytes) -> Result<Arc<Schema>, anyhow::Error> {
