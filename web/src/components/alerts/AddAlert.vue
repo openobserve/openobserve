@@ -86,23 +86,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="wizardStep"
           ref="wizardStepper"
           color="primary"
-          animated
           flat
           class="alert-wizard-stepper"
+          header-nav
         >
+        <!-- Persistent Step Caption (Between Header and Content) -->
+        <template v-slot:message>
+          <div
+            v-if="currentStepCaption"
+            class="persistent-step-caption tw-px-3 tw-py-1 tw-mb-1 tw-mt-2"
+            :class="store.state.theme === 'dark' ? 'dark-mode-caption' : 'light-mode-caption'"
+          >
+            {{ currentStepCaption }}
+          </div>
+        </template>
+
         <!-- Step 1: Alert Setup -->
         <q-step
           :name="1"
           title="Alert Setup"
-          :caption="wizardStep === 1 ? 'Name, folder, stream selection, and alert type' : ''"
+          caption=""
           icon="settings"
           :done="wizardStep > 1"
-          :header-nav="wizardStep > 1"
         >
           <!-- 70/30 Split Layout with Equal Heights -->
-          <div class="tw-flex tw-gap-4 tw-items-stretch" style="height: calc(100vh - 332px); overflow: hidden;">
+          <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow: hidden;">
             <!-- Left Column: Step Content (70%) -->
-            <div class="tw-flex-[0_0_70%] tw-flex tw-flex-col" style="height: calc(100vh - 332px); overflow: hidden;">
+            <div class="tw-flex-[0_0_70%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
                 <Step1AlertSetup
                   ref="step1Ref"
@@ -124,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Right Column: Preview & Summary (30%) -->
-            <div class="tw-flex-[0_0_30%] tw-flex tw-flex-col tw-gap-2" style="height: calc(100vh - 332px); position: sticky; top: 0; overflow: hidden;">
+            <div class="tw-flex-[0_0_30%] tw-flex tw-flex-col tw-gap-2" style="height: calc(100vh - 302px); position: sticky; top: 0; overflow: hidden;">
               <!-- Preview Alert -->
               <preview-alert
                 style="flex: 1; height: 50%; overflow: auto;"
@@ -150,15 +160,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-step
           :name="2"
           title="Query"
-          :caption="wizardStep === 2 ? 'SQL/PromQL editor, conditions, and VRL functions' : ''"
+          caption=""
           icon="search"
           :done="wizardStep > 2"
-          :header-nav="wizardStep > 2"
         >
           <!-- 70/30 Split Layout with Equal Heights -->
-          <div class="tw-flex tw-gap-4 tw-items-stretch" style="height: calc(100vh - 332px); overflow: hidden;">
+          <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow: hidden;">
             <!-- Left Column: Step Content (70%) -->
-            <div class="tw-flex-[0_0_70%] tw-flex tw-flex-col" style="height: calc(100vh - 332px); overflow: hidden;">
+            <div class="tw-flex-[0_0_70%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
                 <Step2QueryConfig
                   :tab="scheduledAlertRef?.tab || 'custom'"
@@ -186,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Right Column: Preview & Summary (30%) -->
-            <div class="tw-flex-[0_0_30%] tw-flex tw-flex-col tw-gap-2" style="height: calc(100vh - 332px); position: sticky; top: 0; overflow: hidden;">
+            <div class="tw-flex-[0_0_30%] tw-flex tw-flex-col tw-gap-2" style="height: calc(100vh - 302px); position: sticky; top: 0; overflow: hidden;">
               <!-- Preview Alert -->
               <preview-alert
                 style="flex: 1; height: 50%; overflow: auto;"
@@ -212,15 +221,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-step
           :name="3"
           title="Alert Settings"
-          :caption="wizardStep === 3 ? (formData.is_real_time === 'true' ? 'Silence notification and destinations' : 'Threshold, aggregation, period, frequency, cooldown, and destinations') : ''"
+          caption=""
           icon="tune"
           :done="wizardStep > 3"
-          :header-nav="wizardStep > 3"
         >
           <!-- 70/30 Split Layout with Equal Heights -->
-          <div class="tw-flex tw-gap-4 tw-items-stretch" style="height: calc(100vh - 332px); overflow: hidden;">
+          <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow: hidden;">
             <!-- Left Column: Step Content (70%) -->
-            <div class="tw-flex-[0_0_70%] tw-flex tw-flex-col" style="height: calc(100vh - 332px); overflow: hidden;">
+            <div class="tw-flex-[0_0_70%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
                 <Step3AlertConditions
                   :formData="formData"
@@ -240,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Right Column: Preview & Summary (30%) -->
-            <div class="tw-flex-[0_0_30%] tw-flex tw-flex-col tw-gap-2" style="height: calc(100vh - 332px); position: sticky; top: 0; overflow: hidden;">
+            <div class="tw-flex-[0_0_30%] tw-flex tw-flex-col tw-gap-2" style="height: calc(100vh - 302px); position: sticky; top: 0; overflow: hidden;">
               <!-- Preview Alert -->
               <preview-alert
                 style="flex: 1; height: 50%; overflow: auto;"
@@ -267,13 +275,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="formData.is_real_time === 'false'"
           :name="4"
           title="Compare with Past"
-          :caption="wizardStep === 4 ? 'Multi-window comparison with historical data' : ''"
+          caption=""
           icon="compare_arrows"
           :done="wizardStep > 4"
-          :header-nav="wizardStep > 4"
         >
           <!-- 70/30 Split Layout with Equal Heights -->
-          <div class="tw-flex tw-gap-4 tw-items-stretch" style="height: calc(100vh - 332px); overflow: hidden;">
+          <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow: hidden;">
             <!-- Left Column: Step Content (70%) -->
             <div class="tw-flex-[0_0_70%] tw-flex tw-flex-col" style="height: 100%; overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
@@ -317,15 +324,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="formData.is_real_time === 'false'"
           :name="5"
           title="Deduplication"
-          :caption="wizardStep === 5 ? 'Prevent duplicate alerts by grouping similar alerts' : ''"
+          caption=""
           icon="filter_list"
           :done="wizardStep > 5"
-          :header-nav="wizardStep > 5"
         >
           <!-- 70/30 Split Layout with Equal Heights -->
-          <div class="tw-flex tw-gap-4 tw-items-stretch" style="height: calc(100vh - 332px); overflow: hidden;">
+          <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow: hidden;">
             <!-- Left Column: Step Content (70%) -->
-            <div class="tw-flex-[0_0_70%] tw-flex tw-flex-col" style="height: calc(100vh - 332px); overflow: hidden;">
+            <div class="tw-flex-[0_0_70%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
                 <Step5Deduplication
                   :deduplication="formData.deduplication"
@@ -337,7 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Right Column: Preview & Summary (30%) -->
-            <div class="tw-flex-[0_0_30%] tw-flex tw-flex-col tw-gap-2" style="height: calc(100vh - 332px); position: sticky; top: 0; overflow: hidden;">
+            <div class="tw-flex-[0_0_30%] tw-flex tw-flex-col tw-gap-2" style="height: calc(100vh - 302px); position: sticky; top: 0; overflow: hidden;">
               <!-- Preview Alert -->
               <preview-alert
                 style="flex: 1; height: 50%; overflow: auto;"
@@ -363,12 +369,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-step
           :name="6"
           title="Advanced"
-          :caption="wizardStep === 6 ? 'Context variables, description, and row templates' : ''"
+          caption=""
           icon="settings_applications"
           :done="false"
         >
           <!-- 70/30 Split Layout with Equal Heights -->
-          <div class="tw-flex tw-gap-4 tw-items-stretch" style="height: calc(100vh - 332px); overflow: hidden;">
+          <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow: hidden;">
             <!-- Left Column: Step Content (70%) -->
             <div class="tw-flex-[0_0_70%] tw-flex tw-flex-col" style="height: 100%; overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
@@ -834,6 +840,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="submit"
             no-caps
             flat
+            :disable="!isLastStep"
             :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             @click="onSubmit"
           />
@@ -1176,6 +1183,19 @@ export default defineComponent({
     const wizardStep = ref(1);
     const wizardStepper = ref(null);
     const step1Ref = ref(null);
+
+    // Computed property for step captions to avoid flickering
+    const currentStepCaption = computed(() => {
+      const captions: Record<number, string> = {
+        1: 'Set the stage for your alert',
+        2: 'What should trigger the alert',
+        3: 'Set your alert rules and choose how you\'d like to be notified.',
+        4: 'Compare current results with data from another time period',
+        5: 'Avoid sending the same alert multiple times by grouping similar alerts together.',
+        6: 'Context variables, description, and row template',
+      };
+      return captions[wizardStep.value] || '';
+    });
 
     const goToStep2 = async () => {
       // Validate step 1 before proceeding
@@ -2155,6 +2175,7 @@ export default defineComponent({
       wizardStep,
       wizardStepper,
       step1Ref,
+      currentStepCaption,
       goToStep2,
       goToNextStep,
       goToPreviousStep,
@@ -2660,6 +2681,14 @@ export default defineComponent({
 // Wizard Stepper Styles
 .alert-wizard-stepper {
   box-shadow: none;
+  .q-stepper__step-inner{
+    padding: 0.375rem !important;
+  }
+  .q-stepper__tab{
+    padding-left: 0.375rem !important;
+    min-height: 30px !important;
+
+  }
 
   :deep(.q-stepper__header) {
     border-bottom: 1px solid #e0e0e0;
@@ -2726,6 +2755,31 @@ export default defineComponent({
       border-bottom-color: #424242;
     }
   }
+}
+
+// Persistent step caption styles (helper text style)
+.persistent-step-caption {
+  font-size: 12px;
+  line-height: 1.6;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  font-weight: 400;
+  margin-left: 0.375rem;
+  letter-spacing: 0.01em;
+}
+
+.dark-mode-caption {
+  background-color: transparent;
+  color: #9e9e9e;
+  border-left: 3px solid #5a5a5a;
+  padding-left: 12px !important;
+}
+
+.light-mode-caption {
+  background-color: transparent;
+  color: #757575;
+  border-left: 3px solid #bdbdbd;
+  padding-left: 12px !important;
 }
 
 </style>

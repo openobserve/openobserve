@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="step-query-config" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
     <div class="step-content card-container tw-px-3 tw-py-4">
       <!-- Query Mode Tabs (hidden for real-time alerts) -->
-      <div v-if="shouldShowTabs" class="tw-mb-4">
+      <div v-if="shouldShowTabs" class="tw-mb-4 tw-flex tw-items-center tw-justify-between">
         <div class="flex items-center app-tabs-container tw-h-[36px] tw-w-fit">
           <AppTabs
             data-test="step2-query-tabs"
@@ -28,6 +28,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:active-tab="updateTab"
           />
         </div>
+
+        <!-- View Editor Button (only for SQL/PromQL tabs) -->
+        <q-btn
+          v-if="localTab !== 'custom'"
+          data-test="step2-view-editor-btn"
+          label="View Editor"
+          icon="edit"
+          size="sm"
+          class="text-bold add-variable no-border q-py-sm"
+          color="primary"
+          style="border-radius: 4px; text-transform: capitalize; color: #fff !important; font-size: 12px; min-width: 130px;"
+          @click="viewSqlEditor = true"
+        />
       </div>
 
       <!-- Custom Query Builder -->
@@ -49,24 +62,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- SQL/PromQL Preview Mode -->
       <template v-else>
         <div class="tw-w-full tw-flex tw-flex-col tw-gap-4">
-          <!-- View Editor Button -->
-          <div class="tw-flex tw-justify-end">
-            <q-btn
-              data-test="step2-view-editor-btn"
-              label="View Editor"
-              icon="edit"
-              size="sm"
-              class="text-bold add-variable no-border q-py-sm"
-              color="primary"
-              style="border-radius: 4px; text-transform: capitalize; color: #fff !important; font-size: 12px; min-width: 130px;"
-              @click="viewSqlEditor = true"
-            />
-          </div>
 
           <!-- Preview Boxes Container -->
           <div class="tw-flex tw-gap-4 tw-w-full">
             <!-- SQL/PromQL Preview Box (50%) -->
-            <div class="preview-box tw-flex-1" :class="store.state.theme === 'dark' ? 'dark-mode-preview' : 'light-mode-preview'" style="height: 500px;">
+            <div class="preview-box tw-flex-1" :class="store.state.theme === 'dark' ? 'dark-mode-preview' : 'light-mode-preview'" style="height: 464px;">
               <div class="preview-header tw-flex tw-items-center tw-justify-between tw-px-3 tw-py-2">
                 <span class="preview-title">{{ localTab === 'sql' ? 'SQL' : 'PromQL' }} Preview</span>
               </div>
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- VRL Preview Box (50%) -->
-            <div class="preview-box tw-flex-1" :class="store.state.theme === 'dark' ? 'dark-mode-preview' : 'light-mode-preview'" style="height: 500px;">
+            <div class="preview-box tw-flex-1" :class="store.state.theme === 'dark' ? 'dark-mode-preview' : 'light-mode-preview'" style="height: 464px;">
               <div class="preview-header tw-flex tw-items-center tw-justify-between tw-px-3 tw-py-2">
                 <span class="preview-title">VRL Preview</span>
               </div>
