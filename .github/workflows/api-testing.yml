@@ -1,16 +1,20 @@
 name: API Integration Test
 
 on:
-  pull_request:
-    types: [synchronize, opened]
-    branches:
-      - "*"
-
   push:
     branches:
       - "main"
-
-  workflow_dispatch:
+    # paths-ignore:
+    #   - "**.md"
+    #   - "**.yml"
+    #   - "**.yaml"
+  pull_request:
+    branches:
+      - "*"
+    # paths-ignore:
+    #   - "**.md"
+    #   - "**.yml"
+    #   - "**.yaml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}

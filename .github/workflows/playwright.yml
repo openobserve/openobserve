@@ -1,23 +1,24 @@
 name: Playwright UI Tests
 
 on:
-  # Run when PR receives an approval review (for TestDino upload gating)
-  pull_request_review:
-    types: [submitted]
-
-  # Run on PR events
+  push:
+    branches:
+      - "main"
+    # paths-ignore:
+    #   - "**.md"
+    #   - "**.yml"
+    #   - "**.yaml"
   pull_request:
     types: [synchronize, opened, labeled]
     branches:
       - "*"
-
-  # Always run on push to main
-  push:
-    branches:
-      - "main"
-
-  # Manual trigger for testing
-  workflow_dispatch:
+    # paths-ignore:
+    #   - "**.md"
+    #   - "**.yml"
+    #   - "**.yaml"
+  # For TestDino upload gating
+  pull_request_review:
+    types: [submitted]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -73,12 +74,7 @@ jobs:
             echo "::notice::Trigger: Push to main branch"
             SHOULD_UPLOAD="true"
 
-          # 2. Always upload on manual dispatch
-          elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "::notice::Trigger: Manual workflow dispatch"
-            SHOULD_UPLOAD="true"
-
-          # 3. Upload if PR just got approved
+          # 2. Upload if PR just got approved
           elif [ "${{ github.event_name }}" == "pull_request_review" ]; then
             if [ "${{ github.event.review.state }}" == "approved" ]; then
               echo "::notice::Trigger: PR just received approval"
@@ -87,7 +83,7 @@ jobs:
               echo "::notice::Review submitted but not an approval (state: ${{ github.event.review.state }})"
             fi
 
-          # 4. For PR events (synchronize, opened, labeled)
+          # 3. For PR events (synchronize, opened, labeled)
           elif [ "${{ github.event_name }}" == "pull_request" ]; then
             # Check for override label
             if [ "${{ contains(github.event.pull_request.labels.*.name, 'upload-testdino-true') }}" == "true" ]; then
