@@ -36,7 +36,9 @@ use {
     chrono::{Duration, Utc},
     config::{SMTP_CLIENT, get_config},
     lettre::{AsyncTransport, Message, message::SinglePart},
-    o2_enterprise::enterprise::cloud::{OrgInviteStatus, org_invites},
+    o2_enterprise::enterprise::cloud::{
+        InvitationRecord, OrgInviteStatus, billings::get_billing_by_org_id, org_invites,
+    },
 };
 
 #[cfg(feature = "cloud")]
@@ -288,6 +290,20 @@ pub async fn create_org(
     if !is_allowed && !is_root_user(user_email) {
         return Err(anyhow::anyhow!("Only root user can create organization"));
     }
+
+    #[cfg(feature = "cloud")]
+    {
+        let orgs = list_orgs_by_user(user_email).await?;
+        for org in orgs {
+            let billing = get_billing_by_org_id(&org.identifier).await?;
+            if billing.is_none() {
+                return Err(anyhow::anyhow!(
+                    "A user cannot be part of multiple free accounts"
+                ));
+            }
+        }
+    }
+
     org.name = org.name.trim().to_owned();
 
     let has_valid_chars = org
@@ -487,6 +503,7 @@ pub async fn get_invitations_for_org(
             expires_at: invite.expires_at,
             is_external: true,
             role: invite.role,
+            token: invite.token,
         })
         .collect())
 }
@@ -529,9 +546,30 @@ pub async fn generate_invitation(
                 ));
             }
         }
+
+        if o2_enterprise::enterprise::cloud::email::check_email(invitee)
+            .await
+            .is_err()
+        {
+            return Err(anyhow::anyhow!("Email Domain not allowed for {invitee}"));
+        }
+
+        if get_billing_by_org_id(org_id).await?.is_none() {
+            // If the org we are inviting to is paid, its fine to send invitations
+            // irrespective of what other orgs invitees are part of.
+            // if it is a free org, we must check that the orgs invitee is already part
+            // of are all paid, as one user cannot be part of more than one free org.
+            let invitee_orgs = list_orgs_by_user(invitee).await?;
+            for org in invitee_orgs {
+                if get_billing_by_org_id(&org.identifier).await?.is_none() {
+                    return Err(anyhow::anyhow!(
+                        "Invitee {invitee} is already part of another free org, cannot be invited in this org"
+                    ));
+                }
+            }
+        }
     }
     if let Some(org) = get_org(org_id).await {
-        let invite_token = config::ider::generate();
         let expires_at = Utc::now().timestamp_micros()
             + Duration::days(cfg.common.org_invite_expiry as i64)
                 .num_microseconds()
@@ -541,7 +579,6 @@ pub async fn generate_invitation(
             &invites.role.to_string(),
             user_email,
             org_id,
-            &invite_token,
             expires_at,
             invites.invites.clone(),
         )
@@ -558,14 +595,8 @@ pub async fn generate_invitation(
             if !cfg.smtp.smtp_reply_to.is_empty() {
                 email = email.reply_to(cfg.smtp.smtp_reply_to.parse()?);
             }
-            let msg = get_invite_email_body(
-                org_id,
-                &org.name,
-                &inviter_name,
-                &invite_token,
-                invites.role,
-                expires_at,
-            );
+            let msg =
+                get_invite_email_body(org_id, &org.name, &inviter_name, invites.role, expires_at);
             let email = email.singlepart(SinglePart::html(msg)).unwrap();
 
             // Send the email
@@ -612,6 +643,20 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
         None => return Err(anyhow::anyhow!("Organization doesn't exist")),
     };
 
+    if get_billing_by_org_id(&org_id).await?.is_none() {
+        // if the org user is joining is paid, no issues, we can just let them join
+        // if it is a free org, we must check that the orgs the joining user is already part
+        // of are all paid, as one user cannot be part of more than one free org.
+        let user_orgs = list_orgs_by_user(user_email).await?;
+        for org in user_orgs {
+            if get_billing_by_org_id(&org.identifier).await?.is_none() {
+                return Err(anyhow::anyhow!(
+                    "User is already a part of a free organization. A user cannot join multiple free orgs."
+                ));
+            }
+        }
+    }
+
     // Check if user is already part of the org
     if get_cached_user_org(&org_id, user_email).is_some() {
         return Ok(()); // User is already part of the org
@@ -651,7 +696,10 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
 }
 
 #[cfg(feature = "cloud")]
-pub async fn decline_invitation(user_email: &str, token: &str) -> Result<(), anyhow::Error> {
+pub async fn decline_invitation(
+    user_email: &str,
+    token: &str,
+) -> Result<Vec<InvitationRecord>, anyhow::Error> {
     let invite = org_invites::get_by_token_user(token, user_email)
         .await
         .map_err(|e| {
@@ -672,7 +720,19 @@ pub async fn decline_invitation(user_email: &str, token: &str) -> Result<(), any
         return Err(anyhow::anyhow!("Error updating status"));
     }
 
-    Ok(())
+    let invites = match db::user::list_user_invites(user_email).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("error in listing invites for {user_email} : {e}");
+            vec![]
+        }
+    };
+    let pending = invites
+        .into_iter()
+        .filter(|invite| invite.status == OrgInviteStatus::Pending && invite.expires_at > now)
+        .collect();
+
+    Ok(pending)
 }
 
 pub async fn get_org(org: &str) -> Option<Organization> {

@@ -58,6 +58,7 @@
             :rules="[(val: any) => !!val || 'Field is required!']"
             :class="inputWidth ? inputWidth : ''"
             @update:model-value="emits('input:update', 'conditions', condition)"
+            :new-value-mode="props.allowCustomColumns ? 'add-unique' : undefined"
           >
           <q-tooltip v-if="condition.column && store.state.isAiChatEnabled">
             {{ condition.column }}
@@ -143,6 +144,11 @@
         required: false,
     },
     isFirstInGroup: {
+        type: Boolean,
+        default: false,
+        required: false,
+    },
+    allowCustomColumns: {
         type: Boolean,
         default: false,
         required: false,

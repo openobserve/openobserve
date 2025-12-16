@@ -451,7 +451,8 @@
     "roles": "ロール",
     "groups": "グループ",
     "customRole": "カスタムロール",
-    "description": "[説明]"
+    "description": "[説明]",
+    "revoke_invite": "招待を取り消す"
   },
   "serviceAccounts": {
     "header": "サービスアカウント",
@@ -1079,7 +1080,10 @@
     "panelQueryMustHaveStream": "パネルクエリにはストリームが設定されている必要があります",
     "unsupportedPanelTypeAlert": "{type} パネルからアラートを作成すると、期待どおりに動作しない場合があります",
     "panelDuplicatedSuccessfully": "パネルは正常に複製されました",
-    "panelDuplicationFailed": "パネルを複製できませんでした"
+    "panelDuplicationFailed": "パネルを複製できませんでした",
+    "customChartTypeSelector": "カスタムチャートタイプセレクター",
+    "customChartTypeSelectorHint": "基本的なコード構造を始めるには、eCharts ライブラリからグラフの種類を選択します。",
+    "selectChartType": "チャートタイプを選択"
   },
   "home": {
     "streams": "ストリーム",
@@ -1307,7 +1311,55 @@
       }
     },
     "triggerAlert": "トリガー",
-    "alertTriggeredSuccess": "アラートは正常にトリガーされました"
+    "alertTriggeredSuccess": "アラートは正常にトリガーされました",
+    "incidents": {
+      "title": "インシデント",
+      "header": "アラートインシデント",
+      "noIncidents": "インシデントは見つかりませんでした",
+      "id": "ID",
+      "status": "ステータス",
+      "severity": "重大度",
+      "alertCount": "アラート",
+      "firstAlertAt": "ファーストアラート",
+      "lastAlertAt": "最終アラート",
+      "resolvedAt": "解決日時",
+      "title_field": "タイトル",
+      "correlationKey": "相関キー",
+      "stableDimensions": "ディメンション",
+      "topology": "トポロジ",
+      "upstreamServices": "アップストリームサービス",
+      "downstreamServices": "ダウンストリームサービス",
+      "correlatedAlerts": "相関アラート",
+      "alertName": "アラート名",
+      "alertFiredAt": "射撃された",
+      "correlationReason": "相関理由",
+      "actions": "[アクション]",
+      "acknowledge": "確認する",
+      "resolve": "解決",
+      "reopen": "[再開]",
+      "viewDetails": "詳細を表示",
+      "statusOpen": "[開く]",
+      "statusAcknowledged": "確認済み",
+      "statusResolved": "解決済み",
+      "severityP1": "P1-クリティカル",
+      "severityP2": "P2-ハイ",
+      "severityP3": "P3-ミディアム",
+      "severityP4": "P4-低",
+      "correlationServiceDiscovery": "サービスディスカバリー",
+      "correlationManualExtraction": "手動抽出",
+      "correlationTemporal": "テンポラル",
+      "filterByStatus": "ステータスで絞り込む",
+      "allStatuses": "すべてのステータス",
+      "loading": "インシデントをロード中...",
+      "errorLoading": "インシデントを読み込めませんでした",
+      "statusUpdated": "インシデントステータスが更新されました",
+      "statusUpdateFailed": "インシデントステータスの更新に失敗しました",
+      "rootCauseAnalysis": "根本原因分析",
+      "analyzeRca": "分析",
+      "rcaInProgress": "根本原因を分析中...",
+      "rcaCompleted": "根本原因分析が完了しました",
+      "noRcaYet": "根本原因分析はありません。[分析] をクリックして開始します。"
+    }
   },
   "alert_templates": {
     "header": "テンプレート",
@@ -1584,7 +1636,8 @@
     "serviceAccountsName": "サービスアカウント名",
     "basicUsers": "ユーザ",
     "externalUserWarningTitle": "外部ユーザー警告",
-    "externalUserWarningMessage": "外部ユーザーをロールに直接追加しても権限は付与されません。代わりにユーザーグループに追加してください。"
+    "externalUserWarningMessage": "外部ユーザーをロールに直接追加しても権限は付与されません。代わりにユーザーグループに追加してください。",
+    "invitations": "招待状"
   },
   "pipeline": {
     "header": "パイプライン",
@@ -1663,7 +1716,8 @@
     "viewLogs": "ログを表示",
     "backToLogs": "ログに戻る",
     "RedMetrics": "RED メトリックス",
-    "loadingStream": "ストリームをロード中..."
+    "loadingStream": "ストリームをロード中...",
+    "viewRelated": "関連を表示"
   },
   "actions": {
     "testAction": "アクションをテスト",
@@ -1955,6 +2009,14 @@
     "tracesFromService": "サービスからのトレース:{service}",
     "noTracesFound": "相関トレースは見つかりませんでした",
     "noTracesDescription": "選択した時間範囲のサービス {service} のトレースが見つかりません",
-    "openTraceInNewWindow": "トレースを新しいウィンドウで開く"
+    "openTraceInNewWindow": "トレースを新しいウィンドウで開く",
+    "filters": "フィルター"
+  },
+  "sreChat": {
+    "emptyMessage": "アラートやインシデントについて何でも聞いてください",
+    "inputPlaceholder": "SRE アシスタントに質問...",
+    "clearChatTitle": "チャットをクリア",
+    "clearChatMessage": "この会話をクリアしてもよろしいですか?",
+    "copiedToClipboard": "クリップボードにコピー"
   }
 }

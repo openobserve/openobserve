@@ -227,6 +227,7 @@ impl Partition {
                     .write(&batches)
                     .await
                     .context(WriteParquetRecordBatchSnafu)?;
+
                 writer.close().await.context(WriteParquetRecordBatchSnafu)?;
                 file_meta.compressed_size = buf_parquet.len() as i64;
 

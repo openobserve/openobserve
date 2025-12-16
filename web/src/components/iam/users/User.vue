@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw-flex tw-flex-row tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[68px] tw-border-b-[1px]"
     >
       <div
-          class="q-table__title full-width tw-font-[600]"
+          class="q-table__title tw-font-[600]"
           data-test="user-title-text"
         >
           {{ t("iam.basicUsers") }}
@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <member-invitation
               :key="currentUserRole"
               v-model:currentrole="currentUserRole"
+              @invite-sent="handleInviteSent"
             />
           </div>
           <div class="col-6" v-else>
@@ -120,6 +121,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="confirmDeleteAction(props)"
                 style="cursor: pointer !important"
                 :data-test="`delete-basic-user-${props.row.email}`"
+              >
+              </q-btn>
+              <q-btn
+                v-if="props.row.status == 'pending' && props.row.token"
+                :title="t('user.revoke_invite')"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                icon="cancel"
+                @click="confirmRevokeAction(props)"
+                style="cursor: pointer !important"
+                :data-test="`revoke-invite-${props.row.email}`"
               >
               </q-btn>
               <q-btn
@@ -228,6 +243,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card>
     </q-dialog>
 
+    <q-dialog v-model="confirmRevoke">
+      <q-card style="width: 400px">
+        <q-card-section class="confirmBody">
+          <div class="head">Revoke Invitation</div>
+          <div class="para">Are you sure you want to revoke the invitation for {{ revokeInviteEmail }}?</div>
+        </q-card-section>
+
+        <q-card-actions class="confirmActions">
+          <q-btn v-close-popup="true" unelevated
+            no-caps class="q-mr-sm o2-secondary-button">
+            {{ t("user.cancel") }}
+          </q-btn>
+          <q-btn
+            v-close-popup="true"
+            unelevated
+            no-caps
+            class="o2-primary-button"
+            @click="revokeInvite"
+          >
+            {{ t("user.ok") }}
+          </q-btn>
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
     <q-dialog v-model="confirmBulkDelete">
       <q-card style="width: 280px">
         <q-card-section class="confirmBody">
@@ -308,6 +348,7 @@ export default defineComponent({
     const showUpdateUserDialog: any = ref(false);
     const showAddUserDialog: any = ref(false);
     const confirmDelete = ref<boolean>(false);
+    const confirmRevoke = ref<boolean>(false);
     const selectedUser: any = ref({});
     const orgData: any = ref(store.state.selectedOrganization);
     const isUpdated: any = ref(false);
@@ -316,6 +357,10 @@ export default defineComponent({
     const isEnterprise = ref(false);
     const isCurrentUserInternal = ref(false);
     const filterQuery = ref("");
+
+    const toCamelCase = (str: string) => {
+      return str.charAt(0).toUpperCase() + str.slice(1);
+    };
     const selectedUsers: any = ref([]);
     const confirmBulkDelete = ref(false);
 
@@ -334,6 +379,7 @@ export default defineComponent({
     onBeforeMount(async () => {
       isEnterprise.value = config.isEnterprise == "true";
       await getOrgMembers();
+      updateUserActions();
       await getRoles();
 
       // if (config.isCloud == "true") {
@@ -414,6 +460,8 @@ export default defineComponent({
     const selectedRole = ref();
     const currentUserRole = ref("");
     let deleteUserEmail = "";
+    let revokeInviteToken = "";
+    const revokeInviteEmail = ref("");
 
     const getRoles = () => {
       return new Promise((resolve) => {
@@ -496,11 +544,12 @@ export default defineComponent({
                 email: maskText(data.email),
                 first_name: data.first_name,
                 last_name: data.last_name,
-                role: data?.status == "pending" ? data.role + " (Invited)": data.role,
+                role: data?.status == "pending" ? toCamelCase(data.role) + " (Invited)": toCamelCase(data.role),
                 enableEdit: store.state.userInfo.email == data.email ? true : false,
                 enableChangeRole: false,
                 enableDelete: config.isCloud == "true" ? true : false,
                 status: data?.status,
+                token: data?.token || null,
               };
             });
 
@@ -859,6 +908,53 @@ export default defineComponent({
         });
     };
 
+    const confirmRevokeAction = (props: any) => {
+      confirmRevoke.value = true;
+      revokeInviteToken = props.row.token;
+      revokeInviteEmail.value = props.row.email;
+    };
+
+    const revokeInvite = async () => {
+      const dismiss = $q.notify({
+        spinner: true,
+        message: "Please wait...",
+        timeout: 2000,
+      });
+
+      organizationsService
+        .revoke_invite(store.state.selectedOrganization.identifier, revokeInviteToken)
+        .then(async (res: any) => {
+          dismiss();
+          $q.notify({
+            color: "positive",
+            message: "Invitation revoked successfully.",
+            timeout: 3000,
+          });
+          await getOrgMembers();
+          updateUserActions();
+
+          segment.track("Button Click", {
+            button: "Revoke Invite",
+            user_org: store.state.selectedOrganization.identifier,
+            user_id: store.state.userInfo.email,
+            page: "Users",
+          });
+        })
+        .catch((err: any) => {
+          dismiss();
+          $q.notify({
+            color: "negative",
+            message: err?.response?.data?.message || "Error while revoking invitation.",
+            timeout: 5000,
+          });
+        });
+    };
+
+    const handleInviteSent = async () => {
+      await getOrgMembers();
+      updateUserActions();
+    };
+
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
     };
@@ -1006,6 +1102,11 @@ export default defineComponent({
       confirmDelete,
       deleteUser,
       confirmDeleteAction,
+      confirmRevoke,
+      revokeInvite,
+      revokeInviteEmail,
+      confirmRevokeAction,
+      handleInviteSent,
       getOrgMembers,
       updateUser,
       updateMember,

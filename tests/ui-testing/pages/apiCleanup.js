@@ -817,14 +817,179 @@ class APICleanup {
     }
 
     /**
+     * Check if a stream is still being deleted or exists
+     * Two-phase check:
+     * 1. GET stream settings - checks if schema exists
+     * 2. If schema gone, PUT settings to check if deletion marker is still active
+     * @param {string} streamName - The stream name to check
+     * @returns {Promise<boolean>} True if stream still exists or is being deleted
+     */
+    async isStreamStillDeleting(streamName) {
+        try {
+            // Phase 1: Check if stream schema exists via GET
+            const getResponse = await fetch(
+                `${this.baseUrl}/api/${this.org}/streams/${streamName}/settings?type=logs`,
+                {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': this.authHeader,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            // If we get 200, stream still exists
+            if (getResponse.ok) {
+                testLogger.debug('Stream schema still exists', { streamName });
+                return true;
+            }
+
+            // Check GET response for "is being deleted" error
+            const getResult = await getResponse.json().catch(() => ({}));
+            if (getResult.message && getResult.message.includes('is being deleted')) {
+                testLogger.debug('Stream is being deleted (GET check)', { streamName });
+                return true;
+            }
+
+            // Phase 2: Schema is gone (404), but deletion marker might still be active
+            // Try PUT settings - this triggers is_deleting_stream check without creating data
+            const putResponse = await fetch(
+                `${this.baseUrl}/api/${this.org}/streams/${streamName}/settings?type=logs`,
+                {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': this.authHeader,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})  // Empty settings - won't create anything
+                }
+            );
+
+            const putResult = await putResponse.json().catch(() => ({}));
+
+            // Check if deletion marker is still active
+            if (putResult.message && putResult.message.includes('is being deleted')) {
+                testLogger.debug('Stream deletion marker still active (PUT check)', { streamName });
+                return true;
+            }
+
+            // Both schema gone and no deletion marker - deletion complete
+            testLogger.debug('Stream deletion fully complete', { streamName, getStatus: getResponse.status, putStatus: putResponse.status });
+            return false;
+        } catch (error) {
+            // Network error - assume deletion might still be in progress
+            testLogger.warn('Error checking stream deletion status', { streamName, error: error.message });
+            return true;
+        }
+    }
+
+    /**
+     * Wait for a stream deletion to fully complete
+     * @param {string} streamName - The stream name to wait for
+     * @param {number} maxWaitMs - Maximum time to wait in milliseconds (default: 120000 = 2 minutes)
+     * @param {number} pollIntervalMs - Polling interval in milliseconds (default: 3000 = 3 seconds)
+     * @returns {Promise<boolean>} True if deletion completed, false if timed out
+     */
+    async waitForStreamDeletion(streamName, maxWaitMs = 120000, pollIntervalMs = 3000) {
+        const startTime = Date.now();
+        let attempts = 0;
+
+        while (Date.now() - startTime < maxWaitMs) {
+            attempts++;
+            const stillDeleting = await this.isStreamStillDeleting(streamName);
+
+            if (!stillDeleting) {
+                testLogger.debug('Stream deletion confirmed complete', {
+                    streamName,
+                    attempts,
+                    elapsedMs: Date.now() - startTime
+                });
+                return true;
+            }
+
+            testLogger.debug('Stream still being deleted, waiting...', {
+                streamName,
+                attempts,
+                elapsedMs: Date.now() - startTime
+            });
+
+            await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+        }
+
+        testLogger.warn('Timeout waiting for stream deletion', {
+            streamName,
+            maxWaitMs,
+            attempts
+        });
+        return false;
+    }
+
+    /**
+     * Wait for specific stream names to be ready (not in "being deleted" state)
+     * Use this to ensure streams are available before tests, even if they weren't found in the stream list
+     * @param {Array<string>} streamNames - Array of stream names to check
+     * @param {number} maxWaitMs - Maximum time to wait per stream in ms (default: 120000)
+     * @returns {Promise<{ready: number, blocked: string[]}>} Count of ready streams and list of blocked stream names
+     */
+    async waitForStreamsReady(streamNames = [], maxWaitMs = 120000) {
+        testLogger.info('Waiting for streams to be ready (not being deleted)...', {
+            streamCount: streamNames.length,
+            maxWaitMs
+        });
+
+        let readyCount = 0;
+        const blockedStreams = [];
+
+        // Process in parallel batches
+        const batchSize = 5;
+        for (let i = 0; i < streamNames.length; i += batchSize) {
+            const batch = streamNames.slice(i, i + batchSize);
+            const results = await Promise.all(
+                batch.map(async (streamName) => {
+                    const ready = await this.waitForStreamDeletion(streamName, maxWaitMs);
+                    return { streamName, ready };
+                })
+            );
+
+            results.forEach(({ streamName, ready }) => {
+                if (ready) {
+                    readyCount++;
+                } else {
+                    blockedStreams.push(streamName);
+                    testLogger.error('Stream still blocked (being deleted)', { streamName });
+                }
+            });
+        }
+
+        testLogger.info('Streams ready check complete', {
+            total: streamNames.length,
+            ready: readyCount,
+            blocked: blockedStreams.length,
+            blockedNames: blockedStreams
+        });
+
+        if (blockedStreams.length > 0) {
+            throw new Error(`${blockedStreams.length} stream(s) still being deleted: ${blockedStreams.join(', ')}`);
+        }
+
+        return { ready: readyCount, blocked: blockedStreams };
+    }
+
+    /**
      * Clean up streams matching specified patterns
      * @param {Array<RegExp>} patterns - Array of regex patterns to match stream names
      * @param {Array<string>} protectedStreams - Array of stream names to never delete (optional)
+     * @param {Object} options - Optional configuration
+     * @param {boolean} options.waitForDeletion - Whether to wait for deletions to complete (default: true)
+     * @param {number} options.maxWaitPerStreamMs - Max wait time per stream in ms (default: 120000)
      */
-    async cleanupStreams(patterns = [], protectedStreams = []) {
+    async cleanupStreams(patterns = [], protectedStreams = [], options = {}) {
+        const { waitForDeletion = true, maxWaitPerStreamMs = 120000 } = options;
+
         testLogger.info('Starting streams cleanup', {
             patterns: patterns.map(p => p.source),
-            protectedStreams
+            protectedStreams,
+            waitForDeletion
         });
 
         try {
@@ -844,23 +1009,70 @@ class APICleanup {
                 return;
             }
 
-            // Delete each stream
+            // Phase 1: Initiate deletion for all streams
             let deletedCount = 0;
             let failedCount = 0;
+            const streamsToWaitFor = [];
 
             for (const stream of matchingStreams) {
                 const result = await this.deleteStream(stream.name);
 
                 if (result.code === 200) {
                     deletedCount++;
-                    testLogger.debug('Deleted stream', { name: stream.name });
+                    streamsToWaitFor.push(stream.name);
+                    testLogger.debug('Initiated stream deletion', { name: stream.name });
                 } else {
                     failedCount++;
-                    testLogger.warn('Failed to delete stream', { name: stream.name, result });
+                    testLogger.warn('Failed to initiate stream deletion', { name: stream.name, result });
                 }
             }
 
-            testLogger.info('Streams cleanup completed', {
+            testLogger.info('Stream deletion initiated', {
+                total: matchingStreams.length,
+                initiated: deletedCount,
+                failed: failedCount
+            });
+
+            // Phase 2: Wait for all deletions to complete (if enabled)
+            if (waitForDeletion && streamsToWaitFor.length > 0) {
+                testLogger.info('Waiting for stream deletions to complete...', {
+                    streamCount: streamsToWaitFor.length,
+                    maxWaitPerStreamMs
+                });
+
+                let completedCount = 0;
+                let timedOutCount = 0;
+
+                // Wait for streams in parallel batches to speed up the process
+                const batchSize = 5;
+                for (let i = 0; i < streamsToWaitFor.length; i += batchSize) {
+                    const batch = streamsToWaitFor.slice(i, i + batchSize);
+                    const results = await Promise.all(
+                        batch.map(streamName => this.waitForStreamDeletion(streamName, maxWaitPerStreamMs))
+                    );
+
+                    results.forEach((completed, index) => {
+                        if (completed) {
+                            completedCount++;
+                        } else {
+                            timedOutCount++;
+                            testLogger.error('Stream deletion timed out', { streamName: batch[index] });
+                        }
+                    });
+                }
+
+                testLogger.info('Stream deletion verification complete', {
+                    total: streamsToWaitFor.length,
+                    completed: completedCount,
+                    timedOut: timedOutCount
+                });
+
+                if (timedOutCount > 0) {
+                    throw new Error(`${timedOutCount} stream(s) failed to complete deletion within timeout`);
+                }
+            }
+
+            testLogger.info('Streams cleanup completed successfully', {
                 total: matchingStreams.length,
                 deleted: deletedCount,
                 failed: failedCount
@@ -868,6 +1080,7 @@ class APICleanup {
 
         } catch (error) {
             testLogger.error('Streams cleanup failed', { error: error.message });
+            throw error; // Re-throw to fail the cleanup test
         }
     }
 
@@ -1241,9 +1454,26 @@ class APICleanup {
 
             testLogger.info('Loaded test pattern names', { count: testPatternNames.size });
 
-            // Filter patterns that match test data names
-            const matchingPatterns = patterns.filter(pattern => testPatternNames.has(pattern.name));
-            testLogger.info('Found patterns matching test data', { count: matchingPatterns.length });
+            // Additional test prefixes that should always be cleaned up
+            const testPrefixes = [
+                'duplicate_test_',      // regexPatternManagement.spec.js
+                'log_filename_',        // multipleSDRPatterns.spec.js
+                'time_hh_mm_ss_',       // multipleSDRPatterns.spec.js
+                'ifsc_code_',           // multipleSDRPatterns.spec.js
+                'date_dd_mm_yyyy_',     // multipleSDRPatterns.spec.js
+                'email_format_',        // SDR tests
+                'us_phone_',            // SDR tests
+                'credit_card_',         // SDR tests
+                'ssn_'                  // SDR tests
+            ];
+
+            // Filter patterns that match test data names (using prefix matching to catch patterns with unique suffixes)
+            const basePatternNames = Array.from(testPatternNames);
+            const matchingPatterns = patterns.filter(pattern =>
+                basePatternNames.some(baseName => pattern.name.startsWith(baseName)) ||
+                testPrefixes.some(prefix => pattern.name.startsWith(prefix))
+            );
+            testLogger.info('Found patterns matching test data (prefix match)', { count: matchingPatterns.length });
 
             if (matchingPatterns.length === 0) {
                 testLogger.info('No regex patterns to clean up');
@@ -2165,6 +2395,187 @@ class APICleanup {
         } catch (error) {
             testLogger.error('Failed to query stream', { streamName, error: error.message });
             throw error;
+        }
+    }
+
+    /**
+     * ==========================================
+     * SDR (Sensitive Data Redaction) CLEANUP METHODS
+     * ==========================================
+     */
+
+    /**
+     * Fetch all regex patterns via API
+     * @returns {Promise<Array>} Array of pattern objects with id, name, pattern, description
+     */
+    async fetchRegexPatterns() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/re_patterns`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                if (response.status === 404) {
+                    testLogger.info('Regex patterns endpoint not available (OSS edition)');
+                    return [];
+                }
+                testLogger.error('Failed to fetch regex patterns', { status: response.status });
+                return [];
+            }
+
+            const data = await response.json();
+            return data.patterns || [];
+        } catch (error) {
+            testLogger.error('Failed to fetch regex patterns', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Delete a single regex pattern by ID
+     * @param {string} patternId - The pattern ID
+     * @param {string} patternName - The pattern name (for logging)
+     * @returns {Promise<Object>} Deletion result
+     */
+    async deleteRegexPatternById(patternId, patternName = '') {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/re_patterns/${patternId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to delete regex pattern', { patternId, patternName, status: response.status });
+                return { code: response.status, message: 'Failed to delete regex pattern' };
+            }
+
+            const result = await response.json();
+            return { code: 200, ...result };
+        } catch (error) {
+            testLogger.error('Failed to delete regex pattern', { patternId, patternName, error: error.message });
+            return { code: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Delete regex patterns matching specified prefixes
+     * @param {Array<string>} prefixes - Array of pattern name prefixes to match (e.g., ['url_format_hash', 'strong_password_hash'])
+     * @returns {Promise<{deleted: number, failed: number}>} Deletion result counts
+     */
+    async deleteRegexPatternsByPrefix(prefixes = []) {
+        testLogger.info('Deleting regex patterns by prefix', { prefixes });
+
+        try {
+            const patterns = await this.fetchRegexPatterns();
+            testLogger.info('Fetched regex patterns', { total: patterns.length });
+
+            // Filter patterns matching prefixes
+            const matchingPatterns = patterns.filter(p =>
+                prefixes.some(prefix => p.name.startsWith(prefix) || p.name === prefix)
+            );
+
+            testLogger.info('Found patterns matching prefixes', { count: matchingPatterns.length });
+
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const pattern of matchingPatterns) {
+                const result = await this.deleteRegexPatternById(pattern.id, pattern.name);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.info('Deleted regex pattern', { name: pattern.name, id: pattern.id });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete regex pattern', { name: pattern.name, id: pattern.id, result });
+                }
+            }
+
+            testLogger.info('Regex patterns deletion completed', {
+                total: matchingPatterns.length,
+                deleted: deletedCount,
+                failed: failedCount
+            });
+
+            return { deleted: deletedCount, failed: failedCount };
+        } catch (error) {
+            testLogger.error('Regex patterns deletion failed', { error: error.message });
+            return { deleted: 0, failed: 0 };
+        }
+    }
+
+    /**
+     * Complete SDR test cleanup - deletes streams first (which removes pattern associations), then patterns
+     * This should be called in beforeAll hook of SDR tests
+     * @param {Array<string>} streamNames - Exact stream names to delete (e.g., ['sdr_combined_hash_test'])
+     * @param {Array<string>} patternPrefixes - Pattern name prefixes to delete (e.g., ['url_format_hash', 'strong_password_hash'])
+     * @param {Object} options - Optional configuration
+     * @param {boolean} options.waitForDeletion - Whether to wait for stream deletions to complete (default: true)
+     */
+    async cleanupSDRTestData(streamNames = [], patternPrefixes = [], options = {}) {
+        const { waitForDeletion = true } = options;
+
+        testLogger.info('=== Starting SDR Test Cleanup via API ===', {
+            streams: streamNames,
+            patternPrefixes
+        });
+
+        try {
+            // Step 1: Delete streams first (this automatically unlinks any pattern associations)
+            if (streamNames.length > 0) {
+                testLogger.info('Step 1: Deleting SDR test streams');
+
+                for (const streamName of streamNames) {
+                    testLogger.info(`Attempting to delete stream: ${streamName}`);
+                    const result = await this.deleteStream(streamName);
+
+                    if (result.code === 200) {
+                        testLogger.info(`✓ Stream deletion initiated: ${streamName}`);
+                    } else if (result.code === 404) {
+                        testLogger.info(`✓ Stream does not exist (OK): ${streamName}`);
+                    } else {
+                        testLogger.warn(`Failed to delete stream: ${streamName}`, { result });
+                    }
+                }
+
+                // Wait for stream deletions to complete if enabled
+                if (waitForDeletion) {
+                    testLogger.info('Waiting for stream deletions to complete...');
+                    for (const streamName of streamNames) {
+                        const completed = await this.waitForStreamDeletion(streamName, 60000, 2000);
+                        if (completed) {
+                            testLogger.info(`✓ Stream deletion complete: ${streamName}`);
+                        } else {
+                            testLogger.warn(`Stream deletion may still be in progress: ${streamName}`);
+                        }
+                    }
+                }
+            }
+
+            // Step 2: Delete patterns by prefix (they should now be unlinked from streams)
+            if (patternPrefixes.length > 0) {
+                testLogger.info('Step 2: Deleting SDR test patterns');
+                const patternResult = await this.deleteRegexPatternsByPrefix(patternPrefixes);
+                testLogger.info('Pattern deletion result', patternResult);
+            }
+
+            // Wait additional time to ensure backend fully processes deletions
+            // This prevents "stream is being deleted" errors when tests immediately try to recreate streams
+            testLogger.info('Waiting additional time for backend to finalize deletions...');
+            await new Promise(resolve => setTimeout(resolve, 5000));
+
+            testLogger.info('=== SDR Test Cleanup Complete ===');
+
+        } catch (error) {
+            testLogger.error('SDR Test Cleanup failed', { error: error.message });
+            // Don't throw - allow test to continue even if cleanup fails
         }
     }
 

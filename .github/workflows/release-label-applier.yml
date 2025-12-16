@@ -48,14 +48,34 @@ jobs:
                 run_id: runId
               });
 
-              // Extract tag from head_ref (more reliable for tag-triggered workflows)
-              // head_ref contains the tag name directly (e.g., "v0.30.0-rc1")
-              const headRef = workflowRun.data.head_ref;
-              if (!headRef) {
-                core.setFailed('Could not determine release tag from workflow run');
+              console.log('🔍 Workflow run data:', JSON.stringify({
+                head_branch: workflowRun.data.head_branch,
+                head_ref: workflowRun.data.head_ref,
+                ref: workflowRun.data.ref,
+                head_sha: workflowRun.data.head_sha
+              }, null, 2));
+
+              // Extract tag from workflow run - try multiple fields
+              // For tag-triggered workflows, the tag can be in different fields:
+              // 1. head_branch - contains tag name for tag pushes
+              // 2. ref - contains full ref like "refs/tags/v0.30.0-rc1"
+              // 3. head_ref - may contain tag for some scenarios
+              let tag = workflowRun.data.head_branch ||
+                        workflowRun.data.head_ref;
+
+              // If not found in head_branch/head_ref, extract from ref
+              if (!tag && workflowRun.data.ref) {
+                const refMatch = workflowRun.data.ref.match(/refs\/tags\/(.+)/);
+                if (refMatch) {
+                  tag = refMatch[1];
+                }
+              }
+
+              if (!tag) {
+                core.setFailed(`Could not determine release tag from workflow run. head_branch: ${workflowRun.data.head_branch}, head_ref: ${workflowRun.data.head_ref}, ref: ${workflowRun.data.ref}`);
                 return;
               }
-              releaseTag = headRef;
+              releaseTag = tag;
             }
 
             console.log(`📦 Processing release tag: ${releaseTag}`);

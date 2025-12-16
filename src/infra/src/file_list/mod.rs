@@ -122,7 +122,11 @@ pub trait FileList: Sync + Send + 'static {
     async fn clean_by_min_update_at(&self, val: i64) -> Result<()>;
 
     // stream stats table
-    async fn stats(&self, time_range: (i64, i64)) -> Result<Vec<(String, StreamStats)>>;
+    async fn stats(
+        &self,
+        time_range: (i64, i64),
+        need_deleted: bool,
+    ) -> Result<Vec<(String, StreamStats)>>;
     async fn get_stream_stats(
         &self,
         org_id: &str,
@@ -372,8 +376,11 @@ pub async fn get_max_update_at() -> Result<i64> {
 }
 
 #[inline]
-pub async fn stats(time_range: (i64, i64)) -> Result<Vec<(String, StreamStats)>> {
-    CLIENT.stats(time_range).await
+pub async fn stats(
+    time_range: (i64, i64),
+    need_deleted: bool,
+) -> Result<Vec<(String, StreamStats)>> {
+    CLIENT.stats(time_range, need_deleted).await
 }
 
 #[inline]

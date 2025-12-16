@@ -298,7 +298,7 @@ pub async fn search(
         );
 
         let storage_search_start = std::time::Instant::now();
-        let (tbls, stats) = match super::storage::search(
+        let (tbls, stats, _) = match super::storage::search(
             query_params.clone(),
             latest_schema.clone(),
             &file_list,
@@ -342,11 +342,9 @@ pub async fn search(
     // search in WAL memory first to capture the snapshot_time
     // IMPORTANT: WAL data is NEVER sampled - it's always returned in full
     // Sampling only applies to parquet files (applied above in file_list processing)
-    let mut snapshot_time = None;
+    let mut memtable_ids = HashSet::new();
     if LOCAL_NODE.is_ingester() {
-        // Set snapshot_time before searching memtable to avoid duplicates with parquet
-        snapshot_time = Some(config::utils::time::now_micros());
-        let (tbls, stats) = match super::wal::search_memtable(
+        let (tbls, stats, ids) = match super::wal::search_memtable(
             query_params.clone(),
             latest_schema.clone(),
             &search_partition_keys,
@@ -364,13 +362,14 @@ pub async fn search(
                 return Err(e);
             }
         };
+        memtable_ids.extend(ids);
         tables.extend(tbls);
         scan_stats.add(&stats);
     }
 
     // Now search in WAL parquet with snapshot_time filter
     if LOCAL_NODE.is_ingester() {
-        let (tbls, stats) = match super::wal::search_parquet(
+        let (tbls, stats, _) = match super::wal::search_parquet(
             query_params.clone(),
             latest_schema.clone(),
             &search_partition_keys,
@@ -378,7 +377,7 @@ pub async fn search(
             file_stats_cache.clone(),
             index_condition.clone(),
             fst_fields.clone(),
-            snapshot_time,
+            memtable_ids,
         )
         .await
         {

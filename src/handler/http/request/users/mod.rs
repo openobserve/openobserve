@@ -938,14 +938,36 @@ pub async fn decline_invitation(
     Headers(user_email): Headers<UserEmail>,
     path: web::Path<String>,
 ) -> Result<HttpResponse, Error> {
-    use crate::service::organization;
+    use super::super::auth::jwt;
+    use crate::service::{db, organization};
 
     let token = path.into_inner();
     let user_id = user_email.user_id.as_str();
 
     match organization::decline_invitation(user_id, &token).await {
-        Ok(_) => Ok(HttpResponse::Ok()
-            .json(serde_json::json!({"message":"Invitation declined successfully"}))),
+        Ok(remaining) => {
+            if remaining.is_empty() {
+                // if there are no remaining invitations, create a new org for the user
+                let db_user = match db::user::get_db_user(user_id).await {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log::error!("error getting db user for {user_id} : {e}");
+                        return Ok(HttpResponse::Ok().json(serde_json::json!({
+                                "message":"Invitation declined successfully",
+                                "remaining": remaining.len()
+                            }
+                        )));
+                    }
+                };
+                let _ = jwt::check_and_add_to_org(
+                    user_id,
+                    &format!("{} {}", db_user.first_name, db_user.last_name),
+                )
+                .await;
+            }
+            Ok(HttpResponse::Ok()
+                    .json(serde_json::json!({"message":"Invitation declined successfully","remaining": remaining.len()})))
+        }
 
         Err(err) => {
             Ok(HttpResponse::BadRequest().json(serde_json::json!({"message": err.to_string()})))

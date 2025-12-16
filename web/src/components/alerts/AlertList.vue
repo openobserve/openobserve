@@ -131,8 +131,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #after>
           <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
             <div class="tw-h-full card-container">
+              <!-- Incidents List (shown when incidents tab is active) -->
+              <IncidentList v-if="activeTab === 'incidents'" />
               <!-- Alert List Table -->
               <q-table
+                v-else
                 v-model:selected="selectedAlerts"
                 :selected-rows-label="getSelectedString"
                 selection="multiple"
@@ -198,7 +201,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <q-td v-for="col in columns" :key="col.name" :props="props">
                       <template v-if="col.name === 'name'">
-                        {{ computedName(props.row[col.field]) }}
+                        <div class="tw-flex tw-items-center tw-gap-1">
+                          <span>{{ computedName(props.row[col.field]) }}</span>
+                          <O2AIContextAddBtn
+                            @sendToAiChat="openSREChat(props.row)"
+                            :size="'6px'"
+                            :imageHeight="'16px'"
+                            :imageWidth="'16px'"
+                          />
+                        </div>
                         <q-tooltip
                           v-if="props.row[col.field]?.length > 30"
                           class="alert-name-tooltip"
@@ -865,6 +876,8 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
 import { symOutlinedSoundSampler } from "@quasar/extras/material-symbols-outlined";
+import IncidentList from "@/components/alerts/IncidentList.vue";
+import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 // import alertList from "./alerts";
 
 export default defineComponent({
@@ -883,6 +896,8 @@ export default defineComponent({
     AppTabs,
     SelectFolderDropDown,
     AlertHistoryDrawer,
+    IncidentList,
+    O2AIContextAddBtn,
   },
   emits: [
     "updated:fields",
@@ -1048,7 +1063,10 @@ export default defineComponent({
 
     const activeFolderToMove = ref("default");
 
-    const activeTab = ref("all");
+    // Initialize activeTab from URL query parameter, default to "all"
+    const activeTab = ref(
+      (router.currentRoute.value.query.tab as string) || "all"
+    );
 
     const tabs = reactive([
       {
@@ -1062,6 +1080,10 @@ export default defineComponent({
       {
         label: t("alerts.realTime"),
         value: "realTime",
+      },
+      {
+        label: t("alerts.incidents.title"),
+        value: "incidents",
       },
     ]);
 
@@ -1438,6 +1460,10 @@ export default defineComponent({
     // Define filterAlertsByTab before watchers that use it
     const filterAlertsByTab = (refreshResults: boolean = true) => {
       if (!refreshResults) {
+        return;
+      }
+      // When incidents tab is active, skip filtering (IncidentList handles its own data)
+      if (activeTab.value === "incidents") {
         return;
       }
       //here we are filtering the alerts by the activeTab
@@ -2202,6 +2228,11 @@ export default defineComponent({
       }
       //here we are filtering the alerts by the activeTab
       filterAlertsByTab();
+
+      // Update URL query parameter to persist tab state across page refreshes
+      router.push({
+        query: { ...router.currentRoute.value.query, tab: newVal },
+      });
     });
 
     const copyToClipboard = (text: string, type: string) => {
@@ -2551,6 +2582,14 @@ export default defineComponent({
     confirmBulkDelete.value = false;
   };
 
+    const openSREChat = (alert?: any) => {
+      store.state.sreChatContext = {
+        type: 'alert',
+        data: alert || null,
+      };
+      store.dispatch("setIsSREChatOpen", true);
+    };
+
     return {
       t,
       qTable,
@@ -2669,7 +2708,9 @@ export default defineComponent({
       openBulkDeleteDialog,
       bulkDeleteAlerts,
       confirmBulkDelete,
-      symOutlinedSoundSampler
+      symOutlinedSoundSampler,
+      openSREChat,
+      config,
     };
   },
 });

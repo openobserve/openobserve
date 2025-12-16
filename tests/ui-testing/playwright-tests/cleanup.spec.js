@@ -18,9 +18,38 @@ test.describe("Pre-Test Cleanup", () => {
     // Run complete cascade cleanup for alert destinations, templates, and folders
     await pm.apiCleanup.completeCascadeCleanup(
       // Destination prefixes to clean up
-      ['auto_', 'newdest_', 'sanitydest-'],
+      [
+        'auto_',
+        'newdest_',
+        'sanitydest-',
+        'rbac_basic_dest_',
+        'rbac_editor_create_dest_',
+        'rbac_403_test_dest_',
+        'rbac_sql_dest_',
+        'rbac_user_delete_dest_',
+        'rbac_user_update_dest_',
+        'rbac_viewer_delete_dest_',
+        'rbac_viewer_update_dest_'
+      ],
       // Template prefixes to clean up
-      ['auto_email_template_', 'auto_webhook_template_', 'auto_playwright_template_', 'auto_url_webhook_template_', 'sanitytemp-', 'newtemp_'],
+      [
+        'auto_email_template_',
+        'auto_webhook_template_',
+        'auto_playwright_template_',
+        'auto_url_webhook_template_',
+        'sanitytemp-',
+        'newtemp_',
+        'email_tmpl_',
+        'rbac_403_test_tmpl_',
+        'rbac_basic_tmpl_',
+        'rbac_del_tmpl_',
+        'rbac_editor_create_tmpl_',
+        'rbac_editor_update_tmpl_',
+        'rbac_sql_tmpl_',
+        'rbac_user_delete_tmpl_',
+        'rbac_viewer_delete_tmpl_',
+        'rbac_viewer_update_tmpl_'
+      ],
       // Folder prefixes to clean up
       ['auto_']
     );
@@ -115,10 +144,13 @@ test.describe("Pre-Test Cleanup", () => {
       [
         /^sanitylogstream_/,           // sanitylogstream_61hj, etc.
         /^test\d+$/,                   // test1, test2, test3, etc.
-        /^stress_test/,                // stress_test*, stress_test123, etc.
+        /^stress_test/,                // stress_test*, stress_test_<runId>_w0, stress_test1, etc.
         /^sdr_/,                       // sdr_* (SDR test streams)
         /^e2e_join_/,                  // e2e_join_* (UNION test streams)
         /^e2e_conditions_/,            // e2e_conditions_* (Pipeline conditions UI test streams)
+        /^e2e_streamcreation_/,        // e2e_streamcreation_* (Stream creation UI test streams)
+        /^e2e_MyUpperStream/i,         // e2e_MyUpperStream* (Stream name casing test streams)
+        /^e2e_mylowerstream/i,         // e2e_mylowerstream* (Stream name casing test streams)
         /^[a-z]{8,9}$/,                // Random 8-9 char lowercase strings
         /^e2e_cond_prec_(src|dest)_\d+$/,     // Test 1: Operator precedence test streams
         /^e2e_multiple_or_(src|dest)_\d+$/,   // Test 2: Multiple OR test streams
@@ -129,7 +161,9 @@ test.describe("Pre-Test Cleanup", () => {
         /^e2e_not_operator_(src|dest)_\d+$/,  // Test 7: NOT operator test streams
         /^e2e_impossible_(src|dest)_\d+$/,    // Test 8: Impossible condition test streams
         /^e2e_universal_(src|dest)_\d+$/,     // Test 9: Universal condition test streams
-        /^e2e_4level_(src|dest)_\d+$/         // Test 10: 4-level nested test streams
+        /^e2e_4level_(src|dest)_\d+$/,        // Test 10: 4-level nested test streams
+        /^stream\d{13}$/,                     // stream1765164273471, etc. (timestamp-based test streams)
+        /^e2e_stream_(a|b)_\d+$/              // Regression test streams (e2e_stream_a_*, e2e_stream_b_*)
       ],
       // Protected streams to never delete
       ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate']
@@ -152,6 +186,12 @@ test.describe("Pre-Test Cleanup", () => {
 
     // Clean up saved views matching test patterns
     await pm.apiCleanup.cleanupSavedViews();
+
+    // Note: Stream deletion waiting is no longer needed here because:
+    // 1. Pipeline conditions tests now use worker-specific stream names (e.g., e2e_conditions_basic_<runId>_w0)
+    // 2. Schemaload/stress tests now use unique stream names (e.g., stress_test_<runId>_w0)
+    // This avoids conflicts both within a test run (parallelIndex) and across test runs (testRunId)
+    // The cleanup patterns above will clean up old test streams via regex matching
 
     testLogger.info('Pre-test cleanup completed successfully');
   });

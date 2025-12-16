@@ -123,6 +123,7 @@ jobs:
                 "serviceAccount.spec.js",
                 "usersOrg.spec.js",
                 "org.spec.js",
+                "theme-management.spec.js",
               ]
           - testfolder: "Logs-Core"
             browser: "chrome"
@@ -135,6 +136,7 @@ jobs:
                 "pagination.spec.js",
                 "unflattened.spec.js",
                 "logstable.spec.js",
+                "shareLink.spec.js",
               ]
           - testfolder: "Logs-Queries"
             browser: "chrome"
@@ -217,7 +219,7 @@ jobs:
               ]
           - testfolder: "RegressionSet"
             browser: "chrome"
-            run_files: ["logs-regression.spec.js"]
+            run_files: ["logs-regression.spec.js", "streams-regression.spec.js"]
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
@@ -673,13 +675,8 @@ jobs:
             echo "::notice::Test job results: $SUCCEEDED succeeded, $FAILED failed, $TOTAL total"
 
             if [ "$SUCCEEDED" -gt 0 ] && [ "$FAILED" -eq 0 ]; then
-              echo "::notice::✅ All test jobs succeeded - they likely skipped because tests already passed"
-              echo "::notice::This is VALID behavior for optimized reruns"
-              echo "::notice::Creating empty report structure for downstream jobs"
-              mkdir -p playwright-results/html-report
-              # Add stats object to make report compatible with TestDino
-              echo '{"config":{},"suites":[],"errors":[],"stats":{"startTime":'$(date +%s000)',"duration":0,"expected":0,"unexpected":0,"flaky":0,"skipped":0}}' > playwright-results/report.json
-              echo "<html><body><h1>No tests executed - all shards skipped</h1><p>All test shards exited early because tests had already passed in a previous attempt.</p></body></html>" > playwright-results/html-report/index.html
+              echo "::notice::✅ All test jobs succeeded - tests likely skipped because they already passed"
+              echo "::notice::Skipping merge and upload (no reports to process)"
               echo "::endgroup::"
               exit 0
             else
@@ -751,10 +748,23 @@ jobs:
         if: ${{ (success() || failure()) && env.UPLOAD_TO_TESTDINO == 'true' }}
         run: |
           cd tests/ui-testing
-          npx --yes tdpw upload playwright-results \
+
+          # Fix startTime format: convert Unix timestamp (number) to ISO 8601 string for TestDino compatibility
+          if [ -f "playwright-results/report.json" ]; then
+            # Check if startTime is a number and convert it
+            START_TIME=$(jq -r '.stats.startTime // empty' playwright-results/report.json)
+            if [ -n "$START_TIME" ] && [[ "$START_TIME" =~ ^[0-9]+$ ]]; then
+              echo "Converting startTime from Unix timestamp to ISO 8601 string"
+              jq '.stats.startTime = (.stats.startTime / 1000 | strftime("%Y-%m-%dT%H:%M:%S.000Z"))' playwright-results/report.json > playwright-results/report.json.tmp
+              mv playwright-results/report.json.tmp playwright-results/report.json
+            fi
+          fi
+
+          npx --yes tdpw@latest upload playwright-results \
             --json-report playwright-results/report.json \
             --html-report playwright-results/html-report \
             --upload-html \
+            --verbose \
             --token="${{ secrets.TESTDINO_API_TOKEN }}"
 
   generate_coverage_report:

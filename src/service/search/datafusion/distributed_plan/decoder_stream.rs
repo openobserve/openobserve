@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fmt::Debug, pin::Pin, task::Poll};
+use std::{fmt::Debug, pin::Pin, sync::atomic::Ordering, task::Poll};
 
 use arrow::array::RecordBatch;
 use arrow_flight::{FlightData, error::Result};
@@ -66,6 +66,11 @@ impl FlightDecoderStream {
             }
             CustomMessage::Metrics(metrics) => {
                 self.query_context.cluster_metrics.lock().extend(metrics);
+            }
+            CustomMessage::PeakMemory(peak_memory) => {
+                self.query_context
+                    .peak_memory
+                    .fetch_max(peak_memory, Ordering::Relaxed);
             }
         }
     }
