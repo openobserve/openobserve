@@ -201,7 +201,7 @@ pub async fn check_cache(
     // requiring us to scan all hits to find the actual time range.
     let is_histogram_non_ts_order = is_histogram_query
         && !order_by.is_empty()
-        && has_non_timestamp_ordering(&order_by, &result_ts_col);
+        && has_non_timestamp_ordering(order_by, &result_ts_col);
 
     let mut multi_resp = MultiCachedQueryResponse {
         trace_id: trace_id.to_string(),
@@ -290,7 +290,7 @@ pub async fn check_cache(
             }
         }
         multi_resp.cache_query_response = true;
-        multi_resp.limit = sql.limit as i64;
+        multi_resp.limit = sql.limit;
         multi_resp.ts_column = result_ts_col;
         multi_resp.took = start.elapsed().as_millis() as usize;
         multi_resp.file_path = file_path.to_string();
@@ -387,7 +387,7 @@ pub async fn check_cache(
         }
         multi_resp.took = start.elapsed().as_millis() as usize;
         multi_resp.cache_query_response = true;
-        multi_resp.limit = sql.limit as i64;
+        multi_resp.limit = sql.limit;
         multi_resp.ts_column = result_ts_col;
         multi_resp.file_path = file_path.to_string();
         multi_resp.order_by = order_by.clone();
