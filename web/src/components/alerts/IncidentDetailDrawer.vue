@@ -546,7 +546,7 @@ export default defineComponent({
     };
 
     const openSREChat = () => {
-      // Open SRE chat with full incident context
+      // Set SRE chat context with full incident context
       store.state.sreChatContext = {
         type: 'incident',
         data: {
@@ -565,6 +565,11 @@ export default defineComponent({
             : rcaStreamContent.value,
         },
       };
+
+      // Close the drawer first
+      close();
+
+      // Then open the SRE chat
       store.dispatch("setIsSREChatOpen", true);
     };
 
