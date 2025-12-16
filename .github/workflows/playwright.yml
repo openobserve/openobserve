@@ -124,6 +124,7 @@ jobs:
                 "usersOrg.spec.js",
                 "org.spec.js",
                 "theme-management.spec.js",
+                "ingestion-config.spec.js",
               ]
           - testfolder: "Logs-Core"
             browser: "chrome"
