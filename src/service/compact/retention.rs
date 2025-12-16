@@ -32,7 +32,7 @@ use itertools::Itertools;
 
 use crate::{
     common::infra::cluster::get_node_by_uuid,
-    service::{db, file_list},
+    service::{db, file_list, file_list_dump::generate_dump_stream_name},
 };
 
 /// This function will split the original time range based on the exclude range
@@ -149,27 +149,34 @@ pub async fn generate_retention_job(
     stream_name: &str,
     extended_retentions: &[TimeRange],
 ) -> Result<(), anyhow::Error> {
+    let cfg = get_config();
     // get min date from file_list
     let min_date = infra::file_list::get_min_date(org_id, stream_type, stream_name, None).await?;
+    let min_date = if !cfg.compact.file_list_dump_enabled {
+        min_date
+    } else {
+        // get min date from dump stream
+        let dump_stream_name = generate_dump_stream_name(stream_type, stream_name);
+        let dump_min_date =
+            infra::file_list::get_min_date(org_id, StreamType::Filelist, &dump_stream_name, None)
+                .await?;
+        if min_date.is_empty() {
+            dump_min_date
+        } else if dump_min_date.is_empty() {
+            min_date
+        } else if min_date > dump_min_date {
+            dump_min_date
+        } else {
+            min_date
+        }
+    };
+
     if min_date.is_empty() {
         return Ok(()); // no data, just skip
     }
     let min_date = format!("{min_date}/00/00+0000");
     let created_at =
         DateTime::parse_from_str(&min_date, "%Y/%m/%d/%H/%M/%S%z")?.with_timezone(&Utc);
-    if created_at >= *lifecycle_end {
-        return Ok(()); // created_at is after lifecycle end, just skip
-    }
-
-    log::debug!(
-        "[COMPACTOR] generate_retention_job {}/{}/{}/{},{}",
-        org_id,
-        stream_type,
-        stream_name,
-        created_at.format("%Y-%m-%d").to_string().as_str(),
-        lifecycle_end.format("%Y-%m-%d").to_string().as_str(),
-    );
-
     if created_at.ge(lifecycle_end) {
         return Ok(()); // created_at is after lifecycle end, just skip
     }
@@ -248,7 +255,7 @@ pub async fn generate_retention_job(
             .await?;
             if created {
                 log::info!(
-                    "[COMPACTOR] generate_retention_job: generate job for {org_id}/{stream_type}/{stream_name}/{time_range_start},{time_range_end}",
+                    "[COMPACTOR] generate_retention_job: generated job for {org_id}/{stream_type}/{stream_name}/{time_range_start},{time_range_end}",
                 );
             }
         }
@@ -403,18 +410,12 @@ pub async fn delete_by_date(
             log::error!("[COMPACTOR] delete_by_date delete_from_file_list failed: {e}");
             e
         })?;
-    super::dump::delete_by_time_range(
-        org_id,
-        stream_type,
-        stream_name,
-        (date_start.timestamp_micros(), date_end.timestamp_micros()),
-        is_hourly,
-    )
-    .await
-    .map_err(|e| {
-        log::error!("[COMPACTOR] delete_by_date delete_file_list_dump failed: {e}");
-        e
-    })?;
+    super::dump::delete_by_time_range(org_id, stream_type, stream_name, time_range, is_hourly)
+        .await
+        .map_err(|e| {
+            log::error!("[COMPACTOR] delete_by_date delete_file_list_dump failed: {e}");
+            e
+        })?;
 
     // archive old schema versions
     let mut schema_versions =

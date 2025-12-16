@@ -196,6 +196,7 @@ pub async fn exec(
     )
     .await;
 
+    scan_stats.querier_files = files.len() as i64;
     let cached_ratio = (scan_stats.querier_memory_cached_files
         + scan_stats.querier_disk_cached_files) as f64
         / scan_stats.querier_files as f64;
