@@ -28,7 +28,10 @@ use config::{
     utils::{
         async_file::{get_file_meta, get_file_size},
         file::scan_files_with_channel,
-        parquet::{get_recordbatch_reader_from_bytes, read_schema_from_file},
+        parquet::{
+            get_recordbatch_reader_from_bytes, parse_time_range_from_filename,
+            read_schema_from_file,
+        },
         schema_ext::SchemaExt,
     },
 };
@@ -321,6 +324,7 @@ async fn prepare_files(
         // {e}");     }
         //     continue;
         // }
+        let (min_ts, max_ts) = parse_time_range_from_filename(&file_key);
         let compressed_size = get_file_size(&wal_dir.join(&file_key)).await.unwrap_or(0);
         let prefix = file_key[..file_key.rfind('/').unwrap()].to_string();
         // remove thread_id from prefix
@@ -334,6 +338,8 @@ async fn prepare_files(
             "".to_string(), // here we don't need it
             file_key.clone(),
             FileMeta {
+                min_ts,
+                max_ts,
                 compressed_size: compressed_size as i64,
                 ..Default::default()
             },
