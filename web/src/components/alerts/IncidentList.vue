@@ -265,11 +265,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Incident detail drawer -->
-    <IncidentDetailDrawer
+    <q-dialog
       v-model="showDetailDrawer"
-      :incident="selectedIncident"
-      @status-updated="onStatusUpdated"
-    />
+      position="right"
+      full-height
+      :maximized="true"
+    >
+      <IncidentDetailDrawer
+        :incident="selectedIncident"
+        @close="showDetailDrawer = false"
+        @status-updated="onStatusUpdated"
+      />
+    </q-dialog>
   </div>
 </template>
 
