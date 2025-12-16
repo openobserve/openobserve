@@ -686,19 +686,19 @@ export default defineComponent({
       // Simple markdown-like formatting for RCA content
       let formatted = normalized;
 
-      // Convert # headers
-      formatted = formatted.replace(/^# (.+)$/gm, '<div class="tw-font-bold tw-text-lg tw-mt-4 tw-mb-2 tw-border-b tw-pb-1">$1</div>');
-      formatted = formatted.replace(/^## (.+)$/gm, '<div class="tw-font-bold tw-text-base tw-mt-3 tw-mb-2 tw-text-blue-600">$1</div>');
-      formatted = formatted.replace(/^### (.+)$/gm, '<div class="tw-font-semibold tw-text-sm tw-mt-2 tw-mb-1">$1</div>');
+      // Convert # headers with better styling
+      formatted = formatted.replace(/^# (.+)$/gm, '<div class="tw-font-bold tw-text-base tw-mt-5 tw-mb-3 tw-border-b tw-pb-2 tw-text-gray-800">$1</div>');
+      formatted = formatted.replace(/^## (.+)$/gm, '<div class="tw-font-bold tw-text-sm tw-mt-4 tw-mb-2 tw-text-blue-600">$1</div>');
+      formatted = formatted.replace(/^### (.+)$/gm, '<div class="tw-font-semibold tw-text-sm tw-mt-3 tw-mb-2 tw-text-gray-700">$1</div>');
 
       // Convert **bold** to <strong>
-      formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong class="tw-font-semibold">$1</strong>');
+      formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong class="tw-font-semibold tw-text-gray-900">$1</strong>');
 
-      // Convert - list items to proper formatting
-      formatted = formatted.replace(/^- (.+)$/gm, '<div class="tw-ml-4 tw-mb-1">• $1</div>');
+      // Convert - list items with better spacing
+      formatted = formatted.replace(/^- (.+)$/gm, '<div class="tw-flex tw-gap-2 tw-ml-2 tw-mb-2"><span class="tw-text-blue-500 tw-font-bold">•</span><span class="tw-flex-1">$1</span></div>');
 
-      // Convert numbered lists
-      formatted = formatted.replace(/^(\d+)\. (.+)$/gm, '<div class="tw-ml-4 tw-mb-1">$1. $2</div>');
+      // Convert numbered lists with better spacing
+      formatted = formatted.replace(/^(\d+)\. (.+)$/gm, '<div class="tw-flex tw-gap-2 tw-ml-2 tw-mb-2"><span class="tw-font-semibold tw-text-gray-600 tw-min-w-[20px]">$1.</span><span class="tw-flex-1">$2</span></div>');
 
       // Convert remaining single newlines to <br>
       formatted = formatted.replace(/\n/g, '<br>');
@@ -861,7 +861,8 @@ body.body--dark .tile-content:hover {
 }
 
 .rca-content {
-  line-height: 1.5;
+  line-height: 1.7;
+  font-size: 14px;
 }
 
 /* RCA Container - Light Mode */
@@ -879,6 +880,10 @@ body.body--dark .tile-content:hover {
   color: #2563eb; /* blue-600 for light mode */
 }
 
+.rca-container-light :deep(.tw-border-b) {
+  border-color: #bfdbfe; /* blue-200 */
+}
+
 /* RCA Container - Dark Mode */
 .rca-container-dark {
   background-color: #1e3a5f; /* dark blue background */
@@ -892,6 +897,30 @@ body.body--dark .tile-content:hover {
 
 .rca-container-dark :deep(.tw-text-blue-600) {
   color: #60a5fa; /* blue-400 for dark mode */
+}
+
+.rca-container-dark :deep(.tw-text-blue-500) {
+  color: #60a5fa; /* blue-400 for dark mode bullet */
+}
+
+.rca-container-dark :deep(.tw-text-gray-800) {
+  color: #e5e7eb; /* gray-200 for dark mode */
+}
+
+.rca-container-dark :deep(.tw-text-gray-700) {
+  color: #d1d5db; /* gray-300 for dark mode */
+}
+
+.rca-container-dark :deep(.tw-text-gray-600) {
+  color: #9ca3af; /* gray-400 for dark mode */
+}
+
+.rca-container-dark :deep(.tw-text-gray-900) {
+  color: #f3f4f6; /* gray-100 for dark mode */
+}
+
+.rca-container-dark :deep(.tw-border-b) {
+  border-color: #3b5875; /* darker blue border */
 }
 
 /* No RCA Container - Light Mode */
