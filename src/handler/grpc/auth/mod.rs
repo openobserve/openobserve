@@ -84,6 +84,9 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         };
 
         if user.token.eq(&credentials.password) {
+            let mut req = req;
+            let user_id_metadata = MetadataValue::try_from(&user_id).unwrap();
+            req.metadata_mut().append("user_id", user_id_metadata);
             return Ok(req);
         }
         let in_pass = get_hash(&credentials.password, &user.salt);

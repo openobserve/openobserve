@@ -51,9 +51,9 @@ use serde_json::json;
 use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
     common::meta::ingestion::{
-        AWSRecordType, BulkResponse, GCPIngestionResponse, IngestionData, IngestionDataIter,
-        IngestionError, IngestionRequest, IngestionResponse, IngestionStatus, IngestionValueType,
-        KinesisFHIngestionResponse, StreamStatus,
+        AWSRecordType, BulkResponse, GCPIngestionResponse, IngestUser, IngestionData,
+        IngestionDataIter, IngestionError, IngestionRequest, IngestionResponse, IngestionStatus,
+        IngestionValueType, KinesisFHIngestionResponse, StreamStatus,
     },
     service::{
         format_stream_name, get_formatted_stream_name,
@@ -68,7 +68,7 @@ pub async fn ingest(
     org_id: &str,
     in_stream_name: &str,
     in_req: IngestionRequest,
-    user_email: &str,
+    user: IngestUser,
     extend_json: Option<&HashMap<String, serde_json::Value>>,
     is_derived: bool,
 ) -> Result<IngestionResponse> {
@@ -535,7 +535,7 @@ pub async fn ingest(
         let write_result = super::write_logs_by_stream(
             thread_id,
             org_id,
-            user_email,
+            &user.to_email(),
             (started_at, &start),
             usage_type,
             &mut status,
