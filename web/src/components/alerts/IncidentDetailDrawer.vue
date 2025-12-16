@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     :class="[store.state.theme === 'dark' ? 'bg-dark' : 'bg-white']"
     class="tw-h-full tw-flex tw-flex-col"
-    style="width: 900px"
+    style="width: 90vw"
   >
     <!-- Header -->
     <div class="incident-detail-header row items-center no-wrap q-px-md tw-p-4">
@@ -55,13 +55,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator />
 
     <!-- Content -->
-    <div v-if="!loading && incidentDetails" class="tw-flex-1 tw-flex tw-flex-col tw-overflow-hidden">
-      <!-- Fixed Header Content -->
-      <div class="tw-flex-shrink-0 tw-p-4 q-px-md">
-        <!-- Status, Severity, Alerts row -->
-        <div class="tw-flex tw-items-stretch tw-gap-2 tw-mb-4">
+    <div v-if="!loading && incidentDetails" class="tw-flex-1 tw-flex tw-overflow-hidden">
+      <!-- Left Column: Incident Details -->
+      <div class="incident-details-column tw-w-[400px] tw-flex-shrink-0 tw-p-4 q-px-md tw-overflow-auto" :class="store.state.theme === 'dark' ? 'tw-border-r tw-border-gray-700' : 'tw-border-r tw-border-gray-200'">
+        <!-- Status, Severity, Alerts - Vertical Stack -->
+        <div class="tw-flex tw-flex-col tw-gap-3 tw-mb-4">
           <!-- Status Tile -->
-          <div class="tile tw-flex-1">
+          <div class="tile">
             <div
               class="tile-content tw-rounded-lg tw-p-3 tw-border tw-shadow-sm tw-h-20 tw-flex tw-flex-col tw-justify-between"
               :class="store.state.theme === 'dark' ? 'tile-content-dark tw-border-gray-700' : 'tile-content-light tw-border-gray-200'"
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Severity Tile -->
-          <div class="tile tw-flex-1">
+          <div class="tile">
             <div
               class="tile-content tw-rounded-lg tw-p-3 tw-border tw-shadow-sm tw-h-20 tw-flex tw-flex-col tw-justify-between"
               :class="store.state.theme === 'dark' ? 'tile-content-dark tw-border-gray-700' : 'tile-content-light tw-border-gray-200'"
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Alert Count Tile -->
-          <div class="tile tw-flex-1">
+          <div class="tile">
             <div
               class="tile-content tw-rounded-lg tw-p-3 tw-border tw-shadow-sm tw-h-20 tw-flex tw-flex-col tw-justify-between"
               :class="store.state.theme === 'dark' ? 'tile-content-dark tw-border-gray-700' : 'tile-content-light tw-border-gray-200'"
@@ -137,9 +137,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
+        </div>
 
-          <!-- Action buttons -->
-          <div class="tw-flex tw-flex-col tw-justify-center tw-gap-1.5 tw-ml-2 tw-min-w-[160px] tw-h-20">
+        <!-- Action buttons -->
+        <div class="tw-mb-4">
+          <div class="tw-flex tw-gap-2">
             <q-btn
               v-if="incidentDetails.status === 'open'"
               color="warning"
@@ -149,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="acknowledgeIncident"
               :loading="updating"
               align="left"
-              class="action-btn-compact tw-justify-start"
+              class="action-btn-compact tw-justify-start tw-flex-1"
             >
               <q-icon name="check_circle" size="xs" class="tw-mr-1.5" />
               <span class="tw-text-xs tw-font-medium">{{ t("alerts.incidents.acknowledge") }}</span>
@@ -164,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="resolveIncident"
               :loading="updating"
               align="left"
-              class="action-btn-compact tw-justify-start"
+              class="action-btn-compact tw-justify-start tw-flex-1"
             >
               <q-icon name="task_alt" size="xs" class="tw-mr-1.5" />
               <span class="tw-text-xs tw-font-medium">{{ t("alerts.incidents.resolve") }}</span>
@@ -191,49 +193,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Timeline with UTC timestamps -->
         <div
           :class="[
-            'tw-flex tw-items-center tw-gap-1.5 tw-px-3 tw-py-2 tw-rounded-md tw-border tw-mb-4 tw-w-fit',
+            'tw-rounded-lg tw-border tw-mb-4 tw-overflow-hidden',
             store.state.theme === 'dark'
-              ? 'tw-bg-gray-800/50 tw-border-gray-600'
-              : 'tw-bg-gray-50 tw-border-gray-200'
+              ? 'tw-border-gray-700'
+              : 'tw-border-gray-200'
           ]"
         >
-          <q-icon name="schedule" size="16px" class="tw-opacity-70" />
-          <div class="tw-flex tw-items-center tw-gap-3">
+          <!-- Header -->
+          <div
+            :class="[
+              'tw-px-3 tw-py-2 tw-flex tw-items-center tw-justify-between tw-border-b',
+              store.state.theme === 'dark'
+                ? 'tw-bg-gray-800 tw-border-gray-700'
+                : 'tw-bg-gray-100 tw-border-gray-200'
+            ]"
+          >
+            <div class="tw-flex tw-items-center tw-gap-2">
+              <q-icon name="schedule" size="16px" class="tw-opacity-80" />
+              <span :class="store.state.theme === 'dark' ? 'tw-text-gray-300' : 'tw-text-gray-700'" class="tw-text-xs tw-font-semibold">
+                Timeline
+              </span>
+            </div>
             <span
               :class="[
-                'tw-text-[10px] tw-font-medium tw-px-1.5 tw-py-0.5 tw-rounded',
+                'tw-text-[10px] tw-font-medium tw-px-2 tw-py-0.5 tw-rounded-full',
                 store.state.theme === 'dark'
-                  ? 'tw-text-gray-300 tw-bg-gray-700/50'
-                  : 'tw-text-gray-600 tw-bg-gray-100'
+                  ? 'tw-text-blue-300 tw-bg-blue-900/30'
+                  : 'tw-text-blue-700 tw-bg-blue-100'
               ]"
             >
               UTC
             </span>
-            <div class="tw-flex tw-items-center tw-gap-1">
-              <span :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'" class="tw-text-xs">
-                First Alert Triggered:
-              </span>
-              <span
-                :class="[
-                  'tw-text-xs tw-font-semibold',
-                  store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-800'
-                ]"
-              >
-                {{ formatTimestampUTC(incidentDetails.first_alert_at) }}
-              </span>
-            </div>
-            <div class="tw-flex tw-items-center tw-gap-1">
-              <span :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'" class="tw-text-xs">
-                Last Alert Triggered:
-              </span>
-              <span
-                :class="[
-                  'tw-text-xs tw-font-semibold',
-                  store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-800'
-                ]"
-              >
-                {{ formatTimestampUTC(incidentDetails.last_alert_at) }}
-              </span>
+          </div>
+
+          <!-- Content -->
+          <div :class="store.state.theme === 'dark' ? 'tw-bg-gray-800/30' : 'tw-bg-white'" class="tw-p-3">
+            <div class="tw-space-y-3">
+              <div class="tw-flex tw-items-start tw-gap-2">
+                <q-icon name="play_arrow" size="14px" :class="store.state.theme === 'dark' ? 'tw-text-green-400' : 'tw-text-green-600'" class="tw-mt-0.5" />
+                <div class="tw-flex-1">
+                  <div :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'" class="tw-text-[11px] tw-mb-0.5">
+                    First Alert
+                  </div>
+                  <div
+                    :class="[
+                      'tw-text-xs tw-font-semibold tw-font-mono',
+                      store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-900'
+                    ]"
+                  >
+                    {{ formatTimestampUTC(incidentDetails.first_alert_at) }}
+                  </div>
+                </div>
+              </div>
+
+              <div class="tw-flex tw-items-start tw-gap-2">
+                <q-icon name="flag" size="14px" :class="store.state.theme === 'dark' ? 'tw-text-orange-400' : 'tw-text-orange-600'" class="tw-mt-0.5" />
+                <div class="tw-flex-1">
+                  <div :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'" class="tw-text-[11px] tw-mb-0.5">
+                    Last Alert
+                  </div>
+                  <div
+                    :class="[
+                      'tw-text-xs tw-font-semibold tw-font-mono',
+                      store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-900'
+                    ]"
+                  >
+                    {{ formatTimestampUTC(incidentDetails.last_alert_at) }}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -302,9 +330,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
+      </div>
 
+      <!-- Right Column: Tabs and Content -->
+      <div class="tabs-content-column tw-flex-1 tw-flex tw-flex-col tw-overflow-hidden">
         <!-- Tabs -->
-        <div class="tw-mb-3 tw-flex tw-items-center tw-justify-between">
+        <div class="tw-flex tw-items-center tw-justify-between tw-px-4 tw-pt-4 tw-pb-2 q-px-md tw-flex-shrink-0">
           <q-tabs v-model="activeTab" inline-label dense no-caps align="left">
             <q-tab
               name="incidentAnalysis"
@@ -335,10 +366,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-tooltip :delay="500" style="width: 180px;">Chat with SRE Assistant</q-tooltip>
           </q-btn>
         </div>
-      </div>
 
-      <!-- Tab Content Area -->
-      <div class="tw-flex-1 tw-flex tw-flex-col tw-px-4 tw-pb-4 q-px-md tw-overflow-hidden">
+        <!-- Tab Content Area -->
+        <div class="tw-flex-1 tw-flex tw-flex-col tw-px-4 tw-pt-2 q-px-md tw-pb-2 tw-overflow-hidden">
         <!-- Incident Analysis Tab Content -->
         <div v-if="activeTab === 'incidentAnalysis'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
           <!-- Trigger button when no analysis exists and not loading -->
@@ -411,11 +441,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-list>
           </div>
         </div>
+        </div>
       </div>
     </div>
 
     <!-- Loading state -->
-    <div v-else-if="loading" class="tw-flex-1 tw-flex tw-items-center tw-justify-center">
+    <div v-if="loading" class="tw-flex-1 tw-flex tw-items-center tw-justify-center">
       <q-spinner-hourglass size="lg" color="primary" />
     </div>
   </div>
@@ -939,5 +970,37 @@ body.body--dark .label-text {
 
 body.body--dark .muted-text {
   color: #6b7280; /* gray-500 in dark mode */
+}
+
+/* Two-Column Layout Styles */
+.incident-details-column {
+  min-width: 400px;
+  max-width: 400px;
+}
+
+.tabs-content-column {
+  min-width: 0; /* Allow flex shrinking */
+}
+
+/* Responsive scrolling */
+.incident-details-column::-webkit-scrollbar,
+.tabs-content-column .tw-overflow-auto::-webkit-scrollbar {
+  width: 6px;
+}
+
+.incident-details-column::-webkit-scrollbar-track,
+.tabs-content-column .tw-overflow-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.incident-details-column::-webkit-scrollbar-thumb,
+.tabs-content-column .tw-overflow-auto::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+body.body--dark .incident-details-column::-webkit-scrollbar-thumb,
+body.body--dark .tabs-content-column .tw-overflow-auto::-webkit-scrollbar-thumb {
+  background: #475569;
 }
 </style>
