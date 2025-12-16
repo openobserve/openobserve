@@ -205,6 +205,12 @@ export default {
 
     const fields = ref(props.modelValue);
 
+    // if functionName property is missing for build type, selected function Name will be None -> null
+    // Ensure functionName property exists for build type fields
+    if (fields.value && fields.value.type === 'build' && !('functionName' in fields.value)) {
+      fields.value.functionName = null;
+    }
+
     const store = useStore();
 
     watch(
