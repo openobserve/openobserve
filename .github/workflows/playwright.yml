@@ -123,6 +123,7 @@ jobs:
                 "serviceAccount.spec.js",
                 "usersOrg.spec.js",
                 "org.spec.js",
+                "theme-management.spec.js",
               ]
           - testfolder: "Logs-Core"
             browser: "chrome"
