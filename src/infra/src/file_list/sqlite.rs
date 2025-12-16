@@ -776,7 +776,8 @@ SELECT
     SUM(compressed_size) AS compressed_size,
     SUM(index_size) AS index_size
 FROM file_list
-WHERE stream = $1 {time_filter};
+WHERE stream = $1 {time_filter}
+GROUP BY stream;
             "#
         );
         let pool = CLIENT_RO.clone();
@@ -1399,7 +1400,8 @@ SELECT
     SUM(compressed_size) AS compressed_size,
     SUM(index_size) AS index_size
 FROM file_list_dump_stats
-WHERE stream = $1 {time_filter};
+WHERE stream = $1 {time_filter}
+GROUP BY stream;
             "#
         );
         let pool = CLIENT_RO.clone();

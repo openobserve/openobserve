@@ -1008,15 +1008,16 @@ SELECT date
         let sql = format!(
             r#"
 SELECT 
-    COUNT(*) AS file_num,
-    MIN(min_ts) AS min_ts,
-    MAX(max_ts) AS max_ts,
-    SUM(records) AS records,
-    SUM(original_size) AS original_size,
-    SUM(compressed_size) AS compressed_size,
-    SUM(index_size) AS index_size
+    CAST(COUNT(*) AS SIGNED) AS file_num,
+    CAST(MIN(min_ts) AS SIGNED) AS min_ts,
+    CAST(MAX(max_ts) AS SIGNED) AS max_ts,
+    CAST(SUM(records) AS SIGNED) AS records,
+    CAST(SUM(original_size) AS SIGNED) AS original_size,
+    CAST(SUM(compressed_size) AS SIGNED) AS compressed_size,
+    CAST(SUM(index_size) AS SIGNED) AS index_size
 FROM file_list
-WHERE stream = ? {time_filter};
+WHERE stream = ? {time_filter}
+GROUP BY stream;
             "#
         );
         let pool = CLIENT_RO.clone();
@@ -1853,15 +1854,16 @@ ON DUPLICATE KEY UPDATE
         let sql = format!(
             r#"
 SELECT 
-    SUM(file_num) AS file_num,
-    MIN(min_ts) AS min_ts,
-    MAX(max_ts) AS max_ts,
-    SUM(records) AS records,
-    SUM(original_size) AS original_size,
-    SUM(compressed_size) AS compressed_size,
-    SUM(index_size) AS index_size
+    CAST(SUM(file_num) AS SIGNED) AS file_num,
+    CAST(MIN(min_ts) AS SIGNED) AS min_ts,
+    CAST(MAX(max_ts) AS SIGNED) AS max_ts,
+    CAST(SUM(records) AS SIGNED) AS records,
+    CAST(SUM(original_size) AS SIGNED) AS original_size,
+    CAST(SUM(compressed_size) AS SIGNED) AS compressed_size,
+    CAST(SUM(index_size) AS SIGNED) AS index_size
 FROM file_list_dump_stats
-WHERE stream = ? {time_filter};
+WHERE stream = ? {time_filter}
+GROUP BY stream;
             "#
         );
         let pool = CLIENT_RO.clone();

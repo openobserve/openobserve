@@ -950,15 +950,16 @@ SELECT date
         let sql = format!(
             r#"
 SELECT 
-    COUNT(*) AS file_num,
-    MIN(min_ts) AS min_ts,
-    MAX(max_ts) AS max_ts,
-    SUM(records) AS records,
-    SUM(original_size) AS original_size,
-    SUM(compressed_size) AS compressed_size,
-    SUM(index_size) AS index_size
+    COUNT(*)::BIGINT AS file_num,
+    MIN(min_ts)::BIGINT AS min_ts,
+    MAX(max_ts)::BIGINT AS max_ts,
+    SUM(records)::BIGINT AS records,
+    SUM(original_size)::BIGINT AS original_size,
+    SUM(compressed_size)::BIGINT AS compressed_size,
+    SUM(index_size)::BIGINT AS index_size
 FROM file_list
-WHERE stream = $1 {time_filter};
+WHERE stream = $1 {time_filter}
+GROUP BY stream;
             "#
         );
         let pool = CLIENT_RO.clone();
@@ -1682,15 +1683,16 @@ DO UPDATE SET
         let sql = format!(
             r#"
 SELECT 
-    SUM(file_num) AS file_num,
-    MIN(min_ts) AS min_ts,
-    MAX(max_ts) AS max_ts,
-    SUM(records) AS records,
-    SUM(original_size) AS original_size,
-    SUM(compressed_size) AS compressed_size,
-    SUM(index_size) AS index_size
+    SUM(file_num)::BIGINT AS file_num,
+    MIN(min_ts)::BIGINT AS min_ts,
+    MAX(max_ts)::BIGINT AS max_ts,
+    SUM(records)::BIGINT AS records,
+    SUM(original_size)::BIGINT AS original_size,
+    SUM(compressed_size)::BIGINT AS compressed_size,
+    SUM(index_size)::BIGINT AS index_size
 FROM file_list_dump_stats
-WHERE stream = $1 {time_filter};
+WHERE stream = $1 {time_filter}
+GROUP BY stream;
             "#
         );
         let pool = CLIENT_RO.clone();
