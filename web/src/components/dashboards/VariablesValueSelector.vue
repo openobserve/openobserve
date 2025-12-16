@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { getCurrentInstance, onMounted, onUnmounted, ref, watch } from "vue";
+import { getCurrentInstance, onMounted, onUnmounted, ref, watch, PropType, inject, computed, nextTick } from "vue";
 import { defineComponent, reactive } from "vue";
 import streamService from "../../services/stream";
 import { useStore } from "vuex";
@@ -106,12 +106,41 @@ import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 
 export default defineComponent({
   name: "VariablesValueSelector",
-  props: [
-    "selectedTimeDate",
-    "variablesConfig",
-    "initialVariableValues",
-    "showDynamicFilters",
-  ],
+  props: {
+    selectedTimeDate: {
+      type: Object as PropType<any>,
+      required: false,
+    },
+    variablesConfig: {
+      type: Object as PropType<any>,
+      required: false,
+    },
+    initialVariableValues: {
+      type: Object as PropType<any>,
+      required: false,
+    },
+    showDynamicFilters: {
+      type: Boolean,
+      default: false,
+    },
+    // New props for scoped variables
+    scope: {
+      type: String as PropType<'global' | 'tabs' | 'panels'>,
+      default: 'global',
+    },
+    tabId: {
+      type: String,
+      default: undefined,
+    },
+    panelId: {
+      type: String,
+      default: undefined,
+    },
+    variablesManager: {
+      type: Object as PropType<any>,
+      default: undefined,
+    },
+  },
   emits: ["variablesData"],
   components: {
     VariableQueryValueSelector,
@@ -121,113 +150,41 @@ export default defineComponent({
   setup(props: any, { emit }) {
     const store = useStore();
 
+    // Try to inject variablesManager from parent (for backward compatibility)
+    const injectedManager = inject<any>('variablesManager', undefined);
+    const manager = props.variablesManager || injectedManager;
+
+    // Determine if we're using the new manager-based approach
+    const useManager = !!manager;
+
+    // Computed property to get filtered variables from manager
+    const managerVariables = computed(() => {
+      if (!useManager) return [];
+
+      const scopeKey = props.scope;
+      let variables: any[] = [];
+
+      if (scopeKey === 'global') {
+        variables = manager.variablesData.global || [];
+      } else if (scopeKey === 'tabs' && props.tabId) {
+        variables = manager.variablesData.tabs[props.tabId] || [];
+      } else if (scopeKey === 'panels' && props.panelId) {
+        variables = manager.variablesData.panels[props.panelId] || [];
+      }
+
+      return variables;
+    });
+
     // variables data derived from the variables config list
     const variablesData: any = reactive({
       isVariablesLoading: false,
       values: [],
     });
 
-    // ================== FOR DEBUGGING PURPOSES ONLY ==================
-    // watch for changes in variablesData.values
-    let previousValues: any[] = [];
-    watch(
-      () => variablesData.values,
-      (newValues) => {
-        return;
-        // Track all changes to log them together
-        const changes: any[] = [];
-
-        // Compare each variable's properties
-        newValues.forEach((newVar: any, index: number) => {
-          const oldVar = previousValues[index];
-          if (!oldVar) {
-            changes.push({
-              variable: newVar.name,
-              type: "new_variable",
-            });
-            return;
-          }
-
-          // List of properties to watch
-          const propertiesToWatch = [
-            "value",
-            "isLoading",
-            "isVariablePartialLoaded",
-            "isVariableLoadingPending",
-            "options",
-          ];
-
-          // Check each property for changes
-          const variableChanges: any = {
-            name: newVar.name,
-            changes: [],
-          };
-
-          propertiesToWatch.forEach((prop) => {
-            // Get deep copies of values to avoid proxy objects
-            const newValue = JSON.parse(JSON.stringify(newVar[prop]));
-            const oldValue = JSON.parse(JSON.stringify(oldVar[prop]));
-
-            // For arrays (like options) or objects, compare stringified versions
-            const hasChanged =
-              Array.isArray(newValue) || typeof newValue === "object"
-                ? JSON.stringify(newValue) !== JSON.stringify(oldValue)
-                : newValue !== oldValue;
-
-            if (hasChanged) {
-              variableChanges.changes.push({
-                property: prop,
-                from: oldValue,
-                to: newValue,
-              });
-            }
-          });
-
-          if (variableChanges.changes.length > 0) {
-            changes.push(variableChanges);
-          }
-        });
-
-        // Log all changes together if there are any
-        if (changes.length > 0) {
-          console.group(`Variables changed at ${new Date().toISOString()}`);
-
-          changes.forEach((change) => {
-            if (change.type === "new_variable") {
-              console.log(`🆕 New variable added: ${change.variable}`);
-            } else {
-              console.groupCollapsed(`Variable: ${change.name}`);
-              change.changes.forEach((propertyChange: any) => {
-                console.log(
-                  `Property "${propertyChange.property}":`,
-                  "\nFrom:",
-                  typeof propertyChange.from === "object"
-                    ? JSON.stringify(propertyChange.from, null, 2)
-                    : propertyChange.from,
-                  "\nTo:",
-                  typeof propertyChange.to === "object"
-                    ? JSON.stringify(propertyChange.to, null, 2)
-                    : propertyChange.to,
-                );
-              });
-              console.groupEnd();
-            }
-          });
-
-          console.groupEnd();
-        }
-
-        // Store deep copy of current values for next comparison
-        previousValues = JSON.parse(JSON.stringify(newValues));
-      },
-      { deep: true },
-    );
-
+    // Utility function for logging (can be enabled for debugging)
     const variableLog = (name: string, message: string) => {
-      // console.log(`[Variable: ${name}] ${message}`);
+      // Uncomment for debugging: console.log(`[Variable: ${name}] ${message}`);
     };
-
-    // ================== [END] FOR DEBUGGING PURPOSES ONLY ==================
 
     // variables dependency graph
     let variablesDependencyGraph: any = {};
@@ -410,13 +367,15 @@ export default defineComponent({
             );
 
             // Process the first response
+            // Filter out undefined, null, and empty strings
             const newOptions = fieldHit.values
-              .filter((value: any) => value.zo_sql_key !== undefined)
+              .filter((value: any) =>
+                value.zo_sql_key !== undefined &&
+                value.zo_sql_key !== null &&
+                value.zo_sql_key !== ""
+              )
               .map((value: any) => ({
-                label:
-                  value.zo_sql_key !== ""
-                    ? value.zo_sql_key.toString()
-                    : "<blank>",
+                label: value.zo_sql_key.toString(),
                 value: value.zo_sql_key.toString(),
               }));
             // For first response or subsequent responses, merge with existing options and keep selected values
@@ -779,8 +738,30 @@ export default defineComponent({
       });
     };
 
+    // Sync manager variables to local state when using manager
+    const syncManagerVariablesToLocal = () => {
+      if (!useManager) return;
+
+      const managedVars = managerVariables.value;
+      if (!managedVars || managedVars.length === 0) {
+        variablesData.values = [];
+        return;
+      }
+
+      // IMPORTANT: Use direct references to manager's variables, not copies
+      // This ensures changes in the component are reflected in the manager
+      variablesData.values = managedVars;
+    };
+
     onMounted(() => {
-      // make list of variables using variables config list
+      // Skip initialization if using manager - manager handles everything
+      if (useManager) {
+        // For manager mode, sync immediately on mount
+        syncManagerVariablesToLocal();
+        return;
+      }
+
+      // Legacy behavior: make list of variables using variables config list
       initializeVariablesData();
 
       // reject all promises
@@ -804,7 +785,12 @@ export default defineComponent({
     watch(
       () => props.variablesConfig,
       async () => {
-        // Reset initial load flag when config changes
+        // Skip if using manager - manager handles config changes
+        if (useManager) {
+          return;
+        }
+
+        // Legacy behavior: Reset initial load flag when config changes
         // isInitialLoad.value = true;
 
         // make list of variables using variables config list
@@ -820,6 +806,50 @@ export default defineComponent({
         // isInitialLoad.value = false;
       },
     );
+
+    // Declare functions that will be defined later (after loadSingleVariableDataByName)
+    // This allows watchers to reference them
+    let loadDependentVariable: (index: number) => Promise<void>;
+    let checkAndLoadPendingVariables: () => void;
+
+    // Watch manager variables for changes and sync to local state
+    // We need to watch with deep: true to detect when manager mutates individual variables
+    watch(
+      () => {
+        if (!useManager || !manager) return [];
+        // Return the actual array reference so deep watch can track mutations
+        const scopeKey = props.scope;
+        if (scopeKey === 'global') {
+          return manager.variablesData.global;
+        } else if (scopeKey === 'tabs' && props.tabId) {
+          return manager.variablesData.tabs[props.tabId];
+        } else if (scopeKey === 'panels' && props.panelId) {
+          return manager.variablesData.panels[props.panelId];
+        }
+        return [];
+      },
+      (newVars) => {
+        if (!useManager) return;
+
+        console.log('[VariablesValueSelector] Manager variables changed:',
+          newVars?.length, 'variables in scope', props.scope);
+        syncManagerVariablesToLocal();
+
+        // Check for pending variables that need to be loaded
+        // Use nextTick to ensure DOM and state are updated
+        nextTick(() => {
+          if (checkAndLoadPendingVariables) {
+            checkAndLoadPendingVariables();
+          }
+        });
+      },
+      { deep: true, immediate: true }
+    );
+
+    // Note: We don't need to watch for completion and trigger children here
+    // The manager's finalizeVariableLoading already handles triggering dependent children
+    // when a variable finishes loading. Adding a watcher here would be redundant
+    // and could cause issues since variablesData.values is a direct reference to manager's arrays.
 
     // you may need to query the data if the variable configs or the data/time changes
     // watch(
@@ -1381,6 +1411,66 @@ export default defineComponent({
       }
     };
 
+    // ========== MANAGER-MODE FUNCTIONS ==========
+    // These functions are used when the component is in manager mode
+    // They must be defined after loadSingleVariableDataByName since they depend on it
+
+    // Load a specific dependent variable (called by manager when dependencies are ready)
+    loadDependentVariable = async (index: number) => {
+      const variable = variablesData.values[index];
+      if (!variable) return;
+
+      console.log('[VariablesValueSelector] Starting to load variable:', variable.name);
+
+      // Mark as loading
+      variable.isLoading = true;
+      variable.isVariableLoadingPending = false;
+
+      try {
+        // Use the legacy function that actually makes the API call
+        // Don't use loadVariableOptions as it delegates back to manager (circular)
+        await loadSingleVariableDataByName(variable, false);
+        console.log('[VariablesValueSelector] Successfully loaded variable:', variable.name);
+      } catch (error) {
+        console.error(`[VariablesValueSelector] Error loading variable ${variable.name}:`, error);
+        variable.isLoading = false;
+      }
+    };
+
+    // Load variables that are marked as pending by the manager
+    checkAndLoadPendingVariables = () => {
+      if (!useManager) return;
+
+      const pendingVars = variablesData.values.filter((v: any) =>
+        v.type === 'query_values' &&
+        v.isVariableLoadingPending === true &&
+        v.isLoading !== true
+      );
+
+      if (pendingVars.length > 0) {
+        console.log('[VariablesValueSelector] Found pending variables to load:',
+          pendingVars.map((v: any) => v.name).join(', ')
+        );
+      }
+
+      variablesData.values.forEach((variable: any, index: number) => {
+        // Only load query_values type that are marked as pending and not currently loading
+        if (
+          variable.type === 'query_values' &&
+          variable.isVariableLoadingPending === true &&
+          variable.isLoading !== true
+        ) {
+          console.log('[VariablesValueSelector] Loading pending variable:', variable.name);
+          // Fire the API call for this variable
+          loadDependentVariable(index);
+        }
+      });
+    };
+
+    // Note: triggerDependentChildren is not needed - the manager handles this
+    // The manager's finalizeVariableLoading function automatically triggers children
+    // when a variable completes loading (see useVariablesManager.ts line 647-671)
+
     /**
      * Builds the query context for the given variable object.
      * @param variableObject The variable object containing the query data.
@@ -1421,7 +1511,19 @@ export default defineComponent({
         : dummyQuery;
 
       // Replace variable placeholders with actual values
-      for (const variable of variablesData.values) {
+      // When using manager, get all visible variables (global + tab + panel)
+      // Otherwise, use local variablesData.values (legacy mode)
+      let variablesToResolve = variablesData.values;
+      if (useManager && manager) {
+        // Get all visible variables for this scope
+        // This includes global, tab-scoped (if in a tab), and panel-scoped (if in a panel)
+        variablesToResolve = manager.getAllVisibleVariables(props.tabId, props.panelId) || variablesData.values;
+        console.log('[VariablesValueSelector] Resolving with variables:',
+          variablesToResolve.map((v: any) => `${v.name}@${v.scope}`).join(', ')
+        );
+      }
+
+      for (const variable of variablesToResolve) {
         if (variable.isVariablePartialLoaded) {
           // Replace array values
           if (Array.isArray(variable.value)) {
@@ -1488,13 +1590,15 @@ export default defineComponent({
 
       if (fieldHit) {
         // Extract the values for the specified field from the result
+        // Filter out undefined, null, and empty strings
         const newOptions = fieldHit.values
-          .filter((value: any) => value.zo_sql_key || value.zo_sql_key === "")
+          .filter((value: any) =>
+            value.zo_sql_key !== undefined &&
+            value.zo_sql_key !== null &&
+            value.zo_sql_key !== ""
+          )
           .map((value: any) => ({
-            // Use the zo_sql_key as the label if it is not empty, otherwise use "<blank>"
-            label:
-              value.zo_sql_key !== "" ? value.zo_sql_key.toString() : "<blank>",
-            // Use the zo_sql_key as the value
+            label: value.zo_sql_key.toString(),
             value: value.zo_sql_key.toString(),
           }));
 
@@ -1692,7 +1796,23 @@ export default defineComponent({
      * @returns {Promise<void>} - A promise that resolves when the options have been loaded.
      */
     const loadVariableOptions = async (variableObject: any) => {
-      // Check if there's already a loading request in progress
+      console.log("variableObject", variableObject);
+      
+      // If using manager, delegate to manager
+      if (useManager && manager) {
+        try {
+          const variableKey = manager.getVariableKey
+            ? manager.getVariableKey(variableObject.name, props.scope, props.tabId, props.panelId)
+            : `${variableObject.name}@${props.scope}${props.tabId ? `@${props.tabId}` : ''}${props.panelId ? `@${props.panelId}` : ''}`;
+          await manager.loadSingleVariable(variableKey);
+          return;
+        } catch (error) {
+          console.error('Error loading variable via manager:', error);
+          // Fall through to legacy behavior on error
+        }
+      }
+
+      // Legacy behavior: Check if there's already a loading request in progress
       if (variableObject.isLoading) {
         return;
       }
@@ -1862,6 +1982,23 @@ export default defineComponent({
       // if currentVariable is undefined, return
       if (!currentVariable) {
         return;
+      }
+
+      // If using manager, delegate to manager's updateVariableValue
+      if (useManager && manager) {
+        try {
+          await manager.updateVariableValue(
+            currentVariable.name,
+            props.scope,
+            props.tabId,
+            props.panelId,
+            currentVariable.value
+          );
+          return; // Manager handles all downstream updates
+        } catch (error) {
+          console.error('Error updating variable via manager:', error);
+          // Fall through to legacy behavior on error
+        }
       }
 
       // For multiSelect, filter out values not present in options only if options are fully loaded

@@ -29,8 +29,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="display: none"
       >
       </span>
+
+      <!-- Global Variables (if using manager) -->
       <VariablesValueSelector
-        v-if="currentTimeObj['__global'] || currentTimeObj['__variables']"
+        v-if="variablesManager && globalVariables.length > 0"
+        :scope="'global'"
+        :variablesConfig="{ list: globalVariables }"
+        :variablesManager="variablesManager"
+        :selectedTimeDate="currentTimeObj['__global']"
+        data-test="global-variables-selector"
+      />
+
+      <!-- Legacy Variables Selector (if not using manager) -->
+      <VariablesValueSelector
+        v-else-if="!variablesManager && (currentTimeObj['__global'] || currentTimeObj['__variables'])"
         :variablesConfig="dashboardData?.variables"
         :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
         :selectedTimeDate="
@@ -40,6 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @variablesData="variablesDataUpdated"
         ref="variablesValueSelectorRef"
       />
+
+      <!-- Tab List -->
       <TabList
         v-if="showTabs && selectedTabId !== null"
         class="q-mt-sm"
@@ -47,6 +61,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :viewOnly="viewOnly"
         @refresh="refreshDashboard"
       />
+
+      <!-- Tab-scoped Variables (for active tab, if using manager) -->
+      <VariablesValueSelector
+        v-if="variablesManager && currentTabVariables.length > 0 && selectedTabId"
+        :scope="'tabs'"
+        :tabId="selectedTabId"
+        :variablesConfig="{ list: currentTabVariables }"
+        :variablesManager="variablesManager"
+        :selectedTimeDate="currentTimeObj['__global']"
+        data-test="tab-variables-selector"
+      />
+
       <slot name="before_panels" />
       <div class="displayDiv">
         <div
@@ -57,6 +83,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           style="height: 100%; width: 100%"
         >
+          <!-- Panel-scoped Variables (if any, if using manager) -->
+          <VariablesValueSelector
+            v-if="variablesManager && getPanelVariables(panels[0].id).length > 0"
+            :scope="'panels'"
+            :panelId="panels[0].id"
+            :tabId="selectedTabId"
+            :variablesConfig="{ list: getPanelVariables(panels[0].id) }"
+            :variablesManager="variablesManager"
+            :selectedTimeDate="currentTimeObj['__global']"
+            data-test="panel-variables-selector"
+          />
+
           <PanelContainer
             @onDeletePanel="onDeletePanel"
             @onViewPanel="onViewPanel"
@@ -75,10 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? shouldRefreshWithoutCacheObj?.[panels?.[0]?.id]
                 : undefined) || false
             "
-            :variablesData="
-              currentVariablesDataRef?.[panels[0]?.id] ||
-              currentVariablesDataRef['__global']
-            "
+            :variablesData="getMergedVariablesForPanel(panels[0]?.id)"
             :forceLoad="forceLoad"
             :searchType="searchType"
             :runId="runId"
@@ -115,6 +150,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="store.state.theme == 'dark' ? 'dark' : ''"
           >
             <div class="grid-stack-item-content">
+              <!-- Panel-scoped Variables (if any, if using manager) -->
+              <VariablesValueSelector
+                v-if="variablesManager && getPanelVariables(item.id).length > 0"
+                :scope="'panels'"
+                :panelId="item.id"
+                :tabId="selectedTabId"
+                :variablesConfig="{ list: getPanelVariables(item.id) }"
+                :variablesManager="variablesManager"
+                :selectedTimeDate="currentTimeObj['__global']"
+                :style="{ marginBottom: '8px' }"
+                data-test="panel-variables-selector"
+              />
+
               <PanelContainer
                 @onDeletePanel="onDeletePanel"
                 @onViewPanel="onViewPanel"
@@ -129,10 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :shouldRefreshWithoutCache="
                   shouldRefreshWithoutCacheObj?.[item?.id] || false
                 "
-                :variablesData="
-                  currentVariablesDataRef?.[item?.id] ||
-                  currentVariablesDataRef['__global']
-                "
+                :variablesData="getMergedVariablesForPanel(item.id)"
                 :currentVariablesData="variablesData"
                 :width="getPanelLayout(item, 'w')"
                 :height="getPanelLayout(item, 'h')"
@@ -222,6 +267,7 @@ import VariablesValueSelector from "../../components/dashboards/VariablesValueSe
 import TabList from "@/components/dashboards/tabs/TabList.vue";
 import { inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
+import type { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { useLoading } from "@/composables/useLoading";
 import { GridStack } from "gridstack";
 import "gridstack/dist/gridstack.min.css";
@@ -307,8 +353,51 @@ export default defineComponent({
     // holds the view panel id
     const viewPanelId = ref("");
 
+    // Store IntersectionObserver for cleanup
+    const panelObserver = ref<IntersectionObserver | null>(null);
+
     // inject selected tab, default will be default tab
     const selectedTabId = inject("selectedTabId", ref("default"));
+
+    // Inject variables manager from parent ViewDashboard
+    const variablesManager = inject<ReturnType<typeof useVariablesManager>>("variablesManager", undefined);
+
+    // Computed properties for filtered variables by scope
+    const globalVariables = computed(() => {
+      return props.dashboardData?.variables?.list?.filter(
+        (v: any) => !v.scope || v.scope === "global"
+      ) || [];
+    });
+
+    const currentTabVariables = computed(() => {
+      if (!selectedTabId.value) return [];
+      return props.dashboardData?.variables?.list?.filter(
+        (v: any) => v.scope === "tabs" && v.tabs?.includes(selectedTabId.value)
+      ) || [];
+    });
+
+    // Helper to get panel-scoped variables
+    const getPanelVariables = (panelId: string) => {
+      return props.dashboardData?.variables?.list?.filter(
+        (v: any) => v.scope === "panels" && v.panels?.includes(panelId)
+      ) || [];
+    };
+
+    // Helper to get merged variables for a panel (global + tab + panel)
+    const getMergedVariablesForPanel = (panelId: string) => {
+      if (!variablesManager) {
+        // Fallback to legacy behavior
+        return currentVariablesDataRef.value?.[panelId] || currentVariablesDataRef.value['__global'];
+      }
+
+      const mergedVars = variablesManager.getVariablesForPanel(panelId, selectedTabId.value);
+
+      // Convert to old format for backward compatibility
+      return {
+        isVariablesLoading: variablesManager.isLoading.value,
+        values: mergedVars
+      };
+    };
 
     const panels: any = computed(() => {
       return selectedTabId.value !== null
@@ -543,14 +632,14 @@ export default defineComponent({
           cellHeight: "17px", // Base cell height
           margin: 2, // Minimal margin between panels
           draggable: {
-            enable: !props.viewOnly && !saveDashboardData.isLoading.value, // Enable dragging unless view-only or saving
+            enable: !props.viewOnly && !saveDashboardData.isLoading, // Enable dragging unless view-only or saving
             handle: ".drag-allow", // Only allow dragging from specific handle
           },
           resizable: {
-            enable: !props.viewOnly && !saveDashboardData.isLoading.value, // Enable resizing unless view-only or saving
+            enable: !props.viewOnly && !saveDashboardData.isLoading, // Enable resizing unless view-only or saving
           },
-          disableResize: props.viewOnly || saveDashboardData.isLoading.value, // Disable resize in view-only
-          disableDrag: props.viewOnly || saveDashboardData.isLoading.value, // Disable drag in view-only
+          disableResize: props.viewOnly || saveDashboardData.isLoading, // Disable resize in view-only
+          disableDrag: props.viewOnly || saveDashboardData.isLoading, // Disable drag in view-only
           acceptWidgets: false, // Don't accept external widgets
           removable: false, // Don't allow removal by dragging out
           animate: false, // Disable animations for better performance
@@ -737,7 +826,7 @@ export default defineComponent({
     // disable resize and drag for view only mode and when saving dashboard
     // do it based on watcher on viewOnly and saveDashboardData.isLoading
     watch(
-      () => props.viewOnly || saveDashboardData.isLoading.value,
+      () => props.viewOnly || saveDashboardData.isLoading,
       async (newValue) => {
         if (gridStackInstance) {
           gridStackInstance.setStatic(newValue === true);
@@ -767,10 +856,51 @@ export default defineComponent({
       await nextTick(); // Wait for DOM to be ready
       initGridStack(); // Initialize the grid system
       await nextTick(); // Wait for grid initialization to complete
+
+      // Set up IntersectionObserver for panel visibility (for lazy loading panel-scoped variables)
+      if (variablesManager) {
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            const panelId = entry.target.getAttribute('gs-id');
+            if (panelId) {
+              variablesManager.setPanelVisibility(panelId, entry.isIntersecting);
+            }
+          });
+        }, {
+          threshold: 0.1 // Panel is visible if 10% is in viewport
+        });
+
+        // Observe all panels
+        await nextTick();
+        const panelElements = gridStackContainer.value?.querySelectorAll('.grid-stack-item');
+        panelElements?.forEach((el: Element) => observer.observe(el));
+
+        // Store observer for cleanup
+        panelObserver.value = observer;
+      }
     });
+
+    // Watch for tab visibility changes
+    watch(() => selectedTabId.value, (newTabId, oldTabId) => {
+      if (variablesManager && newTabId) {
+        // Mark new tab as visible
+        variablesManager.setTabVisibility(newTabId, true);
+
+        // Mark old tab as hidden (optional - for cleanup)
+        if (oldTabId && oldTabId !== newTabId) {
+          variablesManager.setTabVisibility(oldTabId, false);
+        }
+      }
+    }, { immediate: true });
 
     // Clean up GridStack instance before component unmounts to prevent memory leaks
     onBeforeUnmount(() => {
+      // Clean up IntersectionObserver
+      if (panelObserver.value) {
+        panelObserver.value.disconnect();
+        panelObserver.value = null;
+      }
+
       // Clean up GridStack instance
       if (gridStackInstance) {
         gridStackInstance.off("change");
@@ -864,6 +994,12 @@ export default defineComponent({
       currentVariablesDataRef,
       resetGridLayout,
       refreshGridStack,
+      // New scoped variables properties
+      variablesManager,
+      globalVariables,
+      currentTabVariables,
+      getPanelVariables,
+      getMergedVariablesForPanel,
     };
   },
   methods: {

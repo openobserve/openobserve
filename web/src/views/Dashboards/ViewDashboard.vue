@@ -378,6 +378,7 @@ import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { getUUID } from "@/utils/zincutils";
+import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import {
   createDashboardsContextProvider,
   contextRegistry,
@@ -424,6 +425,12 @@ export default defineComponent({
       showErrorNotification,
       showConfictErrorNotificationWithRefreshBtn,
     } = useNotifications();
+
+    // Initialize variables manager for scoped variables
+    const variablesManager = useVariablesManager();
+
+    // Provide to child components
+    provide("variablesManager", variablesManager);
 
     let moment: any = () => {};
 
@@ -690,6 +697,31 @@ export default defineComponent({
         return;
       }
 
+      // Initialize variables manager ONLY if there are scoped variables (tabs or panels)
+      // For legacy dashboards with only global variables, use the legacy approach
+      const hasScopedVariables = currentDashboardData.data?.variables?.list?.some(
+        (v: any) => v.scope === "tabs" || v.scope === "panels"
+      );
+
+      if (hasScopedVariables) {
+        try {
+          await variablesManager.initialize(
+            currentDashboardData.data.variables.list,
+            currentDashboardData.data
+          );
+
+          // Load variable values from URL if present
+          variablesManager.loadFromUrl(route);
+        } catch (error: any) {
+          console.error("Error initializing variables manager:", error);
+          if (error.message?.includes("Circular dependency")) {
+            showErrorNotification("Circular dependency detected in dashboard variables");
+          } else if (error.message?.includes("Invalid dependency")) {
+            showErrorNotification("Invalid variable dependency configuration");
+          }
+        }
+      }
+
       // set selected tab from query params
       const selectedTab = currentDashboardData?.data?.tabs?.find(
         (tab: any) => tab.tabId === route.query.tab,
@@ -698,6 +730,11 @@ export default defineComponent({
       selectedTabId.value = selectedTab
         ? selectedTab.tabId
         : currentDashboardData?.data?.tabs?.[0]?.tabId;
+
+      // If using manager, set the selected tab as visible
+      if (hasScopedVariables && selectedTabId.value) {
+        variablesManager.setTabVisibility(selectedTabId.value, true);
+      }
 
       // if variables data is null, set it to empty list
       if (
@@ -958,6 +995,23 @@ export default defineComponent({
       // resize charts if needed
       await nextTick();
       window.dispatchEvent(new Event("resize"));
+    });
+
+    // Watch for tab changes and update visibility in manager
+    watch(selectedTabId, (newTabId, oldTabId) => {
+      // Check if using manager (has scoped variables)
+      const hasScopedVariables = currentDashboardData.data?.variables?.list?.some(
+        (v: any) => v.scope === "tabs" || v.scope === "panels"
+      );
+
+      if (hasScopedVariables && newTabId) {
+        // Set old tab as not visible
+        if (oldTabId) {
+          variablesManager.setTabVisibility(oldTabId, false);
+        }
+        // Set new tab as visible
+        variablesManager.setTabVisibility(newTabId, true);
+      }
     });
 
     // whenever the refreshInterval is changed, update the query params
