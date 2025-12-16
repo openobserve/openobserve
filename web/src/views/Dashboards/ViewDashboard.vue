@@ -382,7 +382,6 @@ import {
   createDashboardsContextProvider,
   contextRegistry,
 } from "@/composables/contextProviders";
-import { encodeVariableToUrl, decodeVariablesFromUrl } from "@/utils/dashboard/variables/variablesUrlUtils";
 
 const DashboardJsonEditor = defineAsyncComponent(() => {
   return import("./DashboardJsonEditor.vue");
@@ -560,10 +559,8 @@ export default defineComponent({
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
       const variableObj = {};
-
       data.values?.forEach((variable) => {
         if (variable.type === "dynamic_filters") {
-          // Keep existing dynamic filters logic
           const filters = (variable.value || []).filter(
             (item: any) => item.name && item.operator && item.value,
           );
@@ -576,21 +573,9 @@ export default defineComponent({
             JSON.stringify(encodedFilters),
           );
         } else {
-          // Use scope-aware encoding for all other variable types
-          const encoded = encodeVariableToUrl(
-            {
-              name: variable.name,
-              scope: variable.scope || 'global',
-              value: variable.value,
-              _isCurrentLevel: variable._isCurrentLevel,
-            },
-            selectedTabId.value,  // Current tab context
-            undefined  // Panel context not available at this level
-          );
-          Object.assign(variableObj, encoded);
+          variableObj[`var-${variable.name}`] = variable.value;
         }
       });
-
       router.replace({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
@@ -617,47 +602,14 @@ export default defineComponent({
         if (normalized.values) {
           normalized.values = normalized.values
             .map((variable) => {
-              // Create a normalized value for comparison
-              let normalizedValue = variable.value;
-
-              // For scoped variables (tabs/panels), the value is an array of objects
-              // Sort them by their ID for consistent comparison
               if (Array.isArray(variable.value)) {
-                // Check if this is a scoped variable array (has tabId or panelId)
-                const isScopedArray = variable.value.some((item: any) =>
-                  item && typeof item === 'object' && (item.tabId || item.panelId)
+                variable.value.sort((a, b) =>
+                  JSON.stringify(a).localeCompare(JSON.stringify(b)),
                 );
-
-                if (isScopedArray) {
-                  // Sort by tabId or panelId, then by stringified value
-                  normalizedValue = [...variable.value].sort((a, b) => {
-                    const aId = a.tabId || a.panelId || '';
-                    const bId = b.tabId || b.panelId || '';
-                    const idCompare = aId.localeCompare(bId);
-                    if (idCompare !== 0) return idCompare;
-                    return JSON.stringify(a.value).localeCompare(JSON.stringify(b.value));
-                  });
-                } else {
-                  // Regular array (multi-select values), just sort
-                  normalizedValue = [...variable.value].sort((a, b) =>
-                    JSON.stringify(a).localeCompare(JSON.stringify(b))
-                  );
-                }
               }
-
-              return {
-                name: variable.name,
-                scope: variable.scope || 'global',
-                value: normalizedValue,
-                _isCurrentLevel: variable._isCurrentLevel,
-              };
+              return variable;
             })
-            .sort((a, b) => {
-              // Sort by name first, then by scope
-              const nameCompare = a.name.localeCompare(b.name);
-              if (nameCompare !== 0) return nameCompare;
-              return (a.scope || 'global').localeCompare(b.scope || 'global');
-            });
+            .sort((a, b) => a.name.localeCompare(b.name));
         }
         return normalized;
       };
@@ -665,53 +617,17 @@ export default defineComponent({
       const normalizedCurrent = normalizeVariables(variablesData);
       const normalizedRefreshed = normalizeVariables(refreshedVariablesData);
 
-      const isChanged = !isEqual(normalizedCurrent, normalizedRefreshed);
-
-
-      return isChanged;
+      return !isEqual(normalizedCurrent, normalizedRefreshed);
     });
     // ======= [START] default variable values
 
     const initialVariableValues = { value: {} };
-
-    // Decode all scoped variables from URL
-    const decodedVariables = decodeVariablesFromUrl(route.query);
-
-    // Convert decoded variables to the format expected by mergedVariablesValues
-    Object.keys(decodedVariables).forEach((varName) => {
-      const variable = decodedVariables[varName];
-
-      if (variable.scope === 'global') {
-        // Global: store direct value (string, number, or array for multi-select)
-        initialVariableValues.value[varName] = variable.value;
-      } else if (variable.scope === 'tabs') {
-        // Tab: Store as array of { tabId, value } objects
-        // Structure: { varName: [{ tabId, value }, { tabId2, value2 }] }
-        if (Array.isArray(variable.value) && variable.value.length > 0) {
-          initialVariableValues.value[varName] = variable.value;
-        }
-      } else if (variable.scope === 'panels') {
-        // Panel: Store as array of { panelId, value } objects
-        // Structure: { varName: [{ panelId, value }, { panelId2, value2 }] }
-        if (Array.isArray(variable.value) && variable.value.length > 0) {
-          initialVariableValues.value[varName] = variable.value;
-        }
-      }
-    });
-
-    // Backward compatibility: Also handle old URL format (var-name=value)
     Object.keys(route.query).forEach((key) => {
-      if (key.startsWith("var-") && !key.includes(".t.") && !key.includes(".p.")) {
-        const varName = key.slice(4);
-        // Only set if not already decoded from new format
-        if (!initialVariableValues.value.hasOwnProperty(varName)) {
-          initialVariableValues.value[varName] = route.query[key];
-        }
+      if (key.startsWith("var-")) {
+        const newKey = key.slice(4);
+        initialVariableValues.value[newKey] = route.query[key];
       }
     });
-
-    console.log('[viewDashboard] initialVariableValues created:', JSON.stringify(initialVariableValues));
-
     // ======= [END] default variable values
 
     onMounted(async () => {
@@ -957,10 +873,6 @@ export default defineComponent({
             }
           });
         });
-
-        // Sync refreshedVariablesData with current variablesData when refresh is triggered
-        // This marks the current state as "applied" for comparison
-        Object.assign(refreshedVariablesData, JSON.parse(JSON.stringify(variablesData)));
 
         // Refresh the dashboard
         dateTimePicker.value.refresh();
