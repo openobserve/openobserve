@@ -173,6 +173,7 @@ pub async fn search_multi(
     }
 
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    let validate_query = super::utils::get_bool_from_request(&query, "validate");
 
     let dashboard_info = get_dashboard_info_from_request(&query);
 
@@ -245,6 +246,20 @@ pub async fn search_multi(
                     multi_res.new_start_time = Some(req.query.start_time);
                     multi_res.new_end_time = Some(req.query.end_time);
                 }
+            }
+        }
+
+        // Validate query fields if requested
+        if validate_query {
+            if let Err(e) = super::utils::validate_query_fields(
+                &org_id,
+                &stream_name,
+                stream_type,
+                &req.query.sql,
+            )
+            .await
+            {
+                return Ok(map_error_to_http_response(&e, Some(trace_id)));
             }
         }
 
