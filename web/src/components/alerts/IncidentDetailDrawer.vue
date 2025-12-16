@@ -55,9 +55,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator />
 
     <!-- Content -->
-    <div v-if="!loading && incidentDetails" class="tw-flex-1 tw-flex tw-flex-col tw-overflow-hidden">
-      <!-- Fixed Header Content -->
-      <div class="tw-flex-shrink-0 tw-p-4 q-px-md">
+    <div v-if="!loading && incidentDetails" class="tw-flex-1 tw-overflow-auto">
+      <div class="tw-p-4 q-px-md">
         <!-- Status, Severity, Alerts row -->
         <div class="tw-flex tw-items-stretch tw-gap-2 tw-mb-4">
           <!-- Status Tile -->
@@ -335,56 +334,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-tooltip :delay="500" style="width: 180px;">Chat with SRE Assistant</q-tooltip>
           </q-btn>
         </div>
-      </div>
 
-      <!-- Tab Content Area -->
-      <div class="tw-flex-1 tw-flex tw-flex-col tw-px-4 tw-pb-4 q-px-md tw-overflow-hidden">
-        <!-- Incident Analysis Tab Content -->
-        <div v-if="activeTab === 'incidentAnalysis'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
-          <!-- Trigger button when no analysis exists and not loading -->
-          <div v-if="!hasExistingRca && !rcaLoading" class="tw-mb-2 tw-flex-shrink-0">
-            <q-btn
-              size="sm"
-              color="primary"
-              outline
-              no-caps
-              @click="triggerRca"
-              :disable="rcaLoading"
-            >
-              Analyze Incident
-            </q-btn>
-          </div>
-
-          <!-- Loading state with streaming content -->
-          <div v-if="rcaLoading" class="rca-container tw-rounded tw-p-3 tw-flex-1 tw-overflow-auto tw-border" :class="isDarkMode ? 'tw-bg-gray-800 tw-border-gray-700' : 'tw-bg-blue-50 tw-border-blue-200'">
-            <div class="tw-flex tw-items-center tw-gap-2 tw-mb-2">
-              <q-spinner size="sm" color="primary" />
-              <span class="tw-text-sm">Analysis in progress...</span>
+        <!-- Tab Content Area -->
+        <div class="tw-px-4 tw-pb-4 q-px-md">
+          <!-- Incident Analysis Tab Content -->
+          <div v-if="activeTab === 'incidentAnalysis'">
+            <!-- Trigger button when no analysis exists and not loading -->
+            <div v-if="!hasExistingRca && !rcaLoading" class="tw-mb-2">
+              <q-btn
+                size="sm"
+                color="primary"
+                outline
+                no-caps
+                @click="triggerRca"
+                :disable="rcaLoading"
+              >
+                Analyze Incident
+              </q-btn>
             </div>
-            <div
-              v-if="rcaStreamContent"
-              class="tw-text-sm tw-whitespace-pre-wrap rca-content"
-              v-html="formatRcaContent(rcaStreamContent)"
-            />
+
+            <!-- Loading state with streaming content -->
+            <div v-if="rcaLoading" class="rca-container tw-rounded tw-p-3 tw-border" :class="isDarkMode ? 'tw-bg-gray-800 tw-border-gray-700' : 'tw-bg-blue-50 tw-border-blue-200'">
+              <div class="tw-flex tw-items-center tw-gap-2 tw-mb-2">
+                <q-spinner size="sm" color="primary" />
+                <span class="tw-text-sm">Analysis in progress...</span>
+              </div>
+              <div
+                v-if="rcaStreamContent"
+                class="tw-text-sm tw-whitespace-pre-wrap rca-content"
+                v-html="formatRcaContent(rcaStreamContent)"
+              />
+            </div>
+
+            <!-- Existing analysis content -->
+            <div v-else-if="hasExistingRca" class="rca-container tw-rounded tw-p-3 tw-border" :class="isDarkMode ? 'tw-bg-gray-800 tw-border-gray-700' : 'tw-bg-blue-50 tw-border-blue-200'">
+              <div
+                class="tw-text-sm tw-whitespace-pre-wrap rca-content"
+                v-html="formatRcaContent(incidentDetails.topology_context.suggested_root_cause)"
+              />
+            </div>
+
+            <!-- No analysis yet -->
+            <div v-else class="tw-rounded tw-p-3 tw-text-sm tw-border" :class="isDarkMode ? 'tw-bg-gray-700 tw-border-gray-600 tw-text-gray-300' : 'tw-bg-gray-50 tw-border-gray-200 tw-text-gray-500'">
+              No analysis performed yet
+            </div>
           </div>
 
-          <!-- Existing analysis content -->
-          <div v-else-if="hasExistingRca" class="rca-container tw-rounded tw-p-3 tw-flex-1 tw-overflow-auto tw-border" :class="isDarkMode ? 'tw-bg-gray-800 tw-border-gray-700' : 'tw-bg-blue-50 tw-border-blue-200'">
-            <div
-              class="tw-text-sm tw-whitespace-pre-wrap rca-content"
-              v-html="formatRcaContent(incidentDetails.topology_context.suggested_root_cause)"
-            />
-          </div>
-
-          <!-- No analysis yet -->
-          <div v-else class="tw-rounded tw-p-3 tw-text-sm tw-flex-1 tw-border" :class="isDarkMode ? 'tw-bg-gray-700 tw-border-gray-600 tw-text-gray-300' : 'tw-bg-gray-50 tw-border-gray-200 tw-text-gray-500'">
-            No analysis performed yet
-          </div>
-        </div>
-
-        <!-- Alert Triggers Tab Content -->
-        <div v-if="activeTab === 'alertTriggers'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
-          <div class="tw-flex-1 tw-overflow-auto">
+          <!-- Alert Triggers Tab Content -->
+          <div v-if="activeTab === 'alertTriggers'">
             <q-list bordered separator class="tw-rounded">
               <q-item v-for="trigger in triggers" :key="trigger.alert_id + trigger.alert_fired_at">
                 <q-item-section>
