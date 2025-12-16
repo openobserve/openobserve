@@ -17,12 +17,13 @@ use std::{
     cmp::{max, min},
     io::Cursor,
     path::PathBuf,
+    pin::Pin,
     sync::Arc,
 };
 
 use arrow::record_batch::RecordBatch;
 use arrow_schema::Schema;
-use futures::TryStreamExt;
+use futures::{Stream, StreamExt, TryStreamExt};
 use parquet::{
     arrow::{
         AsyncArrowWriter, ParquetRecordBatchStreamBuilder,
@@ -30,9 +31,10 @@ use parquet::{
         async_reader::{AsyncFileReader, ParquetRecordBatchStream},
     },
     basic::{Compression, Encoding},
+    errors::ParquetError,
     file::{metadata::KeyValue, properties::WriterProperties},
 };
-use vortex::{VortexSessionDefault, buffer::Buffer};
+use vortex::{VortexSessionDefault, array::arrow::IntoArrowArray, buffer::Buffer};
 use vortex_file::OpenOptionsSessionExt;
 use vortex_io::session::RuntimeSessionExt;
 use vortex_session::VortexSession;
@@ -132,6 +134,10 @@ pub fn parse_file_key_columns(key: &str) -> Result<(String, String, String), any
     Ok((stream_key, date_key, file_name))
 }
 
+/// Unified stream type that supports both Vortex and Parquet formats
+pub type RecordBatchStream =
+    Pin<Box<dyn Stream<Item = Result<RecordBatch, parquet::errors::ParquetError>> + Send>>;
+
 /// A generic wrapper for getting a record batch stream from a reader.
 /// It can be used for both bytes and file.
 async fn get_recordbatch_reader<T>(
@@ -147,21 +153,67 @@ where
 }
 
 pub async fn get_recordbatch_reader_from_bytes(
+    file_format: FileFormat,
     data: &bytes::Bytes,
-) -> Result<(Arc<Schema>, ParquetRecordBatchStream<Cursor<bytes::Bytes>>), anyhow::Error> {
-    let schema_reader = Cursor::new(data.clone());
+) -> Result<(Arc<Schema>, RecordBatchStream), anyhow::Error> {
+    match file_format {
+        FileFormat::Parquet => {
+            let schema_reader = Cursor::new(data.clone());
+            let (schema, reader) = get_recordbatch_reader(schema_reader).await?;
+            Ok((schema, Box::pin(reader)))
+        }
+        FileFormat::Vortex => {
+            // Read vortex file from bytes and convert to record batches
+            let session = VortexSession::default().with_tokio();
+            let buf = Buffer::from(data.to_vec());
+            let vxf = session.open_options().open(buf).await?;
+            let schema = Arc::new(vxf.dtype().to_arrow_schema()?);
 
-    let (schema, reader) = get_recordbatch_reader(schema_reader).await?;
+            // Create a stream that converts vortex arrays to record batches
+            let arrow_data_type = arrow::datatypes::DataType::Struct(schema.fields().clone());
+            let vortex_stream = vxf.scan()?.into_array_stream()?;
 
-    Ok((schema, reader))
+            let stream = vortex_stream.then(move |result| {
+                let arrow_data_type = arrow_data_type.clone();
+                async move {
+                    match result {
+                        Ok(vortex_array) => {
+                            // Convert vortex array to arrow array
+                            let arrow_array =
+                                vortex_array.into_arrow(&arrow_data_type).map_err(|e| {
+                                    ParquetError::General(format!(
+                                        "Failed to convert vortex to arrow: {e}",
+                                    ))
+                                })?;
+
+                            // Convert to struct array and then to record batch
+                            let struct_array = arrow_array
+                                .as_any()
+                                .downcast_ref::<arrow::array::StructArray>()
+                                .ok_or_else(|| {
+                                    ParquetError::General(
+                                        "Expected struct array from vortex".to_string(),
+                                    )
+                                })?;
+
+                            Ok(RecordBatch::from(struct_array))
+                        }
+                        Err(e) => Err(ParquetError::General(e.to_string())),
+                    }
+                }
+            });
+
+            Ok((schema, Box::pin(stream)))
+        }
+    }
 }
 
 // should not have such function in the config
 pub async fn read_recordbatch_from_bytes(
+    file_format: FileFormat,
     data: &bytes::Bytes,
 ) -> Result<(Arc<Schema>, Vec<RecordBatch>), anyhow::Error> {
-    let reader = Cursor::new(data.clone());
-    let (schema, reader) = get_recordbatch_reader(reader).await?;
+    let (schema, reader) = get_recordbatch_reader_from_bytes(file_format, data).await?;
     let batches = reader.try_collect().await?;
     Ok((schema, batches))
 }
@@ -318,9 +370,10 @@ mod tests {
         .unwrap();
 
         // Read back
-        let (read_schema, read_batches) = read_recordbatch_from_bytes(&bytes::Bytes::from(data))
-            .await
-            .unwrap();
+        let (read_schema, read_batches) =
+            read_recordbatch_from_bytes(FileFormat::Parquet, &bytes::Bytes::from(data))
+                .await
+                .unwrap();
 
         let read_schema = read_schema
             .as_ref()

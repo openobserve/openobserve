@@ -942,7 +942,8 @@ async fn merge_files(
     }
 
     // generate tantivy inverted index and write to storage
-    let (schema, reader) = get_recordbatch_reader_from_bytes(&buf).await?;
+    let file_format = get_config().common.file_format;
+    let (schema, reader) = get_recordbatch_reader_from_bytes(file_format, &buf).await?;
     let index_size = create_tantivy_index(
         "INGESTER",
         &new_file_key,
@@ -984,7 +985,9 @@ async fn extract_patterns_from_parquet(
 
     // Read parquet data and extract log messages
     let parquet_bytes = Bytes::from(parquet_data.to_vec());
-    let (_schema, mut reader) = get_recordbatch_reader_from_bytes(&parquet_bytes).await?;
+    let file_format = get_config().common.file_format;
+    let (_schema, mut reader) =
+        get_recordbatch_reader_from_bytes(file_format, &parquet_bytes).await?;
     let mut log_messages = Vec::new();
     let read_start = std::time::Instant::now();
 
@@ -1145,7 +1148,8 @@ async fn queue_services_from_parquet(
         let mut records_sent = 0u64;
         let mut records_dropped = 0u64;
 
-        let reader_result = get_recordbatch_reader_from_bytes(&parquet_bytes).await;
+        let file_format = get_config().common.file_format;
+        let reader_result = get_recordbatch_reader_from_bytes(file_format, &parquet_bytes).await;
         let (_schema, mut reader) = match reader_result {
             Ok(r) => r,
             Err(e) => {

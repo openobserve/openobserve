@@ -21,7 +21,7 @@ use arrow::array::{
 };
 use arrow_schema::{DataType, Field};
 use config::{
-    FxIndexMap,
+    FileFormat, FxIndexMap,
     cluster::LOCAL_NODE,
     get_config,
     meta::{
@@ -151,7 +151,8 @@ pub async fn generate_file(file: &FileKey) -> Result<(), anyhow::Error> {
     log::debug!("[FLATTEN_COMPACTOR] generate flatten file for {}", file.key);
 
     let data = storage::get_bytes(&file.account, &file.key).await?;
-    let (_, batches) = read_recordbatch_from_bytes(&data)
+    let file_format = FileFormat::from_extension(&file.key).unwrap_or_default();
+    let (_, batches) = read_recordbatch_from_bytes(file_format, &data)
         .await
         .map_err(|e| anyhow::anyhow!("read_recordbatch_from_bytes error: {}", e))?;
     let new_batches = generate_vertical_partition_recordbatch(&batches)

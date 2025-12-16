@@ -1063,7 +1063,8 @@ async fn generate_inverted_index(
     new_file_meta: &mut FileMeta,
     buf: &Bytes,
 ) -> Result<(), anyhow::Error> {
-    let (schema, reader) = get_recordbatch_reader_from_bytes(buf).await?;
+    let file_format = get_config().common.file_format;
+    let (schema, reader) = get_recordbatch_reader_from_bytes(file_format, buf).await?;
     let index_size = create_tantivy_index(
         "COMPACTOR",
         new_file_key,
@@ -1075,10 +1076,7 @@ async fn generate_inverted_index(
     .await
     .map_err(|e| {
         anyhow::anyhow!(
-            "create_tantivy_index_on_compactor for file: {}, error: {}, need delete files: {:?}",
-            new_file_key,
-            e,
-            retain_file_list
+            "create_tantivy_index_on_compactor for file: {new_file_key}, error: {e}, need delete files: {retain_file_list:?}",
         )
     })?;
     new_file_meta.index_size = index_size as i64;
@@ -1377,7 +1375,8 @@ async fn process_single_parquet_buffer(
 ) -> Result<(), anyhow::Error> {
     // Read record batches from parquet bytes
     let bytes = Bytes::from(parquet_bytes.to_vec());
-    let (_schema, batches) = read_recordbatch_from_bytes(&bytes).await?;
+    let file_format = get_config().common.file_format;
+    let (_schema, batches) = read_recordbatch_from_bytes(file_format, &bytes).await?;
 
     if batches.is_empty() {
         return Ok(());
