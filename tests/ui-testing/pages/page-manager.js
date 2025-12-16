@@ -44,6 +44,7 @@ import { SanityPage } from "./generalPages/sanityPage.js";
 import { ChangeOrgPage } from "./generalPages/changeOrgPage.js";
 import { EnrichmentPage } from "./generalPages/enrichmentPage.js";
 import { ThemePage } from "./generalPages/themePage.js";
+import { LanguagePage } from "./generalPages/languagePage.js";
 const SchemaPage = require("./generalPages/schemaPage.js");
 const SchemaLoadPage = require("./generalPages/schemaLoadPage.js");
 const APICleanup = require("./apiCleanup.js");
@@ -115,6 +116,7 @@ class PageManager {
     this.changeOrgPage = new ChangeOrgPage(page);
     this.enrichmentPage = new EnrichmentPage(page);
     this.themePage = new ThemePage(page);
+    this.languagePage = new LanguagePage(page);
     this.schemaPage = new SchemaPage(page);
     this.schemaLoadPage = new SchemaLoadPage(page);
 
