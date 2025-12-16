@@ -856,70 +856,19 @@ export const usePanelDataLoader = (
 
       // Check if the query type is "promql"
       if (panelSchema.value.queryType == "promql") {
+        // copy of current abortController
+        // which is used to check whether the current query has been aborted
+        const abortControllerRef = abortController;
+
         try {
-          // Iterate through each query in the panel schema
-          const queryPromises = panelSchema.value.queries?.map(
-            async (it: any) => {
-              const { query: query1, metadata: metadata1 } = replaceQueryValue(
-                it.query,
-                startISOTimestamp,
-                endISOTimestamp,
-                panelSchema.value.queryType,
-              );
-
-              const { query: query2, metadata: metadata2 } =
-                await applyDynamicVariables(
-                  query1,
-                  panelSchema.value.queryType,
-                );
-
-              const query = query2;
-              const metadata = {
-                originalQuery: it.query,
-                query: query,
-                startTime: startISOTimestamp,
-                endTime: endISOTimestamp,
-                queryType: panelSchema.value.queryType,
-                variables: [...(metadata1 || []), ...(metadata2 || [])],
-              };
-              const { traceparent, traceId } = generateTraceContext();
-              addTraceId(traceId);
-              try {
-                const res = await callWithAbortController(
-                  () =>
-                    queryService.metrics_query_range({
-                      org_identifier:
-                        store.state.selectedOrganization.identifier,
-                      query: query,
-                      start_time: startISOTimestamp,
-                      end_time: endISOTimestamp,
-                      step: panelSchema.value.config.step_value ?? "0",
-                      dashboard_id: dashboardId?.value,
-                      dashboard_name: dashboardName?.value,
-                      folder_id: folderId?.value,
-                      folder_name: folderName?.value,
-                      panel_id: panelSchema.value.id,
-                      panel_name: panelSchema.value.title,
-                      run_id: runId?.value,
-                      tab_id: tabId?.value,
-                      tab_name: tabName?.value,
-                    }),
-                  abortController.signal,
-                );
-
-                state.errorDetail = {
-                  message: "",
-                  code: "",
-                };
-                return { result: res.data.data, metadata: metadata };
-              } catch (error) {
-                processApiError(error, "promql");
-                return { result: null, metadata: metadata };
-              } finally {
-                removeTraceId(traceId);
-              }
-            },
-          );
+          // Initialize state for PromQL streaming
+          state.data = [];
+          state.metadata = {
+            queries: [],
+          };
+          state.resultMetaData = [];
+          state.annotations = [];
+          state.isOperationCancelled = false;
 
           // Start fetching annotations in parallel with queries
           const annotationsPromise = (async () => {
@@ -938,23 +887,151 @@ export const usePanelDataLoader = (
             }
           })();
 
-          // Wait for all query promises to resolve
-          const queryResults: any = await Promise.all(queryPromises);
+          // Initialize result data and metadata arrays
+          const queryResults: any[] = [];
+          const queryMetadata: any[] = [];
 
-          state.loading = false;
-          state.data = queryResults.map((it: any) => it?.result);
-          state.metadata = {
-            queries: queryResults.map((it: any) => it?.metadata),
-          };
+          // Process each query using streaming
+          for (const [queryIndex, it] of panelSchema.value.queries.entries()) {
+            const { query: query1, metadata: metadata1 } = replaceQueryValue(
+              it.query,
+              startISOTimestamp,
+              endISOTimestamp,
+              panelSchema.value.queryType,
+            );
+
+            const { query: query2, metadata: metadata2 } =
+              await applyDynamicVariables(
+                query1,
+                panelSchema.value.queryType,
+              );
+
+            const query = query2;
+            const metadata = {
+              originalQuery: it.query,
+              query: query,
+              startTime: startISOTimestamp,
+              endTime: endISOTimestamp,
+              queryType: panelSchema.value.queryType,
+              variables: [...(metadata1 || []), ...(metadata2 || [])],
+            };
+
+            queryMetadata[queryIndex] = metadata;
+            queryResults[queryIndex] = null; // Initialize with null
+
+            const { traceId } = generateTraceContext();
+            const payload = {
+              queryReq: {
+                query: query,
+                start_time: startISOTimestamp,
+                end_time: endISOTimestamp,
+                step: panelSchema.value.config.step_value ?? "0",
+              },
+              type: "promql" as const,
+              traceId: traceId,
+              org_id: store.state.selectedOrganization.identifier,
+              meta: {
+                dashboard_id: dashboardId?.value,
+                dashboard_name: dashboardName?.value,
+                folder_id: folderId?.value,
+                folder_name: folderName?.value,
+                panel_id: panelSchema.value.id,
+                panel_name: panelSchema.value.title,
+                run_id: runId?.value,
+                tab_id: tabId?.value,
+                tab_name: tabName?.value,
+              },
+            };
+
+            // if aborted, return
+            if (abortControllerRef?.signal?.aborted) {
+              // Set partial data flag on abort
+              state.isPartialData = true;
+              // Save current state to cache
+              saveCurrentStateToCache();
+              return;
+            }
+
+            const handlePromQLResponse = (data: any, res: any) => {
+              if (res?.type === "promql_response") {
+                // Accumulate results - handle partitioned responses
+                const currentResult = queryResults[queryIndex] || [];
+                const newData = res?.content?.results;
+
+                if (Array.isArray(newData)) {
+                  queryResults[queryIndex] = [...currentResult, ...newData];
+                } else {
+                  queryResults[queryIndex] = newData;
+                }
+
+                // Update state with accumulated results
+                state.data = [...queryResults];
+                state.metadata = {
+                  queries: queryMetadata,
+                };
+
+                // Clear error on successful response
+                state.errorDetail = {
+                  message: "",
+                  code: "",
+                };
+              }
+            };
+
+            const handlePromQLError = (data: any, err: any) => {
+              state.loading = false;
+              state.isOperationCancelled = false;
+              state.isPartialData = false;
+
+              const errorMessage = err?.content?.message || err?.content?.error || "Unknown error";
+              const errorCode = err?.content?.code || "";
+
+              state.errorDetail = {
+                message: errorMessage,
+                code: errorCode,
+              };
+
+              removeTraceId(traceId);
+            };
+
+            const handlePromQLComplete = (data: any, _: any) => {
+              state.loading = false;
+              state.isOperationCancelled = false;
+              state.isPartialData = false;
+
+              // Final update with complete results
+              state.data = [...queryResults];
+              state.metadata = {
+                queries: queryMetadata,
+              };
+
+              removeTraceId(traceId);
+
+              // Save to cache after completion
+              saveCurrentStateToCache();
+            };
+
+            const handlePromQLReset = (data: any, res: any) => {
+              // Reset handling if needed
+            };
+
+            fetchQueryDataWithHttpStream(payload, {
+              data: handlePromQLResponse,
+              error: handlePromQLError,
+              complete: handlePromQLComplete,
+              reset: handlePromQLReset,
+            });
+
+            addTraceId(traceId);
+          }
 
           // Wait for annotations to complete and update state
-          // The watcher in PanelSchemaRenderer will trigger re-render when this updates
           state.annotations = await annotationsPromise;
 
-          // this is async task, which will be executed in background(await is not required)
-          saveCurrentStateToCache();
         } catch (error) {
           state.loading = false;
+          state.isOperationCancelled = false;
+          state.isPartialData = false;
         }
       } else {
         // copy of current abortController
