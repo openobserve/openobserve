@@ -999,6 +999,7 @@ mod tests {
     };
     use datafusion::common::TableReference;
     use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+    use proto::cluster_rpc::SearchQuery;
 
     use super::*;
     use crate::{common::meta::search::CachedQueryResponse, service::search::Sql};
@@ -1278,18 +1279,28 @@ mod tests {
             local_mode: None,
         };
         let mut origin_sql = req.query.sql.clone();
-        let mut file_path = "test_org/logs/test_stream".to_string();
+        let file_path = "test_org/logs/test_stream".to_string();
         let is_aggregate = false;
         let mut should_exec_query = true;
+
+        // Parse SQL to get metadata (new signature requires this)
+        let query: SearchQuery = req.query.clone().into();
+        let sql = Sql::new(&query, org_id, stream_type, req.search_type)
+            .await
+            .unwrap();
+        let (result_ts_col, is_descending) =
+            get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate).unwrap_or_default();
 
         let result = check_cache(
             trace_id,
             org_id,
-            stream_type,
             &mut req,
             &mut origin_sql,
-            &mut file_path,
+            &file_path,
             is_aggregate,
+            &sql,
+            &result_ts_col,
+            is_descending,
             &mut should_exec_query,
         )
         .await;
