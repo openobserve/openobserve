@@ -257,7 +257,7 @@ test.describe("Ingestion Configuration Tests", () => {
       { path: '/ingestion/languages/nodejs', label: 'Node.js', category: 'languages' },
       { path: '/ingestion/languages/java', label: 'Java', category: 'languages' },
       { path: '/ingestion/languages/go', label: 'Go', category: 'languages' },
-      { path: '/ingestion/languages/rust', label: 'Rust', category: 'languages' },
+      // Rust integration removed from UI - no longer available
       { path: '/ingestion/languages/dotnetlogs', label: '.NET Logs', category: 'languages' },
       { path: '/ingestion/languages/dotnettracing', label: '.NET Tracing', category: 'languages' },
       { path: '/ingestion/languages/fastapi', label: 'FastAPI', category: 'languages' },
