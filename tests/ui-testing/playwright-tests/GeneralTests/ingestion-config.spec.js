@@ -17,78 +17,60 @@ test.describe("Ingestion Configuration Tests", () => {
   });
 
   test.describe("Ingestion Navigation", () => {
-    test("should navigate to Recommended ingestion page", {
+    test("should navigate to Recommended, Logs, and Metrics pages", {
       tag: ['@ingestion', '@navigation', '@P0']
     }, async () => {
-      testLogger.info('Testing navigation to Recommended ingestion page');
-
       const orgId = process.env["ORGNAME"];
+
+      // Test Recommended page navigation
+      testLogger.info('Testing navigation to Recommended ingestion page');
       await pm.ingestionConfigPage.navigateToRecommended(orgId);
       await pm.ingestionConfigPage.expectRecommendedPageLoaded();
+      testLogger.info('✓ Recommended page loaded successfully');
 
-      testLogger.info('Recommended ingestion page loaded successfully');
-    });
-
-    test("should navigate to Custom/Logs ingestion parent page", {
-      tag: ['@ingestion', '@logs', '@P0']
-    }, async () => {
+      // Test Custom/Logs page navigation
       testLogger.info('Testing navigation to Custom/Logs ingestion page');
-
-      const orgId = process.env["ORGNAME"];
       await pm.ingestionConfigPage.navigateToCustom(orgId);
       await pm.ingestionConfigPage.expectLogsPageLoaded();
+      testLogger.info('✓ Logs page loaded successfully');
 
-      testLogger.info('Logs ingestion page loaded with integration options');
-    });
-
-    test("should navigate to Custom/Metrics ingestion parent page", {
-      tag: ['@ingestion', '@metrics', '@P0']
-    }, async () => {
+      // Test Custom/Metrics page navigation
       testLogger.info('Testing navigation to Custom/Metrics ingestion page');
-
-      const orgId = process.env["ORGNAME"];
-      await pm.ingestionConfigPage.navigateToCustom(orgId);
       await pm.ingestionConfigPage.clickMetricsTab();
       await pm.ingestionConfigPage.expectMetricsPageLoaded();
+      testLogger.info('✓ Metrics page loaded successfully');
 
-      testLogger.info('Metrics ingestion page loaded with integration options');
+      testLogger.info('All ingestion page navigation tests completed');
     });
   });
 
   test.describe("Copy Functionality", () => {
-    test("should copy Fluentd configuration to clipboard", {
+    test("should copy Logs and Metrics configurations to clipboard", {
       tag: ['@ingestion', '@copy', '@P1']
     }, async () => {
-      testLogger.info('Testing copy functionality for Fluentd configuration');
-
       const orgId = process.env["ORGNAME"];
+
+      // Test copy functionality for Logs (Fluentd)
+      testLogger.info('Testing copy functionality for Fluentd (Logs) configuration');
       await pm.ingestionConfigPage.navigateToIntegration('/ingestion/custom/logs/fluentd', orgId);
-
-      const contentText = await pm.ingestionConfigPage.getContentText();
+      const fluentdContent = await pm.ingestionConfigPage.getContentText();
       await pm.ingestionConfigPage.expectContentLength(0);
-      testLogger.info(`Configuration content displayed (${contentText.length} chars)`);
-
+      testLogger.info(`✓ Fluentd configuration displayed (${fluentdContent.length} chars)`);
       await pm.ingestionConfigPage.clickCopyButton();
       await pm.ingestionConfigPage.verifyNotificationVisible('Copied Successfully');
+      testLogger.info('✓ Fluentd configuration copied successfully');
 
-      testLogger.info('Copy button clicked, notification displayed');
-    });
-
-    test("should copy Prometheus configuration to clipboard", {
-      tag: ['@ingestion', '@copy', '@P1']
-    }, async () => {
-      testLogger.info('Testing copy functionality for Prometheus configuration');
-
-      const orgId = process.env["ORGNAME"];
+      // Test copy functionality for Metrics (Prometheus)
+      testLogger.info('Testing copy functionality for Prometheus (Metrics) configuration');
       await pm.ingestionConfigPage.navigateToIntegration('/ingestion/custom/metrics/prometheus', orgId);
-
-      const contentText = await pm.ingestionConfigPage.getContentText();
-      expect(contentText).toBeTruthy();
-
+      const prometheusContent = await pm.ingestionConfigPage.getContentText();
+      expect(prometheusContent).toBeTruthy();
+      testLogger.info(`✓ Prometheus configuration displayed (${prometheusContent.length} chars)`);
       await pm.ingestionConfigPage.clickCopyButton();
       await pm.ingestionConfigPage.verifyNotificationVisible();
+      testLogger.info('✓ Prometheus configuration copied successfully');
 
-      testLogger.info('Prometheus configuration copied successfully');
+      testLogger.info('All copy functionality tests completed');
     });
   });
 
@@ -188,97 +170,12 @@ test.describe("Ingestion Configuration Tests", () => {
   });
 
   test.describe("Documentation Links", () => {
-    // Complete list of ALL integrations across all categories
-    const allIntegrations = [
-      // Logs
-      { path: '/ingestion/custom/logs/curl', label: 'Curl', category: 'logs' },
-      { path: '/ingestion/custom/logs/fluentbit', label: 'FluentBit', category: 'logs' },
-      { path: '/ingestion/custom/logs/fluentd', label: 'Fluentd', category: 'logs' },
-      { path: '/ingestion/custom/logs/filebeat', label: 'FileBeat', category: 'logs' },
-      { path: '/ingestion/custom/logs/vector', label: 'Vector', category: 'logs' },
-      { path: '/ingestion/custom/logs/syslogng', label: 'Syslog-ng', category: 'logs' },
-      { path: '/ingestion/custom/logs/logstash', label: 'Logstash', category: 'logs' },
-
-      // Metrics
-      { path: '/ingestion/custom/metrics/prometheus', label: 'Prometheus', category: 'metrics' },
-      { path: '/ingestion/custom/metrics/otelCollector', label: 'OTEL Collector', category: 'metrics' },
-      { path: '/ingestion/custom/metrics/cloudwatch', label: 'CloudWatch Metrics', category: 'metrics' },
-
-      // Traces
-      { path: '/ingestion/custom/traces/opentelemetry', label: 'OpenTelemetry', category: 'traces' },
-
-      // Databases
-      { path: '/ingestion/databases/postgres', label: 'PostgreSQL', category: 'databases' },
-      { path: '/ingestion/databases/mysql', label: 'MySQL', category: 'databases' },
-      { path: '/ingestion/databases/mongodb', label: 'MongoDB', category: 'databases' },
-      { path: '/ingestion/databases/redis', label: 'Redis', category: 'databases' },
-      { path: '/ingestion/databases/cassandra', label: 'Cassandra', category: 'databases' },
-      { path: '/ingestion/databases/elasticsearch', label: 'Elasticsearch', category: 'databases' },
-      { path: '/ingestion/databases/couchdb', label: 'CouchDB', category: 'databases' },
-      { path: '/ingestion/databases/dynamodb', label: 'DynamoDB', category: 'databases' },
-      { path: '/ingestion/databases/oracle', label: 'Oracle', category: 'databases' },
-      { path: '/ingestion/databases/sqlserver', label: 'SQL Server', category: 'databases' },
-      { path: '/ingestion/databases/snowflake', label: 'Snowflake', category: 'databases' },
-      { path: '/ingestion/databases/databricks', label: 'Databricks', category: 'databases' },
-      { path: '/ingestion/databases/saphana', label: 'SAP HANA', category: 'databases' },
-      { path: '/ingestion/databases/aerospike', label: 'Aerospike', category: 'databases' },
-      { path: '/ingestion/databases/zookeeper', label: 'Zookeeper', category: 'databases' },
-
-      // Servers
-      { path: '/ingestion/servers/nginx', label: 'Nginx', category: 'servers' },
-      { path: '/ingestion/servers/apache', label: 'Apache', category: 'servers' },
-      { path: '/ingestion/servers/iis', label: 'IIS', category: 'servers' },
-
-      // Security
-      { path: '/ingestion/security/okta', label: 'Okta', category: 'security' },
-      { path: '/ingestion/security/office365', label: 'Office 365', category: 'security' },
-      { path: '/ingestion/security/googleworkspace', label: 'Google Workspace', category: 'security' },
-      { path: '/ingestion/security/jumpcloud', label: 'JumpCloud', category: 'security' },
-      { path: '/ingestion/security/openvpn', label: 'OpenVPN', category: 'security' },
-      { path: '/ingestion/security/osquery', label: 'OSQuery', category: 'security' },
-      { path: '/ingestion/security/falco', label: 'Falco', category: 'security' },
-
-      // DevOps
-      { path: '/ingestion/devops/jenkins', label: 'Jenkins', category: 'devops' },
-      { path: '/ingestion/devops/terraform', label: 'Terraform', category: 'devops' },
-      { path: '/ingestion/devops/ansible', label: 'Ansible', category: 'devops' },
-      { path: '/ingestion/devops/githubactions', label: 'GitHub Actions', category: 'devops' },
-
-      // Networking
-      { path: '/ingestion/networking/netflow', label: 'Netflow', category: 'networking' },
-
-      // Message Queues
-      { path: '/ingestion/messagequeues/kafka', label: 'Kafka', category: 'messagequeues' },
-      { path: '/ingestion/messagequeues/rabbitmq', label: 'RabbitMQ', category: 'messagequeues' },
-      { path: '/ingestion/messagequeues/nats', label: 'NATS', category: 'messagequeues' },
-
-      // Languages/Frameworks
-      { path: '/ingestion/languages/python', label: 'Python', category: 'languages' },
-      { path: '/ingestion/languages/nodejs', label: 'Node.js', category: 'languages' },
-      { path: '/ingestion/languages/java', label: 'Java', category: 'languages' },
-      { path: '/ingestion/languages/go', label: 'Go', category: 'languages' },
-      // Rust integration removed from UI - no longer available
-      { path: '/ingestion/languages/dotnetlogs', label: '.NET Logs', category: 'languages' },
-      { path: '/ingestion/languages/dotnettracing', label: '.NET Tracing', category: 'languages' },
-      { path: '/ingestion/languages/fastapi', label: 'FastAPI', category: 'languages' },
-
-      // Others
-      { path: '/ingestion/others/airbyte', label: 'Airbyte', category: 'others' },
-      { path: '/ingestion/others/airflow', label: 'Airflow', category: 'others' },
-      { path: '/ingestion/others/cribl', label: 'Cribl', category: 'others' },
-      { path: '/ingestion/others/heroku', label: 'Heroku', category: 'others' },
-      { path: '/ingestion/others/vercel', label: 'Vercel', category: 'others' },
-
-      // Recommended
-      { path: '/ingestion/recommended/kubernetes', label: 'Kubernetes', category: 'recommended' },
-      { path: '/ingestion/recommended/gcp', label: 'GCP', category: 'recommended' },
-      { path: '/ingestion/recommended/azure', label: 'Azure', category: 'recommended' },
-      { path: '/ingestion/recommended/aws', label: 'AWS', category: 'recommended' },
-    ];
-
     test("should validate ALL documentation links across all integrations", {
       tag: ['@ingestion', '@links', '@comprehensive', '@P1']
     }, async () => {
+      const { IngestionConfigPage } = require('../../pages/generalPages/ingestionConfigPage.js');
+      const allIntegrations = IngestionConfigPage.allIntegrations;
+
       testLogger.info(`=== Starting comprehensive documentation link validation for ${allIntegrations.length} integrations ===`);
 
       // URLs that are known to work but cause issues in automated testing
