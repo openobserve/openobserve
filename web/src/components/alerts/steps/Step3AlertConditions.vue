@@ -453,7 +453,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dense
                   borderless
                   min="1"
-                  style="background: none"
+                  style="background: none;"
                   debounce="300"
                   @update:model-value="emitTriggerUpdate"
                 />
@@ -492,6 +492,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
+        <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
+        <div class="flex items-start q-mr-sm tw-pb-4 tw-mb-4">
+          <div class="tw-font-semibold flex items-center" style="width: 190px">
+            {{ t("alerts.silenceNotification") + " *" }}
+            <q-icon
+              name="info"
+              size="17px"
+              class="q-ml-xs cursor-pointer"
+              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+            >
+              <q-tooltip anchor="center right" self="center left" max-width="300px">
+                <span style="font-size: 14px">
+                  Silences notifications after alert triggers for specified duration.<br />
+                  e.g. if the alert triggers at 4:00 PM and the silence period is 30 minutes,
+                  no notifications will be sent until 4:30 PM even if the alert triggers again.
+                </span>
+              </q-tooltip>
+            </q-icon>
+          </div>
+          <div>
+            <div class="flex items-center">
+              <q-input
+                v-model.number="formData.trigger_condition.silence"
+                type="number"
+                dense
+                borderless
+                min="0"
+                style="width: 180px; background: none"
+                suffix="Minutes"
+                debounce="300"
+                @update:model-value="emitTriggerUpdate"
+              />
+            </div>
+            <div
+              v-if="formData.trigger_condition.silence < 0 || formData.trigger_condition.silence === undefined || formData.trigger_condition.silence === null || formData.trigger_condition.silence === ''"
+              class="text-red-8 q-pt-xs"
+              style="font-size: 11px; line-height: 12px"
+            >
+              Field is required!
+            </div>
+          </div>
+        </div>
+
         <!-- Destinations -->
         <div class="flex items-start q-mr-sm tw-pb-4 tw-mb-4">
           <div class="tw-font-semibold flex items-center" style="width: 190px">
@@ -522,7 +565,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 hide-bottom-space
                 @filter="filterDestinations"
                 @update:model-value="emitDestinationsUpdate"
-                style="width: 300px; max-width: 300px"
+                style="width: 180px; max-width: 300px"
               >
                 <template v-slot:selected>
                   <div

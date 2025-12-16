@@ -25,18 +25,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       Preview
     </div>
-    <div data-test="alert-preview-chart" class="preview-alert-chart card-container" style="flex: 1; min-height: 0">
+    <div data-test="alert-preview-chart" class="preview-alert-chart" style="flex: 1; min-height: 0">
       <p class="sql-preview" v-if="selectedTab === 'sql'">
         Preview is not available in SQL mode
       </p>
       <PanelSchemaRenderer
         v-else-if="chartData"
-        :height="6"
-        :width="6"
+        :height="5"
+        :width="5"
         :panelSchema="chartData"
         :selectedTimeObj="dashboardPanelData.meta.dateTime"
         :variablesData="{}"
         searchType="UI"
+        style="height: 180px; width: 100%; overflow-x: hidden;"
       />
     </div>
   </div>
