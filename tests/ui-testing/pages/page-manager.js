@@ -26,6 +26,7 @@ import { AlertDestinationsPage } from "./alertsPages/alertDestinationsPage.js";
 import { PipelinesPage } from "./pipelinesPages/pipelinesPage.js";
 import { LoginPage } from "./generalPages/loginPage.js";
 import { IngestionPage } from "./generalPages/ingestionPage.js";
+import { IngestionConfigPage } from "./generalPages/ingestionConfigPage.js";
 
 // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
 import { HomePage } from "./generalPages/homePage.js";
@@ -98,6 +99,7 @@ class PageManager {
     this.pipelinesPage = new PipelinesPage(page);
     this.loginPage = new LoginPage(page);
     this.ingestionPage = new IngestionPage(page);
+    this.ingestionConfigPage = new IngestionConfigPage(page);
 
     // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
     this.homePage = new HomePage(page);
