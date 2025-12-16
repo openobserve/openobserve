@@ -258,10 +258,16 @@ export const processVariableContent = (
     ];
 
     placeholders.forEach((placeholder) => {
-      let value = effectiveValue ?? "";
+      // Check if value is null or empty array (use sentinel value)
+      const isNullValue =
+        effectiveValue === null ||
+        effectiveValue === undefined ||
+        (Array.isArray(effectiveValue) && effectiveValue.length === 0);
 
-      // Handle array formatting
-      if (Array.isArray(value)) {
+      let value = isNullValue ? "_o2_all_" : effectiveValue;
+
+      // Handle array formatting (only if not null)
+      if (!isNullValue && Array.isArray(value)) {
         if (placeholder.includes(":csv")) {
           value = value.join(",");
         } else if (placeholder.includes(":pipe")) {
@@ -283,7 +289,7 @@ export const processVariableContent = (
             .replace(/\}/g, "\\}"),
           "g",
         ),
-        value,
+        String(value),
       );
     });
   });

@@ -186,7 +186,7 @@ export default defineComponent({
   },
   setup(props: any, { emit }) {
     const store = useStore();
-
+    
     // Try to inject variablesManager from parent (for backward compatibility)
     const injectedManager = inject<any>("variablesManager", undefined);
     const manager = props.variablesManager || injectedManager;
@@ -229,113 +229,41 @@ export default defineComponent({
       return [...otherVariables, ...dynamicFilters];
     });
 
+    // Try to inject variablesManager from parent (for backward compatibility)
+    const injectedManager = inject<any>('variablesManager', undefined);
+    const manager = props.variablesManager || injectedManager;
+
+    // Determine if we're using the new manager-based approach
+    const useManager = !!manager;
+
+    // Computed property to get filtered variables from manager
+    const managerVariables = computed(() => {
+      if (!useManager) return [];
+
+      const scopeKey = props.scope;
+      let variables: any[] = [];
+
+      if (scopeKey === 'global') {
+        variables = manager.variablesData.global || [];
+      } else if (scopeKey === 'tabs' && props.tabId) {
+        variables = manager.variablesData.tabs[props.tabId] || [];
+      } else if (scopeKey === 'panels' && props.panelId) {
+        variables = manager.variablesData.panels[props.panelId] || [];
+      }
+
+      return variables;
+    });
+
     // variables data derived from the variables config list
     const variablesData: any = reactive({
       isVariablesLoading: false,
       values: [],
     });
 
-    // ================== FOR DEBUGGING PURPOSES ONLY ==================
-    // watch for changes in variablesData.values
-    let previousValues: any[] = [];
-    watch(
-      () => variablesData.values,
-      (newValues) => {
-        return;
-        // Track all changes to log them together
-        const changes: any[] = [];
-
-        // Compare each variable's properties
-        newValues.forEach((newVar: any, index: number) => {
-          const oldVar = previousValues[index];
-          if (!oldVar) {
-            changes.push({
-              variable: newVar.name,
-              type: "new_variable",
-            });
-            return;
-          }
-
-          // List of properties to watch
-          const propertiesToWatch = [
-            "value",
-            "isLoading",
-            "isVariablePartialLoaded",
-            "isVariableLoadingPending",
-            "options",
-          ];
-
-          // Check each property for changes
-          const variableChanges: any = {
-            name: newVar.name,
-            changes: [],
-          };
-
-          propertiesToWatch.forEach((prop) => {
-            // Get deep copies of values to avoid proxy objects
-            const newValue = JSON.parse(JSON.stringify(newVar[prop]));
-            const oldValue = JSON.parse(JSON.stringify(oldVar[prop]));
-
-            // For arrays (like options) or objects, compare stringified versions
-            const hasChanged =
-              Array.isArray(newValue) || typeof newValue === "object"
-                ? JSON.stringify(newValue) !== JSON.stringify(oldValue)
-                : newValue !== oldValue;
-
-            if (hasChanged) {
-              variableChanges.changes.push({
-                property: prop,
-                from: oldValue,
-                to: newValue,
-              });
-            }
-          });
-
-          if (variableChanges.changes.length > 0) {
-            changes.push(variableChanges);
-          }
-        });
-
-        // Log all changes together if there are any
-        if (changes.length > 0) {
-          console.group(`Variables changed at ${new Date().toISOString()}`);
-
-          changes.forEach((change) => {
-            if (change.type === "new_variable") {
-              console.log(`🆕 New variable added: ${change.variable}`);
-            } else {
-              console.groupCollapsed(`Variable: ${change.name}`);
-              change.changes.forEach((propertyChange: any) => {
-                console.log(
-                  `Property "${propertyChange.property}":`,
-                  "\nFrom:",
-                  typeof propertyChange.from === "object"
-                    ? JSON.stringify(propertyChange.from, null, 2)
-                    : propertyChange.from,
-                  "\nTo:",
-                  typeof propertyChange.to === "object"
-                    ? JSON.stringify(propertyChange.to, null, 2)
-                    : propertyChange.to,
-                );
-              });
-              console.groupEnd();
-            }
-          });
-
-          console.groupEnd();
-        }
-
-        // Store deep copy of current values for next comparison
-        previousValues = JSON.parse(JSON.stringify(newValues));
-      },
-      { deep: true },
-    );
-
+    // Utility function for logging (can be enabled for debugging)
     const variableLog = (name: string, message: string) => {
-      // console.log(`[Variable: ${name}] ${message}`);
+      // Uncomment for debugging: console.log(`[Variable: ${name}] ${message}`);
     };
-
-    // ================== [END] FOR DEBUGGING PURPOSES ONLY ==================
 
     // variables dependency graph
     let variablesDependencyGraph: any = {};
@@ -520,12 +448,13 @@ export default defineComponent({
             // Process the first response
             // Filter out only undefined values (keep null and empty strings)
             const newOptions = fieldHit.values
-              .filter((value: any) => value.zo_sql_key !== undefined)
+              .filter((value: any) =>
+                value.zo_sql_key !== undefined &&
+                value.zo_sql_key !== null &&
+                value.zo_sql_key !== ""
+              )
               .map((value: any) => ({
-                label:
-                  value.zo_sql_key !== ""
-                    ? value.zo_sql_key.toString()
-                    : "<blank>",
+                label: value.zo_sql_key.toString(),
                 value: value.zo_sql_key.toString(),
               }));
             // For first response or subsequent responses, merge with existing options and keep selected values
@@ -1883,13 +1812,15 @@ export default defineComponent({
 
       if (fieldHit) {
         // Extract the values for the specified field from the result
+        // Filter out undefined, null, and empty strings
         const newOptions = fieldHit.values
-          .filter((value: any) => value.zo_sql_key || value.zo_sql_key === "")
+          .filter((value: any) =>
+            value.zo_sql_key !== undefined &&
+            value.zo_sql_key !== null &&
+            value.zo_sql_key !== ""
+          )
           .map((value: any) => ({
-            // Use the zo_sql_key as the label if it is not empty, otherwise use "<blank>"
-            label:
-              value.zo_sql_key !== "" ? value.zo_sql_key.toString() : "<blank>",
-            // Use the zo_sql_key as the value
+            label: value.zo_sql_key.toString(),
             value: value.zo_sql_key.toString(),
           }));
 
@@ -2100,7 +2031,23 @@ export default defineComponent({
      * @returns {Promise<void>} - A promise that resolves when the options have been loaded.
      */
     const loadVariableOptions = async (variableObject: any) => {
-      // Check if there's already a loading request in progress
+      console.log("variableObject", variableObject);
+      
+      // If using manager, delegate to manager
+      if (useManager && manager) {
+        try {
+          const variableKey = manager.getVariableKey
+            ? manager.getVariableKey(variableObject.name, props.scope, props.tabId, props.panelId)
+            : `${variableObject.name}@${props.scope}${props.tabId ? `@${props.tabId}` : ''}${props.panelId ? `@${props.panelId}` : ''}`;
+          await manager.loadSingleVariable(variableKey);
+          return;
+        } catch (error) {
+          console.error('Error loading variable via manager:', error);
+          // Fall through to legacy behavior on error
+        }
+      }
+
+      // Legacy behavior: Check if there's already a loading request in progress
       if (variableObject.isLoading) {
         return;
       }
