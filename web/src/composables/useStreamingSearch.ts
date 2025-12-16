@@ -538,9 +538,11 @@ const useHttpStreaming = () => {
   }
 
   const convertToPromQLResponse = (traceId: string, response: any, type: StreamResponseType) => {
+    // Backend sends: PromqlResponse { data: QueryResult { result_type, result } }
+    // We need to extract the QueryResult and return it in a format compatible with the old API
     return {
       content: {
-        results: response.data || response,
+        results: response.data || response, // This contains { result_type, result }
         trace_id: traceId,
       },
       type: "promql_response",
