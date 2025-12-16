@@ -1,11 +1,11 @@
 name: Playwright UI Tests
 
 on:
-  # Run when PR receives an approval review
+  # Run when PR receives an approval review (for TestDino upload gating)
   pull_request_review:
     types: [submitted]
 
-  # Run on PR events (for label override + post-approval pushes)
+  # Run on PR events
   pull_request:
     types: [synchronize, opened, labeled]
     branches:
@@ -51,38 +51,38 @@ env:
   UPLOAD_TO_TESTDINO: ${{ vars.UPLOAD_TO_TESTDINO || 'false' }}
 
 jobs:
-  # Gate job: Determines if tests should run based on approval status or labels
-  check_approval:
-    name: Check Approval Gate
+  # Gate job: Determines if TestDino upload should run based on approval status or labels
+  check_testdino_upload:
+    name: Check TestDino Upload Gate
     runs-on: ubuntu-latest
     permissions:
       pull-requests: read
     outputs:
-      should_run: ${{ steps.check.outputs.should_run }}
+      should_upload: ${{ steps.check.outputs.should_upload }}
     steps:
-      - name: Determine if tests should run
+      - name: Determine if TestDino upload should run
         id: check
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "::group::Determining if tests should run"
-          SHOULD_RUN="false"
+          echo "::group::Determining if TestDino upload should run"
+          SHOULD_UPLOAD="false"
 
-          # 1. Always run on push to main
+          # 1. Always upload on push to main
           if [ "${{ github.event_name }}" == "push" ]; then
             echo "::notice::Trigger: Push to main branch"
-            SHOULD_RUN="true"
+            SHOULD_UPLOAD="true"
 
-          # 2. Always run on manual dispatch
+          # 2. Always upload on manual dispatch
           elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo "::notice::Trigger: Manual workflow dispatch"
-            SHOULD_RUN="true"
+            SHOULD_UPLOAD="true"
 
-          # 3. Run if PR just got approved
+          # 3. Upload if PR just got approved
           elif [ "${{ github.event_name }}" == "pull_request_review" ]; then
             if [ "${{ github.event.review.state }}" == "approved" ]; then
               echo "::notice::Trigger: PR just received approval"
-              SHOULD_RUN="true"
+              SHOULD_UPLOAD="true"
             else
               echo "::notice::Review submitted but not an approval (state: ${{ github.event.review.state }})"
             fi
@@ -90,9 +90,9 @@ jobs:
           # 4. For PR events (synchronize, opened, labeled)
           elif [ "${{ github.event_name }}" == "pull_request" ]; then
             # Check for override label
-            if [ "${{ contains(github.event.pull_request.labels.*.name, 'run-e2e-integration-tests') }}" == "true" ]; then
-              echo "::notice::Trigger: Override label 'run-e2e-integration-tests' detected"
-              SHOULD_RUN="true"
+            if [ "${{ contains(github.event.pull_request.labels.*.name, 'upload-testdino-true') }}" == "true" ]; then
+              echo "::notice::Trigger: Override label 'upload-testdino-true' detected"
+              SHOULD_UPLOAD="true"
             else
               # Check if PR is already approved (for synchronize events)
               echo "Checking PR approval status via API..."
@@ -103,22 +103,20 @@ jobs:
 
               if [ "$APPROVED_COUNT" -gt 0 ]; then
                 echo "::notice::Trigger: PR has existing approval ($APPROVED_COUNT approvals found)"
-                SHOULD_RUN="true"
+                SHOULD_UPLOAD="true"
               else
-                echo "::notice::PR not yet approved and no override label. Skipping tests."
-                echo "::notice::To run tests early, add the 'run-e2e-integration-tests' label"
+                echo "::notice::PR not yet approved and no override label. Skipping TestDino upload."
+                echo "::notice::To upload early, add the 'upload-testdino-true' label"
               fi
             fi
           fi
 
-          echo "should_run=$SHOULD_RUN" >> $GITHUB_OUTPUT
-          echo "::notice::Final decision: should_run=$SHOULD_RUN"
+          echo "should_upload=$SHOULD_UPLOAD" >> $GITHUB_OUTPUT
+          echo "::notice::Final decision: should_upload=$SHOULD_UPLOAD"
           echo "::endgroup::"
 
   build_binary:
     name: build_binary
-    needs: [check_approval]
-    if: needs.check_approval.outputs.should_run == 'true'
     runs-on:
       labels: repo-openobserve-standard-16
 
@@ -683,8 +681,8 @@ jobs:
 
   merge_and_upload_reports:
     name: Merge Reports and Upload to TestDino
-    needs: [check_approval, ui_integration_tests]
-    if: ${{ !cancelled() && needs.check_approval.outputs.should_run == 'true' && needs.ui_integration_tests.result != 'skipped' }}
+    needs: [check_testdino_upload, ui_integration_tests]
+    if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
     runs-on:
       labels: repo-openobserve-standard-8
 
@@ -815,7 +813,7 @@ jobs:
           echo "::endgroup::"
 
       - name: Upload to TestDino
-        if: ${{ (success() || failure()) && env.UPLOAD_TO_TESTDINO == 'true' }}
+        if: ${{ (success() || failure()) && env.UPLOAD_TO_TESTDINO == 'true' && needs.check_testdino_upload.outputs.should_upload == 'true' }}
         run: |
           cd tests/ui-testing
 
@@ -839,11 +837,9 @@ jobs:
 
   generate_coverage_report:
     name: Generate Coverage Report
-    needs: [check_approval, build_binary, ui_integration_tests]
+    needs: [build_binary, ui_integration_tests]
     runs-on: repo-openobserve-standard-8
-    if: |
-      needs.check_approval.outputs.should_run == 'true' &&
-      (success() || failure())
+    if: success() || failure()
 
     steps:
       - name: Clone the current repo
@@ -881,28 +877,11 @@ jobs:
     runs-on:
       labels: repo-openobserve-standard-8
     permissions: {}
-    needs: [check_approval, build_binary, ui_integration_tests, merge_and_upload_reports, generate_coverage_report]
+    needs: [build_binary, ui_integration_tests, merge_and_upload_reports, generate_coverage_report]
     if: always()
     steps:
       - name: Check test results
         run: |
-          # First check if tests were skipped due to approval gating
-          APPROVAL_GATE="${{ needs.check_approval.outputs.should_run }}"
-
-          if [ "$APPROVAL_GATE" != "true" ]; then
-            echo "::notice::Tests were skipped - PR not yet approved"
-            echo ""
-            echo "=================================================="
-            echo "  TESTS SKIPPED - AWAITING PR APPROVAL"
-            echo "=================================================="
-            echo ""
-            echo "Tests will run automatically when:"
-            echo "  - A reviewer approves this PR"
-            echo "  - You add the 'run-e2e-integration-tests' label"
-            echo ""
-            exit 0
-          fi
-
           # Check all job results - accept success or skipped for all jobs
           BUILD_OK=false
           UI_OK=false
