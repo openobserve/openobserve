@@ -188,65 +188,101 @@ test.describe("Ingestion Configuration Tests", () => {
   });
 
   test.describe("Documentation Links", () => {
-    test("should verify FluentBit documentation link exists and is valid", {
-      tag: ['@ingestion', '@links', '@P2']
+    const integrationsWithLinks = [
+      { path: '/ingestion/custom/logs/fluentbit', label: 'FluentBit', category: 'logs' },
+      { path: '/ingestion/custom/logs/fluentd', label: 'Fluentd', category: 'logs' },
+      { path: '/ingestion/custom/metrics/prometheus', label: 'Prometheus', category: 'metrics' },
+      { path: '/ingestion/databases/postgres', label: 'PostgreSQL', category: 'databases' },
+      { path: '/ingestion/databases/mysql', label: 'MySQL', category: 'databases' },
+      { path: '/ingestion/servers/nginx', label: 'Nginx', category: 'servers' },
+      { path: '/ingestion/servers/apache', label: 'Apache', category: 'servers' },
+      { path: '/ingestion/recommended/gcp', label: 'GCP', category: 'recommended' },
+      { path: '/ingestion/recommended/azure', label: 'Azure', category: 'recommended' },
+    ];
+
+    for (const integration of integrationsWithLinks) {
+      test(`should verify ${integration.label} documentation links are accessible`, {
+        tag: ['@ingestion', '@links', `@${integration.category}`, '@P1']
+      }, async () => {
+        testLogger.info(`Testing documentation links for ${integration.label}`);
+
+        const orgId = process.env["ORGNAME"];
+        await pm.ingestionConfigPage.navigateToIntegration(integration.path, orgId);
+
+        // Get all documentation links on this page
+        const linkCount = await pm.ingestionConfigPage.getDocumentationLinkCount();
+        testLogger.info(`Found ${linkCount} documentation link(s) on ${integration.label} page`);
+
+        if (linkCount === 0) {
+          testLogger.info(`ℹ No documentation links found for ${integration.label}`);
+          return;
+        }
+
+        // Check HTTP status for all links
+        const linkResults = await pm.ingestionConfigPage.getAllDocumentationLinksStatus();
+
+        let brokenLinks = 0;
+        for (const result of linkResults) {
+          if (result.ok) {
+            testLogger.info(`✓ Link ${result.index + 1}: ${result.url} - Status: ${result.status}`);
+          } else {
+            testLogger.info(`✗ Link ${result.index + 1}: ${result.url} - Status: ${result.status || result.error}`);
+            brokenLinks++;
+          }
+        }
+
+        // Assert all links are working
+        expect(brokenLinks).toBe(0);
+
+        testLogger.info(`${integration.label} documentation links validation completed - ${linkResults.length} links checked`);
+      });
+    }
+
+    test("should report all broken documentation links across integrations", {
+      tag: ['@ingestion', '@links', '@comprehensive', '@P1']
     }, async () => {
-      testLogger.info('Testing documentation link for FluentBit');
+      testLogger.info('Comprehensive documentation link validation across all tested integrations');
 
       const orgId = process.env["ORGNAME"];
-      await pm.ingestionConfigPage.navigateToIntegration('/ingestion/custom/logs/fluentbit', orgId);
+      const allBrokenLinks = [];
 
-      // Verify documentation links exist
-      const linkCount = await pm.ingestionConfigPage.verifyDocumentationLinksExist();
-      testLogger.info(`✓ Found ${linkCount} documentation link(s)`);
+      for (const integration of integrationsWithLinks) {
+        await pm.ingestionConfigPage.navigateToIntegration(integration.path, orgId);
 
-      // Verify the link has a valid href
-      const href = await pm.ingestionConfigPage.verifyDocumentationLinkHref(0);
-      testLogger.info(`✓ Documentation link URL: ${href}`);
+        const linkCount = await pm.ingestionConfigPage.getDocumentationLinkCount();
 
-      expect(href).toContain('openobserve.ai/blog');
+        if (linkCount > 0) {
+          const linkResults = await pm.ingestionConfigPage.getAllDocumentationLinksStatus();
 
-      testLogger.info('Documentation link verification completed');
-    });
-
-    test("should verify PostgreSQL documentation link exists", {
-      tag: ['@ingestion', '@links', '@databases', '@P2']
-    }, async () => {
-      testLogger.info('Testing documentation link for PostgreSQL');
-
-      const orgId = process.env["ORGNAME"];
-      await pm.ingestionConfigPage.navigateToIntegration('/ingestion/databases/postgres', orgId);
-
-      // Verify at least one documentation link exists
-      const linkCount = await pm.ingestionConfigPage.getDocumentationLinkCount();
-      testLogger.info(`Found ${linkCount} documentation link(s)`);
-
-      if (linkCount > 0) {
-        const href = await pm.ingestionConfigPage.verifyDocumentationLinkHref(0);
-        testLogger.info(`✓ First documentation link: ${href}`);
-        expect(href).toBeTruthy();
+          const broken = linkResults.filter(r => !r.ok);
+          if (broken.length > 0) {
+            allBrokenLinks.push({
+              integration: integration.label,
+              path: integration.path,
+              brokenLinks: broken
+            });
+          }
+        }
       }
 
-      testLogger.info('PostgreSQL documentation link test completed');
-    });
-
-    test("should verify Prometheus documentation link exists", {
-      tag: ['@ingestion', '@links', '@metrics', '@P2']
-    }, async () => {
-      testLogger.info('Testing documentation link for Prometheus');
-
-      const orgId = process.env["ORGNAME"];
-      await pm.ingestionConfigPage.navigateToIntegration('/ingestion/custom/metrics/prometheus', orgId);
-
-      const linkCount = await pm.ingestionConfigPage.getDocumentationLinkCount();
-      testLogger.info(`Found ${linkCount} documentation link(s) on Prometheus page`);
-
-      if (linkCount > 0) {
-        const href = await pm.ingestionConfigPage.verifyDocumentationLinkHref(0);
-        testLogger.info(`✓ Documentation link verified: ${href}`);
+      // Log all broken links
+      if (allBrokenLinks.length > 0) {
+        testLogger.info('=== BROKEN LINKS FOUND ===');
+        for (const item of allBrokenLinks) {
+          testLogger.info(`\n${item.integration} (${item.path}):`);
+          for (const link of item.brokenLinks) {
+            testLogger.info(`  ✗ ${link.url} - Status: ${link.status || link.error}`);
+          }
+        }
+        testLogger.info('\n=========================');
+      } else {
+        testLogger.info('✓ All documentation links are working correctly!');
       }
 
-      testLogger.info('Prometheus documentation link test completed');
+      // Fail test if any broken links found
+      expect(allBrokenLinks.length).toBe(0);
+
+      testLogger.info('Comprehensive link validation completed');
     });
   });
 

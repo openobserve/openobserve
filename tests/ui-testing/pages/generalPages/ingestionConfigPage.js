@@ -203,4 +203,50 @@ export class IngestionConfigPage {
             await links[index].click();
         }
     }
+
+    async verifyDocumentationLinkAccessible(index = 0) {
+        const links = await this.getDocumentationLinks();
+        if (links.length > index) {
+            const href = await links[index].getAttribute('href');
+
+            // Make HEAD request to check if link is accessible
+            const response = await this.page.request.head(href, { timeout: 10000 });
+            const status = response.status();
+
+            return {
+                url: href,
+                status: status,
+                ok: response.ok()
+            };
+        }
+        return null;
+    }
+
+    async getAllDocumentationLinksStatus() {
+        const links = await this.getDocumentationLinks();
+        const results = [];
+
+        for (let i = 0; i < links.length; i++) {
+            const href = await links[i].getAttribute('href');
+            try {
+                const response = await this.page.request.head(href, { timeout: 10000 });
+                results.push({
+                    index: i,
+                    url: href,
+                    status: response.status(),
+                    ok: response.ok()
+                });
+            } catch (error) {
+                results.push({
+                    index: i,
+                    url: href,
+                    status: 'ERROR',
+                    ok: false,
+                    error: error.message
+                });
+            }
+        }
+
+        return results;
+    }
 }
