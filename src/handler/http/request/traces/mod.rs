@@ -97,7 +97,7 @@ async fn handle_req(
     };
 
     let org_id = org_id.into_inner();
-    let user_email = &user_email.user_id;
+    let user = crate::common::meta::ingestion::IngestUser::from_user_email(&user_email.user_id);
 
     #[cfg(feature = "cloud")]
     match check_ingestion_allowed(&org_id, StreamType::Traces, None).await {
@@ -122,9 +122,9 @@ async fn handle_req(
         .get(&get_config().grpc.stream_header_key)
         .and_then(|header| header.to_str().ok());
     let mut resp = if content_type.eq(CONTENT_TYPE_PROTO) {
-        traces::otlp_proto(&org_id, body, in_stream_name, user_email).await?
+        traces::otlp_proto(&org_id, body, in_stream_name, user).await?
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
-        traces::otlp_json(&org_id, body, in_stream_name, user_email).await?
+        traces::otlp_json(&org_id, body, in_stream_name, user).await?
     } else {
         HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
             http::StatusCode::BAD_REQUEST,

@@ -69,7 +69,7 @@ use crate::{
 pub async fn otlp_proto(
     org_id: &str,
     body: web::Bytes,
-    user_email: &str,
+    user: crate::common::meta::ingestion::IngestUser,
 ) -> Result<HttpResponse, std::io::Error> {
     let request = match ExportMetricsServiceRequest::decode(body) {
         Ok(v) => v,
@@ -81,7 +81,7 @@ pub async fn otlp_proto(
             )));
         }
     };
-    match handle_otlp_request(org_id, request, OtlpRequestType::HttpProtobuf, user_email).await {
+    match handle_otlp_request(org_id, request, OtlpRequestType::HttpProtobuf, user).await {
         Ok(v) => Ok(v),
         Err(e) => {
             log::error!(
@@ -103,7 +103,7 @@ pub async fn otlp_proto(
 pub async fn otlp_json(
     org_id: &str,
     body: web::Bytes,
-    user_email: &str,
+    user: crate::common::meta::ingestion::IngestUser,
 ) -> Result<HttpResponse, std::io::Error> {
     let request = match serde_json::from_slice::<ExportMetricsServiceRequest>(body.as_ref()) {
         Ok(req) => req,
@@ -115,7 +115,7 @@ pub async fn otlp_json(
             )));
         }
     };
-    match handle_otlp_request(org_id, request, OtlpRequestType::HttpJson, user_email).await {
+    match handle_otlp_request(org_id, request, OtlpRequestType::HttpJson, user).await {
         Ok(v) => Ok(v),
         Err(e) => {
             log::error!("[METRICS:OTLP] Error while handling http trace request: {e}");
@@ -136,7 +136,7 @@ pub async fn handle_otlp_request(
     org_id: &str,
     request: ExportMetricsServiceRequest,
     req_type: OtlpRequestType,
-    user_email: &str,
+    user: crate::common::meta::ingestion::IngestUser,
 ) -> Result<HttpResponse, anyhow::Error> {
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None).await {
@@ -636,10 +636,11 @@ pub async fn handle_otlp_request(
                         .map_or(0, |exec_pl| exec_pl.num_of_func())
                 });
         req_stats.response_time = start.elapsed().as_secs_f64();
-        req_stats.user_email = if user_email.is_empty() {
+        let email_str = user.to_email();
+        req_stats.user_email = if email_str.is_empty() {
             None
         } else {
-            Some(user_email.to_string())
+            Some(email_str)
         };
         report_request_usage_stats(
             req_stats,
