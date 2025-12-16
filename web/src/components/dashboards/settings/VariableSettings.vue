@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               flat
               :label="t(`dashboard.newVariable`)"
               @click="addVariables"
-              data-test="dashboard-variable-add-btn"
+              data-test="dashboard-add-variable-btn"
             />
           </div>
         </template>

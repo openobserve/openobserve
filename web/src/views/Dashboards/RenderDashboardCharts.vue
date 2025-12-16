@@ -93,6 +93,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           style="height: 100%; width: 100%"
         >
+          <!-- Panel-scoped Variables (if any, if using manager) -->
+          <VariablesValueSelector
+            v-if="variablesManager && getPanelVariables(panels[0].id).length > 0"
+            :scope="'panels'"
+            :panelId="panels[0].id"
+            :tabId="selectedTabId"
+            :variablesConfig="{ list: getPanelVariables(panels[0].id) }"
+            :variablesManager="variablesManager"
+            :selectedTimeDate="currentTimeObj['__global']"
+            data-test="panel-variables-selector"
+          />
+
           <PanelContainer
             @onDeletePanel="onDeletePanel"
             @onViewPanel="onViewPanel"
@@ -765,14 +777,14 @@ export default defineComponent({
           cellHeight: "17px", // Base cell height
           margin: 2, // Minimal margin between panels
           draggable: {
-            enable: !props.viewOnly && !saveDashboardData.isLoading.value, // Enable dragging unless view-only or saving
+            enable: !props.viewOnly && !saveDashboardData.isLoading, // Enable dragging unless view-only or saving
             handle: ".drag-allow", // Only allow dragging from specific handle
           },
           resizable: {
-            enable: !props.viewOnly && !saveDashboardData.isLoading.value, // Enable resizing unless view-only or saving
+            enable: !props.viewOnly && !saveDashboardData.isLoading, // Enable resizing unless view-only or saving
           },
-          disableResize: props.viewOnly || saveDashboardData.isLoading.value, // Disable resize in view-only
-          disableDrag: props.viewOnly || saveDashboardData.isLoading.value, // Disable drag in view-only
+          disableResize: props.viewOnly || saveDashboardData.isLoading, // Disable resize in view-only
+          disableDrag: props.viewOnly || saveDashboardData.isLoading, // Disable drag in view-only
           acceptWidgets: false, // Don't accept external widgets
           removable: false, // Don't allow removal by dragging out
           animate: false, // Disable animations for better performance
