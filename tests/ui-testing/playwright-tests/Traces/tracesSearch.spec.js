@@ -171,14 +171,57 @@ test.describe("Traces Search testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing no stream selected state');
 
-    // Check if no stream message is visible
-    const noStreamMessage = await page.locator(pm.tracesPage.noStreamSelectedText).isVisible({ timeout: 5000 }).catch(() => false);
+    // Wait for page to be ready
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-    if (noStreamMessage) {
-      await expect(page.locator(pm.tracesPage.noStreamSelectedText)).toBeVisible();
+    // Check if we're on the traces page and it's loaded
+    await expect(page.locator(pm.tracesPage.searchBar)).toBeVisible({ timeout: 10000 });
+
+    // Check for no stream message or verify a stream is already selected
+    const noStreamElement = page.locator(pm.tracesPage.noStreamSelectedText);
+    const streamSelectElement = page.locator(pm.tracesPage.streamSelect);
+
+    // First check if the no stream message exists on the page
+    const noStreamExists = await noStreamElement.count() > 0;
+    const streamSelectExists = await streamSelectElement.count() > 0;
+
+    if (noStreamExists && await noStreamElement.isVisible({ timeout: 1000 }).catch(() => false)) {
+      // No stream selected - this is the expected state for this test
+      await expect(noStreamElement).toBeVisible();
       testLogger.info('No stream selected message displayed correctly');
+
+      // Verify that stream selector is also available
+      if (streamSelectExists) {
+        await expect(streamSelectElement).toBeVisible();
+        testLogger.info('Stream selector is available for selection');
+      }
+    } else if (streamSelectExists && await streamSelectElement.isVisible({ timeout: 1000 }).catch(() => false)) {
+      // Stream selector is visible - a stream is already selected
+      testLogger.info('Stream already selected - verifying trace UI is functional');
+
+      // Verify the search bar is still functional
+      await expect(page.locator(pm.tracesPage.searchBar)).toBeVisible();
+
+      // Verify we can see either results or a proper message
+      const hasResults = await pm.tracesPage.hasTraceResults();
+      const hasNoResults = await page.locator(pm.tracesPage.resultNotFoundText).isVisible({ timeout: 1000 }).catch(() => false);
+
+      // At least one state should be present
+      const validState = hasResults || hasNoResults;
+      expect(validState).toBeTruthy();
+      testLogger.info(`Stream selected state verified: hasResults=${hasResults}, hasNoResults=${hasNoResults}`);
     } else {
-      testLogger.info('Stream already selected or not required');
+      // Neither state is visible - this might be a different UI state or error
+      testLogger.info('Neither no-stream message nor stream selector visible - checking page state');
+
+      // At minimum, verify the traces page loaded correctly
+      await expect(page.locator(pm.tracesPage.searchBar)).toBeVisible();
+
+      // Check if we're in a valid traces view state
+      const pageUrl = page.url();
+      expect(pageUrl).toContain('/traces');
+
+      testLogger.info('Traces page is loaded but stream selection UI not visible - may be auto-selected');
     }
   });
 
