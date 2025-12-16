@@ -956,15 +956,15 @@ export const usePanelDataLoader = (
 
             const handlePromQLResponse = (data: any, res: any) => {
               if (res?.type === "promql_response") {
-                // Backend sends: { content: { results: { result_type, result }, trace_id } }
+                // Backend sends: { content: { results: { result_type/resultType, result }, trace_id } }
                 // result is the actual PromQL data (vector/matrix with values)
                 // We need to extract and accumulate the result.result part
 
-                const newData = res?.content?.results; // This is { result_type, result }
+                const newData = res?.content?.results; // This is { result_type/resultType, result }
 
                 // Debug logging
                 console.log(`[PromQL Streaming] Query ${queryIndex} received chunk:`, {
-                  result_type: newData?.result_type,
+                  result_type: newData?.resultType || newData?.result_type,
                   result_length: Array.isArray(newData?.result) ? newData.result.length : 'not array',
                   newData: newData
                 });
@@ -980,9 +980,33 @@ export const usePanelDataLoader = (
                   if (currentResult?.result && Array.isArray(currentResult.result) &&
                       newData?.result && Array.isArray(newData.result)) {
                     // Merge the result arrays (time series data)
+                    // For matrix type, we need to merge values arrays for matching metrics
+                    const mergedResult = [...currentResult.result];
+
+                    newData.result.forEach((newMetric: any) => {
+                      // Find if this metric already exists in current results
+                      const existingIndex = mergedResult.findIndex((existingMetric: any) => {
+                        // Compare metric labels to find matching time series
+                        return JSON.stringify(existingMetric.metric) === JSON.stringify(newMetric.metric);
+                      });
+
+                      if (existingIndex >= 0) {
+                        // Metric exists - merge the values arrays
+                        if (Array.isArray(mergedResult[existingIndex].values) && Array.isArray(newMetric.values)) {
+                          mergedResult[existingIndex] = {
+                            ...mergedResult[existingIndex],
+                            values: [...mergedResult[existingIndex].values, ...newMetric.values]
+                          };
+                        }
+                      } else {
+                        // New metric - add it to results
+                        mergedResult.push(newMetric);
+                      }
+                    });
+
                     queryResults[queryIndex] = {
                       ...newData,
-                      result: [...currentResult.result, ...newData.result]
+                      result: mergedResult
                     };
                   } else if (newData) {
                     // Replace with new data if structure is different
