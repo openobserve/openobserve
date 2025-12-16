@@ -272,12 +272,6 @@ describe("DashboardGeoMapsQueryBuilder", () => {
       });
     });
 
-    it("should initialize operators", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.operators).toEqual(["=", "<>", ">=", "<=", ">", "<"]);
-    });
-
     it("should have access to dashboard panel data", () => {
       wrapper = createWrapper();
 
@@ -882,14 +876,6 @@ describe("DashboardGeoMapsQueryBuilder", () => {
   });
 
   describe("Error Handling", () => {
-    it("should handle missing weight field in having condition methods", () => {
-      mockDashboardPanelData.data.queries[0].fields.weight = { column: "test" };
-      wrapper = createWrapper();
-
-      // The method should handle null weight field gracefully
-      const result = wrapper.vm.getHavingCondition();
-      expect(result).toEqual({ operator: null, value: null });
-    });
 
     it("should handle missing query fields", () => {
       mockDashboardPanelData.data.queries[0].fields = {

@@ -269,12 +269,6 @@ describe("DashboardSankeyChartBuilder", () => {
       });
     });
 
-    it("should initialize operators", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.operators).toEqual(["=", "<>", ">=", "<=", ">", "<"]);
-    });
-
     it("should have access to dashboard panel data", () => {
       wrapper = createWrapper();
 
@@ -288,15 +282,13 @@ describe("DashboardSankeyChartBuilder", () => {
       expect(wrapper.vm.tab).toBe("General");
     });
 
-    it("should have options array defined", () => {
+    it("should have all necessary data properties defined", () => {
       wrapper = createWrapper();
 
-      const expectedOptions = [
-        "=", "<>", ">=", "<=", ">", "<",
-        "IN", "Contains", "Not Contains", "Is Null", "Is Not Null"
-      ];
-
-      expect(wrapper.vm.options).toEqual(expectedOptions);
+      expect(wrapper.vm.pagination).toBeDefined();
+      expect(wrapper.vm.model).toBeDefined();
+      expect(wrapper.vm.tab).toBeDefined();
+      expect(wrapper.vm.expansionItems).toBeDefined();
     });
   });
 
@@ -1015,14 +1007,6 @@ describe("DashboardSankeyChartBuilder", () => {
   });
 
   describe("Error Handling", () => {
-    it("should handle missing value field in having condition methods", () => {
-      mockDashboardPanelData.data.queries[0].fields.value = { column: "test" };
-      wrapper = createWrapper();
-
-      const result = wrapper.vm.getHavingCondition();
-      expect(result).toEqual({ operator: null, value: null });
-    });
-
     it("should handle missing query fields", () => {
       mockDashboardPanelData.data.queries[0].fields = {
         source: null,

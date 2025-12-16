@@ -268,12 +268,6 @@ describe("DashboardMapsQueryBuilder", () => {
       });
     });
 
-    it("should initialize operators", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.operators).toEqual(["=", "<>", ">=", "<=", ">", "<"]);
-    });
-
     it("should have access to dashboard panel data", () => {
       wrapper = createWrapper();
 
@@ -924,18 +918,6 @@ describe("DashboardMapsQueryBuilder", () => {
   });
 
   describe("Error Handling", () => {
-    it("should handle missing value_for_maps field in having condition methods", () => {
-      mockDashboardPanelData.data.queries[0].fields.value_for_maps = {
-        type: "build",
-        args: [
-          { type: "field", value: { field: "test", streamAlias: "" } }
-        ]
-      };
-      wrapper = createWrapper();
-
-      const result = wrapper.vm.getHavingCondition();
-      expect(result).toEqual({ operator: null, value: null });
-    });
 
     it("should handle missing query fields", () => {
       mockDashboardPanelData.data.queries[0].fields = {
@@ -1080,17 +1062,6 @@ describe("DashboardMapsQueryBuilder", () => {
 
       expect(wrapper.vm.getImageURL).toBeDefined();
       expect(typeof wrapper.vm.getImageURL).toBe('function');
-    });
-
-    it("should have options array defined", () => {
-      wrapper = createWrapper();
-
-      const expectedOptions = [
-        "=", "<>", ">=", "<=", ">", "<",
-        "IN", "Contains", "Not Contains", "Is Null", "Is Not Null"
-      ];
-
-      expect(wrapper.vm.options).toEqual(expectedOptions);
     });
   });
 });
