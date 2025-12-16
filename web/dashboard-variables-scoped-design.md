@@ -15,6 +15,7 @@
 12. [Migration Strategy](#migration-strategy)
 13. [Implementation Plan](#implementation-plan)
 14. [Edge Cases & Considerations](#edge-cases--considerations)
+15. [Testing Strategy](#testing-strategy)
 
 ---
 
@@ -2214,6 +2215,825 @@ This specification outlines the complete transformation of the dashboard variabl
 - **Gradual Adoption**: Users can adopt scoped variables incrementally
 
 This design maintains backward compatibility while enabling powerful new capabilities for variable management across complex dashboard layouts.
+
+---
+
+## Testing Strategy
+
+### Overview
+
+**CRITICAL REQUIREMENT**: After completing the implementation of scoped variables, comprehensive Playwright end-to-end tests MUST be run to verify all scenarios, dependencies, and interactions across all variable levels (global, tab, panel).
+
+### Why Playwright Tests Are Essential
+
+1. **Multi-Scope Interactions**: Validates that global, tab, and panel variables work together correctly
+2. **Dependency Chains**: Ensures cascading dependencies load in correct order across scopes
+3. **Lazy Loading**: Verifies variables only load when their scope becomes visible
+4. **URL Synchronization**: Tests that variable state properly persists in URLs
+5. **Edge Cases**: Validates behavior in complex scenarios (null values, rapid switching, etc.)
+6. **Regression Prevention**: Catches breaking changes in existing global-only behavior
+
+### Test Implementation Location
+
+**Directory**: `tests/ui-testing/playwright-tests/dashboards/`
+
+**Test Files**:
+- `dashboard-variables-global.spec.ts` - Global variable tests
+- `dashboard-variables-tab-scoped.spec.ts` - Tab-scoped variable tests
+- `dashboard-variables-panel-scoped.spec.ts` - Panel-scoped variable tests
+- `dashboard-variables-dependencies.spec.ts` - Cross-scope dependency tests
+- `dashboard-variables-url-sync.spec.ts` - URL synchronization tests
+- `dashboard-variables-edge-cases.spec.ts` - Edge case and error handling tests
+
+---
+
+### Test Suite 1: Global Variables
+
+**File**: `dashboard-variables-global.spec.ts`
+
+#### Test Case 1.1: Global Variable Basic Loading
+```typescript
+test('should load global variables on dashboard mount', async ({ page }) => {
+  // Setup: Create dashboard with global variables
+  await createDashboardWithGlobalVariables(page, {
+    variables: [
+      { name: 'country', type: 'query_values', scope: 'global' },
+      { name: 'environment', type: 'custom', scope: 'global', value: ['prod', 'staging'] }
+    ]
+  });
+
+  // Navigate to dashboard
+  await page.goto('/dashboards/view/test-dashboard');
+
+  // Verify: Global variables visible immediately
+  await expect(page.locator('[data-test="variable-selector-country"]')).toBeVisible();
+  await expect(page.locator('[data-test="variable-selector-environment"]')).toBeVisible();
+
+  // Verify: Variables have loaded data
+  await expect(page.locator('[data-test="variable-country-options"]')).not.toBeEmpty();
+});
+```
+
+#### Test Case 1.2: Global Variable Selection Updates All Panels
+```typescript
+test('should update all panels when global variable changes', async ({ page }) => {
+  // Setup: Dashboard with global variable and multiple panels
+  await createDashboardWithGlobalVariables(page, {
+    variables: [{ name: 'status', type: 'custom', scope: 'global', value: ['200', '404', '500'] }],
+    panels: [
+      { id: 'panel-1', query: 'SELECT * WHERE status=$status' },
+      { id: 'panel-2', query: 'SELECT count(*) WHERE status=$status' }
+    ]
+  });
+
+  await page.goto('/dashboards/view/test-dashboard');
+
+  // Select value in global variable
+  await page.locator('[data-test="variable-selector-status"]').click();
+  await page.locator('[data-test="variable-option-200"]').click();
+
+  // Verify: Both panels updated with new filter
+  await expect(page.locator('[data-test="panel-1"]')).toContainText('status=200');
+  await expect(page.locator('[data-test="panel-2"]')).toContainText('status=200');
+});
+```
+
+#### Test Case 1.3: Global Variable Dependencies
+```typescript
+test('should handle global variable dependencies correctly', async ({ page }) => {
+  // Setup: Chain of global variables (country → region → city)
+  await createDashboardWithGlobalVariables(page, {
+    variables: [
+      { name: 'country', type: 'query_values', scope: 'global' },
+      { name: 'region', type: 'query_values', scope: 'global',
+        dependsOn: 'country', query: 'SELECT region WHERE country=$country' },
+      { name: 'city', type: 'query_values', scope: 'global',
+        dependsOn: 'region', query: 'SELECT city WHERE region=$region' }
+    ]
+  });
+
+  await page.goto('/dashboards/view/test-dashboard');
+
+  // Verify: Initial loading sequence
+  await expect(page.locator('[data-test="variable-country-loading"]')).toBeVisible();
+  await expect(page.locator('[data-test="variable-region-loading"]')).toBeVisible();
+  await expect(page.locator('[data-test="variable-city-loading"]')).toBeVisible();
+
+  // Wait for country to load
+  await page.waitForSelector('[data-test="variable-country-loaded"]');
+
+  // Change country
+  await page.locator('[data-test="variable-selector-country"]').click();
+  await page.locator('[data-test="variable-option-USA"]').click();
+
+  // Verify: Dependent variables reload
+  await expect(page.locator('[data-test="variable-region-loading"]')).toBeVisible();
+  await page.waitForSelector('[data-test="variable-region-loaded"]');
+
+  // Verify: City reloads after region
+  await expect(page.locator('[data-test="variable-city-loading"]')).toBeVisible();
+});
+```
+
+---
+
+### Test Suite 2: Tab-Scoped Variables
+
+**File**: `dashboard-variables-tab-scoped.spec.ts`
+
+#### Test Case 2.1: Tab Variable Lazy Loading
+```typescript
+test('should only load tab variables when tab becomes active', async ({ page }) => {
+  // Setup: Dashboard with 2 tabs, each with tab-scoped variables
+  await createDashboardWithTabs(page, {
+    tabs: [
+      { id: 'tab-1', name: 'Logs', variables: [{ name: 'logLevel', scope: 'tab' }] },
+      { id: 'tab-2', name: 'Metrics', variables: [{ name: 'metric', scope: 'tab' }] }
+    ]
+  });
+
+  await page.goto('/dashboards/view/test-dashboard');
+
+  // Verify: Tab 1 visible by default, variables loading
+  await expect(page.locator('[data-test="tab-1"]')).toHaveClass(/active/);
+  await expect(page.locator('[data-test="variable-logLevel-loading"]')).toBeVisible();
+
+  // Verify: Tab 2 variables NOT loading yet
+  await expect(page.locator('[data-test="variable-metric-loading"]')).not.toBeVisible();
+
+  // Switch to Tab 2
+  await page.locator('[data-test="tab-button-tab-2"]').click();
+
+  // Verify: Tab 2 variables now loading
+  await expect(page.locator('[data-test="variable-metric-loading"]')).toBeVisible();
+  await page.waitForSelector('[data-test="variable-metric-loaded"]');
+});
+```
+
+#### Test Case 2.2: Tab Variable Independence
+```typescript
+test('should maintain independent values for same variable in different tabs', async ({ page }) => {
+  // Setup: Two tabs with same variable name but independent values
+  await createDashboardWithTabs(page, {
+    globalVariables: [{ name: 'country', type: 'custom', scope: 'global', value: ['USA'] }],
+    tabs: [
+      { id: 'tab-1', variables: [{ name: 'region', scope: 'tab', type: 'custom', value: ['CA', 'OR'] }] },
+      { id: 'tab-2', variables: [{ name: 'region', scope: 'tab', type: 'custom', value: ['NY', 'NJ'] }] }
+    ]
+  });
+
+  await page.goto('/dashboards/view/test-dashboard');
+
+  // Tab 1: Select CA
+  await page.locator('[data-test="variable-selector-region"]').click();
+  await page.locator('[data-test="variable-option-CA"]').click();
+
+  // Verify: Tab 1 region = CA
+  await expect(page.locator('[data-test="variable-region-value"]')).toContainText('CA');
+
+  // Switch to Tab 2
+  await page.locator('[data-test="tab-button-tab-2"]').click();
+
+  // Verify: Tab 2 region has different options (NY, NJ), NOT CA
+  await page.locator('[data-test="variable-selector-region"]').click();
+  await expect(page.locator('[data-test="variable-option-NY"]')).toBeVisible();
+  await expect(page.locator('[data-test="variable-option-CA"]')).not.toBeVisible();
+
+  // Select NY in Tab 2
+  await page.locator('[data-test="variable-option-NY"]').click();
+
+  // Switch back to Tab 1
+  await page.locator('[data-test="tab-button-tab-1"]').click();
+
+  // Verify: Tab 1 still has CA selected (not affected by Tab 2)
+  await expect(page.locator('[data-test="variable-region-value"]')).toContainText('CA');
+});
+```
+
+#### Test Case 2.3: Tab Variable Depends on Global Variable
+```typescript
+test('should allow tab variable to depend on global variable', async ({ page }) => {
+  // Setup: Global country, tab-scoped region depending on country
+  await createDashboardWithTabs(page, {
+    globalVariables: [{ name: 'country', type: 'custom', scope: 'global', value: ['USA', 'Canada'] }],
+    tabs: [
+      {
+        id: 'tab-1',
+        variables: [
+          { name: 'region', scope: 'tab', type: 'query_values',
+            dependsOn: 'country', query: 'SELECT region WHERE country=$country'
+          }
+        ]
+      }
+    ]
+  });
+
+  await page.goto('/dashboards/view/test-dashboard');
+
+  // Select country
+  await page.locator('[data-test="variable-selector-country"]').click();
+  await page.locator('[data-test="variable-option-USA"]').click();
+
+  // Verify: Tab variable starts loading after global variable changes
+  await expect(page.locator('[data-test="variable-region-loading"]')).toBeVisible();
+  await page.waitForSelector('[data-test="variable-region-loaded"]');
+
+  // Change country again
+  await page.locator('[data-test="variable-selector-country"]').click();
+  await page.locator('[data-test="variable-option-Canada"]').click();
+
+  // Verify: Tab variable reloads with new dependency value
+  await expect(page.locator('[data-test="variable-region-loading"]')).toBeVisible();
+  await page.waitForSelector('[data-test="variable-region-loaded"]');
+});
+```
+
+---
+
+### Test Suite 3: Panel-Scoped Variables
+
+**File**: `dashboard-variables-panel-scoped.spec.ts`
+
+#### Test Case 3.1: Panel Variable Lazy Loading with Intersection Observer
+```typescript
+test('should only load panel variables when panel enters viewport', async ({ page }) => {
+  // Setup: Dashboard with panels having panel-scoped variables, some below fold
+  await createDashboardWithPanels(page, {
+    panels: [
+      { id: 'panel-1', position: 'top', variables: [{ name: 'status', scope: 'panel' }] },
+      { id: 'panel-2', position: 'middle', variables: [{ name: 'code', scope: 'panel' }] },
+      { id: 'panel-3', position: 'bottom', variables: [{ name: 'error', scope: 'panel' }] }
+    ]
+  });
+
+  await page.goto('/dashboards/view/test-dashboard');
+
+  // Verify: Panel 1 (visible) variables loading
+  await expect(page.locator('[data-test="panel-1-variable-status-loading"]')).toBeVisible();
+
+  // Verify: Panel 3 (below fold) variables NOT loading yet
+  await expect(page.locator('[data-test="panel-3-variable-error-loading"]')).not.toBeVisible();
+
+  // Scroll to Panel 3
+  await page.locator('[data-test="panel-3"]').scrollIntoViewIfNeeded();
+
+  // Verify: Panel 3 variables now loading
+  await expect(page.locator('[data-test="panel-3-variable-error-loading"]')).toBeVisible();
+  await page.waitForSelector('[data-test="panel-3-variable-error-loaded"]');
+});
+```
+
+#### Test Case 3.2: Panel Variable Independence
+```typescript
+test('should maintain independent values for same variable in different panels', async ({ page }) => {
+  // Setup: Two panels with same variable name but independent values
+  await createDashboardWithPanels(page, {
+    panels: [
+      { id: 'panel-1', variables: [{ name: 'threshold', scope: 'panel', type: 'textbox', value: '100' }] },
+      { id: 'panel-2', variables: [{ name: 'threshold', scope: 'panel', type: 'textbox', value: '500' }] }
+    ]
+  });
+
+  await page.goto('/dashboards/view/test-dashboard');
+
+  // Verify: Panel 1 threshold = 100
+  await expect(page.locator('[data-test="panel-1-variable-threshold-value"]')).toHaveValue('100');
+
+  // Verify: Panel 2 threshold = 500 (different value)
+  await expect(page.locator('[data-test="panel-2-variable-threshold-value"]')).toHaveValue('500');
+
+  // Change Panel 1 threshold
+  await page.locator('[data-test="panel-1-variable-threshold-input"]').fill('200');
+
+  // Verify: Panel 2 threshold unchanged
+  await expect(page.locator('[data-test="panel-2-variable-threshold-value"]')).toHaveValue('500');
+});
+```
+
+#### Test Case 3.3: Panel Variable Depends on Tab Variable
+```typescript
+test('should allow panel variable to depend on tab variable', async ({ page }) => {
+  // Setup: Tab variable → Panel variable dependency
+  await createDashboardWithTabs(page, {
+    tabs: [
+      {
+        id: 'tab-1',
+        variables: [{ name: 'service', scope: 'tab', type: 'custom', value: ['api', 'web'] }],
+        panels: [
+          {
+            id: 'panel-1',
+            variables: [
+              { name: 'endpoint', scope: 'panel', type: 'query_values',
+                dependsOn: 'service', query: 'SELECT endpoint WHERE service=$service'
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  });
+
+  await page.goto('/dashboards/view/test-dashboard');
+
+  // Select tab variable
+  await page.locator('[data-test="variable-selector-service"]').click();
+  await page.locator('[data-test="variable-option-api"]').click();
+
+  // Verify: Panel variable starts loading
+  await expect(page.locator('[data-test="panel-1-variable-endpoint-loading"]')).toBeVisible();
+  await page.waitForSelector('[data-test="panel-1-variable-endpoint-loaded"]');
+
+  // Change tab variable
+  await page.locator('[data-test="variable-selector-service"]').click();
+  await page.locator('[data-test="variable-option-web"]').click();
+
+  // Verify: Panel variable reloads
+  await expect(page.locator('[data-test="panel-1-variable-endpoint-loading"]')).toBeVisible();
+});
+```
+
+---
+
+### Test Suite 4: Cross-Scope Dependencies
+
+**File**: `dashboard-variables-dependencies.spec.ts`
+
+#### Test Case 4.1: Global → Tab → Panel Dependency Chain
+```typescript
+test('should handle three-level dependency chain correctly', async ({ page }) => {
+  // Setup: Global → Tab → Panel
+  await createDashboardWithTabs(page, {
+    globalVariables: [
+      { name: 'country', type: 'custom', scope: 'global', value: ['USA'] }
+    ],
+    tabs: [
+      {
+        id: 'tab-1',
+        variables: [
+          { name: 'region', scope: 'tab', type: 'query_values',
+            dependsOn: 'country', query: 'SELECT region WHERE country=$country'
+          }
+        ],
+        panels: [
+          {
+            id: 'panel-1',
+            variables: [
+              { name: 'city', scope: 'panel', type: 'query_values',
+                dependsOn: 'region', query: 'SELECT city WHERE region=$region'
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  });
+
+  await page.goto('/dashboards/view/test-dashboard');
+
+  // Verify: All three levels load in sequence
+  await expect(page.locator('[data-test="variable-country-loading"]')).toBeVisible();
+  await page.waitForSelector('[data-test="variable-country-loaded"]');
+
+  await expect(page.locator('[data-test="variable-region-loading"]')).toBeVisible();
+  await page.waitForSelector('[data-test="variable-region-loaded"]');
+
+  await expect(page.locator('[data-test="panel-1-variable-city-loading"]')).toBeVisible();
+  await page.waitForSelector('[data-test="panel-1-variable-city-loaded"]');
+
+  // Change global variable
+  await page.locator('[data-test="variable-selector-country"]').click();
+  await page.locator('[data-test="variable-option-Canada"]').click();
+
+  // Verify: Cascade reload through all levels
+  await expect(page.locator('[data-test="variable-region-loading"]')).toBeVisible();
+  await page.waitForSelector('[data-test="variable-region-loaded"]');
+
+  await expect(page.locator('[data-test="panel-1-variable-city-loading"]')).toBeVisible();
+  await page.waitForSelector('[data-test="panel-1-variable-city-loaded"]');
+});
+```
+
+#### Test Case 4.2: Multiple Dependencies at Same Level
+```typescript
+test('should handle variable with multiple dependencies at same level', async ({ page }) => {
+  // Setup: Variable depending on two parent variables
+  await createDashboardWithGlobalVariables(page, {
+    variables: [
+      { name: 'startDate', type: 'textbox', scope: 'global', value: '2024-01-01' },
+      { name: 'endDate', type: 'textbox', scope: 'global', value: '2024-12-31' },
+      { name: 'events', type: 'query_values', scope: 'global',
+        dependsOn: ['startDate', 'endDate'],
+        query: 'SELECT * WHERE date >= $startDate AND date <= $endDate'
+      }
+    ]
+  });
+
+  await page.goto('/dashboards/view/test-dashboard');
+
+  // Verify: Child variable waits for both parents
+  await page.waitForSelector('[data-test="variable-startDate-loaded"]');
+  await page.waitForSelector('[data-test="variable-endDate-loaded"]');
+  await expect(page.locator('[data-test="variable-events-loading"]')).toBeVisible();
+
+  // Change one parent
+  await page.locator('[data-test="variable-selector-startDate"]').fill('2024-06-01');
+
+  // Verify: Child reloads
+  await expect(page.locator('[data-test="variable-events-loading"]')).toBeVisible();
+});
+```
+
+#### Test Case 4.3: Circular Dependency Detection
+```typescript
+test('should detect and prevent circular dependencies', async ({ page }) => {
+  // Setup: Attempt to create circular dependency
+  await page.goto('/dashboards/edit/test-dashboard');
+
+  // Create variable A
+  await addVariable(page, { name: 'varA', type: 'query_values', scope: 'global' });
+
+  // Create variable B depending on A
+  await addVariable(page, {
+    name: 'varB',
+    type: 'query_values',
+    scope: 'global',
+    dependsOn: 'varA'
+  });
+
+  // Attempt to make A depend on B (circular)
+  await editVariable(page, 'varA', { dependsOn: 'varB' });
+
+  // Verify: Error message shown
+  await expect(page.locator('[data-test="error-circular-dependency"]')).toBeVisible();
+  await expect(page.locator('[data-test="error-circular-dependency"]'))
+    .toContainText('Circular dependency detected: varA → varB → varA');
+
+  // Verify: Save button disabled
+  await expect(page.locator('[data-test="save-dashboard"]')).toBeDisabled();
+});
+```
+
+---
+
+### Test Suite 5: URL Synchronization
+
+**File**: `dashboard-variables-url-sync.spec.ts`
+
+#### Test Case 5.1: Global Variable in URL
+```typescript
+test('should sync global variable changes to URL', async ({ page }) => {
+  await createDashboardWithGlobalVariables(page, {
+    variables: [{ name: 'status', type: 'custom', scope: 'global', value: ['200', '404', '500'] }]
+  });
+
+  await page.goto('/dashboards/view/test-dashboard');
+
+  // Select variable value
+  await page.locator('[data-test="variable-selector-status"]').click();
+  await page.locator('[data-test="variable-option-200"]').click();
+
+  // Verify: URL updated
+  await expect(page).toHaveURL(/var-status=200/);
+
+  // Select multiple values
+  await page.locator('[data-test="variable-selector-status"]').click();
+  await page.locator('[data-test="variable-option-404"]').click();
+
+  // Verify: URL shows comma-separated values
+  await expect(page).toHaveURL(/var-status=200,404/);
+});
+```
+
+#### Test Case 5.2: Tab-Scoped Variable in URL
+```typescript
+test('should sync tab-scoped variable with correct URL format', async ({ page }) => {
+  await createDashboardWithTabs(page, {
+    tabs: [
+      { id: 'tab-1', variables: [{ name: 'region', scope: 'tab', type: 'custom', value: ['CA', 'OR'] }] },
+      { id: 'tab-2', variables: [{ name: 'region', scope: 'tab', type: 'custom', value: ['NY', 'NJ'] }] }
+    ]
+  });
+
+  await page.goto('/dashboards/view/test-dashboard');
+
+  // Tab 1: Select CA
+  await page.locator('[data-test="variable-selector-region"]').click();
+  await page.locator('[data-test="variable-option-CA"]').click();
+
+  // Verify: URL has tab-scoped format
+  await expect(page).toHaveURL(/var-region\.t\.tab-1=CA/);
+
+  // Switch to Tab 2
+  await page.locator('[data-test="tab-button-tab-2"]').click();
+
+  // Tab 2: Select NY
+  await page.locator('[data-test="variable-selector-region"]').click();
+  await page.locator('[data-test="variable-option-NY"]').click();
+
+  // Verify: URL has both tab scopes
+  await expect(page).toHaveURL(/var-region\.t\.tab-1=CA/);
+  await expect(page).toHaveURL(/var-region\.t\.tab-2=NY/);
+});
+```
+
+#### Test Case 5.3: Panel-Scoped Variable in URL
+```typescript
+test('should sync panel-scoped variable with correct URL format', async ({ page }) => {
+  await createDashboardWithPanels(page, {
+    panels: [
+      { id: 'panel-123', variables: [{ name: 'threshold', scope: 'panel', type: 'textbox', value: '100' }] }
+    ]
+  });
+
+  await page.goto('/dashboards/view/test-dashboard');
+
+  // Change panel variable
+  await page.locator('[data-test="panel-123-variable-threshold-input"]').fill('250');
+  await page.keyboard.press('Enter');
+
+  // Verify: URL has panel-scoped format
+  await expect(page).toHaveURL(/var-threshold\.p\.panel-123=250/);
+});
+```
+
+#### Test Case 5.4: Load Variables from URL
+```typescript
+test('should restore variable state from URL on page load', async ({ page }) => {
+  await createDashboardWithGlobalVariables(page, {
+    variables: [
+      { name: 'country', type: 'custom', scope: 'global', value: ['USA', 'Canada'] },
+      { name: 'status', type: 'custom', scope: 'global', value: ['200', '404', '500'] }
+    ]
+  });
+
+  // Navigate with pre-set URL parameters
+  await page.goto('/dashboards/view/test-dashboard?var-country=Canada&var-status=404,500');
+
+  // Verify: Variables restored from URL
+  await expect(page.locator('[data-test="variable-country-value"]')).toContainText('Canada');
+  await expect(page.locator('[data-test="variable-status-value"]')).toContainText('404, 500');
+});
+```
+
+#### Test Case 5.5: Drilldown URL Compatibility
+```typescript
+test('should apply unscoped drilldown URL to all variable instances', async ({ page }) => {
+  await createDashboardWithTabs(page, {
+    globalVariables: [{ name: 'status', type: 'custom', scope: 'global', value: ['200', '404'] }],
+    tabs: [
+      { id: 'tab-1', variables: [{ name: 'status', scope: 'tab', type: 'custom', value: ['200', '404'] }] },
+      { id: 'tab-2', variables: [{ name: 'status', scope: 'tab', type: 'custom', value: ['200', '404'] }] }
+    ]
+  });
+
+  // Navigate with drilldown URL (no scope specified)
+  await page.goto('/dashboards/view/test-dashboard?var-status=404');
+
+  // Verify: Global variable set to 404
+  await expect(page.locator('[data-test="variable-status-value"]')).toContainText('404');
+
+  // Switch to Tab 1
+  await page.locator('[data-test="tab-button-tab-1"]').click();
+
+  // Verify: Tab 1 variable also set to 404
+  await expect(page.locator('[data-test="tab-1-variable-status-value"]')).toContainText('404');
+
+  // Switch to Tab 2
+  await page.locator('[data-test="tab-button-tab-2"]').click();
+
+  // Verify: Tab 2 variable also set to 404
+  await expect(page.locator('[data-test="tab-2-variable-status-value"]')).toContainText('404');
+});
+```
+
+---
+
+### Test Suite 6: Edge Cases and Error Handling
+
+**File**: `dashboard-variables-edge-cases.spec.ts`
+
+#### Test Case 6.1: Variable with No Data (Null Case)
+```typescript
+test('should handle variable with no query results', async ({ page }) => {
+  await createDashboardWithGlobalVariables(page, {
+    variables: [
+      { name: 'nonexistent', type: 'query_values', scope: 'global',
+        query: 'SELECT field FROM nonexistent_table'
+      }
+    ],
+    panels: [
+      { id: 'panel-1', query: 'SELECT * WHERE field=$nonexistent' }
+    ]
+  });
+
+  await page.goto('/dashboards/view/test-dashboard');
+
+  // Verify: Variable shows empty state
+  await page.waitForSelector('[data-test="variable-nonexistent-loaded"]');
+  await expect(page.locator('[data-test="variable-nonexistent-empty"]')).toBeVisible();
+
+  // Verify: Panel query uses sentinel value
+  const panelQuery = await page.locator('[data-test="panel-1-query"]').textContent();
+  expect(panelQuery).toContain('field=_o2_all_');
+});
+```
+
+#### Test Case 6.2: Rapid Tab Switching
+```typescript
+test('should handle rapid tab switching without errors', async ({ page }) => {
+  await createDashboardWithTabs(page, {
+    tabs: [
+      { id: 'tab-1', variables: [{ name: 'var1', scope: 'tab', type: 'query_values' }] },
+      { id: 'tab-2', variables: [{ name: 'var2', scope: 'tab', type: 'query_values' }] },
+      { id: 'tab-3', variables: [{ name: 'var3', scope: 'tab', type: 'query_values' }] }
+    ]
+  });
+
+  await page.goto('/dashboards/view/test-dashboard');
+
+  // Rapidly switch tabs
+  for (let i = 0; i < 10; i++) {
+    await page.locator('[data-test="tab-button-tab-2"]').click();
+    await page.locator('[data-test="tab-button-tab-3"]').click();
+    await page.locator('[data-test="tab-button-tab-1"]').click();
+  }
+
+  // Verify: No errors, variables in correct state
+  await expect(page.locator('[data-test="error-message"]')).not.toBeVisible();
+  await expect(page.locator('[data-test="tab-1-variable-var1"]')).toBeVisible();
+});
+```
+
+#### Test Case 6.3: Panel Scrolling Performance
+```typescript
+test('should efficiently load panel variables during scrolling', async ({ page }) => {
+  // Setup: Many panels with variables
+  await createDashboardWithPanels(page, {
+    panels: Array.from({ length: 20 }, (_, i) => ({
+      id: `panel-${i}`,
+      variables: [{ name: `var${i}`, scope: 'panel', type: 'query_values' }]
+    }))
+  });
+
+  await page.goto('/dashboards/view/test-dashboard');
+
+  // Track network requests
+  let loadCount = 0;
+  page.on('request', (request) => {
+    if (request.url().includes('field_values')) loadCount++;
+  });
+
+  // Scroll through entire page
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+
+  // Wait for loading to stabilize
+  await page.waitForTimeout(2000);
+
+  // Verify: Reasonable number of requests (should use lazy loading)
+  expect(loadCount).toBeLessThan(25); // Not all 20 at once
+});
+```
+
+#### Test Case 6.4: Variable Depends on Hidden Tab
+```typescript
+test('should auto-load dependencies from hidden tabs', async ({ page }) => {
+  await createDashboardWithTabs(page, {
+    tabs: [
+      {
+        id: 'tab-1',
+        variables: [{ name: 'service', scope: 'tab', type: 'custom', value: ['api'] }]
+      },
+      {
+        id: 'tab-2',
+        panels: [
+          {
+            id: 'panel-1',
+            variables: [
+              { name: 'endpoint', scope: 'panel', type: 'query_values',
+                dependsOn: 'service', query: 'SELECT endpoint WHERE service=$service'
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  });
+
+  await page.goto('/dashboards/view/test-dashboard');
+
+  // Navigate directly to Tab 2 (Tab 1 never activated)
+  await page.locator('[data-test="tab-button-tab-2"]').click();
+
+  // Verify: Panel variable still loads (parent from Tab 1 auto-loaded)
+  await expect(page.locator('[data-test="panel-1-variable-endpoint-loading"]')).toBeVisible();
+  await page.waitForSelector('[data-test="panel-1-variable-endpoint-loaded"]');
+});
+```
+
+#### Test Case 6.5: Backward Compatibility with Legacy Dashboards
+```typescript
+test('should auto-migrate legacy dashboards without explicit scope', async ({ page }) => {
+  // Setup: Dashboard with old format (no scope field)
+  await createLegacyDashboard(page, {
+    variables: [
+      { name: 'country', type: 'query_values' }, // No scope specified
+      { name: 'status', type: 'custom', value: ['200', '404'] } // No scope specified
+    ]
+  });
+
+  await page.goto('/dashboards/view/legacy-dashboard');
+
+  // Verify: Variables migrated to global scope
+  await expect(page.locator('[data-test="variable-selector-country"]')).toBeVisible();
+  await expect(page.locator('[data-test="variable-selector-status"]')).toBeVisible();
+
+  // Verify: Variables work as global (visible everywhere)
+  await page.locator('[data-test="variable-selector-status"]').click();
+  await page.locator('[data-test="variable-option-200"]').click();
+
+  // Verify: URL uses global format
+  await expect(page).toHaveURL(/var-status=200/);
+});
+```
+
+---
+
+### Test Execution Strategy
+
+#### 1. Pre-Implementation Testing
+- Create test cases BEFORE implementation
+- Use tests as specification validation
+- Tests will fail initially (expected)
+
+#### 2. During Implementation
+- Run relevant test suite after each feature completion
+- Use test failures to identify integration issues
+- Fix issues immediately before moving to next feature
+
+#### 3. Post-Implementation Validation
+- **CRITICAL**: Run COMPLETE test suite after implementation
+- All tests MUST pass before considering implementation complete
+- Address any failures with high priority
+
+#### 4. Continuous Testing
+- Include tests in CI/CD pipeline
+- Run on every commit to prevent regressions
+- Monitor test performance and stability
+
+---
+
+### Test Execution Commands
+
+```bash
+# Run all dashboard variable tests
+npx playwright test tests/ui-testing/playwright-tests/dashboards/
+
+# Run specific test suite
+npx playwright test dashboard-variables-global.spec.ts
+
+# Run with UI mode for debugging
+npx playwright test --ui
+
+# Run specific test case
+npx playwright test -g "should load global variables on dashboard mount"
+
+# Run tests in parallel
+npx playwright test --workers=4
+
+# Generate test report
+npx playwright test --reporter=html
+```
+
+---
+
+### Success Criteria
+
+Implementation is complete ONLY when:
+
+1. ✅ All global variable tests pass (6+ test cases)
+2. ✅ All tab-scoped variable tests pass (6+ test cases)
+3. ✅ All panel-scoped variable tests pass (6+ test cases)
+4. ✅ All cross-scope dependency tests pass (6+ test cases)
+5. ✅ All URL synchronization tests pass (10+ test cases)
+6. ✅ All edge case tests pass (10+ test cases)
+7. ✅ No console errors during test execution
+8. ✅ All tests pass consistently (3 consecutive runs)
+9. ✅ Test execution time is reasonable (<5 minutes for full suite)
+10. ✅ All network requests are efficient (no unnecessary duplicate requests)
+
+**TOTAL**: Minimum 44+ test cases covering all scenarios
+
+---
+
+### Maintenance and Updates
+
+After initial implementation:
+
+1. **Add tests for new features**: Any new variable-related feature requires corresponding Playwright tests
+2. **Update tests for bug fixes**: Bug fixes should include regression tests
+3. **Monitor test stability**: Address flaky tests immediately
+4. **Review test coverage**: Periodically review and expand test coverage
+5. **Performance benchmarks**: Track test execution time and optimize as needed
 
 ---
 
