@@ -419,7 +419,7 @@ test.describe("dashboard UI testcases", () => {
     );
 
     // Set date-time and timezone for gauge chart
-    await pm.dateTimeHelper.setRelativeTimeRange("6-w");
+    await pm.dateTimeHelper.setRelativeTimeRange("15-m");
     await pm.dashboardPanelActions.applyDashboardBtn();
 
     // Verify the gauge chart is visible
@@ -429,7 +429,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.selectChartType("table");
 
     // Set timezone for the table chart
-    await pm.dateTimeHelper.setRelativeTimeRange("1-w");
+    await pm.dateTimeHelper.setRelativeTimeRange("15-m");
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
 
@@ -471,7 +471,7 @@ test.describe("dashboard UI testcases", () => {
     );
 
     // Set date-time filter
-    await pm.dateTimeHelper.setRelativeTimeRange("5-w");
+    await pm.dateTimeHelper.setRelativeTimeRange("15-m");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
 
@@ -521,7 +521,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Set date-time filter and timezone
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("15", "m");
     await pm.dashboardPanelActions.applyDashboardBtn();
 
     // Attempt to save the panel without a name
@@ -579,7 +579,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "filter");
 
     // Set time range and apply
-    await pm.dateTimeHelper.setRelativeTimeRange("5-w");
+    await pm.dateTimeHelper.setRelativeTimeRange("15-m");
     await pm.dashboardPanelActions.applyDashboardBtn();
 
     // Apply "Is Null" filter

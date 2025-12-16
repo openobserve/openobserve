@@ -87,13 +87,12 @@ test.describe("dashboard streaming testcases", () => {
     );
 
     await pm.dashboardPanelActions.applyDashboardBtn();
-    // await pm.dashboardPanelActions.waitForChartToRender();
-    await page.waitForTimeout(5000);
+    await pm.dashboardPanelActions.waitForChartToRender();
 
-    // await waitForDateTimeButtonToBeEnabled(page);
-    // await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await waitForDateTimeButtonToBeEnabled(page);
+    await pm.dashboardTimeRefresh.setRelative("15", "m");
 
-
+    await pm.dashboardPanelActions.waitForChartToRender();
 
 
     const variableInput = page.getByLabel("variablename", {
@@ -295,7 +294,7 @@ test.describe("dashboard streaming testcases", () => {
 
     await pm.dashboardPanelActions.applyDashboardBtn();
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("15", "m");
     await pm.dashboardPanelActions.waitForChartToRender();
 
 

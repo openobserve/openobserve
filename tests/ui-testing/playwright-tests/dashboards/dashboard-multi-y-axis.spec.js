@@ -59,7 +59,7 @@ test.describe("dashboard multi y axis testcases", () => {
     await pm.chartTypeSelector.searchAndAddField("kubernetes_labels_name", "b");
 
     // Set the relative time range
-    await pm.dateTimeHelper.setRelativeTimeRange("6-w");
+    await pm.dateTimeHelper.setRelativeTimeRange("15-m");
 
     // Apply the configuration and wait for the chart to render
     await pm.dashboardPanelActions.applyDashboardBtn();
