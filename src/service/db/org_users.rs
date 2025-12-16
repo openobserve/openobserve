@@ -341,12 +341,14 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 } else if item_key.starts_with("many/user/") {
                     let user_email = item_key.strip_prefix("many/user/").unwrap();
                     // we need to filter it this way, because by the time we get this notification
-                    // org records are already deleted from db. Thus the only way to remove them is to
-                    // filter the existing records from email, and use that info to remove
-                    let org_user_records = ORG_USERS
+                    // org records are already deleted from db. Thus the only way to remove them is
+                    // to filter the existing records from email, and use that
+                    // info to remove
+                    let org_user_records: Vec<_> = ORG_USERS
                         .iter()
                         .filter(|v| v.email == user_email)
-                        .map(|v| (v.key().to_owned(), v.value().to_owned()));
+                        .map(|v| (v.key().to_owned(), v.value().to_owned()))
+                        .collect();
                     for (k, item) in org_user_records {
                         ORG_USERS.remove(&k);
                         if let Some(rum_token) = &item.rum_token {
