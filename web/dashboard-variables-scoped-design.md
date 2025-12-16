@@ -2,20 +2,21 @@
 
 ## Table of Contents
 1. [Executive Summary](#executive-summary)
-2. [Current State vs New State](#current-state-vs-new-state)
-3. [Architecture Overview](#architecture-overview)
-4. [Scope Levels](#scope-levels)
-5. [Data Structures](#data-structures)
-6. [Dependency Management](#dependency-management)
-7. [Loading Behavior](#loading-behavior)
-8. [Composable Architecture](#composable-architecture)
-9. [URL Synchronization](#url-synchronization)
-10. [Component Integration](#component-integration)
-11. [Variable Visibility & Access](#variable-visibility--access)
-12. [Migration Strategy](#migration-strategy)
-13. [Implementation Plan](#implementation-plan)
-14. [Edge Cases & Considerations](#edge-cases--considerations)
-15. [Testing Strategy](#testing-strategy)
+2. [Current \_\_global Mechanism (Foundation)](#current-__global-mechanism-foundation)
+3. [Current State vs New State](#current-state-vs-new-state)
+4. [Architecture Overview](#architecture-overview)
+5. [Scope Levels](#scope-levels)
+6. [Data Structures](#data-structures)
+7. [Dependency Management](#dependency-management)
+8. [Loading Behavior](#loading-behavior)
+9. [Composable Architecture](#composable-architecture)
+10. [URL Synchronization](#url-synchronization)
+11. [Component Integration](#component-integration)
+12. [Variable Visibility & Access](#variable-visibility--access)
+13. [Migration Strategy](#migration-strategy)
+14. [Implementation Plan](#implementation-plan)
+15. [Edge Cases & Considerations](#edge-cases--considerations)
+16. [Testing Strategy](#testing-strategy)
 
 ---
 
@@ -42,6 +43,194 @@ The dashboard variables system is evolving from a **global-only** architecture t
 - URL parameter format changes for tab/panel-scoped variables
 - New dependency validation rules based on scope hierarchy
 - `VariablesValueSelector` transitions from single instance to multi-instance pattern
+
+---
+
+## Current \_\_global Mechanism (Foundation)
+
+> **⚠️ CRITICAL**: Before implementing scoped variables, you **must** understand the existing `__global` mechanism. The new scoped architecture builds upon and extends this foundation.
+
+### Overview
+
+The current system uses a **two-tier variable propagation mechanism** called `__global` that separates "live" variable selections from "committed" variable values used by panels. This mechanism is **essential** for performance and user experience.
+
+### The Problem It Solves
+
+Without the `__global` mechanism:
+- Every variable change would immediately trigger panel queries (expensive!)
+- Users changing 5 variables = 5 separate panel reloads
+- Network overload and poor UX
+
+With the `__global` mechanism:
+- Variable changes update UI immediately but don't trigger panels
+- User clicks "Refresh" once to apply all changes
+- One batch reload for all variable changes
+
+### Two-Tier State Architecture
+
+```typescript
+// Current implementation in RenderDashboardCharts.vue
+const variablesData = ref({});                // LIVE: Updates immediately
+const currentVariablesDataRef = ref({
+  __global: {},                               // COMMITTED: Used by panels
+  "panel-123": {},                            // Panel-specific override (optional)
+});
+```
+
+#### State 1: Live Variables (`variablesData`)
+
+- **Updates**: Immediately when user changes selection
+- **Purpose**: UI state, change detection
+- **Usage**: Show what will happen when user refreshes
+
+```typescript
+// User selects region: "US" → "EU"
+variablesData.value = {
+  values: [{ name: "region", value: "EU" }]  // ← Updates instantly
+}
+```
+
+#### State 2: Committed Variables (`currentVariablesDataRef`)
+
+- **Updates**: Only when user clicks Refresh button
+- **Purpose**: Actual values panels use for queries
+- **Usage**: Control when panels reload
+
+```typescript
+// Initially
+currentVariablesDataRef.value = {
+  __global: { values: [{ name: "region", value: "US" }] }
+}
+
+// After user clicks Dashboard Refresh
+currentVariablesDataRef.value = {
+  __global: { values: [{ name: "region", value: "EU" }] }  // ← Now updated
+}
+```
+
+### How Panels Receive Variables
+
+**File**: [RenderDashboardCharts.vue:132-135](web/src/views/Dashboards/RenderDashboardCharts.vue#L132-L135)
+
+```vue
+<PanelContainer
+  :variablesData="currentVariablesDataRef?.[panelId] || currentVariablesDataRef.__global"
+  :currentVariablesData="variablesData"
+/>
+```
+
+**Resolution Order**:
+1. Check panel-specific override: `currentVariablesDataRef[panelId]`
+2. Fallback to global: `currentVariablesDataRef.__global`
+3. Compare with live: `variablesData` (for change detection)
+
+### Dashboard Refresh (All Panels)
+
+**File**: [RenderDashboardCharts.vue:376-382](web/src/views/Dashboards/RenderDashboardCharts.vue#L376-L382)
+
+```typescript
+watch(
+  () => props?.currentTimeObj?.__global,
+  () => {
+    // REPLACE entire object - removes panel-specific overrides
+    currentVariablesDataRef.value = {
+      __global: JSON.parse(JSON.stringify(variablesData.value)),
+    };
+  },
+);
+```
+
+**Effect**:
+- Commits live variables to `__global`
+- **Removes** all panel-specific entries
+- All panels reload with new values
+
+### Panel Refresh (Single Panel)
+
+**File**: [RenderDashboardCharts.vue:820-830](web/src/views/Dashboards/RenderDashboardCharts.vue#L820-L830)
+
+```typescript
+const refreshPanelRequest = (panelId) => {
+  // ADD panel-specific entry - keeps __global unchanged
+  currentVariablesDataRef.value = {
+    ...currentVariablesDataRef.value,
+    [panelId]: variablesData.value,
+  };
+};
+```
+
+**Effect**:
+- Adds `[panelId]` entry with current values
+- Keeps `__global` unchanged
+- Only specified panel reloads
+
+### Visual Flow
+
+```
+User Changes Variable
+         ↓
+variablesData updates (LIVE)
+         ↓
+currentVariablesDataRef.__global UNCHANGED
+         ↓
+Visual Indicators:
+  • Refresh button highlighted
+  • Panel warning icons ⚠️
+         ↓
+    User Clicks Refresh
+         ↓
+         ├─ Dashboard Refresh → Update __global → All panels reload
+         └─ Panel Refresh → Add [panelId] → One panel reloads
+```
+
+### Integration with Scoped Variables
+
+**IMPORTANT**: The scoped architecture **must preserve** the `__global` pattern at each scope level:
+
+```typescript
+// Future scoped implementation
+const scopedVariables = {
+  global: {
+    live: { values: [...] },                    // Live global vars
+    committed: {
+      __global: { values: [...] },              // Committed for all tabs/panels
+      "tab-1": { values: [...] },               // Tab-specific override
+    }
+  },
+  tabs: {
+    "tab-1": {
+      live: { values: [...] },                  // Live tab-1 vars
+      committed: {
+        __global: { values: [...] },            // Committed for tab-1 panels
+        "panel-A": { values: [...] },           // Panel-specific override
+      }
+    }
+  },
+  panels: {
+    "panel-A": {
+      live: { values: [...] },                  // Live panel-A vars
+      committed: { values: [...] }              // Committed for panel-A queries
+    }
+  }
+}
+```
+
+### Key Principles to Preserve
+
+✅ **Two-tier state**: Live vs Committed at every scope level
+
+✅ **Explicit refresh**: Variable changes don't auto-reload panels
+
+✅ **Visual feedback**: Show pending changes before commit
+
+✅ **Panel-specific overrides**: Allow individual panel refresh
+
+✅ **Batch updates**: One refresh for multiple variable changes
+
+### Reference Documentation
+
+For complete details on the current `__global` mechanism, see:
+- [design-variables.md - Section 2](design-variables.md#the-__global-mechanism-critical-concept)
 
 ---
 
@@ -3038,4 +3227,3 @@ After initial implementation:
 ---
 
 **End of Specification**
-
