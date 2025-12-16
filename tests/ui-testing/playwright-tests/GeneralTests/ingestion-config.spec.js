@@ -281,13 +281,14 @@ test.describe("Ingestion Configuration Tests", () => {
     }, async () => {
       testLogger.info(`=== Starting comprehensive documentation link validation for ${allIntegrations.length} integrations ===`);
 
-      // URLs that are known to work but cause timeouts in automated testing
+      // URLs that are known to work but cause issues in automated testing
       const skipUrls = [
-        'short.openobserve.ai/database/zookeeper' // Manually verified working but causes 1+ hour timeout
+        'short.openobserve.ai/database/zookeeper', // Manually verified working but causes 1+ hour timeout
+        'axoflow.com/docs/axosyslog-core/chapter-destinations/openobserve' // Returns 405 for HEAD requests but works in browser
       ];
 
       if (skipUrls.length > 0) {
-        testLogger.info(`Note: Skipping ${skipUrls.length} URL(s) known to work but cause timeouts:`);
+        testLogger.info(`Note: Skipping ${skipUrls.length} URL(s) known to work but cause issues in automated testing:`);
         skipUrls.forEach(url => testLogger.info(`  - ${url}`));
       }
 
