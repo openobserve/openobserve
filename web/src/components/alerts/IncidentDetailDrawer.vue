@@ -680,16 +680,29 @@ export default defineComponent({
       // First, escape all HTML to prevent XSS attacks
       const escaped = escapeHtml(content);
 
+      // Collapse only consecutive/multiple newlines (2 or more) into single newline
+      let normalized = escaped.replace(/\n{2,}/g, '\n');
+
       // Simple markdown-like formatting for RCA content
+      let formatted = normalized;
+
+      // Convert # headers
+      formatted = formatted.replace(/^# (.+)$/gm, '<div class="tw-font-bold tw-text-lg tw-mt-4 tw-mb-2 tw-border-b tw-pb-1">$1</div>');
+      formatted = formatted.replace(/^## (.+)$/gm, '<div class="tw-font-bold tw-text-base tw-mt-3 tw-mb-2 tw-text-blue-600">$1</div>');
+      formatted = formatted.replace(/^### (.+)$/gm, '<div class="tw-font-semibold tw-text-sm tw-mt-2 tw-mb-1">$1</div>');
+
       // Convert **bold** to <strong>
-      let formatted = escaped.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-      // Convert headers (##, ###) to styled divs
-      formatted = formatted.replace(/^### (.+)$/gm, '<div class="tw-font-semibold tw-mt-3 tw-mb-1">$1</div>');
-      formatted = formatted.replace(/^## (.+)$/gm, '<div class="tw-font-bold tw-text-base tw-mt-4 tw-mb-2">$1</div>');
+      formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong class="tw-font-semibold">$1</strong>');
+
       // Convert - list items to proper formatting
-      formatted = formatted.replace(/^- (.+)$/gm, '<div class="tw-ml-2">• $1</div>');
+      formatted = formatted.replace(/^- (.+)$/gm, '<div class="tw-ml-4 tw-mb-1">• $1</div>');
+
       // Convert numbered lists
-      formatted = formatted.replace(/^(\d+)\. (.+)$/gm, '<div class="tw-ml-2">$1. $2</div>');
+      formatted = formatted.replace(/^(\d+)\. (.+)$/gm, '<div class="tw-ml-4 tw-mb-1">$1. $2</div>');
+
+      // Convert remaining single newlines to <br>
+      formatted = formatted.replace(/\n/g, '<br>');
+
       return formatted;
     };
 
@@ -848,7 +861,7 @@ body.body--dark .tile-content:hover {
 }
 
 .rca-content {
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
 /* RCA Container - Light Mode */
@@ -862,6 +875,10 @@ body.body--dark .tile-content:hover {
   color: #1e40af; /* blue-800 */
 }
 
+.rca-container-light :deep(.tw-text-blue-600) {
+  color: #2563eb; /* blue-600 for light mode */
+}
+
 /* RCA Container - Dark Mode */
 .rca-container-dark {
   background-color: #1e3a5f; /* dark blue background */
@@ -871,6 +888,10 @@ body.body--dark .tile-content:hover {
 .rca-container-dark :deep(strong) {
   font-weight: 600;
   color: #93c5fd; /* blue-300 - brighter for dark mode */
+}
+
+.rca-container-dark :deep(.tw-text-blue-600) {
+  color: #60a5fa; /* blue-400 for dark mode */
 }
 
 /* No RCA Container - Light Mode */
