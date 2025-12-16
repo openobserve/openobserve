@@ -41,6 +41,8 @@ jobs:
   check_approval:
     name: Check Approval Gate
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
     outputs:
       should_run: ${{ steps.check.outputs.should_run }}
     steps:
