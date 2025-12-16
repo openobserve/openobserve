@@ -209,17 +209,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :size="`sm`"
               />
             </div>
-            <q-btn
+            <share-button
               data-test="trace-details-share-link-btn"
-              class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border !tw-h-[2.25rem] hover:tw-bg-[var(--o2-hover-accent)]"
-              size="xs"
-              icon="share"
-              @click="shareLink"
-            >
-              <q-tooltip>
-                {{ t('search.shareLink') }}
-              </q-tooltip>
-            </q-btn>
+              :url="traceDetailsShareURL"
+              button-class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border !tw-h-[2.25rem] hover:tw-bg-[var(--o2-hover-accent)]"
+              button-size="xs"
+            />
             <q-btn
               data-test="trace-details-close-btn"
               class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border !tw-h-[2.25rem] hover:tw-bg-[var(--o2-hover-accent)]"
@@ -419,6 +414,7 @@ import {
 } from "vue";
 import { cloneDeep } from "lodash-es";
 import SpanRenderer from "./SpanRenderer.vue";
+import ShareButton from "@/components/common/ShareButton.vue";
 import useTraces from "@/composables/useTraces";
 import { computed } from "vue";
 import TraceDetailsSidebar from "./TraceDetailsSidebar.vue";
@@ -457,6 +453,7 @@ export default defineComponent({
   },
   components: {
     SpanRenderer,
+    ShareButton,
     TraceDetailsSidebar,
     TraceTree,
     TraceHeader,
@@ -467,11 +464,11 @@ export default defineComponent({
     ),
   },
 
-  emits: ["shareLink", "searchQueryUpdated"],
+  emits: ["searchQueryUpdated"],
   setup(props, { emit }) {
     const traceTree: any = ref([]);
     const spanMap: any = ref({});
-    const { searchObj, copyTracesUrl } = useTraces();
+    const { searchObj, getUrlQueryParams } = useTraces();
     const baseTracePosition: any = ref({});
     const collapseMapping: any = ref({});
     const traceRootSpan: any = ref(null);
@@ -1314,12 +1311,34 @@ export default defineComponent({
       copyToClipboard(spanList.value[0]["trace_id"]);
     };
 
-    const shareLink = () => {
-      copyTracesUrl({
-        from: router.currentRoute.value.query.from as string,
-        to: router.currentRoute.value.query.to as string,
-      });
-    };
+    /**
+     * Computed property for trace details share URL
+     * Uses custom time range from router query params
+     */
+    const traceDetailsShareURL = computed(() => {
+      const queryParams = getUrlQueryParams(true);
+
+      // Override with custom time range from route
+      const customFrom = router.currentRoute.value.query.from as string;
+      const customTo = router.currentRoute.value.query.to as string;
+
+      if (customFrom) queryParams.from = customFrom;
+      if (customTo) queryParams.to = customTo;
+
+      const searchParams = new URLSearchParams();
+      for (const [key, value] of Object.entries(queryParams)) {
+        searchParams.append(key, String(value));
+      }
+      const queryString = searchParams.toString();
+
+      let shareURL = window.location.origin + window.location.pathname;
+
+      if (queryString != "") {
+        shareURL += "?" + queryString;
+      }
+
+      return shareURL;
+    });
 
     const redirectToLogs = () => {
       if (!searchObj.data.traceDetails.selectedTrace) {
@@ -1430,7 +1449,7 @@ export default defineComponent({
       toggleTimeline,
       copyToClipboard,
       copyTraceId,
-      shareLink,
+      traceDetailsShareURL,
       outlinedInfo,
       redirectToLogs,
       filteredStreamOptions,

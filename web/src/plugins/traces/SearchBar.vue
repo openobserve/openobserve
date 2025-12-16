@@ -144,13 +144,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           title="Export Traces"
           @click="downloadLogs"
         />
-        <q-btn
+        <share-button
           data-test="logs-search-bar-share-link-btn"
-          class="tw-mr-0 download-logs-btn q-px-sm tw-min-h-[2rem] el-border"
-          size="sm"
-          icon="share"
-          :title="t('search.shareLink')"
-          @click="shareLink"
+          :url="tracesShareURL"
+          button-class="tw-mr-0 download-logs-btn q-px-sm tw-min-h-[2rem] el-border"
+          button-size="sm"
         />
       </div>
     </div>
@@ -199,6 +197,7 @@ import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 
 import DateTime from "@/components/DateTime.vue";
+import ShareButton from "@/components/common/ShareButton.vue";
 import useTraces from "@/composables/useTraces";
 import SyntaxGuide from "./SyntaxGuide.vue";
 
@@ -212,12 +211,13 @@ export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
     DateTime,
+    ShareButton,
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
     SyntaxGuide,
   },
-  emits: ["searchdata", "shareLink", "update:activeTab"],
+  emits: ["searchdata", "update:activeTab"],
   props: {
     fieldValues: {
       type: Object,
@@ -250,7 +250,7 @@ export default defineComponent({
     const store = useStore();
     const btnRefreshInterval = ref(null);
 
-    const { searchObj } = useTraces();
+    const { searchObj, tracesShareURL } = useTraces();
     const queryEditorRef = ref(null);
 
     let parser: any;
@@ -483,10 +483,6 @@ export default defineComponent({
       });
     };
 
-    const shareLink = () => {
-      emit("shareLink");
-    };
-
     /**
      * Update the date time in the date time component
      * @param value - object containing start time and end time
@@ -523,9 +519,9 @@ export default defineComponent({
       updateTimezone,
       dateTimeRef,
       resetFilters,
-      shareLink,
       updateNewDateTime,
       metricsIcon,
+      tracesShareURL,
     };
   },
   computed: {
