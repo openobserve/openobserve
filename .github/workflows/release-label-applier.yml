@@ -1,0 +1,216 @@
+name: Release Label Applier
+
+on:
+  # Auto-trigger when Release workflow completes successfully
+  workflow_run:
+    workflows: ["Release"]
+    types:
+      - completed
+
+  # Manual trigger option
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag to apply (e.g., v0.30.0-rc1)'
+        required: true
+        type: string
+
+jobs:
+  apply-labels:
+    name: Apply release labels to milestone issues
+    runs-on: ubuntu-latest
+    # Only run if the Release workflow succeeded
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+
+    permissions:
+      issues: write
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Apply labels to milestone issues
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            // Get the release tag
+            let releaseTag;
+            if (context.eventName === 'workflow_dispatch') {
+              releaseTag = '${{ inputs.release_tag }}';
+            } else {
+              // Get the tag from the completed workflow
+              const runId = context.payload.workflow_run.id;
+              const workflowRun = await github.rest.actions.getWorkflowRun({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: runId
+              });
+
+              console.log('🔍 Workflow run data:', JSON.stringify({
+                head_branch: workflowRun.data.head_branch,
+                head_ref: workflowRun.data.head_ref,
+                ref: workflowRun.data.ref,
+                head_sha: workflowRun.data.head_sha
+              }, null, 2));
+
+              // Extract tag from workflow run - try multiple fields
+              // For tag-triggered workflows, the tag can be in different fields:
+              // 1. head_branch - contains tag name for tag pushes
+              // 2. ref - contains full ref like "refs/tags/v0.30.0-rc1"
+              // 3. head_ref - may contain tag for some scenarios
+              let tag = workflowRun.data.head_branch ||
+                        workflowRun.data.head_ref;
+
+              // If not found in head_branch/head_ref, extract from ref
+              if (!tag && workflowRun.data.ref) {
+                const refMatch = workflowRun.data.ref.match(/refs\/tags\/(.+)/);
+                if (refMatch) {
+                  tag = refMatch[1];
+                }
+              }
+
+              if (!tag) {
+                core.setFailed(`Could not determine release tag from workflow run. head_branch: ${workflowRun.data.head_branch}, head_ref: ${workflowRun.data.head_ref}, ref: ${workflowRun.data.ref}`);
+                return;
+              }
+              releaseTag = tag;
+            }
+
+            console.log(`📦 Processing release tag: ${releaseTag}`);
+
+            // Extract milestone version from tag
+            // Examples: v0.30.0-rc1 -> v0.30.0, v0.30.1 -> v0.30.0, v0.30.0 -> v0.30.0
+            // Patch releases map to their minor version milestone (e.g., v0.30.1 -> v0.30.0)
+            const milestoneMatch = releaseTag.match(/^v(\d+)\.(\d+)\.(\d+)/);
+            if (!milestoneMatch) {
+              core.setFailed(`Invalid tag format: ${releaseTag}. Expected format: vX.Y.Z[-suffix]`);
+              return;
+            }
+
+            // Construct milestone version with patch set to 0
+            const milestoneVersion = `v${milestoneMatch[1]}.${milestoneMatch[2]}.0`;
+            console.log(`🎯 Target milestone: ${milestoneVersion}`);
+
+            // Find the milestone
+            const milestones = await github.rest.issues.listMilestones({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'all'
+            });
+
+            const milestone = milestones.data.find(m => m.title === milestoneVersion);
+            if (!milestone) {
+              core.setFailed(`Milestone "${milestoneVersion}" not found`);
+              return;
+            }
+
+            console.log(`✓ Found milestone: ${milestone.title} (ID: ${milestone.number})`);
+
+            // Get all issues in the milestone
+            const allIssues = [];
+            let page = 1;
+            while (true) {
+              const issues = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                milestone: milestone.number,
+                state: 'all',
+                per_page: 100,
+                page: page
+              });
+
+              if (issues.data.length === 0) break;
+              allIssues.push(...issues.data);
+              page++;
+            }
+
+            console.log(`📋 Found ${allIssues.length} total issues/PRs in milestone`);
+
+            // Filter issues that need labeling
+            const targetLabels = ['Needs-Testing', 'Testing-InProgress'];
+            const issuesToLabel = allIssues.filter(issue => {
+              // Include if: closed OR has target labels
+              const isClosed = issue.state === 'closed';
+              const hasTargetLabel = issue.labels.some(label =>
+                targetLabels.includes(label.name)
+              );
+
+              return isClosed || hasTargetLabel;
+            });
+
+            console.log(`🎯 ${issuesToLabel.length} issues match criteria (closed or have Needs-Testing/Testing-InProgress labels)`);
+
+            // Apply labels (with deduplication check)
+            let labeled = 0;
+            let skipped = 0;
+            const milestonePattern = new RegExp(`^${milestoneVersion.replace(/\./g, '\\.')}(-|$)`);
+
+            for (const issue of issuesToLabel) {
+              // Check if issue already has a label from this milestone
+              const hasExistingMilestoneLabel = issue.labels.some(label =>
+                milestonePattern.test(label.name)
+              );
+
+              if (hasExistingMilestoneLabel) {
+                const existingLabel = issue.labels.find(l => milestonePattern.test(l.name));
+                console.log(`⏭️  Skipping #${issue.number} - already has label: ${existingLabel.name}`);
+                skipped++;
+                continue;
+              }
+
+              // Check if the label already exists on the issue (shouldn't happen, but safety check)
+              if (issue.labels.some(label => label.name === releaseTag)) {
+                console.log(`⏭️  Skipping #${issue.number} - already has exact label: ${releaseTag}`);
+                skipped++;
+                continue;
+              }
+
+              // Create label if it doesn't exist in the repo
+              try {
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: releaseTag,
+                  color: '0E8A16', // Green color for releases
+                  description: `Released in ${releaseTag}`
+                });
+                console.log(`✓ Created label: ${releaseTag}`);
+              } catch (error) {
+                if (error.status !== 422) { // 422 means label already exists
+                  console.log(`⚠️  Error creating label: ${error.message}`);
+                }
+              }
+
+              // Apply label to issue
+              try {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  labels: [releaseTag]
+                });
+                console.log(`✓ Added label "${releaseTag}" to #${issue.number}: ${issue.title}`);
+                labeled++;
+              } catch (error) {
+                console.log(`❌ Failed to label #${issue.number}: ${error.message}`);
+              }
+            }
+
+            // Summary
+            console.log('\n📊 Summary:');
+            console.log(`   Release Tag: ${releaseTag}`);
+            console.log(`   Milestone: ${milestoneVersion}`);
+            console.log(`   Total issues in milestone: ${allIssues.length}`);
+            console.log(`   Issues matching criteria: ${issuesToLabel.length}`);
+            console.log(`   ✓ Labeled: ${labeled}`);
+            console.log(`   ⏭️  Skipped (already labeled): ${skipped}`);
+
+            core.summary
+              .addHeading('Release Label Application Summary')
+              .addRaw(`**Release Tag:** ${releaseTag}`, true)
+              .addRaw(`**Milestone:** ${milestoneVersion}`, true)
+              .addRaw(`**Issues Labeled:** ${labeled}`, true)
+              .addRaw(`**Issues Skipped:** ${skipped} (already had milestone release label)`, true)
+              .write();

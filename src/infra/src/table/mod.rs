@@ -23,6 +23,7 @@ use crate::{
 };
 
 pub mod action_scripts;
+pub mod alert_incidents;
 pub mod alerts;
 pub mod cipher;
 pub mod compactor_manual_jobs;
@@ -46,6 +47,7 @@ pub mod service_streams_dimensions;
 pub mod sessions;
 pub mod short_urls;
 pub mod system_prompts;
+pub mod system_settings;
 pub mod templates;
 pub mod timed_annotation_panels;
 pub mod timed_annotations;

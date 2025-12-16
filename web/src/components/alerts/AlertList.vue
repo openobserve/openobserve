@@ -88,15 +88,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-ml-sm o2-secondary-button tw-h-[36px]"
             no-caps
             flat
-            :label="t('settings.header')"
-            @click="showCorrelationDrawer = true"
-            data-test="correlation-settings-btn"
-            icon="settings"
-          />
-          <q-btn
-            class="q-ml-sm o2-secondary-button tw-h-[36px]"
-            no-caps
-            flat
             :label="t(`dashboard.import`)"
             @click="importAlert"
             data-test="alert-import"
@@ -140,8 +131,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #after>
           <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
             <div class="tw-h-full card-container">
+              <!-- Incidents List (shown when incidents tab is active) -->
+              <IncidentList v-if="activeTab === 'incidents'" />
               <!-- Alert List Table -->
               <q-table
+                v-else
                 v-model:selected="selectedAlerts"
                 :selected-rows-label="getSelectedString"
                 selection="multiple"
@@ -207,7 +201,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <q-td v-for="col in columns" :key="col.name" :props="props">
                       <template v-if="col.name === 'name'">
-                        {{ computedName(props.row[col.field]) }}
+                        <div class="tw-flex tw-items-center tw-gap-1">
+                          <span>{{ computedName(props.row[col.field]) }}</span>
+                          <O2AIContextAddBtn
+                            @sendToAiChat="openSREChat(props.row)"
+                            :size="'6px'"
+                            :imageHeight="'16px'"
+                            :imageWidth="'16px'"
+                          />
+                        </div>
                         <q-tooltip
                           v-if="props.row[col.field]?.length > 30"
                           class="alert-name-tooltip"
@@ -570,47 +572,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </template>
 
-    <!-- Correlation Settings Drawer -->
-    <q-drawer
-      v-model="showCorrelationDrawer"
-      side="right"
-      :width="800"
-      bordered
-      overlay
-      behavior="mobile"
-      data-test="correlation-settings-drawer"
-    >
-      <div class="tw-h-full tw-flex tw-flex-col">
-        <!-- Drawer Header -->
-        <div class="tw-px-6 tw-py-4 tw-border-b tw-flex tw-items-center tw-justify-between">
-          <div class="tw-flex tw-items-center">
-            <q-icon name="group_work" size="24px" class="tw-mr-2" />
-            <h6 class="tw-text-lg tw-font-semibold tw-m-0">
-              {{ t('settings.alertCorrelation') }}
-            </h6>
-          </div>
-          <q-btn
-            flat
-            round
-            dense
-            icon="close"
-            @click="showCorrelationDrawer = false"
-            data-test="close-correlation-drawer"
-          />
-        </div>
-
-        <!-- Drawer Content -->
-        <div class="tw-flex-1 tw-overflow-y-auto">
-          <OrganizationDeduplicationSettings
-            :org-id="store.state.selectedOrganization.identifier"
-            :config="store.state.organizationSettings?.deduplication_config"
-            @saved="onCorrelationSettingsSaved"
-            @cancel="showCorrelationDrawer = false"
-          />
-        </div>
-      </div>
-    </q-drawer>
-
     <ConfirmDialog
       title="Delete Alert"
       message="Are you sure you want to delete this alert?"
@@ -870,7 +831,6 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import ImportAlert from "@/components/alerts/ImportAlert.vue";
-import OrganizationDeduplicationSettings from "@/components/alerts/OrganizationDeduplicationSettings.vue";
 import DedupSummaryCards from "@/components/alerts/DedupSummaryCards.vue";
 import {
   getImageURL,
@@ -896,6 +856,8 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
 import { symOutlinedSoundSampler } from "@quasar/extras/material-symbols-outlined";
+import IncidentList from "@/components/alerts/IncidentList.vue";
+import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 // import alertList from "./alerts";
 
 export default defineComponent({
@@ -908,13 +870,14 @@ export default defineComponent({
     NoData,
     ConfirmDialog,
     ImportAlert,
-    OrganizationDeduplicationSettings,
     DedupSummaryCards,
     FolderList,
     MoveAcrossFolders,
     AppTabs,
     SelectFolderDropDown,
     AlertHistoryDrawer,
+    IncidentList,
+    O2AIContextAddBtn,
   },
   emits: [
     "updated:fields",
@@ -946,7 +909,6 @@ export default defineComponent({
     const showHistoryDrawer = ref(false);
     const selectedHistoryAlertId = ref("");
     const selectedHistoryAlertName = ref("");
-    const showCorrelationDrawer = ref(false);
 
     const { getStreams } = useStreams();
 
@@ -1081,7 +1043,10 @@ export default defineComponent({
 
     const activeFolderToMove = ref("default");
 
-    const activeTab = ref("all");
+    // Initialize activeTab from URL query parameter, default to "all"
+    const activeTab = ref(
+      (router.currentRoute.value.query.tab as string) || "all"
+    );
 
     const tabs = reactive([
       {
@@ -1095,6 +1060,10 @@ export default defineComponent({
       {
         label: t("alerts.realTime"),
         value: "realTime",
+      },
+      {
+        label: t("alerts.incidents.title"),
+        value: "incidents",
       },
     ]);
 
@@ -1471,6 +1440,10 @@ export default defineComponent({
     // Define filterAlertsByTab before watchers that use it
     const filterAlertsByTab = (refreshResults: boolean = true) => {
       if (!refreshResults) {
+        return;
+      }
+      // When incidents tab is active, skip filtering (IncidentList handles its own data)
+      if (activeTab.value === "incidents") {
         return;
       }
       //here we are filtering the alerts by the activeTab
@@ -2039,12 +2012,6 @@ export default defineComponent({
       });
     };
 
-    const onCorrelationSettingsSaved = async () => {
-      // Reload organization settings to get updated dedup config
-      await store.dispatch("getDefaultOrganizationSettings");
-      showCorrelationDrawer.value = false;
-    };
-
     const exportAlert = async (row: any) => {
       // Find the alert based on uuid
       const alertToBeExported = await getAlertById(row.alert_id);
@@ -2241,6 +2208,11 @@ export default defineComponent({
       }
       //here we are filtering the alerts by the activeTab
       filterAlertsByTab();
+
+      // Update URL query parameter to persist tab state across page refreshes
+      router.push({
+        query: { ...router.currentRoute.value.query, tab: newVal },
+      });
     });
 
     const copyToClipboard = (text: string, type: string) => {
@@ -2492,6 +2464,14 @@ export default defineComponent({
       }
     };
 
+    const openSREChat = (alert?: any) => {
+      store.state.sreChatContext = {
+        type: 'alert',
+        data: alert || null,
+      };
+      store.dispatch("setIsSREChatOpen", true);
+    };
+
     return {
       t,
       qTable,
@@ -2601,15 +2581,15 @@ export default defineComponent({
       showHistoryDrawer,
       selectedHistoryAlertId,
       selectedHistoryAlertName,
-      showCorrelationDrawer,
-      onCorrelationSettingsSaved,
       refreshImportedAlerts,
       folderIdToBeCloned,
       updateFolderIdToBeCloned,
       transformToExpression,
       filterAlertsByQuery,
       bulkToggleAlerts,
-      symOutlinedSoundSampler
+      symOutlinedSoundSampler,
+      openSREChat,
+      config,
     };
   },
 });

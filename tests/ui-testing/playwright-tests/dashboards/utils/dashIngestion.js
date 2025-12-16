@@ -1,6 +1,7 @@
 // ingestion.js
 import logsdata from "../../../../test-data/logs_data.json";
 import geoMapdata from "../../../../test-data/geo_map.json";
+import dashboardChartJsonData from "../../../../test-data/dashboard_chart_json.json";
 // Fixed testLogger path - updated to use correct relative path
 const testLogger = require('../../utils/test-logger.js');
 
@@ -92,5 +93,41 @@ const ingestionForMaps = async (page, streamName = "geojson") => {
   }
 };
 
+// Ingestion function for Dashboard Chart JSON data
+const ingestionForDashboardChartJson = async (page, streamName = "kubernetes") => {
+  if (!process.env["ORGNAME"] || !process.env["INGESTION_URL"]) {
+    throw new Error("Required environment variables are not set");
+  }
+
+  const orgId = process.env["ORGNAME"];
+
+  try {
+    const headers = {
+      "Content-Type": "application/json",
+      Authorization: await getAuthToken(),
+    };
+
+    const fetchResponse = await fetch(
+      `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify(dashboardChartJsonData),
+      }
+    );
+
+    if (!fetchResponse.ok) {
+      throw new Error(
+        `HTTP error! status: ${fetchResponse.status}, response: ${fetchResponse}`
+      );
+    }
+
+    return await fetchResponse.json();
+  } catch (error) {
+    testLogger.error("Dashboard Chart JSON ingestion failed", { error });
+    throw error;
+  }
+};
+
 // Export only the required functions
-export { ingestionForMaps, getAuthToken, removeUTFCharacters };
+export { ingestionForMaps, ingestionForDashboardChartJson, getAuthToken, removeUTFCharacters };

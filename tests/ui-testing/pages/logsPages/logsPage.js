@@ -135,6 +135,17 @@ export class LogsPage {
         this.errorIcon = 'text=error';
         this.resultErrorDetailsBtn = '[data-test="logs-page-result-error-details-btn"]';
         this.searchDetailErrorMessage = '[data-test="logs-search-detail-error-message"]';
+
+        // ===== SHARE LINK SELECTORS (VERIFIED) =====
+        this.shareLinkButton = '[data-test="logs-search-bar-share-link-btn"]';
+        this.successNotification = '.q-notification__message';
+        this.linkCopiedSuccessText = 'Link Copied Successfully';
+        this.errorCopyingLinkText = 'Error while copy link';
+
+        // ===== QUERY EDITOR EXPAND/COLLAPSE SELECTORS =====
+        this.queryEditorFullScreenBtn = '[data-test="logs-query-editor-full_screen-btn"]';
+        this.queryEditorContainer = '.query-editor-container';
+        this.expandOnFocusClass = '.expand-on-focus';
     }
 
 
@@ -253,22 +264,70 @@ export class LogsPage {
         await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
     }
 
-    async selectIndexAndStreamJoinUnion() {
-        // Select both e2e_join_a and e2e_join_b streams for UNION queries
-        // These streams have identical schemas to support UNION operations
+    /**
+     * Select two streams for UNION query testing
+     * @param {string} streamA - First stream name (required)
+     * @param {string} streamB - Second stream name (required)
+     */
+    async selectIndexAndStreamJoinUnion(streamA, streamB) {
+        // Validate stream names are provided
+        if (!streamA || !streamB) {
+            throw new Error('selectIndexAndStreamJoinUnion: Both streamA and streamB are required parameters');
+        }
+
+        testLogger.info(`selectIndexAndStreamJoinUnion: Starting selection of ${streamA} and ${streamB} streams`);
+
+        // Wait for both streams to be available via API before attempting UI selection
+        testLogger.debug(`selectIndexAndStreamJoinUnion: Waiting for streams to be available via API...`);
+
+        const streamAAvailable = await this.waitForStreamAvailable(streamA, 30000, 3000);
+        if (!streamAAvailable) {
+            testLogger.error(`selectIndexAndStreamJoinUnion: Stream '${streamA}' NOT FOUND via API after 30s`);
+            throw new Error(`Stream '${streamA}' not available. Ingestion may have failed.`);
+        }
+        testLogger.info(`selectIndexAndStreamJoinUnion: Stream '${streamA}' confirmed available`);
+
+        const streamBAvailable = await this.waitForStreamAvailable(streamB, 30000, 3000);
+        if (!streamBAvailable) {
+            testLogger.error(`selectIndexAndStreamJoinUnion: Stream '${streamB}' NOT FOUND via API after 30s`);
+            throw new Error(`Stream '${streamB}' not available. Ingestion may have failed.`);
+        }
+        testLogger.info(`selectIndexAndStreamJoinUnion: Stream '${streamB}' confirmed available`);
+
+        // Navigate to logs page to ensure fresh stream list
+        const orgId = process.env.ORGNAME;
+        const logsUrl = `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId}`;
+        testLogger.debug(`selectIndexAndStreamJoinUnion: Navigating to logs page: ${logsUrl}`);
+        await this.page.goto(logsUrl, { waitUntil: 'networkidle', timeout: 30000 }).catch((e) => {
+            testLogger.warn(`selectIndexAndStreamJoinUnion: Navigation timeout, continuing... ${e.message}`);
+        });
+        await this.page.waitForTimeout(2000);
+
+        // Open dropdown
         await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
         await this.page.waitForTimeout(3000);
 
-        // Select e2e_join_a stream
-        await this.page.locator('[data-test="log-search-index-list-stream-toggle-e2e_join_a"] div').first().click();
+        // Select first stream with explicit wait
+        const streamASelector = `[data-test="log-search-index-list-stream-toggle-${streamA}"] div`;
+        testLogger.debug(`selectIndexAndStreamJoinUnion: Looking for stream toggle: ${streamASelector}`);
+        const streamAToggle = this.page.locator(streamASelector).first();
+        await streamAToggle.waitFor({ state: 'visible', timeout: 15000 });
+        await streamAToggle.click();
+        testLogger.debug(`selectIndexAndStreamJoinUnion: Selected stream ${streamA}`);
         await this.page.waitForTimeout(1000);
 
-        // Select e2e_join_b stream (dropdown stays open after first selection)
-        await this.page.locator('[data-test="log-search-index-list-stream-toggle-e2e_join_b"] div').first().click();
+        // Select second stream (dropdown stays open after first selection)
+        const streamBSelector = `[data-test="log-search-index-list-stream-toggle-${streamB}"] div`;
+        testLogger.debug(`selectIndexAndStreamJoinUnion: Looking for stream toggle: ${streamBSelector}`);
+        const streamBToggle = this.page.locator(streamBSelector).first();
+        await streamBToggle.waitFor({ state: 'visible', timeout: 15000 });
+        await streamBToggle.click();
+        testLogger.debug(`selectIndexAndStreamJoinUnion: Selected stream ${streamB}`);
         await this.page.waitForTimeout(1000);
 
         // Close dropdown
         await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+        testLogger.info(`selectIndexAndStreamJoinUnion: Successfully selected both streams`);
     }
 
     async selectIndexStreamDefault() {
@@ -295,15 +354,185 @@ export class LogsPage {
         }
     }
 
-    async selectStream(stream) {
-        await this.page.locator(this.indexDropDown).click();
-        await this.page.waitForTimeout(1000);
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    /**
+     * Wait for a stream to be available via API before attempting UI selection
+     * @param {string} streamName - Name of the stream to wait for
+     * @param {number} maxWaitMs - Maximum time to wait in milliseconds
+     * @param {number} pollIntervalMs - Interval between checks
+     * @returns {Promise<boolean>} True if stream exists, false if timeout
+     */
+    async waitForStreamAvailable(streamName, maxWaitMs = 30000, pollIntervalMs = 3000) {
+        testLogger.debug(`waitForStreamAvailable: Waiting for stream ${streamName} to be available`);
+        const startTime = Date.now();
 
-        // Wait for the stream to be visible in the dropdown
-        const streamLocator = this.page.getByText(stream, { exact: true }).first();
-        await streamLocator.waitFor({ state: 'visible', timeout: 15000 });
-        await streamLocator.click();
+        // Get credentials from env
+        const apiUrl = process.env.INGESTION_URL;
+        const orgId = process.env.ORGNAME;
+        const authHeader = `Basic ${Buffer.from(`${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`).toString('base64')}`;
+
+        while (Date.now() - startTime < maxWaitMs) {
+            try {
+                // Use dynamic import for node-fetch
+                const fetchModule = await import('node-fetch');
+                const fetch = fetchModule.default;
+
+                const response = await fetch(`${apiUrl}/api/${orgId}/streams`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': authHeader,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                if (response.status === 200 && data.list) {
+                    const streamExists = data.list.some(s => s.name === streamName);
+                    if (streamExists) {
+                        testLogger.debug(`waitForStreamAvailable: Stream ${streamName} found after ${Date.now() - startTime}ms`);
+                        return true;
+                    }
+                }
+
+                testLogger.debug(`waitForStreamAvailable: Stream ${streamName} not found yet, waiting ${pollIntervalMs}ms...`);
+                await this.page.waitForTimeout(pollIntervalMs);
+            } catch (e) {
+                testLogger.debug(`waitForStreamAvailable: Error checking stream: ${e.message}`);
+                await this.page.waitForTimeout(pollIntervalMs);
+            }
+        }
+
+        testLogger.warn(`waitForStreamAvailable: Stream ${streamName} not found after ${maxWaitMs}ms`);
+        return false;
+    }
+
+    async selectStream(stream, maxRetries = 3) {
+        testLogger.info(`selectStream: Selecting stream: ${stream}`);
+
+        // First, wait for the stream to be available via API
+        const streamAvailable = await this.waitForStreamAvailable(stream, 30000, 3000);
+        if (!streamAvailable) {
+            testLogger.warn(`selectStream: Stream ${stream} not found via API after 30s, will still try UI selection`);
+        } else {
+            testLogger.info(`selectStream: Stream ${stream} confirmed available via API`);
+        }
+
+        // Navigate to logs page via URL to ensure fresh stream list (no page.reload which can cause issues)
+        const orgId = process.env.ORGNAME;
+        const logsUrl = `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId}`;
+        testLogger.info(`selectStream: Navigating to logs page: ${logsUrl}`);
+        await this.page.goto(logsUrl, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+        await this.page.waitForTimeout(3000);
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            testLogger.info(`selectStream: Attempt ${attempt}/${maxRetries} for stream: ${stream}`);
+
+            try {
+                // Click the dropdown arrow to open the stream list
+                testLogger.info(`selectStream: Clicking dropdown arrow`);
+                const dropdownArrow = this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down');
+                await dropdownArrow.waitFor({ state: 'visible', timeout: 10000 });
+                await dropdownArrow.click();
+                await this.page.waitForTimeout(2000);
+
+                // Use search box to filter streams for faster finding
+                const searchInput = this.page.locator('[data-test="log-search-index-list-select-stream"]');
+                const searchVisible = await searchInput.isVisible({ timeout: 2000 }).catch(() => false);
+                if (searchVisible) {
+                    testLogger.info(`selectStream: Using search box to filter for: ${stream}`);
+                    await searchInput.click();
+                    await searchInput.fill(stream);
+                    await this.page.waitForTimeout(1500);
+                }
+
+                // Look for the dropdown menu with scroll capability
+                const dropdownMenu = this.page.locator('.q-menu.scroll, .q-menu .scroll, .q-virtual-scroll__content').first();
+
+                // Try to click the stream toggle div directly first
+                const streamToggleSelector = `[data-test="log-search-index-list-stream-toggle-${stream}"]`;
+                testLogger.info(`selectStream: Looking for: ${streamToggleSelector}`);
+
+                // Scroll through the dropdown to find the stream
+                let maxScrolls = 20;
+                let scrollAmount = 200;
+                let foundStream = false;
+
+                while (maxScrolls > 0 && !foundStream) {
+                    // Check if stream toggle is visible
+                    const streamToggleDiv = this.page.locator(`${streamToggleSelector} div`).first();
+                    const toggleDivVisible = await streamToggleDiv.isVisible({ timeout: 500 }).catch(() => false);
+
+                    if (toggleDivVisible) {
+                        await streamToggleDiv.click();
+                        testLogger.info(`selectStream: Selected stream: ${stream}`);
+                        foundStream = true;
+                        return;
+                    }
+
+                    // Try the toggle itself
+                    const streamToggle = this.page.locator(streamToggleSelector);
+                    const toggleVisible = await streamToggle.isVisible({ timeout: 500 }).catch(() => false);
+
+                    if (toggleVisible) {
+                        await streamToggle.click();
+                        testLogger.info(`selectStream: Selected stream via toggle: ${stream}`);
+                        foundStream = true;
+                        return;
+                    }
+
+                    // Try by text
+                    const streamByText = this.page.getByText(stream, { exact: true }).first();
+                    const textVisible = await streamByText.isVisible({ timeout: 500 }).catch(() => false);
+
+                    if (textVisible) {
+                        await streamByText.click();
+                        testLogger.info(`selectStream: Selected stream by text: ${stream}`);
+                        foundStream = true;
+                        return;
+                    }
+
+                    // Scroll down in the dropdown if stream not found yet
+                    const menuVisible = await dropdownMenu.isVisible({ timeout: 500 }).catch(() => false);
+                    if (menuVisible) {
+                        try {
+                            await dropdownMenu.evaluate((el, amount) => el.scrollTop += amount, scrollAmount);
+                            testLogger.debug(`selectStream: Scrolled dropdown by ${scrollAmount}px`);
+                        } catch (scrollError) {
+                            testLogger.debug(`selectStream: Scroll failed: ${scrollError.message}`);
+                        }
+                    }
+
+                    await this.page.waitForTimeout(300);
+                    maxScrolls--;
+                }
+
+                // Stream not found in this attempt, close dropdown and retry
+                testLogger.info(`selectStream: Stream ${stream} not found on attempt ${attempt}`);
+                await this.page.keyboard.press('Escape');
+                await this.page.waitForTimeout(500);
+
+                if (attempt < maxRetries) {
+                    testLogger.debug(`selectStream: Waiting 5s before retry...`);
+                    await this.page.waitForTimeout(5000); // Wait before retry for stream to be indexed
+
+                    // Navigate to logs page again to refresh stream list
+                    await this.page.goto(logsUrl, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+                    await this.page.waitForTimeout(3000);
+                }
+
+            } catch (e) {
+                testLogger.debug(`selectStream: Attempt ${attempt} failed with error: ${e.message}`);
+                await this.page.keyboard.press('Escape').catch(() => {});
+
+                if (attempt < maxRetries) {
+                    await this.page.waitForTimeout(5000);
+                    await this.page.goto(logsUrl, { waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+                    await this.page.waitForTimeout(3000);
+                }
+            }
+        }
+
+        // All retries exhausted
+        throw new Error(`selectStream: Failed to find stream "${stream}" after ${maxRetries} attempts`);
     }
 
     async selectIndexStreamOld(streamName) {
@@ -766,8 +995,9 @@ export class LogsPage {
     }
 
     async verifySearchPartitionResponse() {
-        const searchPartitionPromise = this.page.waitForResponse(response => 
-            response.url().includes('/api/default/_search_partition') && 
+        const orgName = process.env.ORGNAME || 'default';
+        const searchPartitionPromise = this.page.waitForResponse(response =>
+            response.url().includes(`/api/${orgName}/_search_partition`) &&
             response.request().method() === 'POST'
         );
         
@@ -783,10 +1013,11 @@ export class LogsPage {
 
     async captureSearchCalls() {
         const searchCalls = [];
-        
+        const orgName = process.env.ORGNAME || 'default';
+
         // Create the event listener function
         const responseHandler = async response => {
-            if (response.url().includes('/api/default/_search') && 
+            if (response.url().includes(`/api/${orgName}/_search`) &&
                 response.request().method() === 'POST') {
                 const requestData = await response.request().postDataJSON();
                 searchCalls.push({
@@ -810,12 +1041,13 @@ export class LogsPage {
     }
 
         async verifyStreamingModeResponse() {
+        const orgName = process.env.ORGNAME || 'default';
         testLogger.debug("[DEBUG] Waiting for search response...");
         const searchPromise = this.page.waitForResponse(response => {
             const url = response.url();
             const method = response.request().method();
             testLogger.debug(`[DEBUG] Response: ${method} ${url}`);
-            return url.includes('/api/default/_search') && method === 'POST';
+            return url.includes(`/api/${orgName}/_search`) && method === 'POST';
         });
         
         const searchResponse = await searchPromise;
@@ -843,12 +1075,13 @@ export class LogsPage {
     }
 
     async clickRunQueryButtonAndVerifyStreamingResponse() {
+        const orgName = process.env.ORGNAME || 'default';
         testLogger.debug("[DEBUG] Setting up response listener before clicking run query button");
         const searchPromise = this.page.waitForResponse(response => {
             const url = response.url();
             const method = response.request().method();
             testLogger.debug(`[DEBUG] Response: ${method} ${url}`);
-            return url.includes('/api/default/_search') && method === 'POST';
+            return url.includes(`/api/${orgName}/_search`) && method === 'POST';
         });
         
         await this.clickRunQueryButton();
@@ -971,12 +1204,12 @@ export class LogsPage {
     // Validation methods
     async validateResult() {
         try {
-            // Wait for the logs table with a longer timeout for streaming mode
-            await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', { 
-                timeout: 45000, // Increased timeout for streaming mode
-                state: 'visible' 
+            // Wait for the logs table with a longer timeout for streaming mode and Firefox
+            await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', {
+                timeout: 90000, // Increased timeout for streaming mode and Firefox browser
+                state: 'visible'
             });
-            await expect(this.page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible();
+            await expect(this.page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible({ timeout: 30000 });
         } catch (error) {
             testLogger.error('Error in validateResult:', error);
             // Check if there's an error message visible
@@ -1073,7 +1306,8 @@ export class LogsPage {
     }
 
     async addRemoveInteresting() {
-        await this.clickInterestingFields();
+        // Click the field button once to toggle it off (remove from query)
+        // Note: clickInterestingFields() was already called before this, which added the field
         await this.page.locator('[data-test="log-search-index-list-interesting-kubernetes_pod_name-field-btn"]').first().click();
     }
 
@@ -1085,45 +1319,33 @@ export class LogsPage {
     }
 
     async kubernetesContainerNameJoin() {
-        await this.page
-            .locator('[data-test="logs-search-bar-query-editor"]').locator('.inputarea')
-            .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
-        await this.page.waitForTimeout(5000);
+        await this.clearAndFillQueryEditor('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
+        await this.page.waitForTimeout(3000);
     }
 
     async kubernetesContainerNameJoinLimit() {
-        await this.page
-            .locator('[data-test="logs-search-bar-query-editor"]').locator('.inputarea')
-            .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a left join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name LIMIT 10');
-        await this.page.waitForTimeout(5000);
+        await this.clearAndFillQueryEditor('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a left join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name LIMIT 10');
+        await this.page.waitForTimeout(3000);
     }
 
     async kubernetesContainerNameJoinLike() {
-        await this.page
-            .locator('[data-test="logs-search-bar-query-editor"]').locator('.inputarea')
-            .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name WHERE a.kubernetes_container_name LIKE "%ziox%"');
-        await this.page.waitForTimeout(5000);
+        await this.clearAndFillQueryEditor('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name WHERE a.kubernetes_container_name LIKE "%ziox%"');
+        await this.page.waitForTimeout(3000);
     }
 
     async kubernetesContainerNameLeftJoin() {
-        await this.page
-            .locator('[data-test="logs-search-bar-query-editor"]').locator('.inputarea')
-            .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a LEFT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
-        await this.page.waitForTimeout(5000);
+        await this.clearAndFillQueryEditor('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a LEFT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
+        await this.page.waitForTimeout(3000);
     }
 
     async kubernetesContainerNameRightJoin() {
-        await this.page
-            .locator('[data-test="logs-search-bar-query-editor"]').locator('.inputarea')
-            .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a RIGHT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
-        await this.page.waitForTimeout(5000);
+        await this.clearAndFillQueryEditor('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a RIGHT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
+        await this.page.waitForTimeout(3000);
     }
 
     async kubernetesContainerNameFullJoin() {
-        await this.page
-            .locator('[data-test="logs-search-bar-query-editor"]').locator('.inputarea')
-            .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a FULL JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
-        await this.page.waitForTimeout(5000);
+        await this.clearAndFillQueryEditor('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a FULL JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
+        await this.page.waitForTimeout(3000);
     }
 
     // Log count ordering methods
@@ -1350,6 +1572,75 @@ export class LogsPage {
         return await this.page.locator(this.queryButton).click({ force: true });
     }
 
+    /**
+     * Ingest multiple log entries with retry logic for "stream being deleted" errors
+     * @param {string} streamName - Target stream name
+     * @param {Array<{fieldName: string, fieldValue: string}>} dataObjects - Array of field data to ingest
+     * @param {number} maxRetries - Maximum retry attempts (default: 5)
+     */
+    async ingestMultipleFields(streamName, dataObjects, maxRetries = 5) {
+        const orgId = process.env["ORGNAME"];
+        const basicAuthCredentials = Buffer.from(
+            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+        ).toString('base64');
+
+        const headers = {
+            "Authorization": `Basic ${basicAuthCredentials}`,
+            "Content-Type": "application/json",
+        };
+
+        const baseTimestamp = Date.now() * 1000;
+        const logData = dataObjects.map(({ fieldName, fieldValue }, index) => ({
+            level: "info",
+            [fieldName]: fieldValue,
+            log: `Test log with ${fieldName} field - entry ${index}`,
+            _timestamp: baseTimestamp + (index * 1000000)
+        }));
+
+        testLogger.info(`Preparing to ingest ${logData.length} separate log entries`);
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            const response = await this.page.evaluate(async ({ url, headers, orgId, streamName, logData }) => {
+                const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(logData)
+                });
+                const responseJson = await fetchResponse.json();
+                return {
+                    status: fetchResponse.status,
+                    statusText: fetchResponse.statusText,
+                    body: responseJson
+                };
+            }, {
+                url: process.env.INGESTION_URL,
+                headers: headers,
+                orgId: orgId,
+                streamName: streamName,
+                logData: logData
+            });
+
+            testLogger.info(`Ingestion API response (attempt ${attempt}/${maxRetries}) - Status: ${response.status}, Body:`, response.body);
+
+            if (response.status === 200) {
+                testLogger.info('Ingestion successful, waiting for stream to be indexed...');
+                await this.page.waitForTimeout(5000);
+                return;
+            }
+
+            const errorMessage = response.body?.message || JSON.stringify(response.body);
+            if (errorMessage.includes('being deleted') && attempt < maxRetries) {
+                const waitTime = attempt * 5000;
+                testLogger.info(`Stream is being deleted, waiting ${waitTime/1000}s before retry...`);
+                await this.page.waitForTimeout(waitTime);
+                continue;
+            }
+
+            testLogger.error(`Ingestion failed! Status: ${response.status}, Response:`, response.body);
+            throw new Error(`Ingestion failed with status ${response.status}: ${JSON.stringify(response.body)}`);
+        }
+    }
+
     async clickSearchBarRefreshButton() {
         return await this.page.locator(this.searchBarRefreshButton).click({ force: true });
     }
@@ -1573,9 +1864,42 @@ export class LogsPage {
     }
 
     async clickBarChartCanvas() {
-        return await this.page.locator(this.barChartCanvas).click({
-            position: { x: 182, y: 66 }
-        });
+        // Wait for network idle to ensure chart data has loaded
+        await this.page.waitForLoadState('networkidle');
+
+        const canvasLocator = this.page.locator(this.barChartCanvas);
+
+        // Retry mechanism to handle ECharts canvas re-rendering
+        const maxRetries = 3;
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                // Wait for the canvas to be visible
+                await canvasLocator.waitFor({ state: 'visible', timeout: 30000 });
+
+                // Wait for chart to stabilize - ECharts may re-render multiple times
+                await this.page.waitForTimeout(2000);
+
+                // force:true required for ECharts canvas - canvas elements are interactive
+                // but fail Playwright's actionability checks (no pointer-events in traditional sense)
+                await canvasLocator.click({
+                    position: { x: 182, y: 66 },
+                    force: true,
+                    timeout: 10000
+                });
+                return; // Success
+            } catch (error) {
+                if (attempt === maxRetries) {
+                    throw error;
+                }
+                // Wait before retry to allow chart to stabilize
+                await this.page.waitForTimeout(1000);
+            }
+        }
+    }
+
+    async expectBarChartCanvasVisible() {
+        const canvasLocator = this.page.locator(this.barChartCanvas);
+        return await expect(canvasLocator).toBeVisible({ timeout: 30000 });
     }
 
     async fillIndexFieldSearchInput(text) {
@@ -1877,6 +2201,28 @@ export class LogsPage {
 
     async expectQueryEditorContainsText(text) {
         return await expect(this.page.locator(this.queryEditor).locator('.monaco-editor')).toContainText(text);
+    }
+
+    // ===== QUERY EDITOR EXPAND/COLLAPSE METHODS =====
+    async clickQueryEditorFullScreenBtn() {
+        return await this.page.locator(this.queryEditorFullScreenBtn).click();
+    }
+
+    async expectQueryEditorFullScreenBtnVisible() {
+        return await expect(this.page.locator(this.queryEditorFullScreenBtn)).toBeVisible({ timeout: 10000 });
+    }
+
+    async isQueryEditorExpanded() {
+        const container = this.page.locator(this.queryEditorContainer);
+        return await container.locator(this.expandOnFocusClass).count() > 0;
+    }
+
+    async toggleQueryEditorFullScreen() {
+        const initialState = await this.isQueryEditorExpanded();
+        await this.clickQueryEditorFullScreenBtn();
+        await this.page.waitForTimeout(500); // Wait for animation
+        const newState = await this.isQueryEditorExpanded();
+        return { initialState, newState, toggled: initialState !== newState };
     }
 
     async expectQueryEditorEmpty() {
@@ -2677,15 +3023,49 @@ export class LogsPage {
     }
 
     async toggleQueryModeEditor() {
-        return await this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] div').first().click();
+        await this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] div').first().click();
+        // Wait for the Monaco editor container to appear (Firefox needs this)
+        await this.page.waitForTimeout(2000);
+        await this.page.locator('#fnEditor').waitFor({ state: 'visible', timeout: 15000 });
     }
 
     async clickMonacoEditor() {
-        return await this.page.locator('#fnEditor').locator('.monaco-editor').click();
+        // Wait for Monaco editor to be fully rendered (Firefox needs longer)
+        const monacoEditor = this.page.locator('#fnEditor').locator('.monaco-editor');
+        await monacoEditor.waitFor({ state: 'visible', timeout: 30000 });
+        // Scroll into view for Firefox (element may be outside viewport)
+        await monacoEditor.scrollIntoViewIfNeeded();
+        await this.page.waitForTimeout(1500); // Extra stabilization for Firefox
+        return await monacoEditor.click({ force: true });
     }
 
     async fillMonacoEditor(text) {
-        return await this.page.locator('#fnEditor').locator('.inputarea').fill(text);
+        // Wait for Monaco editor to be visible (Firefox rendering is slower)
+        const fnEditorContainer = this.page.locator('#fnEditor');
+        const monacoEditor = fnEditorContainer.locator('.monaco-editor');
+        await monacoEditor.waitFor({ state: 'visible', timeout: 30000 });
+
+        // Use JavaScript to scroll the fnEditor into center of viewport (more reliable for Firefox)
+        await fnEditorContainer.evaluate(el => {
+            el.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' });
+        });
+        await this.page.waitForTimeout(2000); // Extra stabilization for Firefox
+
+        // Click on the Monaco editor container using coordinates (more reliable for Firefox viewport issues)
+        const editorBox = await monacoEditor.boundingBox();
+        if (editorBox) {
+            await this.page.mouse.click(editorBox.x + 50, editorBox.y + 20);
+        } else {
+            // Fallback: click with force
+            await monacoEditor.click({ force: true });
+        }
+        await this.page.waitForTimeout(500);
+
+        // Clear existing content and fill using keyboard (more reliable on Firefox)
+        await this.page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+        await this.page.keyboard.press('Backspace');
+        await this.page.waitForTimeout(200);
+        await this.page.keyboard.type(text, { delay: 50 });
     }
 
     async getCellByName(name) {
@@ -2779,7 +3159,31 @@ export class LogsPage {
     }
 
     async fillQueryEditorWithRole(text) {
-        return await this.page.locator(this.queryEditor).getByRole('textbox', { name: 'Editor content' }).fill(text);
+        // Wait for query editor to be visible and ready (Firefox needs longer)
+        const queryEditorContainer = this.page.locator(this.queryEditor);
+        await queryEditorContainer.waitFor({ state: 'visible', timeout: 30000 });
+
+        // Use JavaScript to scroll into center of viewport (more reliable for Firefox)
+        await queryEditorContainer.evaluate(el => {
+            el.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' });
+        });
+        await this.page.waitForTimeout(2000); // Extra stabilization for Firefox
+
+        // Click using coordinates (more reliable for Firefox viewport issues)
+        const editorBox = await queryEditorContainer.boundingBox();
+        if (editorBox) {
+            await this.page.mouse.click(editorBox.x + 50, editorBox.y + 20);
+        } else {
+            // Fallback: click with force
+            await queryEditorContainer.click({ force: true });
+        }
+        await this.page.waitForTimeout(500);
+
+        // Clear and type using keyboard (more reliable on Firefox)
+        await this.page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+        await this.page.keyboard.press('Backspace');
+        await this.page.waitForTimeout(200);
+        await this.page.keyboard.type(text, { delay: 30 });
     }
 
     async clickTimeCell() {
@@ -2793,7 +3197,8 @@ export class LogsPage {
     }
 
     async expectErrorIconVisible() {
-        return await expect(this.page.getByText('error')).toBeVisible();
+        // Use specific selector for error icon (material-icons with text-negative class)
+        return await expect(this.page.locator('i.q-icon.text-negative.material-icons').filter({ hasText: 'error' })).toBeVisible();
     }
 
     async expectResultErrorDetailsButtonVisible() {
@@ -2820,4 +3225,522 @@ export class LogsPage {
         // Click outside to trigger validation
         return await this.page.locator('body').click({ position: { x: 0, y: 0 } });
     }
-} 
+
+    /**
+     * ==========================================
+     * DATA INGESTION API METHOD
+     * ==========================================
+     */
+
+    /**
+     * Ingest data to a stream
+     * Sends records individually to ensure uniqueness
+     * @param {string} streamName - Stream name
+     * @param {array} data - Array of log objects
+     * @returns {Promise<object>} Result with success/fail counts
+     */
+    async ingestData(streamName, data) {
+        const fetch = (await import('node-fetch')).default;
+        const orgId = process.env["ORGNAME"];
+        const basicAuthCredentials = Buffer.from(
+            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+        ).toString('base64');
+
+        testLogger.info('Ingesting data', { streamName, recordCount: data.length });
+
+        let successCount = 0;
+        let failCount = 0;
+
+        // Send records one by one to ensure each is treated as unique
+        for (let i = 0; i < data.length; i++) {
+            const record = data[i];
+
+            try {
+                const response = await fetch(`${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Basic ${basicAuthCredentials}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify([record])  // Send as single-element array
+                });
+
+                const responseData = await response.json();
+
+                if (response.status === 200 && responseData.code === 200) {
+                    successCount++;
+                    testLogger.debug(`Ingested record ${i+1}/${data.length}`, { name: record.name, test_id: record.test_id || 'no_id', unique_id: record.unique_id });
+                } else {
+                    failCount++;
+                    testLogger.error(`Failed to ingest record ${i+1}/${data.length}`, { response: responseData, test_id: record.test_id || record.name });
+                }
+
+                // Small delay between records
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+            } catch (error) {
+                failCount++;
+                testLogger.error(`Error ingesting record ${i+1}/${data.length}`, { error: error.message });
+            }
+        }
+
+        testLogger.info('Ingestion complete', { streamName, total: data.length, success: successCount, failed: failCount });
+
+        if (failCount > 0) {
+            throw new Error(`Failed to ingest ${failCount} out of ${data.length} records`);
+        }
+
+        return { total: data.length, success: successCount, failed: failCount };
+    }
+
+    /**
+     * Get severity colors from all visible log rows
+     * Returns array of {severity, color} objects
+     */
+    async getSeverityColors() {
+        return await this.page.evaluate(() => {
+            const rows = document.querySelectorAll('tbody tr[data-index]');
+            const findings = [];
+
+            for (const row of rows) {
+                const text = row.textContent;
+                const colorDiv = row.querySelector('div[class*="tw-absolute"][class*="tw-left-0"]');
+
+                if (!colorDiv) continue;
+
+                const bgColor = window.getComputedStyle(colorDiv).backgroundColor;
+
+                // Check for severity value in the row text - look for "severity":"X" or "severity":X
+                for (let sev = 0; sev <= 7; sev++) {
+                    if (text.includes(`"severity":"${sev}"`) || text.includes(`"severity":${sev},`)) {
+                        findings.push({
+                            severity: sev,
+                            color: bgColor
+                        });
+                        break;
+                    }
+                }
+            }
+
+            return findings;
+        });
+    }
+
+    /**
+     * Get severity color for a specific severity level
+     * @param {number} severityLevel - Severity level (0-7)
+     * @returns {string|null} RGB color string or null if not found
+     */
+    async getSeverityColorBySeverityLevel(severityLevel) {
+        const results = await this.getSeverityColors();
+        const match = results.find(r => r.severity === severityLevel);
+        return match ? match.color : null;
+    }
+
+    /**
+     * Verify severity color matches expected hex color
+     * @param {number} severityLevel - Severity level (0-7)
+     * @param {string} expectedHexColor - Expected hex color (e.g., "#dc2626")
+     * @returns {boolean} True if colors match
+     */
+    async verifySeverityColor(severityLevel, expectedHexColor) {
+        const rgbColor = await this.getSeverityColorBySeverityLevel(severityLevel);
+        if (!rgbColor) {
+            testLogger.warn(`No color found for severity ${severityLevel}`);
+            return false;
+        }
+
+        const hexColor = this.rgbToHex(rgbColor);
+        const normalizedActual = this.normalizeHexColor(hexColor);
+        const normalizedExpected = this.normalizeHexColor(expectedHexColor);
+
+        testLogger.info(`Severity ${severityLevel}: Expected ${normalizedExpected}, Got ${normalizedActual}`);
+        return normalizedActual === normalizedExpected;
+    }
+
+    /**
+     * Convert RGB color to Hex
+     * @param {string} rgb - RGB color string (e.g., "rgb(220, 38, 38)")
+     * @returns {string} Hex color string (e.g., "#dc2626")
+     */
+    rgbToHex(rgb) {
+        const result = rgb.match(/\d+/g);
+        if (!result || result.length < 3) return null;
+        return '#' + result.slice(0, 3).map(x => parseInt(x).toString(16).padStart(2, '0')).join('');
+    }
+
+    /**
+     * Normalize hex color (remove alpha channel if present, lowercase)
+     * @param {string} hex - Hex color string
+     * @returns {string} Normalized hex color
+     */
+    normalizeHexColor(hex) {
+        hex = hex.replace('#', '');
+        if (hex.length === 8) {
+            hex = hex.substring(0, 6);
+        }
+        return '#' + hex.toLowerCase();
+    }
+
+    /**
+     * Ingest severity color test data to a specific stream
+     * @param {string} streamName - Name of the stream to ingest data to
+     * @returns {Promise<Object>} Response from the ingestion API
+     */
+    async severityColorIngestionToStream(streamName) {
+        const severityColorData = require('../../../test-data/severity_color_data.json');
+        const orgId = process.env["ORGNAME"];
+        const basicAuthCredentials = Buffer.from(
+            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+        ).toString('base64');
+
+        const headers = {
+            "Authorization": `Basic ${basicAuthCredentials}`,
+            "Content-Type": "application/json",
+        };
+
+        const url = `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
+
+        try {
+            const response = await this.page.request.post(url, {
+                headers: headers,
+                data: severityColorData
+            });
+
+            if (!response.ok()) {
+                throw new Error(`HTTP error! status: ${response.status()}`);
+            }
+
+            const result = await response.json();
+            testLogger.info(`Successfully ingested ${severityColorData.length} records to stream '${streamName}'`);
+            return result;
+        } catch (error) {
+            testLogger.error('Severity color ingestion failed:', { error: error.message });
+            throw error;
+        }
+    }
+
+    /**
+     * Delete a stream by name
+     * @param {string} streamName - Name of the stream to delete
+     * @returns {Promise<Object>} Response with status
+     */
+    async deleteStream(streamName) {
+        const orgId = process.env["ORGNAME"];
+        const basicAuthCredentials = Buffer.from(
+            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+        ).toString('base64');
+
+        const headers = {
+            "Authorization": `Basic ${basicAuthCredentials}`,
+        };
+
+        const url = `${process.env.INGESTION_URL}/api/${orgId}/streams/${streamName}`;
+
+        try {
+            const response = await this.page.request.delete(url, {
+                headers: headers
+            });
+
+            if (!response.ok() && response.status() !== 404) {
+                throw new Error(`HTTP error! status: ${response.status()}`);
+            }
+
+            const status = response.status();
+            if (status === 200) {
+                testLogger.info(`Stream '${streamName}' deleted successfully`);
+            } else if (status === 404) {
+                testLogger.info(`Stream '${streamName}' not found (already deleted)`);
+            }
+
+            return { status: status };
+        } catch (error) {
+            testLogger.error('Stream deletion failed:', { error: error.message });
+            throw error;
+        }
+    }
+
+    // ===== SHARE LINK METHODS =====
+
+    /**
+     * Click the share link button on the logs search bar
+     */
+    async clickShareLinkButton() {
+        await this.page.locator(this.shareLinkButton).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.locator(this.shareLinkButton).click();
+        testLogger.info('Clicked share link button');
+    }
+
+    /**
+     * Verify the share link button is visible
+     */
+    async expectShareLinkButtonVisible() {
+        await expect(this.page.locator(this.shareLinkButton)).toBeVisible();
+        testLogger.info('Share link button is visible');
+    }
+
+    /**
+     * Click share link and wait for success notification
+     * @returns {Promise<boolean>} true if success notification appeared
+     */
+    async clickShareLinkAndExpectSuccess() {
+        await this.clickShareLinkButton();
+
+        // Wait for success notification
+        const notification = this.page.locator(this.successNotification);
+        await notification.waitFor({ state: 'visible', timeout: 15000 });
+
+        const notificationText = await notification.textContent();
+        const isSuccess = notificationText.includes(this.linkCopiedSuccessText);
+
+        if (isSuccess) {
+            testLogger.info('Share link success notification appeared');
+        } else {
+            testLogger.warn('Notification appeared but was not success message', { text: notificationText });
+        }
+
+        return isSuccess;
+    }
+
+    /**
+     * Verify share link success notification is visible
+     */
+    async expectShareLinkSuccessNotification() {
+        const notification = this.page.locator(this.successNotification).filter({ hasText: this.linkCopiedSuccessText });
+        await expect(notification).toBeVisible({ timeout: 15000 });
+        testLogger.info('Share link success notification verified');
+    }
+
+    /**
+     * Click share link and wait for any notification (success or error)
+     * This is more resilient for environments where the short URL API may not work
+     * @returns {Promise<{appeared: boolean, isSuccess: boolean, text: string}>}
+     */
+    async clickShareLinkAndExpectNotification() {
+        await this.clickShareLinkButton();
+
+        // Wait for any notification
+        const notification = this.page.locator(this.successNotification);
+        try {
+            await notification.waitFor({ state: 'visible', timeout: 15000 });
+            const notificationText = await notification.textContent();
+            const isSuccess = notificationText.includes(this.linkCopiedSuccessText);
+            const isError = notificationText.includes(this.errorCopyingLinkText);
+
+            testLogger.info('Share link notification appeared', {
+                text: notificationText,
+                isSuccess,
+                isError
+            });
+
+            return {
+                appeared: true,
+                isSuccess,
+                isError,
+                text: notificationText
+            };
+        } catch (e) {
+            testLogger.warn('No notification appeared after clicking share link');
+            return { appeared: false, isSuccess: false, isError: false, text: '' };
+        }
+    }
+
+    /**
+     * Verify any notification appears after clicking share link (success or error)
+     * This tests that the button is functional without requiring API success
+     */
+    async expectShareLinkTriggersNotification() {
+        const result = await this.clickShareLinkAndExpectNotification();
+        expect(result.appeared).toBe(true);
+        testLogger.info('Share link triggered notification', { text: result.text });
+        return result;
+    }
+
+    /**
+     * Get the current URL for verification after share link redirect
+     */
+    async getCurrentUrl() {
+        return this.page.url();
+    }
+
+    /**
+     * Verify the URL contains expected query parameters
+     * @param {string} param - Parameter name to check
+     */
+    async expectUrlContainsParam(param) {
+        const url = await this.getCurrentUrl();
+        expect(url).toContain(param);
+        testLogger.info(`URL contains parameter: ${param}`);
+    }
+
+    // ===== STATE PRESERVATION METHODS =====
+
+    /**
+     * Read the clipboard content (requires clipboard permissions in playwright config)
+     * @returns {Promise<string>} The clipboard text content
+     */
+    async readClipboard() {
+        const clipboardText = await this.page.evaluate(() => navigator.clipboard.readText());
+        testLogger.info('Read clipboard content', { length: clipboardText.length });
+        return clipboardText;
+    }
+
+    /**
+     * Click share link and get the copied URL from clipboard
+     * Automatically converts HTTP to HTTPS to maintain auth context
+     * @returns {Promise<string>} The shared URL
+     */
+    async clickShareLinkAndGetUrl() {
+        await this.clickShareLinkButton();
+
+        // Wait for success notification
+        const notification = this.page.locator(this.successNotification);
+        await notification.waitFor({ state: 'visible', timeout: 15000 });
+
+        // Read the URL from clipboard
+        let sharedUrl = await this.readClipboard();
+
+        // Convert HTTP to HTTPS to maintain authentication cookies (skip for localhost)
+        if (sharedUrl.startsWith('http://') && !sharedUrl.includes('localhost')) {
+            sharedUrl = sharedUrl.replace('http://', 'https://');
+            testLogger.info('Converted HTTP to HTTPS', { url: sharedUrl });
+        }
+
+        testLogger.info('Share link URL captured', { url: sharedUrl });
+
+        return sharedUrl;
+    }
+
+    /**
+     * Extract URL query parameters as an object
+     * @param {string} url - The URL to parse
+     * @returns {Object} Key-value pairs of query parameters
+     */
+    parseUrlParams(url) {
+        const urlObj = new URL(url);
+        const params = {};
+        urlObj.searchParams.forEach((value, key) => {
+            params[key] = value;
+        });
+        return params;
+    }
+
+    /**
+     * Capture the current search state from the URL
+     * @returns {Promise<Object>} The current search state
+     */
+    async captureCurrentState() {
+        const url = await this.getCurrentUrl();
+        const params = this.parseUrlParams(url);
+
+        const state = {
+            url: url,
+            stream: params.stream || null,
+            streamType: params.stream_type || 'logs',
+            period: params.period || null,
+            from: params.from || null,
+            to: params.to || null,
+            sqlMode: params.sql_mode || null,
+            quickMode: params.quick_mode || null,
+            showHistogram: params.show_histogram || null,
+            orgIdentifier: params.org_identifier || null,
+            query: params.sql || params.query || null,
+        };
+
+        testLogger.info('Captured current state', state);
+        return state;
+    }
+
+    /**
+     * Compare two search states and return differences
+     * @param {Object} state1 - First state
+     * @param {Object} state2 - Second state
+     * @param {Array<string>} keysToCompare - Keys to compare
+     * @returns {Object} Comparison result with matches and differences
+     */
+    compareStates(state1, state2, keysToCompare = ['stream', 'streamType', 'period', 'sqlMode', 'quickMode', 'showHistogram']) {
+        const result = {
+            isMatch: true,
+            matches: {},
+            differences: {}
+        };
+
+        for (const key of keysToCompare) {
+            const val1 = state1[key];
+            const val2 = state2[key];
+
+            if (val1 === val2) {
+                result.matches[key] = val1;
+            } else {
+                result.isMatch = false;
+                result.differences[key] = { before: val1, after: val2 };
+            }
+        }
+
+        testLogger.info('State comparison result', result);
+        return result;
+    }
+
+    /**
+     * Wait for the page to finish redirecting (URL stabilizes)
+     * @param {number} timeout - Max time to wait in ms
+     */
+    async waitForRedirectComplete(timeout = 15000) {
+        let previousUrl = '';
+        let currentUrl = await this.getCurrentUrl();
+        const startTime = Date.now();
+
+        // Wait for URL to stabilize (not changing for 1 second)
+        while (Date.now() - startTime < timeout) {
+            previousUrl = currentUrl;
+            await this.page.waitForTimeout(1000);
+            currentUrl = await this.getCurrentUrl();
+
+            if (previousUrl === currentUrl && !currentUrl.includes('/short/')) {
+                testLogger.info('Redirect complete', { finalUrl: currentUrl });
+                return;
+            }
+        }
+
+        testLogger.warn('Redirect timeout - URL may still be changing', { currentUrl });
+    }
+
+    /**
+     * Get the selected stream name from the UI
+     * @returns {Promise<string|null>} The selected stream name
+     */
+    async getSelectedStreamFromUI() {
+        try {
+            const streamSelector = this.page.locator('[data-test="log-search-index-list-select-stream"]');
+            await streamSelector.waitFor({ state: 'visible', timeout: 5000 });
+            const streamText = await streamSelector.textContent();
+            return streamText?.trim() || null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    /**
+     * Check if SQL mode is currently enabled
+     * @returns {Promise<boolean>} True if SQL mode is enabled
+     */
+    async isSqlModeEnabled() {
+        const sqlToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
+        const isChecked = await sqlToggle.getAttribute('aria-checked');
+        return isChecked === 'true';
+    }
+
+    /**
+     * Get the current query from the editor
+     * @returns {Promise<string>} The query text
+     */
+    async getQueryFromEditor() {
+        try {
+            const editor = this.page.locator(this.queryEditor);
+            const queryText = await editor.textContent();
+            return queryText?.trim() || '';
+        } catch (e) {
+            return '';
+        }
+    }
+}

@@ -297,6 +297,81 @@ pub enum CardinalityClass {
     VeryHigh,
 }
 
+/// Response for grouped services API
+/// Groups services by their FQN (Fully Qualified Name) for correlation visualization
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct GroupedServicesResponse {
+    /// Services grouped by FQN
+    pub groups: Vec<ServiceFqnGroup>,
+
+    /// Total number of unique FQNs
+    pub total_fqns: usize,
+
+    /// Total number of services (across all FQNs)
+    pub total_services: usize,
+}
+
+/// A group of services sharing the same FQN
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ServiceFqnGroup {
+    /// The Fully Qualified Name (e.g., "o2-openobserve-querier")
+    pub fqn: String,
+
+    /// Services that share this FQN
+    pub services: Vec<ServiceInGroup>,
+
+    /// Summary of streams in this group
+    pub stream_summary: StreamSummary,
+}
+
+/// A service within an FQN group
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ServiceInGroup {
+    /// Service name (e.g., "openobserve", "querier")
+    pub service_name: String,
+
+    /// How the FQN was derived (e.g., "k8s-statefulset", "k8s-deployment", "service")
+    pub derived_from: String,
+
+    /// Streams by type
+    pub streams: ServiceStreams,
+
+    /// Key dimensions for this service
+    pub dimensions: HashMap<String, String>,
+}
+
+/// Streams organized by type
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Default)]
+pub struct ServiceStreams {
+    /// Log stream names
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub logs: Vec<String>,
+
+    /// Trace stream names
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub traces: Vec<String>,
+
+    /// Metric stream names
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub metrics: Vec<String>,
+}
+
+/// Summary of streams in an FQN group
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Default)]
+pub struct StreamSummary {
+    /// Number of log streams
+    pub logs_count: usize,
+
+    /// Number of trace streams
+    pub traces_count: usize,
+
+    /// Number of metric streams
+    pub metrics_count: usize,
+
+    /// Whether this group has all three telemetry types
+    pub has_full_correlation: bool,
+}
+
 impl CardinalityClass {
     /// Classify cardinality based on unique value count
     pub fn from_cardinality(cardinality: usize) -> Self {

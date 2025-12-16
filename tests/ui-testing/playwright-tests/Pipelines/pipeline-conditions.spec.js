@@ -1,8 +1,8 @@
-import { test, expect } from "../baseFixtures.js";
-import logData from "../../fixtures/log.json";
-import logsdata from "../../../test-data/logs_data.json";
-import PageManager from "../../pages/page-manager.js";
+const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
+const PageManager = require('../../pages/page-manager.js');
+const logData = require("../../fixtures/log.json");
+const logsdata = require("../../../test-data/logs_data.json");
 
 test.describe.configure({ mode: "parallel" });
 
@@ -12,66 +12,51 @@ test.use({
   }
 });
 
-async function login(page) {
-  await page.goto(process.env["ZO_BASE_URL"]);
-  if (await page.getByText('Login as internal user').isVisible()) {
-    await page.getByText('Login as internal user').click();
-  }
-  await page.waitForTimeout(1000);
-  await page
-    .locator('[data-cy="login-user-id"]')
-    .fill(process.env["ZO_ROOT_USER_EMAIL"]);
-  await page.locator("label").filter({ hasText: "Password *" }).click();
-  await page
-    .locator('[data-cy="login-password"]')
-    .fill(process.env["ZO_ROOT_USER_PASSWORD"]);
-  await page.locator('[data-cy="login-sign-in"]').click();
-}
-
-async function ingestion(page, streamName = "e2e_automate_conditions") {
-  const orgId = process.env["ORGNAME"];
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString('base64');
-
-  const headers = {
-    "Authorization": `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  };
-
-  const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
-    const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify(logsdata)
-    });
-    return await fetchResponse.json();
-  }, {
-    url: process.env.INGESTION_URL,
-    headers: headers,
-    orgId: orgId,
-    streamName: streamName,
-    logsdata: logsdata
-  });
-  testLogger.debug('API response received', { response, streamName });
-}
+// Generate a unique run ID at the start of test execution (shared across all workers)
+// This ensures stream names are unique across test runs, not just within a run
+const testRunId = Date.now().toString(36).slice(-4);
 
 test.describe("Pipeline Conditions - Comprehensive Tests", () => {
   let pageManager;
 
-  test.beforeEach(async ({ page }) => {
-    await login(page);
-    pageManager = new PageManager(page);
-    await page.waitForTimeout(5000);
+  // Variables for lightweight cleanup
+  let currentPipelineName;
+  // Worker-specific stream suffix to avoid conflicts in parallel execution
+  let streamSuffix;
 
-    // Ingest data to unique streams for each test to avoid conflicts
-    await ingestion(page, "e2e_conditions_basic");
-    await ingestion(page, "e2e_conditions_groups");
-    await ingestion(page, "e2e_conditions_validation");
-    await ingestion(page, "e2e_conditions_precedence");
-    await ingestion(page, "e2e_conditions_multiple");
-    await ingestion(page, "e2e_conditions_delete");
-    await ingestion(page, "e2e_conditions_operators");
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
+
+    // Generate worker-specific stream suffix using parallelIndex AND testRunId
+    // This avoids conflicts both within a test run (parallelIndex) and across test runs (testRunId)
+    streamSuffix = `_${testRunId}_w${testInfo.parallelIndex}`;
+
+    // Navigate to base URL with authentication
+    await navigateToBase(page);
+    pageManager = new PageManager(page);
+
+    // Post-authentication stabilization wait
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(2000);
+
+    // Ingest data to worker-specific unique streams to avoid conflicts in parallel execution
+    // Use only first 10 records to avoid timeout (full dataset has 3800+ records)
+    const streamNames = [
+      `e2e_conditions_basic${streamSuffix}`,
+      `e2e_conditions_groups${streamSuffix}`,
+      `e2e_conditions_validation${streamSuffix}`,
+      `e2e_conditions_precedence${streamSuffix}`,
+      `e2e_conditions_multiple${streamSuffix}`,
+      `e2e_conditions_delete${streamSuffix}`,
+      `e2e_conditions_operators${streamSuffix}`
+    ];
+
+    for (const streamName of streamNames) {
+      await pageManager.logsPage.ingestData(streamName, logsdata.slice(0, 10));
+    }
+
+    // Brief wait for stream schemas to be established
+    await page.waitForTimeout(3000);
 
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
@@ -79,11 +64,29 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     await page.waitForTimeout(2000);
   });
 
-  test("should create, edit, and test basic condition operations with multiple operators", async ({ page }) => {
-    const pipelineName = `pipeline-basic-ops-${Math.random().toString(36).substring(7)}`;
+  test.afterEach(async ({ page }) => {
+    // Lightweight pipeline cleanup
+    try {
+      if (currentPipelineName) {
+        await pageManager.apiCleanup.deletePipeline(currentPipelineName).catch(() => {});
+        testLogger.info('Cleaned up pipeline', { currentPipelineName });
+      }
+    } catch (error) {
+      testLogger.warn('Cleanup failed', { error: error.message });
+    }
 
-    // Create pipeline with condition
-    await pageManager.pipelinesPage.createPipelineWithCondition("e2e_conditions_basic");
+    // Reset variables
+    currentPipelineName = null;
+  });
+
+  test("should create, edit, and test basic condition operations with multiple operators", {
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@pipelinesBasicOperations', '@pipelinesMultipleOperators']
+  }, async ({ page }) => {
+    const pipelineName = `pipeline-basic-ops-${Math.random().toString(36).substring(7)}`;
+    currentPipelineName = pipelineName;
+
+    // Create pipeline with condition (using worker-specific stream name)
+    await pageManager.pipelinesPage.createPipelineWithCondition(`e2e_conditions_basic${streamSuffix}`);
 
     // Verify condition dialog is open
     await pageManager.pipelinesPage.verifyConditionDialogOpen();
@@ -116,12 +119,13 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     await page.waitForTimeout(500);
     await pageManager.pipelinesPage.verifyConditionCount(2);
 
-    // Test 8: Verify first condition cannot be deleted (Bug #9075)
+    // Test 8: Verify all conditions including first can be deleted (after fix for issue #9518)
     await pageManager.pipelinesPage.verifyDeleteButtonCount(2);
 
     // Save and complete pipeline
     await pageManager.pipelinesPage.saveConditionAndCompletePipeline(pipelineName);
-    await ingestion(page);
+
+    // Note: Data already ingested in beforeEach - no need for redundant ingestion here
 
     // Test 9: Edit existing condition
     await pageManager.pipelinesPage.openPipelineMenu();
@@ -138,13 +142,19 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.savePipeline();
 
+    // Wait for save to complete and UI to stabilize
+    await page.waitForTimeout(2000);
+
     // Cleanup
     await pageManager.pipelinesPage.openPipelineMenu();
+    await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.deletePipelineByName(pipelineName);
   });
 
-  test("should handle condition groups, nesting, and reordering", async ({ page }) => {
-    await pageManager.pipelinesPage.createPipelineWithCondition("e2e_conditions_groups");
+  test("should handle condition groups, nesting, and reordering", {
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@pipelinesNesting', '@pipelinesReordering']
+  }, async ({ page }) => {
+    await pageManager.pipelinesPage.createPipelineWithCondition(`e2e_conditions_groups${streamSuffix}`);
 
     // Test 1: Add first condition
     await pageManager.pipelinesPage.fillCondition("kubernetes_container_name", "=", "test-A", 0);
@@ -212,8 +222,10 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     await pageManager.pipelinesPage.verifyConfirmationDialog();
   });
 
-  test("should validate fields and show proper error messages", async ({ page }) => {
-    await pageManager.pipelinesPage.createPipelineWithCondition("e2e_conditions_validation");
+  test("should validate fields and show proper error messages", {
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@pipelinesValidation', '@pipelinesErrorMessages']
+  }, async ({ page }) => {
+    await pageManager.pipelinesPage.createPipelineWithCondition(`e2e_conditions_validation${streamSuffix}`);
 
     // Test 1: Verify guidelines are displayed
     await pageManager.pipelinesPage.verifyNoteContainer();
@@ -246,10 +258,13 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     await pageManager.pipelinesPage.verifyConfirmationDialog();
   });
 
-  test("should test complex conditions and operator precedence (A OR B AND C)", async ({ page }) => {
+  test("should test complex conditions and operator precedence (A OR B AND C)", {
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@pipelinesOperatorPrecedence', '@pipelinesComplexConditions']
+  }, async ({ page }) => {
     const pipelineName = `pipeline-complex-${Math.random().toString(36).substring(7)}`;
+    currentPipelineName = pipelineName;
 
-    await pageManager.pipelinesPage.createPipelineWithCondition("e2e_conditions_precedence");
+    await pageManager.pipelinesPage.createPipelineWithCondition(`e2e_conditions_precedence${streamSuffix}`);
 
     // Create: A OR B AND C (tests operator precedence)
     // Condition A
@@ -275,16 +290,20 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     }
 
     await pageManager.pipelinesPage.saveConditionAndCompletePipeline(pipelineName);
-    await ingestion(page);
+
+    // Note: Data already ingested in beforeEach - no need for redundant ingestion here
 
     await pageManager.pipelinesPage.openPipelineMenu();
     await pageManager.pipelinesPage.deletePipelineByName(pipelineName);
   });
 
-  test("should test multiple conditions: A, B, C, and D", async ({ page }) => {
+  test("should test multiple conditions: A, B, C, and D", {
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@pipelinesMultipleConditions']
+  }, async ({ page }) => {
     const pipelineName = `pipeline-multiple-${Math.random().toString(36).substring(7)}`;
+    currentPipelineName = pipelineName;
 
-    await pageManager.pipelinesPage.createPipelineWithCondition("e2e_conditions_multiple");
+    await pageManager.pipelinesPage.createPipelineWithCondition(`e2e_conditions_multiple${streamSuffix}`);
 
     // Wait for condition dialog to be fully loaded
     await pageManager.pipelinesPage.verifyConditionDialogOpen();
@@ -312,17 +331,21 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     await pageManager.pipelinesPage.verifyConditionCount(4);
 
     await pageManager.pipelinesPage.saveConditionAndCompletePipeline(pipelineName);
-    await ingestion(page);
+
+    // Note: Data already ingested in beforeEach - no need for redundant ingestion here
 
     await pageManager.pipelinesPage.openPipelineMenu();
     await pageManager.pipelinesPage.deletePipelineByName(pipelineName);
   });
 
-  test("should delete condition node from pipeline", async ({ page }) => {
+  test("should delete condition node from pipeline", {
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@pipelinesDeleteNode']
+  }, async ({ page }) => {
     const pipelineName = `pipeline-delete-${Math.random().toString(36).substring(7)}`;
+    currentPipelineName = pipelineName;
 
-    // Create pipeline with condition
-    await pageManager.pipelinesPage.createPipelineWithCondition("e2e_conditions_delete");
+    // Create pipeline with condition (using worker-specific stream name)
+    await pageManager.pipelinesPage.createPipelineWithCondition(`e2e_conditions_delete${streamSuffix}`);
     await pageManager.pipelinesPage.fillCondition("kubernetes_container_name", "=", "test", 0);
     await pageManager.pipelinesPage.saveConditionAndCompletePipeline(pipelineName);
 
@@ -353,10 +376,13 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     await pageManager.pipelinesPage.deletePipelineByName(pipelineName);
   });
 
-  test("should test different comparison operators (>=, !=, Contains, NotContains)", async ({ page }) => {
+  test("should test different comparison operators (>=, !=, Contains, NotContains)", {
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@pipelinesComparisonOperators']
+  }, async ({ page }) => {
     const pipelineName = `pipeline-operators-${Math.random().toString(36).substring(7)}`;
+    currentPipelineName = pipelineName;
 
-    await pageManager.pipelinesPage.createPipelineWithCondition("e2e_conditions_operators");
+    await pageManager.pipelinesPage.createPipelineWithCondition(`e2e_conditions_operators${streamSuffix}`);
 
     // Test >= operator
     await pageManager.pipelinesPage.fillCondition("kubernetes_container_name", ">=", "100", 0);
@@ -373,7 +399,8 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     await pageManager.pipelinesPage.verifyConditionCount(3);
 
     await pageManager.pipelinesPage.saveConditionAndCompletePipeline(pipelineName);
-    await ingestion(page);
+
+    // Note: Data already ingested in beforeEach - no need for redundant ingestion here
 
     await pageManager.pipelinesPage.openPipelineMenu();
     await pageManager.pipelinesPage.deletePipelineByName(pipelineName);

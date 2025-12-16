@@ -19,6 +19,7 @@ import type {
   CorrelationResponse,
   StreamInfo,
 } from "@/services/service_streams";
+import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 
 /**
  * Telemetry Correlation Utilities
@@ -54,27 +55,41 @@ export interface CorrelationResult {
 /**
  * Extract semantic dimensions from telemetry context
  *
- * Maps raw field names to semantic dimension IDs using semantic groups
+ * Maps raw field names to semantic dimension IDs using semantic groups.
+ *
+ * @param context - The telemetry context containing fields
+ * @param semanticGroups - Semantic field group definitions
+ * @param stableOnly - If true, only extract stable dimensions (for correlation).
+ *                     Unstable dimensions (pod-id, pod-start-time, etc.) change
+ *                     on pod restarts and should not be used for service matching.
  */
 export function extractSemanticDimensions(
   context: TelemetryContext,
-  semanticGroups: SemanticFieldGroup[]
+  semanticGroups: SemanticFieldGroup[],
+  stableOnly: boolean = false
 ): Record<string, string> {
   const dimensions: Record<string, string> = {};
 
-  // Build reverse lookup: field name -> dimension ID
-  const fieldToDimension = new Map<string, string>();
+  // Build reverse lookup: field name -> { dimensionId, isStable }
+  const fieldToDimension = new Map<string, { id: string; isStable: boolean }>();
   for (const group of semanticGroups) {
     for (const field of group.fields) {
-      fieldToDimension.set(field, group.id);
+      fieldToDimension.set(field, {
+        id: group.id,
+        isStable: group.is_stable ?? false
+      });
     }
   }
 
   // Extract dimensions from context fields
   for (const [fieldName, value] of Object.entries(context.fields)) {
-    const dimensionId = fieldToDimension.get(fieldName);
-    if (dimensionId && value !== null && value !== undefined) {
-      dimensions[dimensionId] = String(value);
+    const dimInfo = fieldToDimension.get(fieldName);
+    if (dimInfo && value !== null && value !== undefined) {
+      // Skip unstable dimensions if stableOnly is true
+      if (stableOnly && !dimInfo.isStable) {
+        continue;
+      }
+      dimensions[dimInfo.id] = String(value);
     }
   }
 
@@ -109,7 +124,8 @@ function translateDimensionsToFields(
 /**
  * Build WHERE clause conditions using exact field names from StreamInfo.filters
  *
- * Uses the exact field names returned by the _correlate API instead of semantic variations
+ * Uses the exact field names returned by the _correlate API instead of semantic variations.
+ * Skips filters with SELECT_ALL_VALUE (wildcard - means match all values).
  */
 function buildExactDimensionConditions(
   filters: Record<string, string>
@@ -117,6 +133,10 @@ function buildExactDimensionConditions(
   const conditions: string[] = [];
 
   for (const [fieldName, value] of Object.entries(filters)) {
+    // Skip SELECT_ALL_VALUE wildcards - these mean "match all values"
+    if (value === SELECT_ALL_VALUE) {
+      continue;
+    }
     // Escape single quotes in value
     const escapedValue = value.replace(/'/g, "''");
     conditions.push(`${fieldName} = '${escapedValue}'`);
@@ -128,20 +148,19 @@ function buildExactDimensionConditions(
 /**
  * Generate trace query using exact field names from StreamInfo
  * Timestamp is NOT included in SQL - it's passed as separate from/to query params
+ *
+ * Uses only the filters from StreamInfo (same as logs/metrics) - service_name
+ * is already included in filters if present.
  */
 export function buildTraceQuery(
-  serviceName: string,
   streamInfo: StreamInfo,
   context: TelemetryContext,
   timeWindowMinutes: number = 5
 ): CorrelationQuery {
   const conditions: string[] = [];
 
-  // Add service name condition
-  const escapedServiceName = serviceName.replace(/'/g, "''");
-  conditions.push(`service_name = '${escapedServiceName}'`);
-
   // Add dimension conditions using exact field names from StreamInfo.filters
+  // This includes service_name if present in the trace stream
   const dimensionConditions = buildExactDimensionConditions(streamInfo.filters);
   conditions.push(...dimensionConditions);
 
@@ -269,12 +288,12 @@ export function generateCorrelationQueries(
 
   // If we have correlation data from the API, use the exact StreamInfo with field names
   if (correlationData) {
-    const serviceName = correlationData.service_name;
-
     // Generate queries for each target type (excluding source type)
     if (sourceType !== "traces") {
       for (const streamInfo of correlationData.related_streams.traces) {
-        queries.push(buildTraceQuery(serviceName, streamInfo, context, timeWindowMinutes));
+        // Use filters from StreamInfo directly (same as logs/metrics)
+        // service_name is already in filters if present
+        queries.push(buildTraceQuery(streamInfo, context, timeWindowMinutes));
       }
     }
 

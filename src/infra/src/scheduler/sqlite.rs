@@ -356,9 +356,9 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
         sqlx::query(&sql)
-            .bind(TriggerModule::Alert)
-            .bind(alert_max_time)
+            .bind(TriggerModule::Report)
             .bind(report_max_time)
+            .bind(alert_max_time)
             .execute(&*client)
             .await?;
 
@@ -411,9 +411,9 @@ RETURNING *;"#;
         let jobs: Vec<Trigger> = sqlx::query_as::<_, Trigger>(query)
             .bind(TriggerStatus::Processing)
             .bind(now)
-            .bind(TriggerModule::Alert)
-            .bind(alert_max_time)
+            .bind(TriggerModule::Report)
             .bind(report_max_time)
+            .bind(alert_max_time)
             .bind(TriggerStatus::Waiting)
             .bind(now)
             .bind(true)

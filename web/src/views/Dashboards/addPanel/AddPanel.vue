@@ -122,6 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             no-caps
             flat
             dense
+            :loading="searchRequestTraceIds.length > 0"
             :disable="searchRequestTraceIds.length > 0"
             :label="t('panel.apply')"
             @click="() => runQuery(false)"
@@ -299,6 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="layout-panel-container col">
                     <DashboardQueryBuilder
                       :dashboardData="currentDashboardData.data"
+                      @custom-chart-template-selected="handleCustomChartTemplateSelected"
                     />
                     <q-separator />
                     <VariablesValueSelector
@@ -599,10 +601,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="row card-container"
                 style="height: calc(100vh - 99px); overflow-y: auto"
               >
-                <div class="col scroll" style="height: 100%">
-                  <div
-                    class="layout-panel-container tw-h-[calc(100vh-200px)] col"
-                  >
+                <div class="col scroll" style="height: 100%; display: flex; flex-direction: column;">
+                  <div style="height: 500px; flex-shrink: 0;">
                     <q-splitter
                       class="query-editor-splitter"
                       v-model="splitterModel"
@@ -610,10 +610,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:model-value="layoutSplitterUpdated"
                     >
                       <template #before>
-                        <CustomChartEditor
-                          v-model="dashboardPanelData.data.customChartContent"
-                          style="width: 100%; height: 100%"
-                        />
+                        <div style="position: relative; width: 100%; height: 100%;">
+                          <CustomChartEditor
+                            v-model="dashboardPanelData.data.customChartContent"
+                            style="width: 100%; height: 100%;"
+                          />
+                          <!-- Custom Chart Type Selector Button overlaid on Editor -->
+                          <div style="position: absolute; bottom: 10px; right: 10px; z-index: 10;">
+                            <q-btn
+                              unelevated
+                              color="primary"
+                              icon="bar_chart"
+                              label="Example Charts"
+                              @click="openCustomChartTypeSelector"
+                              data-test="custom-chart-type-selector-btn"
+                              no-caps
+                              size="md"
+                            />
+                            <!-- Custom Chart Type Selector Dialog -->
+                            <q-dialog v-model="showCustomChartTypeSelector">
+                              <CustomChartTypeSelector
+                                @select="handleChartTypeSelection"
+                                @close="showCustomChartTypeSelector = false"
+                              />
+                            </q-dialog>
+                          </div>
+                        </div>
                       </template>
                       <template #separator>
                         <div class="splitter-vertical splitter-enabled"></div>
@@ -705,6 +727,7 @@ import {
 import PanelSidebar from "../../../components/dashboards/addPanel/PanelSidebar.vue";
 import ChartSelection from "../../../components/dashboards/addPanel/ChartSelection.vue";
 import FieldList from "../../../components/dashboards/addPanel/FieldList.vue";
+import CustomChartTypeSelector from "../../../components/dashboards/addPanel/customChartExamples/CustomChartTypeSelector.vue";
 
 import { useI18n } from "vue-i18n";
 import {
@@ -732,6 +755,7 @@ import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import useAiChat from "@/composables/useAiChat";
 import useStreams from "@/composables/useStreams";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
+import { loadCustomChartTemplate } from "@/components/dashboards/addPanel/customChartExamples/customChartTemplates";
 import {
   createDashboardsContextProvider,
   contextRegistry,
@@ -777,6 +801,7 @@ export default defineComponent({
     VariablesValueSelector,
     PanelSchemaRenderer,
     RelativeTime,
+    CustomChartTypeSelector,
     DashboardQueryEditor: defineAsyncComponent(
       () => import("@/components/dashboards/addPanel/DashboardQueryEditor.vue"),
     ),
@@ -819,6 +844,52 @@ export default defineComponent({
     const { getStream } = useStreams();
     const seriesData = ref([]);
     const shouldRefreshWithoutCache = ref(false);
+
+    // Custom Chart Type Selector
+    const selectedCustomChartType = ref(null);
+    const showCustomChartTypeSelector = ref(false);
+
+    const openCustomChartTypeSelector = () => {
+      showCustomChartTypeSelector.value = true;
+    };
+
+    const handleChartTypeSelection = async (selection: any) => {
+      // Extract chart and replaceQuery option from the selection
+      const chart = selection.chart || selection; // Support both old and new format
+      const replaceQuery = selection.replaceQuery ?? false; // Default to false (unchecked)
+      
+      selectedCustomChartType.value = chart;
+      
+      try {
+        // Lazy load the template
+        const template = await loadCustomChartTemplate(chart.value);
+        
+        if (template) {
+          // Keep the default commented instructions and only replace the option code
+          const defaultComments = `// To know more about ECharts , 
+// visit: https://echarts.apache.org/examples/en/index.html 
+// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple 
+// Define your ECharts 'option' here. 
+// 'data' variable is available for use and contains the response data from the search result and it is an array.
+`;
+          dashboardPanelData.data.customChartContent = defaultComments + template.code;
+          
+          // Handle query replacement based on user selection
+          const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex || 0;
+          if (dashboardPanelData.data.queries[currentQueryIndex]) {
+            if (replaceQuery && template.query && template.query.trim()) {
+              // Replace with example query if option is selected
+              dashboardPanelData.data.queries[currentQueryIndex].query = template.query.trim();
+              // Enable custom query mode for custom charts
+              dashboardPanelData.data.queries[currentQueryIndex].customQuery = true;
+            }
+            // If replaceQuery is false, preserve the existing query (do nothing)
+          }
+        }
+      } catch (error) {
+        showErrorNotification("There was an error applying the chart example code. Please try again");
+      }
+    };
 
     const seriesDataUpdate = (data: any) => {
       seriesData.value = data;
@@ -1497,6 +1568,14 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     };
 
+    // Handler for custom chart template selection
+    const handleCustomChartTemplateSelected = (templateCode: string) => {
+      // Update the custom chart content with the selected template
+      dashboardPanelData.data.customChartContent = templateCode;
+    };
+
+
+
     watch(
       () => dashboardPanelData.layout.splitter,
       (newVal) => {
@@ -1942,6 +2021,11 @@ export default defineComponent({
       savePanelChangesToDashboard,
       runQuery,
       layoutSplitterUpdated,
+      handleCustomChartTemplateSelected,
+      selectedCustomChartType,
+      showCustomChartTypeSelector,
+      openCustomChartTypeSelector,
+      handleChartTypeSelection,
       expandedSplitterHeight,
       querySplitterUpdated,
       currentDashboard,

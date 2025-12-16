@@ -42,6 +42,11 @@ export interface SemanticFieldGroup {
   fields: string[];
   normalize?: boolean;
   group?: string;
+  /** Whether this dimension is stable (persists across pod restarts, deployments, etc.)
+   * Stable dimensions: cluster, namespace, deployment, statefulset
+   * Unstable dimensions: pod-id, pod-start-time, container-id, node-id
+   * Used for correlation - unstable dimension mismatches are ignored */
+  is_stable?: boolean;
 }
 
 export interface StreamInfo {
@@ -89,6 +94,39 @@ export interface DimensionAnalyticsSummary {
   generated_at: number;
 }
 
+// Types for grouped services API
+export interface ServiceStreamsInfo {
+  logs: string[];
+  traces: string[];
+  metrics: string[];
+}
+
+export interface ServiceInGroup {
+  service_name: string;
+  derived_from: string;
+  streams: ServiceStreamsInfo;
+  dimensions: Record<string, string>;
+}
+
+export interface StreamSummary {
+  logs_count: number;
+  traces_count: number;
+  metrics_count: number;
+  has_full_correlation: boolean;
+}
+
+export interface ServiceFqnGroup {
+  fqn: string;
+  services: ServiceInGroup[];
+  stream_summary: StreamSummary;
+}
+
+export interface GroupedServicesResponse {
+  groups: ServiceFqnGroup[];
+  total_fqns: number;
+  total_services: number;
+}
+
 /**
  * Get semantic field groups for field name translation
  * Uses the existing alerts/deduplication/semantic-groups API
@@ -133,8 +171,26 @@ export const getDimensionAnalytics = (
   return http().get(`/api/${org_identifier}/service_streams/_analytics`);
 };
 
+/**
+ * Get services grouped by their FQN (Fully Qualified Name)
+ *
+ * Returns services organized by their correlation FQN, showing:
+ * - Which services share the same FQN (correlated together)
+ * - Stream counts per group (logs/traces/metrics)
+ * - Whether each group has full telemetry coverage
+ *
+ * @param org_identifier Organization ID
+ * @returns Grouped services response
+ */
+export const getGroupedServices = (
+  org_identifier: string
+): Promise<{ data: GroupedServicesResponse }> => {
+  return http().get(`/api/${org_identifier}/service_streams/_grouped`);
+};
+
 export default {
   getSemanticGroups,
   correlate,
   getDimensionAnalytics,
+  getGroupedServices,
 };
