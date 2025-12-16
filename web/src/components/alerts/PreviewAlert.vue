@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch, onMounted } from "vue";
 import PanelSchemaRenderer from "../dashboards/PanelSchemaRenderer.vue";
 import { reactive } from "vue";
 import { onBeforeMount } from "vue";
@@ -248,6 +248,33 @@ const refreshData = () => {
 
   chartData.value = cloneDeep(dashboardPanelData.data);
 };
+
+// Watch for changes to props and refresh chart data automatically
+watch(
+  () => [
+    props.query,
+    props.formData.stream_name,
+    props.formData.stream_type,
+    props.formData.trigger_condition?.period,
+    props.isAggregationEnabled,
+    props.selectedTab,
+    props.formData.query_condition?.aggregation,
+  ],
+  () => {
+    // Only refresh if we have a valid query and it's not in SQL mode
+    if (props.query && props.selectedTab !== 'sql') {
+      refreshData();
+    }
+  },
+  { deep: true }
+);
+
+// Refresh data on mount if we already have a query
+onMounted(() => {
+  if (props.query && props.selectedTab !== 'sql') {
+    refreshData();
+  }
+});
 
 defineExpose({ refreshData });
 </script>
