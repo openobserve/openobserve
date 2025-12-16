@@ -167,18 +167,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="hideOnPrintMode el-border"
               :dashboardId="currentDashboardData.data?.dashboardId"
             />
-            <q-btn
+            <share-button
               v-if="!isFullscreen"
-              outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
-              size="sm"
-              no-caps
-              icon="share"
-              @click="shareLink.execute()"
-              :loading="shareLink.isLoading.value"
+              :url="dashboardShareURL"
+              button-class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
+              button-size="sm"
               data-test="dashboard-share-btn"
-              ><q-tooltip>{{ t("dashboard.share") }}</q-tooltip></q-btn
-            >
+            />
             <q-btn
               v-if="!isFullscreen"
               outline
@@ -355,6 +350,7 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
+import ShareButton from "@/components/common/ShareButton.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import { useRouter } from "vue-router";
 import {
@@ -404,6 +400,7 @@ export default defineComponent({
   emits: ["onDeletePanel"],
   components: {
     DateTimePickerDashboard,
+    ShareButton,
     AutoRefreshInterval,
     ExportDashboard,
     DashboardSettings,
@@ -1041,7 +1038,11 @@ export default defineComponent({
       }
     };
 
-    const shareLink = useLoading(async () => {
+    /**
+     * Computed property for dashboard share URL
+     * Converts relative time periods to absolute times for sharing
+     */
+    const dashboardShareURL = computed(() => {
       const urlObj = new URL(window.location.href);
       const urlSearchParams = urlObj?.searchParams;
 
@@ -1055,22 +1056,7 @@ export default defineComponent({
         urlSearchParams.set("to", currentTimeObj?.value?.end_time?.getTime());
       }
 
-      try {
-        const res = await shortURLService.create(
-          store.state.selectedOrganization.identifier,
-          urlObj?.href,
-        );
-        const shortURL = res?.data?.short_url;
-        copyToClipboard(shortURL)
-          .then(() => {
-            showPositiveNotification("Link copied successfully");
-          })
-          .catch(() => {
-            showErrorNotification("Error while copying link");
-          });
-      } catch (error) {
-        showErrorNotification("Error while sharing link");
-      }
+      return urlObj?.href;
     });
 
     // Fullscreen
@@ -1264,7 +1250,7 @@ export default defineComponent({
       initialVariableValues,
       getQueryParamsForDuration,
       onDataZoom,
-      shareLink,
+      dashboardShareURL,
       selectedTabId,
       onMovePanel,
       printDashboard,
