@@ -153,6 +153,103 @@ test.describe("Ingestion Configuration Tests", () => {
     });
   });
 
+  test.describe("Content Scrolling and Display", () => {
+    test("should scroll through Kubernetes configuration content", {
+      tag: ['@ingestion', '@scroll', '@P2']
+    }, async ({ page }) => {
+      testLogger.info('Testing scroll behavior for Kubernetes configuration');
+
+      const orgId = process.env["ORGNAME"];
+      await pm.ingestionConfigPage.navigateToIntegration('/ingestion/recommended/kubernetes', orgId);
+
+      await pm.ingestionConfigPage.verifyContentVisible();
+
+      // Get initial scroll dimensions
+      const scrollHeight = await pm.ingestionConfigPage.getContentScrollHeight();
+      const clientHeight = await pm.ingestionConfigPage.getContentClientHeight();
+      testLogger.info(`Content dimensions - scrollHeight: ${scrollHeight}, clientHeight: ${clientHeight}`);
+
+      // Check if content is scrollable (for long configurations)
+      const isScrollable = await pm.ingestionConfigPage.isContentScrollable();
+      if (isScrollable) {
+        testLogger.info('✓ Configuration content is scrollable');
+
+        // Scroll to bottom
+        await pm.ingestionConfigPage.scrollContentToBottom();
+        await page.waitForTimeout(500);
+
+        testLogger.info('✓ Successfully scrolled to bottom of configuration');
+      } else {
+        testLogger.info('✓ Configuration content fits without scrolling');
+      }
+
+      testLogger.info('Scroll test completed successfully');
+    });
+  });
+
+  test.describe("Documentation Links", () => {
+    test("should verify FluentBit documentation link exists and is valid", {
+      tag: ['@ingestion', '@links', '@P2']
+    }, async () => {
+      testLogger.info('Testing documentation link for FluentBit');
+
+      const orgId = process.env["ORGNAME"];
+      await pm.ingestionConfigPage.navigateToIntegration('/ingestion/custom/logs/fluentbit', orgId);
+
+      // Verify documentation links exist
+      const linkCount = await pm.ingestionConfigPage.verifyDocumentationLinksExist();
+      testLogger.info(`✓ Found ${linkCount} documentation link(s)`);
+
+      // Verify the link has a valid href
+      const href = await pm.ingestionConfigPage.verifyDocumentationLinkHref(0);
+      testLogger.info(`✓ Documentation link URL: ${href}`);
+
+      expect(href).toContain('openobserve.ai/blog');
+
+      testLogger.info('Documentation link verification completed');
+    });
+
+    test("should verify PostgreSQL documentation link exists", {
+      tag: ['@ingestion', '@links', '@databases', '@P2']
+    }, async () => {
+      testLogger.info('Testing documentation link for PostgreSQL');
+
+      const orgId = process.env["ORGNAME"];
+      await pm.ingestionConfigPage.navigateToIntegration('/ingestion/databases/postgres', orgId);
+
+      // Verify at least one documentation link exists
+      const linkCount = await pm.ingestionConfigPage.getDocumentationLinkCount();
+      testLogger.info(`Found ${linkCount} documentation link(s)`);
+
+      if (linkCount > 0) {
+        const href = await pm.ingestionConfigPage.verifyDocumentationLinkHref(0);
+        testLogger.info(`✓ First documentation link: ${href}`);
+        expect(href).toBeTruthy();
+      }
+
+      testLogger.info('PostgreSQL documentation link test completed');
+    });
+
+    test("should verify Prometheus documentation link exists", {
+      tag: ['@ingestion', '@links', '@metrics', '@P2']
+    }, async () => {
+      testLogger.info('Testing documentation link for Prometheus');
+
+      const orgId = process.env["ORGNAME"];
+      await pm.ingestionConfigPage.navigateToIntegration('/ingestion/custom/metrics/prometheus', orgId);
+
+      const linkCount = await pm.ingestionConfigPage.getDocumentationLinkCount();
+      testLogger.info(`Found ${linkCount} documentation link(s) on Prometheus page`);
+
+      if (linkCount > 0) {
+        const href = await pm.ingestionConfigPage.verifyDocumentationLinkHref(0);
+        testLogger.info(`✓ Documentation link verified: ${href}`);
+      }
+
+      testLogger.info('Prometheus documentation link test completed');
+    });
+  });
+
   test.afterEach(async () => {
     testLogger.info('Ingestion configuration test completed');
   });

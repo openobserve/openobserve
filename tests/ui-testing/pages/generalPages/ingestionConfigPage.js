@@ -144,4 +144,63 @@ export class IngestionConfigPage {
         const content = await this.getContentText();
         return content.includes('default') || content.includes(orgId);
     }
+
+    // ==================== Scrolling and Content Display ====================
+
+    async scrollContentToBottom() {
+        const contentElement = this.page.locator(this.contentText).first();
+        await contentElement.evaluate(el => el.scrollTop = el.scrollHeight);
+    }
+
+    async getContentScrollHeight() {
+        const contentElement = this.page.locator(this.contentText).first();
+        return await contentElement.evaluate(el => el.scrollHeight);
+    }
+
+    async getContentClientHeight() {
+        const contentElement = this.page.locator(this.contentText).first();
+        return await contentElement.evaluate(el => el.clientHeight);
+    }
+
+    async isContentScrollable() {
+        const scrollHeight = await this.getContentScrollHeight();
+        const clientHeight = await this.getContentClientHeight();
+        return scrollHeight > clientHeight;
+    }
+
+    // ==================== Link Verification ====================
+
+    async getDocumentationLinks() {
+        // Find all external links with target="_blank"
+        return await this.page.locator('a[target="_blank"]').all();
+    }
+
+    async getDocumentationLinkCount() {
+        const links = await this.getDocumentationLinks();
+        return links.length;
+    }
+
+    async verifyDocumentationLinksExist() {
+        const linkCount = await this.getDocumentationLinkCount();
+        expect(linkCount).toBeGreaterThan(0);
+        return linkCount;
+    }
+
+    async verifyDocumentationLinkHref(index = 0) {
+        const links = await this.getDocumentationLinks();
+        if (links.length > index) {
+            const href = await links[index].getAttribute('href');
+            expect(href).toBeTruthy();
+            expect(href).toMatch(/^https?:\/\//); // Verify it's a valid URL
+            return href;
+        }
+        return null;
+    }
+
+    async clickDocumentationLink(index = 0) {
+        const links = await this.getDocumentationLinks();
+        if (links.length > index) {
+            await links[index].click();
+        }
+    }
 }
