@@ -5,15 +5,6 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const {
-  navigateToTraces,
-  setupTraceSearch,
-  enterTraceQuery,
-  hasTraceResults,
-  expandTraceField,
-  selectFieldValue,
-  clickFirstTraceResult
-} = require('./utils/trace-test-helpers.js');
 
 test.describe("Trace Query Editor testcases", () => {
   test.describe.configure({ mode: 'serial' });
@@ -31,7 +22,7 @@ test.describe("Trace Query Editor testcases", () => {
     await page.waitForLoadState('networkidle');
 
     // Navigate to traces page
-    await navigateToTraces(page);
+    await pm.tracesPage.navigateToTraces();
 
     testLogger.info('Test setup completed for trace query editor');
   });
@@ -47,7 +38,7 @@ test.describe("Trace Query Editor testcases", () => {
     testLogger.info('Testing query editor for basic trace search');
 
     // Enter search query
-    await enterTraceQuery(page, "service_name='api-gateway'");
+    await pm.tracesPage.enterTraceQuery("service_name='api-gateway'");
 
     // Verify query appears in editor
     const viewLines = page.locator('.view-lines');
@@ -63,7 +54,7 @@ test.describe("Trace Query Editor testcases", () => {
     let searchCompleted = false;
     for (let i = 0; i < 3; i++) {
       await page.waitForTimeout(2000);
-      const hasResults = await hasTraceResults(page);
+      const hasResults = await pm.tracesPage.hasTraceResults();
       const hasNoResults = await page.locator('[data-test="logs-search-result-not-found-text"]').isVisible({ timeout: 1000 }).catch(() => false);
 
       if (hasResults || hasNoResults) {
@@ -77,7 +68,7 @@ test.describe("Trace Query Editor testcases", () => {
     expect(searchCompleted).toBeTruthy();
 
     // If results exist, verify they match the filter
-    if (await hasTraceResults(page)) {
+    if (await pm.tracesPage.hasTraceResults()) {
       const serviceNameText = await page.getByText('api-gateway').first().isVisible({ timeout: 3000 }).catch(() => false);
       if (serviceNameText) {
         testLogger.info('Results correctly filtered by service name');
@@ -94,14 +85,14 @@ test.describe("Trace Query Editor testcases", () => {
     testLogger.info('Testing field expansion and filtering by clicking field values');
 
     // Initial setup and search
-    await setupTraceSearch(page, pm.tracesPage);
+    await pm.tracesPage.setupTraceSearch();
 
     // Expand status_code field
-    const expanded = await expandTraceField(page, 'status_code');
+    const expanded = await pm.tracesPage.expandTraceField('status_code');
 
     if (expanded) {
       // Select status_code='2' value
-      const selected = await selectFieldValue(page, 'status_code', '2');
+      const selected = await pm.tracesPage.selectFieldValue('status_code', '2');
 
       if (selected) {
         // Verify filter appears in query editor
@@ -118,10 +109,10 @@ test.describe("Trace Query Editor testcases", () => {
       }
     } else {
       // Try alternative field - service_name
-      const serviceExpanded = await expandTraceField(page, 'service_name');
+      const serviceExpanded = await pm.tracesPage.expandTraceField('service_name');
 
       if (serviceExpanded) {
-        await selectFieldValue(page, 'service_name', 'api-gateway');
+        await pm.tracesPage.selectFieldValue('service_name', 'api-gateway');
         await pm.tracesPage.runSearch();
         await page.waitForTimeout(2000);
       }
@@ -137,10 +128,10 @@ test.describe("Trace Query Editor testcases", () => {
     testLogger.info('Testing clicking on trace result to view span details');
 
     // Setup and run initial search
-    await setupTraceSearch(page, pm.tracesPage);
+    await pm.tracesPage.setupTraceSearch();
 
     // Click on first trace result
-    await clickFirstTraceResult(page);
+    await pm.tracesPage.clickFirstTraceResult();
 
     // Check if span details are visible
     const spanServiceName = page.locator('[data-test^="trace-tree-span-service-name-"]').first();
@@ -174,10 +165,10 @@ test.describe("Trace Query Editor testcases", () => {
     testLogger.info('Testing service name filtering from span details');
 
     // Setup and run initial search
-    await setupTraceSearch(page, pm.tracesPage);
+    await pm.tracesPage.setupTraceSearch();
 
     // Click on first trace result
-    await clickFirstTraceResult(page);
+    await pm.tracesPage.clickFirstTraceResult();
 
     // Look for service name in span tree and click it
     const serviceNameSpan = page.locator('[data-test="trace-tree-span-service-name"]').first();
@@ -200,7 +191,7 @@ test.describe("Trace Query Editor testcases", () => {
     testLogger.info('Testing error span viewing');
 
     // Setup and run initial search
-    await setupTraceSearch(page, pm.tracesPage);
+    await pm.tracesPage.setupTraceSearch();
 
     // Look for traces with errors
     const errorTrace = page.getByText(/Errors\s*:\s*[1-9]\d*/);
@@ -237,10 +228,10 @@ test.describe("Trace Query Editor testcases", () => {
     testLogger.info('Testing trace span attributes');
 
     // Setup and run search
-    await setupTraceSearch(page, pm.tracesPage);
+    await pm.tracesPage.setupTraceSearch();
 
     // Click on first trace result
-    await clickFirstTraceResult(page);
+    await pm.tracesPage.clickFirstTraceResult();
 
     // Look for common trace attributes
     const attributes = ['status_code', 'service_name', 'span_name', 'duration'];
