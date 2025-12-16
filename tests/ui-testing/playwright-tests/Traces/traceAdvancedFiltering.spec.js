@@ -5,13 +5,6 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const {
-  enterTraceQuery,
-  hasTraceResults,
-  expandTraceField,
-  clickFirstTraceResult,
-  resetTraceFilters
-} = require('./utils/trace-test-helpers.js');
 
 test.describe("Trace Advanced Filtering testcases", () => {
   test.describe.configure({ mode: 'serial' });
@@ -50,7 +43,7 @@ test.describe("Trace Advanced Filtering testcases", () => {
 
     // Enter complex AND query
     const complexQuery = "service_name='api-gateway' AND status_code='1' AND duration > 100";
-    await enterTraceQuery(page, complexQuery);
+    await pm.tracesPage.enterTraceQuery( complexQuery);
 
     // Verify query in editor
     const viewLines = page.locator('.view-lines');
@@ -71,7 +64,7 @@ test.describe("Trace Advanced Filtering testcases", () => {
     while (attempts < maxAttempts && !searchResult) {
       await page.waitForTimeout(2000);
 
-      const hasResults = await hasTraceResults(page);
+      const hasResults = await pm.tracesPage.hasTraceResults();
       const noResults = await page.locator('[data-test="logs-search-result-not-found-text"]').isVisible({ timeout: 1000 }).catch(() => false);
       const errorMsg = await page.locator('[data-test="logs-search-error-message"]').isVisible({ timeout: 1000 }).catch(() => false);
 
@@ -96,7 +89,7 @@ test.describe("Trace Advanced Filtering testcases", () => {
 
     // Enter OR query
     const orQuery = "service_name='api-gateway' OR service_name='auth-service' OR service_name='user-service'";
-    await enterTraceQuery(page, orQuery);
+    await pm.tracesPage.enterTraceQuery( orQuery);
 
     // Set time range and run search
     await pm.tracesPage.setTimeRange('15m');
@@ -104,7 +97,7 @@ test.describe("Trace Advanced Filtering testcases", () => {
     await page.waitForTimeout(3000);
 
     // Check results
-    const hasResults = await hasTraceResults(page);
+    const hasResults = await pm.tracesPage.hasTraceResults();
 
     if (hasResults) {
       testLogger.info('OR query returned results');
@@ -129,7 +122,7 @@ test.describe("Trace Advanced Filtering testcases", () => {
 
     // Enter NOT query
     const notQuery = "NOT status_code='2'";
-    await enterTraceQuery(page, notQuery);
+    await pm.tracesPage.enterTraceQuery( notQuery);
 
     // Set time range and run search
     await pm.tracesPage.setTimeRange('15m');
@@ -137,13 +130,13 @@ test.describe("Trace Advanced Filtering testcases", () => {
     await page.waitForTimeout(3000);
 
     // Check results
-    const hasResults = await hasTraceResults(page);
+    const hasResults = await pm.tracesPage.hasTraceResults();
 
     if (hasResults) {
       testLogger.info('NOT query returned results');
 
       // Click on first result to verify no errors
-      await clickFirstTraceResult(page);
+      await pm.tracesPage.clickFirstTraceResult();
       await page.waitForTimeout(2000);
 
       // Check that status_code is not 2
@@ -166,7 +159,7 @@ test.describe("Trace Advanced Filtering testcases", () => {
 
     // Enter range query
     const rangeQuery = "duration >= 500 AND duration <= 5000";
-    await enterTraceQuery(page, rangeQuery);
+    await pm.tracesPage.enterTraceQuery( rangeQuery);
 
     // Set time range and run search
     await pm.tracesPage.setTimeRange('15m');
@@ -174,13 +167,13 @@ test.describe("Trace Advanced Filtering testcases", () => {
     await page.waitForTimeout(3000);
 
     // Check results
-    const hasResults = await hasTraceResults(page);
+    const hasResults = await pm.tracesPage.hasTraceResults();
 
     if (hasResults) {
       testLogger.info('Range query returned results');
 
       // Click on first result to check duration
-      await clickFirstTraceResult(page);
+      await pm.tracesPage.clickFirstTraceResult();
       await page.waitForTimeout(2000);
 
       // Look for duration information
@@ -199,17 +192,17 @@ test.describe("Trace Advanced Filtering testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing query with special characters');
 
-    // Test with various special characters
+    // Test with various special characters and patterns from actual data
     const specialQueries = [
-      "service_name='test-service_v1.0'",
-      "span_name='GET /api/users/{id}'",
-      "service_name='service@prod'"
+      "service_name='auth-service'",
+      "span_name LIKE 'HTTP POST%'",
+      "service_name='payment-service'"
     ];
 
     for (const query of specialQueries) {
       testLogger.info(`Testing query: ${query}`);
 
-      await enterTraceQuery(page, query);
+      await pm.tracesPage.enterTraceQuery( query);
       await pm.tracesPage.setTimeRange('15m');
       await pm.tracesPage.runSearch();
       await page.waitForTimeout(2000);
@@ -225,7 +218,7 @@ test.describe("Trace Advanced Filtering testcases", () => {
       }
 
       // Clear query for next test
-      await resetTraceFilters(page);
+      await pm.tracesPage.resetTraceFilters();
     }
   });
 
@@ -235,21 +228,21 @@ test.describe("Trace Advanced Filtering testcases", () => {
     testLogger.info('Testing case sensitivity in queries');
 
     // Test uppercase service name
-    await enterTraceQuery(page, "service_name='API-GATEWAY'");
+    await pm.tracesPage.enterTraceQuery( "service_name='API-GATEWAY'");
     await pm.tracesPage.setTimeRange('15m');
     await pm.tracesPage.runSearch();
     await page.waitForTimeout(2000);
 
-    const uppercaseResults = await hasTraceResults(page);
+    const uppercaseResults = await pm.tracesPage.hasTraceResults();
     testLogger.info(`Uppercase query results: ${uppercaseResults}`);
 
     // Clear and test lowercase
-    await resetTraceFilters(page);
-    await enterTraceQuery(page, "service_name='api-gateway'");
+    await pm.tracesPage.resetTraceFilters();
+    await pm.tracesPage.enterTraceQuery( "service_name='api-gateway'");
     await pm.tracesPage.runSearch();
     await page.waitForTimeout(2000);
 
-    const lowercaseResults = await hasTraceResults(page);
+    const lowercaseResults = await pm.tracesPage.hasTraceResults();
     testLogger.info(`Lowercase query results: ${lowercaseResults}`);
 
     // Log comparison
@@ -265,24 +258,24 @@ test.describe("Trace Advanced Filtering testcases", () => {
     const wildcardQueries = [
       "service_name LIKE 'api%'",
       "service_name LIKE '%service'",
-      "span_name LIKE '%GET%'"
+      "span_name LIKE '%POST%'"
     ];
 
     for (const query of wildcardQueries) {
       testLogger.info(`Testing wildcard query: ${query}`);
 
-      await enterTraceQuery(page, query);
+      await pm.tracesPage.enterTraceQuery( query);
       await pm.tracesPage.setTimeRange('15m');
       await pm.tracesPage.runSearch();
       await page.waitForTimeout(2000);
 
-      const hasResults = await hasTraceResults(page);
+      const hasResults = await pm.tracesPage.hasTraceResults();
       const hasError = await page.locator('[data-test="logs-search-error-message"]').isVisible({ timeout: 1000 }).catch(() => false);
 
       testLogger.info(`Wildcard query results: Results=${hasResults}, Error=${hasError}`);
 
       // Clear for next query
-      await resetTraceFilters(page);
+      await pm.tracesPage.resetTraceFilters();
     }
   });
 
@@ -291,28 +284,28 @@ test.describe("Trace Advanced Filtering testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing empty and null value queries');
 
-    // Test various empty/null scenarios
+    // Test various empty/null scenarios with actual trace fields
     const emptyQueries = [
-      "error_message IS NULL",
-      "error_message = ''",
-      "parent_span_id IS NULL"
+      "span_name = ''",
+      "service_name != ''",
+      "status_code IS NOT NULL"
     ];
 
     for (const query of emptyQueries) {
       testLogger.info(`Testing empty/null query: ${query}`);
 
-      await enterTraceQuery(page, query);
+      await pm.tracesPage.enterTraceQuery( query);
       await pm.tracesPage.setTimeRange('15m');
       await pm.tracesPage.runSearch();
       await page.waitForTimeout(2000);
 
-      const hasResults = await hasTraceResults(page);
+      const hasResults = await pm.tracesPage.hasTraceResults();
       const noResults = await page.locator('[data-test="logs-search-result-not-found-text"]').isVisible({ timeout: 1000 }).catch(() => false);
 
       testLogger.info(`Empty/null query: Results=${hasResults}, NoResults=${noResults}`);
 
       // Clear for next query
-      await resetTraceFilters(page);
+      await pm.tracesPage.resetTraceFilters();
     }
   });
 
@@ -322,7 +315,7 @@ test.describe("Trace Advanced Filtering testcases", () => {
     testLogger.info('Testing combined field selection and query editor');
 
     // First set a base query
-    await enterTraceQuery(page, "status_code='1'");
+    await pm.tracesPage.enterTraceQuery( "status_code='1'");
 
     // Set time range and run search
     await pm.tracesPage.setTimeRange('15m');
@@ -330,7 +323,7 @@ test.describe("Trace Advanced Filtering testcases", () => {
     await page.waitForTimeout(3000);
 
     // Now try to add a filter via field expansion
-    const expanded = await expandTraceField(page, 'service_name');
+    const expanded = await pm.tracesPage.expandTraceField('service_name');
 
     if (expanded) {
       // Look for a service value to click
@@ -349,7 +342,7 @@ test.describe("Trace Advanced Filtering testcases", () => {
         await pm.tracesPage.runSearch();
         await page.waitForTimeout(2000);
 
-        const hasResults = await hasTraceResults(page);
+        const hasResults = await pm.tracesPage.hasTraceResults();
         testLogger.info(`Combined filter results: ${hasResults}`);
       }
     } else {

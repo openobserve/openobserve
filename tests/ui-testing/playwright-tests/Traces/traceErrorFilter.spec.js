@@ -5,13 +5,6 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const {
-  setupTraceSearch,
-  enterTraceQuery,
-  hasTraceResults,
-  getErrorTraces,
-  resetTraceFilters
-} = require('./utils/trace-test-helpers.js');
 
 test.describe("Trace Error Filter testcases", () => {
   test.describe.configure({ mode: 'serial' });
@@ -49,10 +42,10 @@ test.describe("Trace Error Filter testcases", () => {
     testLogger.info('Testing viewing traces with error indicators');
 
     // Setup and run search
-    await setupTraceSearch(page, pm.tracesPage);
+    await pm.tracesPage.setupTraceSearch();
 
     // Look for traces with error counts
-    const errorTrace = getErrorTraces(page);
+    const errorTrace = pm.tracesPage.getErrorTraces();
     let errorTraceCount = 0;
 
     if (await errorTrace.first().isVisible({ timeout: 5000 }).catch(() => false)) {
@@ -96,7 +89,7 @@ test.describe("Trace Error Filter testcases", () => {
     testLogger.info('Testing filtering traces by error status code');
 
     // Enter error filter query
-    await enterTraceQuery(page, "status_code='2'");
+    await pm.tracesPage.enterTraceQuery("status_code='2'");
 
     // Set time range and run query
     await pm.tracesPage.setTimeRange('15m');
@@ -104,13 +97,13 @@ test.describe("Trace Error Filter testcases", () => {
     await page.waitForTimeout(3000);
 
     // Check if results show only error traces
-    const hasResults = await hasTraceResults(page);
+    const hasResults = await pm.tracesPage.hasTraceResults();
 
     if (hasResults) {
       testLogger.info('Error traces filtered successfully');
 
       // All visible traces should have errors
-      const errorTraces = await getErrorTraces(page).count();
+      const errorTraces = await pm.tracesPage.getErrorTraces().count();
       testLogger.info(`Found ${errorTraces} traces with errors`);
     } else {
       const noResults = await page.locator('[data-test="logs-search-result-not-found-text"]').isVisible().catch(() => false);
@@ -126,10 +119,10 @@ test.describe("Trace Error Filter testcases", () => {
     testLogger.info('Testing clicking on error trace to view details');
 
     // Setup and run search
-    await setupTraceSearch(page, pm.tracesPage);
+    await pm.tracesPage.setupTraceSearch();
 
     // Find and click on a trace with errors
-    const errorTrace = getErrorTraces(page);
+    const errorTrace = pm.tracesPage.getErrorTraces();
 
     if (await errorTrace.first().isVisible({ timeout: 5000 }).catch(() => false)) {
       await errorTrace.first().click();
@@ -160,7 +153,7 @@ test.describe("Trace Error Filter testcases", () => {
     testLogger.info('Testing combining error filter with service name filter');
 
     // Enter combined filter query
-    await enterTraceQuery(page, "status_code='2' AND service_name='auth-service'");
+    await pm.tracesPage.enterTraceQuery("status_code='2' AND service_name='auth-service'");
 
     // Set time range and run query
     await pm.tracesPage.setTimeRange('15m');
@@ -168,7 +161,7 @@ test.describe("Trace Error Filter testcases", () => {
     await page.waitForTimeout(3000);
 
     // Check results
-    const hasResults = await hasTraceResults(page);
+    const hasResults = await pm.tracesPage.hasTraceResults();
 
     if (hasResults) {
       testLogger.info('Combined filter applied successfully');
@@ -189,7 +182,7 @@ test.describe("Trace Error Filter testcases", () => {
     testLogger.info('Testing reset of error filters');
 
     // First apply an error filter
-    await enterTraceQuery(page, "status_code='2'");
+    await pm.tracesPage.enterTraceQuery("status_code='2'");
 
     // Set time range and run query
     await pm.tracesPage.setTimeRange('15m');
@@ -197,7 +190,7 @@ test.describe("Trace Error Filter testcases", () => {
     await page.waitForTimeout(2000);
 
     // Now reset filters
-    await resetTraceFilters(page);
+    await pm.tracesPage.resetTraceFilters();
 
     // Verify query editor is cleared
     const viewLines = page.locator('.view-lines');
@@ -215,7 +208,7 @@ test.describe("Trace Error Filter testcases", () => {
     testLogger.info('Testing scenario with no error traces');
 
     // Apply a very specific filter that likely returns no results
-    await enterTraceQuery(page, "status_code='2' AND service_name='nonexistent-service'");
+    await pm.tracesPage.enterTraceQuery("status_code='2' AND service_name='nonexistent-service'");
 
     // Set time range and run query
     await pm.tracesPage.setTimeRange('15m');
@@ -237,7 +230,7 @@ test.describe("Trace Error Filter testcases", () => {
     testLogger.info('Testing toggle between error and success traces');
 
     // First show error traces
-    await enterTraceQuery(page, "status_code='2'");
+    await pm.tracesPage.enterTraceQuery("status_code='2'");
     await pm.tracesPage.setTimeRange('15m');
     await pm.tracesPage.runSearch();
     await page.waitForTimeout(2000);
@@ -245,14 +238,14 @@ test.describe("Trace Error Filter testcases", () => {
     testLogger.info('Viewing error traces');
 
     // Now switch to success traces
-    await enterTraceQuery(page, "status_code='1'");
+    await pm.tracesPage.enterTraceQuery("status_code='1'");
     await pm.tracesPage.runSearch();
     await page.waitForTimeout(2000);
 
     testLogger.info('Switched to viewing success traces');
 
     // Verify no error indicators in results
-    const errorCount = await getErrorTraces(page).count();
+    const errorCount = await pm.tracesPage.getErrorTraces().count();
 
     if (errorCount === 0) {
       testLogger.info('Success traces shown without error indicators');
@@ -265,7 +258,7 @@ test.describe("Trace Error Filter testcases", () => {
     testLogger.info('Testing error filter with invalid syntax');
 
     // Enter invalid syntax
-    await enterTraceQuery(page, "status_code='2 AND"); // Invalid syntax
+    await pm.tracesPage.enterTraceQuery("status_code='2 AND"); // Invalid syntax
 
     await pm.tracesPage.setTimeRange('15m');
     await pm.tracesPage.runSearch();
