@@ -542,51 +542,57 @@ pub async fn prepare_cache_response(
     let mut h = config::utils::hash::gxhash::new();
     let hashed_query = h.sum64(&hash_body.join(","));
 
+    // Parse SQL once to get metadata needed for both cache lookup and file path computation
+    let query: SearchQuery = req.query.clone().into();
+    let sql = match crate::service::search::Sql::new(&query, org_id, stream_type, req.search_type)
+        .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("Error parsing sql: {e}");
+            return Ok((MultiCachedQueryResponse::default(), true));
+        }
+    };
+
+    let (ts_column, is_descending) =
+        cacher::get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate).unwrap_or_default();
+
+    // Compute the complete file path once for both branches
+    let base_file_path = format!("{org_id}/{stream_type}/{stream_name}/{hashed_query}");
+    let file_path = cacher::compute_cache_file_path(
+        &base_file_path,
+        is_aggregate,
+        sql.histogram_interval,
+        &ts_column,
+    );
+
     let mut should_exec_query = true;
 
-    let mut file_path = format!("{org_id}/{stream_type}/{stream_name}/{hashed_query}");
     let resp = if use_cache {
         // if cache is used, we need to check the cache
         check_cache(
             trace_id,
             org_id,
-            stream_type,
             req,
             &mut origin_sql,
-            &mut file_path,
+            &file_path,
             is_aggregate,
+            &sql,
+            &ts_column,
+            is_descending,
             &mut should_exec_query,
         )
         .await
     } else {
-        // if cache is not used, we need to parse the sql to get the ts column and is descending
-        let query: SearchQuery = req.query.clone().into();
-        match crate::service::search::Sql::new(&query, org_id, stream_type, req.search_type).await {
-            Ok(v) => {
-                let (ts_column, is_descending) =
-                    cacher::get_ts_col_order_by(&v, TIMESTAMP_COL_NAME, is_aggregate)
-                        .unwrap_or_default();
-
-                // For histogram queries, append interval and ts_column to file_path
-                // This matches the logic in check_cache function
-                if is_aggregate && let Some(interval) = v.histogram_interval {
-                    file_path = format!("{file_path}_{interval}_{ts_column}");
-                }
-
-                MultiCachedQueryResponse {
-                    ts_column,
-                    is_aggregate,
-                    is_descending,
-                    order_by: v.order_by,
-                    limit: v.limit,
-                    file_path: file_path.clone(),
-                    ..Default::default()
-                }
-            }
-            Err(e) => {
-                log::error!("Error parsing sql: {e}");
-                MultiCachedQueryResponse::default()
-            }
+        // if cache is not used, return the parsed metadata
+        MultiCachedQueryResponse {
+            ts_column,
+            is_aggregate,
+            is_descending,
+            order_by: sql.order_by,
+            limit: sql.limit,
+            file_path,
+            ..Default::default()
         }
     };
     Ok((resp, should_exec_query))
