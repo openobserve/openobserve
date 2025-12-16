@@ -1565,7 +1565,7 @@ function loadFromUrl(route: Route) {
         <!-- Tab Variables -->
         <VariablesValueSelector
           v-if="tab.variables?.length"
-          :scope="'tab'"
+          :scope="'tabs'"
           :scope-id="tab.id"
           :variables-config="tab.variables"
           :variables-manager="variablesManager"
@@ -2347,8 +2347,8 @@ test('should only load tab variables when tab becomes active', async ({ page }) 
   // Setup: Dashboard with 2 tabs, each with tab-scoped variables
   await createDashboardWithTabs(page, {
     tabs: [
-      { id: 'tab-1', name: 'Logs', variables: [{ name: 'logLevel', scope: 'tab' }] },
-      { id: 'tab-2', name: 'Metrics', variables: [{ name: 'metric', scope: 'tab' }] }
+      { id: 'tab-1', name: 'Logs', variables: [{ name: 'logLevel', scope: 'tabs' }] },
+      { id: 'tab-2', name: 'Metrics', variables: [{ name: 'metric', scope: 'tabs' }] }
     ]
   });
 
@@ -2377,8 +2377,8 @@ test('should maintain independent values for same variable in different tabs', a
   await createDashboardWithTabs(page, {
     globalVariables: [{ name: 'country', type: 'custom', scope: 'global', value: ['USA'] }],
     tabs: [
-      { id: 'tab-1', variables: [{ name: 'region', scope: 'tab', type: 'custom', value: ['CA', 'OR'] }] },
-      { id: 'tab-2', variables: [{ name: 'region', scope: 'tab', type: 'custom', value: ['NY', 'NJ'] }] }
+      { id: 'tab-1', variables: [{ name: 'region', scope: 'tabs', type: 'custom', value: ['CA', 'OR'] }] },
+      { id: 'tab-2', variables: [{ name: 'region', scope: 'tabs', type: 'custom', value: ['NY', 'NJ'] }] }
     ]
   });
 
@@ -2420,7 +2420,7 @@ test('should allow tab variable to depend on global variable', async ({ page }) 
       {
         id: 'tab-1',
         variables: [
-          { name: 'region', scope: 'tab', type: 'query_values',
+          { name: 'region', scope: 'tabs', type: 'query_values',
             dependsOn: 'country', query: 'SELECT region WHERE country=$country'
           }
         ]
@@ -2460,9 +2460,9 @@ test('should only load panel variables when panel enters viewport', async ({ pag
   // Setup: Dashboard with panels having panel-scoped variables, some below fold
   await createDashboardWithPanels(page, {
     panels: [
-      { id: 'panel-1', position: 'top', variables: [{ name: 'status', scope: 'panel' }] },
-      { id: 'panel-2', position: 'middle', variables: [{ name: 'code', scope: 'panel' }] },
-      { id: 'panel-3', position: 'bottom', variables: [{ name: 'error', scope: 'panel' }] }
+      { id: 'panel-1', position: 'top', variables: [{ name: 'status', scope: 'panels' }] },
+      { id: 'panel-2', position: 'middle', variables: [{ name: 'code', scope: 'panels' }] },
+      { id: 'panel-3', position: 'bottom', variables: [{ name: 'error', scope: 'panels' }] }
     ]
   });
 
@@ -2489,8 +2489,8 @@ test('should maintain independent values for same variable in different panels',
   // Setup: Two panels with same variable name but independent values
   await createDashboardWithPanels(page, {
     panels: [
-      { id: 'panel-1', variables: [{ name: 'threshold', scope: 'panel', type: 'textbox', value: '100' }] },
-      { id: 'panel-2', variables: [{ name: 'threshold', scope: 'panel', type: 'textbox', value: '500' }] }
+      { id: 'panel-1', variables: [{ name: 'threshold', scope: 'panels', type: 'textbox', value: '100' }] },
+      { id: 'panel-2', variables: [{ name: 'threshold', scope: 'panels', type: 'textbox', value: '500' }] }
     ]
   });
 
@@ -2518,12 +2518,12 @@ test('should allow panel variable to depend on tab variable', async ({ page }) =
     tabs: [
       {
         id: 'tab-1',
-        variables: [{ name: 'service', scope: 'tab', type: 'custom', value: ['api', 'web'] }],
+        variables: [{ name: 'service', scope: 'tabs', type: 'custom', value: ['api', 'web'] }],
         panels: [
           {
             id: 'panel-1',
             variables: [
-              { name: 'endpoint', scope: 'panel', type: 'query_values',
+              { name: 'endpoint', scope: 'panels', type: 'query_values',
                 dependsOn: 'service', query: 'SELECT endpoint WHERE service=$service'
               }
             ]
@@ -2570,7 +2570,7 @@ test('should handle three-level dependency chain correctly', async ({ page }) =>
       {
         id: 'tab-1',
         variables: [
-          { name: 'region', scope: 'tab', type: 'query_values',
+          { name: 'region', scope: 'tabs', type: 'query_values',
             dependsOn: 'country', query: 'SELECT region WHERE country=$country'
           }
         ],
@@ -2578,7 +2578,7 @@ test('should handle three-level dependency chain correctly', async ({ page }) =>
           {
             id: 'panel-1',
             variables: [
-              { name: 'city', scope: 'panel', type: 'query_values',
+              { name: 'city', scope: 'panels', type: 'query_values',
                 dependsOn: 'region', query: 'SELECT city WHERE region=$region'
               }
             ]
@@ -2709,8 +2709,8 @@ test('should sync global variable changes to URL', async ({ page }) => {
 test('should sync tab-scoped variable with correct URL format', async ({ page }) => {
   await createDashboardWithTabs(page, {
     tabs: [
-      { id: 'tab-1', variables: [{ name: 'region', scope: 'tab', type: 'custom', value: ['CA', 'OR'] }] },
-      { id: 'tab-2', variables: [{ name: 'region', scope: 'tab', type: 'custom', value: ['NY', 'NJ'] }] }
+      { id: 'tab-1', variables: [{ name: 'region', scope: 'tabs', type: 'custom', value: ['CA', 'OR'] }] },
+      { id: 'tab-2', variables: [{ name: 'region', scope: 'tabs', type: 'custom', value: ['NY', 'NJ'] }] }
     ]
   });
 
@@ -2741,7 +2741,7 @@ test('should sync tab-scoped variable with correct URL format', async ({ page })
 test('should sync panel-scoped variable with correct URL format', async ({ page }) => {
   await createDashboardWithPanels(page, {
     panels: [
-      { id: 'panel-123', variables: [{ name: 'threshold', scope: 'panel', type: 'textbox', value: '100' }] }
+      { id: 'panel-123', variables: [{ name: 'threshold', scope: 'panels', type: 'textbox', value: '100' }] }
     ]
   });
 
@@ -2781,8 +2781,8 @@ test('should apply unscoped drilldown URL to all variable instances', async ({ p
   await createDashboardWithTabs(page, {
     globalVariables: [{ name: 'status', type: 'custom', scope: 'global', value: ['200', '404'] }],
     tabs: [
-      { id: 'tab-1', variables: [{ name: 'status', scope: 'tab', type: 'custom', value: ['200', '404'] }] },
-      { id: 'tab-2', variables: [{ name: 'status', scope: 'tab', type: 'custom', value: ['200', '404'] }] }
+      { id: 'tab-1', variables: [{ name: 'status', scope: 'tabs', type: 'custom', value: ['200', '404'] }] },
+      { id: 'tab-2', variables: [{ name: 'status', scope: 'tabs', type: 'custom', value: ['200', '404'] }] }
     ]
   });
 
@@ -2843,9 +2843,9 @@ test('should handle variable with no query results', async ({ page }) => {
 test('should handle rapid tab switching without errors', async ({ page }) => {
   await createDashboardWithTabs(page, {
     tabs: [
-      { id: 'tab-1', variables: [{ name: 'var1', scope: 'tab', type: 'query_values' }] },
-      { id: 'tab-2', variables: [{ name: 'var2', scope: 'tab', type: 'query_values' }] },
-      { id: 'tab-3', variables: [{ name: 'var3', scope: 'tab', type: 'query_values' }] }
+      { id: 'tab-1', variables: [{ name: 'var1', scope: 'tabs', type: 'query_values' }] },
+      { id: 'tab-2', variables: [{ name: 'var2', scope: 'tabs', type: 'query_values' }] },
+      { id: 'tab-3', variables: [{ name: 'var3', scope: 'tabs', type: 'query_values' }] }
     ]
   });
 
@@ -2871,7 +2871,7 @@ test('should efficiently load panel variables during scrolling', async ({ page }
   await createDashboardWithPanels(page, {
     panels: Array.from({ length: 20 }, (_, i) => ({
       id: `panel-${i}`,
-      variables: [{ name: `var${i}`, scope: 'panel', type: 'query_values' }]
+      variables: [{ name: `var${i}`, scope: 'panels', type: 'query_values' }]
     }))
   });
 
@@ -2901,7 +2901,7 @@ test('should auto-load dependencies from hidden tabs', async ({ page }) => {
     tabs: [
       {
         id: 'tab-1',
-        variables: [{ name: 'service', scope: 'tab', type: 'custom', value: ['api'] }]
+        variables: [{ name: 'service', scope: 'tabs', type: 'custom', value: ['api'] }]
       },
       {
         id: 'tab-2',
@@ -2909,7 +2909,7 @@ test('should auto-load dependencies from hidden tabs', async ({ page }) => {
           {
             id: 'panel-1',
             variables: [
-              { name: 'endpoint', scope: 'panel', type: 'query_values',
+              { name: 'endpoint', scope: 'panels', type: 'query_values',
                 dependsOn: 'service', query: 'SELECT endpoint WHERE service=$service'
               }
             ]
