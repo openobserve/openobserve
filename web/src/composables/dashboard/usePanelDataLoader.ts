@@ -288,7 +288,7 @@ export const usePanelDataLoader = (
         return;
       }
 
-      // Watch for changes in variables data
+      // Watch for changes in isVisible
       const stopWatching = watch(
         () => variablesData.value,
         (newVal) => {
@@ -306,7 +306,7 @@ export const usePanelDataLoader = (
               "waitForTheVariablesToLoad: variables are loaded (inside watch)",
             );
             resolve();
-            stopWatching(); // Stop watching once variables are loaded
+            stopWatching(); // Stop watching once isVisible is true
           }
         },
         { deep: true }, // Watch nested properties
@@ -1166,9 +1166,6 @@ export const usePanelDataLoader = (
           state.isPartialData = false;
         }
       } else {
-        log("inside search api", JSON.stringify(variablesData.value?.values));
-        // if(variablesData.value?.values.length === 0){
-        //   return}
         // copy of current abortController
         // which is used to check whether the current query has been aborted
         const abortControllerRef = abortController;
@@ -1230,9 +1227,6 @@ export const usePanelDataLoader = (
                     panelSchema.value.queryType,
                   );
                 const query = query2;
-
-                // LOG: Check if variables were properly replaced
-
 
                 // Validate that timestamp column is not used as an alias for other fields
                 if (!checkTimestampAlias(query)) {
@@ -1364,9 +1358,6 @@ export const usePanelDataLoader = (
                     timeShiftQueries,
                   },
                 };
-
-                // LOG: Final check before API call
-
 
                 fetchQueryDataWithHttpStream(payload, {
                   data: (payload: any, response: any) => {
@@ -1625,9 +1616,6 @@ export const usePanelDataLoader = (
               state.data[panelQueryIndex] = [];
               state.resultMetaData[panelQueryIndex] = [];
 
-              // LOG: Final check before streaming API call
-
-
               // Use HTTP2/streaming for all dashboard queries
               await getDataThroughStreaming(
                 query,
@@ -1675,13 +1663,6 @@ export const usePanelDataLoader = (
     () => [selectedTimeObj?.value, forceLoad?.value],
     async () => {
       log("PanelSchema/Time Wather: called");
-
-      // // CRITICAL: Don't load data if variables are still loading
-      // if (variablesData?.value?.isVariablesLoading === true) {
-      //   console.log(`[usePanelDataLoader] ${panelSchema?.value?.title}: ⏸ Skipping time/force load - variables still loading`);
-      //   return;
-      // }
-
       loadData(); // Loading the data
     },
   );
@@ -1700,12 +1681,6 @@ export const usePanelDataLoader = (
       if (!configNeedsApiCall) {
         return;
       }
-
-      // // CRITICAL: Don't load data if variables are still loading
-      // if (variablesData?.value?.isVariablesLoading === true) {
-      //   console.log(`[usePanelDataLoader] ${panelSchema?.value?.title}: ⏸ Skipping schema load - variables still loading`);
-      //   return;
-      // }
 
       loadData();
     },
@@ -2045,13 +2020,6 @@ export const usePanelDataLoader = (
       // if (!panelSchema.value.queries?.length) {
       //   return;
       // }
-
-      // // CRITICAL: Don't load data if variables are still loading (initial dashboard load)
-      // if (variablesData?.value?.isVariablesLoading === true) {
-      //   console.log(`[usePanelDataLoader] ${panelSchema?.value?.title}: ⏸ Skipping - variables still loading`);
-      //   return;
-      // }
-
       log("Variables Watcher: starting...");
 
       const newDependentVariablesData = getDependentVariablesData();
@@ -2186,8 +2154,6 @@ export const usePanelDataLoader = (
     });
 
   const ifPanelVariablesCompletedLoading = () => {
-    // console.log("variablesData", JSON.stringify(variablesData.value));
-
     // STEP 1: Check if there are any dynamic variables that are still loading
     log("Step1: checking if dynamic variables are loading, starting...");
     const newDynamicVariablesData = getDynamicVariablesData();
@@ -2471,12 +2437,6 @@ export const usePanelDataLoader = (
 
   onMounted(async () => {
     log("PanelSchema/Time Initial: should load the data");
-
-    // // CRITICAL: Don't load data on mount if variables are still loading
-    // if (variablesData?.value?.isVariablesLoading === true) {
-    //   console.log(`[usePanelDataLoader] ${panelSchema?.value?.title}: ⏸ Skipping mount load - variables still loading`);
-    //   return;
-    // }
 
     loadData(); // Loading the data
   });
