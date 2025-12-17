@@ -1302,7 +1302,7 @@
     },
     "triggerAlert": "Activar",
     "alertTriggeredSuccess": "La alerta se activó correctamente",
-        "incidents": {
+    "incidents": {
       "title": "Incidentes",
       "header": "Incidentes de alerta",
       "noIncidents": "No se ha encontrado ningún incidente",
