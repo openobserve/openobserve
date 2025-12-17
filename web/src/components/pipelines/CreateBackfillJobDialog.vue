@@ -133,6 +133,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data in the destination stream for the specified time
                       range before running the backfill. This action cannot be
                       undone.
+                      <br /><br />
+                      <strong>Time Alignment Requirements:</strong>
+                      <ul class="tw-mt-1 tw-ml-4 tw-list-disc">
+                        <li>For <strong>logs</strong> streams: Times must align to hour boundaries (e.g., 10:00:00, not 10:15:00)</li>
+                        <li>For <strong>metrics/traces</strong> streams: Times must align to day boundaries (e.g., 00:00:00)</li>
+                      </ul>
                     </div>
                   </div>
                 </div>

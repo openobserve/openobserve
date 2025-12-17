@@ -53,6 +53,106 @@ pub struct BackfillJobStatus {
     pub error: Option<String>,
 }
 
+/// Helper function to extract destination streams from pipeline
+fn get_destination_streams(
+    pipeline: &config::meta::pipeline::Pipeline,
+) -> Result<Vec<config::meta::stream::StreamParams>, anyhow::Error> {
+    let mut destination_streams = Vec::new();
+
+    for node in &pipeline.nodes {
+        if let config::meta::pipeline::components::NodeData::Stream(stream_params) = &node.data {
+            let node_id = node.get_node_id();
+            if !matches!(node_id.as_str(), "source" | "query") {
+                destination_streams.push(stream_params.clone());
+            }
+        }
+    }
+
+    if destination_streams.is_empty() {
+        Err(anyhow::anyhow!("No destination streams found in pipeline"))
+    } else {
+        Ok(destination_streams)
+    }
+}
+
+/// Validate that timestamps are aligned to hour boundaries (for logs streams)
+/// Hours must be at :00:00.000000 (zero minutes, seconds, microseconds)
+fn validate_time_alignment_hourly(
+    start_time: i64,
+    end_time: i64,
+) -> Result<(), anyhow::Error> {
+    use chrono::{Timelike, TimeZone};
+
+    let start_dt = Utc
+        .timestamp_micros(start_time)
+        .single()
+        .ok_or_else(|| anyhow::anyhow!("Invalid start_time"))?;
+    let end_dt = Utc
+        .timestamp_micros(end_time)
+        .single()
+        .ok_or_else(|| anyhow::anyhow!("Invalid end_time"))?;
+
+    // Check if aligned to hour boundary (minute, second, and microsecond must be 0)
+    if start_dt.minute() != 0 || start_dt.second() != 0 || start_dt.nanosecond() != 0 {
+        return Err(anyhow::anyhow!(
+            "For logs streams with delete_before_backfill enabled, start_time must be aligned to hour boundary (e.g., 2024-01-15T10:00:00Z). Got: {}",
+            start_dt.format("%Y-%m-%dT%H:%M:%S%.6fZ")
+        ));
+    }
+
+    if end_dt.minute() != 0 || end_dt.second() != 0 || end_dt.nanosecond() != 0 {
+        return Err(anyhow::anyhow!(
+            "For logs streams with delete_before_backfill enabled, end_time must be aligned to hour boundary (e.g., 2024-01-15T14:00:00Z). Got: {}",
+            end_dt.format("%Y-%m-%dT%H:%M:%S%.6fZ")
+        ));
+    }
+
+    Ok(())
+}
+
+/// Validate that timestamps are aligned to day boundaries (for metrics/traces streams)
+/// Days must be at 00:00:00.000000 (midnight)
+fn validate_time_alignment_daily(
+    start_time: i64,
+    end_time: i64,
+) -> Result<(), anyhow::Error> {
+    use chrono::{Timelike, TimeZone};
+
+    let start_dt = Utc
+        .timestamp_micros(start_time)
+        .single()
+        .ok_or_else(|| anyhow::anyhow!("Invalid start_time"))?;
+    let end_dt = Utc
+        .timestamp_micros(end_time)
+        .single()
+        .ok_or_else(|| anyhow::anyhow!("Invalid end_time"))?;
+
+    // Check if aligned to day boundary (hour, minute, second, and microsecond must be 0)
+    if start_dt.hour() != 0
+        || start_dt.minute() != 0
+        || start_dt.second() != 0
+        || start_dt.nanosecond() != 0
+    {
+        return Err(anyhow::anyhow!(
+            "For metrics/traces streams with delete_before_backfill enabled, start_time must be aligned to day boundary (e.g., 2024-01-15T00:00:00Z). Got: {}",
+            start_dt.format("%Y-%m-%dT%H:%M:%S%.6fZ")
+        ));
+    }
+
+    if end_dt.hour() != 0
+        || end_dt.minute() != 0
+        || end_dt.second() != 0
+        || end_dt.nanosecond() != 0
+    {
+        return Err(anyhow::anyhow!(
+            "For metrics/traces streams with delete_before_backfill enabled, end_time must be aligned to day boundary (e.g., 2024-01-16T00:00:00Z). Got: {}",
+            end_dt.format("%Y-%m-%dT%H:%M:%S%.6fZ")
+        ));
+    }
+
+    Ok(())
+}
+
 pub async fn create_backfill_job(
     org_id: &str,
     pipeline_id: &str,
@@ -90,6 +190,32 @@ pub async fn create_backfill_job(
     let now = Utc::now().timestamp_micros();
     if end_time > now {
         return Err(anyhow::anyhow!("end_time cannot be in the future"));
+    }
+
+    // 2a. Validate time alignment if deletion is enabled
+    if delete_before_backfill {
+        // Get destination streams to check their types
+        let destination_streams = get_destination_streams(&pipeline)?;
+
+        // Check if any destination is a logs stream (requires hourly alignment)
+        // or metrics/traces stream (requires daily alignment)
+        let requires_hourly_alignment = destination_streams
+            .iter()
+            .any(|s| s.stream_type == config::meta::stream::StreamType::Logs);
+        let requires_daily_alignment = destination_streams.iter().any(|s| {
+            matches!(
+                s.stream_type,
+                config::meta::stream::StreamType::Metrics | config::meta::stream::StreamType::Traces
+            )
+        });
+
+        // Validate time alignment based on stream types
+        if requires_hourly_alignment {
+            validate_time_alignment_hourly(start_time, end_time)?;
+        }
+        if requires_daily_alignment {
+            validate_time_alignment_daily(start_time, end_time)?;
+        }
     }
 
     // 3. Create backfill job in backfill_jobs table
