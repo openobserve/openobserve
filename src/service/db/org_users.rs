@@ -98,7 +98,13 @@ pub async fn remove(org_id: &str, user_email: &str) -> Result<(), anyhow::Error>
     org_users::remove(org_id, &user_email)
         .await
         .map_err(|e| anyhow::anyhow!("Failed to remove user from org: {e}"))?;
-    let _ = delete_from_db_coordinator(&key, false, true, None).await;
+    delete_from_db_coordinator(&key, false, true, None)
+        .await
+        .inspect_err(|e| {
+            log::error!(
+                "error sending user single delete notification in nats for {org_id} {user_email} : {e}"
+            )
+        })?;
 
     #[cfg(feature = "enterprise")]
     super_cluster::org_user_remove(&key).await?;
@@ -111,7 +117,11 @@ pub async fn remove_by_user(email: &str) -> Result<(), anyhow::Error> {
     org_users::remove_by_user(&email)
         .await
         .map_err(|e| anyhow::anyhow!("Failed to remove user from org: {e}"))?;
-    let _ = delete_from_db_coordinator(&key, false, true, None).await;
+    delete_from_db_coordinator(&key, false, true, None)
+        .await
+        .inspect_err(|e| {
+            log::error!("error sending user many delete notification in nats for {email} : {e}")
+        })?;
 
     #[cfg(feature = "enterprise")]
     super_cluster::org_user_remove(&key).await?;
@@ -329,18 +339,18 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                             .remove(&format!("{}/{}", item_value.org_id, rum_token));
                     }
                 } else if item_key.starts_with("many/user/") {
-                    let item_key = item_key.strip_prefix("many/user/").unwrap();
-
-                    let item_value: Vec<UserOrgExpandedRecord> =
-                        match list_orgs_by_user(item_key).await {
-                            Ok(val) => val,
-                            Err(e) => {
-                                log::error!("Error getting value: {e}");
-                                continue;
-                            }
-                        };
-                    for item in item_value {
-                        ORG_USERS.remove(&format!("{}/{item_key}", item.org_id));
+                    let user_email = item_key.strip_prefix("many/user/").unwrap();
+                    // we need to filter it this way, because by the time we get this notification
+                    // org records are already deleted from db. Thus the only way to remove them is
+                    // to filter the existing records from email, and use that
+                    // info to remove
+                    let org_user_records: Vec<_> = ORG_USERS
+                        .iter()
+                        .filter(|v| v.email == user_email)
+                        .map(|v| (v.key().to_owned(), v.value().to_owned()))
+                        .collect();
+                    for (k, item) in org_user_records {
+                        ORG_USERS.remove(&k);
                         if let Some(rum_token) = &item.rum_token {
                             USERS_RUM_TOKEN
                                 .clone()

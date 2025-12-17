@@ -241,29 +241,6 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     db::functions::reset().await?;
                 }
                 "stream-stats" => {
-                    if cfg.limit.calculate_stats_step_limit_secs < 3600 {
-                        println!(
-                            r#"
-------------------------------------------------------------------------------
-Warning: !!! 
-Please stop compactor node first, if you are running single node, please set
-ZO_COMPACT_ENABLED=false and then restart node.
-
-calculate_stats_step_limit_secs good to be at least 3600 for stats reset,
-suggested to run again with:
-
-ZO_CALCULATE_STATS_STEP_LIMIT_SECS=3600 ./openobserve reset -c stream-stats
-
-After reset done, you can start compactor node again,
-If you are single node, please set ZO_COMPACT_ENABLED=true and restart node.
-------------------------------------------------------------------------------
-"#
-                        );
-                    }
-                    // get max updated_at
-                    let max_updated_at = infra_file_list::get_max_update_at().await?;
-                    // reset stream stats reset offset
-                    db::compact::stats::set_reset(max_updated_at).await?;
                     // reset stream stats update offset
                     db::compact::stats::set_offset(0, None).await?;
                     // reset stream stats table data

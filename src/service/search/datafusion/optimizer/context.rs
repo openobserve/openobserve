@@ -74,8 +74,8 @@ impl StreamingAggregationContext {
 
         Ok(Some(Self {
             streaming_id,
-            start_time: request.time_range.unwrap_or((0, 0)).0,
-            end_time: request.time_range.unwrap_or((0, 0)).1,
+            start_time: request.time_range.unwrap_or_default().0,
+            end_time: request.time_range.unwrap_or_default().1,
             is_complete_cache_hit,
             overwrite_cache: request.overwrite_cache,
         }))
