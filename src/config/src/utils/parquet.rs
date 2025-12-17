@@ -39,7 +39,9 @@ use vortex_file::OpenOptionsSessionExt;
 use vortex_io::session::RuntimeSessionExt;
 use vortex_session::VortexSession;
 
-use crate::{FileFormat, config::*, ider, meta::stream::FileMeta};
+use crate::{
+    FileFormat, config::*, ider, meta::stream::FileMeta, utils::async_file::get_file_size,
+};
 
 pub fn new_parquet_writer<'a>(
     buf: &'a mut Vec<u8>,
@@ -300,6 +302,18 @@ pub async fn read_metadata_from_file(path: &PathBuf) -> Option<FileMeta> {
     }
     meta.compressed_size = compressed_size as i64;
     Some(meta)
+}
+
+pub async fn read_metadata_from_file_name(path: &PathBuf) -> Option<FileMeta> {
+    let (min_ts, max_ts, original_size) = parse_metadata_from_filename(path.to_str().unwrap());
+    let compressed_size = get_file_size(path).await.ok()?;
+    Some(FileMeta {
+        min_ts,
+        max_ts,
+        original_size,
+        compressed_size: compressed_size as i64,
+        ..Default::default()
+    })
 }
 
 /// Generate filename with time range and original size
