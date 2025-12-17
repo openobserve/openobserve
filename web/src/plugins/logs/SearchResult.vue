@@ -1458,21 +1458,20 @@ export default defineComponent({
       this.noOfRecordsTitle = this.searchObj.data.histogram.chartParams.title;
     },
     updatePatternSummary() {
+    updatePatternSummary() {
       if (this.patternsState?.patterns?.statistics) {
+        // Reuse the same summary logic from PatternStatistics component
         const stats = this.patternsState.patterns.statistics;
-        const patternsFound = stats.total_patterns_found || 0;
-        const logsAnalyzed = (stats.total_logs_analyzed || 0).toLocaleString();
-        const totalEvents = this.searchObj.data.queryResults?.total
-          ? this.searchObj.data.queryResults.total.toLocaleString()
-          : logsAnalyzed;
-
-        // Combine histogram time + pattern extraction time
+        const totalEvents = this.searchObj.data.queryResults?.total || stats.total_logs_analyzed || 0;
         const histogramMs = this.searchObj.data.queryResults?.took || 0;
-        const patternMs = stats.extraction_time_ms || 0;
-        const totalTimeMs = histogramMs + patternMs;
-
-        this.patternSummaryText = `Showing 1 to 50 out of ${totalEvents} events & ${patternsFound} patterns found in ${logsAnalyzed} events in ${totalTimeMs} ms.`;
+        
+        this.patternSummaryText = this.formatPatternSummary(
+          stats, 
+          totalEvents, 
+          histogramMs
+        );
       }
+    },
     },
     reDrawChartData: {
       deep: true,
