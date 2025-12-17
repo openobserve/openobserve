@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::str::FromStr;
-
 use actix_web::{HttpRequest, HttpResponse, get, web};
 use chrono::{Duration, Utc};
 use config::{
@@ -28,6 +26,7 @@ use config::{
 #[cfg(feature = "enterprise")]
 use o2_openfga::{config::get_config as get_openfga_config, meta::mapping::OFGA_MODELS};
 use serde::{Deserialize, Serialize};
+use svix_ksuid::Ksuid;
 use tracing::{Instrument, Span};
 use utoipa::ToSchema;
 
@@ -48,7 +47,7 @@ use crate::{
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AlertHistoryQuery {
     /// Filter by specific alert name
-    pub alert_id: Option<String>,
+    pub alert_id: Option<Ksuid>,
     /// Start time in Unix timestamp microseconds
     pub start_time: Option<i64>,
     /// End time in Unix timestamp microseconds
@@ -221,26 +220,16 @@ pub async fn get_alert_history(
     };
 
     // If alert_id filter is provided, validate it exists
-    let _folder_id = if let Some(ref alert_id) = query.alert_id {
-        // Try to parse the alert_id as Ksuid
-        match svix_ksuid::Ksuid::from_str(alert_id) {
-            Ok(ksuid) => {
-                // Verify the alert exists in the organization
-                let conn = infra::db::ORM_CLIENT
-                    .get_or_init(infra::db::connect_to_orm)
-                    .await;
-                match get_by_id(conn, &org_id, ksuid).await {
-                    Ok((f, _)) => Some(f.folder_id),
-                    Err(_) => {
-                        return MetaHttpResponse::not_found(format!(
-                            "Alert '{alert_id}' not found in organization"
-                        ));
-                    }
-                }
-            }
+    let _folder_id = if let Some(alert_id) = query.alert_id {
+        // Verify the alert exists in the organization
+        let conn = infra::db::ORM_CLIENT
+            .get_or_init(infra::db::connect_to_orm)
+            .await;
+        match get_by_id(conn, &org_id, alert_id).await {
+            Ok((f, _)) => Some(f.folder_id),
             Err(_) => {
-                return MetaHttpResponse::bad_request(format!(
-                    "Invalid alert_id format: '{alert_id}'"
+                return MetaHttpResponse::not_found(format!(
+                    "Alert '{alert_id}' not found in organization"
                 ));
             }
         }
@@ -579,27 +568,6 @@ mod tests {
         assert!(query.size.is_none());
         assert!(query.sort_by.is_none());
         assert!(query.sort_order.is_none());
-    }
-
-    #[test]
-    fn test_alert_history_query_with_values() {
-        let query = AlertHistoryQuery {
-            alert_id: Some("test_alert".to_string()),
-            start_time: Some(1234567890000000),
-            end_time: Some(1234567990000000),
-            from: Some(0),
-            size: Some(50),
-            sort_by: Some("status".to_string()),
-            sort_order: Some("asc".to_string()),
-        };
-
-        assert_eq!(query.alert_id, Some("test_alert".to_string()));
-        assert_eq!(query.start_time, Some(1234567890000000));
-        assert_eq!(query.end_time, Some(1234567990000000));
-        assert_eq!(query.from, Some(0));
-        assert_eq!(query.size, Some(50));
-        assert_eq!(query.sort_by, Some("status".to_string()));
-        assert_eq!(query.sort_order, Some("asc".to_string()));
     }
 
     #[test]
