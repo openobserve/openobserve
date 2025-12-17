@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use chrono::Utc;
 use config::{
     cluster::LOCAL_NODE,
     get_config,
@@ -25,7 +24,7 @@ use config::{
     utils::file::get_file_meta as util_get_file_meta,
 };
 use hashbrown::HashSet;
-use infra::{errors::Result, file_list, storage};
+use infra::{errors::Result, file_list as infra_file_list, storage};
 use rayon::slice::ParallelSliceMut;
 
 use crate::service::{
@@ -41,62 +40,32 @@ use crate::service::{
 pub async fn query(
     trace_id: &str,
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
     time_level: PartitionTimeLevel,
     time_min: i64,
     time_max: i64,
 ) -> Result<Vec<FileKey>> {
-    let cfg = get_config();
-    let mut files = file_list::query(
+    let mut files = infra_file_list::query(
         org_id,
         stream_type,
         stream_name,
         time_level,
-        Some((time_min, time_max)),
+        (time_min, time_max),
         None,
     )
     .await?;
     let dumped_files = file_list_dump::query(
         trace_id,
         org_id,
-        stream_name,
         stream_type,
+        stream_name,
         (time_min, time_max),
-        None,
+        &[],
     )
     .await?;
-    if cfg.common.file_list_dump_enabled && cfg.common.file_list_dump_debug_check {
-        let dumped_file_names = dumped_files
-            .iter()
-            .map(|f| "files/".to_string() + &f.stream + "/" + &f.date + "/" + &f.file)
-            .collect::<HashSet<_>>();
-        let missing_files: usize = files
-            .iter()
-            .map(|f| {
-                if dumped_file_names.contains(&f.key) {
-                    0
-                } else {
-                    1
-                }
-            })
-            .sum();
-        if missing_files > 0 {
-            log::info!(
-                "[trace_id: {trace_id}] dump was missing {missing_files} files present in db"
-            );
-        }
-    }
 
-    if !cfg.common.file_list_dump_dual_write {
-        // we only consider these files in case of dual write disabled,
-        // because with dual write there are some edge cases which cannot be sovled even with id
-        // de-dup so the data gets counted twice.
-        for file in dumped_files.iter() {
-            files.push(file.into())
-        }
-    }
-
+    files.extend(dumped_files.iter().map(|f| f.into()));
     files.par_sort_unstable_by(|a, b| a.key.cmp(&b.key));
     files.dedup_by(|a, b| a.key == b.key);
     Ok(files)
@@ -113,16 +82,16 @@ pub async fn query(
 )]
 pub async fn query_for_merge(
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
     date_start: &str,
     date_end: &str,
 ) -> Result<Vec<FileKey>> {
-    let files = file_list::query_for_merge(
+    let files = infra_file_list::query_for_merge(
         org_id,
         stream_type,
         stream_name,
-        Some((date_start.to_string(), date_end.to_string())),
+        (date_start.to_string(), date_end.to_string()),
     )
     .await?;
     // we don't need to query from dump here, because
@@ -134,28 +103,30 @@ pub async fn query_for_merge(
 #[tracing::instrument(name = "service::file_list::query_by_ids", skip_all)]
 pub async fn query_by_ids(
     trace_id: &str,
-    ids: &[i64],
-    org: &str,
+    org_id: &str,
     stream_type: StreamType,
-    stream: &str,
+    stream_name: &str,
     time_range: Option<(i64, i64)>,
+    ids: &[i64],
 ) -> Result<Vec<FileKey>> {
     let cfg = get_config();
     FILE_LIST_ID_SELECT_COUNT
         .with_label_values::<&str>(&[])
         .set(ids.len() as i64);
     // 1. first query from local cache
-    let (mut files, ids) = if !cfg.common.local_mode {
+    let ids_set: HashSet<_> = ids.iter().cloned().collect();
+    let (mut files, ids_set) = if cfg.common.local_mode {
+        (Vec::with_capacity(ids.len()), ids_set)
+    } else {
         let start = std::time::Instant::now();
-        let ids_set: HashSet<_> = ids.iter().cloned().collect();
-        let cached_files = match file_list::LOCAL_CACHE.query_by_ids(ids).await {
+        let cached_files = match infra_file_list::LOCAL_CACHE.query_by_ids(ids).await {
             Ok(files) => files,
             Err(e) => {
                 log::error!("[trace_id {trace_id}] file_list query cache failed: {e:?}");
                 Vec::new()
             }
         };
-        let cached_ids = cached_files.iter().map(|f| f.id).collect::<HashSet<_>>();
+        let cached_ids: HashSet<_> = cached_files.iter().map(|f| f.id).collect();
         log::info!(
             "{}",
             search_inspector_fields(
@@ -184,15 +155,14 @@ pub async fn query_by_ids(
 
         (
             cached_files,
-            ids_set.difference(&cached_ids).cloned().collect::<Vec<_>>(),
+            ids_set.difference(&cached_ids).cloned().collect(),
         )
-    } else {
-        (Vec::with_capacity(ids.len()), ids.to_vec())
     };
 
     // 2. query from remote db
     let start = std::time::Instant::now();
-    let db_files = file_list::query_by_ids(&ids).await?;
+    let ids: Vec<_> = ids_set.iter().cloned().collect();
+    let mut db_files = infra_file_list::query_by_ids(&ids).await?;
     log::info!(
         "{}",
         search_inspector_fields(
@@ -211,59 +181,38 @@ pub async fn query_by_ids(
         )
     );
 
-    // query from file_list_dump
-    // we use the min(id) as id hint because that automatically filter outs any dump files
-    // which cannot have the ids we are looking for
-    let dumped_files = file_list_dump::query(
-        trace_id,
-        org,
-        stream,
-        stream_type,
-        time_range.unwrap_or((0, Utc::now().timestamp_micros())),
-        ids.iter().min().copied(),
-    )
-    .await?;
-
-    let dumped_files: Vec<FileKey> = dumped_files
-        .iter()
-        .filter(|r| ids.contains(&r.id))
-        .map(|r| r.into())
-        .collect();
-
-    if cfg.common.file_list_dump_enabled && cfg.common.file_list_dump_debug_check {
-        let dump_ids = dumped_files.iter().map(|f| f.id).collect::<HashSet<_>>();
-        let db_ids = db_files.iter().map(|f| f.id).collect::<Vec<_>>();
-        let missing_files: usize = db_ids
-            .iter()
-            .map(|id| if dump_ids.contains(id) { 0 } else { 1 })
-            .sum();
-        if missing_files > 0 {
-            log::info!(
-                "[trace_id: {trace_id}] dump was missing {missing_files} files present in db"
-            );
-        }
+    // 3. query from file_list_dump
+    let db_ids = db_files.iter().map(|f| f.id).collect();
+    let ids_set = ids_set.difference(&db_ids).cloned().collect::<HashSet<_>>();
+    if !ids_set.is_empty() {
+        let ids: Vec<_> = ids_set.iter().cloned().collect();
+        let dumped_files = file_list_dump::query(
+            trace_id,
+            org_id,
+            stream_type,
+            stream_name,
+            time_range.unwrap_or_default(),
+            &ids,
+        )
+        .await?;
+        db_files.extend(
+            dumped_files
+                .iter()
+                .filter_map(|f| ids_set.contains(&f.id).then_some(f.into())),
+        );
     }
 
-    // 3. set the local cache
+    // 4. set the local cache
     if !cfg.common.local_mode {
         let db_files = db_files.clone();
-        let dumped_files = dumped_files.clone();
         let trace_id = trace_id.to_string();
         tokio::task::spawn(async move {
             let start = std::time::Instant::now();
-            let cfg = get_config();
-            if let Err(e) = file_list::LOCAL_CACHE.batch_add_with_id(&db_files).await {
-                log::error!("[trace_id {trace_id}] file_list set cache failed for db files: {e}");
-            }
-
-            if !cfg.common.file_list_dump_dual_write
-                && let Err(e) = file_list::LOCAL_CACHE
-                    .batch_add_with_id(&dumped_files)
-                    .await
+            if let Err(e) = infra_file_list::LOCAL_CACHE
+                .batch_add_with_id(&db_files)
+                .await
             {
-                log::error!(
-                    "[trace_id {trace_id}] file_list set cache failed for dumped files: {e:?}"
-                );
+                log::error!("[trace_id {trace_id}] file_list set cache failed for db files: {e}");
             }
 
             log::info!(
@@ -286,11 +235,8 @@ pub async fn query_by_ids(
         });
     }
 
-    // 4. merge the results
+    // 5. merge the results
     files.extend(db_files);
-    if !cfg.common.file_list_dump_dual_write {
-        files.extend(dumped_files);
-    }
     files.par_sort_unstable_by(|a, b| a.key.cmp(&b.key));
     files.dedup_by(|a, b| a.key == b.key);
     Ok(files)
@@ -306,36 +252,14 @@ pub async fn query_ids(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    time_range: Option<(i64, i64)>,
-) -> Result<Vec<file_list::FileId>> {
-    let cfg = get_config();
-    let mut files = file_list::query_ids(org_id, stream_type, stream_name, time_range).await?;
-    let dumped_files = super::file_list_dump::get_ids_in_range(
-        trace_id,
-        org_id,
-        stream_name,
-        stream_type,
-        time_range
-            .ok_or_else(|| infra::errors::Error::Message("time_range is required".to_string()))?,
-    )
-    .await
-    .unwrap();
-    if cfg.common.file_list_dump_enabled && cfg.common.file_list_dump_debug_check {
-        let dump_ids = dumped_files.iter().map(|f| f.id).collect::<HashSet<_>>();
-        let db_ids = files.iter().map(|f| f.id).collect::<Vec<_>>();
-        let missing_files: usize = db_ids
-            .iter()
-            .map(|id| if dump_ids.contains(id) { 0 } else { 1 })
-            .sum();
-        if missing_files > 0 {
-            log::info!(
-                "[trace_id: {trace_id}] dump was missing {missing_files} files present in db"
-            );
-        }
-    }
-    if !cfg.common.file_list_dump_dual_write {
-        files.extend(dumped_files);
-    }
+    time_range: (i64, i64),
+) -> Result<Vec<infra_file_list::FileId>> {
+    let mut files =
+        infra_file_list::query_ids(org_id, stream_type, stream_name, time_range).await?;
+    let dumped_files =
+        super::file_list_dump::query_ids(trace_id, org_id, stream_type, stream_name, time_range)
+            .await?;
+    files.extend(dumped_files);
     files.par_sort_unstable_by(|a, b| a.id.cmp(&b.id));
     files.dedup_by(|a, b| a.id == b.id);
     Ok(files)
@@ -370,7 +294,7 @@ pub fn calculate_local_files_size(files: &[String]) -> Result<u64> {
 // Delete one parquet file and update the file list
 pub async fn delete_parquet_file(account: &str, key: &str, file_list_only: bool) -> Result<()> {
     // delete from file list in metastore
-    file_list::batch_process(&[FileKey::new(
+    infra_file_list::batch_process(&[FileKey::new(
         0,
         account.to_string(),
         key.to_string(),
@@ -387,9 +311,225 @@ pub async fn delete_parquet_file(account: &str, key: &str, file_list_only: bool)
 }
 
 pub async fn update_compressed_size(key: &str, size: i64) -> Result<()> {
-    file_list::update_compressed_size(key, size).await?;
-    file_list::LOCAL_CACHE
+    infra_file_list::update_compressed_size(key, size).await?;
+    infra_file_list::LOCAL_CACHE
         .update_compressed_size(key, size)
         .await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::{
+        search::ScanStats,
+        stream::{FileKey, FileMeta},
+    };
+
+    use super::*;
+
+    fn create_test_file_key(
+        id: i64,
+        key: &str,
+        records: i64,
+        original_size: i64,
+        compressed_size: i64,
+        index_size: i64,
+    ) -> FileKey {
+        FileKey {
+            id,
+            account: "test_account".to_string(),
+            key: key.to_string(),
+            meta: FileMeta {
+                min_ts: 1000,
+                max_ts: 2000,
+                records,
+                original_size,
+                compressed_size,
+                index_size,
+                flattened: false,
+            },
+            deleted: false,
+            segment_ids: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_calculate_files_size_empty() {
+        let files: Vec<FileKey> = vec![];
+        let result = calculate_files_size(&files).await;
+
+        assert!(result.is_ok());
+        let stats = result.unwrap();
+        assert_eq!(stats.files, 0);
+        assert_eq!(stats.records, 0);
+        assert_eq!(stats.original_size, 0);
+        assert_eq!(stats.compressed_size, 0);
+        assert_eq!(stats.idx_scan_size, 0);
+    }
+
+    #[tokio::test]
+    async fn test_calculate_files_size_single_file() {
+        let files = vec![create_test_file_key(
+            1,
+            "file1.parquet",
+            100,
+            10000,
+            5000,
+            500,
+        )];
+
+        let result = calculate_files_size(&files).await;
+
+        assert!(result.is_ok());
+        let stats = result.unwrap();
+        assert_eq!(stats.files, 1);
+        assert_eq!(stats.records, 100);
+        assert_eq!(stats.original_size, 10000);
+        assert_eq!(stats.compressed_size, 5000);
+        assert_eq!(stats.idx_scan_size, 500);
+    }
+
+    #[tokio::test]
+    async fn test_calculate_files_size_multiple_files() {
+        let files = vec![
+            create_test_file_key(1, "file1.parquet", 100, 10000, 5000, 500),
+            create_test_file_key(2, "file2.parquet", 200, 20000, 10000, 1000),
+            create_test_file_key(3, "file3.parquet", 300, 30000, 15000, 1500),
+        ];
+
+        let result = calculate_files_size(&files).await;
+
+        assert!(result.is_ok());
+        let stats = result.unwrap();
+        assert_eq!(stats.files, 3);
+        assert_eq!(stats.records, 600); // 100 + 200 + 300
+        assert_eq!(stats.original_size, 60000); // 10000 + 20000 + 30000
+        assert_eq!(stats.compressed_size, 30000); // 5000 + 10000 + 15000
+        assert_eq!(stats.idx_scan_size, 3000); // 500 + 1000 + 1500
+    }
+
+    #[tokio::test]
+    async fn test_calculate_files_size_with_zero_values() {
+        let files = vec![
+            create_test_file_key(1, "file1.parquet", 0, 0, 0, 0),
+            create_test_file_key(2, "file2.parquet", 100, 10000, 5000, 500),
+        ];
+
+        let result = calculate_files_size(&files).await;
+
+        assert!(result.is_ok());
+        let stats = result.unwrap();
+        assert_eq!(stats.files, 2);
+        assert_eq!(stats.records, 100);
+        assert_eq!(stats.original_size, 10000);
+        assert_eq!(stats.compressed_size, 5000);
+        assert_eq!(stats.idx_scan_size, 500);
+    }
+
+    #[tokio::test]
+    async fn test_calculate_files_size_large_values() {
+        let files = vec![create_test_file_key(
+            1,
+            "large_file.parquet",
+            1000000,
+            10000000000,
+            5000000000,
+            500000000,
+        )];
+
+        let result = calculate_files_size(&files).await;
+
+        assert!(result.is_ok());
+        let stats = result.unwrap();
+        assert_eq!(stats.files, 1);
+        assert_eq!(stats.records, 1000000);
+        assert_eq!(stats.original_size, 10000000000);
+        assert_eq!(stats.compressed_size, 5000000000);
+        assert_eq!(stats.idx_scan_size, 500000000);
+    }
+
+    #[tokio::test]
+    async fn test_calculate_local_files_size_empty() {
+        let files: Vec<String> = vec![];
+        let result = calculate_local_files_size(&files);
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_calculate_local_files_size_nonexistent_files() {
+        let files = vec![
+            "/nonexistent/file1.parquet".to_string(),
+            "/nonexistent/file2.parquet".to_string(),
+        ];
+
+        let result = calculate_local_files_size(&files);
+
+        // Should return 0 for nonexistent files
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 0);
+    }
+
+    #[test]
+    fn test_scan_stats_creation() {
+        let stats = ScanStats::new();
+
+        // Verify default values
+        assert_eq!(stats.files, 0);
+        assert_eq!(stats.records, 0);
+        assert_eq!(stats.original_size, 0);
+        assert_eq!(stats.compressed_size, 0);
+    }
+
+    #[test]
+    fn test_file_key_creation() {
+        let file_key = create_test_file_key(1, "test.parquet", 100, 1000, 500, 50);
+
+        assert_eq!(file_key.id, 1);
+        assert_eq!(file_key.key, "test.parquet");
+        assert_eq!(file_key.meta.records, 100);
+        assert_eq!(file_key.meta.original_size, 1000);
+        assert_eq!(file_key.meta.compressed_size, 500);
+        assert_eq!(file_key.meta.index_size, 50);
+        assert!(!file_key.deleted);
+        assert!(!file_key.meta.flattened);
+    }
+
+    #[tokio::test]
+    async fn test_calculate_files_size_preserves_stats_type() {
+        let files = vec![create_test_file_key(1, "file.parquet", 100, 1000, 500, 50)];
+
+        let result = calculate_files_size(&files).await;
+
+        assert!(result.is_ok());
+        let stats = result.unwrap();
+
+        // Verify types are correct (all should be i64)
+        let _files: i64 = stats.files;
+        let _records: i64 = stats.records;
+        let _original: i64 = stats.original_size;
+        let _compressed: i64 = stats.compressed_size;
+        let _idx: i64 = stats.idx_scan_size;
+    }
+
+    #[tokio::test]
+    async fn test_calculate_files_size_aggregation() {
+        let files = vec![
+            create_test_file_key(1, "file1.parquet", 50, 5000, 2500, 250),
+            create_test_file_key(2, "file2.parquet", 50, 5000, 2500, 250),
+        ];
+
+        let result = calculate_files_size(&files).await;
+
+        assert!(result.is_ok());
+        let stats = result.unwrap();
+
+        // Verify aggregation is correct
+        assert_eq!(stats.files, 2);
+        assert_eq!(stats.records, 100); // 50 + 50
+        assert_eq!(stats.original_size, 10000); // 5000 + 5000
+        assert_eq!(stats.compressed_size, 5000); // 2500 + 2500
+        assert_eq!(stats.idx_scan_size, 500); // 250 + 250
+    }
 }
