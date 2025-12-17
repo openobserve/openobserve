@@ -90,7 +90,7 @@ test.describe("dashboard streaming testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("15", "m");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
 
     await pm.dashboardPanelActions.waitForChartToRender();
 
@@ -294,7 +294,7 @@ test.describe("dashboard streaming testcases", () => {
 
     await pm.dashboardPanelActions.applyDashboardBtn();
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("15", "m");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.waitForChartToRender();
 
 

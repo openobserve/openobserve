@@ -521,7 +521,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Set date-time filter and timezone
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("15", "m");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.applyDashboardBtn();
 
     // Attempt to save the panel without a name

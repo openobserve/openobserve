@@ -76,7 +76,7 @@ test.describe("dashboard maps testcases", () => {
     );
 
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("15", "m");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
     // await pm.dashboardPanelActions.applyDashboardBtn();
 
     await pm.dashboardPanelActions.waitForChartToRender();
