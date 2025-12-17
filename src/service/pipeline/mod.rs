@@ -253,6 +253,20 @@ pub async fn delete_pipeline(pipeline_id: &str) -> Result<(), PipelineError> {
         return Err(PipelineError::DeleteDerivedStream(error.to_string()));
     }
 
+    // Delete all backfill jobs associated with this pipeline
+    if let Err(error) =
+        super::alerts::backfill::delete_backfill_jobs_by_pipeline(&existing_pipeline.org, pipeline_id)
+            .await
+    {
+        log::error!(
+            "[PIPELINE] Failed to delete backfill jobs for pipeline {}: {}",
+            pipeline_id,
+            error
+        );
+        // Don't fail the pipeline deletion if backfill job deletion fails
+        // Just log the error and continue
+    }
+
     pipeline::delete(pipeline_id).await?;
     remove_ownership(
         &existing_pipeline.org,

@@ -45,7 +45,7 @@ export interface BackfillJob {
   progress_percent: number; // 0-100
   status: "running" | "completed" | "failed" | "pending" | "canceled" | "paused" | "waiting";
   deletion_status?: DeletionStatus;
-  deletion_job_id?: string;
+  deletion_job_ids?: string[]; // Multiple deletion job IDs for tracking
   created_at?: number; // microseconds
   last_triggered_at?: number; // microseconds
   chunks_completed?: number;
@@ -53,6 +53,7 @@ export interface BackfillJob {
   chunk_period_minutes?: number;
   delay_between_chunks_secs?: number;
   delete_before_backfill?: boolean;
+  error?: string; // Error message if job encountered an error
 }
 
 export interface BackfillJobActionResponse {

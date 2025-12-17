@@ -114,38 +114,23 @@ pub struct ScheduledTriggerData {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+/// Dynamic state for backfill job stored in trigger data
+/// Static configuration is stored in backfill_jobs table
 pub struct BackfillJob {
-    /// Reference to the source pipeline ID
-    pub source_pipeline_id: String,
-
-    /// Time range to backfill
-    pub start_time: i64, // microseconds
-    pub end_time: i64, // microseconds
-
-    /// Optional: chunk size for processing large ranges
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub chunk_period_minutes: Option<i64>,
-
-    /// Progress tracking
-    pub current_position: i64,
-
-    /// Optional: rate limiting
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_execution_time_secs: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub delay_between_chunks_secs: Option<i64>,
-
-    /// Delete existing data before backfilling
-    #[serde(default)]
-    pub delete_before_backfill: bool,
+    /// Progress tracking - current position in the time range
+    pub current_position: i64, // microseconds
 
     /// Deletion phase tracking
     #[serde(default)]
     pub deletion_status: DeletionStatus,
 
-    /// Deletion job ID for tracking compactor job
+    /// Deletion job IDs for tracking compactor jobs (one per destination stream)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub deletion_job_ids: Vec<String>,
+
+    /// Error message if any error occurred during backfill or deletion
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub deletion_job_id: Option<String>,
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default, utoipa::ToSchema)]
@@ -156,7 +141,6 @@ pub enum DeletionStatus {
     Pending,
     InProgress,
     Completed,
-    Failed(String),
 }
 
 impl ScheduledTriggerData {

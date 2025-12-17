@@ -310,6 +310,32 @@ const onSubmit = async () => {
     return;
   }
 
+  // Show confirmation dialog if delete_before_backfill is enabled
+  if (formData.value.deleteBeforeBackfill) {
+    $q.dialog({
+      title: "Confirm Data Deletion",
+      message:
+        "You have selected to delete existing data before backfill. This will permanently delete all data in the destination stream for the specified time range. This action CANNOT be undone or cancelled once the job is created. Are you sure you want to proceed?",
+      cancel: {
+        label: "Cancel",
+        color: "grey-8",
+        flat: true,
+      },
+      ok: {
+        label: "Yes, Delete and Backfill",
+        color: "negative",
+      },
+      persistent: true,
+      focus: "cancel", // Focus on cancel button by default for safety
+    }).onOk(() => {
+      createBackfillJobRequest();
+    });
+  } else {
+    createBackfillJobRequest();
+  }
+};
+
+const createBackfillJobRequest = async () => {
   errorMessage.value = "";
   loading.value = true;
 

@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from "vue";
+import { ref, computed, watch } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import backfillService, { type BackfillJob } from "../../services/backfill";
@@ -226,9 +226,9 @@ watch(
 
       // Set date time component
       if (dateTimeRef.value) {
-        dateTimeRef.value.setCustomDate({
-          startTime: job.start_time,
-          endTime: job.end_time,
+        dateTimeRef.value.setCustomDate("absolute", {
+          start: job.start_time / 1000, // Convert from microseconds to milliseconds
+          end: job.end_time / 1000,
         });
       }
     }
@@ -280,12 +280,38 @@ const onSubmit = async () => {
     return;
   }
 
+  // Show confirmation dialog if delete_before_backfill is enabled
+  if (formData.value.deleteBeforeBackfill) {
+    $q.dialog({
+      title: "Confirm Data Deletion",
+      message:
+        "You have selected to delete existing data before backfill. This will permanently delete all data in the destination stream for the specified time range. This action CANNOT be undone or cancelled once the job is updated. Are you sure you want to proceed?",
+      cancel: {
+        label: "Cancel",
+        color: "grey-8",
+        flat: true,
+      },
+      ok: {
+        label: "Yes, Delete and Backfill",
+        color: "negative",
+      },
+      persistent: true,
+      focus: "cancel", // Focus on cancel button by default for safety
+    }).onOk(() => {
+      updateBackfillJobRequest();
+    });
+  } else {
+    updateBackfillJobRequest();
+  }
+};
+
+const updateBackfillJobRequest = async () => {
   loading.value = true;
 
   try {
     await backfillService.updateBackfillJob({
       org_id: store.state.selectedOrganization.identifier,
-      job_id: props.job.job_id,
+      job_id: props.job!.job_id,
       data: {
         start_time: formData.value.startTimeMicros,
         end_time: formData.value.endTimeMicros,

@@ -21,9 +21,9 @@ use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::alert
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct BackfillRequest {
-    #[serde(with = "timestamp_format")]
+    /// Start time in microseconds
     pub start_time: i64,
-    #[serde(with = "timestamp_format")]
+    /// End time in microseconds
     pub end_time: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub chunk_period_minutes: Option<i64>,
@@ -31,47 +31,6 @@ pub struct BackfillRequest {
     pub delay_between_chunks_secs: Option<i64>,
     #[serde(default)]
     pub delete_before_backfill: bool,
-}
-
-mod timestamp_format {
-    use chrono::DateTime;
-    use serde::{self, Deserialize, Deserializer, Serializer};
-
-    pub fn serialize<S>(timestamp: &i64, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_i64(*timestamp)
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<i64, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum Timestamp {
-            Integer(i64),
-            String(String),
-        }
-
-        match Timestamp::deserialize(deserializer)? {
-            Timestamp::Integer(i) => Ok(i),
-            Timestamp::String(s) => {
-                // Try parsing as RFC3339 first
-                if let Ok(dt) = DateTime::parse_from_rfc3339(&s) {
-                    return Ok(dt.timestamp_micros());
-                }
-                // Try parsing as integer string
-                if let Ok(i) = s.parse::<i64>() {
-                    return Ok(i);
-                }
-                Err(serde::de::Error::custom(
-                    "Invalid timestamp format. Expected ISO 8601 string or integer (microseconds)",
-                ))
-            }
-        }
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -96,8 +55,8 @@ pub struct BackfillResponse {
         content = BackfillRequest,
         description = "Backfill parameters",
         example = json!({
-            "start_time": "2024-01-01T00:00:00Z",
-            "end_time": "2024-01-02T00:00:00Z",
+            "start_time": 1704067200000000i64,
+            "end_time": 1704153600000000i64,
             "chunk_period_minutes": 60,
             "delay_between_chunks_secs": 5,
             "delete_before_backfill": false
@@ -255,107 +214,64 @@ pub async fn get_backfill(
     }
 }
 
-/// Pause a backfill job
+/// Enable or disable a backfill job
 ///
-/// Pauses a running backfill job.
+/// Enables (resumes) or disables (pauses) a backfill job.
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
-    operation_id = "PauseBackfillJob",
+    operation_id = "EnableBackfillJob",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization ID"),
         ("job_id" = String, Path, description = "Backfill job ID"),
+        ("value" = bool, Query, description = "Enable (true) or disable (false) the backfill job"),
     ),
     responses(
-        (status = 200, description = "Backfill job paused successfully"),
+        (status = 200, description = "Backfill job status updated successfully"),
+        (status = 400, description = "Bad request"),
         (status = 404, description = "Job not found"),
         (status = 500, description = "Internal server error"),
     ),
 )]
-#[post("/{org_id}/pipelines/backfill/{job_id}/pause")]
-pub async fn pause_backfill(
+#[put("/{org_id}/pipelines/backfill/{job_id}/enable")]
+pub async fn enable_backfill(
     path: web::Path<(String, String)>,
+    query: web::Query<std::collections::HashMap<String, String>>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let (org_id, job_id) = path.into_inner();
 
+    let enable = query
+        .get("value")
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or(false);
+
     log::info!(
-        "[BACKFILL API] Pause backfill job {} for org {}",
+        "[BACKFILL API] {} backfill job {} for org {}",
+        if enable { "Enabling" } else { "Disabling" },
         job_id,
         org_id
     );
 
-    match backfill::cancel_backfill_job(&org_id, &job_id).await {
+    match backfill::enable_backfill_job(&org_id, &job_id, enable).await {
         Ok(_) => {
             log::info!(
-                "[BACKFILL API] Paused backfill job {} for org {}",
+                "[BACKFILL API] {} backfill job {} for org {}",
+                if enable { "Enabled" } else { "Disabled" },
                 job_id,
                 org_id
             );
             Ok(HttpResponse::Ok().json(serde_json::json!({
-                "message": "Backfill job paused successfully"
+                "message": format!(
+                    "Backfill job {} successfully",
+                    if enable { "enabled" } else { "disabled" }
+                )
             })))
         }
         Err(e) => {
             log::error!(
-                "[BACKFILL API] Failed to pause backfill job {} for org {}: {}",
-                job_id,
-                org_id,
-                e
-            );
-            Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                actix_web::http::StatusCode::NOT_FOUND,
-                e.to_string(),
-            )))
-        }
-    }
-}
-
-/// Resume a paused backfill job
-///
-/// Resumes a paused backfill job.
-#[utoipa::path(
-    context_path = "/api",
-    tag = "Pipelines",
-    operation_id = "ResumeBackfillJob",
-    security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization ID"),
-        ("job_id" = String, Path, description = "Backfill job ID"),
-    ),
-    responses(
-        (status = 200, description = "Backfill job resumed successfully"),
-        (status = 404, description = "Job not found"),
-        (status = 400, description = "Job is not paused"),
-        (status = 500, description = "Internal server error"),
-    ),
-)]
-#[post("/{org_id}/pipelines/backfill/{job_id}/resume")]
-pub async fn resume_backfill(
-    path: web::Path<(String, String)>,
-) -> Result<HttpResponse, actix_web::Error> {
-    let (org_id, job_id) = path.into_inner();
-
-    log::info!(
-        "[BACKFILL API] Resume backfill job {} for org {}",
-        job_id,
-        org_id
-    );
-
-    match backfill::resume_backfill_job(&org_id, &job_id).await {
-        Ok(_) => {
-            log::info!(
-                "[BACKFILL API] Resumed backfill job {} for org {}",
-                job_id,
-                org_id
-            );
-            Ok(HttpResponse::Ok().json(serde_json::json!({
-                "message": "Backfill job resumed successfully"
-            })))
-        }
-        Err(e) => {
-            log::error!(
-                "[BACKFILL API] Failed to resume backfill job {} for org {}: {}",
+                "[BACKFILL API] Failed to {} backfill job {} for org {}: {}",
+                if enable { "enable" } else { "disable" },
                 job_id,
                 org_id,
                 e

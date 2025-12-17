@@ -237,6 +237,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <q-tooltip>View Details</q-tooltip>
                 </q-btn>
+                <!-- Error Indicator - Always render to maintain alignment -->
+                <div class="backfill-error-slot">
+                  <q-btn
+                    v-if="props.row.error"
+                    flat
+                    dense
+                    round
+                    icon="error"
+                    size="sm"
+                    color="negative"
+                    @click="showErrorDialog(props.row)"
+                    data-test="error-indicator-btn"
+                  >
+                    <q-tooltip>Error: {{ props.row.error }}</q-tooltip>
+                  </q-btn>
+                </div>
               </div>
             </q-td>
           </template>
@@ -257,6 +273,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :job="selectedJob"
       @job-updated="onJobUpdated"
     />
+
+    <!-- Error Dialog -->
+    <q-dialog v-model="errorDialogVisible" @hide="closeErrorDialog">
+      <q-card class="backfill-error-dialog" style="min-width: 500px">
+        <q-card-section class="row items-center q-pb-none">
+          <div class="text-h6">
+            <q-icon name="error" color="negative" size="24px" class="q-mr-sm" />
+            Backfill Job Error
+          </div>
+          <q-space />
+          <q-btn icon="close" flat round dense v-close-popup />
+        </q-card-section>
+
+        <q-separator />
+
+        <q-card-section v-if="errorDialogData">
+          <div class="q-mb-md">
+            <div class="text-caption text-grey-6">Job ID</div>
+            <div class="text-body2 text-weight-medium">{{ errorDialogData.job_id }}</div>
+          </div>
+
+          <div class="q-mb-md">
+            <div class="text-caption text-grey-6">Pipeline</div>
+            <div class="text-body2">{{ errorDialogData.pipeline_name || errorDialogData.pipeline_id }}</div>
+          </div>
+
+          <div>
+            <div class="text-caption text-grey-6 q-mb-sm">Error Message</div>
+            <div class="error-message-box">
+              {{ errorDialogData.error }}
+            </div>
+          </div>
+        </q-card-section>
+
+        <q-card-actions align="right">
+          <q-btn flat label="Close" color="primary" v-close-popup />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </div>
 </template>
 
@@ -279,6 +334,8 @@ const showDetailsDialog = ref(false);
 const selectedJobId = ref("");
 const showEditDialog = ref(false);
 const selectedJob = ref<BackfillJob | null>(null);
+const errorDialogVisible = ref(false);
+const errorDialogData = ref<BackfillJob | null>(null);
 
 const filters = ref({
   status: null as string | null,
@@ -561,6 +618,16 @@ const onJobCanceled = () => {
   loadJobs();
 };
 
+const showErrorDialog = (job: BackfillJob) => {
+  errorDialogData.value = job;
+  errorDialogVisible.value = true;
+};
+
+const closeErrorDialog = () => {
+  errorDialogVisible.value = false;
+  errorDialogData.value = null;
+};
+
 // Helper functions
 const getProgressColor = (deletionStatus?: any) => {
   if (deletionStatus && ["pending", "in_progress"].includes(deletionStatus)) {
@@ -587,5 +654,25 @@ const formatTimestamp = (timestamp?: number) => {
 <style scoped lang="scss">
 .card-container {
   border-radius: 8px;
+}
+
+.backfill-error-slot {
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+  vertical-align: middle;
+}
+
+.error-message-box {
+  padding: 12px;
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.08);
+  border-left: 3px solid #ef4444;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #991b1b;
 }
 </style>

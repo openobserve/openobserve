@@ -136,14 +136,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
                 </div>
-                <div v-if="job.deletion_job_id">
-                  <div class="text-caption text-grey-6">Deletion Job ID</div>
-                  <div class="tw-font-mono text-xs">{{ job.deletion_job_id }}</div>
+                <div v-if="job.deletion_job_ids && job.deletion_job_ids.length > 0">
+                  <div class="text-caption text-grey-6">Deletion Job IDs ({{ job.deletion_job_ids.length }})</div>
+                  <div v-for="(jobId, idx) in job.deletion_job_ids" :key="idx" class="tw-font-mono text-xs">
+                    {{ jobId }}
+                  </div>
                 </div>
               </div>
               <div v-if="typeof job.deletion_status === 'object' && job.deletion_status.failed" class="tw-mt-3">
                 <div class="text-caption text-grey-6">Error</div>
                 <div class="text-sm text-negative">{{ job.deletion_status.failed }}</div>
+              </div>
+            </q-card>
+          </div>
+
+          <!-- Error Details (if present) -->
+          <div v-if="job.error" class="tw-space-y-3">
+            <div class="text-subtitle1 tw-font-semibold">Error Details</div>
+            <q-card flat bordered class="q-pa-md tw-bg-red-50 tw-border-red-200">
+              <div class="flex items-start">
+                <q-icon name="error" color="negative" size="24px" class="q-mr-sm tw-mt-1" />
+                <div class="tw-flex-1">
+                  <div class="text-caption text-grey-6 q-mb-xs">Error Message</div>
+                  <div class="text-sm tw-text-red-800 tw-whitespace-pre-wrap tw-break-words">
+                    {{ job.error }}
+                  </div>
+                </div>
               </div>
             </q-card>
           </div>
@@ -325,13 +343,14 @@ const getCurrentPhase = computed(() => {
   if (!job.value) return "N/A";
 
   if (job.value.deletion_status) {
-    if (["pending", "in_progress"].includes(job.value.deletion_status)) {
+    const status = job.value.deletion_status;
+    if (typeof status === "string" && ["pending", "in_progress"].includes(status)) {
       return "Deleting Data";
     }
-    if (job.value.deletion_status === "completed") {
+    if (status === "completed") {
       return "Backfilling Data";
     }
-    if (typeof job.value.deletion_status === "object" && "failed" in job.value.deletion_status) {
+    if (typeof status === "object" && "failed" in status) {
       return "Deletion Failed";
     }
   }
@@ -436,7 +455,7 @@ const getStatusLabel = (status: string, deletionStatus?: any) => {
 };
 
 const getProgressColor = (deletionStatus?: any) => {
-  if (deletionStatus && ["pending", "in_progress"].includes(deletionStatus)) {
+  if (deletionStatus && typeof deletionStatus === "string" && ["pending", "in_progress"].includes(deletionStatus)) {
     return "blue";
   }
   return "positive";

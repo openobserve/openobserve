@@ -23,7 +23,7 @@ use crate::{
     errors, orm_err,
 };
 
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug)]
 pub struct BackfillJob {
     pub id: String,
     pub org: String,
@@ -53,8 +53,6 @@ impl From<Model> for BackfillJob {
 }
 
 pub async fn get(org: &str, job_id: &str) -> Result<BackfillJob, errors::Error> {
-    let _lock = get_lock().await;
-
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let res = Entity::find()
         .filter(Column::Org.eq(org))
@@ -74,6 +72,22 @@ pub async fn list_by_org(org: &str) -> Result<Vec<BackfillJob>, errors::Error> {
     match res {
         Ok(models) => Ok(models.into_iter().map(|model| model.into()).collect()),
         Err(e) => orm_err!(format!("list backfill jobs error: {e}")),
+    }
+}
+
+pub async fn list_by_pipeline(
+    org: &str,
+    pipeline_id: &str,
+) -> Result<Vec<BackfillJob>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let res = Entity::find()
+        .filter(Column::Org.eq(org))
+        .filter(Column::PipelineId.eq(pipeline_id))
+        .all(client)
+        .await;
+    match res {
+        Ok(models) => Ok(models.into_iter().map(|model| model.into()).collect()),
+        Err(e) => orm_err!(format!("list backfill jobs by pipeline error: {e}")),
     }
 }
 
