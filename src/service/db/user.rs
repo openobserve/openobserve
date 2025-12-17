@@ -214,9 +214,11 @@ pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
     org_users::remove_by_user(&name).await?;
     match users::remove(&name).await {
         Ok(_) => {
-            delete_from_db_coordinator(&key, false, true, None).await.inspect_err(|e|{
-                log::error!("error sending delete user to nats {name} : {e}");
-            })?;
+            delete_from_db_coordinator(&key, false, true, None)
+                .await
+                .inspect_err(|e| {
+                    log::error!("error sending delete user to nats {name} : {e}");
+                })?;
             #[cfg(feature = "enterprise")]
             super_cluster::delete_user_from_super_cluster(&name).await?;
             Ok(())
