@@ -492,6 +492,22 @@ export default defineComponent({
     },
   },
   methods: {
+    formatPatternSummary(stats: any, totalEvents: number, histogramMs: number) {
+      const patternsFound = stats?.total_patterns_found || 0;
+      const logsAnalyzed = (stats?.total_logs_analyzed || 0).toLocaleString();
+      const totalEventsStr = totalEvents ? totalEvents.toLocaleString() : logsAnalyzed;
+
+      // Combine histogram time + pattern extraction time
+      const patternMs = stats?.extraction_time_ms || 0;
+      const totalTimeMs = histogramMs + patternMs;
+
+      return this.$t("search.pattern_summary", {
+        totalEvents: totalEventsStr,
+        patternsFound: patternsFound,
+        logsAnalyzed: logsAnalyzed,
+        totalTime: totalTimeMs
+      });
+    },
     handleColumnSizesUpdate(newColSizes: any) {
       const prevColSizes =
         this.searchObj.data.resultGrid?.colSizes[
@@ -1458,7 +1474,6 @@ export default defineComponent({
       this.noOfRecordsTitle = this.searchObj.data.histogram.chartParams.title;
     },
     updatePatternSummary() {
-    updatePatternSummary() {
       if (this.patternsState?.patterns?.statistics) {
         // Reuse the same summary logic from PatternStatistics component
         const stats = this.patternsState.patterns.statistics;
@@ -1466,12 +1481,11 @@ export default defineComponent({
         const histogramMs = this.searchObj.data.queryResults?.took || 0;
         
         this.patternSummaryText = this.formatPatternSummary(
-          stats, 
-          totalEvents, 
+          stats,
+          totalEvents,
           histogramMs
         );
       }
-    },
     },
     reDrawChartData: {
       deep: true,
