@@ -328,33 +328,21 @@ pub async fn merge_parquet_files_with_downsampling(
     let physical_plan = ctx.state().create_physical_plan(&plan).await?;
     let schema = physical_plan.schema();
 
-    // write result to parquet file
-    let mut bufs = Vec::new();
-    let mut file_metas = Vec::new();
-    let mut min_ts = 0;
-
-    let mut buf = Vec::with_capacity(cfg.compact.max_file_size as usize);
-    let mut file_meta = FileMeta::default();
-    let mut writer = new_parquet_writer(
-        &mut buf,
-        &schema,
-        bloom_filter_fields,
-        &metadata,
-        false,
-        None,
-    );
+    // write result to parquet or vortex file based on config
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
-    let task = tokio::task::spawn(async move {
+
+    // Create a shared channel for streaming batches
+    let (tx, rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
+
+    // Spawn task to read from batch_stream and send to channel
+    let read_task = tokio::task::spawn(async move {
         loop {
             match batch_stream.try_next().await {
-                Ok(None) => {
-                    break;
-                }
+                Ok(None) => break,
                 Ok(Some(batch)) => {
                     if let Err(e) = tx.send(batch).await {
                         log::error!(
-                            "merge_parquet_files_with_downsampling write to channel error: {e}"
+                            "merge_parquet_files_with_downsampling send to channel error: {e}"
                         );
                         return Err(DataFusionError::External(Box::new(e)));
                     }
@@ -367,45 +355,21 @@ pub async fn merge_parquet_files_with_downsampling(
         }
         Ok(())
     });
-    while let Some(batch) = rx.recv().await {
-        if file_meta.max_ts == 0 {
-            file_meta.max_ts = get_max_timestamp(&batch);
-        }
-        file_meta.original_size += batch.get_array_memory_size() as i64;
-        file_meta.records += batch.num_rows() as i64;
-        min_ts = get_min_timestamp(&batch);
-        if file_meta.original_size > cfg.compact.max_file_size as i64 {
-            file_meta.min_ts = min_ts;
-            writer.close().await?;
-            bufs.push(std::mem::take(&mut buf));
-            file_metas.push(file_meta);
 
-            // reset for next file
-            buf.clear();
-            file_meta = FileMeta::default();
-            writer = new_parquet_writer(
-                &mut buf,
-                &schema,
-                bloom_filter_fields,
-                &metadata,
-                false,
-                None,
-            );
+    // Write batches to the appropriate format
+    let (bufs, file_metas) = match cfg.common.file_format {
+        FileFormat::Parquet => {
+            write_downsampled_parquet(rx, &schema, bloom_filter_fields, &metadata, &cfg).await?
         }
-        if let Err(e) = writer.write(&batch).await {
-            log::error!("merge_parquet_files_with_downsampling write Error: {e}");
-            return Err(e.into());
+        FileFormat::Vortex => {
+            write_downsampled_vortex(rx, schema.clone(), cfg.compact.max_file_size as i64).await?
         }
-    }
-    task.await
+    };
+
+    // Wait for read task to complete
+    read_task
+        .await
         .map_err(|e| DataFusionError::External(Box::new(e)))??;
-
-    if file_meta.original_size > 0 {
-        file_meta.min_ts = min_ts;
-        writer.close().await?;
-        bufs.push(std::mem::take(&mut buf));
-        file_metas.push(file_meta);
-    }
 
     log::debug!(
         "merge_parquet_files_with_downsampling took {} ms",
@@ -413,6 +377,153 @@ pub async fn merge_parquet_files_with_downsampling(
     );
 
     Ok(MergeParquetResult::Multiple { bufs, file_metas })
+}
+
+#[cfg(feature = "enterprise")]
+async fn write_downsampled_parquet(
+    mut rx: tokio::sync::mpsc::Receiver<RecordBatch>,
+    schema: &Arc<datafusion::arrow::datatypes::Schema>,
+    bloom_filter_fields: &[String],
+    metadata: &FileMeta,
+    cfg: &config::Config,
+) -> Result<(Vec<Vec<u8>>, Vec<FileMeta>)> {
+    let mut bufs = Vec::new();
+    let mut file_metas = Vec::new();
+
+    let mut buf = Vec::with_capacity(cfg.compact.max_file_size);
+    let mut file_meta = FileMeta::default();
+    let mut writer =
+        new_parquet_writer(&mut buf, schema, bloom_filter_fields, metadata, false, None);
+    let mut last_min_ts = 0;
+
+    while let Some(batch_result) = rx.recv().await {
+        let batch_size = batch_result.get_array_memory_size() as i64;
+        let batch_rows = batch_result.num_rows() as i64;
+
+        // Check if adding this batch would exceed the file size limit
+        let would_exceed_limit = file_meta.records > 0
+            && (file_meta.original_size + batch_size) > cfg.compact.max_file_size as i64;
+
+        if would_exceed_limit {
+            // Close current file before writing the batch that would exceed the limit
+            file_meta.min_ts = last_min_ts;
+            writer.close().await?;
+            bufs.push(std::mem::take(&mut buf));
+            file_metas.push(file_meta);
+
+            // reset for next file
+            buf = Vec::with_capacity(cfg.compact.max_file_size);
+            file_meta = FileMeta::default();
+            writer =
+                new_parquet_writer(&mut buf, schema, bloom_filter_fields, metadata, false, None);
+        }
+
+        // Update metadata for current batch
+        if file_meta.records == 0 {
+            file_meta.max_ts = get_max_timestamp(&batch_result);
+        }
+        file_meta.original_size += batch_size;
+        file_meta.records += batch_rows;
+        last_min_ts = get_min_timestamp(&batch_result);
+
+        // Write batch to current file
+        if let Err(e) = writer.write(&batch_result).await {
+            log::error!("write_downsampled_parquet write error: {e}");
+            return Err(e.into());
+        }
+    }
+
+    // Finalize last file if it has data
+    if file_meta.records > 0 {
+        file_meta.min_ts = last_min_ts;
+        writer.close().await?;
+        bufs.push(buf);
+        file_metas.push(file_meta);
+    }
+
+    Ok((bufs, file_metas))
+}
+
+#[cfg(feature = "enterprise")]
+async fn write_downsampled_vortex(
+    mut rx: tokio::sync::mpsc::Receiver<RecordBatch>,
+    schema: Arc<datafusion::arrow::datatypes::Schema>,
+    max_file_size: i64,
+) -> Result<(Vec<Vec<u8>>, Vec<FileMeta>)> {
+    // Spawn writer task in VORTEX_RUNTIME
+    let writer_task = VORTEX_RUNTIME.spawn_blocking(move || {
+        VORTEX_RUNTIME.block_on(async move {
+            let mut bufs = Vec::new();
+            let mut file_metas = Vec::new();
+
+            let mut buf = Vec::with_capacity(max_file_size as usize);
+            let mut file_meta = FileMeta::default();
+            let mut last_min_ts = 0;
+
+            let session = VortexSession::default().with_tokio();
+            let dtype = DType::from_arrow(schema.as_ref());
+
+            // Helper to create write options - need to recreate for each writer
+            let strategy = WriteStrategyBuilder::new()
+                .with_compressor(Utf8Compressor::default())
+                .build();
+
+            let write_options =
+                VortexWriteOptions::new(session.clone()).with_strategy(strategy.clone());
+            let mut writer = write_options.writer(&mut buf, dtype.clone());
+
+            while let Some(batch_result) = rx.recv().await {
+                let batch_size = batch_result.get_array_memory_size() as i64;
+                let batch_rows = batch_result.num_rows() as i64;
+
+                // Check if adding this batch would exceed the file size limit
+                let would_exceed_limit =
+                    file_meta.records > 0 && (file_meta.original_size + batch_size) > max_file_size;
+
+                if would_exceed_limit {
+                    // Close current file before writing the batch that would exceed the limit
+                    file_meta.min_ts = last_min_ts;
+                    writer.finish().await?;
+                    bufs.push(std::mem::take(&mut buf));
+                    file_metas.push(file_meta);
+
+                    // reset for next file
+                    buf = Vec::with_capacity(max_file_size as usize);
+                    file_meta = FileMeta::default();
+                    let new_write_options =
+                        VortexWriteOptions::new(session.clone()).with_strategy(strategy.clone());
+                    writer = new_write_options.writer(&mut buf, dtype.clone());
+                }
+
+                // Update metadata for current batch
+                if file_meta.records == 0 {
+                    file_meta.max_ts = get_max_timestamp(&batch_result);
+                }
+                file_meta.original_size += batch_size;
+                file_meta.records += batch_rows;
+                last_min_ts = get_min_timestamp(&batch_result);
+
+                // Write batch to current file (convert to Vortex array)
+                let array: ArrayRef = ArrayRef::from_arrow(batch_result, false);
+                writer.push(array).await?;
+            }
+
+            // Finalize last file if it has data
+            if file_meta.records > 0 {
+                file_meta.min_ts = last_min_ts;
+                writer.finish().await?;
+                bufs.push(buf);
+                file_metas.push(file_meta);
+            }
+
+            Ok::<(Vec<Vec<u8>>, Vec<FileMeta>), anyhow::Error>((bufs, file_metas))
+        })
+    });
+
+    writer_task
+        .await
+        .map_err(|e| DataFusionError::Execution(format!("Vortex runtime task failed: {e}")))?
+        .map_err(|e| DataFusionError::Execution(format!("Failed to write vortex file: {e}")))
 }
 
 pub fn create_session_config(
