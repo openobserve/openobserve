@@ -2182,7 +2182,10 @@ async fn handle_backfill_triggers(
                 &job_id,
             )
             .await;
-            return Err(anyhow::anyhow!("Failed to fetch backfill job config: {}", e));
+            return Err(anyhow::anyhow!(
+                "Failed to fetch backfill job config: {}",
+                e
+            ));
         }
     };
 
@@ -2439,7 +2442,7 @@ async fn handle_backfill_triggers(
                         );
                         backfill_job.deletion_status = DeletionStatus::Completed;
                         backfill_job.error = None; // Clear any previous errors
-                        // Continue to backfill phase below
+                    // Continue to backfill phase below
                     } else {
                         // Still in progress, reschedule to check again
                         // Use delay_between_chunks_secs for checking deletion status
@@ -2765,7 +2768,10 @@ async fn initiate_stream_deletion(
 
     // Convert microseconds to formatted time range strings
     let time_range_start = {
-        let ts = Utc.timestamp_micros(start_time).single().ok_or_else(|| anyhow::anyhow!("Invalid start_time"))?;
+        let ts = Utc
+            .timestamp_micros(start_time)
+            .single()
+            .ok_or_else(|| anyhow::anyhow!("Invalid start_time"))?;
         if stream.stream_type == StreamType::Logs {
             ts.format("%Y-%m-%dT%H:00:00Z").to_string()
         } else {
@@ -2773,7 +2779,10 @@ async fn initiate_stream_deletion(
         }
     };
     let time_range_end = {
-        let ts = Utc.timestamp_micros(end_time).single().ok_or_else(|| anyhow::anyhow!("Invalid end_time"))?;
+        let ts = Utc
+            .timestamp_micros(end_time)
+            .single()
+            .ok_or_else(|| anyhow::anyhow!("Invalid end_time"))?;
         if stream.stream_type == StreamType::Logs {
             ts.format("%Y-%m-%dT%H:00:00Z").to_string()
         } else {

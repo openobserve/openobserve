@@ -181,8 +181,7 @@ async fn create_backfill_job_status(
     let chunks_total = (total_duration_minutes as f64 / chunk_period as f64).ceil() as u64;
     let completed_duration_minutes =
         (backfill_job.current_position - config.start_time) / (60 * 1_000_000);
-    let chunks_completed =
-        (completed_duration_minutes as f64 / chunk_period as f64).floor() as u64;
+    let chunks_completed = (completed_duration_minutes as f64 / chunk_period as f64).floor() as u64;
 
     // Determine actual status: if trigger is Completed but job hasn't reached end_time,
     // it's paused
@@ -281,7 +280,6 @@ pub async fn get_backfill_job(
 
     Err(anyhow::anyhow!("Backfill job data not found in trigger"))
 }
-
 
 pub async fn delete_backfill_job(org_id: &str, job_id: &str) -> Result<(), anyhow::Error> {
     // Find the trigger by job_id

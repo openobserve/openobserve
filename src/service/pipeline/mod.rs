@@ -254,9 +254,11 @@ pub async fn delete_pipeline(pipeline_id: &str) -> Result<(), PipelineError> {
     }
 
     // Delete all backfill jobs associated with this pipeline
-    if let Err(error) =
-        super::alerts::backfill::delete_backfill_jobs_by_pipeline(&existing_pipeline.org, pipeline_id)
-            .await
+    if let Err(error) = super::alerts::backfill::delete_backfill_jobs_by_pipeline(
+        &existing_pipeline.org,
+        pipeline_id,
+    )
+    .await
     {
         log::error!(
             "[PIPELINE] Failed to delete backfill jobs for pipeline {}: {}",
