@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="onUpdateValue"
       @keydown="handleKeydown"
       ref="selectRef"
-     >
+    >
       <template v-slot:no-option>
         <template v-if="filterText">
           <q-item clickable @click="handleCustomValue(filterText)">
@@ -129,7 +129,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { SELECT_ALL_VALUE, CUSTOM_VALUE } from "@/utils/dashboard/constants";
 import { debounce } from "lodash-es";
-import { defineComponent, ref, watch, computed, nextTick, onUnmounted } from "vue";
+import {
+  defineComponent,
+  ref,
+  watch,
+  computed,
+  nextTick,
+  onUnmounted,
+} from "vue";
 
 export default defineComponent({
   name: "VariableQueryValueSelector",
@@ -168,7 +175,7 @@ export default defineComponent({
     // set debouced filterText value that can trigger search
     const searchText = ref("");
     const updateSearch = debounce((val: string) => {
-        searchText.value = val;
+      searchText.value = val;
     }, 500);
 
     // --- Typeahead debounce and emit search event ---
@@ -184,8 +191,8 @@ export default defineComponent({
     watch(
       () => searchText.value,
       (newVal) => {
-        if(newVal == null || newVal == undefined) {
-          return
+        if (newVal == null || newVal == undefined) {
+          return;
         }
 
         // no need to update results if the menu is hidden
@@ -311,7 +318,15 @@ export default defineComponent({
               .join(", ");
           }
         } else if (selectedValue.value === "") {
-          return "<blank>";
+          // Only display <blank> if an actual option with empty-string value exists
+          if (
+            props.variableItem.options &&
+            props.variableItem.options.some((o: any) => o.value === "")
+          ) {
+            return "<blank>";
+          }
+          // Otherwise treat empty-string as unset
+          return "(No Data Found)";
         } else if (selectedValue.value === SELECT_ALL_VALUE) {
           return "<ALL>";
         } else if (
