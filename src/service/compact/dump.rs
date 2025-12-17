@@ -22,14 +22,17 @@ use arrow::{
 use arrow_schema::Schema;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
-    PARQUET_BATCH_SIZE, PARQUET_MAX_ROW_GROUP_SIZE,
+    FileFormat, PARQUET_BATCH_SIZE, PARQUET_MAX_ROW_GROUP_SIZE,
     cluster::LOCAL_NODE,
     get_config, get_parquet_compression,
     meta::{
         cluster::Role,
         stream::{FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
     },
-    utils::time::{BASE_TIME, get_ymdh_from_micros, hour_micros, now, now_micros},
+    utils::{
+        parquet::get_recordbatch_reader_from_bytes,
+        time::{BASE_TIME, get_ymdh_from_micros, hour_micros, now, now_micros},
+    },
 };
 use futures::StreamExt;
 use infra::{
@@ -753,10 +756,10 @@ async fn calculate_dump_file_stats(account: &str, file_key: &str) -> Result<Stre
         .map_err(|e| format!("failed to read dump file from storage: {e}"))?;
 
     // Parse the parquet file to get FileRecord list
-    let mut reader = config::utils::parquet::get_recordbatch_reader_from_bytes(&file_data)
+    let file_format = FileFormat::from_extension(file_key).unwrap_or(FileFormat::Parquet);
+    let (_, mut reader) = get_recordbatch_reader_from_bytes(file_format, &file_data)
         .await
-        .map_err(|e| format!("failed to parse dump file as parquet: {e}"))?
-        .1;
+        .map_err(|e| format!("failed to parse dump file as parquet: {e}"))?;
 
     // Calculate stats from all FileRecords in the dump file
     let mut stats = StreamStats {
