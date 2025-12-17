@@ -30,7 +30,8 @@ export default mergeConfig(
       dangerouslyIgnoreUnhandledErrors: true,
       coverage: {
         reporter: ["text", "json", "html", "json-summary"],
-        all: true,
+        // Vitest v4: 'all' option removed, use 'include' instead
+        include: ["src/**/*.{js,ts,vue,jsx,tsx}"],
         thresholds: {
           lines: 27,
           functions: 27,
