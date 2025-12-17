@@ -60,7 +60,6 @@ use datafusion::{
     prelude::{SessionContext, col},
 };
 use futures::TryStreamExt;
-use parquet::{arrow::AsyncArrowWriter, file::metadata::KeyValue};
 use vortex::{
     VortexSessionDefault,
     array::{ArrayRef, arrow::FromArrowArray},
@@ -128,7 +127,7 @@ pub async fn merge_parquet_files(
                 tables,
                 bloom_filter_fields,
                 rule,
-                metadata,
+                &metadata,
             )
             .await;
         }
@@ -303,7 +302,7 @@ pub async fn merge_parquet_files_with_downsampling(
     bloom_filter_fields: &[String],
     rule: &DownsamplingRule,
     metadata: &FileMeta,
-) -> Result<(Arc<Schema>, MergeParquetResult)> {
+) -> Result<MergeParquetResult> {
     let start = std::time::Instant::now();
     let cfg = get_config();
     let mut metadata = metadata.clone();
@@ -377,7 +376,6 @@ pub async fn merge_parquet_files_with_downsampling(
         min_ts = get_min_timestamp(&batch);
         if file_meta.original_size > cfg.compact.max_file_size as i64 {
             file_meta.min_ts = min_ts;
-            append_metadata(&mut writer, &file_meta)?;
             writer.close().await?;
             bufs.push(std::mem::take(&mut buf));
             file_metas.push(file_meta);
@@ -404,45 +402,17 @@ pub async fn merge_parquet_files_with_downsampling(
 
     if file_meta.original_size > 0 {
         file_meta.min_ts = min_ts;
-        append_metadata(&mut writer, &file_meta)?;
         writer.close().await?;
         bufs.push(std::mem::take(&mut buf));
         file_metas.push(file_meta);
     }
-
-    ctx.deregister_table("tbl")?;
-    drop(ctx);
 
     log::debug!(
         "merge_parquet_files_with_downsampling took {} ms",
         start.elapsed().as_millis()
     );
 
-    Ok((schema, MergeParquetResult::Multiple { bufs, file_metas }))
-}
-
-#[allow(dead_code)]
-fn append_metadata(
-    writer: &mut AsyncArrowWriter<&mut Vec<u8>>,
-    file_meta: &FileMeta,
-) -> Result<()> {
-    writer.append_key_value_metadata(KeyValue::new(
-        "min_ts".to_string(),
-        file_meta.min_ts.to_string(),
-    ));
-    writer.append_key_value_metadata(KeyValue::new(
-        "max_ts".to_string(),
-        file_meta.max_ts.to_string(),
-    ));
-    writer.append_key_value_metadata(KeyValue::new(
-        "records".to_string(),
-        file_meta.records.to_string(),
-    ));
-    writer.append_key_value_metadata(KeyValue::new(
-        "original_size".to_string(),
-        file_meta.original_size.to_string(),
-    ));
-    Ok(())
+    Ok(MergeParquetResult::Multiple { bufs, file_metas })
 }
 
 pub fn create_session_config(
@@ -1099,27 +1069,6 @@ mod tests {
         assert_eq!(min_ts, 3000); // last row in timestamp column
     }
 
-    #[test]
-    fn test_append_metadata() -> Result<()> {
-        let mut buf = Vec::new();
-        let schema = create_test_schema();
-        let mut writer = AsyncArrowWriter::try_new(&mut buf, schema, None)?;
-
-        let file_meta = FileMeta {
-            min_ts: 1000,
-            max_ts: 2000,
-            records: 100,
-            original_size: 1024,
-            compressed_size: 512,
-            flattened: false,
-            index_size: 0,
-        };
-
-        let result = append_metadata(&mut writer, &file_meta);
-        assert!(result.is_ok());
-        Ok(())
-    }
-
     #[tokio::test]
     async fn test_create_session_config_default() -> Result<()> {
         let config = create_session_config(false, 0)?;
@@ -1345,31 +1294,6 @@ mod tests {
         assert!(result.is_ok() || result.is_err());
     }
 
-    #[tokio::test]
-    async fn test_append_metadata_values() -> Result<()> {
-        let mut buf = Vec::new();
-        let schema = create_test_schema();
-        let mut writer = AsyncArrowWriter::try_new(&mut buf, schema, None)?;
-
-        let file_meta = FileMeta {
-            min_ts: 1000,
-            max_ts: 2000,
-            records: 100,
-            original_size: 1024,
-            compressed_size: 512,
-            flattened: false,
-            index_size: 0,
-        };
-
-        append_metadata(&mut writer, &file_meta)?;
-
-        // Verify the writer has the metadata (indirectly by checking no errors)
-        let result = writer.close().await;
-        assert!(result.is_ok());
-
-        Ok(())
-    }
-
     mod integration_tests {
         use config::meta::{
             search::{Session as SearchSession, StorageType},
@@ -1456,19 +1380,6 @@ mod tests {
             let memory_limit = 1024 * 1024 * 256;
             let result = create_runtime_env("test", memory_limit).await;
             assert!(result.is_ok()); // Should handle gracefully
-        }
-
-        #[test]
-        fn test_append_metadata_with_defaults() -> Result<()> {
-            let mut buf = Vec::new();
-            let schema = create_test_schema();
-            let mut writer = AsyncArrowWriter::try_new(&mut buf, schema, None)?;
-
-            let file_meta = FileMeta::default();
-            let result = append_metadata(&mut writer, &file_meta);
-            assert!(result.is_ok());
-
-            Ok(())
         }
 
         #[tokio::test]

@@ -910,8 +910,7 @@ pub async fn merge_files(
                         .await
                 {
                     log::warn!(
-                        "[COMPACTOR] Failed to process service streams for {org_id}/{stream_type}/{stream_name}: {}",
-                        e
+                        "[COMPACTOR] Failed to process service streams for {org_id}/{stream_type}/{stream_name}: {e}",
                     );
                 }
             }
@@ -1348,7 +1347,7 @@ async fn process_service_streams_from_parquet(
     parquet_result: &exec::MergeParquetResult,
 ) -> Result<(), anyhow::Error> {
     let parquet_bytes = match parquet_result {
-        exec::MergeParquetResult::Single(buf) => buf,
+        exec::MergeParquetResult::Single(buf, _file_meta) => buf,
         exec::MergeParquetResult::Multiple { bufs, .. } => {
             // For multiple files, process each one
             for buf in bufs {
