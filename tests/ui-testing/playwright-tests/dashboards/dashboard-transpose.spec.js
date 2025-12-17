@@ -352,7 +352,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.searchAndAddField("xAxis", "y");
     
     // Set relative time range  
-     await pm.dashboardTimeRefresh.setRelative("6", "w");    
+     await pm.dashboardTimeRefresh.setRelative("30", "m");    
 
     await pm.dashboardPanelActions.waitForChartToRender();
 
