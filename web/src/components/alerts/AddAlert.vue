@@ -806,7 +806,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Hidden ScheduledAlert for Editor Dialog Access -->
     <scheduled-alert
-      v-show="false"
+      v-if="false"
       ref="scheduledAlertRef"
       :columns="filteredColumns"
       :streamFieldsMap="streamFieldsMap"
