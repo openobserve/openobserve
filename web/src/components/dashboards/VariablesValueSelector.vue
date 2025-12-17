@@ -448,13 +448,12 @@ export default defineComponent({
             // Process the first response
             // Filter out only undefined values (keep null and empty strings)
             const newOptions = fieldHit.values
-              .filter((value: any) =>
-                value.zo_sql_key !== undefined &&
-                value.zo_sql_key !== null &&
-                value.zo_sql_key !== ""
-              )
+              .filter((value: any) => value.zo_sql_key !== undefined)
               .map((value: any) => ({
-                label: value.zo_sql_key.toString(),
+                label:
+                  value.zo_sql_key !== ""
+                    ? value.zo_sql_key.toString()
+                    : "<blank>",
                 value: value.zo_sql_key.toString(),
               }));
             // For first response or subsequent responses, merge with existing options and keep selected values

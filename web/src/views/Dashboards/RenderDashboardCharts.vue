@@ -102,6 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :variablesConfig="{ list: getPanelVariables(panels[0].id) }"
             :variablesManager="variablesManager"
             :selectedTimeDate="currentTimeObj['__global']"
+            :initialVariableValues="initialVariableValues"
             data-test="panel-variables-selector"
           />
 
