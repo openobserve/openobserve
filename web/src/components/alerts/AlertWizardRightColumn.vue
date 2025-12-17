@@ -22,7 +22,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="collapsible-section card-container"
       :style="previewSectionStyle"
     >
-      <div class="section-header tw-flex tw-items-center tw-justify-between tw-px-4 tw-py-3">
+      <div
+        class="section-header tw-flex tw-items-center tw-justify-between tw-px-4 tw-py-3 tw-cursor-pointer"
+        @click="togglePreview"
+      >
         <span class="tw-text-sm tw-font-semibold">Preview</span>
         <q-btn
           flat
@@ -30,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           round
           size="xs"
           :icon="expandState.preview ? 'expand_less' : 'expand_more'"
-          @click="togglePreview"
+          @click.stop
           class="expand-toggle-btn"
         />
       </div>
@@ -51,7 +54,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="collapsible-section card-container"
       :style="summarySectionStyle"
     >
-      <div class="section-header tw-flex tw-items-center tw-justify-between tw-px-4 tw-py-3">
+      <div
+        class="section-header tw-flex tw-items-center tw-justify-between tw-px-4 tw-py-3 tw-cursor-pointer"
+        @click="toggleSummary"
+      >
         <span class="tw-text-sm tw-font-semibold">Summary</span>
         <q-btn
           flat
@@ -59,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           round
           size="xs"
           :icon="expandState.summary ? 'expand_less' : 'expand_more'"
-          @click="toggleSummary"
+          @click.stop
           class="expand-toggle-btn"
         />
       </div>
@@ -250,9 +256,14 @@ export default defineComponent({
     border-bottom: 1px solid rgba(0, 0, 0, 0.08);
     transition: all 0.2s ease;
     border-radius: 0.375rem 0.375rem 0 0;
+    user-select: none;
 
     &:hover {
-      background: rgba(0, 0, 0, 0.02);
+      background: rgba(0, 0, 0, 0.04);
+    }
+
+    &:active {
+      background: rgba(0, 0, 0, 0.06);
     }
   }
 

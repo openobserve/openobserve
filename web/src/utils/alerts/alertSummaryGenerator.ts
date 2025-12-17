@@ -111,8 +111,8 @@ export function generateAlertSummary(formData: any, destinations: any[], t?: (ke
     }
   }
 
-  // Step 3+: Show alert settings (threshold, period, frequency, cooldown, destinations)
-  if (wizardStep >= 3) {
+  // Step 4+: Show alert settings (threshold, period, frequency, cooldown, destinations)
+  if (wizardStep >= 4) {
     if (isRealTime) {
       // Real-time alert summary
       parts.push(`✓ ${translate('alerts.summary.triggersWhen')}: ${clickable(translate('alerts.summary.queryConditions'), 'conditions')} ${translate('alerts.summary.areMet')}`);
@@ -153,8 +153,8 @@ export function generateAlertSummary(formData: any, destinations: any[], t?: (ke
     }
   }
 
-  // Add plain English summary (only from step 3 onwards)
-  if (wizardStep >= 3) {
+  // Add plain English summary (only from step 4 onwards)
+  if (wizardStep >= 4) {
     const plainEnglish = generatePlainEnglishSummary(formData, destinations, isRealTime, translate);
     if (plainEnglish) {
       parts.push('');

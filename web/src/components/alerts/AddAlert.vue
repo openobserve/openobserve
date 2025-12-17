@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Step 2: Query Configuration -->
         <q-step
           :name="2"
-          title="Query"
+          title="Conditions"
           caption=""
           icon="search"
           :done="wizardStep > 2"
@@ -200,31 +200,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </q-step>
 
-        <!-- Step 3: Alert Settings -->
+        <!-- Step 3: Compare with Past (Scheduled only) -->
         <q-step
+          v-if="formData.is_real_time === 'false'"
           :name="3"
-          title="Alert Settings"
+          title="Compare with Past"
           caption=""
-          icon="tune"
+          icon="compare_arrows"
           :done="wizardStep > 3"
         >
           <!-- 70/30 Split Layout with Equal Heights -->
           <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
             <!-- Left Column: Step Content (70%) -->
-            <div class="tw-flex-[0_0_68%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
+            <div class="tw-flex-[0_0_68%] tw-flex tw-flex-col" style="height: 100%; overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
-                <AlertSettings
-                  :formData="formData"
-                  :isRealTime="formData.is_real_time"
-                  :columns="filteredColumns"
-                  :isAggregationEnabled="isAggregationEnabled"
-                  :destinations="formData.destinations"
-                  :formattedDestinations="getFormattedDestinations"
-                  @update:trigger="(val) => formData.trigger_condition = val"
-                  @update:aggregation="(val) => formData.query_condition.aggregation = val"
-                  @update:isAggregationEnabled="(val) => isAggregationEnabled = val"
-                  @update:destinations="updateDestinations"
-                  @refresh:destinations="refreshDestinations"
+                <CompareWithPast
+                  :multiTimeRange="formData.query_condition.multi_time_range"
+                  :period="formData.trigger_condition.period"
+                  :frequency="formData.trigger_condition.frequency"
+                  :frequencyType="formData.trigger_condition.frequency_type"
+                  :cron="formData.trigger_condition.cron"
+                  @update:multiTimeRange="(val) => formData.query_condition.multi_time_range = val"
                 />
               </div>
 
@@ -244,27 +240,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </q-step>
 
-        <!-- Step 4: Compare with Past (Scheduled only) -->
+        <!-- Step 4: Alert Settings -->
         <q-step
-          v-if="formData.is_real_time === 'false'"
           :name="4"
-          title="Compare with Past"
+          title="Alert Settings"
           caption=""
-          icon="compare_arrows"
+          icon="tune"
           :done="wizardStep > 4"
         >
           <!-- 70/30 Split Layout with Equal Heights -->
           <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
             <!-- Left Column: Step Content (70%) -->
-            <div class="tw-flex-[0_0_68%] tw-flex tw-flex-col" style="height: 100%; overflow: hidden;">
+            <div class="tw-flex-[0_0_68%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
-                <CompareWithPast
-                  :multiTimeRange="formData.query_condition.multi_time_range"
-                  :period="formData.trigger_condition.period"
-                  :frequency="formData.trigger_condition.frequency"
-                  :frequencyType="formData.trigger_condition.frequency_type"
-                  :cron="formData.trigger_condition.cron"
-                  @update:multiTimeRange="(val) => formData.query_condition.multi_time_range = val"
+                <AlertSettings
+                  :formData="formData"
+                  :isRealTime="formData.is_real_time"
+                  :columns="filteredColumns"
+                  :isAggregationEnabled="isAggregationEnabled"
+                  :destinations="formData.destinations"
+                  :formattedDestinations="getFormattedDestinations"
+                  @update:trigger="(val) => formData.trigger_condition = val"
+                  @update:aggregation="(val) => formData.query_condition.aggregation = val"
+                  @update:isAggregationEnabled="(val) => isAggregationEnabled = val"
+                  @update:destinations="updateDestinations"
+                  @refresh:destinations="refreshDestinations"
                 />
               </div>
 
@@ -1673,6 +1673,12 @@ export default defineComponent({
       formData.value.destinations = destinations;
     }
 
+    const updateTab = (tab: string) => {
+      if (scheduledAlertRef.value) {
+        scheduledAlertRef.value.tab = tab;
+      }
+    }
+
 
 // Method to handle the emitted changes and update the structure
   const updateGroup = (updatedGroup: any) => {
@@ -1989,8 +1995,10 @@ export default defineComponent({
     // Wizard step navigation logic
     const goToNextStep = () => {
       if (formData.value.is_real_time === 'true') {
-        // For real-time alerts: 1 -> 2 -> 3 -> 6 (skip 4 and 5)
-        if (wizardStep.value === 3) {
+        // For real-time alerts: 1 -> 2 -> 4 -> 6 (skip 3 and 5)
+        if (wizardStep.value === 2) {
+          wizardStep.value = 4;
+        } else if (wizardStep.value === 4) {
           wizardStep.value = 6;
         } else {
           wizardStep.value = wizardStep.value + 1;
@@ -2003,9 +2011,11 @@ export default defineComponent({
 
     const goToPreviousStep = () => {
       if (formData.value.is_real_time === 'true') {
-        // For real-time alerts: 6 -> 3 -> 2 -> 1 (skip 5 and 4)
+        // For real-time alerts: 6 -> 4 -> 2 -> 1 (skip 5 and 3)
         if (wizardStep.value === 6) {
-          wizardStep.value = 3;
+          wizardStep.value = 4;
+        } else if (wizardStep.value === 4) {
+          wizardStep.value = 2;
         } else {
           wizardStep.value = wizardStep.value - 1;
         }
@@ -2099,6 +2109,7 @@ export default defineComponent({
       updateSilence,
       refreshDestinations,
       updateDestinations,
+      updateTab,
       updateGroup,
       removeConditionGroup,
       transformFEToBE,
