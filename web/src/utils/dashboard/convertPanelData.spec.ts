@@ -119,7 +119,8 @@ describe("convertPanelData", () => {
           mockStore,
           mockChartPanelRef,
           mockHoveredSeriesState,
-          mockAnnotations
+          mockAnnotations,
+          mockMetadata
         );
         expect(result.chartType).toBe(type);
       });
