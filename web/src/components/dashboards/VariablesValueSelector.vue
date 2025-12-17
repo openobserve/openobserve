@@ -1834,13 +1834,16 @@ export default defineComponent({
                 ? validOldValues
                 : validOldValues[0];
             } else {
-              // If no valid old values, use first option
+              // If no valid old values, use first non-blank option
+              const firstNonBlank = newOptions.find(
+                (opt: any) => opt.value !== "" && opt.label !== "<blank>"
+              );
               variableObject.value = variableObject.multiSelect
-                ? newOptions.length > 0
-                  ? [newOptions[0].value]
+                ? firstNonBlank
+                  ? [firstNonBlank.value]
                   : []
-                : newOptions.length > 0
-                  ? newOptions[0].value
+                : firstNonBlank
+                  ? firstNonBlank.value
                   : null;
             }
           } else {
@@ -1852,13 +1855,16 @@ export default defineComponent({
             }
           }
         } else {
-          // Set default value to the first option if no old values are available
+          // Set default value to the first non-blank option if no old values are available
+          const firstNonBlank = newOptions.find(
+            (opt: any) => opt.value !== "" && opt.label !== "<blank>"
+          );
           variableObject.value = variableObject.multiSelect
-            ? newOptions.length > 0
-              ? [newOptions[0].value]
+            ? firstNonBlank
+              ? [firstNonBlank.value]
               : []
-            : newOptions.length > 0
-              ? newOptions[0].value
+            : firstNonBlank
+              ? firstNonBlank.value
               : null;
         }
       } else {
@@ -1995,75 +2001,16 @@ export default defineComponent({
       console.log("variableObject", variableObject);
 
       // If options already loaded and variable is partially loaded, skip fetching on open
-      if (
-        variableObject.options &&
-        variableObject.options.length > 0 &&
-        variableObject.isVariablePartialLoaded
-      ) {
-        variableLog(
-          variableObject.name,
-          "Options already loaded - skipping fetch on dropdown open",
-        );
-        return;
-      }
 
-      // If using manager, delegate to manager
-      if (useManager && manager) {
-        try {
-          const variableKey = manager.getVariableKey
-            ? manager.getVariableKey(
-                variableObject.name,
-                props.scope,
-                props.tabId,
-                props.panelId,
-              )
-            : `${variableObject.name}@${props.scope}${props.tabId ? `@${props.tabId}` : ""}${props.panelId ? `@${props.panelId}` : ""}`;
-
-          // Only trigger manager load if the variable is not partially loaded
-          const mgrVar = manager.getVariable(
-            variableObject.name,
-            props.scope,
-            props.tabId,
-            props.panelId,
-          );
-          if (
-            mgrVar &&
-            mgrVar.isVariablePartialLoaded &&
-            Array.isArray(mgrVar.options) &&
-            mgrVar.options.length > 0
-          ) {
-            variableLog(
-              variableObject.name,
-              "Manager reports options already loaded - skipping manager load on open",
-            );
-            return;
-          }
-
-          await manager.loadSingleVariable(variableKey);
-          return;
-        } catch (error) {
-          console.error("Error loading variable via manager:", error);
-          // Fall through to legacy behavior on error
-        }
-      }
-
-      // Legacy behavior: Check if there's already a loading request in progress
+      // Check if there's already a loading request in progress
       if (variableObject.isLoading) {
         return;
       }
+
       try {
-        // When a dropdown is opened, only load the variable data if it's not already partially loaded
-        if (
-          !variableObject.isVariablePartialLoaded ||
-          (variableObject.options || []).length === 0
-        ) {
+        
+
           await loadSingleVariableDataByName(variableObject);
-        } else {
-          variableLog(
-            variableObject.name,
-            "Legacy mode: options already present - skipping fetch on dropdown open",
-          );
-        }
       } catch (error) {
         variableLog(
           variableObject.name,
