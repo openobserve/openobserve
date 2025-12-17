@@ -1024,7 +1024,7 @@ async fn condition_item_to_sql(
     }
 }
 
-async fn build_sql(
+pub async fn build_sql(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,

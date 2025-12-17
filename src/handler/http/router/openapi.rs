@@ -130,6 +130,7 @@ use crate::{common::meta, handler::http::request};
         request::alerts::enable_alert,
         request::alerts::enable_alert_bulk,
         request::alerts::trigger_alert,
+        request::alerts::generate_sql,
         request::alerts::move_alerts,
         request::alerts::history::get_alert_history,
         request::alerts::templates::list_templates,
