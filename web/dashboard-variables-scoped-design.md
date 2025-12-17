@@ -1,6 +1,7 @@
 # Dashboard Variables - Scoped Implementation Design Specification
 
 ## Table of Contents
+
 1. [Executive Summary](#executive-summary)
 2. [Current \_\_global Mechanism (Foundation)](#current-__global-mechanism-foundation)
 3. [Current State vs New State](#current-state-vs-new-state)
@@ -57,11 +58,13 @@ The current system uses a **two-tier variable propagation mechanism** called `__
 ### The Problem It Solves
 
 Without the `__global` mechanism:
+
 - Every variable change would immediately trigger panel queries (expensive!)
 - Users changing 5 variables = 5 separate panel reloads
 - Network overload and poor UX
 
 With the `__global` mechanism:
+
 - Variable changes update UI immediately but don't trigger panels
 - User clicks "Refresh" once to apply all changes
 - One batch reload for all variable changes
@@ -70,10 +73,10 @@ With the `__global` mechanism:
 
 ```typescript
 // Current implementation in RenderDashboardCharts.vue
-const variablesData = ref({});                // LIVE: Updates immediately
+const variablesData = ref({}); // LIVE: Updates immediately
 const currentVariablesDataRef = ref({
-  __global: {},                               // COMMITTED: Used by panels
-  "panel-123": {},                            // Panel-specific override (optional)
+  __global: {}, // COMMITTED: Used by panels
+  "panel-123": {}, // Panel-specific override (optional)
 });
 ```
 
@@ -86,8 +89,8 @@ const currentVariablesDataRef = ref({
 ```typescript
 // User selects region: "US" → "EU"
 variablesData.value = {
-  values: [{ name: "region", value: "EU" }]  // ← Updates instantly
-}
+  values: [{ name: "region", value: "EU" }], // ← Updates instantly
+};
 ```
 
 #### State 2: Committed Variables (`currentVariablesDataRef`)
@@ -99,13 +102,13 @@ variablesData.value = {
 ```typescript
 // Initially
 currentVariablesDataRef.value = {
-  __global: { values: [{ name: "region", value: "US" }] }
-}
+  __global: { values: [{ name: "region", value: "US" }] },
+};
 
 // After user clicks Dashboard Refresh
 currentVariablesDataRef.value = {
-  __global: { values: [{ name: "region", value: "EU" }] }  // ← Now updated
-}
+  __global: { values: [{ name: "region", value: "EU" }] }, // ← Now updated
+};
 ```
 
 ### How Panels Receive Variables
@@ -114,12 +117,15 @@ currentVariablesDataRef.value = {
 
 ```vue
 <PanelContainer
-  :variablesData="currentVariablesDataRef?.[panelId] || currentVariablesDataRef.__global"
+  :variablesData="
+    currentVariablesDataRef?.[panelId] || currentVariablesDataRef.__global
+  "
   :currentVariablesData="variablesData"
 />
 ```
 
 **Resolution Order**:
+
 1. Check panel-specific override: `currentVariablesDataRef[panelId]`
 2. Fallback to global: `currentVariablesDataRef.__global`
 3. Compare with live: `variablesData` (for change detection)
@@ -141,6 +147,7 @@ watch(
 ```
 
 **Effect**:
+
 - Commits live variables to `__global`
 - **Removes** all panel-specific entries
 - All panels reload with new values
@@ -160,6 +167,7 @@ const refreshPanelRequest = (panelId) => {
 ```
 
 **Effect**:
+
 - Adds `[panelId]` entry with current values
 - Keeps `__global` unchanged
 - Only specified panel reloads
@@ -230,6 +238,7 @@ const scopedVariables = {
 ### Reference Documentation
 
 For complete details on the current `__global` mechanism, see:
+
 - [design-variables.md - Section 2](design-variables.md#the-__global-mechanism-critical-concept)
 
 ---
@@ -254,6 +263,7 @@ Panel C: country = "USA", region = ["CA", "NY"]
 ```
 
 **Characteristics**:
+
 - One `VariablesValueSelector` component manages all variables
 - All variables load on dashboard mount
 - All panels share the same variable values
@@ -269,18 +279,18 @@ Panel C: country = "USA", region = ["CA", "NY"]
   ],
   tabs: {
     "tab-1": [
-      { name: "region", value: ["CA"], scope: "tab", tabId: "tab-1", ... }
+      { name: "region", value: ["CA"], scope: "tabs", tabId: "tab-1", ... }
     ],
     "tab-2": [
-      { name: "region", value: ["NY"], scope: "tab", tabId: "tab-2", ... }
+      { name: "region", value: ["NY"], scope: "tabs", tabId: "tab-2", ... }
     ]
   },
   panels: {
     "panel-1": [
-      { name: "city", value: "LA", scope: "panel", panelId: "panel-1", ... }
+      { name: "city", value: "LA", scope: "panels", panelId: "panel-1", ... }
     ],
     "panel-2": [
-      { name: "city", value: "NYC", scope: "panel", panelId: "panel-2", ... }
+      { name: "city", value: "NYC", scope: "panels", panelId: "panel-2", ... }
     ]
   }
 }
@@ -294,6 +304,7 @@ Tab 2: country = "USA", region = ["NY"]
 ```
 
 **Characteristics**:
+
 - Multiple `VariablesValueSelector` instances (global, per-tab, per-panel)
 - Centralized composable manages all variable state
 - Variables load lazily based on visibility
@@ -329,7 +340,7 @@ Tab 2: country = "USA", region = ["NY"]
 │  │                    Tab Container                               │   │
 │  │  ┌────────────────────────────────────────────────────────┐  │   │
 │  │  │  Tab 1 VariablesValueSelector                          │  │   │
-│  │  │  scope: "tab", tabId: "tab-1"                          │  │   │
+│  │  │  scope: "tabs", tabId: "tab-1"                          │  │   │
 │  │  │  • Loads when tab becomes active                       │  │   │
 │  │  │  • Displays tab-1 scoped variables                     │  │   │
 │  │  └────────────────────────────────────────────────────────┘  │   │
@@ -338,7 +349,7 @@ Tab 2: country = "USA", region = ["NY"]
 │  │  │  Panel A Container                                      │  │   │
 │  │  │  ┌──────────────────────────────────────────────────┐  │  │   │
 │  │  │  │  Panel VariablesValueSelector                    │  │  │   │
-│  │  │  │  scope: "panel", panelId: "panel-a"              │  │  │   │
+│  │  │  │  scope: "panels", panelId: "panel-a"              │  │  │   │
 │  │  │  │  • Loads when panel visible                      │  │  │   │
 │  │  │  │  • Displays panel-a scoped variables             │  │  │   │
 │  │  │  └──────────────────────────────────────────────────┘  │  │   │
@@ -355,13 +366,13 @@ Tab 2: country = "USA", region = ["NY"]
 
 ### Component Responsibilities
 
-| Component | Current | New |
-|-----------|---------|-----|
-| **ViewDashboard** | Pass config to VariablesValueSelector | Host `useVariablesManager()` composable, coordinate multiple selectors |
-| **VariablesValueSelector** | Single instance, manages all loading | Multiple instances, each manages its scope, uses composable for state |
-| **RenderDashboardCharts** | Distribute variables to panels | Same, but now merges variables from multiple scopes |
-| **PanelContainer** | Receive variables, detect changes | Same, but receives merged variables from global+tab+panel |
-| **useVariablesManager()** | N/A (new) | Centralized state management, loading orchestration, dependency resolution |
+| Component                  | Current                               | New                                                                        |
+| -------------------------- | ------------------------------------- | -------------------------------------------------------------------------- |
+| **ViewDashboard**          | Pass config to VariablesValueSelector | Host `useVariablesManager()` composable, coordinate multiple selectors     |
+| **VariablesValueSelector** | Single instance, manages all loading  | Multiple instances, each manages its scope, uses composable for state      |
+| **RenderDashboardCharts**  | Distribute variables to panels        | Same, but now merges variables from multiple scopes                        |
+| **PanelContainer**         | Receive variables, detect changes     | Same, but receives merged variables from global+tab+panel                  |
+| **useVariablesManager()**  | N/A (new)                             | Centralized state management, loading orchestration, dependency resolution |
 
 ---
 
@@ -372,12 +383,14 @@ Tab 2: country = "USA", region = ["NY"]
 **Definition**: Variables visible and shared across the entire dashboard.
 
 **Characteristics**:
+
 - Loaded immediately when dashboard mounts
 - All tabs and panels can access global variables
 - Single instance with one value
 - Highest priority in visibility hierarchy
 
 **Configuration**:
+
 ```typescript
 {
   name: "country",
@@ -388,6 +401,7 @@ Tab 2: country = "USA", region = ["NY"]
 ```
 
 **Use Cases**:
+
 - Organization/tenant filters
 - Date range filters shared across all views
 - Environment selection (prod/staging/dev)
@@ -397,6 +411,7 @@ Tab 2: country = "USA", region = ["NY"]
 **Definition**: Variables scoped to specific tabs, each tab maintains independent values.
 
 **Characteristics**:
+
 - Each tab has its own instance of the variable
 - Loaded when tab becomes active (lazy loading)
 - Independent values per tab
@@ -404,11 +419,12 @@ Tab 2: country = "USA", region = ["NY"]
 - All panels within the tab see the tab's variable value
 
 **Configuration**:
+
 ```typescript
 {
   name: "region",
   type: "query_values",
-  scope: "tab",
+  scope: "tabs",
   tabs: ["tab-1", "tab-2"], // Which tabs this variable appears in
   query_data: {
     filter: [
@@ -419,27 +435,29 @@ Tab 2: country = "USA", region = ["NY"]
 ```
 
 **Internal Representation** (after expansion):
+
 ```typescript
 // Creates separate instances for each tab
 [
   {
     name: "region",
-    scope: "tab",
+    scope: "tabs",
     tabId: "tab-1",
     value: ["CA", "OR"],
     // ... other state
   },
   {
     name: "region",
-    scope: "tab",
+    scope: "tabs",
     tabId: "tab-2",
     value: ["NY", "NJ"],
     // ... other state
-  }
-]
+  },
+];
 ```
 
 **Use Cases**:
+
 - Different service filters per monitoring tab
 - Different customer segments per analytics tab
 - Independent query contexts per tab
@@ -449,6 +467,7 @@ Tab 2: country = "USA", region = ["NY"]
 **Definition**: Variables scoped to specific panels, each panel maintains independent values.
 
 **Characteristics**:
+
 - Each panel has its own instance of the variable
 - Loaded when panel becomes visible (lazy loading + intersection observer)
 - Independent values per panel
@@ -456,37 +475,40 @@ Tab 2: country = "USA", region = ["NY"]
 - Only the specific panel sees this variable
 
 **Configuration**:
+
 ```typescript
 {
   name: "status",
   type: "custom",
-  scope: "panel",
+  scope: "panels",
   panels: ["panel-1", "panel-2"], // Which panels this variable appears in
   value: ["200", "404", "500"]
 }
 ```
 
 **Internal Representation** (after expansion):
+
 ```typescript
 [
   {
     name: "status",
-    scope: "panel",
+    scope: "panels",
     panelId: "panel-1",
     value: ["200"],
     // ... other state
   },
   {
     name: "status",
-    scope: "panel",
+    scope: "panels",
     panelId: "panel-2",
     value: ["404", "500"],
     // ... other state
-  }
-]
+  },
+];
 ```
 
 **Use Cases**:
+
 - Panel-specific filters for detailed drill-downs
 - Independent metric thresholds per panel
 - Panel-specific time windows
@@ -525,9 +547,9 @@ interface VariableConfig {
   type: "query_values" | "custom" | "constant" | "textbox" | "dynamic_filters";
 
   // NEW: Scope configuration
-  scope: "global" | "tab" | "panel";
-  tabs?: string[];   // Only if scope === "tab"
-  panels?: string[]; // Only if scope === "panel"
+  scope: "global" | "tabs" | "panels";
+  tabs?: string[]; // Only if scope === "tabs"
+  panels?: string[]; // Only if scope === "panels"
 
   // Existing fields
   value: any;
@@ -543,9 +565,9 @@ interface VariableConfig {
 interface VariableRuntimeState {
   // Identity
   name: string;
-  scope: "global" | "tab" | "panel";
-  tabId?: string;   // Only if scope === "tab"
-  panelId?: string; // Only if scope === "panel"
+  scope: "global" | "tabs" | "panels";
+  tabId?: string; // Only if scope === "tabs"
+  panelId?: string; // Only if scope === "panels"
 
   // Configuration
   type: "query_values" | "custom" | "constant" | "textbox" | "dynamic_filters";
@@ -575,7 +597,7 @@ Following the pattern from `usePanelDataLoader`, the composable maintains a simp
 const variablesData = reactive({
   global: [] as VariableRuntimeState[],
   tabs: {} as Record<string, VariableRuntimeState[]>,
-  panels: {} as Record<string, VariableRuntimeState[]>
+  panels: {} as Record<string, VariableRuntimeState[]>,
 });
 
 // Dependency graph
@@ -603,13 +625,13 @@ To uniquely identify variables across scopes, use a composite key:
 ```typescript
 function getVariableKey(
   name: string,
-  scope: "global" | "tab" | "panel",
+  scope: "global" | "tabs" | "panels",
   tabId?: string,
-  panelId?: string
+  panelId?: string,
 ): string {
   if (scope === "global") {
     return `${name}@global`;
-  } else if (scope === "tab") {
+  } else if (scope === "tabs") {
     return `${name}@tab@${tabId}`;
   } else {
     return `${name}@panel@${panelId}`;
@@ -655,14 +677,14 @@ interface ScopedDependencyGraph {
   [variableKey: string]: {
     parents: string[];
     children: string[];
-    scope: "global" | "tab" | "panel";
+    scope: "global" | "tabs" | "panels";
     tabId?: string;
     panelId?: string;
   };
 }
 
 function buildScopedDependencyGraph(
-  variables: VariableConfig[]
+  variables: VariableConfig[],
 ): ScopedDependencyGraph {
   const graph: ScopedDependencyGraph = {};
 
@@ -670,36 +692,46 @@ function buildScopedDependencyGraph(
   const expandedVariables = expandVariablesForScopes(variables);
 
   // Step 2: Initialize nodes
-  expandedVariables.forEach(variable => {
-    const key = getVariableKey(variable.name, variable.scope, variable.tabId, variable.panelId);
+  expandedVariables.forEach((variable) => {
+    const key = getVariableKey(
+      variable.name,
+      variable.scope,
+      variable.tabId,
+      variable.panelId,
+    );
     graph[key] = {
       parents: [],
       children: [],
       scope: variable.scope,
       tabId: variable.tabId,
-      panelId: variable.panelId
+      panelId: variable.panelId,
     };
   });
 
   // Step 3: Build edges
-  expandedVariables.forEach(variable => {
-    const childKey = getVariableKey(variable.name, variable.scope, variable.tabId, variable.panelId);
+  expandedVariables.forEach((variable) => {
+    const childKey = getVariableKey(
+      variable.name,
+      variable.scope,
+      variable.tabId,
+      variable.panelId,
+    );
 
     if (variable.type === "query_values") {
       const filters = variable.query_data?.filter || [];
 
-      filters.forEach(filter => {
+      filters.forEach((filter) => {
         // Extract parent variable names from filter (e.g., "$country")
         const parentNames = extractVariableNames(filter.filter || "");
 
-        parentNames.forEach(parentName => {
+        parentNames.forEach((parentName) => {
           // Resolve which parent variable this child should connect to
           const parentKey = resolveParentVariable(
             parentName,
             variable.scope,
             variable.tabId,
             variable.panelId,
-            expandedVariables
+            expandedVariables,
           );
 
           if (parentKey) {
@@ -709,7 +741,7 @@ function buildScopedDependencyGraph(
               graph[parentKey].children.push(childKey);
             } else {
               throw new Error(
-                `Invalid dependency: ${childKey} cannot depend on ${parentKey}`
+                `Invalid dependency: ${childKey} cannot depend on ${parentKey}`,
               );
             }
           }
@@ -723,21 +755,21 @@ function buildScopedDependencyGraph(
 
 function isValidDependency(
   parent: { scope: string; tabId?: string; panelId?: string },
-  child: { scope: string; tabId?: string; panelId?: string }
+  child: { scope: string; tabId?: string; panelId?: string },
 ): boolean {
   // Global can be parent of anything
   if (parent.scope === "global") return true;
 
   // Tab can be parent of panel or same tab
-  if (parent.scope === "tab") {
-    if (child.scope === "panel") return true;
-    if (child.scope === "tab" && parent.tabId === child.tabId) return true;
+  if (parent.scope === "tabs") {
+    if (child.scope === "panels") return true;
+    if (child.scope === "tabs" && parent.tabId === child.tabId) return true;
     return false;
   }
 
   // Panel can be parent of same panel only
-  if (parent.scope === "panel") {
-    return child.scope === "panel" && parent.panelId === child.panelId;
+  if (parent.scope === "panels") {
+    return child.scope === "panels" && parent.panelId === child.panelId;
   }
 
   return false;
@@ -745,10 +777,10 @@ function isValidDependency(
 
 function resolveParentVariable(
   parentName: string,
-  childScope: "global" | "tab" | "panel",
+  childScope: "global" | "tabs" | "panels",
   childTabId: string | undefined,
   childPanelId: string | undefined,
-  allVariables: VariableRuntimeState[]
+  allVariables: VariableRuntimeState[],
 ): string | null {
   // Resolution order (child looking for parent):
   // 1. If child is global: Look in global only
@@ -757,50 +789,56 @@ function resolveParentVariable(
 
   if (childScope === "global") {
     const parent = allVariables.find(
-      v => v.name === parentName && v.scope === "global"
+      (v) => v.name === parentName && v.scope === "global",
     );
     return parent ? getVariableKey(parent.name, parent.scope) : null;
   }
 
-  if (childScope === "tab") {
+  if (childScope === "tabs") {
     // Check same tab first
     let parent = allVariables.find(
-      v => v.name === parentName &&
-           v.scope === "tab" &&
-           v.tabId === childTabId
+      (v) =>
+        v.name === parentName && v.scope === "tabs" && v.tabId === childTabId,
     );
     if (parent) return getVariableKey(parent.name, parent.scope, parent.tabId);
 
     // Fall back to global
     parent = allVariables.find(
-      v => v.name === parentName && v.scope === "global"
+      (v) => v.name === parentName && v.scope === "global",
     );
     return parent ? getVariableKey(parent.name, parent.scope) : null;
   }
 
-  if (childScope === "panel") {
+  if (childScope === "panels") {
     // Check same panel first
     let parent = allVariables.find(
-      v => v.name === parentName &&
-           v.scope === "panel" &&
-           v.panelId === childPanelId
+      (v) =>
+        v.name === parentName &&
+        v.scope === "panels" &&
+        v.panelId === childPanelId,
     );
-    if (parent) return getVariableKey(parent.name, parent.scope, undefined, parent.panelId);
+    if (parent)
+      return getVariableKey(
+        parent.name,
+        parent.scope,
+        undefined,
+        parent.panelId,
+      );
 
     // Check parent tab (need to know which tab the panel belongs to)
     const panelTabId = getPanelTabMapping(childPanelId);
     if (panelTabId) {
       parent = allVariables.find(
-        v => v.name === parentName &&
-             v.scope === "tab" &&
-             v.tabId === panelTabId
+        (v) =>
+          v.name === parentName && v.scope === "tabs" && v.tabId === panelTabId,
       );
-      if (parent) return getVariableKey(parent.name, parent.scope, parent.tabId);
+      if (parent)
+        return getVariableKey(parent.name, parent.scope, parent.tabId);
     }
 
     // Fall back to global
     parent = allVariables.find(
-      v => v.name === parentName && v.scope === "global"
+      (v) => v.name === parentName && v.scope === "global",
     );
     return parent ? getVariableKey(parent.name, parent.scope) : null;
   }
@@ -815,7 +853,7 @@ function resolveParentVariable(
 
 ```typescript
 function detectCyclesInScopedGraph(
-  graph: ScopedDependencyGraph
+  graph: ScopedDependencyGraph,
 ): string[] | null {
   const visited = new Set<string>();
   const recStack = new Set<string>();
@@ -841,11 +879,11 @@ function detectCyclesInScopedGraph(
 
 ### Loading State Flags (Per Variable)
 
-| Flag | Meaning | When Set |
-|------|---------|----------|
-| `isLoading` | API call in progress | When fetch starts, cleared when response completes |
-| `isVariableLoadingPending` | Waiting for dependencies or visibility | Set initially, cleared when loading starts |
-| `isVariablePartialLoaded` | Has received at least partial data | Set on first streaming response |
+| Flag                       | Meaning                                | When Set                                           |
+| -------------------------- | -------------------------------------- | -------------------------------------------------- |
+| `isLoading`                | API call in progress                   | When fetch starts, cleared when response completes |
+| `isVariableLoadingPending` | Waiting for dependencies or visibility | Set initially, cleared when loading starts         |
+| `isVariablePartialLoaded`  | Has received at least partial data     | Set on first streaming response                    |
 
 **Note**: Visibility is tracked at composable level (not per-variable) via `tabsVisibility` and `panelsVisibility` refs, similar to `usePanelDataLoader`'s `isVisible` ref.
 
@@ -917,7 +955,7 @@ watch(
       variablesManager.loadTabVariables(tabId);
     }
   },
-  { immediate: true }
+  { immediate: true },
 );
 ```
 
@@ -932,7 +970,7 @@ const { intersectionObserver } = useIntersectionObserver({
 
     // Trigger loading of panel variables
     variablesManager.loadPanelVariables(panelId);
-  }
+  },
 });
 
 onMounted(() => {
@@ -989,6 +1027,7 @@ This maximizes parallelization and reduces total loading time.
 #### Loading Trigger Conditions
 
 A variable can start loading when:
+
 1. **Visibility**: Its scope is visible (global always, tab when active, panel when in viewport)
 2. **Dependencies**: All parent variables have `isVariablePartialLoaded === true`
 3. **Not Already Loading**: `isLoading === false` and `isVariableLoadingPending === true`
@@ -999,9 +1038,14 @@ function canVariableLoad(
   tabsVisibility: Record<string, boolean>,
   panelsVisibility: Record<string, boolean>,
   allVariables: VariableRuntimeState[],
-  dependencyGraph: ScopedDependencyGraph
+  dependencyGraph: ScopedDependencyGraph,
 ): boolean {
-  const key = getVariableKey(variable.name, variable.scope, variable.tabId, variable.panelId);
+  const key = getVariableKey(
+    variable.name,
+    variable.scope,
+    variable.tabId,
+    variable.panelId,
+  );
 
   // Check 1: Is visible?
   if (!isVariableVisible(variable, tabsVisibility, panelsVisibility)) {
@@ -1015,7 +1059,7 @@ function canVariableLoad(
 
   // Check 3: All parents ready?
   const parents = dependencyGraph[key]?.parents || [];
-  const allParentsReady = parents.every(parentKey => {
+  const allParentsReady = parents.every((parentKey) => {
     const parentVar = findVariableByKey(parentKey, allVariables);
     return parentVar?.isVariablePartialLoaded === true;
   });
@@ -1026,13 +1070,13 @@ function canVariableLoad(
 function isVariableVisible(
   variable: VariableRuntimeState,
   tabsVisibility: Record<string, boolean>,
-  panelsVisibility: Record<string, boolean>
+  panelsVisibility: Record<string, boolean>,
 ): boolean {
   if (variable.scope === "global") return true;
-  if (variable.scope === "tab") {
+  if (variable.scope === "tabs") {
     return tabsVisibility[variable.tabId!] === true;
   }
-  if (variable.scope === "panel") {
+  if (variable.scope === "panels") {
     return panelsVisibility[variable.panelId!] === true;
   }
   return false;
@@ -1053,7 +1097,7 @@ When a variable loads but returns no data:
 ```typescript
 function replaceVariableInQuery(
   query: string,
-  variable: VariableRuntimeState
+  variable: VariableRuntimeState,
 ): string {
   const isNullValue =
     variable.value === null ||
@@ -1061,10 +1105,7 @@ function replaceVariableInQuery(
 
   if (isNullValue) {
     // Replace with sentinel that backend recognizes
-    return query.replaceAll(
-      new RegExp(`\\$${variable.name}`, "g"),
-      "_o2_all_"
-    );
+    return query.replaceAll(new RegExp(`\\$${variable.name}`, "g"), "_o2_all_");
   }
 
   // Normal replacement
@@ -1085,6 +1126,7 @@ Backend should recognize `_o2_all_` and drop that filter entirely.
 **Location**: `web/src/composables/dashboard/useVariablesManager.ts`
 
 **Responsibilities**:
+
 1. Maintain centralized state for all variables
 2. Build and manage dependency graph
 3. Orchestrate loading across scopes
@@ -1117,23 +1159,26 @@ interface UseVariablesManager {
   // Value updates
   updateVariableValue(
     name: string,
-    scope: "global" | "tab" | "panel",
+    scope: "global" | "tabs" | "panels",
     tabId: string | undefined,
     panelId: string | undefined,
-    newValue: any
+    newValue: any,
   ): Promise<void>;
 
   // Queries
   getVariable(
     name: string,
-    scope: "global" | "tab" | "panel",
+    scope: "global" | "tabs" | "panels",
     tabId?: string,
-    panelId?: string
+    panelId?: string,
   ): VariableRuntimeState | undefined;
 
   getVariablesForPanel(panelId: string): VariableRuntimeState[];
   getVariablesForTab(tabId: string): VariableRuntimeState[];
-  getAllVisibleVariables(tabId?: string, panelId?: string): VariableRuntimeState[];
+  getAllVisibleVariables(
+    tabId?: string,
+    panelId?: string,
+  ): VariableRuntimeState[];
 
   // URL sync
   syncToUrl(router: Router, route: Route): void;
@@ -1151,7 +1196,10 @@ interface UseVariablesManager {
 // web/src/composables/dashboard/useVariablesManager.ts
 
 import { ref, computed, reactive } from "vue";
-import { buildScopedDependencyGraph, detectCyclesInScopedGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
+import {
+  buildScopedDependencyGraph,
+  detectCyclesInScopedGraph,
+} from "@/utils/dashboard/variables/variablesDependencyUtils";
 
 export function useVariablesManager() {
   // ========== STATE ==========
@@ -1159,18 +1207,18 @@ export function useVariablesManager() {
     variables: {
       global: [],
       tabs: {},
-      panels: {}
+      panels: {},
     },
     dependencyGraph: {},
     loadingState: {
       global: false,
       tabs: {},
-      panels: {}
+      panels: {},
     },
     visibilityState: {
       tabs: {},
-      panels: {}
-    }
+      panels: {},
+    },
   });
 
   // Promise tracking for cancellation
@@ -1182,15 +1230,15 @@ export function useVariablesManager() {
     const expandedVars = expandVariablesForScopes(config);
 
     // 2. Populate state
-    expandedVars.forEach(varState => {
+    expandedVars.forEach((varState) => {
       if (varState.scope === "global") {
         state.variables.global.push(varState);
-      } else if (varState.scope === "tab") {
+      } else if (varState.scope === "tabs") {
         if (!state.variables.tabs[varState.tabId!]) {
           state.variables.tabs[varState.tabId!] = [];
         }
         state.variables.tabs[varState.tabId!].push(varState);
-      } else if (varState.scope === "panel") {
+      } else if (varState.scope === "panels") {
         if (!state.variables.panels[varState.panelId!]) {
           state.variables.panels[varState.panelId!] = [];
         }
@@ -1217,7 +1265,7 @@ export function useVariablesManager() {
   // ========== LOADING ==========
   async function loadGlobalVariables() {
     const globalVars = state.variables.global;
-    const independentVars = globalVars.filter(v => {
+    const independentVars = globalVars.filter((v) => {
       const key = getVariableKey(v.name, v.scope);
       const parents = state.dependencyGraph[key]?.parents || [];
       return parents.length === 0;
@@ -1225,8 +1273,8 @@ export function useVariablesManager() {
 
     state.loadingState.global = true;
 
-    const promises = independentVars.map(v =>
-      loadSingleVariable(getVariableKey(v.name, v.scope))
+    const promises = independentVars.map((v) =>
+      loadSingleVariable(getVariableKey(v.name, v.scope)),
     );
 
     await Promise.all(promises);
@@ -1236,14 +1284,19 @@ export function useVariablesManager() {
 
   async function loadTabVariables(tabId: string) {
     const tabVars = state.variables.tabs[tabId] || [];
-    const loadableVars = tabVars.filter(v =>
-      canVariableLoad(v, state.visibilityState, getAllVariablesFlat(), state.dependencyGraph)
+    const loadableVars = tabVars.filter((v) =>
+      canVariableLoad(
+        v,
+        state.visibilityState,
+        getAllVariablesFlat(),
+        state.dependencyGraph,
+      ),
     );
 
     state.loadingState.tabs[tabId] = true;
 
-    const promises = loadableVars.map(v =>
-      loadSingleVariable(getVariableKey(v.name, v.scope, v.tabId, v.panelId))
+    const promises = loadableVars.map((v) =>
+      loadSingleVariable(getVariableKey(v.name, v.scope, v.tabId, v.panelId)),
     );
 
     await Promise.all(promises);
@@ -1253,14 +1306,19 @@ export function useVariablesManager() {
 
   async function loadPanelVariables(panelId: string) {
     const panelVars = state.variables.panels[panelId] || [];
-    const loadableVars = panelVars.filter(v =>
-      canVariableLoad(v, state.visibilityState, getAllVariablesFlat(), state.dependencyGraph)
+    const loadableVars = panelVars.filter((v) =>
+      canVariableLoad(
+        v,
+        state.visibilityState,
+        getAllVariablesFlat(),
+        state.dependencyGraph,
+      ),
     );
 
     state.loadingState.panels[panelId] = true;
 
-    const promises = loadableVars.map(v =>
-      loadSingleVariable(getVariableKey(v.name, v.scope, v.tabId, v.panelId))
+    const promises = loadableVars.map((v) =>
+      loadSingleVariable(getVariableKey(v.name, v.scope, v.tabId, v.panelId)),
     );
 
     await Promise.all(promises);
@@ -1292,7 +1350,7 @@ export function useVariablesManager() {
 
       // Check dependencies
       const parents = state.dependencyGraph[variableKey]?.parents || [];
-      const allParentsReady = parents.every(parentKey => {
+      const allParentsReady = parents.every((parentKey) => {
         const parent = findVariableByKey(parentKey, getAllVariablesFlat());
         return parent?.isVariablePartialLoaded === true;
       });
@@ -1321,7 +1379,7 @@ export function useVariablesManager() {
     variable: VariableRuntimeState,
     variableKey: string,
     resolve: Function,
-    reject: Function
+    reject: Function,
   ) {
     // Build query with parent substitution
     const queryContext = buildQueryContext(variable, state);
@@ -1336,17 +1394,18 @@ export function useVariablesManager() {
       },
       onError: (error: any) => {
         finalizeVariableLoading(variable, variableKey, false, reject);
-      }
+      },
     });
   }
 
   function handlePartialResponse(
     variable: VariableRuntimeState,
     variableKey: string,
-    data: any
+    data: any,
   ) {
     // Update options
-    const newValues = data.hits?.map((hit: any) => hit[variable.query_data!.field]) || [];
+    const newValues =
+      data.hits?.map((hit: any) => hit[variable.query_data!.field]) || [];
     const existingOptions = variable.options || [];
     const allOptions = [...existingOptions, ...newValues];
     variable.options = Array.from(new Set(allOptions)).sort();
@@ -1356,9 +1415,17 @@ export function useVariablesManager() {
 
     // Trigger dependent variables
     const children = state.dependencyGraph[variableKey]?.children || [];
-    children.forEach(childKey => {
+    children.forEach((childKey) => {
       const childVar = findVariableByKey(childKey, getAllVariablesFlat());
-      if (childVar && canVariableLoad(childVar, state.visibilityState, getAllVariablesFlat(), state.dependencyGraph)) {
+      if (
+        childVar &&
+        canVariableLoad(
+          childVar,
+          state.visibilityState,
+          getAllVariablesFlat(),
+          state.dependencyGraph,
+        )
+      ) {
         loadSingleVariable(childKey);
       }
     });
@@ -1368,7 +1435,7 @@ export function useVariablesManager() {
     variable: VariableRuntimeState,
     variableKey: string,
     success: boolean,
-    resolve: Function
+    resolve: Function,
   ) {
     variable.isLoading = false;
     variable.isVariablePartialLoaded = success;
@@ -1378,9 +1445,17 @@ export function useVariablesManager() {
 
     // Trigger children
     const children = state.dependencyGraph[variableKey]?.children || [];
-    children.forEach(childKey => {
+    children.forEach((childKey) => {
       const childVar = findVariableByKey(childKey, getAllVariablesFlat());
-      if (childVar && canVariableLoad(childVar, state.visibilityState, getAllVariablesFlat(), state.dependencyGraph)) {
+      if (
+        childVar &&
+        canVariableLoad(
+          childVar,
+          state.visibilityState,
+          getAllVariablesFlat(),
+          state.dependencyGraph,
+        )
+      ) {
         loadSingleVariable(childKey);
       }
     });
@@ -1408,10 +1483,10 @@ export function useVariablesManager() {
   // ========== VALUE UPDATES ==========
   async function updateVariableValue(
     name: string,
-    scope: "global" | "tab" | "panel",
+    scope: "global" | "tabs" | "panels",
     tabId: string | undefined,
     panelId: string | undefined,
-    newValue: any
+    newValue: any,
   ) {
     const variable = getVariable(name, scope, tabId, panelId);
     if (!variable) return;
@@ -1433,16 +1508,16 @@ export function useVariablesManager() {
   // ========== QUERIES ==========
   function getVariable(
     name: string,
-    scope: "global" | "tab" | "panel",
+    scope: "global" | "tabs" | "panels",
     tabId?: string,
-    panelId?: string
+    panelId?: string,
   ): VariableRuntimeState | undefined {
     if (scope === "global") {
-      return state.variables.global.find(v => v.name === name);
-    } else if (scope === "tab" && tabId) {
-      return state.variables.tabs[tabId]?.find(v => v.name === name);
-    } else if (scope === "panel" && panelId) {
-      return state.variables.panels[panelId]?.find(v => v.name === name);
+      return state.variables.global.find((v) => v.name === name);
+    } else if (scope === "tabs" && tabId) {
+      return state.variables.tabs[tabId]?.find((v) => v.name === name);
+    } else if (scope === "panels" && panelId) {
+      return state.variables.panels[panelId]?.find((v) => v.name === name);
     }
     return undefined;
   }
@@ -1455,7 +1530,7 @@ export function useVariablesManager() {
     const merged = [
       ...state.variables.global,
       ...(tabId ? state.variables.tabs[tabId] || [] : []),
-      ...(state.variables.panels[panelId] || [])
+      ...(state.variables.panels[panelId] || []),
     ];
 
     return merged;
@@ -1463,14 +1538,14 @@ export function useVariablesManager() {
 
   function getAllVisibleVariables(
     tabId?: string,
-    panelId?: string
+    panelId?: string,
   ): VariableRuntimeState[] {
     if (panelId) {
       return getVariablesForPanel(panelId);
     } else if (tabId) {
       return [
         ...state.variables.global,
-        ...(state.variables.tabs[tabId] || [])
+        ...(state.variables.tabs[tabId] || []),
       ];
     } else {
       return state.variables.global;
@@ -1483,9 +1558,11 @@ export function useVariablesManager() {
     variables: computed(() => state.variables),
     dependencyGraph: computed(() => state.dependencyGraph),
     isLoading: computed(() => {
-      return state.loadingState.global ||
-             Object.values(state.loadingState.tabs).some(v => v) ||
-             Object.values(state.loadingState.panels).some(v => v);
+      return (
+        state.loadingState.global ||
+        Object.values(state.loadingState.tabs).some((v) => v) ||
+        Object.values(state.loadingState.panels).some((v) => v)
+      );
     }),
 
     // Methods
@@ -1504,7 +1581,7 @@ export function useVariablesManager() {
     syncToUrl,
     loadFromUrl,
     isVariableReady,
-    getDependentVariables
+    getDependentVariables,
   };
 }
 ```
@@ -1520,6 +1597,7 @@ export function useVariablesManager() {
 **Format**: `var-{name}={value}`
 
 **Examples**:
+
 - Single value: `var-country=USA`
 - Multi-select: `var-status=200,404,500`
 
@@ -1528,6 +1606,7 @@ export function useVariablesManager() {
 **Format**: `var-{name}.t.{tabId}={value}`
 
 **Examples**:
+
 - Tab 1: `var-region.t.tab-1=CA,OR`
 - Tab 2: `var-region.t.tab-2=NY,NJ`
 
@@ -1536,6 +1615,7 @@ export function useVariablesManager() {
 **Format**: `var-{name}.p.{panelId}={value}`
 
 **Examples**:
+
 - Panel 1: `var-city.p.panel-123=LA`
 - Panel 2: `var-city.p.panel-456=NYC`
 
@@ -1558,7 +1638,7 @@ function syncToUrl(router: Router, route: Route) {
   const queryParams: Record<string, string> = {};
 
   // Global variables
-  state.variables.global.forEach(variable => {
+  state.variables.global.forEach((variable) => {
     if (variable.type !== "dynamic_filters") {
       const key = `var-${variable.name}`;
       queryParams[key] = formatValueForUrl(variable.value);
@@ -1567,7 +1647,7 @@ function syncToUrl(router: Router, route: Route) {
 
   // Tab variables
   Object.entries(state.variables.tabs).forEach(([tabId, variables]) => {
-    variables.forEach(variable => {
+    variables.forEach((variable) => {
       if (variable.type !== "dynamic_filters") {
         const key = `var-${variable.name}.t.${tabId}`;
         queryParams[key] = formatValueForUrl(variable.value);
@@ -1577,7 +1657,7 @@ function syncToUrl(router: Router, route: Route) {
 
   // Panel variables
   Object.entries(state.variables.panels).forEach(([panelId, variables]) => {
-    variables.forEach(variable => {
+    variables.forEach((variable) => {
       if (variable.type !== "dynamic_filters") {
         const key = `var-${variable.name}.p.${panelId}`;
         queryParams[key] = formatValueForUrl(variable.value);
@@ -1588,8 +1668,8 @@ function syncToUrl(router: Router, route: Route) {
   router.replace({
     query: {
       ...route.query,
-      ...queryParams
-    }
+      ...queryParams,
+    },
   });
 }
 
@@ -1613,13 +1693,16 @@ function loadFromUrl(route: Route) {
     const parsed = parseVariableUrlKey(key);
     if (!parsed) return;
 
-    const variable = getVariable(parsed.name, parsed.scope, parsed.tabId, parsed.panelId);
+    const variable = getVariable(
+      parsed.name,
+      parsed.scope,
+      parsed.tabId,
+      parsed.panelId,
+    );
     if (!variable) return;
 
     // Parse value
-    const parsedValue = variable.multiSelect
-      ? String(value).split(",")
-      : value;
+    const parsedValue = variable.multiSelect ? String(value).split(",") : value;
 
     variable.value = parsedValue;
   });
@@ -1627,7 +1710,7 @@ function loadFromUrl(route: Route) {
 
 interface ParsedUrlKey {
   name: string;
-  scope: "global" | "tab" | "panel";
+  scope: "global" | "tabs" | "panels";
   tabId?: string;
   panelId?: string;
 }
@@ -1641,8 +1724,8 @@ function parseVariableUrlKey(key: string): ParsedUrlKey | null {
   if (tabMatch) {
     return {
       name: tabMatch[1],
-      scope: "tab",
-      tabId: tabMatch[2]
+      scope: "tabs",
+      tabId: tabMatch[2],
     };
   }
 
@@ -1651,15 +1734,15 @@ function parseVariableUrlKey(key: string): ParsedUrlKey | null {
   if (panelMatch) {
     return {
       name: panelMatch[1],
-      scope: "panel",
-      panelId: panelMatch[2]
+      scope: "panels",
+      panelId: panelMatch[2],
     };
   }
 
   // Global scope (no suffix)
   return {
     name: withoutPrefix,
-    scope: "global"
+    scope: "global",
   };
 }
 ```
@@ -1688,22 +1771,27 @@ function loadFromUrl(route: Route) {
       }
 
       // ALSO apply to all tab/panel instances of same name
-      Object.values(state.variables.tabs).forEach(tabVars => {
-        const tabVar = tabVars.find(v => v.name === parsed.name);
+      Object.values(state.variables.tabs).forEach((tabVars) => {
+        const tabVar = tabVars.find((v) => v.name === parsed.name);
         if (tabVar) {
           tabVar.value = parseValue(value, tabVar.multiSelect);
         }
       });
 
-      Object.values(state.variables.panels).forEach(panelVars => {
-        const panelVar = panelVars.find(v => v.name === parsed.name);
+      Object.values(state.variables.panels).forEach((panelVars) => {
+        const panelVar = panelVars.find((v) => v.name === parsed.name);
         if (panelVar) {
           panelVar.value = parseValue(value, panelVar.multiSelect);
         }
       });
     } else {
       // Scoped variable in URL - apply to that specific instance
-      const variable = getVariable(parsed.name, parsed.scope, parsed.tabId, parsed.panelId);
+      const variable = getVariable(
+        parsed.name,
+        parsed.scope,
+        parsed.tabId,
+        parsed.panelId,
+      );
       if (variable) {
         variable.value = parseValue(value, variable.multiSelect);
       }
@@ -1721,6 +1809,7 @@ function loadFromUrl(route: Route) {
 **Current**: Renders single `VariablesValueSelector` at top level.
 
 **New**:
+
 1. Initialize `useVariablesManager()` composable
 2. Render global `VariablesValueSelector` at top level
 3. Pass composable to child components
@@ -1746,11 +1835,7 @@ function loadFromUrl(route: Route) {
     </q-tabs>
 
     <q-tab-panels v-model="activeTab">
-      <q-tab-panel
-        v-for="tab in dashboard.tabs"
-        :key="tab.id"
-        :name="tab.id"
-      >
+      <q-tab-panel v-for="tab in dashboard.tabs" :key="tab.id" :name="tab.id">
         <!-- Tab Variables -->
         <VariablesValueSelector
           v-if="tab.variables?.length"
@@ -1802,10 +1887,11 @@ watch(activeTab, (newTabId) => {
 **New**: Multiple instances, each manages its scope, uses composable for coordination.
 
 **Props**:
+
 ```typescript
 interface Props {
-  scope: "global" | "tab" | "panel";
-  tabId?: string;   // Required for tab scope
+  scope: "global" | "tabs" | "panels";
+  tabId?: string; // Required for tab scope
   panelId?: string; // Required for panel scope
   variablesConfig: VariableConfig[];
   variablesManager: ReturnType<typeof useVariablesManager>;
@@ -1813,6 +1899,7 @@ interface Props {
 ```
 
 **Behavior**:
+
 - Renders only variables for its scope
 - Uses composable methods for loading
 - Emits value changes to composable
@@ -1826,9 +1913,9 @@ const props = defineProps<Props>();
 const variables = computed(() => {
   if (props.scope === "global") {
     return props.variablesManager.variables.value.global;
-  } else if (props.scope === "tab") {
+  } else if (props.scope === "tabs") {
     return props.variablesManager.variables.value.tabs[props.tabId!] || [];
-  } else if (props.scope === "panel") {
+  } else if (props.scope === "panels") {
     return props.variablesManager.variables.value.panels[props.panelId!] || [];
   }
   return [];
@@ -1841,7 +1928,7 @@ function onValueChange(variableName: string, newValue: any) {
     props.scope,
     props.tabId,
     props.panelId,
-    newValue
+    newValue,
   );
 }
 
@@ -1871,7 +1958,7 @@ const variables = computed(() => {
 const { intersectionObserver } = useIntersectionObserver({
   onEnter: () => {
     props.variablesManager.setPanelVisibility(props.panelId, true);
-  }
+  },
 });
 
 onMounted(() => {
@@ -1919,11 +2006,13 @@ onMounted(async () => {
 **Global Variables**: Visible everywhere (all tabs, all panels).
 
 **Tab Variables**: Visible in:
+
 - The tab's variable selector
 - All panels within that tab
 - NOT visible in other tabs
 
 **Panel Variables**: Visible only in:
+
 - The panel's variable selector (if shown)
 - That specific panel
 - NOT visible in other panels or tabs
@@ -1940,9 +2029,9 @@ function getVariablesForPanel(panelId: string): VariableRuntimeState[] {
 
   // Merge in order of precedence (later overrides earlier if same name)
   return [
-    ...state.variables.global,          // 1. Global (lowest precedence)
+    ...state.variables.global, // 1. Global (lowest precedence)
     ...(tabId ? state.variables.tabs[tabId] || [] : []), // 2. Tab
-    ...(state.variables.panels[panelId] || [])  // 3. Panel (highest precedence)
+    ...(state.variables.panels[panelId] || []), // 3. Panel (highest precedence)
   ];
 }
 ```
@@ -1952,18 +2041,24 @@ function getVariablesForPanel(panelId: string): VariableRuntimeState[] {
 ```typescript
 function resolveVariableForPanel(
   variableName: string,
-  panelId: string
+  panelId: string,
 ): VariableRuntimeState | undefined {
   const allVars = getVariablesForPanel(panelId);
 
   // Find the most specific scope (panel > tab > global)
-  let panelVar = allVars.find(v => v.name === variableName && v.scope === "panel");
+  let panelVar = allVars.find(
+    (v) => v.name === variableName && v.scope === "panels",
+  );
   if (panelVar) return panelVar;
 
-  let tabVar = allVars.find(v => v.name === variableName && v.scope === "tab");
+  let tabVar = allVars.find(
+    (v) => v.name === variableName && v.scope === "tabs",
+  );
   if (tabVar) return tabVar;
 
-  let globalVar = allVars.find(v => v.name === variableName && v.scope === "global");
+  let globalVar = allVars.find(
+    (v) => v.name === variableName && v.scope === "global",
+  );
   return globalVar;
 }
 ```
@@ -1977,7 +2072,7 @@ function resolveVariableForPanel(
 ```typescript
 function getAvailableVariablesForPanel(
   panelId: string,
-  dashboard: Dashboard
+  dashboard: Dashboard,
 ): VariableConfig[] {
   const tabId = getPanelTabMapping(panelId);
 
@@ -1985,19 +2080,19 @@ function getAvailableVariablesForPanel(
   const accessible: VariableConfig[] = [];
 
   // 1. All global variables
-  accessible.push(...dashboard.variables.filter(v => v.scope === "global"));
+  accessible.push(...dashboard.variables.filter((v) => v.scope === "global"));
 
   // 2. Tab variables from parent tab
   if (tabId) {
     const tabVars = dashboard.variables.filter(
-      v => v.scope === "tab" && v.tabs?.includes(tabId)
+      (v) => v.scope === "tabs" && v.tabs?.includes(tabId),
     );
     accessible.push(...tabVars);
   }
 
   // 3. Panel variables for this specific panel
   const panelVars = dashboard.variables.filter(
-    v => v.scope === "panel" && v.panels?.includes(panelId)
+    (v) => v.scope === "panels" && v.panels?.includes(panelId),
   );
   accessible.push(...panelVars);
 
@@ -2061,12 +2156,12 @@ const availableVariables = computed(() => {
 function migrateLegacyDashboard(dashboard: Dashboard): Dashboard {
   if (!dashboard.variables) return dashboard;
 
-  dashboard.variables = dashboard.variables.map(variable => {
+  dashboard.variables = dashboard.variables.map((variable) => {
     // If no scope specified, treat as global
     if (!variable.scope) {
       return {
         ...variable,
-        scope: "global"
+        scope: "global",
       };
     }
     return variable;
@@ -2089,11 +2184,13 @@ async function loadDashboard(dashboardId: string) {
 ### Migration Steps for Users
 
 1. **Phase 1 - No Action Required** (Backward Compatible):
+
    - Deploy new code
    - Existing dashboards auto-migrate to global scope
    - Everything works as before
 
 2. **Phase 2 - Gradual Adoption** (Optional):
+
    - Users can start adding tab/panel scoped variables
    - New variable creation UI shows scope selector
    - Existing global variables remain unchanged
@@ -2106,6 +2203,7 @@ async function loadDashboard(dashboardId: string) {
 ### Data Model Changes
 
 **Dashboard Schema Before**:
+
 ```typescript
 {
   variables: [
@@ -2115,6 +2213,7 @@ async function loadDashboard(dashboardId: string) {
 ```
 
 **Dashboard Schema After**:
+
 ```typescript
 {
   variables: [
@@ -2147,24 +2246,24 @@ function renameVariable(
   oldName: string,
   newName: string,
   scope: string,
-  dashboard: Dashboard
+  dashboard: Dashboard,
 ) {
   // 1. Update variable config
   const variable = dashboard.variables.find(
-    v => v.name === oldName && v.scope === scope
+    (v) => v.name === oldName && v.scope === scope,
   );
   if (variable) {
     variable.name = newName;
   }
 
   // 2. Update all references in other variables' filters
-  dashboard.variables.forEach(v => {
+  dashboard.variables.forEach((v) => {
     if (v.type === "query_values" && v.query_data?.filter) {
-      v.query_data.filter.forEach(f => {
+      v.query_data.filter.forEach((f) => {
         if (f.filter) {
           f.filter = f.filter.replace(
             new RegExp(`\\$${oldName}\\b`, "g"),
-            `$${newName}`
+            `$${newName}`,
           );
         }
       });
@@ -2172,11 +2271,11 @@ function renameVariable(
   });
 
   // 3. Update panel query references
-  dashboard.panels?.forEach(panel => {
-    panel.queries?.forEach(query => {
+  dashboard.panels?.forEach((panel) => {
+    panel.queries?.forEach((query) => {
       query.query = query.query.replace(
         new RegExp(`\\$${oldName}\\b`, "g"),
-        `$${newName}`
+        `$${newName}`,
       );
     });
   });
@@ -2188,6 +2287,7 @@ function renameVariable(
 **Problem**: If user deletes a tab, what happens to variables scoped to that tab?
 
 **Solution**:
+
 1. Warn user that variables will be deleted
 2. Show which panels/variables will be affected
 3. Offer to move variables to global scope
@@ -2195,14 +2295,14 @@ function renameVariable(
 ```typescript
 function validateTabDeletion(tabId: string, dashboard: Dashboard) {
   const affectedVars = dashboard.variables.filter(
-    v => v.scope === "tab" && v.tabs?.includes(tabId)
+    (v) => v.scope === "tabs" && v.tabs?.includes(tabId),
   );
 
   if (affectedVars.length > 0) {
     return {
       canDelete: false,
       message: `This tab has ${affectedVars.length} variable(s). Delete them or move to global?`,
-      affectedVariables: affectedVars
+      affectedVariables: affectedVars,
     };
   }
 
@@ -2221,26 +2321,27 @@ function validatePanelMove(
   panelId: string,
   fromTabId: string,
   toTabId: string,
-  dashboard: Dashboard
+  dashboard: Dashboard,
 ) {
   const panelVars = dashboard.variables.filter(
-    v => v.scope === "panel" && v.panels?.includes(panelId)
+    (v) => v.scope === "panels" && v.panels?.includes(panelId),
   );
 
   // Check if any panel variables depend on source tab's variables
-  const dependsOnSourceTab = panelVars.some(panelVar => {
+  const dependsOnSourceTab = panelVars.some((panelVar) => {
     const deps = extractDependencies(panelVar);
-    return deps.some(depName => {
-      const depVar = dashboard.variables.find(v => v.name === depName);
-      return depVar?.scope === "tab" && depVar.tabs?.includes(fromTabId);
+    return deps.some((depName) => {
+      const depVar = dashboard.variables.find((v) => v.name === depName);
+      return depVar?.scope === "tabs" && depVar.tabs?.includes(fromTabId);
     });
   });
 
   if (dependsOnSourceTab) {
     return {
       canMove: false,
-      message: "Panel depends on variables from source tab. Copy variables to target tab?",
-      requiresAction: true
+      message:
+        "Panel depends on variables from source tab. Copy variables to target tab?",
+      requiresAction: true,
     };
   }
 
@@ -2279,6 +2380,7 @@ if (cycle) {
 **Scenario**: Variable query returns no results.
 
 **Behavior**:
+
 1. Set `value = null` or `[]`
 2. Set `isVariablePartialLoaded = true` (allow children to proceed)
 3. Children cascade down, likely also returning empty
@@ -2286,6 +2388,7 @@ if (cycle) {
 5. Backend drops filter, returns all data
 
 **Example**:
+
 ```sql
 -- Original query
 SELECT * FROM logs WHERE region IN ($region) AND status = $status
@@ -2358,8 +2461,13 @@ function setTabVisibility(tabId: string, visible: boolean) {
   if (!visible) {
     // Cancel all in-flight requests for this tab
     const tabVars = variablesData.tabs[tabId] || [];
-    tabVars.forEach(variable => {
-      const key = getVariableKey(variable.name, variable.scope, variable.tabId, variable.panelId);
+    tabVars.forEach((variable) => {
+      const key = getVariableKey(
+        variable.name,
+        variable.scope,
+        variable.tabId,
+        variable.panelId,
+      );
       if (currentlyExecutingPromises.has(key)) {
         currentlyExecutingPromises.get(key)!.reject();
         currentlyExecutingPromises.delete(key);
@@ -2380,25 +2488,30 @@ function setTabVisibility(tabId: string, visible: boolean) {
 This specification outlines the complete transformation of the dashboard variables system from a global-only to a multi-scoped architecture. Key takeaways:
 
 ### Architecture Changes
+
 - **Centralized Management**: New `useVariablesManager()` composable controls all variable state
 - **Multi-Instance Components**: `VariablesValueSelector` transitions from single to multiple instances
 - **Lazy Loading**: Variables load only when their scope becomes visible
 
 ### Data Model Changes
+
 - **Scoped Variables**: Each variable has explicit `scope` and optional `tabs`/`panels`
 - **Expanded State**: Variables with multiple assignments create separate instances internally
 - **Scoped Keys**: Unique identification using `name@scope@tabId` or `name@scope@panelId` format
 
 ### Behavior Changes
+
 - **Independent Values**: Same variable name can have different values in different tabs/panels
 - **Lazy Loading**: Tab variables load on tab activation, panel variables on viewport entry
 - **Null Handling**: Empty results cascade down dependency tree, use `_o2_all_` sentinel in queries
 
 ### URL Changes
+
 - **Scoped Format**: `var-name.t.tabId` and `var-name.p.panelId` for tab/panel variables
 - **Drilldown Compatibility**: Unscoped URLs apply to all instances of variable name
 
 ### Implementation Strategy
+
 - **8-Week Phased Rollout**: Foundation → URL/Visibility → Components → UI → Migration → Performance
 - **Backward Compatible**: Existing dashboards auto-migrate to global scope
 - **Gradual Adoption**: Users can adopt scoped variables incrementally
@@ -2427,6 +2540,7 @@ This design maintains backward compatibility while enabling powerful new capabil
 **Directory**: `tests/ui-testing/playwright-tests/dashboards/`
 
 **Test Files**:
+
 - `dashboard-variables-global.spec.ts` - Global variable tests
 - `dashboard-variables-tab-scoped.spec.ts` - Tab-scoped variable tests
 - `dashboard-variables-panel-scoped.spec.ts` - Panel-scoped variable tests
@@ -2441,72 +2555,117 @@ This design maintains backward compatibility while enabling powerful new capabil
 **File**: `dashboard-variables-global.spec.ts`
 
 #### Test Case 1.1: Global Variable Basic Loading
+
 ```typescript
-test('should load global variables on dashboard mount', async ({ page }) => {
+test("should load global variables on dashboard mount", async ({ page }) => {
   // Setup: Create dashboard with global variables
   await createDashboardWithGlobalVariables(page, {
     variables: [
-      { name: 'country', type: 'query_values', scope: 'global' },
-      { name: 'environment', type: 'custom', scope: 'global', value: ['prod', 'staging'] }
-    ]
+      { name: "country", type: "query_values", scope: "global" },
+      {
+        name: "environment",
+        type: "custom",
+        scope: "global",
+        value: ["prod", "staging"],
+      },
+    ],
   });
 
   // Navigate to dashboard
-  await page.goto('/dashboards/view/test-dashboard');
+  await page.goto("/dashboards/view/test-dashboard");
 
   // Verify: Global variables visible immediately
-  await expect(page.locator('[data-test="variable-selector-country"]')).toBeVisible();
-  await expect(page.locator('[data-test="variable-selector-environment"]')).toBeVisible();
+  await expect(
+    page.locator('[data-test="variable-selector-country"]'),
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-test="variable-selector-environment"]'),
+  ).toBeVisible();
 
   // Verify: Variables have loaded data
-  await expect(page.locator('[data-test="variable-country-options"]')).not.toBeEmpty();
+  await expect(
+    page.locator('[data-test="variable-country-options"]'),
+  ).not.toBeEmpty();
 });
 ```
 
 #### Test Case 1.2: Global Variable Selection Updates All Panels
+
 ```typescript
-test('should update all panels when global variable changes', async ({ page }) => {
+test("should update all panels when global variable changes", async ({
+  page,
+}) => {
   // Setup: Dashboard with global variable and multiple panels
   await createDashboardWithGlobalVariables(page, {
-    variables: [{ name: 'status', type: 'custom', scope: 'global', value: ['200', '404', '500'] }],
+    variables: [
+      {
+        name: "status",
+        type: "custom",
+        scope: "global",
+        value: ["200", "404", "500"],
+      },
+    ],
     panels: [
-      { id: 'panel-1', query: 'SELECT * WHERE status=$status' },
-      { id: 'panel-2', query: 'SELECT count(*) WHERE status=$status' }
-    ]
+      { id: "panel-1", query: "SELECT * WHERE status=$status" },
+      { id: "panel-2", query: "SELECT count(*) WHERE status=$status" },
+    ],
   });
 
-  await page.goto('/dashboards/view/test-dashboard');
+  await page.goto("/dashboards/view/test-dashboard");
 
   // Select value in global variable
   await page.locator('[data-test="variable-selector-status"]').click();
   await page.locator('[data-test="variable-option-200"]').click();
 
   // Verify: Both panels updated with new filter
-  await expect(page.locator('[data-test="panel-1"]')).toContainText('status=200');
-  await expect(page.locator('[data-test="panel-2"]')).toContainText('status=200');
+  await expect(page.locator('[data-test="panel-1"]')).toContainText(
+    "status=200",
+  );
+  await expect(page.locator('[data-test="panel-2"]')).toContainText(
+    "status=200",
+  );
 });
 ```
 
 #### Test Case 1.3: Global Variable Dependencies
+
 ```typescript
-test('should handle global variable dependencies correctly', async ({ page }) => {
+test("should handle global variable dependencies correctly", async ({
+  page,
+}) => {
   // Setup: Chain of global variables (country → region → city)
   await createDashboardWithGlobalVariables(page, {
     variables: [
-      { name: 'country', type: 'query_values', scope: 'global' },
-      { name: 'region', type: 'query_values', scope: 'global',
-        dependsOn: 'country', query: 'SELECT region WHERE country=$country' },
-      { name: 'city', type: 'query_values', scope: 'global',
-        dependsOn: 'region', query: 'SELECT city WHERE region=$region' }
-    ]
+      { name: "country", type: "query_values", scope: "global" },
+      {
+        name: "region",
+        type: "query_values",
+        scope: "global",
+        dependsOn: "country",
+        query: "SELECT region WHERE country=$country",
+      },
+      {
+        name: "city",
+        type: "query_values",
+        scope: "global",
+        dependsOn: "region",
+        query: "SELECT city WHERE region=$region",
+      },
+    ],
   });
 
-  await page.goto('/dashboards/view/test-dashboard');
+  await page.goto("/dashboards/view/test-dashboard");
 
   // Verify: Initial loading sequence
-  await expect(page.locator('[data-test="variable-country-loading"]')).toBeVisible();
-  await expect(page.locator('[data-test="variable-region-loading"]')).toBeVisible();
-  await expect(page.locator('[data-test="variable-city-loading"]')).toBeVisible();
+  await expect(
+    page.locator('[data-test="variable-country-loading"]'),
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-test="variable-region-loading"]'),
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-test="variable-city-loading"]'),
+  ).toBeVisible();
 
   // Wait for country to load
   await page.waitForSelector('[data-test="variable-country-loaded"]');
@@ -2516,11 +2675,15 @@ test('should handle global variable dependencies correctly', async ({ page }) =>
   await page.locator('[data-test="variable-option-USA"]').click();
 
   // Verify: Dependent variables reload
-  await expect(page.locator('[data-test="variable-region-loading"]')).toBeVisible();
+  await expect(
+    page.locator('[data-test="variable-region-loading"]'),
+  ).toBeVisible();
   await page.waitForSelector('[data-test="variable-region-loaded"]');
 
   // Verify: City reloads after region
-  await expect(page.locator('[data-test="variable-city-loading"]')).toBeVisible();
+  await expect(
+    page.locator('[data-test="variable-city-loading"]'),
+  ).toBeVisible();
 });
 ```
 
@@ -2531,54 +2694,98 @@ test('should handle global variable dependencies correctly', async ({ page }) =>
 **File**: `dashboard-variables-tab-scoped.spec.ts`
 
 #### Test Case 2.1: Tab Variable Lazy Loading
+
 ```typescript
-test('should only load tab variables when tab becomes active', async ({ page }) => {
+test("should only load tab variables when tab becomes active", async ({
+  page,
+}) => {
   // Setup: Dashboard with 2 tabs, each with tab-scoped variables
   await createDashboardWithTabs(page, {
     tabs: [
-      { id: 'tab-1', name: 'Logs', variables: [{ name: 'logLevel', scope: 'tabs' }] },
-      { id: 'tab-2', name: 'Metrics', variables: [{ name: 'metric', scope: 'tabs' }] }
-    ]
+      {
+        id: "tab-1",
+        name: "Logs",
+        variables: [{ name: "logLevel", scope: "tabs" }],
+      },
+      {
+        id: "tab-2",
+        name: "Metrics",
+        variables: [{ name: "metric", scope: "tabs" }],
+      },
+    ],
   });
 
-  await page.goto('/dashboards/view/test-dashboard');
+  await page.goto("/dashboards/view/test-dashboard");
 
   // Verify: Tab 1 visible by default, variables loading
   await expect(page.locator('[data-test="tab-1"]')).toHaveClass(/active/);
-  await expect(page.locator('[data-test="variable-logLevel-loading"]')).toBeVisible();
+  await expect(
+    page.locator('[data-test="variable-logLevel-loading"]'),
+  ).toBeVisible();
 
   // Verify: Tab 2 variables NOT loading yet
-  await expect(page.locator('[data-test="variable-metric-loading"]')).not.toBeVisible();
+  await expect(
+    page.locator('[data-test="variable-metric-loading"]'),
+  ).not.toBeVisible();
 
   // Switch to Tab 2
   await page.locator('[data-test="tab-button-tab-2"]').click();
 
   // Verify: Tab 2 variables now loading
-  await expect(page.locator('[data-test="variable-metric-loading"]')).toBeVisible();
+  await expect(
+    page.locator('[data-test="variable-metric-loading"]'),
+  ).toBeVisible();
   await page.waitForSelector('[data-test="variable-metric-loaded"]');
 });
 ```
 
 #### Test Case 2.2: Tab Variable Independence
+
 ```typescript
-test('should maintain independent values for same variable in different tabs', async ({ page }) => {
+test("should maintain independent values for same variable in different tabs", async ({
+  page,
+}) => {
   // Setup: Two tabs with same variable name but independent values
   await createDashboardWithTabs(page, {
-    globalVariables: [{ name: 'country', type: 'custom', scope: 'global', value: ['USA'] }],
+    globalVariables: [
+      { name: "country", type: "custom", scope: "global", value: ["USA"] },
+    ],
     tabs: [
-      { id: 'tab-1', variables: [{ name: 'region', scope: 'tabs', type: 'custom', value: ['CA', 'OR'] }] },
-      { id: 'tab-2', variables: [{ name: 'region', scope: 'tabs', type: 'custom', value: ['NY', 'NJ'] }] }
-    ]
+      {
+        id: "tab-1",
+        variables: [
+          {
+            name: "region",
+            scope: "tabs",
+            type: "custom",
+            value: ["CA", "OR"],
+          },
+        ],
+      },
+      {
+        id: "tab-2",
+        variables: [
+          {
+            name: "region",
+            scope: "tabs",
+            type: "custom",
+            value: ["NY", "NJ"],
+          },
+        ],
+      },
+    ],
   });
 
-  await page.goto('/dashboards/view/test-dashboard');
+  await page.goto("/dashboards/view/test-dashboard");
 
   // Tab 1: Select CA
   await page.locator('[data-test="variable-selector-region"]').click();
   await page.locator('[data-test="variable-option-CA"]').click();
 
   // Verify: Tab 1 region = CA
-  await expect(page.locator('[data-test="variable-region-value"]')).toContainText('CA');
+  await expect(
+    page.locator('[data-test="variable-region-value"]'),
+  ).toContainText("CA");
 
   // Switch to Tab 2
   await page.locator('[data-test="tab-button-tab-2"]').click();
@@ -2586,7 +2793,9 @@ test('should maintain independent values for same variable in different tabs', a
   // Verify: Tab 2 region has different options (NY, NJ), NOT CA
   await page.locator('[data-test="variable-selector-region"]').click();
   await expect(page.locator('[data-test="variable-option-NY"]')).toBeVisible();
-  await expect(page.locator('[data-test="variable-option-CA"]')).not.toBeVisible();
+  await expect(
+    page.locator('[data-test="variable-option-CA"]'),
+  ).not.toBeVisible();
 
   // Select NY in Tab 2
   await page.locator('[data-test="variable-option-NY"]').click();
@@ -2595,36 +2804,54 @@ test('should maintain independent values for same variable in different tabs', a
   await page.locator('[data-test="tab-button-tab-1"]').click();
 
   // Verify: Tab 1 still has CA selected (not affected by Tab 2)
-  await expect(page.locator('[data-test="variable-region-value"]')).toContainText('CA');
+  await expect(
+    page.locator('[data-test="variable-region-value"]'),
+  ).toContainText("CA");
 });
 ```
 
 #### Test Case 2.3: Tab Variable Depends on Global Variable
+
 ```typescript
-test('should allow tab variable to depend on global variable', async ({ page }) => {
+test("should allow tab variable to depend on global variable", async ({
+  page,
+}) => {
   // Setup: Global country, tab-scoped region depending on country
   await createDashboardWithTabs(page, {
-    globalVariables: [{ name: 'country', type: 'custom', scope: 'global', value: ['USA', 'Canada'] }],
+    globalVariables: [
+      {
+        name: "country",
+        type: "custom",
+        scope: "global",
+        value: ["USA", "Canada"],
+      },
+    ],
     tabs: [
       {
-        id: 'tab-1',
+        id: "tab-1",
         variables: [
-          { name: 'region', scope: 'tabs', type: 'query_values',
-            dependsOn: 'country', query: 'SELECT region WHERE country=$country'
-          }
-        ]
-      }
-    ]
+          {
+            name: "region",
+            scope: "tabs",
+            type: "query_values",
+            dependsOn: "country",
+            query: "SELECT region WHERE country=$country",
+          },
+        ],
+      },
+    ],
   });
 
-  await page.goto('/dashboards/view/test-dashboard');
+  await page.goto("/dashboards/view/test-dashboard");
 
   // Select country
   await page.locator('[data-test="variable-selector-country"]').click();
   await page.locator('[data-test="variable-option-USA"]').click();
 
   // Verify: Tab variable starts loading after global variable changes
-  await expect(page.locator('[data-test="variable-region-loading"]')).toBeVisible();
+  await expect(
+    page.locator('[data-test="variable-region-loading"]'),
+  ).toBeVisible();
   await page.waitForSelector('[data-test="variable-region-loaded"]');
 
   // Change country again
@@ -2632,7 +2859,9 @@ test('should allow tab variable to depend on global variable', async ({ page }) 
   await page.locator('[data-test="variable-option-Canada"]').click();
 
   // Verify: Tab variable reloads with new dependency value
-  await expect(page.locator('[data-test="variable-region-loading"]')).toBeVisible();
+  await expect(
+    page.locator('[data-test="variable-region-loading"]'),
+  ).toBeVisible();
   await page.waitForSelector('[data-test="variable-region-loaded"]');
 });
 ```
@@ -2644,92 +2873,150 @@ test('should allow tab variable to depend on global variable', async ({ page }) 
 **File**: `dashboard-variables-panel-scoped.spec.ts`
 
 #### Test Case 3.1: Panel Variable Lazy Loading with Intersection Observer
+
 ```typescript
-test('should only load panel variables when panel enters viewport', async ({ page }) => {
+test("should only load panel variables when panel enters viewport", async ({
+  page,
+}) => {
   // Setup: Dashboard with panels having panel-scoped variables, some below fold
   await createDashboardWithPanels(page, {
     panels: [
-      { id: 'panel-1', position: 'top', variables: [{ name: 'status', scope: 'panels' }] },
-      { id: 'panel-2', position: 'middle', variables: [{ name: 'code', scope: 'panels' }] },
-      { id: 'panel-3', position: 'bottom', variables: [{ name: 'error', scope: 'panels' }] }
-    ]
+      {
+        id: "panel-1",
+        position: "top",
+        variables: [{ name: "status", scope: "panels" }],
+      },
+      {
+        id: "panel-2",
+        position: "middle",
+        variables: [{ name: "code", scope: "panels" }],
+      },
+      {
+        id: "panel-3",
+        position: "bottom",
+        variables: [{ name: "error", scope: "panels" }],
+      },
+    ],
   });
 
-  await page.goto('/dashboards/view/test-dashboard');
+  await page.goto("/dashboards/view/test-dashboard");
 
   // Verify: Panel 1 (visible) variables loading
-  await expect(page.locator('[data-test="panel-1-variable-status-loading"]')).toBeVisible();
+  await expect(
+    page.locator('[data-test="panel-1-variable-status-loading"]'),
+  ).toBeVisible();
 
   // Verify: Panel 3 (below fold) variables NOT loading yet
-  await expect(page.locator('[data-test="panel-3-variable-error-loading"]')).not.toBeVisible();
+  await expect(
+    page.locator('[data-test="panel-3-variable-error-loading"]'),
+  ).not.toBeVisible();
 
   // Scroll to Panel 3
   await page.locator('[data-test="panel-3"]').scrollIntoViewIfNeeded();
 
   // Verify: Panel 3 variables now loading
-  await expect(page.locator('[data-test="panel-3-variable-error-loading"]')).toBeVisible();
+  await expect(
+    page.locator('[data-test="panel-3-variable-error-loading"]'),
+  ).toBeVisible();
   await page.waitForSelector('[data-test="panel-3-variable-error-loaded"]');
 });
 ```
 
 #### Test Case 3.2: Panel Variable Independence
+
 ```typescript
-test('should maintain independent values for same variable in different panels', async ({ page }) => {
+test("should maintain independent values for same variable in different panels", async ({
+  page,
+}) => {
   // Setup: Two panels with same variable name but independent values
   await createDashboardWithPanels(page, {
     panels: [
-      { id: 'panel-1', variables: [{ name: 'threshold', scope: 'panels', type: 'textbox', value: '100' }] },
-      { id: 'panel-2', variables: [{ name: 'threshold', scope: 'panels', type: 'textbox', value: '500' }] }
-    ]
+      {
+        id: "panel-1",
+        variables: [
+          { name: "threshold", scope: "panels", type: "textbox", value: "100" },
+        ],
+      },
+      {
+        id: "panel-2",
+        variables: [
+          { name: "threshold", scope: "panels", type: "textbox", value: "500" },
+        ],
+      },
+    ],
   });
 
-  await page.goto('/dashboards/view/test-dashboard');
+  await page.goto("/dashboards/view/test-dashboard");
 
   // Verify: Panel 1 threshold = 100
-  await expect(page.locator('[data-test="panel-1-variable-threshold-value"]')).toHaveValue('100');
+  await expect(
+    page.locator('[data-test="panel-1-variable-threshold-value"]'),
+  ).toHaveValue("100");
 
   // Verify: Panel 2 threshold = 500 (different value)
-  await expect(page.locator('[data-test="panel-2-variable-threshold-value"]')).toHaveValue('500');
+  await expect(
+    page.locator('[data-test="panel-2-variable-threshold-value"]'),
+  ).toHaveValue("500");
 
   // Change Panel 1 threshold
-  await page.locator('[data-test="panel-1-variable-threshold-input"]').fill('200');
+  await page
+    .locator('[data-test="panel-1-variable-threshold-input"]')
+    .fill("200");
 
   // Verify: Panel 2 threshold unchanged
-  await expect(page.locator('[data-test="panel-2-variable-threshold-value"]')).toHaveValue('500');
+  await expect(
+    page.locator('[data-test="panel-2-variable-threshold-value"]'),
+  ).toHaveValue("500");
 });
 ```
 
 #### Test Case 3.3: Panel Variable Depends on Tab Variable
+
 ```typescript
-test('should allow panel variable to depend on tab variable', async ({ page }) => {
+test("should allow panel variable to depend on tab variable", async ({
+  page,
+}) => {
   // Setup: Tab variable → Panel variable dependency
   await createDashboardWithTabs(page, {
     tabs: [
       {
-        id: 'tab-1',
-        variables: [{ name: 'service', scope: 'tabs', type: 'custom', value: ['api', 'web'] }],
+        id: "tab-1",
+        variables: [
+          {
+            name: "service",
+            scope: "tabs",
+            type: "custom",
+            value: ["api", "web"],
+          },
+        ],
         panels: [
           {
-            id: 'panel-1',
+            id: "panel-1",
             variables: [
-              { name: 'endpoint', scope: 'panels', type: 'query_values',
-                dependsOn: 'service', query: 'SELECT endpoint WHERE service=$service'
-              }
-            ]
-          }
-        ]
-      }
-    ]
+              {
+                name: "endpoint",
+                scope: "panels",
+                type: "query_values",
+                dependsOn: "service",
+                query: "SELECT endpoint WHERE service=$service",
+              },
+            ],
+          },
+        ],
+      },
+    ],
   });
 
-  await page.goto('/dashboards/view/test-dashboard');
+  await page.goto("/dashboards/view/test-dashboard");
 
   // Select tab variable
   await page.locator('[data-test="variable-selector-service"]').click();
   await page.locator('[data-test="variable-option-api"]').click();
 
   // Verify: Panel variable starts loading
-  await expect(page.locator('[data-test="panel-1-variable-endpoint-loading"]')).toBeVisible();
+  await expect(
+    page.locator('[data-test="panel-1-variable-endpoint-loading"]'),
+  ).toBeVisible();
   await page.waitForSelector('[data-test="panel-1-variable-endpoint-loaded"]');
 
   // Change tab variable
@@ -2737,7 +3024,9 @@ test('should allow panel variable to depend on tab variable', async ({ page }) =
   await page.locator('[data-test="variable-option-web"]').click();
 
   // Verify: Panel variable reloads
-  await expect(page.locator('[data-test="panel-1-variable-endpoint-loading"]')).toBeVisible();
+  await expect(
+    page.locator('[data-test="panel-1-variable-endpoint-loading"]'),
+  ).toBeVisible();
 });
 ```
 
@@ -2748,45 +3037,62 @@ test('should allow panel variable to depend on tab variable', async ({ page }) =
 **File**: `dashboard-variables-dependencies.spec.ts`
 
 #### Test Case 4.1: Global → Tab → Panel Dependency Chain
+
 ```typescript
-test('should handle three-level dependency chain correctly', async ({ page }) => {
+test("should handle three-level dependency chain correctly", async ({
+  page,
+}) => {
   // Setup: Global → Tab → Panel
   await createDashboardWithTabs(page, {
     globalVariables: [
-      { name: 'country', type: 'custom', scope: 'global', value: ['USA'] }
+      { name: "country", type: "custom", scope: "global", value: ["USA"] },
     ],
     tabs: [
       {
-        id: 'tab-1',
+        id: "tab-1",
         variables: [
-          { name: 'region', scope: 'tabs', type: 'query_values',
-            dependsOn: 'country', query: 'SELECT region WHERE country=$country'
-          }
+          {
+            name: "region",
+            scope: "tabs",
+            type: "query_values",
+            dependsOn: "country",
+            query: "SELECT region WHERE country=$country",
+          },
         ],
         panels: [
           {
-            id: 'panel-1',
+            id: "panel-1",
             variables: [
-              { name: 'city', scope: 'panels', type: 'query_values',
-                dependsOn: 'region', query: 'SELECT city WHERE region=$region'
-              }
-            ]
-          }
-        ]
-      }
-    ]
+              {
+                name: "city",
+                scope: "panels",
+                type: "query_values",
+                dependsOn: "region",
+                query: "SELECT city WHERE region=$region",
+              },
+            ],
+          },
+        ],
+      },
+    ],
   });
 
-  await page.goto('/dashboards/view/test-dashboard');
+  await page.goto("/dashboards/view/test-dashboard");
 
   // Verify: All three levels load in sequence
-  await expect(page.locator('[data-test="variable-country-loading"]')).toBeVisible();
+  await expect(
+    page.locator('[data-test="variable-country-loading"]'),
+  ).toBeVisible();
   await page.waitForSelector('[data-test="variable-country-loaded"]');
 
-  await expect(page.locator('[data-test="variable-region-loading"]')).toBeVisible();
+  await expect(
+    page.locator('[data-test="variable-region-loading"]'),
+  ).toBeVisible();
   await page.waitForSelector('[data-test="variable-region-loaded"]');
 
-  await expect(page.locator('[data-test="panel-1-variable-city-loading"]')).toBeVisible();
+  await expect(
+    page.locator('[data-test="panel-1-variable-city-loading"]'),
+  ).toBeVisible();
   await page.waitForSelector('[data-test="panel-1-variable-city-loaded"]');
 
   // Change global variable
@@ -2794,68 +3100,102 @@ test('should handle three-level dependency chain correctly', async ({ page }) =>
   await page.locator('[data-test="variable-option-Canada"]').click();
 
   // Verify: Cascade reload through all levels
-  await expect(page.locator('[data-test="variable-region-loading"]')).toBeVisible();
+  await expect(
+    page.locator('[data-test="variable-region-loading"]'),
+  ).toBeVisible();
   await page.waitForSelector('[data-test="variable-region-loaded"]');
 
-  await expect(page.locator('[data-test="panel-1-variable-city-loading"]')).toBeVisible();
+  await expect(
+    page.locator('[data-test="panel-1-variable-city-loading"]'),
+  ).toBeVisible();
   await page.waitForSelector('[data-test="panel-1-variable-city-loaded"]');
 });
 ```
 
 #### Test Case 4.2: Multiple Dependencies at Same Level
+
 ```typescript
-test('should handle variable with multiple dependencies at same level', async ({ page }) => {
+test("should handle variable with multiple dependencies at same level", async ({
+  page,
+}) => {
   // Setup: Variable depending on two parent variables
   await createDashboardWithGlobalVariables(page, {
     variables: [
-      { name: 'startDate', type: 'textbox', scope: 'global', value: '2024-01-01' },
-      { name: 'endDate', type: 'textbox', scope: 'global', value: '2024-12-31' },
-      { name: 'events', type: 'query_values', scope: 'global',
-        dependsOn: ['startDate', 'endDate'],
-        query: 'SELECT * WHERE date >= $startDate AND date <= $endDate'
-      }
-    ]
+      {
+        name: "startDate",
+        type: "textbox",
+        scope: "global",
+        value: "2024-01-01",
+      },
+      {
+        name: "endDate",
+        type: "textbox",
+        scope: "global",
+        value: "2024-12-31",
+      },
+      {
+        name: "events",
+        type: "query_values",
+        scope: "global",
+        dependsOn: ["startDate", "endDate"],
+        query: "SELECT * WHERE date >= $startDate AND date <= $endDate",
+      },
+    ],
   });
 
-  await page.goto('/dashboards/view/test-dashboard');
+  await page.goto("/dashboards/view/test-dashboard");
 
   // Verify: Child variable waits for both parents
   await page.waitForSelector('[data-test="variable-startDate-loaded"]');
   await page.waitForSelector('[data-test="variable-endDate-loaded"]');
-  await expect(page.locator('[data-test="variable-events-loading"]')).toBeVisible();
+  await expect(
+    page.locator('[data-test="variable-events-loading"]'),
+  ).toBeVisible();
 
   // Change one parent
-  await page.locator('[data-test="variable-selector-startDate"]').fill('2024-06-01');
+  await page
+    .locator('[data-test="variable-selector-startDate"]')
+    .fill("2024-06-01");
 
   // Verify: Child reloads
-  await expect(page.locator('[data-test="variable-events-loading"]')).toBeVisible();
+  await expect(
+    page.locator('[data-test="variable-events-loading"]'),
+  ).toBeVisible();
 });
 ```
 
 #### Test Case 4.3: Circular Dependency Detection
+
 ```typescript
-test('should detect and prevent circular dependencies', async ({ page }) => {
+test("should detect and prevent circular dependencies", async ({ page }) => {
   // Setup: Attempt to create circular dependency
-  await page.goto('/dashboards/edit/test-dashboard');
+  await page.goto("/dashboards/edit/test-dashboard");
 
   // Create variable A
-  await addVariable(page, { name: 'varA', type: 'query_values', scope: 'global' });
+  await addVariable(page, {
+    name: "varA",
+    type: "query_values",
+    scope: "global",
+  });
 
   // Create variable B depending on A
   await addVariable(page, {
-    name: 'varB',
-    type: 'query_values',
-    scope: 'global',
-    dependsOn: 'varA'
+    name: "varB",
+    type: "query_values",
+    scope: "global",
+    dependsOn: "varA",
   });
 
   // Attempt to make A depend on B (circular)
-  await editVariable(page, 'varA', { dependsOn: 'varB' });
+  await editVariable(page, "varA", { dependsOn: "varB" });
 
   // Verify: Error message shown
-  await expect(page.locator('[data-test="error-circular-dependency"]')).toBeVisible();
-  await expect(page.locator('[data-test="error-circular-dependency"]'))
-    .toContainText('Circular dependency detected: varA → varB → varA');
+  await expect(
+    page.locator('[data-test="error-circular-dependency"]'),
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-test="error-circular-dependency"]'),
+  ).toContainText("Circular dependency detected: varA → varB → varA");
 
   // Verify: Save button disabled
   await expect(page.locator('[data-test="save-dashboard"]')).toBeDisabled();
@@ -2869,13 +3209,21 @@ test('should detect and prevent circular dependencies', async ({ page }) => {
 **File**: `dashboard-variables-url-sync.spec.ts`
 
 #### Test Case 5.1: Global Variable in URL
+
 ```typescript
-test('should sync global variable changes to URL', async ({ page }) => {
+test("should sync global variable changes to URL", async ({ page }) => {
   await createDashboardWithGlobalVariables(page, {
-    variables: [{ name: 'status', type: 'custom', scope: 'global', value: ['200', '404', '500'] }]
+    variables: [
+      {
+        name: "status",
+        type: "custom",
+        scope: "global",
+        value: ["200", "404", "500"],
+      },
+    ],
   });
 
-  await page.goto('/dashboards/view/test-dashboard');
+  await page.goto("/dashboards/view/test-dashboard");
 
   // Select variable value
   await page.locator('[data-test="variable-selector-status"]').click();
@@ -2894,16 +3242,39 @@ test('should sync global variable changes to URL', async ({ page }) => {
 ```
 
 #### Test Case 5.2: Tab-Scoped Variable in URL
+
 ```typescript
-test('should sync tab-scoped variable with correct URL format', async ({ page }) => {
+test("should sync tab-scoped variable with correct URL format", async ({
+  page,
+}) => {
   await createDashboardWithTabs(page, {
     tabs: [
-      { id: 'tab-1', variables: [{ name: 'region', scope: 'tabs', type: 'custom', value: ['CA', 'OR'] }] },
-      { id: 'tab-2', variables: [{ name: 'region', scope: 'tabs', type: 'custom', value: ['NY', 'NJ'] }] }
-    ]
+      {
+        id: "tab-1",
+        variables: [
+          {
+            name: "region",
+            scope: "tabs",
+            type: "custom",
+            value: ["CA", "OR"],
+          },
+        ],
+      },
+      {
+        id: "tab-2",
+        variables: [
+          {
+            name: "region",
+            scope: "tabs",
+            type: "custom",
+            value: ["NY", "NJ"],
+          },
+        ],
+      },
+    ],
   });
 
-  await page.goto('/dashboards/view/test-dashboard');
+  await page.goto("/dashboards/view/test-dashboard");
 
   // Tab 1: Select CA
   await page.locator('[data-test="variable-selector-region"]').click();
@@ -2926,19 +3297,29 @@ test('should sync tab-scoped variable with correct URL format', async ({ page })
 ```
 
 #### Test Case 5.3: Panel-Scoped Variable in URL
+
 ```typescript
-test('should sync panel-scoped variable with correct URL format', async ({ page }) => {
+test("should sync panel-scoped variable with correct URL format", async ({
+  page,
+}) => {
   await createDashboardWithPanels(page, {
     panels: [
-      { id: 'panel-123', variables: [{ name: 'threshold', scope: 'panels', type: 'textbox', value: '100' }] }
-    ]
+      {
+        id: "panel-123",
+        variables: [
+          { name: "threshold", scope: "panels", type: "textbox", value: "100" },
+        ],
+      },
+    ],
   });
 
-  await page.goto('/dashboards/view/test-dashboard');
+  await page.goto("/dashboards/view/test-dashboard");
 
   // Change panel variable
-  await page.locator('[data-test="panel-123-variable-threshold-input"]').fill('250');
-  await page.keyboard.press('Enter');
+  await page
+    .locator('[data-test="panel-123-variable-threshold-input"]')
+    .fill("250");
+  await page.keyboard.press("Enter");
 
   // Verify: URL has panel-scoped format
   await expect(page).toHaveURL(/var-threshold\.p\.panel-123=250/);
@@ -2946,52 +3327,107 @@ test('should sync panel-scoped variable with correct URL format', async ({ page 
 ```
 
 #### Test Case 5.4: Load Variables from URL
+
 ```typescript
-test('should restore variable state from URL on page load', async ({ page }) => {
+test("should restore variable state from URL on page load", async ({
+  page,
+}) => {
   await createDashboardWithGlobalVariables(page, {
     variables: [
-      { name: 'country', type: 'custom', scope: 'global', value: ['USA', 'Canada'] },
-      { name: 'status', type: 'custom', scope: 'global', value: ['200', '404', '500'] }
-    ]
+      {
+        name: "country",
+        type: "custom",
+        scope: "global",
+        value: ["USA", "Canada"],
+      },
+      {
+        name: "status",
+        type: "custom",
+        scope: "global",
+        value: ["200", "404", "500"],
+      },
+    ],
   });
 
   // Navigate with pre-set URL parameters
-  await page.goto('/dashboards/view/test-dashboard?var-country=Canada&var-status=404,500');
+  await page.goto(
+    "/dashboards/view/test-dashboard?var-country=Canada&var-status=404,500",
+  );
 
   // Verify: Variables restored from URL
-  await expect(page.locator('[data-test="variable-country-value"]')).toContainText('Canada');
-  await expect(page.locator('[data-test="variable-status-value"]')).toContainText('404, 500');
+  await expect(
+    page.locator('[data-test="variable-country-value"]'),
+  ).toContainText("Canada");
+  await expect(
+    page.locator('[data-test="variable-status-value"]'),
+  ).toContainText("404, 500");
 });
 ```
 
 #### Test Case 5.5: Drilldown URL Compatibility
+
 ```typescript
-test('should apply unscoped drilldown URL to all variable instances', async ({ page }) => {
+test("should apply unscoped drilldown URL to all variable instances", async ({
+  page,
+}) => {
   await createDashboardWithTabs(page, {
-    globalVariables: [{ name: 'status', type: 'custom', scope: 'global', value: ['200', '404'] }],
+    globalVariables: [
+      {
+        name: "status",
+        type: "custom",
+        scope: "global",
+        value: ["200", "404"],
+      },
+    ],
     tabs: [
-      { id: 'tab-1', variables: [{ name: 'status', scope: 'tabs', type: 'custom', value: ['200', '404'] }] },
-      { id: 'tab-2', variables: [{ name: 'status', scope: 'tabs', type: 'custom', value: ['200', '404'] }] }
-    ]
+      {
+        id: "tab-1",
+        variables: [
+          {
+            name: "status",
+            scope: "tabs",
+            type: "custom",
+            value: ["200", "404"],
+          },
+        ],
+      },
+      {
+        id: "tab-2",
+        variables: [
+          {
+            name: "status",
+            scope: "tabs",
+            type: "custom",
+            value: ["200", "404"],
+          },
+        ],
+      },
+    ],
   });
 
   // Navigate with drilldown URL (no scope specified)
-  await page.goto('/dashboards/view/test-dashboard?var-status=404');
+  await page.goto("/dashboards/view/test-dashboard?var-status=404");
 
   // Verify: Global variable set to 404
-  await expect(page.locator('[data-test="variable-status-value"]')).toContainText('404');
+  await expect(
+    page.locator('[data-test="variable-status-value"]'),
+  ).toContainText("404");
 
   // Switch to Tab 1
   await page.locator('[data-test="tab-button-tab-1"]').click();
 
   // Verify: Tab 1 variable also set to 404
-  await expect(page.locator('[data-test="tab-1-variable-status-value"]')).toContainText('404');
+  await expect(
+    page.locator('[data-test="tab-1-variable-status-value"]'),
+  ).toContainText("404");
 
   // Switch to Tab 2
   await page.locator('[data-test="tab-button-tab-2"]').click();
 
   // Verify: Tab 2 variable also set to 404
-  await expect(page.locator('[data-test="tab-2-variable-status-value"]')).toContainText('404');
+  await expect(
+    page.locator('[data-test="tab-2-variable-status-value"]'),
+  ).toContainText("404");
 });
 ```
 
@@ -3002,43 +3438,59 @@ test('should apply unscoped drilldown URL to all variable instances', async ({ p
 **File**: `dashboard-variables-edge-cases.spec.ts`
 
 #### Test Case 6.1: Variable with No Data (Null Case)
+
 ```typescript
-test('should handle variable with no query results', async ({ page }) => {
+test("should handle variable with no query results", async ({ page }) => {
   await createDashboardWithGlobalVariables(page, {
     variables: [
-      { name: 'nonexistent', type: 'query_values', scope: 'global',
-        query: 'SELECT field FROM nonexistent_table'
-      }
+      {
+        name: "nonexistent",
+        type: "query_values",
+        scope: "global",
+        query: "SELECT field FROM nonexistent_table",
+      },
     ],
-    panels: [
-      { id: 'panel-1', query: 'SELECT * WHERE field=$nonexistent' }
-    ]
+    panels: [{ id: "panel-1", query: "SELECT * WHERE field=$nonexistent" }],
   });
 
-  await page.goto('/dashboards/view/test-dashboard');
+  await page.goto("/dashboards/view/test-dashboard");
 
   // Verify: Variable shows empty state
   await page.waitForSelector('[data-test="variable-nonexistent-loaded"]');
-  await expect(page.locator('[data-test="variable-nonexistent-empty"]')).toBeVisible();
+  await expect(
+    page.locator('[data-test="variable-nonexistent-empty"]'),
+  ).toBeVisible();
 
   // Verify: Panel query uses sentinel value
-  const panelQuery = await page.locator('[data-test="panel-1-query"]').textContent();
-  expect(panelQuery).toContain('field=_o2_all_');
+  const panelQuery = await page
+    .locator('[data-test="panel-1-query"]')
+    .textContent();
+  expect(panelQuery).toContain("field=_o2_all_");
 });
 ```
 
 #### Test Case 6.2: Rapid Tab Switching
+
 ```typescript
-test('should handle rapid tab switching without errors', async ({ page }) => {
+test("should handle rapid tab switching without errors", async ({ page }) => {
   await createDashboardWithTabs(page, {
     tabs: [
-      { id: 'tab-1', variables: [{ name: 'var1', scope: 'tabs', type: 'query_values' }] },
-      { id: 'tab-2', variables: [{ name: 'var2', scope: 'tabs', type: 'query_values' }] },
-      { id: 'tab-3', variables: [{ name: 'var3', scope: 'tabs', type: 'query_values' }] }
-    ]
+      {
+        id: "tab-1",
+        variables: [{ name: "var1", scope: "tabs", type: "query_values" }],
+      },
+      {
+        id: "tab-2",
+        variables: [{ name: "var2", scope: "tabs", type: "query_values" }],
+      },
+      {
+        id: "tab-3",
+        variables: [{ name: "var3", scope: "tabs", type: "query_values" }],
+      },
+    ],
   });
 
-  await page.goto('/dashboards/view/test-dashboard');
+  await page.goto("/dashboards/view/test-dashboard");
 
   // Rapidly switch tabs
   for (let i = 0; i < 10; i++) {
@@ -3054,22 +3506,25 @@ test('should handle rapid tab switching without errors', async ({ page }) => {
 ```
 
 #### Test Case 6.3: Panel Scrolling Performance
+
 ```typescript
-test('should efficiently load panel variables during scrolling', async ({ page }) => {
+test("should efficiently load panel variables during scrolling", async ({
+  page,
+}) => {
   // Setup: Many panels with variables
   await createDashboardWithPanels(page, {
     panels: Array.from({ length: 20 }, (_, i) => ({
       id: `panel-${i}`,
-      variables: [{ name: `var${i}`, scope: 'panels', type: 'query_values' }]
-    }))
+      variables: [{ name: `var${i}`, scope: "panels", type: "query_values" }],
+    })),
   });
 
-  await page.goto('/dashboards/view/test-dashboard');
+  await page.goto("/dashboards/view/test-dashboard");
 
   // Track network requests
   let loadCount = 0;
-  page.on('request', (request) => {
-    if (request.url().includes('field_values')) loadCount++;
+  page.on("request", (request) => {
+    if (request.url().includes("field_values")) loadCount++;
   });
 
   // Scroll through entire page
@@ -3084,57 +3539,73 @@ test('should efficiently load panel variables during scrolling', async ({ page }
 ```
 
 #### Test Case 6.4: Variable Depends on Hidden Tab
+
 ```typescript
-test('should auto-load dependencies from hidden tabs', async ({ page }) => {
+test("should auto-load dependencies from hidden tabs", async ({ page }) => {
   await createDashboardWithTabs(page, {
     tabs: [
       {
-        id: 'tab-1',
-        variables: [{ name: 'service', scope: 'tabs', type: 'custom', value: ['api'] }]
+        id: "tab-1",
+        variables: [
+          { name: "service", scope: "tabs", type: "custom", value: ["api"] },
+        ],
       },
       {
-        id: 'tab-2',
+        id: "tab-2",
         panels: [
           {
-            id: 'panel-1',
+            id: "panel-1",
             variables: [
-              { name: 'endpoint', scope: 'panels', type: 'query_values',
-                dependsOn: 'service', query: 'SELECT endpoint WHERE service=$service'
-              }
-            ]
-          }
-        ]
-      }
-    ]
+              {
+                name: "endpoint",
+                scope: "panels",
+                type: "query_values",
+                dependsOn: "service",
+                query: "SELECT endpoint WHERE service=$service",
+              },
+            ],
+          },
+        ],
+      },
+    ],
   });
 
-  await page.goto('/dashboards/view/test-dashboard');
+  await page.goto("/dashboards/view/test-dashboard");
 
   // Navigate directly to Tab 2 (Tab 1 never activated)
   await page.locator('[data-test="tab-button-tab-2"]').click();
 
   // Verify: Panel variable still loads (parent from Tab 1 auto-loaded)
-  await expect(page.locator('[data-test="panel-1-variable-endpoint-loading"]')).toBeVisible();
+  await expect(
+    page.locator('[data-test="panel-1-variable-endpoint-loading"]'),
+  ).toBeVisible();
   await page.waitForSelector('[data-test="panel-1-variable-endpoint-loaded"]');
 });
 ```
 
 #### Test Case 6.5: Backward Compatibility with Legacy Dashboards
+
 ```typescript
-test('should auto-migrate legacy dashboards without explicit scope', async ({ page }) => {
+test("should auto-migrate legacy dashboards without explicit scope", async ({
+  page,
+}) => {
   // Setup: Dashboard with old format (no scope field)
   await createLegacyDashboard(page, {
     variables: [
-      { name: 'country', type: 'query_values' }, // No scope specified
-      { name: 'status', type: 'custom', value: ['200', '404'] } // No scope specified
-    ]
+      { name: "country", type: "query_values" }, // No scope specified
+      { name: "status", type: "custom", value: ["200", "404"] }, // No scope specified
+    ],
   });
 
-  await page.goto('/dashboards/view/legacy-dashboard');
+  await page.goto("/dashboards/view/legacy-dashboard");
 
   // Verify: Variables migrated to global scope
-  await expect(page.locator('[data-test="variable-selector-country"]')).toBeVisible();
-  await expect(page.locator('[data-test="variable-selector-status"]')).toBeVisible();
+  await expect(
+    page.locator('[data-test="variable-selector-country"]'),
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-test="variable-selector-status"]'),
+  ).toBeVisible();
 
   // Verify: Variables work as global (visible everywhere)
   await page.locator('[data-test="variable-selector-status"]').click();
@@ -3150,21 +3621,25 @@ test('should auto-migrate legacy dashboards without explicit scope', async ({ pa
 ### Test Execution Strategy
 
 #### 1. Pre-Implementation Testing
+
 - Create test cases BEFORE implementation
 - Use tests as specification validation
 - Tests will fail initially (expected)
 
 #### 2. During Implementation
+
 - Run relevant test suite after each feature completion
 - Use test failures to identify integration issues
 - Fix issues immediately before moving to next feature
 
 #### 3. Post-Implementation Validation
+
 - **CRITICAL**: Run COMPLETE test suite after implementation
 - All tests MUST pass before considering implementation complete
 - Address any failures with high priority
 
 #### 4. Continuous Testing
+
 - Include tests in CI/CD pipeline
 - Run on every commit to prevent regressions
 - Monitor test performance and stability
