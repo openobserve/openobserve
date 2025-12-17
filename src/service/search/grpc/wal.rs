@@ -28,7 +28,9 @@ use config::{
     utils::{
         async_file::{create_wal_dir_datetime_filter, scan_files_filtered},
         file::is_exists,
-        parquet::{parse_time_range_from_filename, read_metadata_from_file_name},
+        parquet::{
+            parse_time_range_from_filename, read_metadata_from_file, read_metadata_from_file_name,
+        },
         record_batch_ext::concat_batches,
         size::bytes_to_human_readable,
         time::{DAY_MICRO_SECS, HOUR_MICRO_SECS},
@@ -120,9 +122,14 @@ pub async fn search_parquet(
                 return file;
             }
             drop(r);
-            let meta = read_metadata_from_file_name(&source_file.into())
-                .await
-                .unwrap_or_default();
+            let path = source_file.into();
+            let meta = if let Some(meta) = read_metadata_from_file(&path).await {
+                meta
+            } else {
+                read_metadata_from_file_name(&path)
+                    .await
+                    .unwrap_or_default()
+            };
             file.meta = meta;
             file
         })
