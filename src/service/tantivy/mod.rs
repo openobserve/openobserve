@@ -19,7 +19,10 @@ pub mod puffin_directory;
 use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Context;
-use arrow::array::{Array, BooleanArray, Float64Array, Int64Array, StringArray, UInt64Array};
+use arrow::array::{
+    Array, BooleanArray, Float64Array, Int64Array, LargeStringArray, StringArray, StringViewArray,
+    UInt64Array,
+};
 use arrow_schema::{DataType, Schema};
 use bytes::Bytes;
 use config::{
@@ -35,6 +38,41 @@ use hashbrown::HashSet;
 use infra::storage;
 use puffin_directory::writer::PuffinDirWriter;
 use tokio::task::JoinHandle;
+
+// macro to reduce duplication in array processing
+macro_rules! process_string_array {
+    ($data:expr, $array_type:ty, $docs:expr, $field:expr) => {
+        if let Some(array) = $data.as_any().downcast_ref::<$array_type>() {
+            for (i, doc) in $docs.iter_mut().enumerate() {
+                if array.is_null(i) {
+                    doc.add_text($field, "");
+                } else {
+                    doc.add_text($field, array.value(i));
+                }
+                tokio::task::coop::consume_budget().await;
+            }
+            continue;
+        }
+    };
+}
+
+// macro to reduce duplication in array processing
+macro_rules! process_numeric_array {
+    ($data:expr, $array_type:ty, $docs:expr, $field:expr) => {
+        if let Some(array) = $data.as_any().downcast_ref::<$array_type>() {
+            for (i, doc) in $docs.iter_mut().enumerate() {
+                if array.is_null(i) {
+                    doc.add_text($field, "");
+                } else {
+                    let text = array.value(i).to_string();
+                    doc.add_text($field, &text);
+                }
+                tokio::task::coop::consume_budget().await;
+            }
+            continue;
+        }
+    };
+}
 
 pub(crate) async fn create_tantivy_index(
     caller: &str,
@@ -194,66 +232,36 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
             // process full text search fields
             let mut docs = vec![tantivy::doc!(); num_rows];
             for column_name in tantivy_fields.iter() {
-                // utf8, uint64, int64, float64, boolean
-                let column_data = match inverted_idx_batch.column_by_name(column_name) {
-                    Some(data) => {
-                        if let Some(array) = data.as_any().downcast_ref::<StringArray>() {
-                            array
-                        } else if let Some(array) = data.as_any().downcast_ref::<Int64Array>() {
-                            // convert to string array
-                            &StringArray::from(
-                                array
-                                    .values()
-                                    .iter()
-                                    .map(|v| v.to_string())
-                                    .collect::<Vec<_>>(),
-                            )
-                        } else if let Some(array) = data.as_any().downcast_ref::<UInt64Array>() {
-                            // convert to string array
-                            &StringArray::from(
-                                array
-                                    .values()
-                                    .iter()
-                                    .map(|v| v.to_string())
-                                    .collect::<Vec<_>>(),
-                            )
-                        } else if let Some(array) = data.as_any().downcast_ref::<BooleanArray>() {
-                            // convert to string array
-                            &StringArray::from(
-                                array
-                                    .values()
-                                    .iter()
-                                    .map(|v| v.to_string())
-                                    .collect::<Vec<_>>(),
-                            )
-                        } else if let Some(array) = data.as_any().downcast_ref::<Float64Array>() {
-                            // convert to string array
-                            &StringArray::from(
-                                array
-                                    .values()
-                                    .iter()
-                                    .map(|v| v.to_string())
-                                    .collect::<Vec<_>>(),
-                            )
-                        } else {
-                            // generate empty array to ensure the tantivy and parquet have same rows
-                            &StringArray::from(vec![""; num_rows])
-                        }
-                    }
-                    None => {
-                        // generate empty array to ensure the tantivy and parquet have same rows
-                        &StringArray::from(vec![""; num_rows])
-                    }
-                };
-
                 // get field
                 let field = match tantivy_schema.get_field(column_name) {
                     Ok(f) => f,
                     Err(_) => fts_field.unwrap(),
                 };
-                for (i, doc) in docs.iter_mut().enumerate() {
-                    doc.add_text(field, column_data.value(i));
-                    tokio::task::coop::consume_budget().await;
+
+                // get column data and convert to strings for indexing
+                if let Some(data) = inverted_idx_batch.column_by_name(column_name) {
+                    // handle string types directly
+                    process_string_array!(data, StringViewArray, docs, field);
+                    process_string_array!(data, StringArray, docs, field);
+                    process_string_array!(data, LargeStringArray, docs, field);
+
+                    // handle numeric and boolean types with to_string conversion
+                    process_numeric_array!(data, Int64Array, docs, field);
+                    process_numeric_array!(data, UInt64Array, docs, field);
+                    process_numeric_array!(data, Float64Array, docs, field);
+                    process_numeric_array!(data, BooleanArray, docs, field);
+
+                    // unsupported type, add empty string
+                    for doc in docs.iter_mut() {
+                        doc.add_text(field, "");
+                        tokio::task::coop::consume_budget().await;
+                    }
+                } else {
+                    // column not found, add empty string
+                    for doc in docs.iter_mut() {
+                        doc.add_text(field, "");
+                        tokio::task::coop::consume_budget().await;
+                    }
                 }
             }
 

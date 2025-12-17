@@ -277,16 +277,16 @@ arrow-json = "57.0.0"
 arrow-schema = { version = "57.0.0", features = ["serde"] }
 parquet = { version = "57.0.0", features = ["arrow", "async", "object_store"] }
 object_store = { version = "0.12.4", features = ["aws", "azure", "gcp"] }
-vortex-array = { git = "https://github.com/haohuaijin/vortex", rev = "78e953e41a222f22cac9c1b91cad671649597619" }
-vortex-buffer = { git = "https://github.com/haohuaijin/vortex", rev = "78e953e41a222f22cac9c1b91cad671649597619" }
-vortex-file = { git = "https://github.com/haohuaijin/vortex", rev = "78e953e41a222f22cac9c1b91cad671649597619" }
-vortex-io = { git = "https://github.com/haohuaijin/vortex", rev = "78e953e41a222f22cac9c1b91cad671649597619" }
-vortex-session = { git = "https://github.com/haohuaijin/vortex", rev = "78e953e41a222f22cac9c1b91cad671649597619" }
-vortex = { git = "https://github.com/haohuaijin/vortex", rev = "78e953e41a222f22cac9c1b91cad671649597619", features = [
+vortex-array = { git = "https://github.com/haohuaijin/vortex", rev = "6d2b64f50199789d8ff02accd3104121f5cdd9e7" }
+vortex-buffer = { git = "https://github.com/haohuaijin/vortex", rev = "6d2b64f50199789d8ff02accd3104121f5cdd9e7" }
+vortex-file = { git = "https://github.com/haohuaijin/vortex", rev = "6d2b64f50199789d8ff02accd3104121f5cdd9e7" }
+vortex-io = { git = "https://github.com/haohuaijin/vortex", rev = "6d2b64f50199789d8ff02accd3104121f5cdd9e7" }
+vortex-session = { git = "https://github.com/haohuaijin/vortex", rev = "6d2b64f50199789d8ff02accd3104121f5cdd9e7" }
+vortex = { git = "https://github.com/haohuaijin/vortex", rev = "6d2b64f50199789d8ff02accd3104121f5cdd9e7", features = [
     "tokio",
 ] }
-vortex-datafusion = { git = "https://github.com/haohuaijin/vortex", rev = "78e953e41a222f22cac9c1b91cad671649597619" }
-vortex-scan = { git = "https://github.com/haohuaijin/vortex", rev = "78e953e41a222f22cac9c1b91cad671649597619", features = [
+vortex-datafusion = { git = "https://github.com/haohuaijin/vortex", rev = "6d2b64f50199789d8ff02accd3104121f5cdd9e7" }
+vortex-scan = { git = "https://github.com/haohuaijin/vortex", rev = "6d2b64f50199789d8ff02accd3104121f5cdd9e7", features = [
     "roaring",
 ] }
 sqlparser = { version = "0.59.0", features = ["serde", "visitor"] }
