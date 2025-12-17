@@ -559,43 +559,21 @@ export default defineComponent({
     // provide it to child components
     provide("selectedTabId", selectedTabId);
 
+    // Track if we're using the scoped variables manager
+    const usingScopedVariablesManager = ref(false);
+
     // variables data
     const variablesData = reactive({});
     const refreshedVariablesData = reactive({}); // Flag to track if variables have changed
 
     const variablesDataUpdated = (data: any) => {
+      // ONLY update the live variables data - DO NOT update URL
+      // URL updates should happen ONLY after commitAll() is called (on refresh button click)
+      // This follows the __global mechanism from the main branch design
       Object.assign(variablesData, data);
-      const variableObj = {};
-      data.values?.forEach((variable) => {
-        if (variable.type === "dynamic_filters") {
-          const filters = (variable.value || []).filter(
-            (item: any) => item.name && item.operator && item.value,
-          );
-          const encodedFilters = filters.map((item: any) => ({
-            name: item.name,
-            operator: item.operator,
-            value: item.value,
-          }));
-          variableObj[`var-${variable.name}`] = encodeURIComponent(
-            JSON.stringify(encodedFilters),
-          );
-        } else {
-          variableObj[`var-${variable.name}`] = variable.value;
-        }
-      });
-      router.replace({
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          dashboard: route.query.dashboard,
-          folder: route.query.folder,
-          tab: selectedTabId.value,
-          refresh: generateDurationLabel(refreshInterval.value),
-          ...getQueryParamsForDuration(selectedDate.value),
-          ...variableObj,
-          print: store.state.printMode,
-          searchtype: route.query.searchtype,
-        },
-      });
+
+      // NOTE: URL sync has been moved to refreshData() after commitAll()
+      // This ensures URL only reflects COMMITTED variable values, not live changes
     };
 
     const refreshedVariablesDataUpdated = (variablesData: any) => {
@@ -719,6 +697,9 @@ export default defineComponent({
 
           // Load variable values from URL if present
           variablesManager.loadFromUrl(route);
+
+          // Track that we're using the scoped variables manager
+          usingScopedVariablesManager.value = true;
         } catch (error: any) {
           console.error("Error initializing variables manager:", error);
           if (error.message?.includes("Circular dependency")) {
@@ -729,6 +710,9 @@ export default defineComponent({
             showErrorNotification("Invalid variable dependency configuration");
           }
         }
+      } else {
+        // Not using scoped variables manager
+        usingScopedVariablesManager.value = false;
       }
 
       // set selected tab from query params
@@ -926,14 +910,6 @@ export default defineComponent({
         if (variablesManager) {
           variablesManager.commitAll();
           // After committing, sync committed values to URL so only committed state is reflected in the URL
-          try {
-            variablesManager.syncToUrl(router, route);
-            console.log(
-              "[ViewDashboard] Committed all variable changes and synced to URL",
-            );
-          } catch (err) {
-            console.warn("[ViewDashboard] Error syncing variables to URL", err);
-          }
         }
 
         // Refresh the dashboard
@@ -1040,24 +1016,76 @@ export default defineComponent({
       }
     });
 
+    // Helper to get current variable params from manager
+    const getVariableParamsFromManager = (): Record<string, any> => {
+      const variableParams: Record<string, any> = {};
+
+      if (!variablesManager) return variableParams;
+
+      const committedVars = variablesManager.committedVariablesData;
+
+      // Helper to check if value is valid for URL
+      const hasValidValue = (value: any): boolean => {
+        if (value === null || value === undefined) return false;
+        if (value === "null") return false;
+        if (Array.isArray(value) && value.length === 0) return false;
+        if (Array.isArray(value) && value.every((v) => v === null || v === undefined || v === "")) return false;
+        return true;
+      };
+
+      // Global variables
+      committedVars.global.forEach((variable: any) => {
+        if (variable.type !== "dynamic_filters" && hasValidValue(variable.value)) {
+          variableParams[`var-${variable.name}`] = variable.value;
+        }
+      });
+
+      // Tab variables
+      Object.entries(committedVars.tabs).forEach(([tabId, variables]: [string, any]) => {
+        variables.forEach((variable: any) => {
+          if (variable.type !== "dynamic_filters" && hasValidValue(variable.value)) {
+            variableParams[`var-${variable.name}.t.${tabId}`] = variable.value;
+          }
+        });
+      });
+
+      // Panel variables
+      Object.entries(committedVars.panels).forEach(([panelId, variables]: [string, any]) => {
+        variables.forEach((variable: any) => {
+          if (variable.type !== "dynamic_filters" && hasValidValue(variable.value)) {
+            variableParams[`var-${variable.name}.p.${panelId}`] = variable.value;
+          }
+        });
+      });
+
+      return variableParams;
+    };
+
     // whenever the refreshInterval is changed, update the query params
     watch([refreshInterval, selectedDate, selectedTabId], () => {
       generateNewDashboardRunId();
+
+      // Get variable params from manager instead of route.query to avoid race condition
+      const variableParams = getVariableParamsFromManager();
+
+      console.log("[ViewDashboard] Watcher triggered - preserving variables from manager:", variableParams);
+
       router.replace({
         query: {
-          ...route.query, // used to keep current variables data as is
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder,
           tab: selectedTabId.value,
           refresh: generateDurationLabel(refreshInterval.value),
           ...getQueryParamsForDuration(selectedDate.value),
+          ...variableParams, // Use variables from manager
           print: store.state.printMode,
           searchtype: route.query.searchtype,
         },
       });
     });
 
+  
     const onDeletePanel = async (panelId: any) => {
       try {
         await deletePanel(

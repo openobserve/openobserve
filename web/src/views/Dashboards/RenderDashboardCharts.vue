@@ -117,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : undefined) || false
             "
             :variablesData="getMergedVariablesForPanel(panels[0]?.id)"
+            :currentVariablesData="getLiveVariablesForPanel()"
             :forceLoad="forceLoad"
             :searchType="searchType"
             :runId="runId"
@@ -182,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   shouldRefreshWithoutCacheObj?.[item?.id] || false
                 "
                 :variablesData="getMergedVariablesForPanel(item.id)"
-                :currentVariablesData="variablesData"
+                :currentVariablesData="getLiveVariablesForPanel()"
                 :width="getPanelLayout(item, 'w')"
                 :height="getPanelLayout(item, 'h')"
                 :forceLoad="forceLoad"
@@ -405,6 +406,25 @@ export default defineComponent({
       return {
         isVariablesLoading: variablesManager.isLoading.value,
         values: mergedVars
+      };
+    };
+
+    // Helper to get LIVE (uncommitted) variables for a panel
+    // Used for detecting changes and showing yellow refresh icon
+    const getLiveVariablesForPanel = () => {
+      if (!variablesManager) {
+        // Legacy mode: use variablesData ref
+        return variablesData.value;
+      }
+
+      // Get live variables for the selected tab
+      // This allows panel to detect uncommitted changes
+      const liveVars = variablesManager.getVariablesForPanel('', selectedTabId.value);
+
+      // Convert to old format for backward compatibility
+      return {
+        isVariablesLoading: variablesManager.isLoading.value,
+        values: liveVars
       };
     };
 
@@ -1045,6 +1065,7 @@ export default defineComponent({
       currentTabVariables,
       getPanelVariables,
       getMergedVariablesForPanel,
+      getLiveVariablesForPanel,
     };
   },
   methods: {
