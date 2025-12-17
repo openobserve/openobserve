@@ -21,7 +21,7 @@ use std::{
 use anyhow::Result;
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, SQL_FULL_TEXT_SEARCH_FIELDS,
-    TIMESTAMP_COL_NAME,
+    SQL_SECONDARY_INDEX_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE_ID,
     get_config,
     ider::SnowflakeIdGenerator,
@@ -374,8 +374,20 @@ pub(crate) async fn handle_diff_schema(
             cfg.common.column_all.to_string(),
         ];
         let mut keep_fields = check_schema_for_defined_schema_fields(stream_type, keep_fields);
-        // add FTS fields
+        // add FTS fields (default SQL FTS fields)
         for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
+            keep_fields.insert(field.to_string());
+        }
+        // add secondary index fields (default SQL secondary index fields)
+        for field in SQL_SECONDARY_INDEX_SEARCH_FIELDS.iter() {
+            keep_fields.insert(field.to_string());
+        }
+        // add user-configured FTS fields
+        for field in stream_setting.full_text_search_keys.iter() {
+            keep_fields.insert(field.to_string());
+        }
+        // add user-configured index fields
+        for field in stream_setting.index_fields.iter() {
             keep_fields.insert(field.to_string());
         }
 

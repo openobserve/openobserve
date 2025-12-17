@@ -993,6 +993,8 @@ async fn extract_patterns_from_parquet(
 
     // ParquetRecordBatchStream is a Stream, use .next().await
     use futures::StreamExt;
+
+    use crate::common::meta::ingestion::{IngestUser, SystemJobType};
     while let Some(batch_result) = reader.next().await {
         let batch = batch_result?;
 
@@ -1083,9 +1085,14 @@ async fn extract_patterns_from_parquet(
 
     // Ingest patterns immediately
     let ingest_start = std::time::Instant::now();
-    crate::service::logs::patterns::ingest_patterns(org_id, stream_name, patterns)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to ingest patterns: {}", e))?;
+    crate::service::logs::patterns::ingest_patterns(
+        org_id,
+        stream_name,
+        patterns,
+        IngestUser::SystemJob(SystemJobType::LogPatterns),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("Failed to ingest patterns: {}", e))?;
     let ingest_duration = ingest_start.elapsed();
 
     let total_duration = start.elapsed();

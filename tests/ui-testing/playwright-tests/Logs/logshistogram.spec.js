@@ -66,7 +66,8 @@ test.describe("Logs Histogram testcases", () => {
     await page.waitForTimeout(1000);
 
     // Wait for initial search to complete
-    const allsearch = page.waitForResponse("**/api/default/_search**", { timeout: 60000 });
+    const orgName = process.env.ORGNAME || 'default';
+    const allsearch = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await allsearch;
     await page.waitForTimeout(1000);
@@ -100,7 +101,8 @@ test.describe("Logs Histogram testcases", () => {
     await pm.logsPage.waitForTimeout(1000);
 
     // Wait for search response before checking for error
-    const searchResponse = page.waitForResponse("**/api/default/_search**", { timeout: 60000 });
+    const orgName = process.env.ORGNAME || 'default';
+    const searchResponse = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
     await pm.logsPage.clickRefresh();
     await searchResponse;
     await pm.logsPage.waitForTimeout(2000);
@@ -113,7 +115,7 @@ test.describe("Logs Histogram testcases", () => {
     await pm.logsPage.waitForTimeout(1000);
 
     // Wait for search response before checking for no data
-    const sqlSearchResponse = page.waitForResponse("**/api/default/_search**", { timeout: 60000 });
+    const sqlSearchResponse = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
     await pm.logsPage.clickRefresh();
     await sqlSearchResponse;
     await pm.logsPage.waitForTimeout(2000);

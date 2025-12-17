@@ -332,7 +332,7 @@ export default defineComponent({
 
     onMounted(() => {
       //  We don't need to make license data call for cloud
-      if(config.isCloud == 'false'){
+      if(config.isCloud == 'false' && config.isEnterprise == 'true'){
         loadLicenseData();
       }
     });

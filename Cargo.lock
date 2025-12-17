@@ -5523,6 +5523,7 @@ dependencies = [
  "ahash 0.8.11",
  "anyhow",
  "arc-swap",
+ "arrow",
  "async-nats",
  "async-recursion",
  "async-trait",
@@ -5544,7 +5545,6 @@ dependencies = [
  "parquet",
  "proto",
  "reqwest",
- "scc",
  "sea-orm",
  "sea-orm-migration",
  "serde",
@@ -5583,7 +5583,6 @@ dependencies = [
  "log",
  "once_cell",
  "parquet",
- "scc",
  "serde",
  "serde_json",
  "snafu 0.8.9",
@@ -7187,7 +7186,6 @@ dependencies = [
  "rust-embed-for-web",
  "rustls 0.23.20",
  "rustls-pemfile 2.2.0",
- "scc",
  "sea-orm",
  "segment",
  "serde",
@@ -9539,12 +9537,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f3cb5ba0dc43242ce17de99c180e96db90b235b8a9fdc9543c96d2209116bd9f"
 
 [[package]]
-name = "saa"
-version = "5.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4dfac11c0cd0606aaf7eb9ef66f82c119438a96dc487715abb8b57fdf08ad4fe"
-
-[[package]]
 name = "salsa20"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9560,17 +9552,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
 dependencies = [
  "winapi-util",
-]
-
-[[package]]
-name = "scc"
-version = "3.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd714a8af37b350df813d52ae4b2ea19211e40dac10dce189d80fb95e44cc618"
-dependencies = [
- "equivalent",
- "saa",
- "sdd",
 ]
 
 [[package]]
@@ -9597,12 +9578,6 @@ dependencies = [
  "ring",
  "untrusted",
 ]
-
-[[package]]
-name = "sdd"
-version = "4.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19556830bd73d11d6961adaf20b1725fbb5b74c8cc32888a4dcd7049c56b6c35"
 
 [[package]]
 name = "sea-bae"

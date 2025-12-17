@@ -31,6 +31,7 @@ use config::{
     utils::{
         json,
         parquet::{read_recordbatch_from_bytes, write_recordbatch_to_parquet},
+        time::{BASE_TIME, now_micros},
     },
 };
 use hashbrown::HashSet;
@@ -116,7 +117,7 @@ pub async fn generate_by_stream(
         stream_type,
         stream_name,
         PartitionTimeLevel::Hourly,
-        None,
+        (BASE_TIME.timestamp_micros(), now_micros()),
         Some(false),
     )
     .await?;
