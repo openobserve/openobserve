@@ -29,8 +29,8 @@ use config::{
         async_file::{get_file_meta, get_file_size},
         file::scan_files_with_channel,
         parquet::{
-            get_recordbatch_reader_from_bytes, parse_time_range_from_filename,
-            read_schema_from_file,
+            get_recordbatch_reader_from_bytes, parse_metadata_from_filename,
+            read_metadata_from_file, read_schema_from_file,
         },
         schema_ext::SchemaExt,
     },
@@ -307,25 +307,42 @@ async fn prepare_files(
             continue;
         }
 
-        // let parquet_meta = if let Some(meta) = WAL_PARQUET_METADATA.read().await.get(&file_key) {
-        //     meta.clone()
-        // } else if let Ok(parquet_meta) = read_metadata_from_file(&(&file).into()).await {
-        //     parquet_meta
-        // } else {
-        //     continue;
-        // };
-        // if parquet_meta.eq(&FileMeta::default()) {
-        //     log::warn!("[INGESTER:JOB] the file is empty, just delete file: {file}");
-        //     // delete metadata from cache
-        //     WAL_PARQUET_METADATA.write().await.remove(&file_key);
-        //     // delete file from disk
-        //     if let Err(e) = remove_file(wal_dir.join(&file)).await {
-        //         log::error!("[INGESTER:JOB] Failed to remove parquet file from disk: {file},
-        // {e}");     }
-        //     continue;
-        // }
-        let (min_ts, max_ts) = parse_time_range_from_filename(&file_key);
-        let compressed_size = get_file_size(&wal_dir.join(&file_key)).await.unwrap_or(0);
+        // Check if the file has valid metadata, either from cache or by reading the file
+        let meta = if let Some(meta) = WAL_PARQUET_METADATA.read().await.get(&file_key) {
+            meta.clone()
+        } else if file_key.ends_with(".parquet")
+            && let Some(meta) = read_metadata_from_file(&wal_dir.join(&file_key)).await
+        {
+            meta
+        } else {
+            let (min_ts, max_ts, original_size) = parse_metadata_from_filename(&file_key);
+            if original_size == 0 {
+                log::warn!("[INGESTER:JOB] original_size is 0 for file: {file_key}");
+            }
+            let compressed_size = get_file_size(&wal_dir.join(&file_key))
+                .await
+                .unwrap_or_default();
+            FileMeta {
+                min_ts,
+                max_ts,
+                original_size,
+                compressed_size: compressed_size as i64,
+                ..Default::default()
+            }
+        };
+
+        // If the file is empty, delete it immediately
+        if meta.eq(&FileMeta::default()) {
+            log::warn!("[INGESTER:JOB] the file is empty, just delete file: {file}");
+            // delete metadata from cache
+            WAL_PARQUET_METADATA.write().await.remove(&file_key);
+            // delete file from disk
+            if let Err(e) = remove_file(wal_dir.join(&file)).await {
+                log::error!("[INGESTER:JOB] Failed to remove parquet file from disk: {file}, {e}");
+            }
+            continue;
+        }
+
         let prefix = file_key[..file_key.rfind('/').unwrap()].to_string();
         // remove thread_id from prefix
         // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/
@@ -337,12 +354,7 @@ async fn prepare_files(
             0,
             "".to_string(), // here we don't need it
             file_key.clone(),
-            FileMeta {
-                min_ts,
-                max_ts,
-                compressed_size: compressed_size as i64,
-                ..Default::default()
-            },
+            meta,
             false,
         ));
         // mark the file as processing
@@ -690,7 +702,7 @@ async fn merge_files(
     let max_ts = new_file_list.iter().map(|f| f.meta.max_ts).max().unwrap();
     let total_records = new_file_list.iter().map(|f| f.meta.records).sum();
     let new_file_size = new_file_list.iter().map(|f| f.meta.original_size).sum();
-    let mut new_file_meta = FileMeta {
+    let new_file_meta = FileMeta {
         min_ts,
         max_ts,
         records: total_records,
@@ -698,9 +710,6 @@ async fn merge_files(
         flattened: false,
         ..Default::default()
     };
-    // if new_file_meta.records == 0 {
-    //     return Err(anyhow::anyhow!("merge_files error: records is 0"));
-    // }
 
     // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/7099303408192061440f3XQ2p.
     // parquet eg: files/default/traces/default/2/2023/09/04/05/default/service_name=ingester/
@@ -780,7 +789,7 @@ async fn merge_files(
         schema,
         tables,
         &bloom_filter_fields,
-        &new_file_meta,
+        new_file_meta,
         true,
     )
     .await;
@@ -798,15 +807,14 @@ async fn merge_files(
         }
     };
 
-    let buf = match buf {
-        MergeParquetResult::Single(v) => v,
+    let (buf, mut new_file_meta) = match buf {
+        MergeParquetResult::Single(buf, meta) => (buf, meta),
         MergeParquetResult::Multiple { .. } => {
             // ingester should not support multiple files, it will be handled in compactor mode
             panic!("[INGESTER:JOB] merge_parquet_files error: multiple files");
         }
     };
 
-    new_file_meta.compressed_size = buf.len() as i64;
     if new_file_meta.compressed_size == 0 {
         return Err(anyhow::anyhow!(
             "merge_parquet_files error: compressed_size is 0"

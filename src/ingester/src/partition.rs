@@ -21,7 +21,7 @@ use config::{
     metrics,
     utils::{
         file_writer::{WriteConfig, write_recordbatches_to_buf},
-        parquet::generate_filename_with_time_range,
+        parquet::generate_filename_with_metadata,
         record_batch_ext::merge_record_batches,
         schema::filter_source_by_partition_key,
         schema_ext::SchemaExt,
@@ -232,12 +232,14 @@ impl Partition {
                         let err: Box<dyn std::error::Error + Send + Sync> = e.into();
                         WriteFileRecordBatchSnafu.into_error(err)
                     })?;
-
                 file_meta.compressed_size = buf_file.len() as i64;
 
-                // write into local file
-                let file_name =
-                    generate_filename_with_time_range(file_meta.min_ts, file_meta.max_ts);
+                let file_name = generate_filename_with_metadata(
+                    file_meta.min_ts,
+                    file_meta.max_ts,
+                    file_meta.original_size,
+                    file_format.extension(),
+                );
                 let mut path = path.clone();
                 path.push(hour.to_string());
                 path.push(file_name);

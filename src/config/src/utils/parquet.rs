@@ -281,40 +281,75 @@ pub async fn read_metadata_from_bytes(data: &bytes::Bytes) -> Result<FileMeta, a
     Ok(meta)
 }
 
-pub async fn read_metadata_from_file(path: &PathBuf) -> Result<FileMeta, anyhow::Error> {
+pub async fn read_metadata_from_file(path: &PathBuf) -> Option<FileMeta> {
     let mut meta = FileMeta::default();
-    let mut file = tokio::fs::File::open(path).await?;
+    let mut file = tokio::fs::File::open(path).await.ok()?;
     // read the file size
-    let metadata = file.metadata().await?;
+    let metadata = file.metadata().await.ok()?;
     let compressed_size = metadata.len();
-    let arrow_reader = ArrowReaderMetadata::load_async(&mut file, Default::default()).await?;
+    let arrow_reader = ArrowReaderMetadata::load_async(&mut file, Default::default())
+        .await
+        .ok()?;
     if let Some(metadata) = arrow_reader.metadata().file_metadata().key_value_metadata() {
         meta = metadata.as_slice().into();
     }
+    // because we do not write metadata to the file, so if the records is 0, means
+    // the file's metadata is not valid, just return None
+    if meta.records == 0 {
+        return None;
+    }
     meta.compressed_size = compressed_size as i64;
-    Ok(meta)
+    Some(meta)
 }
 
-pub fn generate_filename_with_time_range(min_ts: i64, max_ts: i64) -> String {
+/// Generate filename with time range and original size
+/// Format: {min_ts}.{max_ts}.{original_size}.{id}.{ext}
+pub fn generate_filename_with_metadata(
+    min_ts: i64,
+    max_ts: i64,
+    original_size: i64,
+    extension: &str,
+) -> String {
     format!(
-        "{}.{}.{}{}",
+        "{}.{}.{}.{}{}",
         min_ts,
         max_ts,
+        original_size,
         ider::generate(),
-        FILE_EXT_PARQUET
+        extension
     )
 }
 
-pub fn parse_time_range_from_filename(mut name: &str) -> (i64, i64) {
+/// Parse metadata (min_ts, max_ts, original_size) from filename
+/// Returns (min_ts, max_ts, original_size)
+/// If original_size is not in filename, returns 0 for it
+pub fn parse_metadata_from_filename(mut name: &str) -> (i64, i64, i64) {
     if let Some(v) = name.rfind('/') {
         name = &name[v + 1..];
     }
     let columns = name.split('.').collect::<Vec<&str>>();
-    if columns.len() < 4 {
-        return (0, 0);
+
+    // New format: {min_ts}.{max_ts}.{original_size}.{id}.{ext}
+    // Old format: {min_ts}.{max_ts}.{id}.{ext}
+    if columns.len() >= 5 {
+        // New format with original_size
+        let min_ts = columns[0].parse::<i64>().unwrap_or(0);
+        let max_ts = columns[1].parse::<i64>().unwrap_or(0);
+        let original_size = columns[2].parse::<i64>().unwrap_or(0);
+        (min_ts, max_ts, original_size)
+    } else if columns.len() >= 4 {
+        // Old format without original_size
+        let min_ts = columns[0].parse::<i64>().unwrap_or(0);
+        let max_ts = columns[1].parse::<i64>().unwrap_or(0);
+        (min_ts, max_ts, 0)
+    } else {
+        (0, 0, 0)
     }
-    let min_ts = columns[0].parse::<i64>().unwrap_or(0);
-    let max_ts = columns[1].parse::<i64>().unwrap_or(0);
+}
+
+/// Parse time range from filename (backwards compatible wrapper)
+pub fn parse_time_range_from_filename(name: &str) -> (i64, i64) {
+    let (min_ts, max_ts, _) = parse_metadata_from_filename(name);
     (min_ts, max_ts)
 }
 
@@ -429,13 +464,6 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_filename_with_time_range() {
-        let filename = generate_filename_with_time_range(1000, 2000);
-        assert!(filename.ends_with(FILE_EXT_PARQUET));
-        assert!(filename.starts_with("1000.2000."));
-    }
-
-    #[test]
     fn test_parse_time_range_from_filename() {
         let filename = "1000.2000.123456789.parquet";
         let (min_ts, max_ts) = parse_time_range_from_filename(filename);
@@ -457,5 +485,71 @@ mod tests {
         let (min_ts, max_ts) = parse_time_range_from_filename(filename);
         assert_eq!(min_ts, 0);
         assert_eq!(max_ts, 0);
+    }
+
+    #[test]
+    fn test_generate_filename_with_metadata() {
+        let filename = generate_filename_with_metadata(1000, 2000, 12345, FILE_EXT_PARQUET);
+        assert!(filename.ends_with(FILE_EXT_PARQUET));
+        assert!(filename.starts_with("1000.2000.12345."));
+
+        let filename_vortex = generate_filename_with_metadata(1000, 2000, 12345, FILE_EXT_VORTEX);
+        assert!(filename_vortex.ends_with(FILE_EXT_VORTEX));
+        assert!(filename_vortex.starts_with("1000.2000.12345."));
+    }
+
+    #[test]
+    fn test_parse_metadata_from_filename() {
+        // Test new format with original_size
+        let filename = "1000.2000.12345.abc123.parquet";
+        let (min_ts, max_ts, original_size) = parse_metadata_from_filename(filename);
+        assert_eq!(min_ts, 1000);
+        assert_eq!(max_ts, 2000);
+        assert_eq!(original_size, 12345);
+
+        // Test old format without original_size
+        let old_filename = "1000.2000.abc123.parquet";
+        let (min_ts, max_ts, original_size) = parse_metadata_from_filename(old_filename);
+        assert_eq!(min_ts, 1000);
+        assert_eq!(max_ts, 2000);
+        assert_eq!(original_size, 0);
+
+        // Test with path
+        let filename_with_path = "/path/to/1000.2000.12345.abc123.parquet";
+        let (min_ts, max_ts, original_size) = parse_metadata_from_filename(filename_with_path);
+        assert_eq!(min_ts, 1000);
+        assert_eq!(max_ts, 2000);
+        assert_eq!(original_size, 12345);
+
+        // Test vortex extension
+        let vortex_filename = "1000.2000.12345.abc123.vortex";
+        let (min_ts, max_ts, original_size) = parse_metadata_from_filename(vortex_filename);
+        assert_eq!(min_ts, 1000);
+        assert_eq!(max_ts, 2000);
+        assert_eq!(original_size, 12345);
+    }
+
+    #[test]
+    fn test_parse_metadata_from_filename_invalid() {
+        let filename = "invalid.parquet";
+        let (min_ts, max_ts, original_size) = parse_metadata_from_filename(filename);
+        assert_eq!(min_ts, 0);
+        assert_eq!(max_ts, 0);
+        assert_eq!(original_size, 0);
+    }
+
+    #[test]
+    fn test_parse_time_range_backwards_compatible() {
+        // Test that parse_time_range_from_filename still works with new format
+        let new_format = "1000.2000.12345.abc123.parquet";
+        let (min_ts, max_ts) = parse_time_range_from_filename(new_format);
+        assert_eq!(min_ts, 1000);
+        assert_eq!(max_ts, 2000);
+
+        // Test with old format
+        let old_format = "1000.2000.abc123.parquet";
+        let (min_ts, max_ts) = parse_time_range_from_filename(old_format);
+        assert_eq!(min_ts, 1000);
+        assert_eq!(max_ts, 2000);
     }
 }

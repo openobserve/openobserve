@@ -746,7 +746,7 @@ pub async fn merge_files(
     );
     let min_ts = if min_ts == i64::MAX { 0 } else { min_ts };
     let max_ts = if max_ts == i64::MIN { 0 } else { max_ts };
-    let mut new_file_meta = FileMeta {
+    let new_file_meta = FileMeta {
         min_ts,
         max_ts,
         records: total_records,
@@ -755,9 +755,9 @@ pub async fn merge_files(
         flattened: false,
         index_size: 0,
     };
-    // if new_file_meta.records == 0 {
-    //     return Err(anyhow::anyhow!("merge_files error: records is 0"));
-    // }
+    if new_file_meta.records == 0 {
+        return Err(anyhow::anyhow!("merge_files error: records is 0"));
+    }
 
     // get latest version of schema
     let latest_schema = infra::schema::get(org_id, stream_name, stream_type).await?;
@@ -849,7 +849,6 @@ pub async fn merge_files(
     let merge_result = {
         let stream_name = stream_name.to_string();
         let latest_schema = latest_schema.clone();
-        let new_file_meta = new_file_meta.clone();
         DATAFUSION_RUNTIME
             .spawn(async move {
                 exec::merge_parquet_files(
@@ -858,7 +857,7 @@ pub async fn merge_files(
                     latest_schema,
                     vec![table],
                     &bloom_filter_fields,
-                    &new_file_meta,
+                    new_file_meta,
                     false,
                 )
                 .await
@@ -934,8 +933,7 @@ pub async fn merge_files(
 
     let mut new_files = Vec::new();
     match buf {
-        MergeParquetResult::Single(buf) => {
-            new_file_meta.compressed_size = buf.len() as i64;
+        MergeParquetResult::Single(buf, mut new_file_meta) => {
             if new_file_meta.compressed_size == 0 {
                 return Err(anyhow::anyhow!(
                     "merge_parquet_files error: compressed_size is 0"

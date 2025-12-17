@@ -13,7 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, num::NonZero, str::FromStr, sync::Arc};
+use std::{
+    cmp::max,
+    num::NonZero,
+    str::FromStr,
+    sync::{
+        Arc,
+        atomic::{AtomicI64, Ordering},
+    },
+};
 
 use arrow::array::RecordBatch;
 use arrow_schema::Field;
@@ -87,7 +95,7 @@ const DATAFUSION_MIN_PARTITION: usize = 2; // CPU cores
 const TIMESTAMP_ALIAS: &str = "_timestamp_alias";
 
 pub enum MergeParquetResult {
-    Single(Vec<u8>),
+    Single(Vec<u8>, FileMeta),
     #[allow(unused)]
     Multiple {
         bufs: Vec<Vec<u8>>,
@@ -101,7 +109,7 @@ pub async fn merge_parquet_files(
     schema: Arc<Schema>,
     tables: Vec<Arc<dyn TableProvider>>,
     bloom_filter_fields: &[String],
-    metadata: &FileMeta,
+    mut metadata: FileMeta,
     is_ingester: bool,
 ) -> Result<MergeParquetResult> {
     let start = std::time::Instant::now();
@@ -169,19 +177,20 @@ pub async fn merge_parquet_files(
     }
 
     // write result to file (parquet or vortex based on config)
-    let file_format = cfg.common.file_format;
     let compression = if is_ingester && cfg.common.feature_ingester_none_compression {
         Some("none")
     } else {
         None
     };
 
+    let records = Arc::new(AtomicI64::new(0));
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
 
     // Create a shared channel for streaming batches
     let (tx, mut rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
 
     // Spawn task to read from batch_stream and send to channel
+    let records_clone = records.clone();
     let read_task = tokio::task::spawn(async move {
         loop {
             match batch_stream.try_next().await {
@@ -189,6 +198,7 @@ pub async fn merge_parquet_files(
                     break;
                 }
                 Ok(Some(batch)) => {
+                    records_clone.fetch_add(batch.num_rows() as i64, Ordering::Relaxed);
                     if let Err(e) = tx.send(batch).await {
                         log::error!("merge_parquet_files write to channel error: {e}");
                         return Err(DataFusionError::External(Box::new(e)));
@@ -204,14 +214,14 @@ pub async fn merge_parquet_files(
     });
 
     // write batches to the appropriate format
-    let buf = match file_format {
+    let buf = match cfg.common.file_format {
         FileFormat::Parquet => {
             let mut buf = Vec::new();
             let mut writer = new_parquet_writer(
                 &mut buf,
                 &schema,
                 bloom_filter_fields,
-                metadata,
+                &metadata,
                 false,
                 compression,
             );
@@ -273,7 +283,9 @@ pub async fn merge_parquet_files(
         start.elapsed().as_millis()
     );
 
-    Ok(MergeParquetResult::Single(buf))
+    metadata.records = records.load(Ordering::Relaxed);
+    metadata.compressed_size = buf.len() as i64;
+    Ok(MergeParquetResult::Single(buf, metadata))
 }
 
 #[cfg(feature = "enterprise")]
@@ -1308,7 +1320,7 @@ mod tests {
             schema,
             empty_tables,
             &bloom_fields,
-            &metadata,
+            metadata,
             false,
         )
         .await;
