@@ -856,17 +856,17 @@ impl TableBuilder {
         }
 
         let schema_key = schema.hash_key();
-        let prefix = if session.storage_type == StorageType::Memory {
-            file_list::set(&session.id, &schema_key, files).await;
-            format!("memory:///{}/schema={}/", session.id, schema_key)
-        } else if session.storage_type == StorageType::Wal {
-            file_list::set(&session.id, &schema_key, files).await;
-            format!("wal:///{}/schema={}/", session.id, schema_key)
-        } else {
-            return Err(DataFusionError::Execution(format!(
-                "Unsupported storage_type {:?}",
-                session.storage_type,
-            )));
+        let format = format.extension();
+        let trace_id = &session.id;
+        let prefix = match session.storage_type {
+            StorageType::Memory => {
+                file_list::set(trace_id, &schema_key, format, files).await;
+                format!("memory:///{trace_id}/schema={schema_key}/format={format}/",)
+            }
+            StorageType::Wal => {
+                file_list::set(trace_id, &schema_key, format, files).await;
+                format!("wal:///{trace_id}/schema={schema_key}/format={format}/",)
+            }
         };
         let prefix = match ListingTableUrl::parse(prefix) {
             Ok(url) => url,
@@ -902,7 +902,7 @@ impl TableBuilder {
         config = config.with_schema(schema);
         let mut table = ListingTableAdapter::try_new(
             config,
-            session.id.clone(),
+            session.id,
             self.index_condition.clone(),
             self.fst_fields.clone(),
         )?;
