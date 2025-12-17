@@ -22,10 +22,27 @@
                 square
                 :no-wrap="true"
                 size="sm"
-                :label="joinObj?.stream"
                 :data-test="`dashboard-join-item-${index}`"
                 class="q-pl-sm"
               >
+                <div class="join-btn-content">
+                  <LeftJoinTypeSvg
+                    v-if="joinObj?.joinType === 'left'"
+                    :shouldFill="true"
+                    class="join-type-icon"
+                  />
+                  <InnerJoinTypeSvg
+                    v-else-if="joinObj?.joinType === 'inner'"
+                    :shouldFill="true"
+                    class="join-type-icon"
+                  />
+                  <RightJoinTypeSvg
+                    v-else-if="joinObj?.joinType === 'right'"
+                    :shouldFill="true"
+                    class="join-type-icon"
+                  />
+                  <span class="join-stream-label">{{ joinObj?.stream }}</span>
+                </div>
                 <q-menu
                   class="q-pa-md"
                   :data-test="`dashboard-join-menu-${index}`"
@@ -76,6 +93,9 @@ import { useStore } from "vuex";
 import { watchDebounced } from "@vueuse/core";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import AddJoinPopUp from "./AddJoinPopUp.vue";
+import LeftJoinTypeSvg from "@/components/icons/LeftJoinTypeSvg.vue";
+import InnerJoinTypeSvg from "@/components/icons/InnerJoinTypeSvg.vue";
+import RightJoinTypeSvg from "@/components/icons/RightJoinTypeSvg.vue";
 
 interface JoinFieldReference {
   streamAlias: string;
@@ -132,6 +152,9 @@ export default defineComponent({
 
   components: {
     AddJoinPopUp,
+    LeftJoinTypeSvg,
+    InnerJoinTypeSvg,
+    RightJoinTypeSvg,
   },
 
   setup() {
@@ -400,5 +423,22 @@ export default defineComponent({
 .axis-field {
   display: flex;
   align-items: center;
+}
+
+.join-btn-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.join-type-icon {
+  height: 20px;
+  width: 20px;
+  flex-shrink: 0;
+  filter: brightness(0) invert(1);
+}
+
+.join-stream-label {
+  line-height: 1;
 }
 </style>
