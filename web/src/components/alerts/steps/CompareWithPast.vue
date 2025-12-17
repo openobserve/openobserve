@@ -145,6 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="text-semibold add-variable q-pa-sm multi-window-text no-border"
             style="font-size: 14px;"
             no-caps
+            :disable="isComparisonDisabled"
             @click="addTimeShift"
           >
             <q-icon
@@ -152,6 +153,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="add"
               size="20px"
             />
+            <q-tooltip
+              v-if="isComparisonDisabled"
+              anchor="top middle"
+              self="bottom middle"
+              :offset="[0, 8]"
+            >
+              {{ comparisonDisabledTooltip }}
+            </q-tooltip>
           </q-btn>
         </div>
       </div>
@@ -160,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, type PropType } from "vue";
+import { defineComponent, ref, watch, computed, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { getUUID } from "@/utils/zincutils";
@@ -197,6 +206,10 @@ export default defineComponent({
       type: String,
       default: "",
     },
+    selectedTab: {
+      type: String,
+      default: "custom",
+    },
   },
   emits: ["update:multiTimeRange"],
   setup(props, { emit }) {
@@ -213,6 +226,20 @@ export default defineComponent({
       },
       { deep: true }
     );
+
+    // Check if comparison window should be disabled (only SQL mode supports comparison)
+    const isComparisonDisabled = computed(() => {
+      return props.selectedTab !== "sql";
+    });
+
+    const comparisonDisabledTooltip = computed(() => {
+      if (props.selectedTab === "custom") {
+        return "Please switch to SQL mode in conditions step to enable comparison windows";
+      } else if (props.selectedTab === "promql") {
+        return "Please switch to SQL mode in conditions step to enable comparison windows";
+      }
+      return "";
+    });
 
     const addTimeShift = () => {
       const newTimeShift: TimeShiftPicker = {
@@ -284,6 +311,8 @@ export default defineComponent({
       updateDateTimePicker,
       getDisplayValue,
       convertMinutesToDisplayValue,
+      isComparisonDisabled,
+      comparisonDisabledTooltip,
     };
   },
 });

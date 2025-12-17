@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             data-test="alert-variables-add-btn"
             size="sm"
-            class="text-bold no-border o2-secondary-button tw-h-[36px]"
+            class="no-border o2-secondary-button tw-h-[36px]"
             flat
             no-caps
             @click="addVariable"

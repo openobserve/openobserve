@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :formData="formData"
               :previewQuery="previewQuery"
               :generatedSqlQuery="generatedSqlQuery"
-              :selectedTab="scheduledAlertRef?.tab || 'custom'"
+              :selectedTab="formData.query_condition.type || 'custom'"
               :isAggregationEnabled="isAggregationEnabled"
               :destinations="formData.destinations"
               :focusManager="focusManager"
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw-flex-[0_0_68%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
                 <QueryConfig
-                  :tab="scheduledAlertRef?.tab || 'custom'"
+                  :tab="formData.query_condition.type || 'custom'"
                   :multiTimeRange="formData.query_condition.multi_time_range"
                   :columns="filteredColumns"
                   :streamFieldsMap="streamFieldsMap"
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :formData="formData"
               :previewQuery="previewQuery"
               :generatedSqlQuery="generatedSqlQuery"
-              :selectedTab="scheduledAlertRef?.tab || 'custom'"
+              :selectedTab="formData.query_condition.type || 'custom'"
               :isAggregationEnabled="isAggregationEnabled"
               :destinations="formData.destinations"
               :focusManager="focusManager"
@@ -220,6 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :frequency="formData.trigger_condition.frequency"
                   :frequencyType="formData.trigger_condition.frequency_type"
                   :cron="formData.trigger_condition.cron"
+                  :selectedTab="formData.query_condition.type || 'custom'"
                   @update:multiTimeRange="(val) => formData.query_condition.multi_time_range = val"
                 />
               </div>
@@ -231,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :formData="formData"
               :previewQuery="previewQuery"
               :generatedSqlQuery="generatedSqlQuery"
-              :selectedTab="scheduledAlertRef?.tab || 'custom'"
+              :selectedTab="formData.query_condition.type || 'custom'"
               :isAggregationEnabled="isAggregationEnabled"
               :destinations="formData.destinations"
               :focusManager="focusManager"
@@ -275,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :formData="formData"
               :previewQuery="previewQuery"
               :generatedSqlQuery="generatedSqlQuery"
-              :selectedTab="scheduledAlertRef?.tab || 'custom'"
+              :selectedTab="formData.query_condition.type || 'custom'"
               :isAggregationEnabled="isAggregationEnabled"
               :destinations="formData.destinations"
               :focusManager="focusManager"
@@ -312,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :formData="formData"
               :previewQuery="previewQuery"
               :generatedSqlQuery="generatedSqlQuery"
-              :selectedTab="scheduledAlertRef?.tab || 'custom'"
+              :selectedTab="formData.query_condition.type || 'custom'"
               :isAggregationEnabled="isAggregationEnabled"
               :destinations="formData.destinations"
               :focusManager="focusManager"
@@ -353,7 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :formData="formData"
               :previewQuery="previewQuery"
               :generatedSqlQuery="generatedSqlQuery"
-              :selectedTab="scheduledAlertRef?.tab || 'custom'"
+              :selectedTab="formData.query_condition.type || 'custom'"
               :isAggregationEnabled="isAggregationEnabled"
               :destinations="formData.destinations"
               :focusManager="focusManager"
@@ -720,7 +721,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="previewAlertRef"
               :formData="formData"
               :query="previewQuery"
-              :selectedTab="scheduledAlertRef?.tab || 'custom'"
+              :selectedTab="formData.query_condition.type || 'custom'"
               :isAggregationEnabled="isAggregationEnabled"
             />
 
@@ -1239,6 +1240,11 @@ export default defineComponent({
       }
 
       if (newVal) {
+        // Initialize tab from formData
+        if (formData.value.query_condition.type) {
+          newVal.tab = formData.value.query_condition.type;
+        }
+
         // Register ScheduledAlert fields once the component is mounted
         nextTick(() => {
           focusManager.registerField('frequency', {
@@ -1502,7 +1508,7 @@ export default defineComponent({
     };
 
     const getSelectedTab = computed(() => {
-      return scheduledAlertRef.value?.tab || null;
+      return formData.value.query_condition.type || null;
     });
 
     const openEditorDialog = () => {
@@ -1674,6 +1680,10 @@ export default defineComponent({
     }
 
     const updateTab = (tab: string) => {
+      // Save to formData so it persists when navigating between steps
+      formData.value.query_condition.type = tab;
+
+      // Also update the ref for immediate UI updates
       if (scheduledAlertRef.value) {
         scheduledAlertRef.value.tab = tab;
       }
