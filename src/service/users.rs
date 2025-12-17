@@ -956,21 +956,16 @@ pub async fn remove_user_from_org(
                 {
                     use o2_enterprise::enterprise::cloud::org_invites;
 
-                    match org_invites::delete_invites_for_user(org_id, &email_id).await {
-                        Ok(_) => {
-                            log::info!("successfully delete invites for {email_id}");
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "error deleting invites when deleting user {email_id} from org {org_id} : {e}"
-                            );
-                            return Ok(HttpResponse::InternalServerError().json(
-                                MetaHttpResponse::error(
-                                    http::StatusCode::INTERNAL_SERVER_ERROR,
-                                    "error deleting user invites",
-                                ),
-                            ));
-                        }
+                    if let Err(e) = org_invites::delete_invites_for_user(org_id, &email_id).await {
+                        log::error!(
+                            "error deleting invites when deleting user {email_id} from org {org_id} : {e}"
+                        );
+                        return Ok(HttpResponse::InternalServerError().json(
+                            MetaHttpResponse::error(
+                                http::StatusCode::INTERNAL_SERVER_ERROR,
+                                "error deleting user invites",
+                            ),
+                        ));
                     }
                 }
 
@@ -983,8 +978,6 @@ pub async fn remove_user_from_org(
                                 "Not Allowed",
                             )));
                         }
-                        log::info!("user {email_id} has single organization, deleting");
-
                         if let Err(e) = db::user::delete(&email_id).await {
                             log::error!("error deleting user from db : {e}");
                             return Ok(HttpResponse::InternalServerError().json(
@@ -1038,9 +1031,6 @@ pub async fn remove_user_from_org(
                                     };
                             }
                         }
-                        log::info!(
-                            "user {email_id} is part of multiple orgs, removing from {org_id}"
-                        );
                         orgs.retain(|x| !x.name.eq(org_id));
                         let resp = db::org_users::remove(org_id, &email_id).await;
                         // special case as we cache flattened user struct
