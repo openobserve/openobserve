@@ -1257,33 +1257,33 @@ const validateJoinField = (join: any, errors: string[], joinIndex: number) => {
     errors.push(`Join #${joinIndex + 1}: Join type is required`);
   }
 
-  // validate conditions
-  // at least one condition is required
-  // and each condition should have leftField, rightField, operation
+  // validate clauses
+  // at least one clause is required
+  // and each clause should have leftField, rightField, operation
   if (!join?.conditions || join?.conditions?.length === 0) {
-    errors.push(`Join #${joinIndex + 1}: Conditions are required`);
+    errors.push(`Join #${joinIndex + 1}: At least one clause is required`);
   }
 
-  // validate each condition
+  // validate each clause
   join?.conditions?.forEach((condition: any, conditionIndex: number) => {
     // validate leftField
     if (!condition?.leftField?.field) {
       errors.push(
-        `Join #${joinIndex + 1}: Condition #${conditionIndex + 1}: Left field is required`,
+        `Join #${joinIndex + 1}: Clause ${conditionIndex + 1}: Left field is required`,
       );
     }
 
     // validate rightField
     if (!condition?.rightField?.field) {
       errors.push(
-        `Join #${joinIndex + 1}: Condition #${conditionIndex + 1}: Right field is required`,
+        `Join #${joinIndex + 1}: Clause ${conditionIndex + 1}: Right field is required`,
       );
     }
 
     // validate operation
     if (!condition?.operation) {
       errors.push(
-        `Join #${joinIndex + 1}: Condition #${conditionIndex + 1}: Operation is required`,
+        `Join #${joinIndex + 1}: Clause ${conditionIndex + 1}: Operation is required`,
       );
     }
   });
