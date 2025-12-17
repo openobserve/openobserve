@@ -589,9 +589,9 @@ export default defineComponent({
       type: String,
       default: "custom",
     },
-    disableQueryTypeSelection: {
-      type: Boolean,
-      default: false,
+    multiTimeRange: {
+      type: Array as PropType<any[]>,
+      default: () => [],
     },
     columns: {
       type: Array as PropType<any[]>,
@@ -679,6 +679,8 @@ export default defineComponent({
 
     // Compute tab options based on stream type and alert type
     const tabOptions = computed(() => {
+      const hasComparisonWindow = props.multiTimeRange.length > 0;
+
       // For real-time alerts, only show Custom (no tabs needed)
       if (props.isRealTime === "true") {
         return [
@@ -695,6 +697,8 @@ export default defineComponent({
           {
             label: "Custom",
             value: "custom",
+            disabled: hasComparisonWindow,
+            tooltipLabel: hasComparisonWindow ? "Custom mode is disabled when comparison window is added." : "",
           },
           {
             label: "SQL",
@@ -703,6 +707,8 @@ export default defineComponent({
           {
             label: "PromQL",
             value: "promql",
+            disabled: hasComparisonWindow,
+            tooltipLabel: hasComparisonWindow ? "PromQL mode is disabled when comparison window is added." : "",
           },
         ];
       }
@@ -712,6 +718,8 @@ export default defineComponent({
         {
           label: "Custom",
           value: "custom",
+          disabled: hasComparisonWindow,
+          tooltipLabel: hasComparisonWindow ? "Custom mode is disabled when comparison window is added." : "",
         },
         {
           label: "SQL",
@@ -722,7 +730,7 @@ export default defineComponent({
 
     // Hide tabs completely for real-time alerts (only one option)
     const shouldShowTabs = computed(() => {
-      return props.isRealTime === "false" && !props.disableQueryTypeSelection;
+      return props.isRealTime === "false";
     });
 
     const updateTab = (tab: string) => {

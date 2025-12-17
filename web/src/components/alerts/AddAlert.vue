@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw-flex-1" style="overflow: auto;">
                 <QueryConfig
                   :tab="scheduledAlertRef?.tab || 'custom'"
-                  :disableQueryTypeSelection="false"
+                  :multiTimeRange="formData.query_condition.multi_time_range"
                   :columns="filteredColumns"
                   :streamFieldsMap="streamFieldsMap"
                   :generatedSqlQuery="generatedSqlQuery"
