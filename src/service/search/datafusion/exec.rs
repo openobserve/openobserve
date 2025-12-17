@@ -31,7 +31,10 @@ use config::{
         search::{Session as SearchSession, StorageType},
         stream::{FileKey, FileMeta, StreamType},
     },
-    utils::{file_writer::VORTEX_RUNTIME, parquet::new_parquet_writer, schema_ext::SchemaExt},
+    utils::{
+        file_writer::VORTEX_RUNTIME, parquet::new_parquet_writer, schema_ext::SchemaExt,
+        vortex::Utf8Compressor,
+    },
 };
 use datafusion::{
     arrow::datatypes::{DataType, Schema},
@@ -66,6 +69,7 @@ use vortex::{
     session::VortexSession,
 };
 use vortex_datafusion::VortexFormat;
+use vortex_file::WriteStrategyBuilder;
 use vortex_io::session::RuntimeSessionExt;
 #[cfg(feature = "enterprise")]
 use {
@@ -248,7 +252,11 @@ pub async fn merge_parquet_files(
                     let mut buf = Vec::new();
                     let session = VortexSession::default().with_tokio();
                     let dtype = DType::from_arrow(schema_clone.as_ref());
-                    let write_options = VortexWriteOptions::new(session.clone());
+                    let write_options = VortexWriteOptions::new(session.clone()).with_strategy(
+                        WriteStrategyBuilder::new()
+                            .with_compressor(Utf8Compressor::default())
+                            .build(),
+                    );
                     let mut writer = write_options.writer(&mut buf, dtype);
 
                     while let Some(batch) = rx.recv().await {

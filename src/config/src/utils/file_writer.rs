@@ -26,12 +26,13 @@ use vortex::{
     file::VortexWriteOptions,
     session::VortexSession,
 };
+use vortex_file::WriteStrategyBuilder;
 use vortex_io::session::RuntimeSessionExt;
 
 use crate::{
     config::{self, FileFormat},
     meta::stream::FileMeta,
-    utils::parquet::new_parquet_writer,
+    utils::{parquet::new_parquet_writer, vortex::Utf8Compressor},
 };
 
 pub static VORTEX_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
@@ -71,6 +72,7 @@ async fn write_recordbatches_to_parquet(
     config: WriteConfig<'_>,
 ) -> Result<Vec<u8>, anyhow::Error> {
     let mut buf = Vec::new();
+    // TODO: remove write metadata from parquet writer
     let mut writer = new_parquet_writer(
         &mut buf,
         config.schema,
@@ -104,15 +106,17 @@ async fn write_recordbatches_to_vortex(
                 let mut buf = Vec::new();
                 let session = VortexSession::default().with_tokio();
                 let dtype = DType::from_arrow(schema.as_ref());
-                let write_options = VortexWriteOptions::new(session.clone());
+                let write_options = VortexWriteOptions::new(session.clone()).with_strategy(
+                    WriteStrategyBuilder::new()
+                        .with_compressor(Utf8Compressor::default())
+                        .build(),
+                );
                 let mut writer = write_options.writer(&mut buf, dtype);
 
                 for batch in &batches {
                     let array: ArrayRef = ArrayRef::from_arrow(batch.clone(), false);
                     writer.push(array).await?;
                 }
-
-                // TODO: write the metadata to the file
 
                 writer.finish().await?;
 

@@ -42,3 +42,4 @@ pub mod tantivy;
 pub mod time;
 pub mod took_watcher;
 pub mod util;
+pub mod vortex;
