@@ -103,6 +103,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="$emit('refresh:destinations')"
               style="min-width: auto"
             />
+            <q-btn
+              data-test="create-destination-btn"
+              label="Add New Destination"
+              class="text-bold no-border q-ml-sm"
+              color="primary"
+              no-caps
+              @click="routeToCreateDestination"
+            />
           </div>
         </div>
       </template>
@@ -612,6 +620,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="$emit('refresh:destinations')"
                 style="min-width: auto"
               />
+              <q-btn
+                data-test="create-destination-btn"
+                label="Add New Destination"
+                class="text-bold no-border q-ml-sm"
+                color="primary"
+                no-caps
+                @click="routeToCreateDestination"
+              />
             </div>
           </div>
         </div>
@@ -624,6 +640,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, watch, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 
 export default defineComponent({
   name: "Step3AlertConditions",
@@ -663,6 +680,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
+    const router = useRouter();
 
     // Local state for aggregation toggle
     const localIsAggregationEnabled = ref(props.isAggregationEnabled);
@@ -764,6 +782,17 @@ export default defineComponent({
       emit("update:destinations", localDestinations.value);
     };
 
+    const routeToCreateDestination = () => {
+      const url = router.resolve({
+        name: "alertDestinations",
+        query: {
+          action: "add",
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      }).href;
+      window.open(url, "_blank");
+    };
+
     return {
       t,
       store,
@@ -783,6 +812,7 @@ export default defineComponent({
       emitTriggerUpdate,
       emitAggregationUpdate,
       emitDestinationsUpdate,
+      routeToCreateDestination,
     };
   },
 });

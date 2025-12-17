@@ -17,11 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="step-alert-setup" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
     <div class="step-content card-container tw-px-3 tw-py-4">
-      <!-- <div class="step-header tw-mb-4">
-        <div class="step-title">Alert Setup</div>
-        <div class="step-subtitle">Set the stage for your alert by configuring basic information.</div>
-      </div> -->
-
       <q-form ref="step1Form" @submit.prevent>
         <!-- Alert Name -->
         <div class="form-field tw-mb-4">
