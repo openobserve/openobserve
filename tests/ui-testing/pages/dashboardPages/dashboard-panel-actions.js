@@ -37,18 +37,35 @@ export default class DashboardactionPage {
 
   async waitForChartToRender() {
     // Wait for button or parent to have light button class (render complete)
-    // Supports both repo structures: button.o2-primary-button-light OR parent.o2-secondary-button-light
+    // The parent div.q-btn-group has classes o2-primary-button and o2-secondary-button-light
     await this.page.waitForFunction(() => {
       const btn = document.querySelector('[data-test="dashboard-apply"]');
-      return (
-        btn &&
-        (btn.classList.contains("o2-primary-button-light") ||
-          btn.classList.contains("o2-secondary-button-light") ||
-          (btn.parentElement &&
-            (btn.parentElement.classList.contains("o2-primary-button-light") ||
-              btn.parentElement.classList.contains("o2-secondary-button-light"))))
-      );
-    });
+      if (!btn) return false;
+
+      // Check button itself
+      if (btn.classList.contains("o2-primary-button-light") ||
+          btn.classList.contains("o2-secondary-button-light")) {
+        return true;
+      }
+
+      // Check immediate parent (button group container)
+      const parent = btn.parentElement;
+      if (parent &&
+          (parent.classList.contains("o2-primary-button-light") ||
+           parent.classList.contains("o2-secondary-button-light"))) {
+        return true;
+      }
+
+      // Check if parent has both o2-primary-button AND o2-secondary-button-light
+      // (which indicates the button group is in the rendered state)
+      if (parent &&
+          parent.classList.contains("o2-primary-button") &&
+          parent.classList.contains("o2-secondary-button-light")) {
+        return true;
+      }
+
+      return false;
+    }, { timeout: 30000 });
   }
 
   //Dashboard panel actions(Edit, Layout, Duplicate, Inspector, Move, Delete)

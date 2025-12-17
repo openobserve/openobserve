@@ -79,6 +79,7 @@ export const convertPromQLData = async (
   chartPanelRef: any,
   hoveredSeriesState: any,
   annotations: any,
+  metadata: any = null,
 ) => {
   // console.time("convertPromQLData");
 
@@ -160,6 +161,15 @@ export const convertPromQLData = async (
 
   // sort the timestamp and make an array
   xAxisData = Array.from(xAxisData).sort();
+
+  // Add end time from metadata to reserve full time range and prevent chart shifting during chunked data loading
+  if (metadata?.queries?.[0]?.endTime) {
+    const endTimeInSeconds = Math.floor(metadata.queries[0].endTime / 1000000); // Convert from microseconds to seconds
+    // Only add if end time is not already in the data
+    if (!xAxisData.includes(endTimeInSeconds)) {
+      xAxisData.push(endTimeInSeconds);
+    }
+  }
 
   // convert timestamp to specified timezone time
   xAxisData.forEach((value: number, index: number) => {
