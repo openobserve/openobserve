@@ -258,7 +258,7 @@ pub async fn search(
 
     log::debug!("search->storage: session target_partitions: {target_partitions}");
 
-    let table = TableBuilder::new()
+    let tables = TableBuilder::new()
         .sorted_by_time(sorted_by_time)
         .file_stat_cache(file_stat_cache.clone())
         .index_condition(index_condition.clone())
@@ -285,7 +285,7 @@ pub async fn search(
                 .build()
         )
     );
-    Ok((vec![table], scan_stats, HashSet::new()))
+    Ok((tables, scan_stats, HashSet::new()))
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]

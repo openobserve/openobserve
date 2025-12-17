@@ -212,7 +212,7 @@ pub async fn search_parquet(
         target_partitions: cfg.limit.cpu_num,
     };
 
-    let table = match TableBuilder::new()
+    let tables = match TableBuilder::new()
         .sorted_by_time(sorted_by_time)
         .file_stat_cache(file_stat_cache.clone())
         .index_condition(index_condition.clone())
@@ -224,7 +224,7 @@ pub async fn search_parquet(
         )
         .await
     {
-        Ok(v) => v,
+        Ok(tables) => tables,
         Err(e) => {
             // release all files
             wal::release_files(&lock_files);
@@ -251,7 +251,7 @@ pub async fn search_parquet(
         )
     );
 
-    Ok((vec![table], scan_stats, HashSet::new()))
+    Ok((tables, scan_stats, HashSet::new()))
 }
 
 /// search in local WAL, which haven't been sync to object storage

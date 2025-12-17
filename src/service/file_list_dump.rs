@@ -33,7 +33,10 @@ use itertools::Itertools;
 use once_cell::sync::Lazy;
 use rayon::slice::ParallelSliceMut;
 
-use crate::service::search::datafusion::exec::{DataFusionContextBuilder, TableBuilder};
+use crate::service::search::datafusion::{
+    exec::{DataFusionContextBuilder, TableBuilder},
+    table_provider::uniontable::NewUnionTable,
+};
 
 pub static FILE_LIST_SCHEMA: Lazy<Arc<Schema>> = Lazy::new(|| {
     Arc::new(Schema::new(vec![
@@ -244,7 +247,8 @@ async fn inner_exec(
         .trace_id(trace_id)
         .build(partitions)
         .await?;
-    ctx.register_table("file_list", table)?;
+    let union_table = Arc::new(NewUnionTable::new(schema, table));
+    ctx.register_table("file_list", union_table)?;
     let df = ctx.sql(query).await?;
     let ret = df.collect().await?;
     Ok(ret)

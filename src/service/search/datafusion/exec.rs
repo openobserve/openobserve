@@ -703,12 +703,13 @@ pub async fn register_table(
         .build(session.target_partitions)
         .await?;
 
-    let table = TableBuilder::new()
+    let tables = TableBuilder::new()
         .sorted_by_time(sorted_by_time)
         .file_stat_cache(ctx.runtime_env().cache_manager.get_file_statistic_cache())
-        .build(session.clone(), files, schema)
+        .build(session.clone(), files, schema.clone())
         .await?;
-    ctx.register_table(table_name, table)?;
+    let union_table = Arc::new(NewUnionTable::new(schema, tables));
+    ctx.register_table(table_name, union_table)?;
 
     Ok(ctx)
 }
@@ -756,7 +757,7 @@ impl TableBuilder {
         session: SearchSession,
         files: Vec<FileKey>,
         schema: Arc<Schema>,
-    ) -> Result<Arc<dyn TableProvider>> {
+    ) -> Result<Vec<Arc<dyn TableProvider>>> {
         let cfg = get_config();
         let target_partitions = if session.target_partitions == 0 {
             cfg.limit.cpu_num
@@ -788,6 +789,13 @@ impl TableBuilder {
             }
         }
 
+        log::info!(
+            "[trace_id: {}] parquet_files numbers: {}, vortex_files numbers: {}",
+            session.id,
+            parquet_files.len(),
+            vortex_files.len()
+        );
+
         // Build table providers for each format
         let mut tables: Vec<Arc<dyn TableProvider>> = Vec::new();
 
@@ -817,8 +825,7 @@ impl TableBuilder {
             tables.push(table);
         }
 
-        // TODO: return the vec of tables
-        Ok(Arc::new(NewUnionTable::new(schema, tables)))
+        Ok(tables)
     }
 
     async fn build_table_for_format(
@@ -840,7 +847,7 @@ impl TableBuilder {
 
         let mut listing_options = ListingOptions::new(file_format)
             .with_target_partitions(target_partitions)
-            .with_collect_stat(true); // current is default to true
+            .with_collect_stat(true);
 
         if self.sorted_by_time {
             // specify sort columns for parquet file

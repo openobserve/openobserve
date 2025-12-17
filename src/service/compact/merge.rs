@@ -832,12 +832,12 @@ pub async fn merge_files(
         target_partitions: 2,
     };
 
-    let table = match TableBuilder::new()
+    let tables = match TableBuilder::new()
         .sorted_by_time(true)
         .build(session, files.clone(), latest_schema.clone())
         .await
     {
-        Ok(table) => table,
+        Ok(tables) => tables,
         Err(e) => {
             log::error!(
                 "create_parquet_table err: {e}, files: {files:?}, schema: {latest_schema:?}"
@@ -855,7 +855,7 @@ pub async fn merge_files(
                     stream_type,
                     &stream_name,
                     latest_schema,
-                    vec![table],
+                    tables,
                     &bloom_filter_fields,
                     new_file_meta,
                     false,

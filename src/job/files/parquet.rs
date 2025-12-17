@@ -776,11 +776,10 @@ async fn merge_files(
         work_group: None,
         target_partitions: 0,
     };
-    let table = TableBuilder::new()
+    let tables = TableBuilder::new()
         .sorted_by_time(true)
         .build(session, new_file_list, schema.clone())
         .await?;
-    let tables = vec![table];
 
     let start = std::time::Instant::now();
     let merge_result = exec::merge_parquet_files(
