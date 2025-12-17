@@ -23,6 +23,7 @@ import {
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import dashboardService from "@/services/dashboards";
 import { useStore } from "vuex";
+import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 
 export interface VariableConfig {
   name: string;
@@ -570,8 +571,8 @@ export const useVariablesManager = () => {
         replaced = replaced.replace(new RegExp(`\\$${varName}`, "g"), value);
       } else {
         // Use sentinel value for null/undefined
-        replaced = replaced.replace(new RegExp(`\\$\\{${varName}\\}`, "g"), "_o2_all_");
-        replaced = replaced.replace(new RegExp(`\\$${varName}`, "g"), "_o2_all_");
+        replaced = replaced.replace(new RegExp(`\\$\\{${varName}\\}`, "g"), SELECT_ALL_VALUE);
+        replaced = replaced.replace(new RegExp(`\\$${varName}`, "g"), SELECT_ALL_VALUE);
       }
     });
 
