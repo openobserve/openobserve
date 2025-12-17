@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :variablesConfig="{ list: globalVariables }"
         :variablesManager="variablesManager"
         :selectedTimeDate="currentTimeObj['__global']"
+        :initialVariableValues="initialVariableValues"
         data-test="global-variables-selector"
       />
 
@@ -70,6 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :variablesConfig="{ list: currentTabVariables }"
         :variablesManager="variablesManager"
         :selectedTimeDate="currentTimeObj['__global']"
+        :initialVariableValues="initialVariableValues"
         data-test="tab-variables-selector"
       />
 
@@ -92,6 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :variablesConfig="{ list: getPanelVariables(panels[0].id) }"
             :variablesManager="variablesManager"
             :selectedTimeDate="currentTimeObj['__global']"
+            :initialVariableValues="initialVariableValues"
             data-test="panel-variables-selector"
           />
 
@@ -159,6 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :variablesConfig="{ list: getPanelVariables(item.id) }"
                 :variablesManager="variablesManager"
                 :selectedTimeDate="currentTimeObj['__global']"
+                :initialVariableValues="initialVariableValues"
                 :style="{ marginBottom: '8px' }"
                 data-test="panel-variables-selector"
               />
@@ -386,13 +390,15 @@ export default defineComponent({
     // Helper to get merged variables for a panel (global + tab + panel)
     const getMergedVariablesForPanel = (panelId: string) => {
       if (!variablesManager) {
-        // Fallback to legacy behavior
-        return currentVariablesDataRef.value?.[panelId] || currentVariablesDataRef.value['__global'];
+        // Fallback to legacy behavior: panel-specific override takes precedence over __global
+        return currentVariablesDataRef.value?.[panelId] || currentVariablesDataRef.value['__global'] || { values: [] };
       }
 
+      // In manager mode, get the merged variables for this panel
       const mergedVars = variablesManager.getVariablesForPanel(panelId, selectedTabId.value);
 
       // Convert to old format for backward compatibility
+      // Panel expects: { isVariablesLoading: boolean, values: Array<VariableRuntimeState> }
       return {
         isVariablesLoading: variablesManager.isLoading.value,
         values: mergedVars
@@ -462,12 +468,27 @@ export default defineComponent({
     });
 
     // watch on currentTimeObj to update the variablesData
+    // This watcher handles dashboard-wide refresh (user clicks main Refresh button)
     watch(
       () => props?.currentTimeObj?.__global,
       () => {
-        currentVariablesDataRef.value = {
-          __global: JSON.parse(JSON.stringify(variablesData.value)),
-        };
+        if (!variablesManager) {
+          // Legacy mode: replace entire currentVariablesDataRef with just __global
+          // This clears all panel-specific overrides, applying global variables everywhere
+          currentVariablesDataRef.value = {
+            __global: JSON.parse(JSON.stringify(variablesData.value)),
+          };
+        } else {
+          // Manager mode: sync currentVariablesDataRef with manager state
+          // Convert manager's variables to legacy format for backward compatibility
+          const allGlobalVars = variablesManager.variablesData.global;
+          currentVariablesDataRef.value = {
+            __global: {
+              isVariablesLoading: variablesManager.isLoading.value,
+              values: allGlobalVars
+            }
+          };
+        }
       },
     );
 
@@ -533,15 +554,22 @@ export default defineComponent({
 
     const variablesDataUpdated = (data: any) => {
       try {
-        // update the variables data
+        // Update the live variables data (immediate UI state)
         variablesData.value = data;
+
         if (needsVariablesAutoUpdate) {
-          // check if the length is > 0
+          // Check if the variables have loaded (length > 0)
           if (checkIfVariablesAreLoaded(variablesData.value)) {
             needsVariablesAutoUpdate = false;
           }
-          currentVariablesDataRef.value = { __global: variablesData.value };
+          // Auto-update committed state on first load (legacy mode only)
+          if (!variablesManager) {
+            currentVariablesDataRef.value = { __global: variablesData.value };
+          }
         }
+
+        // In manager mode, the manager handles variable updates directly
+        // This function is primarily for legacy mode where variables are managed centrally
         return;
       } catch (error) {
         return;
@@ -953,10 +981,24 @@ export default defineComponent({
     ) => {
       emit("refreshPanelRequest", panelId, shouldRefreshWithoutCache);
 
-      currentVariablesDataRef.value = {
-        ...currentVariablesDataRef.value,
-        [panelId]: variablesData.value,
-      };
+      // Panel-specific refresh: creates a snapshot for this panel only
+      if (!variablesManager) {
+        // Legacy mode: store current variablesData as panel-specific override
+        currentVariablesDataRef.value = {
+          ...currentVariablesDataRef.value,
+          [panelId]: variablesData.value,
+        };
+      } else {
+        // Manager mode: get merged variables for this panel and store as override
+        const panelVars = variablesManager.getVariablesForPanel(panelId, selectedTabId.value);
+        currentVariablesDataRef.value = {
+          ...currentVariablesDataRef.value,
+          [panelId]: {
+            isVariablesLoading: variablesManager.isLoading.value,
+            values: panelVars
+          },
+        };
+      }
     };
 
     const updateRunId = (newRunId) => {

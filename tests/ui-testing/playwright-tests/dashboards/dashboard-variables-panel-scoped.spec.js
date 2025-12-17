@@ -13,7 +13,7 @@
 const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
-import { waitForDashboardPage, deleteDashboard } = require("./utils/dashCreation.js");
+import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 
 const dashboardName = `DashVarPanel_${Date.now()}`;
 

@@ -1,3 +1,5 @@
+import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+
 export const formatInterval = (interval: any) => {
   switch (true) {
     // 0.01s
@@ -264,7 +266,7 @@ export const processVariableContent = (
         effectiveValue === undefined ||
         (Array.isArray(effectiveValue) && effectiveValue.length === 0);
 
-      let value = isNullValue ? "_o2_all_" : effectiveValue;
+      let value = isNullValue ? SELECT_ALL_VALUE : effectiveValue;
 
       // Handle array formatting (only if not null)
       if (!isNullValue && Array.isArray(value)) {
