@@ -86,7 +86,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon="insights"
           />
           <q-btn
-            v-if="false"
             class="q-ml-sm o2-secondary-button tw-h-[36px]"
             no-caps
             flat
