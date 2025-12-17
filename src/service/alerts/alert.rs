@@ -1512,7 +1512,8 @@ async fn process_dest_template(
             "{alert_trigger_time_seconds}",
             &evaluation_timestamp_seconds.to_string(),
         )
-        .replace("{alert_trigger_time_str}", &evaluation_timestamp_str);
+        .replace("{alert_trigger_time_str}", &evaluation_timestamp_str)
+        .replace("{alert_description}", &alert.description);
 
     if let Some(contidion) = &alert.query_condition.promql_condition {
         resp = resp
