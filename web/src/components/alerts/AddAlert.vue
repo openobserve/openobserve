@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Left Column: Step Content (70%) -->
             <div class="tw-flex-[0_0_70%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
-                <Step1AlertSetup
+                <AlertSetup
                   ref="step1Ref"
                   :formData="formData"
                   :beingUpdated="beingUpdated"
@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Left Column: Step Content (70%) -->
             <div class="tw-flex-[0_0_70%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
-                <Step2QueryConfig
+                <QueryConfig
                   :tab="scheduledAlertRef?.tab || 'custom'"
                   :disableQueryTypeSelection="false"
                   :columns="filteredColumns"
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Left Column: Step Content (70%) -->
             <div class="tw-flex-[0_0_70%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
-                <Step3AlertConditions
+                <AlertSettings
                   :formData="formData"
                   :isRealTime="formData.is_real_time"
                   :columns="filteredColumns"
@@ -252,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Left Column: Step Content (70%) -->
             <div class="tw-flex-[0_0_70%] tw-flex tw-flex-col" style="height: 100%; overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
-                <Step4CompareWithPast
+                <CompareWithPast
                   :multiTimeRange="formData.query_condition.multi_time_range"
                   :period="formData.trigger_condition.period"
                   :frequency="formData.trigger_condition.frequency"
@@ -290,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Left Column: Step Content (70%) -->
             <div class="tw-flex-[0_0_70%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
-                <Step5Deduplication
+                <Deduplication
                   :deduplication="formData.deduplication"
                   :columns="filteredColumns"
                   @update:deduplication="(val) => formData.deduplication = val"
@@ -324,7 +324,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Left Column: Step Content (70%) -->
             <div class="tw-flex-[0_0_70%] tw-flex tw-flex-col" style="height: 100%; overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
-                <Step6Advanced
+                <Advanced
                   :contextAttributes="formData.context_attributes"
                   :description="formData.description"
                   :rowTemplate="formData.row_template"
@@ -803,7 +803,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :isEditing="beingUpdated"
       />
     </q-dialog>
-
+<!-- 
     <!-- Hidden ScheduledAlert for Editor Dialog Access -->
     <scheduled-alert
       v-if="false"
@@ -839,7 +839,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @remove:group="removeConditionGroup"
       @update:silence="updateSilence"
       @update:multi-time-range="updateMultiTimeRange"
-    />
+    /> -->
 
 </template>
 
@@ -904,12 +904,12 @@ import JsonEditor from "../common/JsonEditor.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { createAlertsContextProvider, contextRegistry } from "@/composables/contextProviders";
 import HorizontalStepper from "./HorizontalStepper.vue";
-import Step1AlertSetup from "./steps/Step1AlertSetup.vue";
-import Step2QueryConfig from "./steps/Step2QueryConfig.vue";
-import Step3AlertConditions from "./steps/Step3AlertConditions.vue";
-import Step4CompareWithPast from "./steps/Step4CompareWithPast.vue";
-import Step5Deduplication from "./steps/Step5Deduplication.vue";
-import Step6Advanced from "./steps/Step6Advanced.vue";
+import AlertSetup from "./steps/AlertSetup.vue";
+import QueryConfig from "./steps/QueryConfig.vue";
+import AlertSettings from "./steps/AlertSettings.vue";
+import CompareWithPast from "./steps/CompareWithPast.vue";
+import Deduplication from "./steps/Deduplication.vue";
+import Advanced from "./steps/Advanced.vue";
 import AlertWizardRightColumn from "./AlertWizardRightColumn.vue";
 import {
   updateGroup as updateGroupUtil,
@@ -1007,12 +1007,12 @@ export default defineComponent({
     AlertsContainer,
     JsonEditor,
     HorizontalStepper,
-    Step1AlertSetup,
-    Step2QueryConfig,
-    Step3AlertConditions,
-    Step4CompareWithPast,
-    Step5Deduplication,
-    Step6Advanced,
+    AlertSetup,
+    QueryConfig,
+    AlertSettings,
+    CompareWithPast,
+    Deduplication,
+    Advanced,
     AlertWizardRightColumn,
   },
   setup(props, { emit }) {
