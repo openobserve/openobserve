@@ -127,3 +127,203 @@ impl fmt::Display for TookWatcher {
         write!(f, "{}ms", self.total_millis())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_took_watcher_total_elapsed() {
+        let watcher = TookWatcher::new();
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        let elapsed = watcher.total_elapsed();
+        assert!(elapsed.as_millis() >= 10);
+    }
+
+    #[tokio::test]
+    async fn test_took_watcher_total_millis() {
+        let watcher = TookWatcher::new();
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        let millis = watcher.total_millis();
+        assert!(millis >= 10);
+    }
+
+    #[tokio::test]
+    async fn test_took_watcher_total_secs_f64() {
+        let watcher = TookWatcher::new();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        let secs = watcher.total_secs_f64();
+        assert!(secs >= 0.1);
+    }
+
+    #[tokio::test]
+    async fn test_took_watcher_split_elapsed() {
+        let watcher = TookWatcher::new();
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        let elapsed = watcher.split_elapsed();
+        assert!(elapsed.as_millis() >= 10);
+    }
+
+    #[tokio::test]
+    async fn test_took_watcher_split_elapsed_millis() {
+        let watcher = TookWatcher::new();
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        let millis = watcher.split_elapsed_millis();
+        assert!(millis >= 10);
+    }
+
+    #[tokio::test]
+    async fn test_took_watcher_split_elapsed_secs_f64() {
+        let watcher = TookWatcher::new();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        let secs = watcher.split_elapsed_secs_f64();
+        assert!(secs >= 0.1);
+    }
+
+    #[tokio::test]
+    async fn test_took_watcher_record_split() {
+        let mut watcher = TookWatcher::new();
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        let duration = watcher.record_split("first");
+        assert!(duration.as_millis() >= 10);
+        assert_eq!(watcher.get_splits().len(), 1);
+        assert_eq!(watcher.get_splits()[0].name, "first");
+    }
+
+    #[tokio::test]
+    async fn test_took_watcher_multiple_splits() {
+        let mut watcher = TookWatcher::new();
+
+        tokio::time::sleep(Duration::from_millis(10)).await;
+        watcher.record_split("first");
+
+        tokio::time::sleep(Duration::from_millis(10)).await;
+        watcher.record_split("second");
+
+        tokio::time::sleep(Duration::from_millis(10)).await;
+        watcher.record_split("third");
+
+        let splits = watcher.get_splits();
+        assert_eq!(splits.len(), 3);
+        assert_eq!(splits[0].name, "first");
+        assert_eq!(splits[1].name, "second");
+        assert_eq!(splits[2].name, "third");
+    }
+
+    #[tokio::test]
+    async fn test_took_watcher_split_elapsed_after_record() {
+        let mut watcher = TookWatcher::new();
+
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        watcher.record_split("first");
+
+        // Reset the timer
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        // split_elapsed should measure from last record_split
+        let elapsed = watcher.split_elapsed_millis();
+        assert!(elapsed >= 10);
+        assert!(elapsed < 20); // Should be much less than total time
+    }
+
+    #[tokio::test]
+    async fn test_took_watcher_get_summary() {
+        let mut watcher = TookWatcher::new();
+
+        tokio::time::sleep(Duration::from_millis(10)).await;
+        watcher.record_split("operation1");
+
+        tokio::time::sleep(Duration::from_millis(10)).await;
+        watcher.record_split("operation2");
+
+        let summary = watcher.get_summary();
+        assert!(summary.contains("total:"));
+        assert!(summary.contains("ms"));
+        assert!(summary.contains("operation1"));
+        assert!(summary.contains("operation2"));
+    }
+
+    #[test]
+    fn test_took_watcher_split_structure() {
+        let split = Split {
+            name: "test".to_string(),
+            duration: Duration::from_millis(100),
+        };
+
+        assert_eq!(split.name, "test");
+        assert_eq!(split.duration.as_millis(), 100);
+    }
+
+    #[test]
+    fn test_took_watcher_split_clone() {
+        let split = Split {
+            name: "test".to_string(),
+            duration: Duration::from_millis(100),
+        };
+
+        let cloned = split.clone();
+        assert_eq!(cloned.name, split.name);
+        assert_eq!(cloned.duration, split.duration);
+    }
+
+    #[tokio::test]
+    async fn test_took_watcher_display_implementation() {
+        let watcher = TookWatcher::new();
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        let display_string = format!("{}", watcher);
+        assert!(display_string.ends_with("ms"));
+        assert!(display_string.len() > 2); // Should have some digits
+    }
+
+    #[tokio::test]
+    async fn test_took_watcher_debug_implementation() {
+        let watcher = TookWatcher::new();
+        let debug_string = format!("{:?}", watcher);
+
+        assert!(debug_string.contains("StopWatch"));
+        assert!(debug_string.contains("elapsed_ms"));
+        assert!(debug_string.contains("total_ms"));
+        assert!(debug_string.contains("splits"));
+    }
+
+    #[tokio::test]
+    async fn test_took_watcher_split_elapsed_without_mutation() {
+        let watcher = TookWatcher::new();
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        // Call multiple times should not change anything
+        let elapsed1 = watcher.split_elapsed_millis();
+        let elapsed2 = watcher.split_elapsed_millis();
+
+        // Both should be roughly the same (within a reasonable margin)
+        assert!((elapsed2 as i64 - elapsed1 as i64).abs() < 50);
+    }
+
+    #[tokio::test]
+    async fn test_took_watcher_empty_summary() {
+        let watcher = TookWatcher::new();
+        let summary = watcher.get_summary();
+
+        assert!(summary.contains("total:"));
+        assert!(summary.contains("breakdown:"));
+    }
+
+    #[tokio::test]
+    async fn test_took_watcher_clone() {
+        let mut watcher = TookWatcher::new();
+        tokio::time::sleep(Duration::from_millis(10)).await;
+        watcher.record_split("test");
+
+        let cloned = watcher.clone();
+        assert_eq!(cloned.get_splits().len(), watcher.get_splits().len());
+        assert_eq!(cloned.get_splits()[0].name, "test");
+    }
+}

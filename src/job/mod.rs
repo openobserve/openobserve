@@ -55,7 +55,6 @@ mod service_graph;
 mod stats;
 
 pub use file_downloader::{download_from_node, queue_download};
-pub use file_list_dump::FILE_LIST_SCHEMA;
 pub use mmdb_downloader::MMDB_INIT_NOTIFIER;
 
 #[cfg(feature = "enterprise")]
