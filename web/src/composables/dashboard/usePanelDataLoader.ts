@@ -962,13 +962,6 @@ export const usePanelDataLoader = (
 
                 const newData = res?.content?.results; // This is { result_type/resultType, result }
 
-                // Debug logging
-                console.log(`[PromQL Streaming] Query ${queryIndex} received chunk:`, {
-                  result_type: newData?.resultType || newData?.result_type,
-                  result_length: Array.isArray(newData?.result) ? newData.result.length : 'not array',
-                  newData: newData
-                });
-
                 if (!queryResults[queryIndex]) {
                   // First chunk - initialize with the structure
                   queryResults[queryIndex] = newData;
@@ -1054,10 +1047,6 @@ export const usePanelDataLoader = (
               // Mark this query as completed
               completedQueries.add(queryIndex);
 
-              // Debug logging
-              console.log(`[PromQL Streaming] Query ${queryIndex} completed. Total queries: ${panelSchema.value.queries.length}, Completed: ${completedQueries.size}`);
-              console.log(`[PromQL Streaming] Final data for query ${queryIndex}:`, queryResults[queryIndex]);
-
               // Final update with complete results
               state.data = [...queryResults];
               state.metadata = {
@@ -1068,7 +1057,6 @@ export const usePanelDataLoader = (
 
               // Only mark loading as complete when ALL queries are done
               if (completedQueries.size === panelSchema.value.queries.length) {
-                console.log('[PromQL Streaming] All queries completed. Final state.data:', state.data);
                 state.loading = false;
                 state.isOperationCancelled = false;
                 state.isPartialData = false;
