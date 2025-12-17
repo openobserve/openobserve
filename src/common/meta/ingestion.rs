@@ -25,6 +25,68 @@ use utoipa::ToSchema;
 
 use super::stream::SchemaRecords;
 
+/// System job types for backend ingestion processes
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SystemJobType {
+    LogPatterns,
+    SelfMetricsPromql,
+    ServiceGraph,
+    SelfReporting,
+    InternalGrpc,
+}
+
+impl SystemJobType {
+    /// Format as email local part (before @system.local)
+    pub fn as_email_local(&self) -> &'static str {
+        match self {
+            SystemJobType::LogPatterns => "log_patterns",
+            SystemJobType::SelfMetricsPromql => "self_metrics_promql",
+            SystemJobType::ServiceGraph => "service_graph",
+            SystemJobType::SelfReporting => "self_reporting",
+            SystemJobType::InternalGrpc => "internal_grpc",
+        }
+    }
+}
+
+/// User identifier for ingestion operations
+///
+/// This enum ensures proper tracking of who initiated an ingestion:
+/// - Real user emails for API requests
+/// - System job identifiers for automated backend processes
+///
+/// This prevents empty emails in usage reporting and makes it explicit
+/// whether ingestion was user-initiated or system-initiated.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IngestUser {
+    /// Real user email from authenticated API request
+    User(String),
+    /// System job identifier for automated backend processes
+    SystemJob(SystemJobType),
+}
+
+impl IngestUser {
+    /// Convert to email string for storage and reporting
+    ///
+    /// - User emails are returned as-is
+    /// - System jobs are formatted as `{job_name}@system.local`
+    pub fn to_email(&self) -> String {
+        match self {
+            IngestUser::User(email) => email.clone(),
+            IngestUser::SystemJob(job) => format!("{}@system.local", job.as_email_local()),
+        }
+    }
+
+    /// Create from a user email string
+    pub fn from_user_email(email: impl Into<String>) -> Self {
+        // we use unknown@system.local if email is passed as empty string
+        let email = match email.into() {
+            email if email.is_empty() => "unknown@system.local".to_string(),
+            email => email,
+        };
+        IngestUser::User(email)
+    }
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct RecordStatus {
     pub successful: u32,

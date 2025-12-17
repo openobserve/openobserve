@@ -86,7 +86,7 @@ pub async fn search(
     // get file list
     let mut files = file_list.to_vec();
     if files.is_empty() {
-        return Ok((vec![], ScanStats::default()));
+        return Ok((vec![], ScanStats::default(), HashSet::new()));
     }
     let original_files_len = files.len();
     log::info!(
@@ -182,7 +182,7 @@ pub async fn search(
         "parquet",
     )
     .instrument(enter_span.clone())
-    .await?;
+    .await;
 
     // report cache hit and miss metrics
     metrics::QUERY_DISK_CACHE_HIT_COUNT
@@ -285,7 +285,7 @@ pub async fn search(
                 .build()
         )
     );
-    Ok((vec![table], scan_stats))
+    Ok((vec![table], scan_stats, HashSet::new()))
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]
@@ -294,7 +294,7 @@ pub async fn cache_files(
     files: &[(i64, &String, &String, i64, i64)],
     scan_stats: &mut ScanStats,
     file_type: &str,
-) -> Result<(file_data::CacheType, u64, u64), Error> {
+) -> (file_data::CacheType, u64, u64) {
     // check how many files already cached
     let mut cached_files = HashSet::with_capacity(files.len());
     let (mut cache_hits, mut cache_misses) = (0, 0);
@@ -350,7 +350,7 @@ pub async fn cache_files(
     let files_num = files.len() as i64;
     if files_num == scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files {
         // all files are cached
-        return Ok((file_data::CacheType::Disk, cache_hits, cache_misses));
+        return (file_data::CacheType::Disk, cache_hits, cache_misses);
     }
 
     // check cache size
@@ -368,7 +368,7 @@ pub async fn cache_files(
         file_data::CacheType::Disk
     } else {
         // no cache, the files are too big than cache size
-        return Ok((file_data::CacheType::None, cache_hits, cache_misses));
+        return (file_data::CacheType::None, cache_hits, cache_misses);
     };
 
     let trace_id = trace_id.to_string();
@@ -410,9 +410,9 @@ pub async fn cache_files(
     // if cached file less than 50% of the total files, return None
     if scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files < files_num / 2
     {
-        Ok((file_data::CacheType::None, cache_hits, cache_misses))
+        (file_data::CacheType::None, cache_hits, cache_misses)
     } else {
-        Ok((cache_type, cache_hits, cache_misses))
+        (cache_type, cache_hits, cache_misses)
     }
 }
 
@@ -460,7 +460,7 @@ pub async fn tantivy_search(
         &mut scan_stats,
         "index",
     )
-    .await?;
+    .await;
 
     // report cache hit and miss metrics
     metrics::QUERY_DISK_CACHE_HIT_COUNT
@@ -525,7 +525,7 @@ pub async fn tantivy_search(
 
     let search_start = std::time::Instant::now();
     let mut is_add_filter_back = file_list_map.len() != index_file_names.len();
-    let time_range = query.time_range.unwrap_or((0, 0));
+    let time_range = query.time_range.unwrap_or_default();
     let index_parquet_files = index_file_names.into_iter().map(|(_, f)| f).collect_vec();
     let (index_parquet_files, query_limit) =
         partition_tantivy_files(index_parquet_files, &idx_optimize_mode, target_partitions);

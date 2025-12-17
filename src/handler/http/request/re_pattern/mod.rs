@@ -304,12 +304,9 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         let mgr = match get_pattern_manager().await {
             Ok(m) => m,
             Err(e) => {
-                return Ok(
-                    HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                        http::StatusCode::INTERNAL_SERVER_ERROR,
-                        format!("Cannot get pattern manager : {e:?}"),
-                    )),
-                );
+                return Ok(MetaHttpResponse::internal_error(format!(
+                    "Cannot get pattern manager : {e:?}"
+                )));
             }
         };
         let pattern_usage = mgr.get_pattern_usage(&id);

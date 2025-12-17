@@ -247,7 +247,7 @@ pub async fn generate_old_data_job_by_stream(
         org_id,
         stream_type,
         stream_name,
-        Some((start_time, end_time - 1)),
+        (start_time, end_time - 1),
     )
     .await?;
 
@@ -409,7 +409,6 @@ pub async fn merge_by_stream(
     stream_name: &str,
     job_id: i64,
     offset: i64,
-    stats_offset: i64,
 ) -> Result<(), anyhow::Error> {
     let cfg = get_config();
     let start = std::time::Instant::now();
@@ -446,19 +445,9 @@ pub async fn merge_by_stream(
         )
     };
     let files =
-        file_list::query_for_merge(org_id, stream_name, stream_type, &date_start, &date_end)
+        file_list::query_for_merge(org_id, stream_type, stream_name, &date_start, &date_end)
             .await
             .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
-
-    if !files.is_empty() && offset + hour_micros(1) > stats_offset {
-        // check stream stats update offset, if the merge offset greater than the stream stats
-        // offset, we need to wait for the stream stats to be updated first. here we just
-        // simple skip it, it will be retried in 10 minutes
-        log::warn!(
-            "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] offset: {offset}, skipped, it needs to wait stream_stats offset: {stats_offset}",
-        );
-        return Ok(());
-    }
 
     log::debug!(
         "[COMPACTOR] merge_by_stream [{}/{}/{}] date range: [{},{}], files: {}",
@@ -641,7 +630,7 @@ pub async fn merge_by_stream(
                 events.sort_by(|a, b| a.key.cmp(&b.key));
 
                 // write file list to storage
-                if let Err(e) = write_file_list(&org_id, &events).await {
+                if let Err(e) = write_file_list(&org_id, stream_type, &events).await {
                     log::error!("[COMPACTOR] write file list failed: {e}");
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                     continue;
@@ -909,15 +898,29 @@ pub async fn merge_files(
                 || stream_type == StreamType::Metrics
                 || stream_type == StreamType::Traces)
         {
-            // Process the merged data for service discovery
-            // Works with all stream types (same as ingester mode)
-            if let Err(e) =
-                process_service_streams_from_parquet(org_id, stream_name, stream_type, &buf).await
-            {
-                log::warn!(
-                    "[COMPACTOR] Failed to process service streams for {org_id}/{stream_type}/{stream_name}: {}",
-                    e
+            // Apply two-tier sampling to ensure fair processing across all streams
+            // Use the first file key as identifier for this merge operation
+            let file_identifier = files.first().map(|f| f.as_str()).unwrap_or("unknown");
+            let should_process =
+                o2_enterprise::enterprise::service_streams::sampler::should_process_file(
+                    org_id,
+                    stream_type,
+                    stream_name,
+                    file_identifier,
                 );
+
+            if should_process {
+                // Process the merged data for service discovery
+                // Works with all stream types (same as ingester mode)
+                if let Err(e) =
+                    process_service_streams_from_parquet(org_id, stream_name, stream_type, &buf)
+                        .await
+                {
+                    log::warn!(
+                        "[COMPACTOR] Failed to process service streams for {org_id}/{stream_type}/{stream_name}: {}",
+                        e
+                    );
+                }
             }
         }
     }
@@ -1072,7 +1075,11 @@ async fn generate_inverted_index(
     Ok(())
 }
 
-async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow::Error> {
+async fn write_file_list(
+    org_id: &str,
+    stream_type: StreamType,
+    events: &[FileKey],
+) -> Result<(), anyhow::Error> {
     if events.is_empty() {
         return Ok(());
     }
@@ -1091,14 +1098,17 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
 
     // set to db
     // retry 5 times
+    let cfg = get_config();
     let mut success = false;
+    let mut mark_deleted_done = false;
     let created_at = config::utils::time::now_micros();
     for _ in 0..5 {
-        if let Err(e) = infra_file_list::batch_process(events).await {
+        if !mark_deleted_done && let Err(e) = infra::file_list::batch_process(events).await {
             log::error!("[COMPACTOR] batch_process to db failed, retrying: {e}");
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             continue;
         }
+        mark_deleted_done = true;
         if !del_items.is_empty()
             && let Err(e) = infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
         {
@@ -1110,9 +1120,15 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
         break;
     }
 
+    // handle dump_stats for file_list type streams
+    if success && stream_type == StreamType::Filelist && cfg.compact.file_list_dump_enabled {
+        let (deleted_files, new_files): (Vec<_>, Vec<_>) = events.iter().partition(|e| e.deleted);
+        super::dump::handle_dump_stats_on_merge(&deleted_files, &new_files).await;
+    }
+
     if success {
         // send broadcast to other nodes
-        if get_config().cache_latest_files.enabled {
+        if cfg.cache_latest_files.enabled {
             // get id for all the new files
             let file_ids = infra_file_list::query_ids_by_files(events).await?;
             let mut events = events.to_vec();
@@ -1365,19 +1381,7 @@ async fn process_single_parquet_buffer(
     let bytes = Bytes::from(parquet_bytes.to_vec());
     let (_schema, batches) = read_recordbatch_from_bytes(&bytes).await?;
 
-    // Convert all batches to HashMap records
-    let mut all_records: Vec<std::collections::HashMap<String, serde_json::Value>> = Vec::new();
-    for batch in batches {
-        let records = record_batch_to_hashmap(&batch)?;
-        // Convert hashbrown::HashMap to std::collections::HashMap
-        for record in records {
-            let std_map: std::collections::HashMap<String, serde_json::Value> =
-                record.into_iter().collect();
-            all_records.push(std_map);
-        }
-    }
-
-    if all_records.is_empty() {
+    if batches.is_empty() {
         return Ok(());
     }
 
@@ -1389,35 +1393,135 @@ async fn process_single_parquet_buffer(
     let fqn_priority =
         crate::service::db::system_settings::get_fqn_priority_dimensions(org_id).await;
 
-    let processor = o2_enterprise::enterprise::service_streams::processor::StreamProcessor::new(
-        org_id.to_string(),
-        semantic_groups,
-        fqn_priority,
+    let processor = std::sync::Arc::new(
+        o2_enterprise::enterprise::service_streams::processor::StreamProcessor::new(
+            org_id.to_string(),
+            semantic_groups,
+            fqn_priority,
+        ),
     );
 
-    // Process records and extract services
-    let services = processor
-        .process_records(stream_type, stream_name, &all_records)
-        .await;
+    // Get config values for channel/batch sizes
+    let ss_config = &o2_enterprise::enterprise::common::config::get_config().service_streams;
+    let channel_capacity = ss_config.channel_capacity;
+    let batch_size = ss_config.record_batch_size;
 
-    if services.is_empty() {
-        return Ok(());
+    // Use bounded channel with backpressure for memory control
+    let (tx, mut rx) = mpsc::channel::<Vec<std::collections::HashMap<String, serde_json::Value>>>(
+        channel_capacity,
+    );
+
+    let org_id_owned = org_id.to_string();
+    let stream_name_owned = stream_name.to_string();
+
+    // Spawn producer task to convert batches to records in batches
+    let producer_handle = tokio::spawn(async move {
+        let mut current_batch: Vec<std::collections::HashMap<String, serde_json::Value>> =
+            Vec::with_capacity(batch_size);
+        let mut records_sent: u64 = 0;
+        let mut records_dropped: u64 = 0;
+
+        for batch in batches {
+            let records = match record_batch_to_hashmap(&batch) {
+                Ok(r) => r,
+                Err(e) => {
+                    log::warn!(
+                        "[COMPACTOR] Failed to convert record batch to hashmap: {}",
+                        e
+                    );
+                    continue;
+                }
+            };
+
+            for record in records {
+                // Convert hashbrown::HashMap to std::collections::HashMap
+                let std_map: std::collections::HashMap<String, serde_json::Value> =
+                    record.into_iter().collect();
+                current_batch.push(std_map);
+
+                // When batch is full, send it through channel
+                if current_batch.len() >= batch_size {
+                    let batch_len = current_batch.len() as u64;
+                    let batch_to_send =
+                        std::mem::replace(&mut current_batch, Vec::with_capacity(batch_size));
+
+                    // Use try_send for backpressure - drop if channel is full
+                    match tx.try_send(batch_to_send) {
+                        Ok(()) => {
+                            records_sent += batch_len;
+                        }
+                        Err(mpsc::error::TrySendError::Full(_)) => {
+                            records_dropped += batch_len;
+                            if records_dropped.is_multiple_of(1000) {
+                                log::warn!(
+                                    "[COMPACTOR] Service streams channel full, dropped {} records so far",
+                                    records_dropped
+                                );
+                            }
+                        }
+                        Err(mpsc::error::TrySendError::Closed(_)) => {
+                            return (records_sent, records_dropped);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Send remaining records
+        if !current_batch.is_empty() {
+            let batch_len = current_batch.len() as u64;
+            match tx.try_send(current_batch) {
+                Ok(()) => {
+                    records_sent += batch_len;
+                }
+                Err(mpsc::error::TrySendError::Full(_)) => {
+                    records_dropped += batch_len;
+                }
+                Err(mpsc::error::TrySendError::Closed(_)) => {}
+            }
+        }
+
+        (records_sent, records_dropped)
+    });
+
+    // Consumer: process batches as they arrive
+    let mut total_services = 0u64;
+    while let Some(records) = rx.recv().await {
+        if records.is_empty() {
+            continue;
+        }
+
+        let services = processor
+            .process_records(stream_type, &stream_name_owned, &records)
+            .await;
+
+        if !services.is_empty() {
+            let service_count = services.len() as u64;
+            total_services += service_count;
+
+            // Queue services for batched processing
+            o2_enterprise::enterprise::service_streams::batch_processor::queue_services(
+                org_id_owned.clone(),
+                services,
+            )
+            .await;
+        }
     }
 
-    log::info!(
-        "[COMPACTOR] Discovered {} services from {}/{}/{}",
-        services.len(),
-        org_id,
-        stream_type,
-        stream_name
-    );
+    // Wait for producer to finish and get stats
+    let (records_sent, records_dropped) = producer_handle.await.unwrap_or((0, 0));
 
-    // Queue services for batched processing (same as ingester mode)
-    o2_enterprise::enterprise::service_streams::batch_processor::queue_services(
-        org_id.to_string(),
-        services,
-    )
-    .await;
+    if total_services > 0 || records_dropped > 0 {
+        log::info!(
+            "[COMPACTOR] Service streams for {}/{}/{}: {} services discovered, {} records processed, {} records dropped",
+            org_id_owned,
+            stream_type,
+            stream_name_owned,
+            total_services,
+            records_sent,
+            records_dropped
+        );
+    }
 
     Ok(())
 }

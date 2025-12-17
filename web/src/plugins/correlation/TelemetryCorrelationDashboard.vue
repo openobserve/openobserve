@@ -53,31 +53,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </q-card-section>
 
-      <!-- Matched Dimensions Display -->
+      <!-- Dimensions Display - Stable (matched) and Unstable (additional) -->
       <div class="tw-py-2 tw-px-4 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)]">
         <div class="tw-flex tw-items-center tw-gap-3 tw-flex-wrap">
           <span class="tw-text-xs tw-font-semibold tw-opacity-70">
-            {{ t('correlation.dimensions') }}:
+            {{ t('correlation.filters') }}:
           </span>
           <div
-            v-for="(value, key) in activeDimensions"
+            v-for="(value, key) in pendingDimensions"
             :key="key"
             class="tw-flex tw-items-center tw-gap-2"
+            :class="{ 'tw-opacity-60': unstableDimensionKeys.has(key) }"
           >
-            <span class="tw-text-xs tw-font-semibold">{{ key }}:</span>
+            <span
+              class="tw-text-xs tw-font-semibold"
+              :class="unstableDimensionKeys.has(key) ? 'tw-text-gray-500' : ''"
+            >
+              {{ key }}:
+            </span>
             <q-select
-              v-model="activeDimensions[key]"
+              v-model="pendingDimensions[key]"
               :options="getDimensionOptions(key, value)"
               dense
               outlined
               emit-value
               map-options
-              @update:model-value="onDimensionChange"
+              @update:model-value="onPendingDimensionChange"
               class="dimension-dropdown"
               borderless
               style="min-width: 120px"
             />
+            <q-tooltip v-if="unstableDimensionKeys.has(key)">
+              Unstable dimension - changes on pod restart. Default: All values.
+            </q-tooltip>
           </div>
+          <!-- Apply Button -->
+          <q-btn
+            dense
+            no-caps
+            color="primary"
+            :label="t('common.apply')"
+            :disable="!hasPendingChanges"
+            @click="applyDimensionChanges"
+            class="tw-ml-2"
+            size="sm"
+            data-test="apply-dimension-filters"
+          />
         </div>
       </div>
 
@@ -188,6 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Dashboard -->
           <RenderDashboardCharts
             v-else-if="dashboardData"
+            ref="dashboardChartsRef"
             :key="dashboardRenderKey"
             :dashboardData="dashboardData"
             :currentTimeObj="currentTimeObj"
@@ -419,18 +441,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <!-- Embedded Tabs Mode -->
   <div v-else class="correlation-dashboard-embedded">
-    <!-- Matched Dimensions Display -->
+    <!-- Dimensions Display - Stable (matched) and Unstable (additional) -->
     <div class="tw-py-2 tw-px-4 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)]">
       <div class="tw-flex tw-items-center tw-gap-3 tw-flex-wrap">
         <span class="tw-text-xs tw-font-semibold tw-opacity-70">
-          {{ t('correlation.dimensions') }}:
+          {{ t('correlation.filters') }}:
         </span>
         <div
           v-for="(value, key) in activeDimensions"
           :key="key"
           class="tw-flex tw-items-center tw-gap-2"
+          :class="{ 'tw-opacity-60': unstableDimensionKeys.has(key) }"
         >
-          <span class="tw-text-xs tw-font-semibold">{{ key }}:</span>
+          <span
+            class="tw-text-xs tw-font-semibold"
+            :class="unstableDimensionKeys.has(key) ? 'tw-text-gray-500' : ''"
+          >
+            {{ key }}:
+          </span>
           <q-select
             v-model="activeDimensions[key]"
             :options="getDimensionOptions(key, value)"
@@ -443,6 +471,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             borderless
             style="min-width: 120px"
           />
+          <q-tooltip v-if="unstableDimensionKeys.has(key)">
+            Unstable dimension - changes on pod restart. Default: All values.
+          </q-tooltip>
         </div>
       </div>
     </div>
@@ -763,6 +794,7 @@ import {
   watch,
   defineAsyncComponent,
   provide,
+  nextTick,
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -788,6 +820,7 @@ interface TimeRange {
 interface Props {
   serviceName: string;
   matchedDimensions: Record<string, string>;
+  additionalDimensions?: Record<string, string>; // Unstable dimensions (pod-id, etc.) - shown with _o2_all option
   metricStreams: StreamInfo[];
   logStreams?: StreamInfo[];
   traceStreams?: StreamInfo[];
@@ -832,7 +865,9 @@ const error = ref<string | null>(null);
 const dashboardData = ref<any>(null);
 const logsDashboardData = ref<any>(null);
 const dashboardRenderKey = ref(0);
+const initialLoadCompleted = ref(false); // Track if initial load has completed to avoid duplicate loadDashboard calls
 const logsDashboardRenderKey = ref(0);
+const dashboardChartsRef = ref<any>(null);
 const showMetricSelector = ref(false);
 const metricSearchText = ref("");
 
@@ -888,8 +923,43 @@ const activeTab = computed({
 });
 const internalActiveTab = ref("logs");
 
-// Active dimensions that can be removed
-const activeDimensions = ref<Record<string, string>>({ ...props.matchedDimensions });
+// Active dimensions that can be modified
+// - matchedDimensions (stable): use actual values
+// - additionalDimensions (unstable): default to SELECT_ALL_VALUE (wildcard)
+// Applied dimensions - these are used to generate queries
+const activeDimensions = ref<Record<string, string>>({
+  ...props.matchedDimensions,
+  // Add additional dimensions with SELECT_ALL_VALUE as default (user can switch to actual value)
+  ...Object.fromEntries(
+    Object.keys(props.additionalDimensions || {}).map(key => [key, SELECT_ALL_VALUE])
+  )
+});
+
+// Pending dimensions - these are edited by the user but not yet applied
+const pendingDimensions = ref<Record<string, string>>({
+  ...props.matchedDimensions,
+  ...Object.fromEntries(
+    Object.keys(props.additionalDimensions || {}).map(key => [key, SELECT_ALL_VALUE])
+  )
+});
+
+// Track if there are pending changes that haven't been applied
+const hasPendingChanges = computed(() => {
+  const activeKeys = Object.keys(activeDimensions.value);
+  const pendingKeys = Object.keys(pendingDimensions.value);
+
+  if (activeKeys.length !== pendingKeys.length) return true;
+
+  for (const key of activeKeys) {
+    if (activeDimensions.value[key] !== pendingDimensions.value[key]) {
+      return true;
+    }
+  }
+  return false;
+});
+
+// Track which dimensions are unstable (for UI styling)
+const unstableDimensionKeys = computed(() => new Set(Object.keys(props.additionalDimensions || {})));
 
 // Get unique metric streams by stream_name
 const getUniqueStreams = (streams: StreamInfo[]) => {
@@ -906,13 +976,117 @@ const getUniqueStreams = (streams: StreamInfo[]) => {
   return unique;
 };
 
+/**
+ * Apply SELECT_ALL_VALUE to filters for unstable dimensions
+ * This ensures that unstable dimension filters default to wildcard (All values)
+ *
+ * Strategy: Use semantic groups to map metric field names to dimension IDs.
+ * 1. Build a reverse lookup: field_name -> semantic_dimension_id (from semanticGroups)
+ * 2. For each filter in the stream, find its semantic dimension ID
+ * 3. If that dimension ID is in additionalDimensions (unstable), set filter to SELECT_ALL_VALUE
+ *
+ * Example:
+ * - semanticGroups has: { id: 'k8s-node-id', fields: ['k8s_node_name', 'node_name', ...] }
+ * - additionalDimensions has: { 'k8s-node-id': 'node-abc' }
+ * - Metric filter has: { k8s_node_name: 'node-xyz' }
+ * - k8s_node_name maps to 'k8s-node-id' which is in additionalDimensions -> set to SELECT_ALL_VALUE
+ */
+const applyUnstableDimensionDefaults = (streams: StreamInfo[]): StreamInfo[] => {
+  console.log("[METRICS-DEBUG] ========== applyUnstableDimensionDefaults START ==========");
+  console.log("[METRICS-DEBUG] Input streams count:", streams.length);
+  console.log("[METRICS-DEBUG] Input streams:", streams.map(s => ({ name: s.stream_name, filters: s.filters })));
+
+  // Collect ALL unstable dimension IDs from:
+  // 1. additionalDimensions (explicitly marked as unstable)
+  // 2. matchedDimensions where value is already SELECT_ALL_VALUE (unstable dims with wildcard)
+  const unstableDimIds = new Set<string>();
+
+  const additionalDims = props.additionalDimensions || {};
+  const matchedDims = props.matchedDimensions || {};
+
+  // Add all keys from additionalDimensions
+  for (const key of Object.keys(additionalDims)) {
+    unstableDimIds.add(key);
+  }
+
+  // Add keys from matchedDimensions that have SELECT_ALL_VALUE (these are unstable)
+  for (const [key, value] of Object.entries(matchedDims)) {
+    if (value === SELECT_ALL_VALUE) {
+      unstableDimIds.add(key);
+    }
+  }
+
+  console.log("[METRICS-DEBUG] additionalDimensions:", additionalDims);
+  console.log("[METRICS-DEBUG] matchedDimensions:", matchedDims);
+  console.log("[METRICS-DEBUG] unstableDimIds (combined):", [...unstableDimIds]);
+
+  if (unstableDimIds.size === 0) {
+    console.log("[METRICS-DEBUG] No unstable dimensions found, returning streams unchanged");
+    console.log("[METRICS-DEBUG] ========== applyUnstableDimensionDefaults END ==========");
+    return streams;
+  }
+
+  // Build reverse lookup: field_name -> semantic_dimension_id
+  // Using semanticGroups from useServiceCorrelation()
+  console.log("[METRICS-DEBUG] semanticGroups.value.length:", semanticGroups.value.length);
+
+  const fieldToDimensionId = new Map<string, string>();
+  for (const group of semanticGroups.value) {
+    for (const field of group.fields) {
+      fieldToDimensionId.set(field, group.id);
+    }
+  }
+  console.log("[METRICS-DEBUG] fieldToDimensionId map size:", fieldToDimensionId.size);
+  console.log("[METRICS-DEBUG] fieldToDimensionId entries (first 20):", [...fieldToDimensionId.entries()].slice(0, 20));
+
+  const result = streams.map(stream => {
+    const updatedFilters = { ...stream.filters };
+    const changedKeys: string[] = [];
+    const notMatchedKeys: string[] = [];
+
+    // For each filter in the stream, check if it maps to an unstable dimension
+    for (const [filterKey, filterValue] of Object.entries(stream.filters)) {
+      // Look up the semantic dimension ID for this field name
+      const dimensionId = fieldToDimensionId.get(filterKey);
+
+      console.log(`[METRICS-DEBUG] Stream ${stream.stream_name}: filterKey=${filterKey}, dimensionId=${dimensionId}, isUnstable=${dimensionId ? unstableDimIds.has(dimensionId) : 'N/A'}`);
+
+      if (dimensionId && unstableDimIds.has(dimensionId)) {
+        // This filter's field maps to an unstable dimension - set to wildcard
+        updatedFilters[filterKey] = SELECT_ALL_VALUE;
+        changedKeys.push(`${filterKey} (${dimensionId})=${filterValue}`);
+      } else if (!dimensionId) {
+        notMatchedKeys.push(filterKey);
+      }
+    }
+
+    if (changedKeys.length > 0) {
+      console.log(`[METRICS-DEBUG] Stream ${stream.stream_name}: SET TO SELECT_ALL_VALUE: ${changedKeys.join(', ')}`);
+    }
+    if (notMatchedKeys.length > 0) {
+      console.log(`[METRICS-DEBUG] Stream ${stream.stream_name}: NO SEMANTIC MATCH for: ${notMatchedKeys.join(', ')}`);
+    }
+
+    console.log(`[METRICS-DEBUG] Stream ${stream.stream_name}: FINAL filters:`, updatedFilters);
+
+    return {
+      ...stream,
+      filters: updatedFilters,
+    };
+  });
+
+  console.log("[METRICS-DEBUG] ========== applyUnstableDimensionDefaults END ==========");
+  return result;
+};
+
 const uniqueMetricStreams = computed(() => {
   return getUniqueStreams(props.metricStreams);
 });
 
 // Selected metric streams (default to first 6 unique streams)
+// Apply SELECT_ALL_VALUE defaults for unstable dimensions
 const selectedMetricStreams = ref<StreamInfo[]>(
-  getUniqueStreams(props.metricStreams).slice(0, 6)
+  applyUnstableDimensionDefaults(getUniqueStreams(props.metricStreams).slice(0, 6))
 );
 
 // Filter metric streams based on search text
@@ -959,16 +1133,19 @@ const toggleMetricStream = (stream: StreamInfo) => {
       s => s.stream_name !== stream.stream_name
     );
   } else {
-    // Add stream
-    selectedMetricStreams.value = [...selectedMetricStreams.value, stream];
+    // Add stream - apply SELECT_ALL_VALUE defaults for unstable dimensions
+    const streamsWithDefaults = applyUnstableDimensionDefaults([stream]);
+    selectedMetricStreams.value = [...selectedMetricStreams.value, ...streamsWithDefaults];
   }
 };
 
 // Get dropdown options for a dimension
 const getDimensionOptions = (key: string, currentValue: string) => {
-  const originalValue = props.matchedDimensions[key];
+  // Get the original value - could be from matched (stable) or additional (unstable) dimensions
+  const originalValue = props.matchedDimensions[key] || props.additionalDimensions?.[key];
+  const isUnstable = unstableDimensionKeys.value.has(key);
 
-  // Create options array, avoiding duplicates
+  // Create options array
   const options = [
     {
       label: t('correlation.all'),
@@ -976,10 +1153,10 @@ const getDimensionOptions = (key: string, currentValue: string) => {
     },
   ];
 
-  // Only add the original value if it's not the same as SELECT_ALL_VALUE
-  if (originalValue !== SELECT_ALL_VALUE) {
+  // Add the original value option if it exists and is not already SELECT_ALL_VALUE
+  if (originalValue && originalValue !== SELECT_ALL_VALUE) {
     options.push({
-      label: originalValue,
+      label: isUnstable ? `${originalValue} (current)` : originalValue,
       value: originalValue,
     });
   }
@@ -1038,37 +1215,49 @@ const fetchMetricSchemas = async (streamNames: string[]) => {
   }
 };
 
-// Handle dimension value change
-const onDimensionChange = () => {
-  console.log("[TelemetryCorrelationDashboard] Dimension changed:", activeDimensions.value);
+// Handle pending dimension value change - just updates pending state, doesn't regenerate queries
+const onPendingDimensionChange = () => {
+  console.log("[TelemetryCorrelationDashboard] Pending dimension changed:", pendingDimensions.value);
+  // No action needed - hasPendingChanges computed will update automatically
+};
+
+// Apply pending dimension changes and regenerate dashboard
+const applyDimensionChanges = () => {
+  console.log("[TelemetryCorrelationDashboard] Applying dimension changes:", pendingDimensions.value);
+  console.log("[TelemetryCorrelationDashboard] activeDimensions BEFORE:", activeDimensions.value);
+
+  // Copy pending to active
+  activeDimensions.value = { ...pendingDimensions.value };
+
+  console.log("[TelemetryCorrelationDashboard] activeDimensions AFTER:", activeDimensions.value);
+
+  // Build field_name -> dimension_id mapping from semantic groups
+  // This is the same approach as applyUnstableDimensionDefaults
+  const fieldToDimensionId = new Map<string, string>();
+  for (const group of semanticGroups.value) {
+    for (const field of group.fields) {
+      fieldToDimensionId.set(field, group.id);
+    }
+  }
+
+  console.log("[TelemetryCorrelationDashboard] applyDimensionChanges - fieldToDimensionId size:", fieldToDimensionId.size);
+  console.log("[TelemetryCorrelationDashboard] applyDimensionChanges - selectedMetricStreams count:", selectedMetricStreams.value.length);
 
   // Update metric stream filters with new dimension values
-  // Need to map semantic keys to actual filter field names
+  // Use semantic groups to map filter field names to dimension IDs
   selectedMetricStreams.value = selectedMetricStreams.value.map(stream => {
     const updatedFilters = { ...stream.filters };
+    console.log(`[TelemetryCorrelationDashboard] Processing stream ${stream.stream_name}, filter keys:`, Object.keys(stream.filters));
 
-    // Update each filter based on the active dimensions
-    for (const [semanticKey, newValue] of Object.entries(activeDimensions.value)) {
-      // Try to find the matching filter field in the stream
-      // First, try direct match with semantic key
-      if (updatedFilters[semanticKey] !== undefined) {
-        updatedFilters[semanticKey] = newValue;
-      } else {
-        // Try normalized key (replace hyphens with underscores)
-        const normalizedKey = semanticKey.replace(/-/g, '_');
-        if (updatedFilters[normalizedKey] !== undefined) {
-          updatedFilters[normalizedKey] = newValue;
-        } else {
-          // If not found, check if any filter field matches the original value
-          // This handles cases where the stream uses the semantic key directly
-          const originalValue = props.matchedDimensions[semanticKey];
-          for (const [filterKey, filterValue] of Object.entries(stream.filters)) {
-            if (filterValue === originalValue) {
-              updatedFilters[filterKey] = newValue;
-              break;
-            }
-          }
-        }
+    // For each filter in the stream, find its semantic dimension ID
+    // and update with the new value from activeDimensions
+    for (const [filterKey, _filterValue] of Object.entries(stream.filters)) {
+      const dimensionId = fieldToDimensionId.get(filterKey);
+      console.log(`[TelemetryCorrelationDashboard]   filterKey=${filterKey}, dimensionId=${dimensionId}, hasInActiveDims=${dimensionId ? activeDimensions.value[dimensionId] !== undefined : 'N/A'}`);
+      if (dimensionId && activeDimensions.value[dimensionId] !== undefined) {
+        const newValue = activeDimensions.value[dimensionId];
+        updatedFilters[filterKey] = newValue;
+        console.log(`[TelemetryCorrelationDashboard] applyDimensionChanges: ${filterKey} (${dimensionId}) -> ${newValue}`);
       }
     }
 
@@ -1088,6 +1277,7 @@ const onDimensionChange = () => {
 };
 
 const loadDashboard = async () => {
+  console.log("[TelemetryCorrelationDashboard] loadDashboard CALLED - stack:", new Error().stack?.split('\n').slice(1, 4).join(' <- '));
   try {
     loading.value = true;
     error.value = null;
@@ -1114,10 +1304,18 @@ const loadDashboard = async () => {
     };
 
     // Generate metrics dashboard JSON (if we have metrics)
+    console.log("[TelemetryCorrelationDashboard] loadDashboard - selectedMetricStreams.length:", selectedMetricStreams.value.length);
     if (selectedMetricStreams.value.length > 0) {
+      console.log("[TelemetryCorrelationDashboard] loadDashboard - selectedMetricStreams filters:");
+      selectedMetricStreams.value.forEach(s => {
+        console.log(`  ${s.stream_name}:`, s.filters);
+      });
       const dashboard = generateDashboard(selectedMetricStreams.value, config);
+      console.log("[TelemetryCorrelationDashboard] Generated metrics dashboard:", dashboard);
       dashboardData.value = dashboard;
       dashboardRenderKey.value++;
+    } else {
+      console.log("[TelemetryCorrelationDashboard] No metric streams selected, skipping metrics dashboard");
     }
 
     // Generate logs dashboard JSON
@@ -1144,10 +1342,98 @@ const loadDashboard = async () => {
   }
 };
 
+/**
+ * Add new metric panels without re-rendering existing ones
+ * This is called when user adds new metrics to avoid reloading all panels
+ */
+const addMetricPanels = async (addedStreams: StreamInfo[]) => {
+  if (!dashboardData.value || !dashboardData.value.tabs?.[0]?.panels) {
+    // No existing dashboard, do full load
+    loadDashboard();
+    return;
+  }
+
+  try {
+    // Get current panels
+    const currentPanels = dashboardData.value.tabs[0].panels;
+    const existingCount = currentPanels.length;
+
+    // Fetch schemas for new streams only
+    const newStreamNames = addedStreams.map(s => s.stream_name);
+    const newSchemas = await fetchMetricSchemas(newStreamNames);
+
+    // Build config for new panels
+    const config: MetricsCorrelationConfig = {
+      serviceName: props.serviceName,
+      matchedDimensions: activeDimensions.value,
+      metricStreams: addedStreams,
+      logStreams: props.logStreams,
+      traceStreams: props.traceStreams,
+      orgIdentifier: currentOrgIdentifier.value,
+      timeRange: props.timeRange,
+      sourceStream: props.sourceStream,
+      sourceType: props.sourceType,
+      availableDimensions: props.availableDimensions,
+      metricSchemas: newSchemas,
+    };
+
+    // Generate panels for new streams only
+    const newDashboard = generateDashboard(addedStreams, config);
+    const newPanels = newDashboard.tabs[0].panels;
+
+    // Update layout positions for new panels to appear after existing ones
+    const timestamp = Date.now();
+    newPanels.forEach((panel: any, index: number) => {
+      const absoluteIndex = existingCount + index;
+      // Use completely unique ID with timestamp to avoid collision
+      const uniqueId = `${panel.layout.i}_${timestamp}_${absoluteIndex}`;
+      panel.layout = {
+        x: (absoluteIndex % 3) * 64,
+        y: Math.floor(absoluteIndex / 3) * 16,
+        w: 64,
+        h: 16,
+        i: uniqueId,
+      };
+      // Update panel ID to match
+      panel.id = `${panel.id}_${timestamp}`;
+    });
+
+    // Create new dashboard object by appending panels
+    const updatedDashboard = {
+      ...dashboardData.value,
+      tabs: [
+        {
+          ...dashboardData.value.tabs[0],
+          panels: [...currentPanels, ...newPanels],
+        },
+        ...dashboardData.value.tabs.slice(1),
+      ],
+    };
+
+    dashboardData.value = updatedDashboard;
+
+    // DON'T increment dashboardRenderKey - let Vue's reactivity handle it
+    // Since each panel has a unique ID, Vue will only render the new panels
+
+    // Wait for DOM to update, then refresh GridStack to position new panels
+    await nextTick();
+    if (dashboardChartsRef.value?.refreshGridStack) {
+      await dashboardChartsRef.value.refreshGridStack();
+    }
+
+    console.log("[TelemetryCorrelationDashboard] Added", addedStreams.length, "new metric panels without full reload");
+  } catch (err: any) {
+    console.error("[TelemetryCorrelationDashboard] Error adding metric panels, falling back to full reload:", err);
+    loadDashboard();
+  }
+};
+
 const onClose = () => {
   if (props.mode === 'dialog') {
     isOpen.value = false;
   }
+  // Reset initial load flag for next open
+  initialLoadCompleted.value = false;
   emit("close");
 };
 
@@ -1223,24 +1509,43 @@ const deriveFieldNameVariations = (baseFieldName: string): string[] => {
 /**
  * Build regex patterns for extracting trace_id from text content
  * Dynamically generates patterns based on the configured field name
+ * Supports: hex, alphanumeric, and UUID format trace IDs
  */
 const buildTraceIdTextPatterns = (fieldName: string): RegExp[] => {
   const variations = deriveFieldNameVariations(fieldName);
   const patterns: RegExp[] = [];
 
+  // UUID pattern: 8-4-4-4-12 hex with hyphens
+  const uuidPattern = '[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}';
+  // Alphanumeric pattern: 16-64 chars
+  const alphanumPattern = '[a-zA-Z0-9]{16,64}';
+
   for (const variant of variations) {
     // Escape special regex characters in the variant
     const escaped = variant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-    // Pattern: [field_name abc123-suffix] - handles formats like [trace_id 019b042dc72d76429043efccfe8e96c9-f1Mwiur]
-    // Captures the hex part before any dash suffix
-    patterns.push(new RegExp(`\\[${escaped}\\s+([a-fA-F0-9]{16,64})(?:-[^\\]]*)?\\]`, 'i'));
+    // UUID format patterns (must come first as they're more specific)
+    // Pattern: [field_name uuid] - e.g., [trace_id 019411a7-30e7-7e8a-a456-426614174000]
+    patterns.push(new RegExp(`\\[${escaped}\\s+(${uuidPattern})\\]`, 'i'));
+
+    // Pattern: field_name=uuid or field_name: uuid
+    patterns.push(new RegExp(`${escaped}[=:]\\s*["']?(${uuidPattern})["']?`, 'i'));
+
+    // Pattern: "field_name": "uuid" (JSON)
+    patterns.push(new RegExp(`"${escaped}"\\s*:\\s*"(${uuidPattern})"`, 'i'));
+
+    // Alphanumeric format patterns
+    // Pattern: [field_name abc123] - handles formats like [trace_id 36eFC0BZ5e7PHLMEd1ojvr06I3K]
+    patterns.push(new RegExp(`\\[${escaped}\\s+(${alphanumPattern})\\]`, 'i'));
+
+    // Pattern: [field_name abc123-suffix] - handles formats with dash suffix
+    patterns.push(new RegExp(`\\[${escaped}\\s+(${alphanumPattern})(?:-[^\\]]*)?\\]`, 'i'));
 
     // Pattern: field_name=abc123 or field_name: abc123 (possibly with dash suffix)
-    patterns.push(new RegExp(`${escaped}[=:]\\s*["']?([a-fA-F0-9]{16,64})(?:-[^"'\\s]*)?["']?`, 'i'));
+    patterns.push(new RegExp(`${escaped}[=:]\\s*["']?(${alphanumPattern})(?:-[^"'\\s]*)?["']?`, 'i'));
 
     // Pattern: "field_name": "abc123" (JSON, possibly with dash suffix)
-    patterns.push(new RegExp(`"${escaped}"\\s*:\\s*"([a-fA-F0-9]{16,64})(?:-[^"]*)?\\s*"`, 'i'));
+    patterns.push(new RegExp(`"${escaped}"\\s*:\\s*"(${alphanumPattern})(?:-[^"]*)?\\s*"`, 'i'));
   }
 
   return patterns;
@@ -1381,13 +1686,41 @@ const extractTraceIdFromLog = (): string | null => {
 
 /**
  * Validate if a string looks like a valid trace ID
- * Trace IDs are typically 16-32 character hex strings
+ * Supports multiple trace ID formats:
+ * - Hex trace IDs: 16-64 hex characters (OpenTelemetry, Jaeger, Zipkin)
+ * - Alphanumeric trace IDs: 16-64 alphanumeric characters (some custom systems)
+ * - UUID format: 8-4-4-4-12 hex with hyphens (UUID v1, v4, v7, etc.)
+ * - AWS X-Ray format: 1-{8 hex}-{24 hex} (e.g., 1-5759e988-bd862e3fe1be46a994272793)
  */
 const isValidTraceId = (value: string): boolean => {
   if (!value || typeof value !== 'string') return false;
   const trimmed = value.trim();
-  // Valid trace ID: 16-64 hex characters (some systems use 128-bit = 32 chars, some use 64-bit = 16 chars)
-  return /^[a-fA-F0-9]{16,64}$/.test(trimmed);
+
+  // Pattern 1: Standard hex trace ID (OpenTelemetry, Jaeger, Zipkin)
+  // 16-64 hex characters
+  if (/^[a-fA-F0-9]{16,64}$/.test(trimmed)) {
+    return true;
+  }
+
+  // Pattern 2: Alphanumeric trace ID (some systems use base64-like IDs)
+  // 16-64 alphanumeric characters (letters and numbers)
+  if (/^[a-zA-Z0-9]{16,64}$/.test(trimmed)) {
+    return true;
+  }
+
+  // Pattern 3: UUID format (v1, v4, v7, etc.): 8-4-4-4-12 hex with hyphens
+  // e.g., 019411a7-30e7-7e8a-a456-426614174000 (UUID v7)
+  // e.g., 550e8400-e29b-41d4-a716-446655440000 (UUID v4)
+  if (/^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$/.test(trimmed)) {
+    return true;
+  }
+
+  // Pattern 4: AWS X-Ray format: 1-{8 hex}-{24 hex}
+  if (/^1-[a-fA-F0-9]{8}-[a-fA-F0-9]{24}$/.test(trimmed)) {
+    return true;
+  }
+
+  return false;
 };
 
 /**
@@ -1682,35 +2015,115 @@ watch(
 );
 
 // Load dashboard when modal opens
+// First load semantic groups (required for metric filter transformation), then load dashboard
 watch(
   () => isOpen.value,
-  (newVal) => {
+  async (newVal) => {
     console.log("[TelemetryCorrelationDashboard] isOpen changed:", newVal, "mode:", props.mode);
     if (newVal) {
-      loadDashboard();
+      // Load semantic groups first (required for applyUnstableDimensionDefaults)
+      console.log("[TelemetryCorrelationDashboard] Loading semantic groups before dashboard...");
+      await loadSemanticGroups();
+      console.log("[TelemetryCorrelationDashboard] Semantic groups loaded, count:", semanticGroups.value.length);
+
+      // Re-apply defaults now that semantic groups are loaded
+      // Check if there are ANY unstable dimensions (either in additionalDimensions OR matchedDimensions with _o2_all_)
+      const hasAdditionalDims = Object.keys(props.additionalDimensions || {}).length > 0;
+      const hasUnstableInMatched = Object.values(props.matchedDimensions || {}).some(v => v === SELECT_ALL_VALUE);
+      if (semanticGroups.value.length > 0 && (hasAdditionalDims || hasUnstableInMatched)) {
+        console.log("[TelemetryCorrelationDashboard] Re-applying unstable dimension defaults after semantic groups loaded");
+        console.log("[TelemetryCorrelationDashboard] hasAdditionalDims:", hasAdditionalDims, "hasUnstableInMatched:", hasUnstableInMatched);
+        selectedMetricStreams.value = applyUnstableDimensionDefaults(selectedMetricStreams.value);
+      }
+
+      await loadDashboard();
+      initialLoadCompleted.value = true;
     }
   },
   { immediate: true }
 );
 
-// Reload when selected metric streams change
+// Reload when selected metric streams change (only after initial load)
 watch(
   selectedMetricStreams,
   (newStreams, oldStreams) => {
-    // Skip if this is the initial load
-    if (!oldStreams || oldStreams.length === 0) {
+    // Skip if this is the initial load (already handled by isOpen watcher)
+    if (!oldStreams || oldStreams.length === 0 || !initialLoadCompleted.value) {
       return;
     }
 
-    // Check if streams actually changed
+    // Check if streams actually changed (by name, not by filters)
     const changed = newStreams.length !== oldStreams.length ||
       newStreams.some((s, i) => s.stream_name !== oldStreams[i]?.stream_name);
 
-    if (changed && isOpen.value && newStreams.length > 0) {
-      loadDashboard();
+    if (!changed) {
+      return;
+    }
+
+    // Determine which streams were added vs removed
+    const oldStreamNames = new Set(oldStreams.map(s => s.stream_name));
+    const newStreamNames = new Set(newStreams.map(s => s.stream_name));
+
+    const addedStreams = newStreams.filter(s => !oldStreamNames.has(s.stream_name));
+    const removedStreams = oldStreams.filter(s => !newStreamNames.has(s.stream_name));
+
+    if (isOpen.value && newStreams.length > 0) {
+      if (removedStreams.length > 0) {
+        // If streams were removed, we need full reload to remove panels
+        console.log("[TelemetryCorrelationDashboard] Streams removed, doing full reload");
+        dashboardData.value = null;
+        nextTick(() => {
+          loadDashboard();
+        });
+      } else if (addedStreams.length > 0) {
+        // If only added, append new panels without regenerating existing ones
+        console.log("[TelemetryCorrelationDashboard] Streams added, appending panels only");
+        addMetricPanels(addedStreams);
+      }
     }
   },
   { deep: true }
+);
+
+// Re-apply unstable dimension defaults when additionalDimensions prop changes
+// This handles the case where props are updated AFTER initial component mount
+// Note: NOT immediate - only reacts to changes after initial load
+watch(
+  () => props.additionalDimensions,
+  (newAdditionalDims, oldAdditionalDims) => {
+    // Skip if this is the initial call (no old value) or initial load hasn't completed
+    if (!oldAdditionalDims || !initialLoadCompleted.value) {
+      return;
+    }
+    if (newAdditionalDims && Object.keys(newAdditionalDims).length > 0 && semanticGroups.value.length > 0) {
+      console.log("[TelemetryCorrelationDashboard] additionalDimensions changed, re-applying defaults to metric streams");
+      selectedMetricStreams.value = applyUnstableDimensionDefaults(selectedMetricStreams.value);
+      if (isOpen.value) {
+        loadDashboard();
+      }
+    }
+  }
+);
+
+// Re-apply unstable dimension defaults when matchedDimensions prop changes
+// This handles the case where matchedDimensions contains _o2_all_ values for unstable dims
+// Note: NOT immediate - only reacts to changes after initial load
+watch(
+  () => props.matchedDimensions,
+  (newMatchedDims, oldMatchedDims) => {
+    // Skip if this is the initial call (no old value) or initial load hasn't completed
+    if (!oldMatchedDims || !initialLoadCompleted.value) {
+      return;
+    }
+    const hasUnstableInMatched = Object.values(newMatchedDims || {}).some(v => v === SELECT_ALL_VALUE);
+    if (hasUnstableInMatched && semanticGroups.value.length > 0) {
+      console.log("[TelemetryCorrelationDashboard] matchedDimensions changed with unstable dims, re-applying defaults");
+      selectedMetricStreams.value = applyUnstableDimensionDefaults(selectedMetricStreams.value);
+      if (isOpen.value) {
+        loadDashboard();
+      }
+    }
+  }
 );
 </script>
 

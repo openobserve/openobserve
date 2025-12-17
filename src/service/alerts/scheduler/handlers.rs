@@ -821,6 +821,80 @@ async fn handle_alert_triggers(
         //     );
         // }
 
+        // [ENTERPRISE] Correlate alert to incident for unified incident management
+        #[cfg(feature = "enterprise")]
+        if o2_enterprise::enterprise::common::config::get_config()
+            .incidents
+            .enabled
+            && let Some(first_row) = data.first()
+        {
+            // Extract service name from result labels (used for topology enrichment)
+            let service_name = first_row
+                .get("service.name")
+                .or_else(|| first_row.get("service_name"))
+                .and_then(json::Value::as_str);
+
+            // Extract trace_id for trace-based correlation
+            let trace_id = first_row
+                .get("trace_id")
+                .or_else(|| first_row.get("traceId"))
+                .or_else(|| first_row.get("TraceId"))
+                .and_then(json::Value::as_str);
+
+            match crate::service::alerts::incidents::correlate_alert_to_incident(
+                &alert,
+                first_row,
+                triggered_at,
+                service_name,
+                trace_id,
+            )
+            .await
+            {
+                Ok(Some(incident_id)) => {
+                    log::info!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Alert {}/{} correlated to incident {}",
+                        &new_trigger.org,
+                        &alert.name,
+                        incident_id
+                    );
+
+                    // Spawn async task to enrich incident with topology context
+                    // This runs in the background to not block notification sending
+                    if let Some(service_name) = service_name {
+                        let org_id = new_trigger.org.clone();
+                        let incident_id_clone = incident_id.clone();
+                        let service_name_clone = service_name.to_string();
+                        tokio::spawn(async move {
+                            if let Err(e) = crate::service::alerts::incidents::enrich_with_topology(
+                                &org_id,
+                                &incident_id_clone,
+                                &service_name_clone,
+                            )
+                            .await
+                            {
+                                log::debug!(
+                                    "[incidents] Topology enrichment failed for incident {incident_id_clone}: {e}"
+                                );
+                            }
+                        });
+                    }
+                }
+                Ok(None) => {
+                    log::debug!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] No incident correlation for alert {}/{}",
+                        &new_trigger.org,
+                        &alert.name
+                    );
+                }
+                Err(e) => {
+                    log::error!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Error correlating alert to incident: {e}"
+                    );
+                    // Don't fail alert processing if incident correlation fails
+                }
+            }
+        }
+
         let vars = get_row_column_map(&data);
         // Multi-time range alerts can have multiple time ranges, hence only
         // use the main start_time (now - period) and end_time (now) for the alert evaluation.

@@ -28,7 +28,7 @@ use datafusion::execution::memory_pool::{
 pub struct PeakMemoryPool {
     trace_id: String,
     inner: Arc<dyn MemoryPool>,
-    peak_memory: Arc<AtomicUsize>,
+    pub peak_memory: Arc<AtomicUsize>,
 }
 
 impl PeakMemoryPool {
@@ -335,7 +335,7 @@ mod tests {
             let pool_clone = pool.clone();
             let pool_dyn_clone = pool_dyn.clone();
             let handle = thread::spawn(move || {
-                let consumer = MemoryConsumer::new(&format!("consumer-{}", i));
+                let consumer = MemoryConsumer::new(format!("consumer-{i}"));
                 let reservation = consumer.register(&pool_dyn_clone);
 
                 // Each thread allocates some memory

@@ -52,6 +52,8 @@ pub mod destinations;
 #[cfg(feature = "enterprise")]
 pub mod grouping;
 #[cfg(feature = "enterprise")]
+pub mod incidents;
+#[cfg(feature = "enterprise")]
 pub mod org_config;
 pub mod scheduler;
 pub mod templates;

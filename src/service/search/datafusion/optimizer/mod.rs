@@ -99,7 +99,7 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
         None
     };
     let offset = sql.offset as usize;
-    let (start_time, end_time) = sql.time_range.unwrap();
+    let (start_time, end_time) = sql.time_range.unwrap_or_default();
 
     let mut rules: Vec<Arc<dyn OptimizerRule + Send + Sync>> = Vec::with_capacity(64);
 

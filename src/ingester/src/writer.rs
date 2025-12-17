@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
+    collections::HashSet,
     path::PathBuf,
     sync::{
         Arc,
@@ -28,7 +29,6 @@ use config::{
     MEM_TABLE_INDIVIDUAL_STREAMS, get_config, metrics,
     utils::hash::{Sum64, gxhash},
 };
-use hashbrown::HashSet;
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use tokio::sync::{RwLock, mpsc};
@@ -220,7 +220,7 @@ pub async fn read_from_memtable(
     stream_name: &str,
     time_range: Option<(i64, i64)>,
     partition_filters: &[(String, Vec<String>)],
-) -> Result<Vec<ReadRecordBatchEntry>> {
+) -> Result<(HashSet<u64>, Vec<ReadRecordBatchEntry>)> {
     let cfg = get_config();
     // fast past
     if cfg.limit.mem_table_bucket_num <= 1 {
@@ -229,13 +229,17 @@ pub async fn read_from_memtable(
         let w = WRITERS[idx].read().await;
         return match w.get(&key) {
             Some(r) => {
-                r.read(org_id, stream_name, time_range, partition_filters)
-                    .await
+                let (id, batches) = r
+                    .read(org_id, stream_name, time_range, partition_filters)
+                    .await?;
+                Ok((HashSet::from([id]), batches))
             }
-            None => Ok(Vec::new()),
+            None => Ok((HashSet::new(), Vec::new())),
         };
     }
+
     // slow path
+    let mut ids = HashSet::new();
     let mut batches = Vec::new();
     let mut visited = HashSet::with_capacity(cfg.limit.mem_table_bucket_num);
     for thread_id in 0..cfg.limit.http_worker_num {
@@ -247,14 +251,15 @@ pub async fn read_from_memtable(
         let key = WriterKey::new(idx, org_id, stream_type);
         let w = WRITERS[idx].read().await;
         if let Some(r) = w.get(&key)
-            && let Ok(data) = r
+            && let Ok((id, data)) = r
                 .read(org_id, stream_name, time_range, partition_filters)
                 .await
         {
+            ids.insert(id);
             batches.extend(data);
         }
     }
-    Ok(batches)
+    Ok((ids, batches))
 }
 
 pub async fn check_ttl() -> Result<()> {
@@ -653,7 +658,7 @@ impl Writer {
         stream_name: &str,
         time_range: Option<(i64, i64)>,
         partition_filters: &[(String, Vec<String>)],
-    ) -> Result<Vec<ReadRecordBatchEntry>> {
+    ) -> Result<(u64, Vec<ReadRecordBatchEntry>)> {
         let memtable = self.memtable.read().await;
         memtable.read(org_id, stream_name, time_range, partition_filters)
     }

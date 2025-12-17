@@ -22,7 +22,10 @@ use config::meta::stream::StreamType;
 #[cfg(feature = "cloud")]
 use crate::service::ingestion::check_ingestion_allowed;
 use crate::{
-    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
+    common::{
+        meta::{http::HttpResponse as MetaHttpResponse, ingestion::IngestUser},
+        utils::auth::UserEmail,
+    },
     handler::http::{
         extractors::Headers,
         request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
@@ -65,7 +68,7 @@ pub async fn json(
     };
 
     let org_id = org_id.into_inner();
-    let user_email = &user_email.user_id;
+    let user = IngestUser::from_user_email(&user_email.user_id);
 
     #[cfg(feature = "cloud")]
     match check_ingestion_allowed(&org_id, StreamType::Metrics, None).await {
@@ -80,7 +83,7 @@ pub async fn json(
         }
     }
 
-    let mut resp = match metrics::json::ingest(&org_id, body, user_email).await {
+    let mut resp = match metrics::json::ingest(&org_id, body, user).await {
         Ok(v) => HttpResponse::Ok().json(v),
         Err(e) => {
             log::error!("Error processing request {org_id}/metrics/_json: {e}");
@@ -130,7 +133,7 @@ pub async fn otlp_metrics_write(
     };
 
     let org_id = org_id.into_inner();
-    let user_email = &user_email.user_id;
+    let user = IngestUser::from_user_email(&user_email.user_id);
 
     #[cfg(feature = "cloud")]
     match check_ingestion_allowed(&org_id, StreamType::Metrics, None).await {
@@ -147,9 +150,9 @@ pub async fn otlp_metrics_write(
 
     let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
     let mut resp = if content_type.eq(CONTENT_TYPE_PROTO) {
-        metrics::otlp::otlp_proto(&org_id, body, user_email).await?
+        metrics::otlp::otlp_proto(&org_id, body, user).await?
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
-        metrics::otlp::otlp_json(&org_id, body, user_email).await?
+        metrics::otlp::otlp_json(&org_id, body, user).await?
     } else {
         HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST,

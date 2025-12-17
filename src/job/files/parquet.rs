@@ -1015,6 +1015,8 @@ async fn extract_patterns_from_parquet(
 
     // ParquetRecordBatchStream is a Stream, use .next().await
     use futures::StreamExt;
+
+    use crate::common::meta::ingestion::{IngestUser, SystemJobType};
     while let Some(batch_result) = reader.next().await {
         let batch = batch_result?;
 
@@ -1105,9 +1107,14 @@ async fn extract_patterns_from_parquet(
 
     // Ingest patterns immediately
     let ingest_start = std::time::Instant::now();
-    crate::service::logs::patterns::ingest_patterns(org_id, stream_name, patterns)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to ingest patterns: {}", e))?;
+    crate::service::logs::patterns::ingest_patterns(
+        org_id,
+        stream_name,
+        patterns,
+        IngestUser::SystemJob(SystemJobType::LogPatterns),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("Failed to ingest patterns: {}", e))?;
     let ingest_duration = ingest_start.elapsed();
 
     let total_duration = start.elapsed();
@@ -1144,77 +1151,174 @@ async fn queue_services_from_parquet(
 ) -> Result<(), anyhow::Error> {
     use std::collections::HashMap;
 
+    use tokio::sync::mpsc;
+
     let start = std::time::Instant::now();
 
-    // Read parquet data and extract services
-    let parquet_bytes = Bytes::from(parquet_data.to_vec());
-    let (_schema, mut reader) = get_recordbatch_reader_from_bytes(&parquet_bytes).await?;
-
-    let mut all_records = Vec::new();
-
-    // Read all record batches and extract field values
-    use futures::StreamExt;
-    while let Some(batch_result) = reader.next().await {
-        let batch = batch_result?;
-        let num_rows = batch.num_rows();
-        if num_rows == 0 {
-            continue;
-        }
-
-        // Build records for each row
-        for row_idx in 0..num_rows {
-            let mut record = HashMap::new();
-
-            // Extract all string columns
-            for (col_idx, field) in batch.schema().fields().iter().enumerate() {
-                let column = batch.column(col_idx);
-
-                // Only process string columns for service discovery
-                use arrow::array::Array;
-                if let Some(array) = column.as_any().downcast_ref::<arrow::array::StringArray>()
-                    && !array.is_null(row_idx)
-                {
-                    let value = array.value(row_idx);
-                    if !value.is_empty() {
-                        record.insert(
-                            field.name().clone(),
-                            serde_json::Value::String(value.to_string()),
-                        );
-                    }
-                }
-            }
-
-            if !record.is_empty() {
-                all_records.push(record);
-            }
-        }
-    }
-
-    if all_records.is_empty() {
-        return Ok(());
-    }
-
-    // Get semantic field groups from system_settings (user-customizable via UI, with caching)
+    // Get semantic field groups and FQN priority upfront (before spawning tasks)
     let semantic_groups =
         crate::service::db::system_settings::get_semantic_field_groups(org_id).await;
-
-    // Get FQN priority from DB/cache (org-level setting or system default)
     let fqn_priority =
         crate::service::db::system_settings::get_fqn_priority_dimensions(org_id).await;
 
-    // Create processor (with org_id for cardinality tracking)
+    // Get config values for channel/batch sizes
+    let ss_config = &o2_enterprise::enterprise::common::config::get_config().service_streams;
+    let channel_capacity = ss_config.channel_capacity;
+    let batch_size = ss_config.record_batch_size;
+
+    // Create bounded channel for backpressure - drops records if consumer can't keep up
+    let (tx, mut rx) = mpsc::channel::<Vec<HashMap<String, serde_json::Value>>>(channel_capacity);
+
+    // Clone data needed for producer task
+    let parquet_bytes = Bytes::copy_from_slice(parquet_data);
+
+    // Spawn producer task to read parquet and send batches through channel
+    let producer_handle = tokio::spawn(async move {
+        let mut records_sent = 0u64;
+        let mut records_dropped = 0u64;
+
+        let reader_result = get_recordbatch_reader_from_bytes(&parquet_bytes).await;
+        let (_schema, mut reader) = match reader_result {
+            Ok(r) => r,
+            Err(e) => {
+                log::error!("[ServiceStreams] Failed to read parquet: {}", e);
+                return (records_sent, records_dropped);
+            }
+        };
+
+        let mut current_batch: Vec<HashMap<String, serde_json::Value>> =
+            Vec::with_capacity(batch_size);
+
+        use futures::StreamExt;
+        while let Some(batch_result) = reader.next().await {
+            let batch = match batch_result {
+                Ok(b) => b,
+                Err(e) => {
+                    log::error!("[ServiceStreams] Error reading batch: {}", e);
+                    continue;
+                }
+            };
+
+            let num_rows = batch.num_rows();
+            if num_rows == 0 {
+                continue;
+            }
+
+            // Process each row in the batch
+            for row_idx in 0..num_rows {
+                let mut record = HashMap::new();
+
+                // Extract all string columns
+                for (col_idx, field) in batch.schema().fields().iter().enumerate() {
+                    let column = batch.column(col_idx);
+
+                    use arrow::array::Array;
+                    if let Some(array) = column.as_any().downcast_ref::<arrow::array::StringArray>()
+                        && !array.is_null(row_idx)
+                    {
+                        let value = array.value(row_idx);
+                        if !value.is_empty() {
+                            record.insert(
+                                field.name().clone(),
+                                serde_json::Value::String(value.to_string()),
+                            );
+                        }
+                    }
+                }
+
+                if !record.is_empty() {
+                    current_batch.push(record);
+
+                    // Send batch when full
+                    if current_batch.len() >= batch_size {
+                        let batch_to_send =
+                            std::mem::replace(&mut current_batch, Vec::with_capacity(batch_size));
+                        let batch_len = batch_to_send.len() as u64;
+
+                        // Use try_send to avoid blocking - drop records if channel full
+                        match tx.try_send(batch_to_send) {
+                            Ok(()) => records_sent += batch_len,
+                            Err(mpsc::error::TrySendError::Full(_)) => {
+                                records_dropped += batch_len;
+                                log::debug!(
+                                    "[ServiceStreams] Channel full, dropped {} records",
+                                    batch_len
+                                );
+                            }
+                            Err(mpsc::error::TrySendError::Closed(_)) => {
+                                // Consumer closed, stop producing
+                                return (records_sent, records_dropped);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Send remaining records
+        if !current_batch.is_empty() {
+            let batch_len = current_batch.len() as u64;
+            match tx.try_send(current_batch) {
+                Ok(()) => records_sent += batch_len,
+                Err(mpsc::error::TrySendError::Full(_)) => {
+                    records_dropped += batch_len;
+                }
+                Err(mpsc::error::TrySendError::Closed(_)) => {}
+            }
+        }
+
+        (records_sent, records_dropped)
+    });
+
+    // Consumer: Process batches as they arrive
     let processor = o2_enterprise::enterprise::service_streams::processor::StreamProcessor::new(
         org_id.to_string(),
         semantic_groups,
         fqn_priority,
     );
 
-    // Extract services from records (with automatic cardinality protection)
-    let services = processor
-        .process_records(stream_type, stream_name, &all_records)
-        .await;
+    let mut all_services: HashMap<
+        String,
+        o2_enterprise::enterprise::service_streams::meta::ServiceMetadata,
+    > = HashMap::new();
+    let mut total_records_processed = 0u64;
 
-    // Log if any dimensions were blocked due to high cardinality
+    // Process batches from channel
+    while let Some(batch) = rx.recv().await {
+        let batch_len = batch.len();
+
+        // Process batch using optimized method
+        let services = processor
+            .process_records(stream_type, stream_name, &batch)
+            .await;
+
+        // Merge discovered services
+        for (key, service) in services {
+            all_services
+                .entry(key)
+                .and_modify(|existing| existing.merge(&service))
+                .or_insert(service);
+        }
+
+        total_records_processed += batch_len as u64;
+    }
+
+    // Wait for producer to finish and get stats
+    let (records_sent, records_dropped) = producer_handle.await.unwrap_or((0, 0));
+
+    if records_dropped > 0 {
+        log::warn!(
+            "[ServiceStreams] Dropped {} records due to backpressure for {}/{}",
+            records_dropped,
+            org_id,
+            stream_name
+        );
+        metrics::SERVICE_STREAMS_RECORDS_DROPPED
+            .with_label_values(&[org_id, &stream_type.to_string()])
+            .inc_by(records_dropped);
+    }
+
+    // Log blocked dimensions
     let blocked = processor.get_blocked_dimensions().await;
     if !blocked.is_empty() {
         log::warn!(
@@ -1223,7 +1327,6 @@ async fn queue_services_from_parquet(
             stream_name,
             blocked
         );
-        // Record blocked dimensions in metrics
         for (dimension, _count) in &blocked {
             metrics::SERVICE_STREAMS_HIGH_CARDINALITY_BLOCKED
                 .with_label_values(&[org_id, dimension])
@@ -1231,38 +1334,38 @@ async fn queue_services_from_parquet(
         }
     }
 
-    if services.is_empty() {
+    if all_services.is_empty() {
         return Ok(());
     }
 
-    // Record number of services discovered
-    let service_count = services.len() as u64;
+    // Record metrics
+    let service_count = all_services.len() as u64;
     metrics::SERVICE_STREAMS_SERVICES_DISCOVERED
         .with_label_values(&[org_id, &stream_type.to_string()])
         .inc_by(service_count);
 
-    // Record processing time
     let duration = start.elapsed();
     metrics::SERVICE_STREAMS_PROCESSING_TIME
         .with_label_values(&[org_id])
         .observe(duration.as_secs_f64());
 
-    // Update dimension cardinality gauge
-    let dimension_stats = processor.get_dimension_stats().await;
-    for (dimension, count) in dimension_stats {
-        metrics::SERVICE_STREAMS_DIMENSION_CARDINALITY
-            .with_label_values(&[org_id, &dimension])
-            .set(count as i64);
-    }
+    log::debug!(
+        "[ServiceStreams] Processed {} records, discovered {} services in {:?} for {}/{} (sent: {}, dropped: {})",
+        total_records_processed,
+        service_count,
+        duration,
+        org_id,
+        stream_name,
+        records_sent,
+        records_dropped
+    );
 
-    // Queue services for batched processing (avoids per-file DB writes)
+    // Queue services for batched processing
     o2_enterprise::enterprise::service_streams::batch_processor::queue_services(
         org_id.to_string(),
-        services,
+        all_services,
     )
     .await;
-
-    // No bookkeeping needed - sampling is stateless hash-based per stream type
 
     Ok(())
 }

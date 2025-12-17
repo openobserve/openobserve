@@ -1064,7 +1064,10 @@
     "panelDuplicatedSuccessfully": "面板已成功复制",
     "panelDuplicationFailed": "面板复制失败",
     "mapname": "姓名",
-    "mapvalue": "价值"
+    "mapvalue": "价值",
+    "customChartTypeSelector": "自定义图表类型选择器",
+    "customChartTypeSelectorHint": "从 ECharts 库中选择图表类型，开始使用基本代码结构",
+    "selectChartType": "选择图表类型"
   },
   "home": {
     "streams": "数据流",
@@ -1294,7 +1297,55 @@
       }
     },
     "triggerAlert": "触发器",
-    "alertTriggeredSuccess": "警报成功触发"
+    "alertTriggeredSuccess": "警报成功触发",
+    "incidents": {
+      "title": "事件",
+      "header": "警报事件",
+      "noIncidents": "未发现任何事件",
+      "id": "身份证",
+      "status": "状态",
+      "severity": "严重程度",
+      "alertCount": "警报",
+      "firstAlertAt": "第一次警报",
+      "lastAlertAt": "最后的警报",
+      "resolvedAt": "已解决于",
+      "title_field": "标题",
+      "correlationKey": "关联密钥",
+      "stableDimensions": "尺寸",
+      "topology": "拓扑",
+      "upstreamServices": "上游服务",
+      "downstreamServices": "下游服务",
+      "correlatedAlerts": "相关警报",
+      "alertName": "警报名称",
+      "alertFiredAt": "开枪射击",
+      "correlationReason": "关联原因",
+      "actions": "行动",
+      "acknowledge": "确认",
+      "resolve": "解决",
+      "reopen": "重新打开",
+      "viewDetails": "查看详情",
+      "statusOpen": "打开",
+      "statusAcknowledged": "已确认",
+      "statusResolved": "已解决",
+      "severityP1": "P1-关键",
+      "severityP2": "P2-高",
+      "severityP3": "P3-中级",
+      "severityP4": "P4-低",
+      "correlationServiceDiscovery": "服务发现",
+      "correlationManualExtraction": "手动提取",
+      "correlationTemporal": "时间的",
+      "filterByStatus": "按状态筛选",
+      "allStatuses": "所有状态",
+      "loading": "正在加载事件...",
+      "errorLoading": "加载事件失败",
+      "statusUpdated": "事件状态已更新",
+      "statusUpdateFailed": "未能更新事件状态",
+      "rootCauseAnalysis": "根本原因分析",
+      "analyzeRca": "分析",
+      "rcaInProgress": "正在分析根本原因...",
+      "rcaCompleted": "根本原因分析已完成",
+      "noRcaYet": "没有根本原因分析可用。点击 “分析” 开始。"
+    }
   },
   "alert_templates": {
     "header": "模板",
@@ -1647,7 +1698,8 @@
     "viewLogs": "查看日志",
     "backToLogs": "返回日志",
     "RedMetrics": "RED 指标",
-    "loadingStream": "正在加载直播..."
+    "loadingStream": "正在加载直播...",
+    "viewRelated": "查看相关"
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",
@@ -1960,6 +2012,14 @@
     "tracesFromService": "来自服务的跟踪：{service}",
     "noTracesFound": "未找到相关的痕迹",
     "noTracesDescription": "在所选时间范围内未找到服务 {service} 的跟踪",
-    "openTraceInNewWindow": "在新窗口中打开 trace"
+    "openTraceInNewWindow": "在新窗口中打开 trace",
+    "filters": "过滤器"
+  },
+  "sreChat": {
+    "emptyMessage": "向我询问有关您的警报和事件的任何信息",
+    "inputPlaceholder": "向 SRE 助手提问...",
+    "clearChatTitle": "清除聊天",
+    "clearChatMessage": "你确定要清除这个对话吗？",
+    "copiedToClipboard": "已复制到剪贴板"
   }
 }

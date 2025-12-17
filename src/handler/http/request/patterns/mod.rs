@@ -60,11 +60,13 @@ use crate::{
 #[post("/{org_id}/streams/{stream_name}/patterns/extract")]
 pub async fn extract_patterns(
     path: web::Path<(String, String)>,
-    in_req: actix_web::HttpRequest,
-    body: web::Bytes,
-    Headers(user_email): Headers<UserEmail>,
+    #[allow(unused_variables)] in_req: actix_web::HttpRequest,
+    #[allow(unused_variables)] body: web::Bytes,
+    #[allow(unused_variables)] Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, actix_web::Error> {
+    #[allow(unused_variables)]
     let (org_id, stream_name) = path.into_inner();
+    #[allow(unused_variables)]
     let user_id = user_email.user_id;
 
     #[cfg(feature = "enterprise")]

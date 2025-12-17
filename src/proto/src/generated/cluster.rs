@@ -41,10 +41,10 @@ pub struct ScanStats {
     pub files: i64,
     #[prost(int64, tag = "2")]
     pub records: i64,
-    /// unit: MB
+    /// unit: bytes
     #[prost(int64, tag = "3")]
     pub original_size: i64,
-    /// unit: MB
+    /// unit: bytes
     #[prost(int64, tag = "4")]
     pub compressed_size: i64,
     #[prost(int64, tag = "5")]
@@ -53,7 +53,7 @@ pub struct ScanStats {
     pub querier_memory_cached_files: i64,
     #[prost(int64, tag = "7")]
     pub querier_disk_cached_files: i64,
-    /// unit: MB
+    /// unit: bytes
     #[prost(int64, tag = "8")]
     pub idx_scan_size: i64,
     /// unit: ms
@@ -65,6 +65,9 @@ pub struct ScanStats {
     /// unit: %
     #[prost(int64, tag = "11")]
     pub aggs_cache_ratio: i64,
+    /// unit: bytes
+    #[prost(int64, tag = "12")]
+    pub peak_memory_usage: i64,
 }
 #[derive(serde::Serialize)]
 #[derive(Clone, PartialEq, ::prost::Message)]
