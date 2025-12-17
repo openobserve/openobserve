@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               @trigger="refreshData"
               class="dashboard-icons hideOnPrintMode q-ml-sm"
-              style="padding-left: 0px; padding-right: 0px;"
+              style="padding-left: 0px; padding-right: 0px"
               size="sm"
             />
             <q-btn
@@ -602,7 +602,13 @@ export default defineComponent({
       Object.assign(refreshedVariablesData, variablesData);
     };
     const isVariablesChanged = computed(() => {
-      // Convert both objects to a consistent format for comparison
+      // If using variables manager, use its hasUncommittedChanges computed
+      // This is the proper way to detect live vs committed state differences
+      if (variablesManager) {
+        return variablesManager.hasUncommittedChanges.value;
+      }
+
+      // Legacy mode: Convert both objects to a consistent format for comparison
       const normalizeVariables = (obj) => {
         const normalized = JSON.parse(JSON.stringify(obj));
         // Sort arrays to ensure consistent ordering
@@ -699,15 +705,16 @@ export default defineComponent({
 
       // Initialize variables manager ONLY if there are scoped variables (tabs or panels)
       // For legacy dashboards with only global variables, use the legacy approach
-      const hasScopedVariables = currentDashboardData.data?.variables?.list?.some(
-        (v: any) => v.scope === "tabs" || v.scope === "panels"
-      );
+      const hasScopedVariables =
+        currentDashboardData.data?.variables?.list?.some(
+          (v: any) => v.scope === "tabs" || v.scope === "panels",
+        );
 
       if (hasScopedVariables) {
         try {
           await variablesManager.initialize(
             currentDashboardData.data.variables.list,
-            currentDashboardData.data
+            currentDashboardData.data,
           );
 
           // Load variable values from URL if present
@@ -715,7 +722,9 @@ export default defineComponent({
         } catch (error: any) {
           console.error("Error initializing variables manager:", error);
           if (error.message?.includes("Circular dependency")) {
-            showErrorNotification("Circular dependency detected in dashboard variables");
+            showErrorNotification(
+              "Circular dependency detected in dashboard variables",
+            );
           } else if (error.message?.includes("Invalid dependency")) {
             showErrorNotification("Invalid variable dependency configuration");
           }
@@ -904,12 +913,28 @@ export default defineComponent({
         const allPanelIds = [];
         currentDashboardData.data.tabs?.forEach((tab: any) => {
           tab.panels?.forEach((panel: any) => {
-            if(panel.id){
+            if (panel.id) {
               allPanelIds.push(panel?.id);
               shouldRefreshWithoutCachePerPanel.value[panel.id] = false;
             }
           });
         });
+
+        // CRITICAL: Commit all live variable changes to committed state
+        // This is the key mechanism that prevents premature API calls
+        // Similar to updating currentVariablesDataRef.__global in main branch
+        if (variablesManager) {
+          variablesManager.commitAll();
+          // After committing, sync committed values to URL so only committed state is reflected in the URL
+          try {
+            variablesManager.syncToUrl(router, route);
+            console.log(
+              "[ViewDashboard] Committed all variable changes and synced to URL",
+            );
+          } catch (err) {
+            console.warn("[ViewDashboard] Error syncing variables to URL", err);
+          }
+        }
 
         // Refresh the dashboard
         dateTimePicker.value.refresh();
@@ -1000,9 +1025,10 @@ export default defineComponent({
     // Watch for tab changes and update visibility in manager
     watch(selectedTabId, (newTabId, oldTabId) => {
       // Check if using manager (has scoped variables)
-      const hasScopedVariables = currentDashboardData.data?.variables?.list?.some(
-        (v: any) => v.scope === "tabs" || v.scope === "panels"
-      );
+      const hasScopedVariables =
+        currentDashboardData.data?.variables?.list?.some(
+          (v: any) => v.scope === "tabs" || v.scope === "panels",
+        );
 
       if (hasScopedVariables && newTabId) {
         // Set old tab as not visible

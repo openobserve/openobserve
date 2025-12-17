@@ -394,8 +394,11 @@ export default defineComponent({
         return currentVariablesDataRef.value?.[panelId] || currentVariablesDataRef.value['__global'] || { values: [] };
       }
 
-      // In manager mode, get the merged variables for this panel
-      const mergedVars = variablesManager.getVariablesForPanel(panelId, selectedTabId.value);
+      // CRITICAL: Use COMMITTED state (not live state)!
+      // This prevents panels from reloading on every variable change
+      // Panels only reload when user clicks Refresh (which commits the changes)
+      // This is the same pattern as currentVariablesDataRef.__global in main branch
+      const mergedVars = variablesManager.getCommittedVariablesForPanel(panelId, selectedTabId.value);
 
       // Convert to old format for backward compatibility
       // Panel expects: { isVariablesLoading: boolean, values: Array<VariableRuntimeState> }
