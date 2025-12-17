@@ -567,12 +567,19 @@ pub async fn prepare_cache_response(
                     cacher::get_ts_col_order_by(&v, TIMESTAMP_COL_NAME, is_aggregate)
                         .unwrap_or_default();
 
+                // For histogram queries, append interval and ts_column to file_path
+                // This matches the logic in check_cache function
+                if is_aggregate && let Some(interval) = v.histogram_interval {
+                    file_path = format!("{file_path}_{interval}_{ts_column}");
+                }
+
                 MultiCachedQueryResponse {
                     ts_column,
                     is_aggregate,
                     is_descending,
                     order_by: v.order_by,
                     limit: v.limit,
+                    file_path: file_path.clone(),
                     ..Default::default()
                 }
             }
