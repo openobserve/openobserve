@@ -69,6 +69,19 @@ pub async fn create_backfill_job(
         return Err(anyhow::anyhow!("Pipeline is not a scheduled pipeline"));
     }
 
+    // 1a. Validate deletion is not enabled for pipelines with remote destinations
+    if delete_before_backfill {
+        let has_remote_destination = pipeline.nodes.iter().any(|node| {
+            matches!(&node.data, config::meta::pipeline::components::NodeData::RemoteStream(_))
+        });
+
+        if has_remote_destination {
+            return Err(anyhow::anyhow!(
+                "Deletion is not supported for pipelines with remote destinations"
+            ));
+        }
+    }
+
     // 2. Validate time range
     if start_time >= end_time {
         return Err(anyhow::anyhow!("start_time must be before end_time"));
@@ -464,6 +477,20 @@ pub async fn update_backfill_job(
     let _backfill_job = trigger_data
         .backfill_job
         .ok_or_else(|| anyhow::anyhow!("Backfill job data not found in trigger"))?;
+
+    // Validate deletion is not enabled for pipelines with remote destinations
+    if req.delete_before_backfill {
+        let pipeline = crate::service::db::pipeline::get_by_id(&existing_config.pipeline_id).await?;
+        let has_remote_destination = pipeline.nodes.iter().any(|node| {
+            matches!(&node.data, config::meta::pipeline::components::NodeData::RemoteStream(_))
+        });
+
+        if has_remote_destination {
+            return Err(anyhow::anyhow!(
+                "Deletion is not supported for pipelines with remote destinations"
+            ));
+        }
+    }
 
     // Update backfill_jobs table with new config
     let updated_db_job = infra::table::backfill_jobs::BackfillJob {
