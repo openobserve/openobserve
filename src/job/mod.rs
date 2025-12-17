@@ -80,6 +80,59 @@ async fn enforce_usage_stream_retention() {
     }
 }
 
+#[cfg(feature = "cloud")]
+async fn get_metering_lock() -> Result<Option<()>, infra::errors::Error> {
+    if !LOCAL_NODE.is_alert_manager() {
+        return Ok(None);
+    }
+    use infra::dist_lock;
+
+    use crate::common::infra::cluster::get_node_by_uuid;
+
+    let db = infra::db::get_db().await;
+    let node = db
+        .get("/cloud/metering/node")
+        .await
+        .ok()
+        .unwrap_or_default();
+    let node = String::from_utf8_lossy(&node);
+    if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
+        log::info!("[o2::ENT] metering is locked by node {node}");
+        return Ok(None); // other node is processing
+    }
+
+    if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
+        let locker = infra::dist_lock::lock("/cloud/metering/node", 0).await?;
+        // check the working node again, maybe other node locked it first
+        let node = db
+            .get("/cloud/metering/node")
+            .await
+            .ok()
+            .unwrap_or_default();
+        let node = String::from_utf8_lossy(&node);
+        if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
+        {
+            dist_lock::unlock(&locker).await?;
+            return Ok(None); // other node is processing
+        }
+        // set to current node
+        let ret = db
+            .put(
+                "/cloud/metering/node",
+                LOCAL_NODE.uuid.clone().into(),
+                infra::db::NO_NEED_WATCH,
+                None,
+            )
+            .await;
+        dist_lock::unlock(&locker).await?;
+        log::info!("[o2::ENT] Metering lock acquired");
+        drop(locker);
+        ret?;
+    }
+
+    Ok(Some(()))
+}
+
 pub async fn init() -> Result<(), anyhow::Error> {
     let email_regex = Regex::new(
         r"^([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",
@@ -396,9 +449,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
             .expect("cloud ofga migrations failed");
 
         use crate::service::self_reporting::{ingest_data_retention_usages, search::get_usage};
-        o2_enterprise::enterprise::metering::init(get_usage, ingest_data_retention_usages)
-            .await
-            .expect("cloud usage metering job init failed");
+        o2_enterprise::enterprise::metering::init(
+            get_metering_lock,
+            get_usage,
+            ingest_data_retention_usages,
+        )
+        .await
+        .expect("cloud usage metering job init failed");
 
         // run these cloud jobs only in alert manager
         if LOCAL_NODE.is_alert_manager() {
