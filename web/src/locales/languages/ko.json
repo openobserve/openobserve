@@ -1302,7 +1302,7 @@
     },
     "triggerAlert": "트리거",
     "alertTriggeredSuccess": "경고가 성공적으로 트리거됨",
-        "incidents": {
+    "incidents": {
       "title": "인시던트",
       "header": "경고 인시던트",
       "noIncidents": "사건이 발견되지 않았습니다",
