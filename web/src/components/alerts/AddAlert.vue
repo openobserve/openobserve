@@ -138,10 +138,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="previewAlertRef"
               :formData="formData"
               :previewQuery="previewQuery"
+              :generatedSqlQuery="generatedSqlQuery"
               :selectedTab="scheduledAlertRef?.tab || 'custom'"
               :isAggregationEnabled="isAggregationEnabled"
               :destinations="formData.destinations"
               :focusManager="focusManager"
+              :wizardStep="wizardStep"
             />
           </div>
         </q-step>
@@ -188,10 +190,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="previewAlertRef"
               :formData="formData"
               :previewQuery="previewQuery"
+              :generatedSqlQuery="generatedSqlQuery"
               :selectedTab="scheduledAlertRef?.tab || 'custom'"
               :isAggregationEnabled="isAggregationEnabled"
               :destinations="formData.destinations"
               :focusManager="focusManager"
+              :wizardStep="wizardStep"
             />
           </div>
         </q-step>
@@ -230,10 +234,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="previewAlertRef"
               :formData="formData"
               :previewQuery="previewQuery"
+              :generatedSqlQuery="generatedSqlQuery"
               :selectedTab="scheduledAlertRef?.tab || 'custom'"
               :isAggregationEnabled="isAggregationEnabled"
               :destinations="formData.destinations"
               :focusManager="focusManager"
+              :wizardStep="wizardStep"
             />
           </div>
         </q-step>
@@ -268,10 +274,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="previewAlertRef"
               :formData="formData"
               :previewQuery="previewQuery"
+              :generatedSqlQuery="generatedSqlQuery"
               :selectedTab="scheduledAlertRef?.tab || 'custom'"
               :isAggregationEnabled="isAggregationEnabled"
               :destinations="formData.destinations"
               :focusManager="focusManager"
+              :wizardStep="wizardStep"
             />
           </div>
         </q-step>
@@ -303,10 +311,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="previewAlertRef"
               :formData="formData"
               :previewQuery="previewQuery"
+              :generatedSqlQuery="generatedSqlQuery"
               :selectedTab="scheduledAlertRef?.tab || 'custom'"
               :isAggregationEnabled="isAggregationEnabled"
               :destinations="formData.destinations"
               :focusManager="focusManager"
+              :wizardStep="wizardStep"
             />
           </div>
         </q-step>
@@ -342,10 +352,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="previewAlertRef"
               :formData="formData"
               :previewQuery="previewQuery"
+              :generatedSqlQuery="generatedSqlQuery"
               :selectedTab="scheduledAlertRef?.tab || 'custom'"
               :isAggregationEnabled="isAggregationEnabled"
               :destinations="formData.destinations"
               :focusManager="focusManager"
+              :wizardStep="wizardStep"
             />
           </div>
         </q-step>

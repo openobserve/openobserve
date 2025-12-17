@@ -1389,6 +1389,10 @@
     },
     "summary": {
       "configureAlert": "Configure your alert to see a summary",
+      "alertName": "Alert Name",
+      "streamInfo": "Data Source",
+      "alertType": "Alert Type",
+      "queryCondition": "Query Condition",
       "monitors": "Monitors",
       "from": "from",
       "inRealTime": "in real-time",

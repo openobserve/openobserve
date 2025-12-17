@@ -15,9 +15,18 @@ export interface SummarySegment {
  * @param formData - The alert form data
  * @param destinations - Array of destination objects
  * @param t - Translation function (optional, for i18n support)
+ * @param wizardStep - Current wizard step (1-6), used to show progressive summary
+ * @param previewQuery - The formatted preview query string
+ * @param generatedSqlQuery - The generated SQL query for custom conditions (computed property)
  */
-export function generateAlertSummary(formData: any, destinations: any[], t?: (key: string) => string): string {
-  if (!formData || !formData.stream_name) {
+export function generateAlertSummary(formData: any, destinations: any[], t?: (key: string) => string, wizardStep: number = 6, previewQuery: string = '', generatedSqlQuery: string = ''): string {
+  // Generate summary based on available data (progressive disclosure)
+  if (!formData) {
+    return '';
+  }
+
+  // At minimum, we need stream_name to show any summary
+  if (!formData.stream_name) {
     return '';
   }
 
@@ -37,6 +46,10 @@ export function generateAlertSummary(formData: any, destinations: any[], t?: (ke
       'alerts.summary.notSetupYet': '(not set up yet)',
       'alerts.summary.cooldown': 'Cooldown',
       'alerts.summary.betweenAlerts': 'between alerts',
+      'alerts.summary.alertName': 'Alert Name',
+      'alerts.summary.streamInfo': 'Data Source',
+      'alerts.summary.alertType': 'Alert Type',
+      'alerts.summary.queryCondition': 'Query Condition',
     };
     return fallbacks[key] || key;
   });
@@ -49,58 +62,104 @@ export function generateAlertSummary(formData: any, destinations: any[], t?: (ke
     return `<span class="summary-clickable" data-focus-target="${fieldId}">${text}</span>`;
   };
 
-  // Build the bullet-point summary
+  // Build the bullet-point summary based on wizard step
   const streamType = formData.stream_type || 'logs';
   const streamName = formData.stream_name || 'the selected stream';
 
-  if (isRealTime) {
-    // Real-time alert summary
-    parts.push(`✓ ${translate('alerts.summary.monitors')}: ${clickable(streamType, 'streamType')} ${translate('alerts.summary.from')} ${clickable(streamName, 'stream')} ${translate('alerts.summary.inRealTime')}`);
-    parts.push(`✓ ${translate('alerts.summary.triggersWhen')}: ${clickable(translate('alerts.summary.queryConditions'), 'conditions')} ${translate('alerts.summary.areMet')}`);
-  } else {
-    // Scheduled alert summary
-    const period = getPeriodText(formData.trigger_condition?.period, translate);
-    parts.push(`✓ ${translate('alerts.summary.monitors')}: ${clickable(period, 'period')} ${translate('alerts.summary.ofData')}`);
-
-    // Trigger condition
-    if (formData.query_condition && formData.trigger_condition?.operator && formData.trigger_condition?.threshold !== undefined) {
-      const threshold = formData.trigger_condition.threshold;
-      const operator = formData.trigger_condition.operator;
-      const operatorText = getOperatorSymbol(operator, translate);
-
-      parts.push(`✓ ${translate('alerts.summary.triggersWhen')}: ${clickable(`${threshold} ${operatorText}`, 'threshold')} ${translate('alerts.summary.eventsDetected')}`);
+  // Step 1: Show basic alert info (stream type, stream name, alert type)
+  if (wizardStep >= 1) {
+    // Capitalize stream type for better display
+    const displayStreamType = streamType.charAt(0).toUpperCase() + streamType.slice(1);
+    parts.push(`✓ ${translate('alerts.summary.streamInfo')}: ${clickable(displayStreamType, 'streamType')} - ${clickable(streamName, 'stream')}`);
+    if (isRealTime) {
+      parts.push(`✓ ${translate('alerts.summary.alertType')}: ${clickable('Real-Time', 'alertType')}`);
     } else {
-      parts.push(`✓ ${translate('alerts.summary.triggersWhen')}: ${clickable(translate('alerts.summary.queryConditions'), 'conditions')} ${translate('alerts.summary.areMet')}`);
+      parts.push(`✓ ${translate('alerts.summary.alertType')}: ${clickable('Scheduled', 'alertType')}`);
     }
   }
 
-  // Notification section
-  if (!destinations || destinations.length === 0) {
-    parts.push(`✓ ${translate('alerts.summary.sendsTo')}: ${clickable(translate('alerts.summary.noDestination'), 'destinations')} ${translate('alerts.summary.notSetupYet')} ⚠️`);
-  } else {
-    const destNames = destinations.map(dest => {
-      if (typeof dest === 'string') return dest;
-      return dest.name || 'Unknown';
-    });
-    const uniqueNames = Array.from(new Set(destNames));
-    const destText = uniqueNames.join(', ');
-    parts.push(`✓ ${translate('alerts.summary.sendsTo')}: ${clickable(destText, 'destinations')}`);
+  // Step 2+: Show query condition (from step 2 onwards)
+  if (wizardStep >= 2) {
+    let queryText = '';
+
+    // Get query from different sources
+    if (previewQuery && previewQuery.trim()) {
+      // Use previewQuery if available (already formatted by previewAlert)
+      queryText = previewQuery;
+    } else if (generatedSqlQuery && generatedSqlQuery.trim()) {
+      // For custom mode, use the generated SQL query from computed property
+      queryText = generatedSqlQuery;
+    } else if (formData.query_condition) {
+      // Fall back to extracting from formData
+      if (formData.query_condition.sql) {
+        queryText = formData.query_condition.sql.trim();
+      } else if (formData.query_condition.promql) {
+        queryText = formData.query_condition.promql.trim();
+      }
+    }
+
+    if (queryText) {
+      // Truncate if longer than 60 characters
+      const maxLength = 60;
+      const truncatedQuery = queryText.length > maxLength
+        ? queryText.substring(0, maxLength) + '...'
+        : queryText;
+
+      // Create clickable span with query
+      const queryLabel = translate('alerts.summary.queryCondition');
+      parts.push(`✓ ${queryLabel}: <span class="summary-clickable" data-focus-target="query">${truncatedQuery}</span>`);
+    }
   }
 
-  // Cooldown section (only if configured and not real-time)
-  if (!isRealTime) {
-    const silence = formData.trigger_condition?.silence;
-    if (silence !== undefined && silence >= 0) {
-      const timeText = getSilenceText(silence, translate);
+  // Step 3+: Show alert settings (threshold, period, frequency, cooldown, destinations)
+  if (wizardStep >= 3) {
+    if (isRealTime) {
+      // Real-time alert summary
+      parts.push(`✓ ${translate('alerts.summary.triggersWhen')}: ${clickable(translate('alerts.summary.queryConditions'), 'conditions')} ${translate('alerts.summary.areMet')}`);
+    } else {
+      // Scheduled alert summary
+      if (formData.trigger_condition?.period) {
+        const period = getPeriodText(formData.trigger_condition.period, translate);
+        parts.push(`✓ ${translate('alerts.summary.monitors')}: ${clickable(period, 'period')} ${translate('alerts.summary.ofData')}`);
+      }
+
+      // Trigger condition
+      if (formData.query_condition && formData.trigger_condition?.operator && formData.trigger_condition?.threshold !== undefined) {
+        const threshold = formData.trigger_condition.threshold;
+        const operator = formData.trigger_condition.operator;
+        const operatorText = getOperatorSymbol(operator, translate);
+
+        parts.push(`✓ ${translate('alerts.summary.triggersWhen')}: ${clickable(`${threshold} ${operatorText}`, 'threshold')} ${translate('alerts.summary.eventsDetected')}`);
+      }
+    }
+
+    // Notification section
+    if (!destinations || destinations.length === 0) {
+      parts.push(`✓ ${translate('alerts.summary.sendsTo')}: ${clickable(translate('alerts.summary.noDestination'), 'destinations')} ${translate('alerts.summary.notSetupYet')} ⚠️`);
+    } else {
+      const destNames = destinations.map(dest => {
+        if (typeof dest === 'string') return dest;
+        return dest.name || 'Unknown';
+      });
+      const uniqueNames = Array.from(new Set(destNames));
+      const destText = uniqueNames.join(', ');
+      parts.push(`✓ ${translate('alerts.summary.sendsTo')}: ${clickable(destText, 'destinations')}`);
+    }
+
+    // Cooldown section (only if configured and not real-time)
+    if (!isRealTime && formData.trigger_condition?.silence !== undefined && formData.trigger_condition?.silence >= 0) {
+      const timeText = getSilenceText(formData.trigger_condition.silence, translate);
       parts.push(`✓ ${translate('alerts.summary.cooldown')}: ${clickable(timeText, 'silence')} ${translate('alerts.summary.betweenAlerts')}`);
     }
   }
 
-  // Add plain English summary
-  const plainEnglish = generatePlainEnglishSummary(formData, destinations, isRealTime, translate);
-  if (plainEnglish) {
-    parts.push('');
-    parts.push(`<div class="plain-english-section">"${plainEnglish}"</div>`);
+  // Add plain English summary (only from step 3 onwards)
+  if (wizardStep >= 3) {
+    const plainEnglish = generatePlainEnglishSummary(formData, destinations, isRealTime, translate);
+    if (plainEnglish) {
+      parts.push('');
+      parts.push(`<div class="plain-english-section">"${plainEnglish}"</div>`);
+    }
   }
 
   return parts.join('\n');

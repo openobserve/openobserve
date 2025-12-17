@@ -33,6 +33,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :formData="formData"
       :destinations="destinations"
       :focusManager="focusManager"
+      :wizardStep="wizardStep"
+      :previewQuery="previewQuery"
+      :generatedSqlQuery="generatedSqlQuery"
     />
   </div>
 </template>
@@ -57,6 +60,10 @@ export default defineComponent({
       type: String,
       default: "",
     },
+    generatedSqlQuery: {
+      type: String,
+      default: "",
+    },
     selectedTab: {
       type: String,
       default: "custom",
@@ -72,6 +79,11 @@ export default defineComponent({
     focusManager: {
       type: Object as PropType<any>,
       default: undefined,
+    },
+    wizardStep: {
+      type: Number,
+      required: false,
+      default: 1,
     },
   },
   setup(props, { expose }) {

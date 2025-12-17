@@ -46,11 +46,24 @@ const props = defineProps({
   focusManager: {
     type: Object,
     required: false
+  },
+  wizardStep: {
+    type: Number,
+    required: false,
+    default: 1
+  },
+  previewQuery: {
+    type: String,
+    default: ''
+  },
+  generatedSqlQuery: {
+    type: String,
+    default: ''
   }
 });
 
 const summaryText = computed(() => {
-  return generateAlertSummary(props.formData, props.destinations, t);
+  return generateAlertSummary(props.formData, props.destinations, t, props.wizardStep, props.previewQuery, props.generatedSqlQuery);
 });
 
 const handleSummaryClick = (event: MouseEvent) => {
@@ -126,12 +139,13 @@ const handleSummaryClick = (event: MouseEvent) => {
       color-mix(in srgb, var(--q-primary) 12%, transparent)
     );
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    display: inline-block;
+    display: inline;
     position: relative;
     box-shadow: 0 0 0 0.0625rem color-mix(in srgb, var(--q-primary) 15%, transparent);
     line-height: 1.4;
     vertical-align: baseline;
-    white-space: nowrap;
+    white-space: normal;
+    word-break: break-word;
 
     &:hover {
       background: linear-gradient(
