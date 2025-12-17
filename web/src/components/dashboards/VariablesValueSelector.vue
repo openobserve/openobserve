@@ -454,14 +454,23 @@ export default defineComponent({
 
                 handleQueryValuesLogic(variableObject, oldValues);
               } else {
+                // Don't auto-set value to first option if dropdown was just opened
+                // Only set default value during initial load or when explicitly needed
                 variableLog(
                   variableObject.name,
-                  `Old values not found, setting default value`,
+                  `Old values not found - keeping existing value if set`,
                 );
 
-                variableObject.value = variableObject.options.length
-                  ? variableObject.options[0].value
-                  : null;
+                // Only set to first option if current value is null/undefined/empty
+                if (
+                  variableObject.value === null ||
+                  variableObject.value === undefined ||
+                  (Array.isArray(variableObject.value) && variableObject.value.length === 0)
+                ) {
+                  variableObject.value = variableObject.options.length
+                    ? variableObject.options[0].value
+                    : null;
+                }
               }
 
               const hasValueChanged =
