@@ -13,21 +13,53 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use arrow::array::{BooleanArray, Int64Array, RecordBatch, StringArray};
-use chrono::Utc;
+use arrow_schema::{DataType, Field, Schema};
 use config::{
-    get_config,
-    meta::stream::{ALL_STREAM_TYPES, FileKey, FileListDeleted, StreamStats, StreamType},
-    utils::time::hour_micros,
+    get_config, ider,
+    meta::{
+        search::ScanStats,
+        stream::{FileKey, PartitionTimeLevel, StreamStats, StreamType},
+    },
 };
 use hashbrown::HashMap;
 use infra::{
     errors,
     file_list::{FileId, FileRecord, calculate_max_ts_upper_bound},
 };
+use itertools::Itertools;
+use once_cell::sync::Lazy;
 use rayon::slice::ParallelSliceMut;
 
 use crate::service::search::datafusion::exec::{DataFusionContextBuilder, TableBuilder};
+
+pub static FILE_LIST_SCHEMA: Lazy<Arc<Schema>> = Lazy::new(|| {
+    Arc::new(Schema::new(vec![
+        Field::new("id", DataType::Int64, false),
+        Field::new("account", DataType::Utf8, false),
+        Field::new("org", DataType::Utf8, false),
+        Field::new("stream", DataType::Utf8, false),
+        Field::new("date", DataType::Utf8, false),
+        Field::new("file", DataType::Utf8, false),
+        Field::new("deleted", DataType::Boolean, false),
+        Field::new("flattened", DataType::Boolean, false),
+        Field::new("min_ts", DataType::Int64, false),
+        Field::new("max_ts", DataType::Int64, false),
+        Field::new("records", DataType::Int64, false),
+        Field::new("original_size", DataType::Int64, false),
+        Field::new("compressed_size", DataType::Int64, false),
+        Field::new("index_size", DataType::Int64, false),
+        Field::new("created_at", DataType::Int64, false),
+        Field::new("updated_at", DataType::Int64, false),
+    ]))
+});
+
+enum QueryType {
+    FileRecord,
+    FileId,
+}
 
 macro_rules! get_col {
     ($var:ident, $name:literal, $typ:ty, $rbatch:ident) => {
@@ -40,38 +72,7 @@ macro_rules! get_col {
     };
 }
 
-#[inline]
-fn round_down_to_hour(v: i64) -> i64 {
-    v - (v % hour_micros(1))
-}
-
-async fn get_dump_files_in_range(
-    org: &str,
-    stream: Option<&str>,
-    range: (i64, i64),
-    min_updated_at: Option<i64>,
-) -> Result<Vec<FileRecord>, errors::Error> {
-    let start = round_down_to_hour(range.0);
-    let end = round_down_to_hour(range.1) + hour_micros(1);
-
-    let list =
-        infra::file_list::get_entries_in_range(org, stream, start, end, min_updated_at).await?;
-    let list = list
-        .into_iter()
-        .filter(|f| {
-            let columns = f.stream.split('/').collect::<Vec<&str>>();
-            if columns.len() != 3 {
-                return false;
-            }
-            let stream_type = StreamType::from(columns[1]);
-            stream_type == StreamType::Filelist
-        })
-        .collect();
-
-    Ok(list)
-}
-
-fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
+pub fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
     get_col!(id_col, "id", Int64Array, rb);
     get_col!(account_col, "account", StringArray, rb);
     get_col!(org_col, "org", StringArray, rb);
@@ -163,13 +164,72 @@ fn record_batch_to_stats(rb: RecordBatch) -> Vec<(String, StreamStats)> {
     ret
 }
 
+pub fn generate_dump_stream_name(stream_type: StreamType, stream_name: &str) -> String {
+    format!("{}_{}", stream_name, stream_type)
+}
+
+pub async fn exec(
+    trace_id: &str,
+    partitions: usize,
+    files: Vec<FileKey>,
+    query: &str,
+) -> Result<Vec<RecordBatch>, errors::Error> {
+    // load files to local cache
+    let start = std::time::Instant::now();
+    let mut scan_stats = ScanStats::default();
+    let (cache_type, ..) = super::search::grpc::storage::cache_files(
+        trace_id,
+        &files
+            .iter()
+            .map(|f| {
+                (
+                    f.id,
+                    &f.account,
+                    &f.key,
+                    f.meta.compressed_size,
+                    f.meta.max_ts,
+                )
+            })
+            .collect_vec(),
+        &mut scan_stats,
+        "parquet",
+    )
+    .await;
+
+    scan_stats.querier_files = files.len() as i64;
+    let cached_ratio = (scan_stats.querier_memory_cached_files
+        + scan_stats.querier_disk_cached_files) as f64
+        / scan_stats.querier_files as f64;
+
+    let download_msg = if cache_type == infra::cache::file_data::CacheType::None {
+        "".to_string()
+    } else {
+        format!(" downloading others into {cache_type:?} in background,")
+    };
+    log::info!(
+        "[FILE_LIST_DUMP {trace_id}] query load files {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
+        scan_stats.querier_files,
+        scan_stats.querier_memory_cached_files,
+        scan_stats.querier_disk_cached_files,
+        (cached_ratio * 100.0) as usize,
+        start.elapsed().as_millis()
+    );
+
+    // search real file list by datafusion
+    let trace_id = format!("{trace_id}-file-list-dump");
+    let ret = inner_exec(&trace_id, partitions, files, query).await;
+    // we always have to clear the files loaded
+    super::search::datafusion::storage::file_list::clear(&trace_id);
+    ret
+}
+
 async fn inner_exec(
     trace_id: &str,
     partitions: usize,
     dump_files: Vec<FileKey>,
     query: &str,
 ) -> Result<Vec<RecordBatch>, errors::Error> {
-    let schema = super::super::job::FILE_LIST_SCHEMA.clone();
+    let schema = FILE_LIST_SCHEMA.clone();
 
     let session = config::meta::search::Session {
         id: trace_id.to_string(),
@@ -190,275 +250,212 @@ async fn inner_exec(
     Ok(ret)
 }
 
-async fn exec(
-    trace_id: &str,
-    partitions: usize,
-    dump_files: Vec<FileKey>,
-    query: &str,
-) -> Result<Vec<RecordBatch>, errors::Error> {
-    let trace_id = format!("{trace_id}-file-list-dump");
-    let ret = inner_exec(&trace_id, partitions, dump_files, query).await;
-    // we always have to clear the files loaded
-    super::search::datafusion::storage::file_list::clear(&trace_id);
-    ret
-}
-
 pub async fn query(
     trace_id: &str,
-    org: &str,
-    stream: &str,
-    stream_type: StreamType,
-    range: (i64, i64),
-    id_hint: Option<i64>,
-) -> Result<Vec<FileRecord>, errors::Error> {
-    let cfg = get_config();
-    if !cfg.common.file_list_dump_enabled {
-        return Ok(vec![]);
-    }
-
-    let stream_key = format!(
-        "{org}/{}/{org}_{stream_type}_{stream}",
-        StreamType::Filelist
-    );
-    let db_start = std::time::Instant::now();
-    let dump_files = get_dump_files_in_range(org, Some(&stream_key), range, id_hint).await?;
-    if dump_files.is_empty() {
-        return Ok(vec![]);
-    }
-    let db_time = db_start.elapsed().as_millis();
-
-    let process_start = std::time::Instant::now();
-    let dump_files: Vec<_> = dump_files.iter().map(|f| f.into()).collect();
-    let max_ts_upper_bound = calculate_max_ts_upper_bound(range.1, stream_type);
-
-    let stream_key = format!("{org}/{stream_type}/{stream}");
-    let query = format!(
-        "SELECT * FROM file_list WHERE org= '{org}' AND stream = '{stream_key}' AND max_ts >= {} AND max_ts <= {} AND min_ts <= {};",
-        range.0, max_ts_upper_bound, range.1
-    );
-
-    let t = exec(trace_id, cfg.limit.cpu_num, dump_files, &query).await?;
-
-    let ret = t
-        .into_iter()
-        .flat_map(record_batch_to_file_record)
-        .collect();
-    let process_time = process_start.elapsed().as_millis();
-
-    log::info!(
-        "[FILE_LIST_DUMP: {trace_id}] : getting dump files from db took {db_time} ms, searching for entries took {process_time} ms"
-    );
-
-    Ok(ret)
-}
-
-pub async fn get_ids_in_range(
-    trace_id: &str,
-    org: &str,
-    stream: &str,
-    stream_type: StreamType,
-    range: (i64, i64),
-) -> Result<Vec<FileId>, errors::Error> {
-    let cfg = get_config();
-    let stream_key = format!(
-        "{org}/{}/{org}_{stream_type}_{stream}",
-        StreamType::Filelist
-    );
-    let db_start = std::time::Instant::now();
-    let dump_files = get_dump_files_in_range(org, Some(&stream_key), range, None).await?;
-    if dump_files.is_empty() {
-        return Ok(vec![]);
-    }
-    let db_time = db_start.elapsed().as_millis();
-
-    let process_start = std::time::Instant::now();
-    let dump_files: Vec<_> = dump_files.iter().map(|f| f.into()).collect();
-    let max_ts_upper_bound = calculate_max_ts_upper_bound(range.1, stream_type);
-
-    let stream_key = format!("{org}/{stream_type}/{stream}");
-
-    let query = format!(
-        "SELECT id,records,original_size FROM file_list WHERE org= '{org}' AND stream = '{stream_key}' AND max_ts >= {} AND max_ts <= {} AND min_ts <= {};",
-        range.0, max_ts_upper_bound, range.1
-    );
-
-    let t = exec(trace_id, cfg.limit.cpu_num, dump_files, &query).await?;
-
-    let ret = t.into_iter().flat_map(record_batch_to_file_id).collect();
-    let process_time = process_start.elapsed().as_millis();
-
-    log::info!(
-        "[FILE_LIST_DUMP: {trace_id}] : getting dump files from db took {db_time} ms, searching for entries took {process_time} ms"
-    );
-
-    Ok(ret)
-}
-
-async fn move_and_delete(
-    org: &str,
-    stream_type: StreamType,
-    stream: &str,
-    range: (i64, i64),
-) -> Result<(), errors::Error> {
-    let stream_key = format!(
-        "{org}/{}/{org}_{stream_type}_{stream}",
-        StreamType::Filelist
-    );
-    let list =
-        infra::file_list::get_entries_in_range(org, Some(&stream_key), range.0, range.1, None)
-            .await?;
-
-    // for deleting dump files themselves, we explicitly make sure that
-    // the min and max ts both are in the range given, so to not accidentally delete
-    // dump files which may have entries outside the range
-    let dump_files: Vec<_> = get_dump_files_in_range(org, Some(stream), range, None)
-        .await?
-        .into_iter()
-        .filter(|f| f.min_ts >= range.0 && f.max_ts <= range.1)
-        .collect();
-    let del_items: Vec<_> = list
-        .iter()
-        .chain(dump_files.iter())
-        .map(|f| FileListDeleted {
-            id: 0,
-            account: f.account.to_string(),
-            file: format!("files/{}/{}/{}", stream_key, f.date, f.file),
-            index_file: false,
-            flattened: false,
-        })
-        .collect();
-
-    let mut inserted_into_deleted = false;
-
-    for _ in 0..5 {
-        if !inserted_into_deleted
-            && let Err(e) =
-                infra::file_list::batch_add_deleted(org, Utc::now().timestamp_micros(), &del_items)
-                    .await
-        {
-            log::error!("[FILE_LIST_DUMP] batch_add_deleted to db failed, retrying: {e}");
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            continue;
-        }
-        inserted_into_deleted = true;
-        let items: Vec<_> = list
-            .iter()
-            .chain(dump_files.iter())
-            .map(|f| {
-                let mut f = FileKey::from(f);
-                f.deleted = true;
-                f.segment_ids = None;
-                f
-            })
-            .collect();
-        if let Err(e) = infra::file_list::batch_process(&items).await {
-            log::error!("[FILE_LIST_DUMP] batch_delete to db failed, retrying: {e}");
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            continue;
-        }
-        break;
-    }
-
-    Ok(())
-}
-
-pub async fn delete_all_for_stream(
-    org: &str,
-    stream_type: StreamType,
-    stream: &str,
-) -> Result<(), errors::Error> {
-    move_and_delete(org, stream_type, stream, (0, Utc::now().timestamp_micros())).await
-}
-
-pub async fn delete_in_time_range(
-    org: &str,
-    stream_type: StreamType,
-    stream: &str,
-    range: (i64, i64),
-) -> Result<(), errors::Error> {
-    move_and_delete(org, stream_type, stream, range).await
-}
-
-// we never store deleted file in dump, so we never have to consider deleted in this
-pub async fn stats(time_range: (i64, i64)) -> Result<Vec<(String, StreamStats)>, errors::Error> {
-    if !get_config().common.file_list_dump_enabled {
-        return Ok(vec![]);
-    }
-
-    let mut ret = HashMap::new();
-    let orgs = crate::service::db::schema::list_organizations_from_cache().await;
-    for org_id in orgs {
-        for stream_type in ALL_STREAM_TYPES {
-            if stream_type == StreamType::Filelist || stream_type == StreamType::Index {
-                continue;
-            }
-            let stream_names =
-                crate::service::db::schema::list_streams_from_cache(&org_id, stream_type).await;
-            for stream_name in stream_names {
-                let stats = stats_inner(&org_id, stream_type, &stream_name, time_range).await?;
-                ret.extend(stats);
-                log::debug!(
-                    "[FILE_LIST_DUMP] stats for {org_id}/{stream_type}/{stream_name}: time_range: {time_range:?}",
-                );
-            }
-        }
-    }
-    Ok(ret.into_iter().collect())
-}
-
-async fn stats_inner(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    time_range: (i64, i64),
-) -> Result<Vec<(String, StreamStats)>, errors::Error> {
+    range: (i64, i64),
+    ids: &[i64],
+) -> Result<Vec<FileRecord>, errors::Error> {
     let cfg = get_config();
-
-    // in case of dual write, we have no way of de-duping with ids for stats.
-    // so we simply do not consider dumped files when dual-write is enabled.
-    if cfg.common.file_list_dump_dual_write {
+    if !cfg.compact.file_list_dump_enabled {
         return Ok(vec![]);
     }
-
-    let stream_key = format!(
-        "{org_id}/{}/{org_id}_{stream_type}_{stream_name}",
-        StreamType::Filelist
-    );
-    let (min_ts, max_ts) = time_range;
-
-    // here need to improve, it always scan all the data of this stream
-    let dump_files = get_dump_files_in_range(
+    let start = std::time::Instant::now();
+    let batches = query_inner(
+        trace_id,
         org_id,
-        Some(&stream_key),
-        (0, Utc::now().timestamp_micros()),
-        Some(min_ts),
+        stream_type,
+        stream_name,
+        range,
+        ids,
+        QueryType::FileRecord,
     )
     .await?;
+    let ret = batches
+        .into_iter()
+        .flat_map(record_batch_to_file_record)
+        .collect();
+    log::info!(
+        "[FILE_LIST_DUMP {trace_id}] query took {} ms",
+        start.elapsed().as_millis()
+    );
+    Ok(ret)
+}
 
+pub async fn query_ids(
+    trace_id: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    range: (i64, i64),
+) -> Result<Vec<FileId>, errors::Error> {
+    let cfg = get_config();
+    if !cfg.compact.file_list_dump_enabled {
+        return Ok(vec![]);
+    }
+    let start = std::time::Instant::now();
+    let batches = query_inner(
+        trace_id,
+        org_id,
+        stream_type,
+        stream_name,
+        range,
+        &[],
+        QueryType::FileId,
+    )
+    .await?;
+    let ret = batches
+        .into_iter()
+        .flat_map(record_batch_to_file_id)
+        .collect();
+    log::info!(
+        "[FILE_LIST_DUMP {trace_id}] query_ids took {} ms",
+        start.elapsed().as_millis()
+    );
+    Ok(ret)
+}
+
+async fn query_inner(
+    trace_id: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    range: (i64, i64),
+    ids: &[i64],
+    query_type: QueryType,
+) -> Result<Vec<RecordBatch>, errors::Error> {
+    let dump_stream_name = generate_dump_stream_name(stream_type, stream_name);
+    let db_start = std::time::Instant::now();
+    let dump_files = infra::file_list::query(
+        org_id,
+        StreamType::Filelist,
+        &dump_stream_name,
+        PartitionTimeLevel::Hourly,
+        range,
+        None,
+    )
+    .await?;
     if dump_files.is_empty() {
         return Ok(vec![]);
     }
+    let db_time = db_start.elapsed().as_millis();
 
-    let dump_files: Vec<_> = dump_files.iter().map(|f| f.into()).collect();
+    let process_start = std::time::Instant::now();
+    let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+    let fields = match query_type {
+        QueryType::FileRecord => "*",
+        QueryType::FileId => "id, records, original_size",
+    };
+    let query = if !ids.is_empty() && ids.len() <= 1000 {
+        format!(
+            "SELECT {fields} FROM file_list WHERE id IN ({})",
+            ids.iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<String>>()
+                .join(",")
+        )
+    } else {
+        let max_ts_upper_bound = calculate_max_ts_upper_bound(range.1, stream_type);
+        format!(
+            "SELECT {fields} FROM file_list WHERE org = '{org_id}' AND stream = '{stream_key}' AND max_ts >= {} AND max_ts <= {} AND min_ts <= {};",
+            range.0, max_ts_upper_bound, range.1
+        )
+    };
+    let ret = exec(trace_id, get_config().limit.cpu_num, dump_files, &query).await?;
+    let process_time = process_start.elapsed().as_millis();
 
-    let field = "stream";
-    let value = format!("{org_id}/{stream_type}/{stream_name}");
+    log::info!(
+        "[FILE_LIST_DUMP {trace_id}] getting dump files from db took {db_time} ms, searching for entries took {process_time} ms"
+    );
+
+    Ok(ret)
+}
+
+// 1. use updated_at time range to get changed file_list dump files
+// 2. group the files by deleted flag, one for added, one for deleted
+// 3. calculate the stats for each group
+// 4. return the stats
+pub async fn stats(
+    time_range: (i64, i64),
+    need_apply_time_range: bool,
+) -> Result<Vec<(String, StreamStats)>, errors::Error> {
+    if !get_config().compact.file_list_dump_enabled {
+        return Ok(vec![]);
+    }
+
+    let mut ret = Vec::new();
+    let dump_files = infra::file_list::query_for_dump_by_updated_at(time_range).await?;
+    let (deleted_files, added_files): (Vec<_>, Vec<_>) =
+        dump_files.into_iter().partition(|file| file.deleted);
+    // calculate the stats
+    let added_stats = stats_inner(added_files, time_range, need_apply_time_range).await?;
+    let deleted_stats = stats_inner(deleted_files, time_range, false).await?;
+    // we need convert deleted stats to negative
+    let deleted_stats = deleted_stats.into_iter().map(|(stream, stats)| {
+        (
+            stream,
+            StreamStats {
+                doc_num: -stats.doc_num,
+                file_num: -stats.file_num,
+                storage_size: -stats.storage_size,
+                compressed_size: -stats.compressed_size,
+                index_size: -stats.index_size,
+                doc_time_min: 0,
+                doc_time_max: 0,
+                created_at: 0,
+            },
+        )
+    });
+    ret.extend(added_stats);
+    ret.extend(deleted_stats);
+    Ok(ret)
+}
+
+async fn stats_inner(
+    files: Vec<FileRecord>,
+    time_range: (i64, i64),
+    need_apply_time_range: bool,
+) -> Result<Vec<(String, StreamStats)>, errors::Error> {
+    if files.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let cfg = get_config();
+    let (min_ts, max_ts) = time_range;
+    let dump_files: Vec<_> = files.iter().map(|f| f.into()).collect();
+    let filter = if need_apply_time_range {
+        format!("WHERE updated_at > {min_ts} AND updated_at <= {max_ts}")
+    } else {
+        "".to_string()
+    };
     let sql = format!(
         r#"
 SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, COUNT(*)::BIGINT AS file_num, 
 SUM(records)::BIGINT AS records, SUM(original_size)::BIGINT AS original_size, SUM(compressed_size)::BIGINT AS compressed_size, SUM(index_size)::BIGINT AS index_size
-FROM file_list 
-WHERE {field} = '{value}'
+FROM file_list {filter} GROUP BY stream
         "#
     );
-    let sql = format!("{sql} AND updated_at > {min_ts} AND updated_at <= {max_ts} GROUP BY stream");
 
-    let task_id = tokio::task::try_id()
-        .map(|id| id.to_string())
-        .unwrap_or_else(|| rand::random::<u64>().to_string());
-    let fake_trace_id = format!("stats_on_dump-{task_id}");
-    let t = exec(&fake_trace_id, cfg.limit.cpu_num, dump_files, &sql).await?;
-    let ret = t.into_iter().flat_map(record_batch_to_stats).collect();
+    let mut stats_map = HashMap::new();
+    log::info!(
+        "[O2::FILE_DUMP::STATS] total dump file count: {}",
+        dump_files.len(),
+    );
+
+    let trace_id = ider::generate_trace_id();
+    let t = exec(&trace_id, cfg.limit.cpu_num, dump_files, &sql).await?;
+    let ret = t
+        .into_iter()
+        .flat_map(record_batch_to_stats)
+        .collect::<Vec<_>>();
+    for (stream, stats) in ret {
+        let entry = stats_map.entry(stream).or_insert(StreamStats::default());
+        *entry = &*entry + &stats;
+    }
+
+    let ret = stats_map.into_iter().collect();
     Ok(ret)
 }
 
@@ -472,62 +469,6 @@ mod tests {
     };
 
     use super::*;
-
-    #[test]
-    fn test_round_down_to_hour_basic() {
-        // Test basic hour rounding
-        let hour_micros = 3_600_000_000i64; // 1 hour in microseconds
-
-        // Test exact hour boundary
-        let timestamp = hour_micros * 5; // 5 hours
-        assert_eq!(round_down_to_hour(timestamp), timestamp);
-
-        // Test within hour - should round down
-        let timestamp = hour_micros * 5 + 1_800_000_000; // 5.5 hours
-        assert_eq!(round_down_to_hour(timestamp), hour_micros * 5);
-
-        // Test just before next hour
-        let timestamp = hour_micros * 3 + hour_micros - 1; // Almost 4 hours
-        assert_eq!(round_down_to_hour(timestamp), hour_micros * 3);
-    }
-
-    #[test]
-    fn test_round_down_to_hour_zero() {
-        // Test zero timestamp
-        assert_eq!(round_down_to_hour(0), 0);
-
-        // Test small value less than an hour
-        let small_timestamp = 1_800_000_000i64; // 30 minutes
-        assert_eq!(round_down_to_hour(small_timestamp), 0);
-    }
-
-    #[test]
-    fn test_round_down_to_hour_negative() {
-        // Test negative timestamps (edge case)
-        let hour_micros = 3_600_000_000i64;
-        let negative_timestamp = -hour_micros / 2; // -30 minutes = -1,800,000,000
-
-        // For negative_timestamp = -1,800,000,000
-        // negative_timestamp % hour_micros = -1,800,000,000 % 3,600,000,000 = -1,800,000,000 (in
-        // Rust) So result = -1,800,000,000 - (-1,800,000,000) = 0
-        let result = round_down_to_hour(negative_timestamp);
-
-        // For negative values, the "floor" behavior is different in Rust's % operator
-        // The function actually rounds toward zero, not down for negatives
-        assert_eq!(result, 0); // Should be 0 for this specific case
-    }
-
-    #[test]
-    fn test_round_down_to_hour_large_values() {
-        // Test with large timestamps (years in the future)
-        let hour_micros = 3_600_000_000i64;
-        let large_timestamp = hour_micros * 10000 + 1_500_000_000; // 10000.25 hours
-
-        let result = round_down_to_hour(large_timestamp);
-        assert_eq!(result, hour_micros * 10000);
-        assert!(result <= large_timestamp);
-        assert!(large_timestamp - result < hour_micros);
-    }
 
     fn create_test_record_batch() -> RecordBatch {
         let schema = Arc::new(Schema::new(vec![
@@ -856,24 +797,232 @@ mod tests {
     }
 
     #[test]
-    fn test_time_boundary_calculations() {
-        let hour_micros = 3_600_000_000i64;
+    fn test_generate_dump_stream_name() {
+        // Test with different stream types
+        let result = generate_dump_stream_name(StreamType::Logs, "my_stream");
+        assert_eq!(result, "my_stream_logs");
 
-        // Test range calculations as used in get_dump_files_in_range
-        let range = (
-            hour_micros * 2 + 1_800_000_000,
-            hour_micros * 5 + 600_000_000,
-        ); // 2.5 to 5.1 hours
-        let start = round_down_to_hour(range.0);
-        let end = round_down_to_hour(range.1) + hour_micros;
+        let result = generate_dump_stream_name(StreamType::Metrics, "metric_stream");
+        assert_eq!(result, "metric_stream_metrics");
 
-        // Start should be rounded down to 2 hours
-        assert_eq!(start, hour_micros * 2);
-        // End should be rounded down to 5 hours then add 1 hour = 6 hours
-        assert_eq!(end, hour_micros * 6);
+        let result = generate_dump_stream_name(StreamType::Traces, "trace_stream");
+        assert_eq!(result, "trace_stream_traces");
 
-        // Verify range covers the original timestamps
-        assert!(start <= range.0);
-        assert!(end > range.1);
+        // Test with stream name containing special characters
+        let result = generate_dump_stream_name(StreamType::Logs, "my-stream_2024");
+        assert_eq!(result, "my-stream_2024_logs");
+
+        // Test with empty stream name
+        let result = generate_dump_stream_name(StreamType::Logs, "");
+        assert_eq!(result, "_logs");
+    }
+
+    #[test]
+    fn test_file_list_schema() {
+        // Verify the schema has the expected fields
+        let schema = FILE_LIST_SCHEMA.clone();
+
+        assert_eq!(schema.fields().len(), 16);
+
+        // Check key field names and types
+        assert_eq!(schema.field(0).name(), "id");
+        assert_eq!(schema.field(0).data_type(), &DataType::Int64);
+
+        assert_eq!(schema.field(1).name(), "account");
+        assert_eq!(schema.field(1).data_type(), &DataType::Utf8);
+
+        assert_eq!(schema.field(2).name(), "org");
+        assert_eq!(schema.field(2).data_type(), &DataType::Utf8);
+
+        assert_eq!(schema.field(3).name(), "stream");
+        assert_eq!(schema.field(3).data_type(), &DataType::Utf8);
+
+        assert_eq!(schema.field(6).name(), "deleted");
+        assert_eq!(schema.field(6).data_type(), &DataType::Boolean);
+
+        assert_eq!(schema.field(7).name(), "flattened");
+        assert_eq!(schema.field(7).data_type(), &DataType::Boolean);
+    }
+
+    #[test]
+    fn test_record_batch_to_file_record_empty() {
+        let schema = FILE_LIST_SCHEMA.clone();
+        let empty_batch = RecordBatch::new_empty(schema);
+
+        let records = record_batch_to_file_record(empty_batch);
+        assert_eq!(records.len(), 0);
+    }
+
+    #[test]
+    fn test_record_batch_to_file_record_preserves_order() {
+        let rb = create_test_record_batch();
+        let records = record_batch_to_file_record(rb);
+
+        // Verify records are in the same order as input
+        assert_eq!(records[0].id, 1);
+        assert_eq!(records[1].id, 2);
+        assert_eq!(records[2].id, 3);
+
+        assert_eq!(records[0].org, "org1");
+        assert_eq!(records[1].org, "org2");
+        assert_eq!(records[2].org, "org3");
+    }
+
+    #[test]
+    fn test_record_batch_to_file_record_handles_boolean_fields() {
+        let rb = create_test_record_batch();
+        let records = record_batch_to_file_record(rb);
+
+        // Verify boolean fields
+        assert!(!records[0].deleted);
+        assert!(records[1].deleted);
+        assert!(!records[2].deleted);
+
+        assert!(records[0].flattened);
+        assert!(!records[1].flattened);
+        assert!(records[2].flattened);
+    }
+
+    #[test]
+    fn test_record_batch_to_file_record_handles_timestamps() {
+        let rb = create_test_record_batch();
+        let records = record_batch_to_file_record(rb);
+
+        // Verify timestamp fields
+        assert_eq!(records[0].min_ts, 1000);
+        assert_eq!(records[0].max_ts, 1100);
+        assert_eq!(records[1].min_ts, 2000);
+        assert_eq!(records[1].max_ts, 2100);
+        assert_eq!(records[2].min_ts, 3000);
+        assert_eq!(records[2].max_ts, 3100);
+    }
+
+    #[test]
+    fn test_record_batch_to_file_record_handles_sizes() {
+        let rb = create_test_record_batch();
+        let records = record_batch_to_file_record(rb);
+
+        // Verify size fields
+        assert_eq!(records[0].original_size, 1000);
+        assert_eq!(records[0].compressed_size, 500);
+        assert_eq!(records[0].index_size, 50);
+
+        assert_eq!(records[1].original_size, 2000);
+        assert_eq!(records[1].compressed_size, 1000);
+        assert_eq!(records[1].index_size, 100);
+
+        assert_eq!(records[2].original_size, 3000);
+        assert_eq!(records[2].compressed_size, 1500);
+        assert_eq!(records[2].index_size, 150);
+    }
+
+    #[test]
+    fn test_record_batch_to_file_record_all_fields() {
+        let rb = create_test_record_batch();
+        let records = record_batch_to_file_record(rb);
+
+        // Comprehensive test of first record
+        let first = &records[0];
+        assert_eq!(first.id, 1);
+        assert_eq!(first.account, "account1");
+        assert_eq!(first.org, "org1");
+        assert_eq!(first.stream, "stream1");
+        assert_eq!(first.date, "2024-01-01");
+        assert_eq!(first.file, "file1.parquet");
+        assert!(!first.deleted);
+        assert!(first.flattened);
+        assert_eq!(first.min_ts, 1000);
+        assert_eq!(first.max_ts, 1100);
+        assert_eq!(first.records, 100);
+        assert_eq!(first.original_size, 1000);
+        assert_eq!(first.compressed_size, 500);
+        assert_eq!(first.index_size, 50);
+        assert_eq!(first.created_at, 1000);
+        assert_eq!(first.updated_at, 1100);
+    }
+
+    #[test]
+    fn test_generate_dump_stream_name_with_various_stream_types() {
+        // Test all stream types
+        let stream_types = vec![
+            (StreamType::Logs, "logs"),
+            (StreamType::Metrics, "metrics"),
+            (StreamType::Traces, "traces"),
+        ];
+
+        for (stream_type, suffix) in stream_types {
+            let result = generate_dump_stream_name(stream_type, "test");
+            assert_eq!(result, format!("test_{}", suffix));
+        }
+    }
+
+    #[test]
+    fn test_file_list_schema_field_ordering() {
+        let schema = FILE_LIST_SCHEMA.clone();
+
+        // Verify the exact order of fields
+        let expected_fields = vec![
+            ("id", DataType::Int64),
+            ("account", DataType::Utf8),
+            ("org", DataType::Utf8),
+            ("stream", DataType::Utf8),
+            ("date", DataType::Utf8),
+            ("file", DataType::Utf8),
+            ("deleted", DataType::Boolean),
+            ("flattened", DataType::Boolean),
+            ("min_ts", DataType::Int64),
+            ("max_ts", DataType::Int64),
+            ("records", DataType::Int64),
+            ("original_size", DataType::Int64),
+            ("compressed_size", DataType::Int64),
+            ("index_size", DataType::Int64),
+            ("created_at", DataType::Int64),
+            ("updated_at", DataType::Int64),
+        ];
+
+        for (i, (name, dtype)) in expected_fields.iter().enumerate() {
+            assert_eq!(schema.field(i).name(), name);
+            assert_eq!(schema.field(i).data_type(), dtype);
+        }
+    }
+
+    #[test]
+    fn test_file_list_schema_nullability() {
+        let schema = FILE_LIST_SCHEMA.clone();
+
+        // All fields should be non-nullable
+        for field in schema.fields() {
+            assert!(
+                !field.is_nullable(),
+                "Field {} should not be nullable",
+                field.name()
+            );
+        }
+    }
+
+    #[test]
+    fn test_record_batch_to_file_record_consistency() {
+        // Create batch twice and verify results are consistent
+        let rb1 = create_test_record_batch();
+        let rb2 = create_test_record_batch();
+
+        let records1 = record_batch_to_file_record(rb1);
+        let records2 = record_batch_to_file_record(rb2);
+
+        assert_eq!(records1.len(), records2.len());
+        for (r1, r2) in records1.iter().zip(records2.iter()) {
+            assert_eq!(r1.id, r2.id);
+            assert_eq!(r1.account, r2.account);
+            assert_eq!(r1.org, r2.org);
+            assert_eq!(r1.stream, r2.stream);
+        }
+    }
+
+    #[test]
+    fn test_generate_dump_stream_name_idempotent() {
+        // Calling multiple times with same inputs should give same output
+        let result1 = generate_dump_stream_name(StreamType::Logs, "test_stream");
+        let result2 = generate_dump_stream_name(StreamType::Logs, "test_stream");
+        assert_eq!(result1, result2);
     }
 }
