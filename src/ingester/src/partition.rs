@@ -222,7 +222,7 @@ impl Partition {
                     schema: &schema,
                     bloom_filter_fields: &bloom_filter_fields,
                     metadata: &file_meta,
-                    write_metadata: true,
+                    write_metadata: false,
                     compression,
                 };
 
