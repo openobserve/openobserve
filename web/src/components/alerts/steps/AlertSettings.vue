@@ -20,21 +20,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- For Real-Time Alerts -->
       <template v-if="isRealTime === 'true'">
         <!-- Silence Notification (Cooldown) -->
-        <div class="flex justify-start items-center tw-font-semibold tw-pb-3 tw-mb-4">
-          <div style="width: 190px">{{ t("alerts.silenceNotification") }} *</div>
-          <q-input
-            v-model.number="formData.trigger_condition.silence"
-            type="number"
-            dense
-            filled
-            min="0"
-            suffix="Minutes"
-            style="max-width: 300px"
-            :class="
-              store.state.theme === 'dark' ? 'input-box-bg-dark input-border-dark' : 'input-box-bg-light input-border-light'
-            "
-            @update:model-value="$emit('update:trigger', formData.trigger_condition)"
-          />
+        <div class="flex justify-start items-center tw-pb-3 tw-mb-4">
+          <div class="tw-font-semibold flex items-center" style="width: 190px">
+            {{ t("alerts.silenceNotification") + " *" }}
+            <q-icon
+              name="info"
+              size="17px"
+              class="q-ml-xs cursor-pointer"
+              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+            >
+              <q-tooltip anchor="center right" self="center left" max-width="300px">
+                <span style="font-size: 14px">
+                  If the alert triggers then how long should it wait before sending another notification.<br />
+                  e.g. if the alert triggers at 4:00 PM and the silence notification is set to 10 minutes then it will not send
+                  another notification until 4:10 PM even if the alert is still after 1 minute. This is to avoid spamming the user
+                  with notifications.
+                </span>
+              </q-tooltip>
+            </q-icon>
+          </div>
+          <div>
+            <div class="flex items-center q-mr-sm" style="width: fit-content">
+              <div
+                style="width: 87px; margin-left: 0 !important"
+                class="silence-notification-input"
+              >
+                <q-input
+                  v-model.number="formData.trigger_condition.silence"
+                  type="number"
+                  dense
+                  borderless
+                  min="0"
+                  style="background: none"
+                  @update:model-value="$emit('update:trigger', formData.trigger_condition)"
+                />
+              </div>
+              <div
+                style="
+                  min-width: 90px;
+                  margin-left: 0 !important;
+                  height: 36px;
+                "
+                :style="store.state.theme === 'dark' ? 'border: 1px solid #2c2c2c' : ''"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'bg-grey-10'
+                    : 'bg-grey-2'
+                "
+                class="flex justify-center items-center"
+              >
+                {{ t("alerts.minutes") }}
+              </div>
+            </div>
+            <div
+              v-if="formData.trigger_condition.silence < 0 || formData.trigger_condition.silence === undefined || formData.trigger_condition.silence === null || formData.trigger_condition.silence === ''"
+              class="text-red-8 q-pt-xs"
+              style="font-size: 11px; line-height: 12px"
+            >
+              Field is required!
+            </div>
+          </div>
         </div>
 
         <!-- Destinations -->
@@ -444,6 +489,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
               </q-tooltip>
             </q-icon>
+            <template v-if="formData.trigger_condition.frequency_type === 'cron' && showTimezoneWarning">
+              <q-icon
+                name="warning"
+                size="18px"
+                class="cursor-pointer tw-ml-2"
+                :class="store.state.theme === 'dark' ? 'tw-text-orange-500' : 'tw-text-orange-500'"
+              >
+                <q-tooltip
+                  anchor="center right"
+                  self="center left"
+                  max-width="auto"
+                  class="tw-text-[14px]"
+                >
+                  Warning: The displayed timezone is approximate. Verify and select the correct timezone manually.
+                </q-tooltip>
+              </q-icon>
+            </template>
           </div>
           <div>
             <div class="flex items-center" style="width: fit-content">
@@ -465,16 +527,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   debounce="300"
                   @update:model-value="emitTriggerUpdate"
                 />
-                <q-input
-                  v-else
-                  v-model="formData.trigger_condition.cron"
-                  dense
-                  borderless
-                  style="width: 250px; background: none"
-                  :placeholder="'0 * * * *'"
-                  debounce="300"
-                  @update:model-value="emitTriggerUpdate"
-                />
+                <div v-else class="tw-flex tw-items-center">
+                  <q-input
+                    v-model="formData.trigger_condition.cron"
+                    dense
+                    borderless
+                    :label="t('reports.cron') + ' *'"
+                    style="background: none; width: 180px"
+                    class="showLabelOnTop"
+                    stack-label
+                    debounce="300"
+                    @update:model-value="emitTriggerUpdate"
+                  />
+                  <q-select
+                    v-model="formData.trigger_condition.timezone"
+                    :options="filteredTimezone"
+                    @blur="
+                      browserTimezone =
+                        browserTimezone === ''
+                          ? Intl.DateTimeFormat().resolvedOptions().timeZone
+                          : browserTimezone
+                    "
+                    use-input
+                    @filter="timezoneFilterFn"
+                    input-debounce="0"
+                    dense
+                    borderless
+                    emit-value
+                    fill-input
+                    hide-selected
+                    :title="formData.trigger_condition.timezone"
+                    :label="t('logStream.timezone') + ' *'"
+                    :display-value="`Timezone: ${browserTimezone}`"
+                    class="showLabelOnTop q-ml-sm"
+                    stack-label
+                    style="width: 210px"
+                    @update:model-value="emitTriggerUpdate"
+                  />
+                </div>
               </div>
               <div
                 v-if="formData.trigger_condition.frequency_type === 'minutes'"
@@ -488,14 +578,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="
-                formData.trigger_condition.frequency_type === 'minutes'
-                  ? !Number(formData.trigger_condition.frequency)
-                  : !formData.trigger_condition.cron
+                (formData.trigger_condition.frequency_type === 'minutes' && !Number(formData.trigger_condition.frequency)) ||
+                (formData.trigger_condition.frequency_type === 'cron' && (!formData.trigger_condition.cron || !formData.trigger_condition.timezone)) ||
+                cronJobError
               "
               class="text-red-8 q-pt-xs"
               style="font-size: 11px; line-height: 12px"
             >
-              Field is required!
+              {{ cronJobError || "Field is required!" }}
             </div>
           </div>
         </div>
@@ -512,26 +602,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <q-tooltip anchor="center right" self="center left" max-width="300px">
                 <span style="font-size: 14px">
-                  Silences notifications after alert triggers for specified duration.<br />
-                  e.g. if the alert triggers at 4:00 PM and the silence period is 30 minutes,
-                  no notifications will be sent until 4:30 PM even if the alert triggers again.
+                  If the alert triggers then how long should it wait before sending another notification.<br />
+                  e.g. if the alert triggers at 4:00 PM and the silence notification is set to 10 minutes then it will not send
+                  another notification until 4:10 PM even if the alert is still after 1 minute. This is to avoid spamming the user
+                  with notifications.
                 </span>
               </q-tooltip>
             </q-icon>
           </div>
           <div>
-            <div class="flex items-center">
-              <q-input
-                v-model.number="formData.trigger_condition.silence"
-                type="number"
-                dense
-                borderless
-                min="0"
-                style="width: 180px; background: none"
-                suffix="Minutes"
-                debounce="300"
-                @update:model-value="emitTriggerUpdate"
-              />
+            <div class="flex items-center q-mr-sm" style="width: fit-content">
+              <div
+                style="width: 87px; margin-left: 0 !important"
+                class="silence-notification-input"
+              >
+                <q-input
+                  v-model.number="formData.trigger_condition.silence"
+                  type="number"
+                  dense
+                  borderless
+                  min="0"
+                  style="background: none"
+                  debounce="300"
+                  @update:model-value="emitTriggerUpdate"
+                />
+              </div>
+              <div
+                style="
+                  min-width: 90px;
+                  margin-left: 0 !important;
+                  height: 36px;
+                "
+                :style="store.state.theme === 'dark' ? 'border: 1px solid #2c2c2c' : ''"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'bg-grey-10'
+                    : 'bg-grey-2'
+                "
+                class="flex justify-center items-center"
+              >
+                {{ t("alerts.minutes") }}
+              </div>
             </div>
             <div
               v-if="formData.trigger_condition.silence < 0 || formData.trigger_condition.silence === undefined || formData.trigger_condition.silence === null || formData.trigger_condition.silence === ''"
@@ -641,6 +752,10 @@ import { defineComponent, ref, computed, watch, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import {
+  getCronIntervalDifferenceInSeconds,
+  isAboveMinRefreshInterval,
+} from "@/utils/zincutils";
 
 export default defineComponent({
   name: "Step3AlertConditions",
@@ -686,6 +801,49 @@ export default defineComponent({
     const localIsAggregationEnabled = ref(props.isAggregationEnabled);
     const localDestinations = ref(props.destinations);
 
+    // Timezone management
+    const browserTimezone = ref("");
+    const filteredTimezone = ref<string[]>([]);
+    const showTimezoneWarning = ref(false);
+
+    // Cron validation
+    const cronJobError = ref("");
+
+    // Initialize timezone
+    const initializeTimezone = () => {
+      try {
+        const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        browserTimezone.value = detectedTimezone;
+
+        // Auto-detect and set timezone if not already set and in cron mode
+        if (props.formData.trigger_condition.frequency_type === 'cron' && !props.formData.trigger_condition.timezone) {
+          props.formData.trigger_condition.timezone = detectedTimezone;
+          showTimezoneWarning.value = true;
+        }
+
+        // Get all available timezones
+        try {
+          // @ts-ignore - supportedValuesOf is not in all TypeScript versions
+          if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
+            // @ts-ignore
+            filteredTimezone.value = Intl.supportedValuesOf("timeZone");
+          } else {
+            // Fallback for older browsers
+            filteredTimezone.value = [detectedTimezone];
+          }
+        } catch (err) {
+          filteredTimezone.value = [detectedTimezone];
+        }
+      } catch (e) {
+        console.error('Error initializing timezone:', e);
+        browserTimezone.value = "UTC";
+        filteredTimezone.value = ["UTC"];
+      }
+    };
+
+    // Initialize on mount
+    initializeTimezone();
+
     // Watch for prop changes
     watch(
       () => props.isAggregationEnabled,
@@ -701,11 +859,21 @@ export default defineComponent({
       }
     );
 
+    // Watch for frequency type changes to manage timezone
+    watch(
+      () => props.formData.trigger_condition.frequency_type,
+      (newVal) => {
+        if (newVal === 'cron') {
+          initializeTimezone();
+        }
+      }
+    );
+
     // Aggregation functions
     const aggFunctions = ["count", "min", "max", "avg", "sum", "median", "p50", "p75", "p90", "p95", "p99"];
 
     // Trigger operators
-    const triggerOperators = ["=", "!=", ">=", ">", "<=", "<"];
+    const triggerOperators = ["=", "!=", ">=", ">", "<=", "<", "Contains", "NotContains"];
 
     // Filtered fields for group by
     const filteredFields = ref([...props.columns]);
@@ -748,6 +916,38 @@ export default defineComponent({
       });
     };
 
+    // Timezone filter function
+    const timezoneFilterFn = (val: string, update: any) => {
+      update(() => {
+        if (val === "") {
+          try {
+            // @ts-ignore
+            if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
+              // @ts-ignore
+              filteredTimezone.value = Intl.supportedValuesOf("timeZone");
+            }
+          } catch (e) {
+            // Keep current filtered list
+          }
+        } else {
+          const needle = val.toLowerCase();
+          const allTimezones: string[] = [];
+          try {
+            // @ts-ignore
+            if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
+              // @ts-ignore
+              allTimezones.push(...Intl.supportedValuesOf("timeZone"));
+            }
+          } catch (e) {
+            allTimezones.push(browserTimezone.value);
+          }
+          filteredTimezone.value = allTimezones.filter((v: string) =>
+            v.toLowerCase().indexOf(needle) > -1
+          );
+        }
+      });
+    };
+
     // Toggle aggregation
     const toggleAggregation = () => {
       emit("update:isAggregationEnabled", localIsAggregationEnabled.value);
@@ -769,8 +969,40 @@ export default defineComponent({
       }
     };
 
+    // Validate cron expression
+    const validateFrequency = () => {
+      cronJobError.value = "";
+
+      if (props.formData.trigger_condition.frequency_type === "cron") {
+        try {
+          const intervalInSecs = getCronIntervalDifferenceInSeconds(props.formData.trigger_condition.cron);
+
+          if (
+            typeof intervalInSecs === "number" &&
+            !isAboveMinRefreshInterval(intervalInSecs, store.state?.zoConfig)
+          ) {
+            const minInterval = Number(store.state?.zoConfig?.min_auto_refresh_interval) || 1;
+            cronJobError.value = `Frequency should be greater than ${minInterval - 1} seconds.`;
+            return;
+          }
+        } catch (e) {
+          cronJobError.value = "Invalid cron expression";
+        }
+      }
+
+      if (props.formData.trigger_condition.frequency_type === "minutes") {
+        const intervalInMins = Math.ceil(store.state?.zoConfig?.min_auto_refresh_interval / 60);
+
+        if (props.formData.trigger_condition.frequency < intervalInMins) {
+          cronJobError.value = "Minimum frequency should be " + intervalInMins + " minutes";
+          return;
+        }
+      }
+    };
+
     // Emit updates
     const emitTriggerUpdate = () => {
+      validateFrequency();
       emit("update:trigger", props.formData.trigger_condition);
     };
 
@@ -813,6 +1045,14 @@ export default defineComponent({
       emitAggregationUpdate,
       emitDestinationsUpdate,
       routeToCreateDestination,
+      // Timezone-related
+      browserTimezone,
+      filteredTimezone,
+      showTimezoneWarning,
+      timezoneFilterFn,
+      // Cron validation
+      cronJobError,
+      validateFrequency,
     };
   },
 });
@@ -823,11 +1063,11 @@ export default defineComponent({
   width: 100%;
   height: 100%;
   margin: 0 auto;
-  overflow: auto;
 
   .step-content {
     border-radius: 8px;
-    min-height: 100%;
+    height: 100%;
+    overflow-y: auto;
   }
 
   .step-header {
