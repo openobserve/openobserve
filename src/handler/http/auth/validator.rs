@@ -172,7 +172,7 @@ pub async fn validate_credentials(
                     None
                 } else {
                     // For organizations endpoint, specifically look for user in _meta org
-                    // since permission check at line 966 expects the user to be in _meta
+                    // since permission check at line 992 expects the user to be in _meta
                     all_users
                         .iter()
                         .find(|u| u.org == config::META_ORG_ID)
@@ -359,7 +359,7 @@ pub async fn validate_credentials_ext(
                     None
                 } else {
                     // For organizations endpoint, specifically look for user in _meta org
-                    // since permission check at line 966 expects the user to be in _meta
+                    // since permission check at line 992 expects the user to be in _meta
                     all_users
                         .iter()
                         .find(|u| u.org == config::META_ORG_ID)
