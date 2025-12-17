@@ -427,4 +427,219 @@ mod tests {
         // Result depends on stream settings, but should be >= 0
         assert!(result >= 0);
     }
+
+    #[tokio::test]
+    async fn test_populate_file_meta_with_missing_field() {
+        // define a schema without the expected timestamp field
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("log", DataType::Utf8, false),
+            Field::new("pod_id", DataType::Int64, false),
+        ]));
+
+        // define data without timestamp field
+        let batch = RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(StringArray::from(vec!["a", "b", "c", "d"])),
+                Arc::new(Int64Array::from(vec![1, 2, 1, 2])),
+            ],
+        )
+        .unwrap();
+
+        let mut file_meta = FileMeta {
+            min_ts: 0,
+            max_ts: 0,
+            records: 0,
+            original_size: 1000,
+            compressed_size: 700,
+            flattened: false,
+            index_size: 0,
+        };
+
+        // This should fail because the _timestamp field is missing
+        let result = populate_file_meta(&[&batch], &mut file_meta, None, None).await;
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("No min_field found")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_populate_file_meta_with_multiple_batches() {
+        // define a schema
+        let val: i64 = 1666093521151350;
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("log", DataType::Utf8, false),
+            Field::new("_timestamp", DataType::Int64, false),
+        ]));
+
+        // define first batch
+        let batch1 = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["a", "b"])),
+                Arc::new(Int64Array::from(vec![val - 100, val - 50])),
+            ],
+        )
+        .unwrap();
+
+        // define second batch with different min/max
+        let batch2 = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["c", "d", "e"])),
+                Arc::new(Int64Array::from(vec![val - 200, val, val - 150])),
+            ],
+        )
+        .unwrap();
+
+        let mut file_meta = FileMeta {
+            min_ts: 0,
+            max_ts: 0,
+            records: 0,
+            original_size: 1000,
+            compressed_size: 700,
+            flattened: false,
+            index_size: 0,
+        };
+
+        populate_file_meta(&[&batch1, &batch2], &mut file_meta, None, None)
+            .await
+            .unwrap();
+
+        assert_eq!(file_meta.records, 5); // 2 + 3 records
+        assert_eq!(file_meta.min_ts, val - 200); // minimum from both batches
+        assert_eq!(file_meta.max_ts, val); // maximum from both batches
+    }
+
+    #[tokio::test]
+    async fn test_populate_file_meta_with_empty_batches() {
+        let mut file_meta = FileMeta {
+            min_ts: 100,
+            max_ts: 200,
+            records: 5,
+            original_size: 1000,
+            compressed_size: 700,
+            flattened: false,
+            index_size: 0,
+        };
+
+        // Test with empty batches array
+        let result = populate_file_meta(&[], &mut file_meta, None, None).await;
+        assert!(result.is_ok());
+
+        // File meta should remain unchanged
+        assert_eq!(file_meta.records, 5);
+        assert_eq!(file_meta.min_ts, 100);
+        assert_eq!(file_meta.max_ts, 200);
+    }
+
+    #[test]
+    fn test_get_max_query_range_by_user_role_with_zero_stream_max() {
+        use config::meta::user::User;
+
+        // Test with service account and zero stream max query range
+        let stream_max_query_range = 0;
+        let user = User {
+            email: "service@example.com".to_string(),
+            password: "".to_string(),
+            role: config::meta::user::UserRole::ServiceAccount,
+            first_name: "".to_string(),
+            last_name: "".to_string(),
+            is_external: false,
+            token: "".to_string(),
+            salt: "".to_string(),
+            rum_token: Some("".to_string()),
+            org: "".to_string(),
+            password_ext: Some("".to_string()),
+        };
+
+        let result = get_max_query_range_by_user_role(stream_max_query_range, &user);
+        let cfg = get_config();
+        let default_max = cfg.limit.default_max_query_range_days * 24;
+        let sa_max = cfg.limit.max_query_range_for_sa;
+
+        if sa_max > 0 && default_max > 0 {
+            assert_eq!(result, std::cmp::min(default_max, sa_max));
+        } else if sa_max > 0 {
+            assert_eq!(result, sa_max);
+        } else {
+            assert_eq!(result, default_max);
+        }
+    }
+
+    #[test]
+    fn test_increment_stream_file_num_v1_edge_cases() {
+        // Test with larger suffix numbers
+        let new_suffix = increment_stream_file_num_v1(
+            "./data/openobserve/WAL/nexus/logs/olympics/1663064862606912_999.json",
+        );
+        assert_eq!(new_suffix, 1000);
+
+        // Test with suffix 0
+        let new_suffix = increment_stream_file_num_v1(
+            "./data/openobserve/WAL/nexus/logs/olympics/1663064862606912_0.json",
+        );
+        assert_eq!(new_suffix, 1);
+    }
+
+    #[test]
+    fn test_get_stream_file_num_v1_edge_cases() {
+        // Test with larger suffix numbers
+        let file_num =
+            get_stream_file_num_v1("./data/openobserve/WAL/logs/nexus/Olympics/Olympics_9999.json");
+        assert_eq!(file_num, 9999);
+
+        // Test with suffix 0
+        let file_num =
+            get_stream_file_num_v1("./data/openobserve/WAL/logs/nexus/Olympics/Olympics_0.json");
+        assert_eq!(file_num, 0);
+    }
+
+    #[tokio::test]
+    async fn test_populate_file_meta_with_custom_min_max_fields() {
+        // Test with different min and max fields
+        let val: i64 = 1666093521151350;
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("log", DataType::Utf8, false),
+            Field::new("start_time", DataType::Int64, false),
+            Field::new("end_time", DataType::Int64, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(StringArray::from(vec!["a", "b", "c"])),
+                Arc::new(Int64Array::from(vec![val - 100, val - 200, val - 150])),
+                Arc::new(Int64Array::from(vec![val, val + 50, val + 100])),
+            ],
+        )
+        .unwrap();
+
+        let mut file_meta = FileMeta {
+            min_ts: 0,
+            max_ts: 0,
+            records: 0,
+            original_size: 1000,
+            compressed_size: 700,
+            flattened: false,
+            index_size: 0,
+        };
+
+        populate_file_meta(
+            &[&batch],
+            &mut file_meta,
+            Some("start_time"),
+            Some("end_time"),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(file_meta.records, 3);
+        assert_eq!(file_meta.min_ts, val - 200); // minimum from start_time
+        assert_eq!(file_meta.max_ts, val + 100); // maximum from end_time
+    }
 }
