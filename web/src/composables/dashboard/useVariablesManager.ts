@@ -13,17 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { ref, computed, reactive, toRaw } from "vue";
+import { ref, computed, reactive } from "vue";
 import {
   buildScopedDependencyGraph,
   detectCyclesInScopedGraph,
   extractVariableNames,
   type ScopedDependencyGraph,
 } from "@/utils/dashboard/variables/variablesDependencyUtils";
-import { b64EncodeUnicode } from "@/utils/zincutils";
-import dashboardService from "@/services/dashboards";
-import { useStore } from "vuex";
-import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 
 export interface VariableConfig {
   name: string;
@@ -66,51 +62,6 @@ export interface VariableRuntimeState extends VariableConfig {
   error?: string;
 }
 
-export interface UseVariablesManager {
-  variablesData: {
-    global: VariableRuntimeState[];
-    tabs: Record<string, VariableRuntimeState[]>;
-    panels: Record<string, VariableRuntimeState[]>;
-  };
-  dependencyGraph: ScopedDependencyGraph;
-  tabsVisibility: Record<string, boolean>;
-  panelsVisibility: Record<string, boolean>;
-  isLoading: boolean;
-  initialize: (config: VariableConfig[], dashboard: any) => Promise<void>;
-  loadGlobalVariables: () => Promise<void>;
-  loadTabVariables: (tabId: string) => Promise<void>;
-  loadPanelVariables: (panelId: string) => Promise<void>;
-  loadSingleVariable: (variableKey: string) => Promise<void>;
-  setTabVisibility: (tabId: string, visible: boolean) => void;
-  setPanelVisibility: (panelId: string, visible: boolean) => void;
-  updateVariableValue: (
-    name: string,
-    scope: "global" | "tabs" | "panels",
-    tabId: string | undefined,
-    panelId: string | undefined,
-    newValue: any,
-  ) => Promise<void>;
-  getVariable: (
-    name: string,
-    scope: "global" | "tabs" | "panels",
-    tabId?: string,
-    panelId?: string,
-  ) => VariableRuntimeState | undefined;
-  getVariablesForPanel: (
-    panelId: string,
-    tabId: string,
-  ) => VariableRuntimeState[];
-  getVariablesForTab: (tabId: string) => VariableRuntimeState[];
-  getAllVisibleVariables: (
-    tabId?: string,
-    panelId?: string,
-  ) => VariableRuntimeState[];
-  isVariableReady: (variableKey: string) => boolean;
-  getDependentVariables: (variableKey: string) => string[];
-  syncToUrl: (router: any, route: any) => void;
-  loadFromUrl: (route: any) => void;
-}
-
 // Helper to generate variable keys
 export const getVariableKey = (
   name: string,
@@ -140,23 +91,20 @@ const expandVariablesForScopes = (
       expanded.push({
         ...variable,
         scope: "global",
-        // Initialize loading states - set pending to false initially
-        // Will be set to true when loadSingleVariable is called
         isVariableLoadingPending: false,
         isLoading: false,
-        isVariablePartialLoaded: variable.type !== "query_values", // Non-query types are immediately ready
+        // Non-query types are immediately ready
+        isVariablePartialLoaded: variable.type !== "query_values",
       });
     } else if (scope === "tabs" && variable.tabs && variable.tabs.length > 0) {
-      // Create instance for each tab
       variable.tabs.forEach((tabId) => {
         expanded.push({
           ...variable,
           scope: "tabs",
           tabId,
-          // Initialize loading states - pending will be set when tab becomes visible
           isVariableLoadingPending: false,
           isLoading: false,
-          isVariablePartialLoaded: false,
+          isVariablePartialLoaded: variable.type !== "query_values",
         });
       });
     } else if (
@@ -164,16 +112,14 @@ const expandVariablesForScopes = (
       variable.panels &&
       variable.panels.length > 0
     ) {
-      // Create instance for each panel
       variable.panels.forEach((panelId) => {
         expanded.push({
           ...variable,
           scope: "panels",
           panelId,
-          // Initialize loading states - pending will be set when panel becomes visible
           isVariableLoadingPending: false,
           isLoading: false,
-          isVariablePartialLoaded: false,
+          isVariablePartialLoaded: variable.type !== "query_values",
         });
       });
     }
@@ -183,10 +129,9 @@ const expandVariablesForScopes = (
 };
 
 export const useVariablesManager = () => {
-  const store = useStore();
-
   // ========== STATE ==========
-  // TWO-TIER STATE ARCHITECTURE (like __global mechanism in main branch)
+  // TWO-TIER STATE ARCHITECTURE (like __global mechanism)
+
   // LIVE STATE: Updates immediately when user changes variables
   const variablesData = reactive<{
     global: VariableRuntimeState[];
@@ -216,9 +161,6 @@ export const useVariablesManager = () => {
   const currentDashboard = ref<any>(null);
   const panelTabMapping = ref<Record<string, string>>({});
 
-  // Promise tracking for cancellation
-  const currentlyExecutingPromises = new Map<string, { reject: Function }>();
-
   const isLoading = computed(() => {
     const hasLoadingGlobal = variablesData.global.some((v) => v.isLoading);
     const hasLoadingTabs = Object.values(variablesData.tabs).some((vars) =>
@@ -232,14 +174,12 @@ export const useVariablesManager = () => {
 
   // Check if there are uncommitted changes (for yellow icon indicator)
   const hasUncommittedChanges = computed(() => {
-    // Compare live vs committed state
     const globalChanged = !areVariableArraysEqual(
       variablesData.global,
       committedVariablesData.global,
     );
     if (globalChanged) return true;
 
-    // Check all tabs
     const allTabIds = new Set([
       ...Object.keys(variablesData.tabs),
       ...Object.keys(committedVariablesData.tabs),
@@ -255,7 +195,6 @@ export const useVariablesManager = () => {
       }
     }
 
-    // Check all panels
     const allPanelIds = new Set([
       ...Object.keys(variablesData.panels),
       ...Object.keys(committedVariablesData.panels),
@@ -274,7 +213,7 @@ export const useVariablesManager = () => {
     return false;
   });
 
-  // Helper to compare variable arrays by value
+  // ========== HELPER FUNCTIONS ==========
   const areVariableArraysEqual = (
     arr1: VariableRuntimeState[],
     arr2: VariableRuntimeState[],
@@ -287,7 +226,6 @@ export const useVariablesManager = () => {
 
       if (v1.name !== v2.name) return false;
 
-      // Compare values (handle arrays)
       if (Array.isArray(v1.value) && Array.isArray(v2.value)) {
         if (JSON.stringify(v1.value) !== JSON.stringify(v2.value)) {
           return false;
@@ -300,7 +238,6 @@ export const useVariablesManager = () => {
     return true;
   };
 
-  // ========== HELPER FUNCTIONS ==========
   const getAllVariablesFlat = (): VariableRuntimeState[] => {
     const allVars: VariableRuntimeState[] = [...variablesData.global];
 
@@ -325,28 +262,18 @@ export const useVariablesManager = () => {
     });
   };
 
-  const isVariableVisible = (
-    variable: VariableRuntimeState,
-    tabsVis: Record<string, boolean>,
-    panelsVis: Record<string, boolean>,
-  ): boolean => {
+  const isVariableVisible = (variable: VariableRuntimeState): boolean => {
     if (variable.scope === "global") return true;
     if (variable.scope === "tabs") {
-      return tabsVis[variable.tabId!] === true;
+      return tabsVisibility.value[variable.tabId!] === true;
     }
     if (variable.scope === "panels") {
-      return panelsVis[variable.panelId!] === true;
+      return panelsVisibility.value[variable.panelId!] === true;
     }
     return false;
   };
 
-  const canVariableLoad = (
-    variable: VariableRuntimeState,
-    tabsVis: Record<string, boolean>,
-    panelsVis: Record<string, boolean>,
-    allVariables: VariableRuntimeState[],
-    depGraph: ScopedDependencyGraph,
-  ): boolean => {
+  const canVariableLoad = (variable: VariableRuntimeState): boolean => {
     const key = getVariableKey(
       variable.name,
       variable.scope,
@@ -355,7 +282,7 @@ export const useVariablesManager = () => {
     );
 
     // Check 1: Is visible?
-    if (!isVariableVisible(variable, tabsVis, panelsVis)) {
+    if (!isVariableVisible(variable)) {
       return false;
     }
 
@@ -365,10 +292,21 @@ export const useVariablesManager = () => {
     }
 
     // Check 3: All parents ready?
-    const parents = depGraph[key]?.parents || [];
+    const parents = dependencyGraph.value[key]?.parents || [];
+    const allVars = getAllVariablesFlat();
     const allParentsReady = parents.every((parentKey) => {
-      const parentVar = findVariableByKey(parentKey, allVariables);
-      return parentVar?.isVariablePartialLoaded === true;
+      const parentVar = findVariableByKey(parentKey, allVars);
+      // Parent MUST be marked as partially loaded - this is the authoritative flag
+      // that indicates the variable is ready to be used in queries
+      if (!parentVar || parentVar.isVariablePartialLoaded !== true) {
+        return false;
+      }
+      // Additionally check that parent has a valid value
+      const hasValue =
+        parentVar.value !== null &&
+        parentVar.value !== undefined &&
+        (!Array.isArray(parentVar.value) || parentVar.value.length > 0);
+      return hasValue;
     });
 
     return allParentsReady;
@@ -441,27 +379,40 @@ export const useVariablesManager = () => {
       throw new Error(`Circular dependency detected: ${cycle.join(" → ")}`);
     }
 
-    // Step 5: Automatically load global variables that have no dependencies
-    // This starts the cascading load process
-    console.log(
-      "[VariablesManager] Initialization complete, loading global variables...",
-    );
-    await loadGlobalVariables();
-    console.log("[VariablesManager] Global variables load initiated");
+    // Step 5: Mark global independent variables as ready to load
+    // Tab/panel variables will be marked when they become visible via setTabVisibility/setPanelVisibility
+    const globalVars = variablesData.global;
+    const independentGlobalVars = globalVars.filter((v) => {
+      const key = getVariableKey(v.name, v.scope);
+      const parents = dependencyGraph.value[key]?.parents || [];
+      return parents.length === 0;
+    });
 
-    // Step 6: Initialize committed state (first commit)
-    // This is like the initial __global state in main branch
-    commitAll();
+    independentGlobalVars.forEach((v) => {
+      // Mark as pending so selector will fire API
+      if (v.type === "query_values") {
+        v.isVariableLoadingPending = true;
+      }
+    });
+
+    // Step 6: Initialize committed state (empty at first)
+    // Will be filled after variables load and user clicks refresh
+    committedVariablesData.global = [];
+    committedVariablesData.tabs = {};
+    committedVariablesData.panels = {};
   };
 
   // ========== COMMIT MECHANISM (like __global in main branch) ==========
   /**
    * Commits all live variable changes to committed state
    * This is triggered when user clicks the Dashboard Refresh button
-   * Similar to updating currentVariablesDataRef.__global in main branch
    */
   const commitAll = () => {
-    console.log("[VariablesManager] Committing all variable changes");
+    console.log("[commitAll] START - Committing live variables to committed state");
+    console.log("[commitAll] BEFORE commit - variablesData (live state):");
+    console.log("  Global:", variablesData.global.map(v => ({ name: v.name, value: v.value })));
+    console.log("  Tabs:", Object.entries(variablesData.tabs).map(([id, vars]) => ({ tabId: id, vars: vars.map(v => ({ name: v.name, value: v.value })) })));
+    console.log("  Panels:", Object.entries(variablesData.panels).map(([id, vars]) => ({ panelId: id, vars: vars.map(v => ({ name: v.name, value: v.value })) })));
 
     // Deep clone global variables
     committedVariablesData.global = variablesData.global.map((v) => ({
@@ -487,25 +438,19 @@ export const useVariablesManager = () => {
       }));
     });
 
-    console.log("[VariablesManager] Commit complete");
+    console.log("[commitAll] AFTER commit - committedVariablesData:");
+    console.log("  Global:", committedVariablesData.global.map(v => ({ name: v.name, value: v.value })));
+    console.log("  Tabs:", Object.entries(committedVariablesData.tabs).map(([id, vars]) => ({ tabId: id, vars: vars.map(v => ({ name: v.name, value: v.value })) })));
+    console.log("  Panels:", Object.entries(committedVariablesData.panels).map(([id, vars]) => ({ panelId: id, vars: vars.map(v => ({ name: v.name, value: v.value })) })));
+    console.log("[commitAll] DONE");
   };
 
   /**
-   * Commits variables for a specific scope (tab or panel only)
+   * Commits variables for a specific scope (panel only)
    * This is triggered when user clicks panel-specific refresh
-   * Similar to adding currentVariablesDataRef[panelId] in main branch
    */
-  const commitScope = (scope: "tabs" | "panels", id: string) => {
-    console.log(`[VariablesManager] Committing ${scope} scope: ${id}`);
-
-    if (scope === "tabs") {
-      if (variablesData.tabs[id]) {
-        committedVariablesData.tabs[id] = variablesData.tabs[id].map((v) => ({
-          ...v,
-          value: Array.isArray(v.value) ? [...v.value] : v.value,
-        }));
-      }
-    } else if (scope === "panels") {
+  const commitScope = (scope: "panels", id: string) => {
+    if (scope === "panels") {
       if (variablesData.panels[id]) {
         committedVariablesData.panels[id] = variablesData.panels[id].map(
           (v) => ({
@@ -515,393 +460,64 @@ export const useVariablesManager = () => {
         );
       }
     }
-
-    console.log(`[VariablesManager] Commit complete for ${scope}: ${id}`);
   };
 
-  // ========== LOADING ==========
-  const loadGlobalVariables = async () => {
-    const globalVars = variablesData.global;
-    const independentVars = globalVars.filter((v) => {
-      const key = getVariableKey(v.name, v.scope);
-      const parents = dependencyGraph.value[key]?.parents || [];
-      return parents.length === 0;
-    });
-
-    console.log(
-      "[VariablesManager] Loading global variables:",
-      independentVars.map((v) => v.name).join(", ") || "none",
-    );
-
-    const promises = independentVars.map((v) =>
-      loadSingleVariable(getVariableKey(v.name, v.scope)),
-    );
-
-    await Promise.allSettled(promises);
-  };
-
-  const loadTabVariables = async (tabId: string) => {
-    const tabVars = variablesData.tabs[tabId] || [];
+  // ========== LOADING STATE MANAGEMENT ==========
+  /**
+   * Called by VariablesValueSelector when a variable completes loading
+   * This triggers dependent children to start loading
+   */
+  const onVariablePartiallyLoaded = (variableKey: string) => {
     const allVars = getAllVariablesFlat();
-    const loadableVars = tabVars.filter((v) =>
-      canVariableLoad(
-        v,
-        tabsVisibility.value,
-        panelsVisibility.value,
-        allVars,
-        dependencyGraph.value,
-      ),
-    );
+    const variable = findVariableByKey(variableKey, allVars);
 
-    const promises = loadableVars.map((v) =>
-      loadSingleVariable(getVariableKey(v.name, v.scope, v.tabId, v.panelId)),
-    );
+    if (!variable) return;
 
-    await Promise.allSettled(promises);
-  };
+    // Mark as partially loaded
+    variable.isVariablePartialLoaded = true;
 
-  const loadPanelVariables = async (panelId: string) => {
-    const panelVars = variablesData.panels[panelId] || [];
-    const allVars = getAllVariablesFlat();
-    const loadableVars = panelVars.filter((v) =>
-      canVariableLoad(
-        v,
-        tabsVisibility.value,
-        panelsVisibility.value,
-        allVars,
-        dependencyGraph.value,
-      ),
-    );
+    // Trigger children - ensure they're reset and ready to load with new parent value
+    const children = dependencyGraph.value[variableKey]?.children || [];
 
-    const promises = loadableVars.map((v) =>
-      loadSingleVariable(getVariableKey(v.name, v.scope, v.tabId, v.panelId)),
-    );
-
-    await Promise.allSettled(promises);
-  };
-
-  const loadSingleVariable = (variableKey: string): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      // Cancel previous request
-      if (currentlyExecutingPromises.has(variableKey)) {
-        currentlyExecutingPromises.get(variableKey)!.reject("Cancelled");
-        currentlyExecutingPromises.delete(variableKey);
-      }
-
-      currentlyExecutingPromises.set(variableKey, { reject });
-
-      const allVars = getAllVariablesFlat();
-      const variable = findVariableByKey(variableKey, allVars);
-
-      if (!variable) {
-        reject("Variable not found");
-        return;
-      }
-
-      // Check visibility
-      if (
-        !isVariableVisible(
-          variable,
-          tabsVisibility.value,
-          panelsVisibility.value,
-        )
-      ) {
-        variable.isVariableLoadingPending = true;
-        reject("Not visible");
-        return;
-      }
-
-      // Check dependencies
-      const parents = dependencyGraph.value[variableKey]?.parents || [];
-      const allParentsReady = parents.every((parentKey) => {
-        const parent = findVariableByKey(parentKey, allVars);
-        return parent?.isVariablePartialLoaded === true;
-      });
-
-      if (!allParentsReady) {
-        variable.isVariableLoadingPending = true;
-
-        // Trigger loading of unloaded parents
-        const unloadedParents = parents.filter((parentKey) => {
-          const parent = findVariableByKey(parentKey, allVars);
-          return !parent?.isVariablePartialLoaded && !parent?.isLoading;
-        });
-
-        if (unloadedParents.length > 0) {
-          // Load parents first, then retry loading this variable
-          Promise.allSettled(
-            unloadedParents.map((parentKey) => loadSingleVariable(parentKey)),
-          ).then(() => {
-            // After parents are loaded, retry loading this variable
-            loadSingleVariable(variableKey).then(resolve).catch(reject);
-          });
-        } else {
-          // Parents are loading, just wait
-          reject("Dependencies not ready");
+    children.forEach((childKey) => {
+      const childVar = findVariableByKey(childKey, allVars);
+      if (childVar) {
+        // Check if child can load (has all parents ready and is visible)
+        // Do this check BEFORE resetting to avoid triggering watchers prematurely
+        if (canVariableLoad(childVar)) {
+          // Reset child state to ensure it reloads with the new parent value
+          // This is critical for scoped variables that need fresh data
+          if (childVar.type === "query_values") {
+            // Only reset if not already loading/pending
+            if (!childVar.isLoading && !childVar.isVariableLoadingPending) {
+              childVar.isVariablePartialLoaded = false;
+              childVar.isLoading = false;
+              // Reset value and options to force fresh load
+              if (childVar.multiSelect) {
+                childVar.value = [];
+              } else {
+                childVar.value = null;
+              }
+              childVar.options = [];
+              // Mark as pending to trigger load
+              childVar.isVariableLoadingPending = true;
+            }
+          } else {
+            // Non-query types are immediate
+            childVar.isVariablePartialLoaded = true;
+            onVariablePartiallyLoaded(childKey);
+          }
         }
-        return;
-      }
-
-      // Start loading
-      variable.isLoading = true;
-      variable.isVariableLoadingPending = false;
-
-      // Handle by type
-      if (variable.type === "query_values") {
-        loadQueryValuesVariable(variable, variableKey, resolve, reject);
-      } else if (variable.type === "constant") {
-        // Constant: value should already be set in config
-        // Just mark as loaded
-        finalizeVariableLoading(variable, variableKey, true, resolve);
-      } else if (variable.type === "custom") {
-        // Custom: value should already be set in config
-        // Just mark as loaded
-        finalizeVariableLoading(variable, variableKey, true, resolve);
-      } else if (variable.type === "textbox") {
-        // Textbox: value should already be set in config
-        // Just mark as loaded
-        finalizeVariableLoading(variable, variableKey, true, resolve);
-      } else {
-        // Other immediate types
-        finalizeVariableLoading(variable, variableKey, true, resolve);
       }
     });
   };
 
-  const loadQueryValuesVariable = (
-    variable: VariableRuntimeState,
-    variableKey: string,
-    resolve: Function,
-    reject: Function,
-  ) => {
-    // Note: The actual API call is handled by VariablesValueSelector.vue
-    // This manager just tracks loading states and dependencies
-    // The VariablesValueSelector watches the manager state and calls APIs as needed
-
-    console.log("[VariablesManager] Marking variable as pending:", variableKey);
-
-    // Mark as pending so the selector knows to fire the API
-    // The selector will see isVariableLoadingPending = true and fire the WebSocket API
-    variable.isVariableLoadingPending = true;
-    variable.isLoading = false; // Not loading yet, just pending
-
-    // Immediately resolve - the component will handle the actual loading
-    resolve(true);
-  };
-
-  const buildQueryContext = (
-    variable: VariableRuntimeState,
-    allVariables: VariableRuntimeState[],
-  ) => {
-    const filters: string[] = [];
-
-    // Process filters and replace variable references
-    if (variable.query_data?.filter) {
-      variable.query_data.filter.forEach((filter) => {
-        const filterString = filter.filter || filter.value || "";
-        if (filterString) {
-          // Replace variables in filter
-          const replacedFilter = replaceVariablesInFilter(
-            filterString,
-            variable,
-            allVariables,
-          );
-          filters.push(replacedFilter);
-        }
-      });
-    }
-
-    // Build SQL query context for the API
-    const streamName = variable.query_data?.stream || "";
-    let sqlQuery = "";
-
-    if (filters.length > 0) {
-      // Combine filters with AND
-      const whereClause = filters.join(" AND ");
-      sqlQuery = b64EncodeUnicode(
-        `SELECT * FROM '${streamName}' WHERE ${whereClause}`,
-      );
-    }
-
-    return { filters, sqlQuery };
-  };
-
-  const replaceVariablesInFilter = (
-    filterString: string,
-    currentVariable: VariableRuntimeState,
-    allVariables: VariableRuntimeState[],
-  ): string => {
-    let replaced = filterString;
-
-    // Extract variable names from filter
-    const variableNames = extractVariableNames(filterString);
-
-    variableNames.forEach((varName) => {
-      // Resolve parent variable based on scope hierarchy
-      const parentVar = resolveParentVariable(
-        varName,
-        currentVariable,
-        allVariables,
-      );
-
-      if (
-        parentVar &&
-        parentVar.value !== null &&
-        parentVar.value !== undefined
-      ) {
-        const value = Array.isArray(parentVar.value)
-          ? parentVar.value.join(",")
-          : String(parentVar.value);
-
-        // Replace both $varName and ${varName} formats
-        replaced = replaced.replace(
-          new RegExp(`\\$\\{${varName}\\}`, "g"),
-          value,
-        );
-        replaced = replaced.replace(new RegExp(`\\$${varName}`, "g"), value);
-      } else {
-        // Use sentinel value for null/undefined
-        replaced = replaced.replace(
-          new RegExp(`\\$\\{${varName}\\}`, "g"),
-          SELECT_ALL_VALUE,
-        );
-        replaced = replaced.replace(
-          new RegExp(`\\$${varName}`, "g"),
-          SELECT_ALL_VALUE,
-        );
-      }
-    });
-
-    return replaced;
-  };
-
-  const resolveParentVariable = (
-    parentName: string,
-    childVariable: VariableRuntimeState,
-    allVariables: VariableRuntimeState[],
-  ): VariableRuntimeState | undefined => {
-    // Resolution order (child looking for parent):
-    // 1. If child is global: Look in global only
-    // 2. If child is tab: Look in same tab, then global
-    // 3. If child is panel: Look in same panel, then parent tab, then global
-
-    if (childVariable.scope === "global") {
-      return allVariables.find(
-        (v) => v.name === parentName && v.scope === "global",
-      );
-    }
-
-    if (childVariable.scope === "tabs") {
-      // Check same tab first
-      let parent = allVariables.find(
-        (v) =>
-          v.name === parentName &&
-          v.scope === "tabs" &&
-          v.tabId === childVariable.tabId,
-      );
-      if (parent) return parent;
-
-      // Fall back to global
-      return allVariables.find(
-        (v) => v.name === parentName && v.scope === "global",
-      );
-    }
-
-    if (childVariable.scope === "panels") {
-      // Check same panel first
-      let parent = allVariables.find(
-        (v) =>
-          v.name === parentName &&
-          v.scope === "panels" &&
-          v.panelId === childVariable.panelId,
-      );
-      if (parent) return parent;
-
-      // Check parent tab
-      const tabId = panelTabMapping.value[childVariable.panelId!];
-      if (tabId) {
-        parent = allVariables.find(
-          (v) =>
-            v.name === parentName && v.scope === "tabs" && v.tabId === tabId,
-        );
-        if (parent) return parent;
-      }
-
-      // Fall back to global
-      return allVariables.find(
-        (v) => v.name === parentName && v.scope === "global",
-      );
-    }
-
-    return undefined;
-  };
-
-  // Note: Response handling is done by VariablesValueSelector.vue
-  // This manager just provides state tracking
-
-  const finalizeVariableLoading = (
-    variable: VariableRuntimeState,
-    variableKey: string,
-    success: boolean,
-    resolve: Function,
-  ) => {
-    variable.isLoading = false;
-    variable.isVariablePartialLoaded = success;
-
-    currentlyExecutingPromises.delete(variableKey);
-
-    // Trigger children only if successfully loaded
-    if (success) {
-      const children = dependencyGraph.value[variableKey]?.children || [];
-      const allVars = getAllVariablesFlat();
-
-      children.forEach((childKey) => {
-        const childVar = findVariableByKey(childKey, allVars);
-        // Load child if it's pending due to this parent
-        if (
-          childVar &&
-          childVar.isVariableLoadingPending &&
-          canVariableLoad(
-            childVar,
-            tabsVisibility.value,
-            panelsVisibility.value,
-            allVars,
-            dependencyGraph.value,
-          )
-        ) {
-          loadSingleVariable(childKey).catch(() => {
-            // Ignore errors from child loading
-          });
-        }
-      });
-    }
-
-    resolve(success);
-  };
-
-  // ========== VISIBILITY ==========
-  const setTabVisibility = (tabId: string, visible: boolean) => {
-    tabsVisibility.value[tabId] = visible;
-
-    if (visible) {
-      loadTabVariables(tabId).catch(() => {
-        // Ignore errors
-      });
-    }
-  };
-
-  const setPanelVisibility = (panelId: string, visible: boolean) => {
-    panelsVisibility.value[panelId] = visible;
-
-    if (visible) {
-      loadPanelVariables(panelId).catch(() => {
-        // Ignore errors
-      });
-    }
-  };
-
-  // ========== VALUE UPDATES ==========
-  const updateVariableValue = async (
+  /**
+   * Called when user changes a variable value
+   * Marks dependent children as needing reload
+   * This recursively resets all descendants in the dependency chain
+   */
+  const updateVariableValue = (
     name: string,
     scope: "global" | "tabs" | "panels",
     tabId: string | undefined,
@@ -910,57 +526,102 @@ export const useVariablesManager = () => {
   ) => {
     const variable = getVariable(name, scope, tabId, panelId);
     if (!variable) {
-      console.log("[VariablesManager] Variable not found:", name, scope);
+      console.log(`[updateVariableValue] Variable not found: ${name}@${scope}`);
       return;
     }
+
+    console.log(`[updateVariableValue] Updating ${name}@${scope} from ${JSON.stringify(variable.value)} to ${JSON.stringify(newValue)}`);
     variable.value = newValue;
 
-    // Trigger dependent variables to reload
-    const variableKey = getVariableKey(name, scope, tabId, panelId);
-    const children = dependencyGraph.value[variableKey]?.children || [];
-    const allVars = getAllVariablesFlat();
+    // Recursively reset all descendants
+    const resetDescendants = (parentKey: string) => {
+      const children = dependencyGraph.value[parentKey]?.children || [];
+      const allVars = getAllVariablesFlat();
 
-    console.log(
-      "[VariablesManager] Found",
-      children.length,
-      "children for",
-      variableKey,
-      ":",
-      children,
-    );
+      console.log(`[updateVariableValue] Resetting ${children.length} children of ${parentKey}`);
 
-    const promises = children.map((childKey) => {
-      const childVar = findVariableByKey(childKey, allVars);
-      if (childVar) {
-        console.log(
-          "[VariablesManager] Marking child as pending:",
-          childKey,
-          "scope:",
-          childVar.scope,
-          "tabId:",
-          childVar.tabId,
-          "panelId:",
-          childVar.panelId,
-        );
-        // Reset child's loading state to force reload
-        childVar.isVariablePartialLoaded = false;
-        childVar.isVariableLoadingPending = true;
-      } else {
-        console.warn("[VariablesManager] Child variable not found:", childKey);
-      }
-      return loadSingleVariable(childKey).catch(() => {
-        // Ignore errors
+      children.forEach((childKey) => {
+        const childVar = findVariableByKey(childKey, allVars);
+        if (childVar) {
+          console.log(`[updateVariableValue] Resetting child ${childVar.name}@${childVar.scope} from ${JSON.stringify(childVar.value)} to ${childVar.multiSelect ? '[]' : 'null'}`);
+
+          // Reset child's state completely - do this regardless of visibility
+          // If the child is not visible now, it needs to be reset for when it becomes visible
+          childVar.isVariablePartialLoaded = false;
+          childVar.isLoading = false;
+
+          // Reset value and options
+          if (childVar.multiSelect) {
+            childVar.value = [];
+          } else {
+            childVar.value = null;
+          }
+          childVar.options = [];
+
+          // Mark as pending to trigger reload only if visible
+          // If not visible, it will be marked pending when it becomes visible
+          if (childVar.type === "query_values") {
+            if (isVariableVisible(childVar)) {
+              childVar.isVariableLoadingPending = true;
+            }
+          }
+
+          // Recursively reset this child's descendants
+          resetDescendants(childKey);
+        }
       });
-    });
+    };
 
-    await Promise.allSettled(promises);
-    console.log(
-      "[VariablesManager] Finished updating",
-      name,
-      "and loading",
-      children.length,
-      "children",
-    );
+    // Start the cascade from the changed variable
+    const variableKey = getVariableKey(name, scope, tabId, panelId);
+    resetDescendants(variableKey);
+  };
+
+  // ========== VISIBILITY ==========
+  const setTabVisibility = (tabId: string, visible: boolean) => {
+    tabsVisibility.value[tabId] = visible;
+
+    if (visible) {
+      // Mark ONLY independent tab variables as pending
+      // Dependent variables will be marked by onVariablePartiallyLoaded when parents finish
+      const tabVars = variablesData.tabs[tabId] || [];
+      tabVars.forEach((v) => {
+        if (v.type === "query_values" && !v.isVariablePartialLoaded) {
+          // Only mark as pending if this variable has no parents (is independent)
+          const key = getVariableKey(v.name, v.scope, v.tabId, v.panelId);
+          const parents = dependencyGraph.value[key]?.parents || [];
+
+          if (parents.length === 0) {
+            // Independent variable - safe to mark as pending immediately
+            v.isVariableLoadingPending = true;
+          }
+          // Dependent variables will be triggered by onVariablePartiallyLoaded
+        }
+      });
+    }
+  };
+
+  const setPanelVisibility = (panelId: string, visible: boolean) => {
+    panelsVisibility.value[panelId] = visible;
+
+    if (visible) {
+      // Mark ONLY independent panel variables as pending
+      // Dependent variables will be marked by onVariablePartiallyLoaded when parents finish
+      const panelVars = variablesData.panels[panelId] || [];
+      panelVars.forEach((v) => {
+        if (v.type === "query_values" && !v.isVariablePartialLoaded) {
+          // Only mark as pending if this variable has no parents (is independent)
+          const key = getVariableKey(v.name, v.scope, v.tabId, v.panelId);
+          const parents = dependencyGraph.value[key]?.parents || [];
+
+          if (parents.length === 0) {
+            // Independent variable - safe to mark as pending immediately
+            v.isVariableLoadingPending = true;
+          }
+          // Dependent variables will be triggered by onVariablePartiallyLoaded
+        }
+      });
+    }
   };
 
   // ========== QUERIES ==========
@@ -1002,7 +663,6 @@ export const useVariablesManager = () => {
     panelId: string,
     tabId: string,
   ): VariableRuntimeState[] => {
-    // Merge: global + tab + panel (COMMITTED state)
     const merged = [
       ...committedVariablesData.global,
       ...(tabId && committedVariablesData.tabs[tabId]
@@ -1015,18 +675,7 @@ export const useVariablesManager = () => {
   };
 
   const getVariablesForTab = (tabId: string): VariableRuntimeState[] => {
-    // LIVE state
     return [...variablesData.global, ...(variablesData.tabs[tabId] || [])];
-  };
-
-  const getCommittedVariablesForTab = (
-    tabId: string,
-  ): VariableRuntimeState[] => {
-    // COMMITTED state
-    return [
-      ...committedVariablesData.global,
-      ...(committedVariablesData.tabs[tabId] || []),
-    ];
   };
 
   const getAllVisibleVariables = (
@@ -1034,8 +683,7 @@ export const useVariablesManager = () => {
     panelId?: string,
   ): VariableRuntimeState[] => {
     if (panelId) {
-      const panelTabId = panelTabMapping.value[panelId] || tabId || "";
-      return getVariablesForPanel(panelId, panelTabId);
+      return getVariablesForPanel(panelId, tabId || "");
     } else if (tabId) {
       return getVariablesForTab(tabId);
     } else {
@@ -1054,111 +702,49 @@ export const useVariablesManager = () => {
   };
 
   // ========== URL SYNCHRONIZATION ==========
-  const syncToUrl = (router: any, route: any) => {
-    const queryParams: Record<string, string | string[]> = { ...route.query };
-
-    // Use COMMITTED state for URL sync so that URLs are only updated on commit/refresh
-    // Global variables (committed)
-    committedVariablesData.global.forEach((variable) => {
-      if (variable.type !== "dynamic_filters") {
-        const key = `var-${variable.name}`;
-        queryParams[key] = formatValueForUrl(variable.value);
-      }
-    });
-
-    // Tab variables (committed)
-    Object.entries(committedVariablesData.tabs).forEach(
-      ([tabId, variables]) => {
-        variables.forEach((variable) => {
-          if (variable.type !== "dynamic_filters") {
-            const key = `var-${variable.name}.t.${tabId}`;
-            queryParams[key] = formatValueForUrl(variable.value);
-          }
-        });
-      },
-    );
-
-    // Panel variables (committed)
-    Object.entries(committedVariablesData.panels).forEach(
-      ([panelId, variables]) => {
-        variables.forEach((variable) => {
-          if (variable.type !== "dynamic_filters") {
-            const key = `var-${variable.name}.p.${panelId}`;
-            queryParams[key] = formatValueForUrl(variable.value);
-          }
-        });
-      },
-    );
-
-    router.replace({
-      query: queryParams,
-    });
-  };
-
-  const formatValueForUrl = (value: any): string | string[] => {
-    if (Array.isArray(value)) {
-      // Return array directly - Vue Router will handle multiple params
-      // URL will be: ?var-name=value1&var-name=value2 instead of ?var-name=value1,value2
-      return value.map((v) => String(v));
-    }
-    return String(value);
-  };
-
   const loadFromUrl = (route: any) => {
+    console.log("[loadFromUrl] START - URL query:", route.query);
     const query = route.query;
-    console.log(
-      "[VariablesManager] Loading values from URL:",
-      Object.keys(query).filter((k) => k.startsWith("var-")),
-    );
 
     Object.entries(query).forEach(([key, value]) => {
       if (!key.startsWith("var-")) return;
 
       const parsed = parseVariableUrlKey(key);
       if (!parsed) {
-        console.warn("[VariablesManager] Failed to parse URL key:", key);
+        console.log(`[loadFromUrl] ✗ Failed to parse key: ${key}`);
         return;
       }
 
-      // Drilldown scenario: If scope is global but variable name doesn't exist as global,
-      // apply to all tab/panel instances of that variable name
+      console.log(`[loadFromUrl] Parsed ${key} -> name='${parsed.name}', scope='${parsed.scope}', tabId='${parsed.tabId}', panelId='${parsed.panelId}', value=${JSON.stringify(value)}`);
+
       if (parsed.scope === "global") {
-        const globalVar = getVariable(parsed.name, "global");
-
-        if (globalVar) {
-          // Normal global variable - set its value
-          applyUrlValueToVariable(globalVar, value);
+        const variable = getVariable(parsed.name, "global");
+        if (variable) {
+          const parsedValue = parseValue(value, variable.multiSelect);
+          variable.value = parsedValue;
+          console.log(`[loadFromUrl] ✓ Set global var '${parsed.name}' = ${JSON.stringify(parsedValue)}`);
         } else {
-          // No global variable with this name - apply to all tab/panel instances
-          // This handles drilldown URLs like var-region=CA that should apply to all tabs
-          let appliedToAny = false;
-
-          // Apply to all tab instances with this name
-          Object.values(variablesData.tabs).forEach((tabVars) => {
-            const tabVar = tabVars.find((v) => v.name === parsed.name);
-            if (tabVar) {
-              applyUrlValueToVariable(tabVar, value);
-              appliedToAny = true;
-            }
-          });
-
-          // Apply to all panel instances with this name
-          Object.values(variablesData.panels).forEach((panelVars) => {
-            const panelVar = panelVars.find((v) => v.name === parsed.name);
-            if (panelVar) {
-              applyUrlValueToVariable(panelVar, value);
-              appliedToAny = true;
-            }
-          });
-
-          if (!appliedToAny) {
-            console.warn(
-              "[VariablesManager] Variable not found for URL key:",
-              key,
-              parsed,
-            );
-          }
+          console.log(`[loadFromUrl] ✗ Global variable '${parsed.name}' not found`);
         }
+
+        // ALSO apply to all tab/panel instances of same name (drilldown compatibility)
+        Object.values(variablesData.tabs).forEach((tabVars) => {
+          const tabVar = tabVars.find((v) => v.name === parsed.name);
+          if (tabVar) {
+            const parsedValue = parseValue(value, tabVar.multiSelect);
+            tabVar.value = parsedValue;
+            console.log(`[loadFromUrl] ✓ Set tab var '${parsed.name}' = ${JSON.stringify(parsedValue)}`);
+          }
+        });
+
+        Object.values(variablesData.panels).forEach((panelVars) => {
+          const panelVar = panelVars.find((v) => v.name === parsed.name);
+          if (panelVar) {
+            const parsedValue = parseValue(value, panelVar.multiSelect);
+            panelVar.value = parsedValue;
+            console.log(`[loadFromUrl] ✓ Set panel var '${parsed.name}' = ${JSON.stringify(parsedValue)}`);
+          }
+        });
       } else {
         // Scoped variable in URL - apply to that specific instance
         const variable = getVariable(
@@ -1167,99 +753,20 @@ export const useVariablesManager = () => {
           parsed.tabId,
           parsed.panelId,
         );
-        if (!variable) {
-          console.warn(
-            "[VariablesManager] Variable not found for URL key:",
-            key,
-            parsed,
-          );
-          return;
+        if (variable) {
+          const parsedValue = parseValue(value, variable.multiSelect);
+          variable.value = parsedValue;
+          console.log(`[loadFromUrl] ✓ Set ${parsed.scope} var '${parsed.name}' (${parsed.scope === 'tabs' ? 'tab=' + parsed.tabId : 'panel=' + parsed.panelId}) = ${JSON.stringify(parsedValue)}`);
+        } else {
+          console.log(`[loadFromUrl] ✗ ${parsed.scope} variable '${parsed.name}' not found`);
         }
-        applyUrlValueToVariable(variable, value);
       }
     });
-  };
 
-  const applyUrlValueToVariable = (
-    variable: VariableRuntimeState,
-    value: any,
-  ) => {
-    // Parse value - handle both array format (multiple params) and comma-separated (legacy)
-    let parsedValue: any;
-    if (variable.multiSelect) {
-      if (Array.isArray(value)) {
-        // URL format: ?var-name=value1&var-name=value2
-        parsedValue = value;
-      } else if (typeof value === "string" && value.includes(",")) {
-        // Legacy format: ?var-name=value1,value2
-        parsedValue = value.split(",");
-      } else {
-        // Single value as array
-        parsedValue = [value];
-      }
-    } else {
-      // Single select - take first value if array
-      parsedValue = Array.isArray(value) ? value[0] : value;
-    }
-
-    console.log(
-      "[VariablesManager] Setting",
-      variable.name,
-      "(scope:",
-      variable.scope,
-      variable.tabId || variable.panelId || "",
-      ") from URL to:",
-      parsedValue,
-    );
-    variable.value = parsedValue;
-
-    // Also apply to committed state so that panels/readers see the URL value immediately
-    try {
-      if (variable.scope === "global") {
-        const committed = committedVariablesData.global.find(
-          (v) => v.name === variable.name,
-        );
-        if (committed)
-          committed.value = Array.isArray(parsedValue)
-            ? [...parsedValue]
-            : parsedValue;
-      } else if (variable.scope === "tabs" && variable.tabId) {
-        committedVariablesData.tabs[variable.tabId] =
-          committedVariablesData.tabs[variable.tabId] || [];
-        const committed = committedVariablesData.tabs[variable.tabId].find(
-          (v) => v.name === variable.name,
-        );
-        if (committed)
-          committed.value = Array.isArray(parsedValue)
-            ? [...parsedValue]
-            : parsedValue;
-      } else if (variable.scope === "panels" && variable.panelId) {
-        committedVariablesData.panels[variable.panelId] =
-          committedVariablesData.panels[variable.panelId] || [];
-        const committed = committedVariablesData.panels[variable.panelId].find(
-          (v) => v.name === variable.name,
-        );
-        if (committed)
-          committed.value = Array.isArray(parsedValue)
-            ? [...parsedValue]
-            : parsedValue;
-      }
-    } catch (err) {
-      console.warn(
-        "[VariablesManager] Failed to set committed state for URL-applied variable",
-        err,
-      );
-    }
-
-    // Mark variable as needing reload to apply the URL value in its query
-    // This ensures dependent children also reload with the new parent value
-    if (variable.type === "query_values") {
-      variable.isVariableLoadingPending = true;
-      variable.isVariablePartialLoaded = false;
-    } else {
-      // For non-query types (constant, textbox, custom), mark as loaded
-      variable.isVariablePartialLoaded = true;
-    }
+    console.log("[loadFromUrl] DONE - variablesData state after load:");
+    console.log("  Global:", variablesData.global.map(v => ({ name: v.name, value: v.value })));
+    console.log("  Tabs:", Object.entries(variablesData.tabs).map(([id, vars]) => ({ tabId: id, vars: vars.map(v => ({ name: v.name, value: v.value })) })));
+    console.log("  Panels:", Object.entries(variablesData.panels).map(([id, vars]) => ({ panelId: id, vars: vars.map(v => ({ name: v.name, value: v.value })) })));
   };
 
   interface ParsedUrlKey {
@@ -1270,10 +777,8 @@ export const useVariablesManager = () => {
   }
 
   const parseVariableUrlKey = (key: string): ParsedUrlKey | null => {
-    // Remove "var-" prefix
     const withoutPrefix = key.replace(/^var-/, "");
 
-    // Check for tab scope: var-region.t.tab-1
     const tabMatch = withoutPrefix.match(/^(.+)\.t\.(.+)$/);
     if (tabMatch) {
       return {
@@ -1283,7 +788,6 @@ export const useVariablesManager = () => {
       };
     }
 
-    // Check for panel scope: var-city.p.panel-123
     const panelMatch = withoutPrefix.match(/^(.+)\.p\.(.+)$/);
     if (panelMatch) {
       return {
@@ -1293,41 +797,45 @@ export const useVariablesManager = () => {
       };
     }
 
-    // Global scope (no suffix)
     return {
       name: withoutPrefix,
       scope: "global",
     };
   };
 
+  const parseValue = (value: any, multiSelect?: boolean): any => {
+    if (multiSelect) {
+      return Array.isArray(value) ? value : [value];
+    }
+    return Array.isArray(value) ? value[0] : value;
+  };
+
+  // ========== RETURN API ==========
   return {
+    // State
     variablesData,
-    committedVariablesData, // Expose committed state
+    committedVariablesData,
     dependencyGraph: computed(() => dependencyGraph.value),
     tabsVisibility: computed(() => tabsVisibility.value),
     panelsVisibility: computed(() => panelsVisibility.value),
     isLoading,
-    hasUncommittedChanges, // For yellow icon indicator
+    hasUncommittedChanges,
+
+    // Methods
     initialize,
-    loadGlobalVariables,
-    loadTabVariables,
-    loadPanelVariables,
-    loadSingleVariable,
+    commitAll,
+    commitScope,
+    onVariablePartiallyLoaded,
+    updateVariableValue,
     setTabVisibility,
     setPanelVisibility,
-    updateVariableValue,
     getVariable,
-    getVariableKey,
     getVariablesForPanel,
-    getCommittedVariablesForPanel, // Use this for panels (not live state!)
+    getCommittedVariablesForPanel,
     getVariablesForTab,
-    getCommittedVariablesForTab, // Use this for committed tab state
     getAllVisibleVariables,
     isVariableReady,
     getDependentVariables,
-    syncToUrl,
     loadFromUrl,
-    commitAll, // Commit all live changes (Dashboard Refresh)
-    commitScope, // Commit specific scope (Panel Refresh)
   };
 };

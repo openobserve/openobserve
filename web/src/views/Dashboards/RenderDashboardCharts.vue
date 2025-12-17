@@ -501,23 +501,39 @@ export default defineComponent({
 
     // Helper to get LIVE (uncommitted) variables for a panel
     // Used for detecting changes and showing yellow refresh icon
-    const getLiveVariablesForPanel = (panelId: string) => {
+    const getLiveVariablesForPanel = () => {
       if (!variablesManager) {
         // Legacy mode: use variablesData ref
         return variablesData.value;
       }
 
-      // Get live variables for the selected tab and panel
-      // This allows panel to detect uncommitted changes including panel-scoped ones
-      const liveVars = variablesManager.getVariablesForPanel(
-        panelId,
-        selectedTabId.value,
-      );
+      // Get live variables for the selected tab
+      // This allows panel to detect uncommitted changes
+      const liveVars = variablesManager.getVariablesForPanel('', selectedTabId.value);
 
       // Convert to old format for backward compatibility
       return {
         isVariablesLoading: variablesManager.isLoading.value,
-        values: liveVars,
+        values: liveVars
+      };
+    };
+
+    // Helper to get LIVE (uncommitted) variables for a panel
+    // Used for detecting changes and showing yellow refresh icon
+    const getLiveVariablesForPanel = () => {
+      if (!variablesManager) {
+        // Legacy mode: use variablesData ref
+        return variablesData.value;
+      }
+
+      // Get live variables for the selected tab
+      // This allows panel to detect uncommitted changes
+      const liveVars = variablesManager.getVariablesForPanel('', selectedTabId.value);
+
+      // Convert to old format for backward compatibility
+      return {
+        isVariablesLoading: variablesManager.isLoading.value,
+        values: liveVars
       };
     };
 
