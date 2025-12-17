@@ -1302,7 +1302,7 @@
     },
     "triggerAlert": "Tetikleyici",
     "alertTriggeredSuccess": "Uyarı başarıyla tetiklendi",
-        "incidents": {
+    "incidents": {
       "title": "Olaylar",
       "header": "Uyarı Olayları",
       "noIncidents": "Olay bulunamadı",

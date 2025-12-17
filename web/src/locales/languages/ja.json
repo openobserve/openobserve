@@ -1312,7 +1312,7 @@
     },
     "triggerAlert": "トリガー",
     "alertTriggeredSuccess": "アラートは正常にトリガーされました",
-        "incidents": {
+    "incidents": {
       "title": "インシデント",
       "header": "アラートインシデント",
       "noIncidents": "インシデントは見つかりませんでした",

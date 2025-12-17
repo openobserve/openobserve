@@ -1302,7 +1302,7 @@
     },
     "triggerAlert": "Auslösen",
     "alertTriggeredSuccess": "Warnung wurde erfolgreich ausgelöst",
-       "incidents": {
+    "incidents": {
       "title": "Vorfälle",
       "header": "Vorfälle warnen",
       "noIncidents": "Keine Vorfälle gefunden",

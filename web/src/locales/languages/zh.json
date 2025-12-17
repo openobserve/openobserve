@@ -1298,7 +1298,7 @@
     },
     "triggerAlert": "触发器",
     "alertTriggeredSuccess": "警报成功触发",
-        "incidents": {
+    "incidents": {
       "title": "事件",
       "header": "警报事件",
       "noIncidents": "未发现任何事件",
