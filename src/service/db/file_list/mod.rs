@@ -135,13 +135,15 @@ pub async fn cache_stats() -> Result<()> {
 async fn single_cache_stats() -> Result<()> {
     let orgs = crate::service::db::schema::list_organizations_from_cache().await;
     for org_id in orgs {
-        let ret = infra::file_list::get_stream_stats(&org_id, None, None).await;
-        if ret.is_err() {
-            log::error!("Load stream stats from db  error: {}", ret.err().unwrap());
-            continue;
-        }
+        let ret = match infra::file_list::get_stream_stats(&org_id, None, None).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("Load stream stats from db  error: {e:?}");
+                continue;
+            }
+        };
 
-        for (stream, stats) in ret.unwrap() {
+        for (stream, stats) in ret {
             let columns = stream.split('/').collect::<Vec<&str>>();
             let org_id = columns[0];
             let stream_type = columns[1];

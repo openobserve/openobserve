@@ -696,18 +696,12 @@ alt="Quick Mode" class="toolbar-icon" />
           @select:function="populateFunctionImplementation"
           @save:function="fnSavedFunctionDialog"
         />
-        <q-btn
+        <share-button
           data-test="logs-search-bar-share-link-btn"
-          class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border"
-          size="xs"
-          @click="shareLink.execute()"
-          :loading="shareLink.isLoading.value"
-          icon="share"
-        >
-          <q-tooltip>
-            {{ t("search.shareLink") }}
-          </q-tooltip>
-        </q-btn>
+          :url="shareURL"
+          button-class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border"
+          button-size="xs"
+        />
 
         <q-btn
           data-test="logs-search-bar-more-options-btn"
@@ -1671,6 +1665,7 @@ import { useStore } from "vuex";
 import { useQuasar, copyToClipboard, is, QTooltip } from "quasar";
 
 import DateTime from "@/components/DateTime.vue";
+import ShareButton from "@/components/common/ShareButton.vue";
 import useLogs from "@/composables/useLogs";
 import useStreams from "@/composables/useStreams";
 import SyntaxGuide from "./SyntaxGuide.vue";
@@ -1739,6 +1734,7 @@ export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
     DateTime,
+    ShareButton,
     SyntaxGuide,
     AutoRefreshInterval,
     ConfirmDialog,
@@ -3610,7 +3606,11 @@ export default defineComponent({
       }
     };
 
-    const shareLink = useLoading(async () => {
+    /**
+     * Computed property for share URL
+     * Generates the full shareable URL with all query parameters
+     */
+    const shareURL = computed(() => {
       const queryObj = generateURLQuery(true, dashboardPanelData);
       // Removed the 'type' property from the object to avoid issues when navigating from the stream to the logs page,
       // especially when the user performs multi-select on streams and shares the URL.
@@ -3622,41 +3622,13 @@ export default defineComponent({
         )
         .join("&");
 
-      let shareURL = window.location.origin + window.location.pathname;
+      let url = window.location.origin + window.location.pathname;
 
       if (queryString != "") {
-        shareURL += "?" + queryString;
+        url += "?" + queryString;
       }
 
-      await shortURLService
-        .create(store.state.selectedOrganization.identifier, shareURL)
-        .then((res: any) => {
-          if (res.status == 200) {
-            shareURL = res.data.short_url;
-            copyToClipboard(shareURL)
-              .then(() => {
-                $q.notify({
-                  type: "positive",
-                  message: t("search.linkCopiedSuccessfully"),
-                  timeout: 5000,
-                });
-              })
-              .catch(() => {
-                $q.notify({
-                  type: "negative",
-                  message: t("search.errorCopyingLink"),
-                  timeout: 5000,
-                });
-              });
-          }
-        })
-        .catch(() => {
-          $q.notify({
-            type: "negative",
-            message: t("search.errorShorteningLink"),
-            timeout: 5000,
-          });
-        });
+      return url;
     });
     const showSearchHistoryfn = () => {
       emit("showSearchHistory");
@@ -4099,6 +4071,7 @@ export default defineComponent({
       );
       disable.value = panelsValues.some((item: any) => item === true);
     });
+
     const iconRight = computed(() => {
       return (
         "img:" +
@@ -4340,7 +4313,7 @@ export default defineComponent({
       savedFunctionName,
       savedFunctionSelectedName,
       saveFunctionLoader,
-      shareLink,
+      shareURL,
       showSearchHistoryfn,
       getImageURL,
       resetFilters,

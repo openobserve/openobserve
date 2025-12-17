@@ -722,7 +722,7 @@ pub async fn search_partition(
                 &sql.org_id,
                 stream_type,
                 &stream_name,
-                sql.time_range,
+                sql.time_range.unwrap_or_default(),
             )
             .await?;
             max_query_range = max(

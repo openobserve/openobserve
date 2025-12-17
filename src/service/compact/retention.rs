@@ -25,14 +25,14 @@ use config::{
     utils::time::{BASE_TIME, day_micros, get_ymdh_from_micros, hour_micros},
 };
 use infra::{
-    cache, dist_lock, file_list as infra_file_list,
+    dist_lock, file_list as infra_file_list,
     table::compactor_manual_jobs::Status as CompactorManualJobStatus,
 };
 use itertools::Itertools;
 
 use crate::{
     common::infra::cluster::get_node_by_uuid,
-    service::{db, file_list},
+    service::{db, file_list, file_list_dump::generate_dump_stream_name},
 };
 
 /// This function will split the original time range based on the exclude range
@@ -149,27 +149,34 @@ pub async fn generate_retention_job(
     stream_name: &str,
     extended_retentions: &[TimeRange],
 ) -> Result<(), anyhow::Error> {
+    let cfg = get_config();
     // get min date from file_list
     let min_date = infra::file_list::get_min_date(org_id, stream_type, stream_name, None).await?;
+    let min_date = if !cfg.compact.file_list_dump_enabled {
+        min_date
+    } else {
+        // get min date from dump stream
+        let dump_stream_name = generate_dump_stream_name(stream_type, stream_name);
+        let dump_min_date =
+            infra::file_list::get_min_date(org_id, StreamType::Filelist, &dump_stream_name, None)
+                .await?;
+        if min_date.is_empty() {
+            dump_min_date
+        } else if dump_min_date.is_empty() {
+            min_date
+        } else if min_date > dump_min_date {
+            dump_min_date
+        } else {
+            min_date
+        }
+    };
+
     if min_date.is_empty() {
         return Ok(()); // no data, just skip
     }
     let min_date = format!("{min_date}/00/00+0000");
     let created_at =
         DateTime::parse_from_str(&min_date, "%Y/%m/%d/%H/%M/%S%z")?.with_timezone(&Utc);
-    if created_at >= *lifecycle_end {
-        return Ok(()); // created_at is after lifecycle end, just skip
-    }
-
-    log::debug!(
-        "[COMPACTOR] generate_retention_job {}/{}/{}/{},{}",
-        org_id,
-        stream_type,
-        stream_name,
-        created_at.format("%Y-%m-%d").to_string().as_str(),
-        lifecycle_end.format("%Y-%m-%d").to_string().as_str(),
-    );
-
     if created_at.ge(lifecycle_end) {
         return Ok(()); // created_at is after lifecycle end, just skip
     }
@@ -248,7 +255,7 @@ pub async fn generate_retention_job(
             .await?;
             if created {
                 log::info!(
-                    "[COMPACTOR] generate_retention_job: generate job for {org_id}/{stream_type}/{stream_name}/{time_range_start},{time_range_end}",
+                    "[COMPACTOR] generate_retention_job: generated job for {org_id}/{stream_type}/{stream_name}/{time_range_start},{time_range_end}",
                 );
             }
         }
@@ -303,7 +310,7 @@ pub async fn delete_all(
 
     // delete from file list
     delete_from_file_list(org_id, stream_type, stream_name, (start_time, end_time)).await?;
-    super::super::file_list_dump::delete_all_for_stream(org_id, stream_type, stream_name).await?;
+    super::dump::delete_all(org_id, stream_type, stream_name).await?;
     log::info!("deleted file list for: {org_id}/{stream_type}/{stream_name}/all");
 
     // mark delete done
@@ -352,7 +359,8 @@ pub async fn delete_by_date(
         return handle_delete_by_date_done(org_id, stream_type, stream_name, date_range).await;
     }
 
-    let mut date_start = if date_range.0.ends_with("00Z") {
+    let is_hourly = date_range.0.ends_with("00Z") || date_range.1.ends_with("00Z");
+    let mut date_start = if is_hourly {
         DateTime::parse_from_rfc3339(date_range.0)?.with_timezone(&Utc)
     } else {
         DateTime::parse_from_rfc3339(&format!("{}T00:00:00Z", date_range.0))?.with_timezone(&Utc)
@@ -361,7 +369,7 @@ pub async fn delete_by_date(
     if date_range.0.starts_with("1970-01-01") {
         date_start += Duration::try_milliseconds(1).unwrap();
     }
-    let date_end = if date_range.1.ends_with("00Z") {
+    let date_end = if is_hourly {
         DateTime::parse_from_rfc3339(date_range.1)?.with_timezone(&Utc)
     } else {
         DateTime::parse_from_rfc3339(&format!("{}T00:00:00Z", date_range.1))?.with_timezone(&Utc)
@@ -372,19 +380,6 @@ pub async fn delete_by_date(
             date_end.timestamp_micros() - 1,
         )
     };
-
-    // check stream stats offset, if the merge offset greater than the stream stats offset, we
-    // need to wait for the stream stats to be updated first
-    let (stream_stats_offset, _) = db::compact::stats::get_offset().await;
-    if time_range.1 > stream_stats_offset {
-        // simple skip and don't release it, because release will cause it retry immediately, if
-        // we skip it, it need to wait for 10 minutes
-        log::warn!(
-            "[COMPACTOR] delete_by_date: stream {org_id}/{stream_type}/{stream_name}, time range {:?}, skipped, it needs to wait stream_stats offset: {stream_stats_offset}",
-            time_range
-        );
-        return Ok(());
-    }
 
     if is_local_disk_storage() {
         let dirs_to_delete =
@@ -415,14 +410,12 @@ pub async fn delete_by_date(
             log::error!("[COMPACTOR] delete_by_date delete_from_file_list failed: {e}");
             e
         })?;
-
-    super::super::file_list_dump::delete_in_time_range(
-        org_id,
-        stream_type,
-        stream_name,
-        (date_start.timestamp_micros(), date_end.timestamp_micros()),
-    )
-    .await?;
+    super::dump::delete_by_time_range(org_id, stream_type, stream_name, time_range, is_hourly)
+        .await
+        .map_err(|e| {
+            log::error!("[COMPACTOR] delete_by_date delete_file_list_dump failed: {e}");
+            e
+        })?;
 
     // archive old schema versions
     let mut schema_versions =
@@ -442,19 +435,18 @@ pub async fn delete_by_date(
     }
 
     // update stream stats retention time
-    let mut stats = cache::stats::get_stream_stats(org_id, stream_name, stream_type);
-    // we use date_end as the new min doc time
-    let min_ts = date_end.timestamp_micros();
-    infra_file_list::reset_stream_stats_min_ts(
+    let stats_data_range = ("".to_string(), super::stats::get_yesterday_boundary());
+    if let Err(e) = super::stats::update_stats_from_file_list_for_stream(
         org_id,
-        format!("{org_id}/{stream_type}/{stream_name}").as_str(),
-        min_ts,
+        stream_type,
+        stream_name,
+        stats_data_range,
+        false,
     )
-    .await?;
-    // update stream stats in cache
-    if min_ts > stats.doc_time_min {
-        stats.doc_time_min = min_ts;
-        cache::stats::set_stream_stats(org_id, stream_name, stream_type, stats);
+    .await
+    {
+        log::error!("[COMPACTOR] delete_by_date update stats failed: {e}");
+        return Err(e);
     }
 
     // mark delete done
@@ -477,8 +469,8 @@ pub async fn delete_from_file_list(
     let files = file_list::query(
         &fake_trace_id,
         org_id,
-        stream_name,
         stream_type,
+        stream_name,
         PartitionTimeLevel::Unset,
         time_range.0,
         time_range.1,
@@ -525,10 +517,18 @@ async fn write_file_list(
                 .compact
                 .file_list_deleted_mode
                 .eq(&FileListBookKeepMode::History.to_string())
-                && let Err(e) = infra_file_list::batch_add_history(&events).await
             {
-                log::error!("[COMPACTOR] file_list batch_add_history failed: {}", e);
-                return Err(e.into());
+                let events = events
+                    .iter()
+                    .map(|v| FileKey {
+                        deleted: false,
+                        ..v.clone()
+                    })
+                    .collect::<Vec<_>>();
+                if let Err(e) = infra_file_list::batch_add_history(&events).await {
+                    log::error!("[COMPACTOR] file_list batch_add_history failed: {}", e);
+                    return Err(e.into());
+                }
             }
             // delete from file_list table
             if let Err(e) = infra_file_list::batch_process(&events).await {
