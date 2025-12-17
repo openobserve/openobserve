@@ -276,7 +276,8 @@
     "actionLabel": "行动",
     "transformLabel": "转型",
     "addToDashboard": "添加到控制面板",
-    "selectStream": "选择直播"
+    "selectStream": "选择直播",
+    "pattern_summary": "在 {totalTime} 毫秒内显示在 {LogsAnalyzed} 事件中找到的 {TotalEvents} 事件和 {PatternsFound} 模式中的 1 到 50 个。"
   },
   "menu": {
     "home": "主页",
