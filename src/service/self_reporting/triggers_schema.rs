@@ -88,16 +88,22 @@ async fn initialize_triggers_stream_schema(org_id: &str) -> Result<()> {
     let stream_name = usage::TRIGGERS_STREAM;
     let stream_type = StreamType::Logs;
 
-    // Check if stream exists
+    // Check if stream exists with a non-empty schema
     let schema_result = infra::schema::get(org_id, stream_name, stream_type).await;
 
-    if schema_result.is_ok() {
-        // Stream already exists, schema will evolve naturally through ingestion
-        log::debug!("[SELF-REPORTING] Triggers stream {org_id}/{stream_name} already exists");
-        return Ok(());
+    if let Ok(ref schema) = schema_result {
+        let field_count = schema.fields().len();
+
+        if field_count > 0 {
+            // Stream already exists with fields, schema will evolve naturally through ingestion
+            log::debug!(
+                "[SELF-REPORTING] Triggers stream {org_id}/{stream_name} already exists with {field_count} fields"
+            );
+            return Ok(());
+        }
     }
 
-    // Stream doesn't exist - create schema using reflection
+    // Stream doesn't exist or has no fields - create schema using reflection
     log::info!(
         "[SELF-REPORTING] Creating triggers stream schema for {org_id}/{stream_name} via reflection"
     );
