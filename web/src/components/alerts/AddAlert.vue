@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             border: 1.5px solid;
             border-radius: 50%;
             width: 22px;
-            height: 22px;
+            height: 22px; 
           "
           title="Go Back"
           @click="router.back()"
@@ -111,9 +111,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="wizardStep > 1"
         >
           <!-- 70/30 Split Layout with Equal Heights -->
-          <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow: hidden;">
+          <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
             <!-- Left Column: Step Content (70%) -->
-            <div class="tw-flex-[0_0_70%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
+            <div class="tw-flex-[0_0_68%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
                 <AlertSetup
                   ref="step1Ref"
@@ -157,9 +157,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="wizardStep > 2"
         >
           <!-- 70/30 Split Layout with Equal Heights -->
-          <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow: hidden;">
+          <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
             <!-- Left Column: Step Content (70%) -->
-            <div class="tw-flex-[0_0_70%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
+            <div class="tw-flex-[0_0_68%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
                 <QueryConfig
                   :tab="scheduledAlertRef?.tab || 'custom'"
@@ -209,9 +209,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="wizardStep > 3"
         >
           <!-- 70/30 Split Layout with Equal Heights -->
-          <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow: hidden;">
+          <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
             <!-- Left Column: Step Content (70%) -->
-            <div class="tw-flex-[0_0_70%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
+            <div class="tw-flex-[0_0_68%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
                 <AlertSettings
                   :formData="formData"
@@ -254,9 +254,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="wizardStep > 4"
         >
           <!-- 70/30 Split Layout with Equal Heights -->
-          <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow: hidden;">
+          <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
             <!-- Left Column: Step Content (70%) -->
-            <div class="tw-flex-[0_0_70%] tw-flex tw-flex-col" style="height: 100%; overflow: hidden;">
+            <div class="tw-flex-[0_0_68%] tw-flex tw-flex-col" style="height: 100%; overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
                 <CompareWithPast
                   :multiTimeRange="formData.query_condition.multi_time_range"
@@ -294,9 +294,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="wizardStep > 5"
         >
           <!-- 70/30 Split Layout with Equal Heights -->
-          <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow: hidden;">
+          <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
             <!-- Left Column: Step Content (70%) -->
-            <div class="tw-flex-[0_0_70%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
+            <div class="tw-flex-[0_0_68%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
                 <Deduplication
                   :deduplication="formData.deduplication"
@@ -330,9 +330,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="false"
         >
           <!-- 70/30 Split Layout with Equal Heights -->
-          <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow: hidden;">
+          <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
             <!-- Left Column: Step Content (70%) -->
-            <div class="tw-flex-[0_0_70%] tw-flex tw-flex-col" style="height: 100%; overflow: hidden;">
+            <div class="tw-flex-[0_0_68%] tw-flex tw-flex-col" style="height: 100%; overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
                 <Advanced
                   :contextAttributes="formData.context_attributes"

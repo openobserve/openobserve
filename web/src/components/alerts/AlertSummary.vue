@@ -15,9 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="alert-summary card-container">
-    <div class="summary-header">Alert Summary</div>
-    <div class="summary-separator"></div>
+  <div class="alert-summary">
     <div class="summary-content">
       <p v-if="summaryText" class="summary-text" v-html="summaryText" @click="handleSummaryClick"></p>
       <p v-else class="summary-placeholder">{{ t('alerts.summary.configureAlert') }}</p>
@@ -78,31 +76,9 @@ const handleSummaryClick = (event: MouseEvent) => {
 
 <style scoped lang="scss">
 .alert-summary {
-  padding: 0.75rem 1rem;
   height: 100%;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
-}
-
-.summary-header {
-  font-size: 0.875rem;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-  flex-shrink: 0;
-}
-
-.summary-separator {
-  height: 0.0625rem;
-  background: linear-gradient(
-    to right,
-    transparent,
-    color-mix(in srgb, currentColor 15%, transparent) 10%,
-    color-mix(in srgb, currentColor 15%, transparent) 90%,
-    transparent
-  );
-  margin-bottom: 0.75rem;
-  flex-shrink: 0;
 }
 
 .summary-content {
@@ -110,6 +86,7 @@ const handleSummaryClick = (event: MouseEvent) => {
   line-height: 1.8;
   flex: 1;
   overflow-y: auto;
+  padding: 1rem;
 }
 
 .summary-text {

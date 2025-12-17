@@ -15,33 +15,72 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <!-- Right Column: Preview & Summary (30%) -->
-  <div class="tw-flex-[0_0_30%] tw-flex tw-flex-col tw-gap-2" style="height: calc(100vh - 302px); position: sticky; top: 0; overflow: hidden;">
-    <!-- Preview Alert -->
-    <preview-alert
-      style="flex: 1; height: 50%; overflow: auto;"
-      ref="previewAlertRef"
-      :formData="formData"
-      :query="previewQuery"
-      :selectedTab="selectedTab"
-      :isAggregationEnabled="isAggregationEnabled"
-    />
+  <!-- Right Column: Preview & Summary (calc to account for gap) -->
+  <div class="tw-flex-[0_0_calc(32%-0.625rem)] tw-flex tw-flex-col tw-gap-2" style="height: calc(100vh - 302px); position: sticky; top: 0;">
+    <!-- Preview Section -->
+    <div
+      class="collapsible-section card-container"
+      :style="previewSectionStyle"
+    >
+      <div class="section-header tw-flex tw-items-center tw-justify-between tw-px-4 tw-py-3">
+        <span class="tw-text-sm tw-font-semibold">Preview</span>
+        <q-btn
+          flat
+          dense
+          round
+          size="xs"
+          :icon="expandState.preview ? 'expand_less' : 'expand_more'"
+          @click="togglePreview"
+          class="expand-toggle-btn"
+        />
+      </div>
+      <div v-show="expandState.preview" class="section-content">
+        <preview-alert
+          style="height: 100%; overflow: auto;"
+          ref="previewAlertRef"
+          :formData="formData"
+          :query="previewQuery"
+          :selectedTab="selectedTab"
+          :isAggregationEnabled="isAggregationEnabled"
+        />
+      </div>
+    </div>
 
-    <!-- Alert Summary -->
-    <alert-summary
-      style="flex: 1; height: 50%; overflow: auto;"
-      :formData="formData"
-      :destinations="destinations"
-      :focusManager="focusManager"
-      :wizardStep="wizardStep"
-      :previewQuery="previewQuery"
-      :generatedSqlQuery="generatedSqlQuery"
-    />
+    <!-- Summary Section -->
+    <div
+      class="collapsible-section card-container"
+      :style="summarySectionStyle"
+    >
+      <div class="section-header tw-flex tw-items-center tw-justify-between tw-px-4 tw-py-3">
+        <span class="tw-text-sm tw-font-semibold">Summary</span>
+        <q-btn
+          flat
+          dense
+          round
+          size="xs"
+          :icon="expandState.summary ? 'expand_less' : 'expand_more'"
+          @click="toggleSummary"
+          class="expand-toggle-btn"
+        />
+      </div>
+      <div v-show="expandState.summary" class="section-content">
+        <alert-summary
+          style="height: 100%; overflow: auto;"
+          :formData="formData"
+          :destinations="destinations"
+          :focusManager="focusManager"
+          :wizardStep="wizardStep"
+          :previewQuery="previewQuery"
+          :generatedSqlQuery="generatedSqlQuery"
+        />
+      </div>
+    </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type PropType } from "vue";
+import { defineComponent, ref, computed, reactive, watch, type PropType } from "vue";
+import { useStore } from "vuex";
 import PreviewAlert from "./PreviewAlert.vue";
 import AlertSummary from "./AlertSummary.vue";
 
@@ -87,7 +126,87 @@ export default defineComponent({
     },
   },
   setup(props, { expose }) {
+    const store = useStore();
     const previewAlertRef = ref(null);
+
+    // Load saved state from localStorage or use defaults
+    const loadExpandState = () => {
+      try {
+        const saved = localStorage.getItem('alertWizardExpandState');
+        if (saved) {
+          return JSON.parse(saved);
+        }
+      } catch (e) {
+        console.error('Failed to load expand state:', e);
+      }
+      return { preview: true, summary: true };
+    };
+
+    // Expand/collapse state for both sections
+    const expandState = reactive(loadExpandState());
+
+    // Save state to localStorage
+    const saveExpandState = () => {
+      try {
+        localStorage.setItem('alertWizardExpandState', JSON.stringify({
+          preview: expandState.preview,
+          summary: expandState.summary,
+        }));
+      } catch (e) {
+        console.error('Failed to save expand state:', e);
+      }
+    };
+
+    // Toggle functions - simple toggle for each section
+    const togglePreview = () => {
+      expandState.preview = !expandState.preview;
+      saveExpandState();
+    };
+
+    const toggleSummary = () => {
+      expandState.summary = !expandState.summary;
+      saveExpandState();
+    };
+
+    // Calculate section heights based on expand state
+    const previewSectionStyle = computed(() => {
+      if (!expandState.preview) {
+        // Preview collapsed: only show header
+        return { flex: "0 0 auto" };
+      } else if (expandState.summary) {
+        // Both expanded: 50% each
+        return { flex: "1", minHeight: "0" };
+      } else {
+        // Preview expanded, summary collapsed: take all space
+        return { flex: "1", minHeight: "0" };
+      }
+    });
+
+    const summarySectionStyle = computed(() => {
+      if (!expandState.summary) {
+        // Summary collapsed: only show header
+        return { flex: "0 0 auto" };
+      } else if (expandState.preview) {
+        // Both expanded: 50% each
+        return { flex: "1", minHeight: "0" };
+      } else {
+        // Summary expanded, preview collapsed: take all space
+        return { flex: "1", minHeight: "0" };
+      }
+    });
+
+    // Watch for Query step with custom tab - auto-expand preview if collapsed
+    watch(
+      () => [props.wizardStep, props.selectedTab],
+      ([step, tab]) => {
+        // Step 2 is Query step, and tab is "custom"
+        if (step === 2 && tab === "custom" && !expandState.preview) {
+          expandState.preview = true;
+          saveExpandState();
+        }
+      },
+      { immediate: true }
+    );
 
     // Expose refreshData method from PreviewAlert
     const refreshData = () => {
@@ -102,8 +221,55 @@ export default defineComponent({
     });
 
     return {
+      store,
       previewAlertRef,
+      expandState,
+      togglePreview,
+      toggleSummary,
+      previewSectionStyle,
+      summarySectionStyle,
     };
   },
 });
 </script>
+
+<style scoped lang="scss">
+.collapsible-section {
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
+  // Ensure card-container styles are applied
+  background-color: var(--o2-card-bg);
+  border-radius: 0.375rem;
+  box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
+  border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.08));
+  overflow: hidden;
+
+  .section-header {
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    transition: all 0.2s ease;
+    border-radius: 0.375rem 0.375rem 0 0;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.02);
+    }
+  }
+
+  .section-content {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .expand-toggle-btn {
+    opacity: 0.5;
+    transition: all 0.2s ease;
+
+    &:hover {
+      opacity: 1;
+    }
+  }
+}
+</style>
