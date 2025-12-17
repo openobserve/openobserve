@@ -104,7 +104,12 @@ pub async fn token_validator(
                             if all_users.is_empty() {
                                 None
                             } else {
-                                all_users.first().cloned()
+                                // For organizations/clusters endpoints, prioritize _meta org
+                                all_users
+                                    .iter()
+                                    .find(|u| u.org == config::META_ORG_ID)
+                                    .cloned()
+                                    .or_else(|| all_users.first().cloned())
                             }
                         }
                         Err(e) => {
