@@ -40,18 +40,3 @@ pub async fn set_offset(offset: i64, node: Option<&str>) -> Result<(), anyhow::E
     };
     Ok(db::put(key, val.into(), db::NO_NEED_WATCH, None).await?)
 }
-
-pub async fn get_reset() -> i64 {
-    let key = "/compact/stream_stats/reset";
-    let value = match db::get(key).await {
-        Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
-        Err(_) => String::from("0"),
-    };
-    value.parse().unwrap_or_default()
-}
-
-pub async fn set_reset(offset: i64) -> Result<(), anyhow::Error> {
-    let key = "/compact/stream_stats/reset";
-    let val = offset.to_string();
-    Ok(db::put(key, val.into(), db::NEED_WATCH, None).await?)
-}

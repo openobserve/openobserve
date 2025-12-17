@@ -113,8 +113,14 @@ pub async fn search(
     let stream_type = stream.get_stream_type(req.stream_type);
 
     // 1. get file id list
-    let file_id_list =
-        get_file_id_lists(&trace_id, &req.org_id, stream_type, &stream, req.time_range).await?;
+    let file_id_list = get_file_id_lists(
+        &trace_id,
+        &req.org_id,
+        stream_type,
+        &stream,
+        req.time_range.unwrap_or_default(),
+    )
+    .await?;
     let file_id_list_vec = file_id_list.iter().collect::<Vec<_>>();
     let file_id_list_num = file_id_list_vec.len();
 
@@ -300,7 +306,7 @@ pub async fn get_file_id_lists(
     org_id: &str,
     stream_type: StreamType,
     stream: &TableReference,
-    mut time_range: Option<(i64, i64)>,
+    mut time_range: (i64, i64),
 ) -> Result<Vec<FileId>> {
     let stream_name = stream.stream_name();
     let stream_type = stream.get_stream_type(stream_type);
@@ -310,7 +316,7 @@ pub async fn get_file_id_lists(
     {
         let start = enrichment_table::get_start_time(org_id, &stream_name).await;
         let end = config::utils::time::now_micros();
-        time_range = Some((start, end));
+        time_range = (start, end);
     }
     let file_id_list = crate::service::file_list::query_ids(
         trace_id,

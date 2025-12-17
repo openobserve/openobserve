@@ -604,7 +604,7 @@ async fn get_file_list(
     }
 
     let mut result = Vec::with_capacity(files.len());
-    let (min_ts, max_ts) = query.time_range.unwrap_or((0, 0));
+    let (min_ts, max_ts) = query.time_range.unwrap_or_default();
     for file in files.iter() {
         let file_key = FileKey::from_file_name(file);
         if (min_ts, max_ts) != (0, 0) {
