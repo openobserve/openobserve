@@ -110,7 +110,7 @@
         ]"
         v-if="showJoinSummary"
       >
-        Performing a
+        Performing 
         <span class="text-primary">{{ joinTypeLabel }} Join</span> between
         <span class="tw-font-semibold">{{ mainStream }}</span> and
         <span class="tw-font-semibold">{{ modelValue.stream }}</span>
