@@ -476,12 +476,11 @@ const useLogs = () => {
     }
   };
 
-  const reorderArrayByReference = (arr1: string[], arr2: string[]) => {
-    arr1.sort((a, b) => {
+  const reorderArrayByReference = (arr1: string[], arr2: string[]): string[] => {
+    return [...arr1].sort((a, b) => {
       const indexA = arr2.indexOf(a);
       const indexB = arr2.indexOf(b);
 
-      // If an element is not found in arr1, keep it at the end
       if (indexA === -1) return 1;
       if (indexB === -1) return -1;
 
@@ -502,8 +501,13 @@ const useLogs = () => {
         _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
     );
 
+    // Skip reordering when colOrder is empty to prevent unstable sort in Firefox
+    if (colOrder.length === 0) {
+      return selectedFields;
+    }
+
     if (JSON.stringify(selectedFields) !== JSON.stringify(colOrder)) {
-      reorderArrayByReference(selectedFields, colOrder);
+      return reorderArrayByReference(selectedFields, colOrder);
     }
 
     return selectedFields;

@@ -16,6 +16,7 @@
 use std::io::Error;
 
 use actix_web::{HttpResponse, http, http::StatusCode};
+use chrono::{TimeZone, Timelike, Utc};
 #[cfg(feature = "enterprise")]
 use config::{META_ORG_ID, meta::self_reporting::usage::USAGE_STREAM};
 use config::{
@@ -23,8 +24,8 @@ use config::{
     meta::{
         promql,
         stream::{
-            DistinctField, StreamField, StreamParams, StreamSettings, StreamStats, StreamType,
-            UpdateStreamSettings,
+            DistinctField, PartitionTimeLevel, StreamField, StreamParams, StreamSettings,
+            StreamStats, StreamType, TimeRange, UpdateStreamSettings,
         },
     },
     utils::{flatten::format_label_name, json, time::now_micros},
@@ -35,8 +36,8 @@ use infra::{
     cache::stats,
     schema::{
         STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
-        get_stream_setting_fts_fields, unwrap_partition_time_level, unwrap_stream_created_at,
-        unwrap_stream_is_derived, unwrap_stream_settings,
+        get_settings, get_stream_setting_fts_fields, unwrap_partition_time_level,
+        unwrap_stream_created_at, unwrap_stream_is_derived, unwrap_stream_settings,
     },
     table::distinct_values::{DistinctFieldRecord, OriginType, check_field_use},
 };
@@ -823,12 +824,9 @@ pub async fn update_stream_settings(
         )
         .await
         {
-            return Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Internal server error while updating pattern associations {e}",),
-                )),
-            );
+            return Ok(MetaHttpResponse::internal_error(format!(
+                "Internal server error while updating pattern associations {e}",
+            )));
         }
     }
 
@@ -989,6 +987,85 @@ pub async fn stream_delete_inner(
     }
 
     Ok(())
+}
+
+pub async fn delete_stream_data_by_time_range(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    time_range: TimeRange,
+) -> Result<String, infra::errors::Error> {
+    if time_range.start > time_range.end {
+        return Err(infra::errors::Error::Message(
+            "Start time must be less than end time".to_string(),
+        ));
+    }
+
+    // Convert the time range to RFC3339 format
+    // we need check the date is hour or day, user can't delete data with minute and second
+    let stream_settings = get_settings(org_id, stream_name, stream_type)
+        .await
+        .unwrap_or_default();
+    let partition_time_level =
+        unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+    let start_time = Utc.timestamp_nanos(time_range.start * 1000);
+    let end_time = Utc.timestamp_nanos(time_range.end * 1000);
+    let (start_time, end_time) = if partition_time_level == PartitionTimeLevel::Daily {
+        if start_time.hour() != 0 || start_time.minute() != 0 || start_time.second() != 0 {
+            return Err(infra::errors::Error::Message(
+                "Start time must be with zero hour, minute and second".to_string(),
+            ));
+        }
+        if end_time.hour() != 0 || end_time.minute() != 0 || end_time.second() != 0 {
+            return Err(infra::errors::Error::Message(
+                "End time must be with zero hour, minute and second".to_string(),
+            ));
+        }
+        (
+            start_time.format("%Y-%m-%d").to_string(),
+            end_time.format("%Y-%m-%d").to_string(),
+        )
+    } else {
+        if start_time.minute() != 0 || start_time.second() != 0 {
+            return Err(infra::errors::Error::Message(
+                "Start time must be with zero minute and second".to_string(),
+            ));
+        }
+        if end_time.minute() != 0 || end_time.second() != 0 {
+            return Err(infra::errors::Error::Message(
+                "End time must be with zero minute and second".to_string(),
+            ));
+        }
+        (
+            start_time.format("%Y-%m-%dT%H:00:00Z").to_string(),
+            end_time.format("%Y-%m-%dT%H:00:00Z").to_string(),
+        )
+    };
+
+    // Create a job to delete the data by the time range
+    let (key, _created) = match crate::service::db::compact::retention::delete_stream(
+        org_id,
+        stream_type,
+        stream_name,
+        Some((start_time.as_str(), end_time.as_str())),
+    )
+    .await
+    {
+        Ok(key) => key,
+        Err(e) => {
+            return Err(infra::errors::Error::Message(e.to_string()));
+        }
+    };
+
+    // Create a job in the compact manual jobs table
+    let job = infra::table::compactor_manual_jobs::CompactorManualJob {
+        id: config::ider::uuid(),
+        key,
+        status: infra::table::compactor_manual_jobs::Status::Pending,
+        created_at: Utc::now().timestamp_micros(),
+        ended_at: 0,
+    };
+    crate::service::db::compact::compactor_manual_jobs::add_job(job).await
 }
 
 async fn transform_stats(

@@ -1064,7 +1064,10 @@
     "panelDuplicatedSuccessfully": "Pannello duplicato con successo",
     "panelDuplicationFailed": "Duplicazione del pannello non riuscita",
     "mapname": "Nome",
-    "mapvalue": "Valore"
+    "mapvalue": "Valore",
+    "customChartTypeSelector": "Selettore del tipo di grafico personalizzato",
+    "customChartTypeSelectorHint": "Seleziona un tipo di grafico dalla libreria eCharts per iniziare con una struttura di codice di base",
+    "selectChartType": "Seleziona il tipo di grafico"
   },
   "home": {
     "streams": "Stream",
@@ -1299,6 +1302,54 @@
     },
     "triggerAlert": "Trigger",
     "alertTriggeredSuccess": "Avviso attivato con successo",
+        "incidents": {
+      "title": "Incidenti",
+      "header": "Incidenti di avviso",
+      "noIncidents": "Nessun incidente trovato",
+      "id": "ID",
+      "status": "Status",
+      "severity": "Gravità",
+      "alertCount": "Avvisi",
+      "firstAlertAt": "Primo avviso",
+      "lastAlertAt": "Ultimo avviso",
+      "resolvedAt": "Risolto a",
+      "title_field": "Titolo",
+      "correlationKey": "Chiave di correlazione",
+      "stableDimensions": "Dimensioni",
+      "topology": "Topologia",
+      "upstreamServices": "Servizi upstream",
+      "downstreamServices": "Servizi downstream",
+      "correlatedAlerts": "Avvisi correlati",
+      "alertName": "Nome dell'avviso",
+      "alertFiredAt": "Licenziato a",
+      "correlationReason": "Motivo della correlazione",
+      "actions": "Azioni",
+      "acknowledge": "Riconoscere",
+      "resolve": "Risolvere",
+      "reopen": "Riaprire",
+      "viewDetails": "Visualizza dettagli",
+      "statusOpen": "Aperta",
+      "statusAcknowledged": "Riconosciuto",
+      "statusResolved": "Risolto",
+      "severityP1": "P1 - Critico",
+      "severityP2": "P2 - Alto",
+      "severityP3": "P3 - Medio",
+      "severityP4": "P4 - Basso",
+      "correlationServiceDiscovery": "Scoperta dei servizi",
+      "correlationManualExtraction": "Estrazione manuale",
+      "correlationTemporal": "Temporale",
+      "filterByStatus": "Filtra per stato",
+      "allStatuses": "Tutti gli stati",
+      "loading": "Incidenti di caricamento...",
+      "errorLoading": "Caricamento degli incidenti non riuscito",
+      "statusUpdated": "Stato dell'incidente aggiornato",
+      "statusUpdateFailed": "Aggiornamento dello stato dell'incidente non riuscito",
+      "rootCauseAnalysis": "Analisi delle cause principali",
+      "analyzeRca": "Analizza",
+      "rcaInProgress": "Analisi della causa principale...",
+      "rcaCompleted": "Analisi della causa principale completata",
+      "noRcaYet": "Nessuna analisi della causa principale disponibile. Fai clic su «Analizza» per iniziare."
+    },
     "events": "Eventi",
     "multiWindow": "Confronta con il passato",
     "multiWindowSubLabel": "Confronta i risultati attuali con i dati di un altro periodo di tempo",
@@ -1721,7 +1772,8 @@
     "viewLogs": "Visualizza i log",
     "backToLogs": "Torna ai log",
     "RedMetrics": "Metriche RED",
-    "loadingStream": "Caricamento dello stream..."
+    "loadingStream": "Caricamento dello stream...",
+    "viewRelated": "Visualizza correlati"
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",
@@ -2034,6 +2086,14 @@
     "tracesFromService": "Tracce dal servizio: {service}",
     "noTracesFound": "Nessuna traccia correlata trovata",
     "noTracesDescription": "Nessuna traccia trovata per service {service} nell'intervallo di tempo selezionato",
-    "openTraceInNewWindow": "Apri traccia in una nuova finestra"
+    "openTraceInNewWindow": "Apri traccia in una nuova finestra",
+    "filters": "Filtri"
+  },
+  "sreChat": {
+    "emptyMessage": "Chiedimi qualcosa sui tuoi avvisi e incidenti",
+    "inputPlaceholder": "Chiedi a SRE Assistant...",
+    "clearChatTitle": "Cancella chat",
+    "clearChatMessage": "Sei sicuro di voler chiarire questa conversazione?",
+    "copiedToClipboard": "Copiato negli appunti"
   }
 }

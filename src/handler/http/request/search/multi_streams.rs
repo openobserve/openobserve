@@ -408,6 +408,7 @@ pub async fn search_multi(
                     trace_id: Some(res.trace_id.clone()),
                     took_wait_in_queue: Some(res.took_detail.wait_in_queue),
                     work_group: res.work_group,
+                    peak_memory_usage: res.peak_memory_usage,
                     ..Default::default()
                 };
                 let num_fn = req.query.query_fn.is_some() as u16;

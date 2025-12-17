@@ -38,6 +38,7 @@ pub struct MergeResult {
 
 pub type MergeSender = mpsc::Sender<Result<(usize, Vec<FileKey>), anyhow::Error>>;
 
+#[derive(Clone)]
 pub struct MergeJob {
     pub org_id: String,
     pub stream_type: StreamType,

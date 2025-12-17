@@ -412,7 +412,7 @@ export function useTextHighlighter() {
       hasParentheses: /[()\[\]]/.test(text),
       dotSeparatedNumbers: (text.match(/\d+/g) || []).length,
       startsWithUppercase: /^[A-Z]/.test(text),
-      isThreeDigitStatusCode: /^[1-5]\d{2}$/.test(text),
+      isThreeDigitStatusCode: /^(1(0[0-3])|2(0[0-8]|26)|3(0[0-8])|4(0[0-9]|1[0-9]|2[0-9]|3[01]|51)|5(0[0-9]|1[01]))$/.test(text),
       isLargeNumber: /^\d{4,}$/.test(text),
       hasDateTimePattern:
         /\d{1,4}[/-]\w{1,3}[/-]\d{1,4}[:\s]\d{1,2}:\d{1,2}(?::\d{1,2})?(?:\s*[+-]\d{4})?/.test(
@@ -545,7 +545,7 @@ export function useTextHighlighter() {
         pattern: /\b(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\b/g,
         type: "http_method",
       },
-      { pattern: /\b[1-5]\d{2}\b/g, type: "status_code" },
+      { pattern: /\b(1(0[0-3])|2(0[0-8]|26)|3(0[0-8])|4(0[0-9]|1[0-9]|2[0-9]|3[01]|51)|5(0[0-9]|1[01]))\b/g, type: "status_code" },
       {
         pattern:
           /\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b/g,

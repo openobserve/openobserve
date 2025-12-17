@@ -94,12 +94,7 @@ pub async fn organizations(
     let is_root_user = is_root_user(user_id);
     let all_orgs = if is_root_user {
         let Ok(records) = organization::list_all_orgs(limit).await else {
-            return Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR,
-                    "Something went wrong",
-                )),
-            );
+            return Ok(MetaHttpResponse::internal_error("Something went wrong"));
         };
         records
     } else {
@@ -119,12 +114,7 @@ pub async fn organizations(
             .map(|cb| (cb.org_id, cb.subscription_type as i32))
             .collect::<HashMap<_, _>>(),
         Err(e) => {
-            return Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR,
-                    e.to_string(),
-                )),
-            );
+            return Ok(MetaHttpResponse::internal_error(e.to_string()));
         }
     };
 
@@ -199,12 +189,7 @@ pub async fn all_organizations(
     let all_orgs = match infra::table::organizations::list(filter).await {
         Ok(orgs) => orgs,
         Err(e) => {
-            return Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR,
-                    e.to_string(),
-                )),
-            );
+            return Ok(MetaHttpResponse::internal_error(e.to_string()));
         }
     };
 
@@ -214,12 +199,7 @@ pub async fn all_organizations(
             .map(|cb| (cb.org_id, cb.subscription_type as i32))
             .collect::<HashMap<_, _>>(),
         Err(e) => {
-            return Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR,
-                    e.to_string(),
-                )),
-            );
+            return Ok(MetaHttpResponse::internal_error(e.to_string()));
         }
     };
 

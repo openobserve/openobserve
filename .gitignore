@@ -43,3 +43,4 @@ tests/ui-testing/playwright-tests/utils/auth/user.json
 /tests/ui-testing/MD_Files
 .github/workflows/bug-automation-helper.yml
 /tests/bug-automation
+tests/playwright_mcp/

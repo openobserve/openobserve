@@ -106,8 +106,9 @@ const expect = test.expect;
  */
 async function verifyAuthentication(page) {
   try {
+    // Increase timeout for authentication verification, especially important for first test in suite
     await page.waitHelpers.waitForElementVisible('[data-test="menu-link-\\/-item"]', {
-      timeout: 5000,
+      timeout: 15000,
       description: 'home menu link (auth verification)'
     });
     return true;

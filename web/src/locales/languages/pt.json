@@ -1064,7 +1064,10 @@
     "panelDuplicatedSuccessfully": "Painel duplicado com sucesso",
     "panelDuplicationFailed": "Falha na duplicação do painel",
     "mapname": "Nome",
-    "mapvalue": "Valor"
+    "mapvalue": "Valor",
+    "customChartTypeSelector": "Seletor de tipo de gráfico personalizado",
+    "customChartTypeSelectorHint": "Selecione um tipo de gráfico na biblioteca eCharts para começar com uma estrutura de código básica",
+    "selectChartType": "Selecione o tipo de gráfico"
   },
   "home": {
     "streams": "Transmissões",
@@ -1299,6 +1302,54 @@
     },
     "triggerAlert": "Gatilho",
     "alertTriggeredSuccess": "Alerta acionado com sucesso",
+        "incidents": {
+      "title": "Incidentes",
+      "header": "Incidentes de alerta",
+      "noIncidents": "Nenhum incidente encontrado",
+      "id": "CARTEIRA DE IDENTIDADE",
+      "status": "Status",
+      "severity": "Severidade",
+      "alertCount": "Alertas",
+      "firstAlertAt": "Primeiro alerta",
+      "lastAlertAt": "Último alerta",
+      "resolvedAt": "Resolvido em",
+      "title_field": "Título",
+      "correlationKey": "Chave de correlação",
+      "stableDimensions": "Dimensões",
+      "topology": "Topologia",
+      "upstreamServices": "Serviços upstream",
+      "downstreamServices": "Serviços downstream",
+      "correlatedAlerts": "Alertas correlacionados",
+      "alertName": "Nome do alerta",
+      "alertFiredAt": "Atirado em",
+      "correlationReason": "Motivo da correlação",
+      "actions": "Ações",
+      "acknowledge": "Reconhecer",
+      "resolve": "Resolver",
+      "reopen": "Reabrir",
+      "viewDetails": "Exibir detalhes",
+      "statusOpen": "Aberto",
+      "statusAcknowledged": "Reconhecido",
+      "statusResolved": "Resolvido",
+      "severityP1": "P1 - Crítico",
+      "severityP2": "P2 - Alto",
+      "severityP3": "P3 - Médio",
+      "severityP4": "P4 - Baixo",
+      "correlationServiceDiscovery": "Descoberta de serviços",
+      "correlationManualExtraction": "Extração manual",
+      "correlationTemporal": "Temporal",
+      "filterByStatus": "Filtrar por status",
+      "allStatuses": "Todos os status",
+      "loading": "Carregando incidentes...",
+      "errorLoading": "Falha ao carregar incidentes",
+      "statusUpdated": "Status do incidente atualizado",
+      "statusUpdateFailed": "Falha ao atualizar o status do incidente",
+      "rootCauseAnalysis": "Análise da causa raiz",
+      "analyzeRca": "Analisar",
+      "rcaInProgress": "Analisando a causa raiz...",
+      "rcaCompleted": "Análise da causa raiz concluída",
+      "noRcaYet": "Nenhuma análise de causa raiz disponível. Clique em “Analisar” para começar."
+    },
     "events": "Eventos",
     "multiWindow": "Compare com o passado",
     "multiWindowSubLabel": "Compare os resultados atuais com dados de outro período",
@@ -1721,7 +1772,8 @@
     "viewLogs": "Exibir registros",
     "backToLogs": "Voltar aos registros",
     "RedMetrics": "Métricas RED",
-    "loadingStream": "Carregando Stream..."
+    "loadingStream": "Carregando Stream...",
+    "viewRelated": "Exibir relacionado"
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",
@@ -2034,6 +2086,14 @@
     "tracesFromService": "Traços do serviço: {service}",
     "noTracesFound": "Nenhum traço correlacionado encontrado",
     "noTracesDescription": "Nenhum rastreamento encontrado para o serviço {service} no intervalo de tempo selecionado",
-    "openTraceInNewWindow": "Abrir rastreamento em uma nova janela"
+    "openTraceInNewWindow": "Abrir rastreamento em uma nova janela",
+    "filters": "Filtros"
+  },
+  "sreChat": {
+    "emptyMessage": "Pergunte-me qualquer coisa sobre seus alertas e incidentes",
+    "inputPlaceholder": "Pergunte ao SRE Assistant...",
+    "clearChatTitle": "Limpar bate-papo",
+    "clearChatMessage": "Tem certeza de que deseja encerrar essa conversa?",
+    "copiedToClipboard": "Copiado para a prancheta"
   }
 }

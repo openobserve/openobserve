@@ -26,6 +26,7 @@ import { AlertDestinationsPage } from "./alertsPages/alertDestinationsPage.js";
 import { PipelinesPage } from "./pipelinesPages/pipelinesPage.js";
 import { LoginPage } from "./generalPages/loginPage.js";
 import { IngestionPage } from "./generalPages/ingestionPage.js";
+import { IngestionConfigPage } from "./generalPages/ingestionConfigPage.js";
 
 // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
 import { HomePage } from "./generalPages/homePage.js";
@@ -43,6 +44,8 @@ import { UserPage } from "./generalPages/userPage.js";
 import { SanityPage } from "./generalPages/sanityPage.js";
 import { ChangeOrgPage } from "./generalPages/changeOrgPage.js";
 import { EnrichmentPage } from "./generalPages/enrichmentPage.js";
+import { ThemePage } from "./generalPages/themePage.js";
+import { LanguagePage } from "./generalPages/languagePage.js";
 const SchemaPage = require("./generalPages/schemaPage.js");
 const SchemaLoadPage = require("./generalPages/schemaLoadPage.js");
 const APICleanup = require("./apiCleanup.js");
@@ -96,6 +99,7 @@ class PageManager {
     this.pipelinesPage = new PipelinesPage(page);
     this.loginPage = new LoginPage(page);
     this.ingestionPage = new IngestionPage(page);
+    this.ingestionConfigPage = new IngestionConfigPage(page);
 
     // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
     this.homePage = new HomePage(page);
@@ -113,6 +117,8 @@ class PageManager {
     this.sanityPage = new SanityPage(page);
     this.changeOrgPage = new ChangeOrgPage(page);
     this.enrichmentPage = new EnrichmentPage(page);
+    this.themePage = new ThemePage(page);
+    this.languagePage = new LanguagePage(page);
     this.schemaPage = new SchemaPage(page);
     this.schemaLoadPage = new SchemaLoadPage(page);
 

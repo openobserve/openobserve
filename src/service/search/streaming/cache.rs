@@ -453,6 +453,7 @@ async fn send_cached_responses(
         took_wait_in_queue: Some(cached.cached_response.took_detail.wait_in_queue),
         work_group: None, // TODO: add work group
         result_cache_ratio: Some(cached.cached_response.result_cache_ratio),
+        peak_memory_usage: cached.cached_response.peak_memory_usage,
         ..Default::default()
     };
     report_request_usage_stats(
