@@ -997,4 +997,131 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
     }
   });
 
+  /**
+   * Test 8: Error Handling & Recovery
+   * - Incomplete join configuration (add but don't fully configure)
+   * - Cancel/close join popup mid-configuration
+   * - Remove join and verify panel still works
+   * - Panel without any fields after removing join
+   */
+  test("Test 8: Error Handling & Recovery", {
+    tag: ['@dashboard-joins', '@dashboard-joins-error', '@P2']
+  }, async ({ page }) => {
+    const testId = generateTestId();
+    const STREAMS = generateStreamNames(testId);
+    const dashboardName = generateDashboardName(testId);
+
+    await navigateToBase(page);
+    await ingestTestData(STREAMS);
+
+    const pm = new PageManager(page);
+    const joinHelper = new JoinHelper(page);
+
+    try {
+      // === Scenario 1: Incomplete join is gracefully handled ===
+      testLogger.info("Scenario 1: Testing incomplete join configuration");
+      await createDashboardAndAddFirstPanel(page, pm, dashboardName);
+      await pm.dashboardPanelActions.addPanelName("error-handling-panel");
+
+      await pm.chartTypeSelector.selectChartType("table");
+      await pm.chartTypeSelector.selectStreamType("logs");
+      await pm.chartTypeSelector.selectStream(STREAMS.WEB_REQUESTS);
+      await page.waitForTimeout(2000);
+
+      // Add a join but close popup before configuring conditions
+      const addJoinBtn = page.locator('[data-test="dashboard-add-join-btn"]');
+      await addJoinBtn.waitFor({ state: "visible", timeout: 10000 });
+      await addJoinBtn.click();
+      await page.waitForTimeout(1000);
+
+      // Click on the new join item to open popup
+      const newJoinItem = page.locator('[data-test="dashboard-join-item-0"]');
+      await newJoinItem.waitFor({ state: "visible", timeout: 10000 });
+      await newJoinItem.click();
+
+      // Wait for popup
+      await page.locator('[data-test="dashboard-join-pop-up"]').waitFor({ state: "visible", timeout: 10000 });
+
+      // Select join type but don't configure fully - close popup
+      await joinHelper.selectJoinType("inner");
+      await page.waitForTimeout(500);
+
+      // Close popup without completing configuration
+      await page.keyboard.press("Escape");
+      await page.waitForTimeout(500);
+      testLogger.info("Closed popup with incomplete join configuration");
+
+      // Verify the incomplete join chip is still visible (even if not fully configured)
+      const incompleteJoinChip = page.locator('[data-test="dashboard-join-item-0"]');
+      const isChipVisible = await incompleteJoinChip.isVisible();
+      testLogger.info(`Incomplete join chip visible: ${isChipVisible}`);
+
+      // Remove the incomplete join
+      if (isChipVisible) {
+        const removeBtn = page.locator('[data-test="dashboard-join-item-0-remove"]');
+        await removeBtn.click();
+        await page.waitForTimeout(500);
+        testLogger.info("Removed incomplete join");
+      }
+
+      // === Scenario 2: Panel works without joins ===
+      testLogger.info("Scenario 2: Verifying panel works without joins");
+
+      // Add fields and apply - should work without any joins
+      await pm.chartTypeSelector.searchAndAddField("request_id", "x");
+      await pm.chartTypeSelector.searchAndAddField("path", "y");
+
+      await pm.dashboardPanelActions.applyDashboardBtn();
+      await page.waitForTimeout(3000);
+
+      // Verify we get data without joins
+      const noJoinRowCount = await getTableRowCount(page);
+      expect(noJoinRowCount).toBeGreaterThan(0);
+      testLogger.info(`Panel without joins: ${noJoinRowCount} rows`);
+
+      // === Scenario 3: Add valid join, remove it, panel still works ===
+      testLogger.info("Scenario 3: Add join then remove it");
+
+      // Now add a proper join
+      await joinHelper.configureJoin("inner", STREAMS.APP_USERS, [
+        { leftField: "user_id", operation: "=", rightField: "user_id" },
+      ]);
+      await verifyJoinChipIsVisible(page, STREAMS.APP_USERS, 0);
+
+      await pm.dashboardPanelActions.applyDashboardBtn();
+      await page.waitForTimeout(3000);
+
+      const withJoinRowCount = await getTableRowCount(page);
+      expect(withJoinRowCount).toBeGreaterThan(0);
+      testLogger.info(`Panel with join: ${withJoinRowCount} rows`);
+
+      // Now remove the join
+      await joinHelper.removeJoin(0);
+      await page.waitForTimeout(500);
+
+      // Verify join chip is gone
+      const joinChipAfterRemove = page.locator('[data-test="dashboard-join-item-0"]');
+      await expect(joinChipAfterRemove).not.toBeVisible({ timeout: 5000 });
+      testLogger.info("Join removed successfully");
+
+      // Apply again - should still work
+      await pm.dashboardPanelActions.applyDashboardBtn();
+      await page.waitForTimeout(3000);
+
+      const afterRemoveRowCount = await getTableRowCount(page);
+      expect(afterRemoveRowCount).toBeGreaterThan(0);
+      testLogger.info(`Panel after removing join: ${afterRemoveRowCount} rows (expected same as without join)`);
+
+      // Verify we get back to original row count (without join)
+      expect(afterRemoveRowCount).toBe(noJoinRowCount);
+      testLogger.info("Row count matches - join removal worked correctly");
+
+      await pm.dashboardPanelActions.savePanel();
+
+    } finally {
+      await cleanupStreams(STREAMS);
+      await deleteDashboardByName(dashboardName);
+    }
+  });
+
 });
