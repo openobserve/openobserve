@@ -79,6 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-mr-lg q-mt-xs"
           v-model="item.value"
           :variableItem="item"
+          @update:model-value="onVariablesValueUpdated(index)"
         />
       </div>
     </div>

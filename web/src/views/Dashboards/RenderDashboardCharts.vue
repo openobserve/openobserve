@@ -30,9 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
       </span>
 
-      <!-- Global Variables (if using manager) -->
       <VariablesValueSelector
-        v-if="variablesManager && globalVariables.length > 0"
+        v-if="variablesManager && (globalVariables.length > 0 || dashboardData.variables?.showDynamicFilters)"
         :scope="'global'"
         :variablesConfig="{ list: globalVariables }"
         :variablesManager="variablesManager"

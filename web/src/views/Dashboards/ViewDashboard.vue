@@ -681,44 +681,33 @@ export default defineComponent({
         return;
       }
 
-      // Initialize variables manager ONLY if there are scoped variables (tabs or panels)
-      // For legacy dashboards with only global variables, use the legacy approach
-      const hasScopedVariables =
-        dashboard?.variables?.list?.some(
-          (v: any) => v.scope === "tabs" || v.scope === "panels",
+      // Initialize variables manager for all dashboards to ensure consistent handling
+      try {
+        await variablesManager.initialize(
+          dashboard?.variables?.list || [],
+          dashboard,
         );
 
-      if (hasScopedVariables) {
-        try {
-          await variablesManager.initialize(
-            dashboard.variables.list,
-            dashboard,
+        // Load variable values from URL if present
+        variablesManager.loadFromUrl(route);
+
+        // PERFORM INITIAL COMMIT!
+        // This ensures that when the dashboard renders (in the next step),
+        // variables are ALREADY in the committed state (even if values are null).
+        // This allows panels to correctly identify their dependencies from the start.
+        variablesManager.commitAll();
+
+        // Track that we're using the scoped variables manager
+        usingScopedVariablesManager.value = true;
+      } catch (error: any) {
+        console.error("Error initializing variables manager:", error);
+        if (error.message?.includes("Circular dependency")) {
+          showErrorNotification(
+            "Circular dependency detected in dashboard variables",
           );
-
-          // Load variable values from URL if present
-          variablesManager.loadFromUrl(route);
-
-          // PERFORM INITIAL COMMIT!
-          // This ensures that when the dashboard renders (in the next step),
-          // variables are ALREADY in the committed state (even if values are null).
-          // This allows panels to correctly identify their dependencies from the start.
-          variablesManager.commitAll();
-
-          // Track that we're using the scoped variables manager
-          usingScopedVariablesManager.value = true;
-        } catch (error: any) {
-          console.error("Error initializing variables manager:", error);
-          if (error.message?.includes("Circular dependency")) {
-            showErrorNotification(
-              "Circular dependency detected in dashboard variables",
-            );
-          } else if (error.message?.includes("Invalid dependency")) {
-            showErrorNotification("Invalid variable dependency configuration");
-          }
+        } else if (error.message?.includes("Invalid dependency")) {
+          showErrorNotification("Invalid variable dependency configuration");
         }
-      } else {
-        // Not using scoped variables manager
-        usingScopedVariablesManager.value = false;
       }
 
       // NOW set the reactive dashboard data to trigger rendering
@@ -735,7 +724,7 @@ export default defineComponent({
         : dashboard?.tabs?.[0]?.tabId;
 
       // If using manager, set the selected tab as visible
-      if (hasScopedVariables && selectedTabId.value) {
+      if (selectedTabId.value) {
         variablesManager.setTabVisibility(selectedTabId.value, true);
       }
 
@@ -1044,16 +1033,24 @@ export default defineComponent({
 
       // Global variables
       committedVars.global.forEach((variable: any) => {
-        if (variable.type !== "dynamic_filters" && hasValidValue(variable.value)) {
-          variableParams[`var-${variable.name}`] = variable.value;
+        if (hasValidValue(variable.value)) {
+          let value = variable.value;
+          if (variable.type === "dynamic_filters") {
+            value = encodeURIComponent(JSON.stringify(value));
+          }
+          variableParams[`var-${variable.name}`] = value;
         }
       });
 
       // Tab variables
       Object.entries(committedVars.tabs).forEach(([tabId, variables]: [string, any]) => {
         variables.forEach((variable: any) => {
-          if (variable.type !== "dynamic_filters" && hasValidValue(variable.value)) {
-            variableParams[`var-${variable.name}.t.${tabId}`] = variable.value;
+          if (hasValidValue(variable.value)) {
+            let value = variable.value;
+            if (variable.type === "dynamic_filters") {
+              value = encodeURIComponent(JSON.stringify(value));
+            }
+            variableParams[`var-${variable.name}.t.${tabId}`] = value;
           }
         });
       });
@@ -1061,8 +1058,12 @@ export default defineComponent({
       // Panel variables
       Object.entries(committedVars.panels).forEach(([panelId, variables]: [string, any]) => {
         variables.forEach((variable: any) => {
-          if (variable.type !== "dynamic_filters" && hasValidValue(variable.value)) {
-            variableParams[`var-${variable.name}.p.${panelId}`] = variable.value;
+          if (hasValidValue(variable.value)) {
+            let value = variable.value;
+            if (variable.type === "dynamic_filters") {
+              value = encodeURIComponent(JSON.stringify(value));
+            }
+            variableParams[`var-${variable.name}.p.${panelId}`] = value;
           }
         });
       });
