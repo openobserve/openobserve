@@ -174,6 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :promqlQuery="formData.query_condition.promql"
                   :vrlFunction="decodedVrlFunction"
                   :streamName="formData.stream_name"
+                  :sqlQueryErrorMsg="sqlQueryErrorMsg"
                   @update:tab="updateTab"
                   @update-group="updateGroup"
                   @remove-group="removeConditionGroup"
@@ -181,6 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:sqlQuery="(value) => formData.query_condition.sql = value"
                   @update:promqlQuery="(value) => formData.query_condition.promql = value"
                   @update:vrlFunction="(value) => formData.query_condition.vrl_function = value"
+                  @validate-sql="validateSqlQuery"
                 />
               </div>
 

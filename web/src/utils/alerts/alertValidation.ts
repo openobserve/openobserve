@@ -476,6 +476,12 @@ export const validateSqlQuery = async (
   // Delaying the validation by 300ms, as editor has debounce of 300ms. Else old value will be used for validation
   await new Promise((resolve) => setTimeout(resolve, 300));
 
+  // Skip validation if SQL query is empty or only whitespace
+  if (!formData.query_condition.sql || formData.query_condition.sql.trim() === '') {
+    sqlQueryErrorMsg.value = "";
+    return;
+  }
+
   if (!getParser(formData.query_condition.sql)) {
     return;
   }
@@ -524,14 +530,8 @@ export const validateSqlQuery = async (
           ? err.response?.data?.message
           : "Invalid SQL Query";
 
-        // Show error only if it is not real time alert
-        // This case happens when user enters invalid query and then switches to real time alert
-        if (formData.query_condition.type === "sql")
-          q.notify({
-            type: "negative",
-            message: "Invalid SQL Query : " + err.response?.data?.message,
-            timeout: 3000,
-          });
+        // Error message is displayed inline below the editor
+        // No need for toast notification as it's redundant
 
         reject("sql_error");
       });
