@@ -2221,6 +2221,7 @@ export default defineComponent({
       contextMenuVisible,
       contextMenuPosition,
       contextMenuValue,
+      contextMenuData,
       onChartContextMenu,
       onChartDomContextMenu,
       hideContextMenu,

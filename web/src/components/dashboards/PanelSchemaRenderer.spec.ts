@@ -2059,5 +2059,127 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.vm.contextMenuVisible).toBe(true);
       expect(wrapper.vm.contextMenuValue).toBe(1);
     });
+
+    it("should store context menu data for alert creation", () => {
+      wrapper = createWrapper({ allowAlertCreation: true });
+
+      const mockEvent = {
+        x: 120,
+        y: 180,
+        value: 65.5,
+      };
+
+      wrapper.vm.onChartDomContextMenu(mockEvent);
+
+      expect(wrapper.vm.contextMenuData).toEqual(mockEvent);
+      expect(wrapper.vm.contextMenuPosition).toEqual({ x: 120, y: 180 });
+      expect(wrapper.vm.contextMenuValue).toBe(65.5);
+    });
+
+    it("should not interfere with regular contextmenu when using domcontextmenu", () => {
+      wrapper = createWrapper({ allowAlertCreation: true });
+
+      const regularContextMenuEvent = {
+        x: 100,
+        y: 200,
+        value: 50,
+        seriesName: "test",
+        dataIndex: 0,
+        seriesIndex: 0,
+      };
+
+      const domContextMenuEvent = {
+        x: 150,
+        y: 250,
+        value: 75,
+      };
+
+      // Regular contextmenu should only emit, not show alert menu
+      wrapper.vm.onChartContextMenu(regularContextMenuEvent);
+      expect(wrapper.emitted("contextmenu")).toBeTruthy();
+      expect(wrapper.vm.contextMenuVisible).toBe(false);
+
+      // DOM contextmenu should show alert menu
+      wrapper.vm.onChartDomContextMenu(domContextMenuEvent);
+      expect(wrapper.vm.contextMenuVisible).toBe(true);
+    });
+
+    it("should handle context menu for different metric values", () => {
+      wrapper = createWrapper({ allowAlertCreation: true });
+
+      const testValues = [0, 1, 100, 0.5, -10, 999.99];
+
+      testValues.forEach(value => {
+        wrapper.vm.onChartDomContextMenu({
+          x: 100,
+          y: 200,
+          value: value,
+        });
+
+        expect(wrapper.vm.contextMenuValue).toBe(value);
+        expect(wrapper.vm.contextMenuVisible).toBe(true);
+
+        // Reset for next test
+        wrapper.vm.hideContextMenu();
+      });
+    });
+
+    it("should preserve event data when creating alert from context menu", () => {
+      wrapper = createWrapper({ allowAlertCreation: true });
+
+      const mockEvent = {
+        x: 100,
+        y: 200,
+        value: 50,
+        additionalData: "test",
+      };
+
+      wrapper.vm.onChartDomContextMenu(mockEvent);
+
+      // All event data should be preserved
+      expect(wrapper.vm.contextMenuData).toEqual(mockEvent);
+      expect(wrapper.vm.contextMenuData.additionalData).toBe("test");
+    });
+
+    it("should handle rapid contextmenu toggling", () => {
+      wrapper = createWrapper({ allowAlertCreation: true });
+
+      // Show context menu
+      wrapper.vm.onChartDomContextMenu({ x: 100, y: 200, value: 50 });
+      expect(wrapper.vm.contextMenuVisible).toBe(true);
+
+      // Hide context menu
+      wrapper.vm.hideContextMenu();
+      expect(wrapper.vm.contextMenuVisible).toBe(false);
+
+      // Show again with different value
+      wrapper.vm.onChartDomContextMenu({ x: 150, y: 250, value: 75 });
+      expect(wrapper.vm.contextMenuVisible).toBe(true);
+      expect(wrapper.vm.contextMenuValue).toBe(75);
+    });
+
+    it("should pass panel information with contextmenu event", () => {
+      wrapper = createWrapper({ allowAlertCreation: true });
+
+      const mockEvent = {
+        x: 100,
+        y: 200,
+        value: 50,
+        seriesName: "test",
+      };
+
+      wrapper.vm.onChartContextMenu(mockEvent);
+
+      const emitted = wrapper.emitted("contextmenu");
+      expect(emitted).toBeTruthy();
+      if (emitted) {
+        const eventData = emitted[0][0];
+        expect(eventData.panelTitle).toBe(defaultProps.panelSchema.title);
+        expect(eventData.panelId).toBe(defaultProps.panelSchema.id);
+        expect(eventData.x).toBe(100);
+        expect(eventData.y).toBe(200);
+        expect(eventData.value).toBe(50);
+      }
+    });
   });
 });
