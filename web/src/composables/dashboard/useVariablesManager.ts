@@ -91,6 +91,12 @@ const expandVariablesForScopes = (
       expanded.push({
         ...variable,
         scope: "global",
+        value:
+          variable.value === ""
+            ? variable.multiSelect
+              ? []
+              : null
+            : variable.value,
         isVariableLoadingPending: false,
         isLoading: false,
         // Non-query types are immediately ready
@@ -102,6 +108,12 @@ const expandVariablesForScopes = (
           ...variable,
           scope: "tabs",
           tabId,
+          value:
+            variable.value === ""
+              ? variable.multiSelect
+                ? []
+                : null
+              : variable.value,
           isVariableLoadingPending: false,
           isLoading: false,
           isVariablePartialLoaded: variable.type !== "query_values",
@@ -117,6 +129,12 @@ const expandVariablesForScopes = (
           ...variable,
           scope: "panels",
           panelId,
+          value:
+            variable.value === ""
+              ? variable.multiSelect
+                ? []
+                : null
+              : variable.value,
           isVariableLoadingPending: false,
           isLoading: false,
           isVariablePartialLoaded: variable.type !== "query_values",
@@ -137,10 +155,12 @@ export const useVariablesManager = () => {
     global: VariableRuntimeState[];
     tabs: Record<string, VariableRuntimeState[]>;
     panels: Record<string, VariableRuntimeState[]>;
+    isInitialized: boolean;
   }>({
     global: [],
     tabs: {},
     panels: {},
+    isInitialized: false,
   });
 
   // COMMITTED STATE: Updates only when user clicks Refresh (like __global)
@@ -162,13 +182,30 @@ export const useVariablesManager = () => {
   const panelTabMapping = ref<Record<string, string>>({});
 
   const isLoading = computed(() => {
-    const hasLoadingGlobal = variablesData.global.some((v) => v.isLoading);
-    const hasLoadingTabs = Object.values(variablesData.tabs).some((vars) =>
-      vars.some((v) => v.isLoading),
+    if (!variablesData.isInitialized) return true;
+
+    // Helper to determine if a specific variable is still in its initial loading phase
+    const isVarLoading = (v: VariableRuntimeState) => {
+      if (v.type !== "query_values") return false;
+      return (
+        v.isLoading || v.isVariableLoadingPending || !v.isVariablePartialLoaded
+      );
+    };
+
+    // Global variables are always relevant
+    const hasLoadingGlobal = variablesData.global.some(isVarLoading);
+
+    // Only check variables in visible tabs
+    const hasLoadingTabs = Object.entries(variablesData.tabs).some(
+      ([tabId, vars]) => tabsVisibility.value[tabId] && vars.some(isVarLoading),
     );
-    const hasLoadingPanels = Object.values(variablesData.panels).some((vars) =>
-      vars.some((v) => v.isLoading),
+
+    // Only check variables in visible panels
+    const hasLoadingPanels = Object.entries(variablesData.panels).some(
+      ([panelId, vars]) =>
+        panelsVisibility.value[panelId] && vars.some(isVarLoading),
     );
+
     return hasLoadingGlobal || hasLoadingTabs || hasLoadingPanels;
   });
 
@@ -315,6 +352,7 @@ export const useVariablesManager = () => {
       const hasValue =
         parentVar.value !== null &&
         parentVar.value !== undefined &&
+        parentVar.value !== "" &&
         (!Array.isArray(parentVar.value) || parentVar.value.length > 0);
       
       if (!hasValue) {
@@ -416,6 +454,8 @@ export const useVariablesManager = () => {
     committedVariablesData.global = [];
     committedVariablesData.tabs = {};
     committedVariablesData.panels = {};
+
+    variablesData.isInitialized = true;
   };
 
   // ========== COMMIT MECHANISM (like __global in main branch) ==========
@@ -826,6 +866,9 @@ export const useVariablesManager = () => {
   };
 
   const parseValue = (value: any, multiSelect?: boolean): any => {
+    if (value === "" || value === undefined || value === null) {
+      return multiSelect ? [] : null;
+    }
     if (multiSelect) {
       return Array.isArray(value) ? value : [value];
     }
