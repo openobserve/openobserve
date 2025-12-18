@@ -44,3 +44,7 @@ tests/ui-testing/playwright-tests/utils/auth/user.json
 .github/workflows/bug-automation-helper.yml
 /tests/bug-automation
 tests/playwright_mcp/
+.claude/.clauderc
+.mcp.json
+.claude/.clauderc
+/.claude

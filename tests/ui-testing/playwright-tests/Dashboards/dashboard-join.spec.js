@@ -28,7 +28,7 @@ const {
   test,
   expect,
 } = require("../utils/enhanced-baseFixtures.js");
-const { waitForDashboardPage } = require("./utils/dashCreation.js");
+const { waitForDashboardPage } = require("../../pages/dashboardPages/dashCreation.js");
 const PageManager = require("../../pages/page-manager");
 const testLogger = require("../utils/test-logger.js");
 const { JoinHelper, getTableRowCount, verifyJoinChipVisible } = require("../../pages/dashboardPages/dashboard-joins.js");
