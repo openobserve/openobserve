@@ -268,13 +268,10 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info(`Expanding field: ${fieldToExpand}`);
     await expandButton.waitFor({ state: 'visible', timeout: 10000 });
     await expandButton.click();
-    await page.waitForTimeout(2000);
 
-    // Wait for values to load or error to show
-    await page.waitForTimeout(2000);
-
-    // Verify NO 400 error is shown (main bug fix validation)
+    // Wait for field expansion content to be visible (values or error message)
     const fieldExpansionContent = page.locator(pm.logsPage.fieldListItem(fieldToExpand));
+    await fieldExpansionContent.waitFor({ state: 'visible', timeout: 10000 });
     const contentText = await fieldExpansionContent.textContent().catch(() => '');
 
     // Primary assertion: NO 400 error (this was the bug)
@@ -338,13 +335,10 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info(`Expanding field: ${fieldToExpand}`);
     await expandButton.waitFor({ state: 'visible', timeout: 10000 });
     await expandButton.click();
-    await page.waitForTimeout(2000);
 
-    // Wait for values to load or error to show
-    await page.waitForTimeout(2000);
-
-    // Verify NO 400 error is shown (main bug fix validation)
+    // Wait for field expansion content to be visible (values or error message)
     const fieldExpansionContent = page.locator(pm.logsPage.fieldListItem(fieldToExpand));
+    await fieldExpansionContent.waitFor({ state: 'visible', timeout: 10000 });
     const contentText = await fieldExpansionContent.textContent().catch(() => '');
 
     // Primary assertion: NO 400 error (this was the bug)
@@ -408,13 +402,10 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info(`Expanding field: ${fieldToExpand}`);
     await expandButton.waitFor({ state: 'visible', timeout: 10000 });
     await expandButton.click();
-    await page.waitForTimeout(2000);
 
-    // Wait for values to load or error to show
-    await page.waitForTimeout(2000);
-
-    // Verify NO 400 error is shown (main bug fix validation)
+    // Wait for field expansion content to be visible (values or error message)
     const fieldExpansionContent = page.locator(pm.logsPage.fieldListItem(fieldToExpand));
+    await fieldExpansionContent.waitFor({ state: 'visible', timeout: 10000 });
     const contentText = await fieldExpansionContent.textContent().catch(() => '');
 
     // Primary assertion: NO 400 error (this was the bug)
@@ -513,8 +504,6 @@ test.describe("Logs Regression Bugs", () => {
     }
   });
 
-  /**
-  /**
   /**
    * Bug #9311: Alert graph color appears only on half of the graph
    * Issue: https://github.com/openobserve/openobserve/issues/9311
