@@ -1,16 +1,9 @@
 import { fileURLToPath } from 'node:url'
 import { mergeConfig, defineConfig, configDefaults } from 'vitest/config'
-import type { ConfigEnv } from 'vitest/config'
-import type { UserConfig } from 'vite'
 import viteConfig from './vite.config'
 
-// Convert the vite config to a plain object if it's a function
-const viteConfigObj = typeof viteConfig === 'function' 
-  ? (viteConfig as (options: ConfigEnv) => UserConfig)({ command: 'serve', mode: 'development' }) 
-  : viteConfig
-
 export default mergeConfig(
-  viteConfigObj,
+  viteConfig,
   defineConfig({
     resolve: {
       alias: {
@@ -23,8 +16,10 @@ export default mergeConfig(
       include: ["src/**/*.spec.{ts,js,vue}"],
       root: fileURLToPath(new URL('.', import.meta.url)),
       setupFiles: ['src/test/unit/helpers/setupTests.ts'],
-      deps: {
-        inline: ["monaco-editor", "vitest-canvas-mock"],
+      server: {
+        deps: {
+          inline: ["monaco-editor", "vitest-canvas-mock"],
+        },
       },
       // Prevent unhandled errors from failing the test suite
       dangerouslyIgnoreUnhandledErrors: true,
