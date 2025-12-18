@@ -637,12 +637,15 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
   });
 
   /**
-   * Test 5: Filters & Edge Cases (3 panels)
+   * Test 5: Filters & Edge Cases (6 panels)
    * - Panel 1: INNER + filter setup
    * - Panel 2: LEFT JOIN with NULLs (12 rows)
    * - Panel 3: Session duration join
+   * - Panel 4: Not-Equal join (!=)
+   * - Panel 5: Greater-than join (>)
+   * - Panel 6: Self-join
    */
-  test("Test 5: Filters & Edge Cases (3 panels)", {
+  test("Test 5: Filters & Edge Cases (6 panels)", {
     tag: ['@dashboard-joins', '@dashboard-joins-filters', '@P2']
   }, async ({ page }) => {
     const testId = generateTestId();
@@ -739,6 +742,81 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
 
       await pm.dashboardPanelActions.savePanel();
 
+      // === PANEL 4: Not-Equal Join (!=) ===
+      testLogger.info("Panel 4: Testing Not-Equal Join (!=)");
+      await addNextPanel(page);
+      await pm.dashboardPanelActions.addPanelName("not-equal-join-panel");
+
+      await pm.chartTypeSelector.selectChartType("table");
+      await pm.chartTypeSelector.selectStream(STREAMS.WEB_REQUESTS);
+      await page.waitForTimeout(2000);
+
+      await joinHelper.configureJoin("left", STREAMS.APP_USERS, [
+        { leftField: "user_id", operation: "!=", rightField: "user_id" },
+      ]);
+
+      await pm.chartTypeSelector.searchAndAddField("request_id", "x");
+      await pm.chartTypeSelector.searchAndAddField("path", "y");
+
+      await pm.dashboardPanelActions.applyDashboardBtn();
+      await page.waitForTimeout(3000);
+
+      const notEqualRowCount = await getTableRowCount(page);
+      expect(notEqualRowCount).toBeGreaterThanOrEqual(0);
+      testLogger.info(`Panel 4 Not-Equal: ${notEqualRowCount} rows`);
+
+      await pm.dashboardPanelActions.savePanel();
+
+      // === PANEL 5: Greater-than Join (>) ===
+      testLogger.info("Panel 5: Testing Greater-than Join (>)");
+      await addNextPanel(page);
+      await pm.dashboardPanelActions.addPanelName("greater-than-join-panel");
+
+      await pm.chartTypeSelector.selectChartType("table");
+      await pm.chartTypeSelector.selectStream(STREAMS.WEB_REQUESTS);
+      await page.waitForTimeout(2000);
+
+      await joinHelper.configureJoin("left", STREAMS.APP_USERS, [
+        { leftField: "user_id", operation: ">", rightField: "user_id" },
+      ]);
+
+      await pm.chartTypeSelector.searchAndAddField("request_id", "x");
+      await pm.chartTypeSelector.searchAndAddField("status", "y");
+
+      await pm.dashboardPanelActions.applyDashboardBtn();
+      await page.waitForTimeout(3000);
+
+      const greaterThanRowCount = await getTableRowCount(page);
+      expect(greaterThanRowCount).toBeGreaterThanOrEqual(0);
+      testLogger.info(`Panel 5 Greater-than: ${greaterThanRowCount} rows`);
+
+      await pm.dashboardPanelActions.savePanel();
+
+      // === PANEL 6: Self-Join ===
+      testLogger.info("Panel 6: Testing Self-Join");
+      await addNextPanel(page);
+      await pm.dashboardPanelActions.addPanelName("self-join-panel");
+
+      await pm.chartTypeSelector.selectChartType("table");
+      await pm.chartTypeSelector.selectStream(STREAMS.WEB_REQUESTS);
+      await page.waitForTimeout(2000);
+
+      await joinHelper.configureJoin("inner", STREAMS.WEB_REQUESTS, [
+        { leftField: "user_id", operation: "=", rightField: "user_id" },
+      ]);
+
+      await pm.chartTypeSelector.searchAndAddField("request_id", "x");
+      await pm.chartTypeSelector.searchAndAddField("path", "y");
+
+      await pm.dashboardPanelActions.applyDashboardBtn();
+      await page.waitForTimeout(3000);
+
+      const selfJoinRowCount = await getTableRowCount(page);
+      expect(selfJoinRowCount).toBeGreaterThan(0);
+      testLogger.info(`Panel 6 Self-Join: ${selfJoinRowCount} rows`);
+
+      await pm.dashboardPanelActions.savePanel();
+
     } finally {
       await cleanupStreams(STREAMS);
       await deleteDashboardByName(dashboardName);
@@ -746,10 +824,11 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
   });
 
   /**
-   * Test 6: Dynamic Join Operations (standalone)
+   * Test 6: Dynamic Join Operations & UI Validation
    * - Add join → verify → Add second → verify → Remove first → verify
+   * - Condition management: remove button disabled with single condition
    */
-  test("Test 6: Dynamic Join Operations - Add/Remove Joins", {
+  test("Test 6: Dynamic Join Operations & UI Validation", {
     tag: ['@dashboard-joins', '@dashboard-joins-dynamic', '@P1']
   }, async ({ page }) => {
     const testId = generateTestId();
@@ -803,6 +882,39 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       const noErrors = await noDataElement.isHidden();
       expect(noErrors).toBeTruthy();
       testLogger.info("Dynamic join operations completed successfully");
+
+      // === UI Validation: Condition Management ===
+      testLogger.info("Testing condition management UI validation");
+
+      // Click on the remaining join to open popup
+      const joinItem = page.locator('[data-test="dashboard-join-item-0"]');
+      await joinItem.click();
+      await page.locator('[data-test="dashboard-join-pop-up"]').waitFor({ state: "visible", timeout: 10000 });
+
+      // With single condition, remove button should be disabled
+      const removeBtn = page.locator('[data-test="dashboard-join-condition-remove-0"]');
+      await expect(removeBtn).toBeDisabled();
+      testLogger.info("Remove button correctly disabled with single condition");
+
+      // Add another condition
+      await joinHelper.addAnotherCondition(0);
+      await page.waitForTimeout(500);
+
+      // Now remove buttons should be enabled
+      const removeBtnFirst = page.locator('[data-test="dashboard-join-condition-remove-0"]');
+      await expect(removeBtnFirst).not.toBeDisabled();
+      testLogger.info("Remove buttons enabled with multiple conditions");
+
+      // Remove the added condition
+      await joinHelper.removeCondition(1);
+      await page.waitForTimeout(500);
+
+      // Back to single condition, remove should be disabled again
+      const removeBtnAfter = page.locator('[data-test="dashboard-join-condition-remove-0"]');
+      await expect(removeBtnAfter).toBeDisabled();
+      testLogger.info("Remove button disabled again after removing to single condition");
+
+      await joinHelper.closeJoinPopup();
 
       await pm.dashboardPanelActions.savePanel();
 
