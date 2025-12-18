@@ -117,6 +117,9 @@
                 :initialVariableValues="getInitialVariablesData()"
                 @variablesData="variablesDataUpdated"
                 data-test="dashboard-viewpanel-variables-value-selector"
+                :showAllVisible="true"
+                :tabId="currentTabId"
+                :panelId="currentPanelId"
               />
               <div style="flex: 1; overflow: hidden">
                 <div
@@ -583,6 +586,27 @@ export default defineComponent({
       );
       currentDashboardData.data = data;
 
+      // Initialize variables manager with dashboard variables
+      try {
+        await variablesManager.initialize(
+          currentDashboardData.data?.variables?.list || [],
+          currentDashboardData.data,
+        );
+
+        // Mark current tab and panel as visible so their variables can load
+        const tabId = (route.query.tab as string) ?? currentDashboardData.data?.tabs?.[0]?.tabId;
+        if (tabId) {
+          variablesManager.setTabVisibility(tabId, true);
+        }
+
+        // Mark the panel as visible
+        if (props.panelId) {
+          variablesManager.setPanelVisibility(props.panelId, true);
+        }
+      } catch (error) {
+        console.error("Error initializing variables manager:", error);
+      }
+
       // if variables data is null, set it to empty list
       if (
         !(
@@ -719,6 +743,15 @@ export default defineComponent({
 
     // [END] cancel running queries
 
+    // Computed properties for current tab and panel IDs
+    const currentTabId = computed(() => {
+      return (route.query.tab as string) ?? currentDashboardData.data?.tabs?.[0]?.tabId;
+    });
+
+    const currentPanelId = computed(() => {
+      return props.panelId;
+    });
+
     return {
       t,
       setTimeForVariables,
@@ -759,6 +792,8 @@ export default defineComponent({
       errorMessage,
       outlinedWarning,
       symOutlinedDataInfoAlert,
+      currentTabId,
+      currentPanelId,
     };
   },
 });

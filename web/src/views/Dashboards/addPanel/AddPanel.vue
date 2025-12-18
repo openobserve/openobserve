@@ -326,6 +326,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @openAddVariable="handleOpenAddVariable"
                       :initialVariableValues="initialVariableValues"
                       :showAddVariableButton="true"
+                      :showAllVisible="true"
+                      :tabId="currentTabId"
+                      :panelId="currentPanelId"
                     />
 
                     <div v-if="isOutDated" class="tw-p-2">
@@ -493,6 +496,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :initialVariableValues="initialVariableValues"
               class="tw-flex-shrink-0 q-mb-sm"
               :showAddVariableButton="true"
+              :showAllVisible="true"
+              :tabId="currentTabId"
+              :panelId="currentPanelId"
             />
             <CustomHTMLEditor
               v-model="dashboardPanelData.data.htmlContent"
@@ -521,6 +527,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :initialVariableValues="initialVariableValues"
               class="tw-flex-shrink-0 q-mb-sm"
               :showAddVariableButton="true"
+              :showAllVisible="true"
+              :tabId="currentTabId"
+              :panelId="currentPanelId"
             />
             <CustomMarkdownEditor
               v-model="dashboardPanelData.data.markdownContent"
@@ -1220,6 +1229,27 @@ export default defineComponent({
         forceSkipBeforeUnloadListener = true;
         goBack();
         return;
+      }
+
+      // Initialize variables manager with dashboard variables
+      try {
+        await variablesManager.initialize(
+          currentDashboardData.data?.variables?.list || [],
+          currentDashboardData.data,
+        );
+
+        // Mark current tab and panel as visible so their variables can load
+        const tabId = (route.query.tab as string) ?? currentDashboardData.data?.tabs?.[0]?.tabId;
+        if (tabId) {
+          variablesManager.setTabVisibility(tabId, true);
+        }
+
+        // In edit mode, mark the panel as visible
+        if (route.query.panelId) {
+          variablesManager.setPanelVisibility(route.query.panelId as string, true);
+        }
+      } catch (error) {
+        console.error("Error initializing variables manager:", error);
       }
 
       // if variables data is null, set it to empty list
@@ -2222,6 +2252,20 @@ export default defineComponent({
 
     // [END] O2 AI Context Handler
 
+    // Computed properties for current tab and panel IDs
+    const currentTabId = computed(() => {
+      return (route.query.tab as string) ?? currentDashboardData.data?.tabs?.[0]?.tabId;
+    });
+
+    const currentPanelId = computed(() => {
+      // In edit mode, use the panelId from query params
+      if (editMode.value && route.query.panelId) {
+        return route.query.panelId as string;
+      }
+      // In add mode, use the panel ID from dashboardPanelData (after it's generated)
+      return dashboardPanelData.data.id || undefined;
+    });
+
     /**
      * Opens the Add Variable panel
      */
@@ -2360,6 +2404,8 @@ export default defineComponent({
       handleOpenAddVariable,
       handleCloseAddVariable,
       handleSaveVariable,
+      currentTabId,
+      currentPanelId,
     };
   },
   methods: {

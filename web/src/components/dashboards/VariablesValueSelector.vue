@@ -152,6 +152,11 @@ export default defineComponent({
       type: Object as PropType<any>,
       default: undefined,
     },
+    // When true, shows all visible variables (global + tab + panel) for the given context
+    showAllVisible: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ["variablesData"],
   components: {
@@ -173,6 +178,13 @@ export default defineComponent({
     const managerVariables = computed(() => {
       if (!useManager) return [];
 
+      // If showAllVisible is true, return all visible variables for this context
+      // This includes global + tab + panel variables
+      if (props.showAllVisible) {
+        return manager.getAllVisibleVariables(props.tabId, props.panelId) || [];
+      }
+
+      // Otherwise, return only variables from the specified scope
       const scopeKey = props.scope;
       let variables: any[] = [];
 
@@ -946,16 +958,9 @@ export default defineComponent({
     watch(
       () => {
         if (!useManager || !manager) return [];
-        // Return the actual array reference so deep watch can track mutations
-        const scopeKey = props.scope;
-        if (scopeKey === "global") {
-          return manager.variablesData.global;
-        } else if (scopeKey === "tabs" && props.tabId) {
-          return manager.variablesData.tabs[props.tabId];
-        } else if (scopeKey === "panels" && props.panelId) {
-          return manager.variablesData.panels[props.panelId];
-        }
-        return [];
+        // Watch the managerVariables computed property directly
+        // This handles both single-scope and showAllVisible modes
+        return managerVariables.value;
       },
       () => {
         if (!useManager) return;
