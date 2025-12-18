@@ -893,7 +893,8 @@ export const usePanelDataLoader = (
           const completedQueries = new Set<number>(); // Track completed queries
 
           // Process each query using streaming
-          for (const [queryIndex, it] of panelSchema.value.queries.entries()) {
+          // Process all queries in parallel using Promise.all
+          panelSchema.value.queries.map(async (it, queryIndex) => {
             const { query: query1, metadata: metadata1 } = replaceQueryValue(
               it.query,
               startISOTimestamp,
@@ -902,10 +903,7 @@ export const usePanelDataLoader = (
             );
 
             const { query: query2, metadata: metadata2 } =
-              await applyDynamicVariables(
-                query1,
-                panelSchema.value.queryType,
-              );
+              await applyDynamicVariables(query1, panelSchema.value.queryType);
 
             const query = query2;
             const metadata = {
@@ -970,25 +968,40 @@ export const usePanelDataLoader = (
                   const currentResult = queryResults[queryIndex];
 
                   // If both have result arrays, merge them
-                  if (currentResult?.result && Array.isArray(currentResult.result) &&
-                      newData?.result && Array.isArray(newData.result)) {
+                  if (
+                    currentResult?.result &&
+                    Array.isArray(currentResult.result) &&
+                    newData?.result &&
+                    Array.isArray(newData.result)
+                  ) {
                     // Merge the result arrays (time series data)
                     // For matrix type, we need to merge values arrays for matching metrics
                     const mergedResult = [...currentResult.result];
 
                     newData.result.forEach((newMetric: any) => {
                       // Find if this metric already exists in current results
-                      const existingIndex = mergedResult.findIndex((existingMetric: any) => {
-                        // Compare metric labels to find matching time series
-                        return JSON.stringify(existingMetric.metric) === JSON.stringify(newMetric.metric);
-                      });
+                      const existingIndex = mergedResult.findIndex(
+                        (existingMetric: any) => {
+                          // Compare metric labels to find matching time series
+                          return (
+                            JSON.stringify(existingMetric.metric) ===
+                            JSON.stringify(newMetric.metric)
+                          );
+                        },
+                      );
 
                       if (existingIndex >= 0) {
                         // Metric exists - merge the values arrays
-                        if (Array.isArray(mergedResult[existingIndex].values) && Array.isArray(newMetric.values)) {
+                        if (
+                          Array.isArray(mergedResult[existingIndex].values) &&
+                          Array.isArray(newMetric.values)
+                        ) {
                           mergedResult[existingIndex] = {
                             ...mergedResult[existingIndex],
-                            values: [...mergedResult[existingIndex].values, ...newMetric.values]
+                            values: [
+                              ...mergedResult[existingIndex].values,
+                              ...newMetric.values,
+                            ],
                           };
                         }
                       } else {
@@ -999,7 +1012,7 @@ export const usePanelDataLoader = (
 
                     queryResults[queryIndex] = {
                       ...newData,
-                      result: mergedResult
+                      result: mergedResult,
                     };
                   } else if (newData) {
                     // Replace with new data if structure is different
@@ -1025,7 +1038,8 @@ export const usePanelDataLoader = (
               // Mark this query as completed (even with error)
               completedQueries.add(queryIndex);
 
-              const errorMessage = err?.content?.message || err?.content?.error || "Unknown error";
+              const errorMessage =
+                err?.content?.message || err?.content?.error || "Unknown error";
               const errorCode = err?.content?.code || "";
 
               state.errorDetail = {
@@ -1078,11 +1092,10 @@ export const usePanelDataLoader = (
             });
 
             addTraceId(traceId);
-          }
+          });
 
           // Wait for annotations to complete and update state
           state.annotations = await annotationsPromise;
-
         } catch (error) {
           state.loading = false;
           state.isOperationCancelled = false;
@@ -1333,7 +1346,8 @@ export const usePanelDataLoader = (
                       ) {
                         // Check if streaming_aggs is enabled
                         const streaming_aggs =
-                          state.resultMetaData[queryIndex]?.[0]?.streaming_aggs ?? false;
+                          state.resultMetaData[queryIndex]?.[0]
+                            ?.streaming_aggs ?? false;
 
                         // If streaming_aggs, replace the data (aggregation query)
                         if (streaming_aggs) {
@@ -1710,7 +1724,8 @@ export const usePanelDataLoader = (
         let variableValue = "";
         if (Array.isArray(variable.value)) {
           // If no data found (empty array), use SELECT_ALL_VALUE
-          const valueToUse = variable.value.length === 0 ? [SELECT_ALL_VALUE] : variable.value;
+          const valueToUse =
+            variable.value.length === 0 ? [SELECT_ALL_VALUE] : variable.value;
           const value =
             valueToUse
               .map(
@@ -1730,8 +1745,7 @@ export const usePanelDataLoader = (
             {
               placeHolder: `\${${variable.name}:doublequote}`,
               value:
-                valueToUse.map((value: any) => `"${value}"`).join(",") ||
-                '""',
+                valueToUse.map((value: any) => `"${value}"`).join(",") || '""',
             },
             {
               placeHolder: `\${${variable.name}:singlequote}`,
@@ -1762,7 +1776,8 @@ export const usePanelDataLoader = (
           });
         } else {
           // If no data found (null value), use SELECT_ALL_VALUE
-          const valueToUse = variable.value === null ? SELECT_ALL_VALUE : variable.value;
+          const valueToUse =
+            variable.value === null ? SELECT_ALL_VALUE : variable.value;
           variableValue = `${variable.escapeSingleQuotes ? escapeSingleQuotes(valueToUse) : valueToUse}`;
           if (
             query.includes(variableName) ||
@@ -2288,7 +2303,6 @@ export const usePanelDataLoader = (
       rootMargin: "0px",
       threshold: 0, // Adjust as needed
     });
-
 
     // Keep the working solution - setTimeout ensures the element is fully rendered
     // This is necessary because IntersectionObserver checks immediately after observe()
