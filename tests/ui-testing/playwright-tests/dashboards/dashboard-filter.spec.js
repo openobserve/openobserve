@@ -389,7 +389,7 @@ test.describe("dashboard filter testcases", () => {
     await pm.chartTypeSelector.selectStreamType("logs");
     await pm.chartTypeSelector.selectStream("e2e_automate");
     await page
-      .locator('[data-test="dashboard-x-item-_timestamp-remove"]')
+      .locator('[data-test="dashboard-x-item-x_axis_1-remove"]')
       .click();
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_container_name",

@@ -1068,7 +1068,15 @@
     "mapvalue": "价值",
     "customChartTypeSelector": "自定义图表类型选择器",
     "customChartTypeSelectorHint": "从 ECharts 库中选择图表类型，开始使用基本代码结构",
-    "selectChartType": "选择图表类型"
+    "selectChartType": "选择图表类型",
+    "joins": "加入",
+    "addJoin": "添加加入",
+    "removeJoin": "移除加入",
+    "leftJoin": "向左加入",
+    "innerJoin": "内部加入",
+    "rightJoin": "右键加入",
+    "addClause": "添加条款",
+    "removeClause": "移除条款"
   },
   "home": {
     "streams": "数据流",
