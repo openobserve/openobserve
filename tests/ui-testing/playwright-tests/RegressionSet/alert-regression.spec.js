@@ -67,8 +67,16 @@ test.describe("Alert Regression Bugs", () => {
     await pm.alertsPage.verifyAlertCreated(alertName);
     testLogger.info(`Alert created: ${alertName}`);
 
-    // Step 4: Click on the created alert to view details
-    const alertRow = page.locator(pm.alertsPage.tableBodyRowWithIndex).first();
+    // Step 4: Navigate back to alerts list and click on the created alert
+    await pm.commonActions.navigateToAlerts();
+    await page.waitForLoadState('networkidle');
+
+    // Wait for alert table to be visible
+    await page.locator(pm.alertsPage.tableBodyRowWithIndex).first().waitFor({ state: 'visible', timeout: 30000 });
+
+    // Click on the specific alert row by name
+    const alertRow = page.getByRole('cell', { name: alertName }).first();
+    await alertRow.waitFor({ state: 'visible', timeout: 10000 });
     await alertRow.click();
     await page.waitForTimeout(2000);
     testLogger.info('Opened alert details');
