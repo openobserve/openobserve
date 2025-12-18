@@ -166,6 +166,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^stream\d{13}$/,                     // stream1765164273471, etc. (timestamp-based test streams)
         /^e2e_stream_(a|b)_\d+$/,             // Regression test streams (e2e_stream_a_*, e2e_stream_b_*)
         /^join_[a-z0-9]+_(requests|users|sessions)$/,  // Dashboard joins test streams (join_<testId>_requests, etc.)
+        /^func_test_[a-z0-9]+$/,                       // Dashboard functions test streams (func_test_<testId>)
         /^join_manual_test$/,                          // Manual join test stream
         /^test_app_users$/,                            // Test app users stream
         /^test_sessions$/,                             // Test sessions stream
