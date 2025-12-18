@@ -51,12 +51,11 @@ pub async fn set(org_id: &str, key: &str, val: Bytes) -> Result<(), anyhow::Erro
 
     let cache_key = mk_cache_key(org_id, key);
 
-    // Send to super cluster first (if enabled)
+    infra::table::kv_store::set(org_id, key, &val).await?;
+
+    // Send to super cluster (if enabled)
     #[cfg(feature = "enterprise")]
     super_cluster::emit_put_event(org_id, key, val.clone()).await?;
-
-    // Set in database table (primary storage)
-    infra::table::kv_store::set(org_id, key, &val).await?;
 
     // Publish event to coordinator for cluster cache synchronization
     // NOTE: put_into_db_coordinator handles local vs cluster mode:
@@ -76,12 +75,11 @@ pub async fn delete(org_id: &str, key: &str) -> Result<(), anyhow::Error> {
     let cache_key = mk_cache_key(org_id, key);
     KVS.remove(&cache_key);
 
-    // Send to super cluster first (if enabled)
+    infra::table::kv_store::delete(org_id, key).await?;
+
+    // Send to super cluster (if enabled)
     #[cfg(feature = "enterprise")]
     super_cluster::emit_delete_event(org_id, key).await?;
-
-    // Delete from database table (primary storage)
-    infra::table::kv_store::delete(org_id, key).await?;
 
     // Publish delete event to coordinator for cluster cache synchronization
     let coord_key = format!("/kv/{}", cache_key);
@@ -141,7 +139,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let item_value = match infra::table::kv_store::get(org_id, kv_key).await {
                     Ok(Some(model)) => Bytes::from(model.value),
                     Ok(None) => {
-                        log::warn!("KV key not found in table: {}", item_key);
+                        log::error!("KV key not found in table: {}", item_key);
                         continue;
                     }
                     Err(e) => {

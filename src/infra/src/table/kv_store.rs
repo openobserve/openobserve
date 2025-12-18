@@ -102,9 +102,10 @@ pub async fn list(org_id: &str, prefix: &str) -> Result<Vec<String>, errors::Err
 
 /// Clears all KV entries from the table
 pub async fn clear() -> Result<(), errors::Error> {
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     // make sure only one client is writing to the database (only for sqlite)
     let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::delete_many().exec(client).await?;
     Ok(())
 }
