@@ -2490,7 +2490,7 @@ describe("Dashboard Data Conversion Utils", () => {
       };
       const errors = [];
       validatePanel(panelData, errors, true, [{ name: "time" }, { name: "value" }], "dashboard", mockStore, checkTimestampAlias);
-      expect(errors).toContain("Join #1: Conditions are required");
+      expect(errors).toContain("Join #1: At least one clause is required");
     });
 
     it("should validate join condition leftField for lines 1489-1493", () => {
@@ -2515,7 +2515,7 @@ describe("Dashboard Data Conversion Utils", () => {
       };
       const errors = [];
       validatePanel(panelData, errors, true, [{ name: "time" }, { name: "value" }], "dashboard", mockStore, checkTimestampAlias);
-      expect(errors).toContain("Join #1: Condition #1: Left field is required");
+      expect(errors).toContain("Join #1: Clause 1: Left field is required");
     });
 
     it("should validate join condition rightField for lines 1496-1500", () => {
@@ -2540,7 +2540,7 @@ describe("Dashboard Data Conversion Utils", () => {
       };
       const errors = [];
       validatePanel(panelData, errors, true, [{ name: "time" }, { name: "value" }], "dashboard", mockStore, checkTimestampAlias);
-      expect(errors).toContain("Join #1: Condition #1: Right field is required");
+      expect(errors).toContain("Join #1: Clause 1: Right field is required");
     });
 
     it("should validate join condition operation for lines 1503-1507", () => {
@@ -2565,7 +2565,7 @@ describe("Dashboard Data Conversion Utils", () => {
       };
       const errors = [];
       validatePanel(panelData, errors, true, [{ name: "time" }, { name: "value" }], "dashboard", mockStore, checkTimestampAlias);
-      expect(errors).toContain("Join #1: Condition #1: Operation is required");
+      expect(errors).toContain("Join #1: Clause 1: Operation is required");
     });
 
     it("should validate multiple joins for lines 1514-1517", () => {
