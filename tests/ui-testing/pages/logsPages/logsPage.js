@@ -168,7 +168,8 @@ export class LogsPage {
 
         // Additional regression test selectors
         this.streamsSearchInputField = '[data-test="streams-search-stream-input"] input';
-        this.errorIndicators = '.error, [class*="error"], .q-notification--negative, .text-negative';
+        // Note: Narrowed from [class*="error"] to avoid false positives like "error-free"
+        this.errorIndicators = '.q-notification--negative, .q-notification__message--error, .text-negative, [class^="error-"], [class$="-error"]';
         this.timestampInDetail = '[data-test*="timestamp"], .timestamp';
     }
 

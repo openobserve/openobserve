@@ -632,7 +632,8 @@ test.describe("Logs Regression Bugs", () => {
     await page.waitForTimeout(1000);
 
     // Execute a histogram query (similar to the one that failed in bug report)
-    const histogramQuery = 'SELECT histogram(_timestamp) AS zo_sql_key, COUNT(*) AS zo_sql_num FROM "e2e_automate" GROUP BY zo_sql_key ORDER BY zo_sql_key';
+    // Note: Bug #8180 requires zo_sql_val alias for COUNT (not zo_sql_num) - per Greptile review
+    const histogramQuery = 'SELECT histogram(_timestamp) AS zo_sql_key, COUNT(*) AS zo_sql_val FROM "e2e_automate" GROUP BY zo_sql_key ORDER BY zo_sql_key';
     await pm.logsPage.fillQueryEditor(histogramQuery);
     await pm.logsPage.clickRefreshButton();
     await page.waitForTimeout(3000);

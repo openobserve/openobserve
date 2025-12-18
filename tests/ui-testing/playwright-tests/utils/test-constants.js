@@ -23,8 +23,21 @@ module.exports = {
   },
 
   // Wait Times (in milliseconds)
-  // Note: These are for cases where deterministic waits aren't possible
-  // Prefer waitForSelector, waitForLoadState, or expect().toBeVisible() when possible
+  // ⚠️ WARNING: Fixed timeouts are an anti-pattern in Playwright!
+  // These constants are provided for legacy compatibility only.
+  //
+  // PREFERRED APPROACHES:
+  // 1. await page.waitForLoadState('networkidle')
+  // 2. await element.waitFor({ state: 'visible' })
+  // 3. await expect(element).toBeVisible()
+  // 4. await page.waitForSelector('[data-test="element"]')
+  //
+  // Only use these constants when:
+  // - Waiting for animations/transitions (use TRANSITION)
+  // - Working around race conditions that can't be fixed with explicit waits
+  // - Dealing with third-party components without proper loading states
+  //
+  // TODO: Replace all usages of these constants with explicit waits
   TIMEOUTS: {
     // Short waits for UI transitions
     TRANSITION: 300,
