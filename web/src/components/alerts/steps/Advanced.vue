@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="showLabelOnTop q-mb-sm q-text-area-input"
           stack-label
           outlined
-          filled
+          borderless
           dense
           tabindex="0"
           style="width: 100%; resize: none;"
@@ -171,10 +171,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           color="input-border"
           bg-color="input-bg"
           class="row-template-input"
-          :class="store.state.theme === 'dark' ? 'dark-mode-row-template' : 'light-mode-row-template'"
           stack-label
           outlined
-          filled
+          borderless
           dense
           tabindex="0"
           style="width: 100%; resize: none;"
@@ -372,15 +371,6 @@ export default defineComponent({
     :deep(.q-field__control) {
       background-color: #ffffff !important;
     }
-  }
-}
-
-.o2-secondary-button {
-  border: 1px solid #7980cc;
-  color: #7980cc;
-
-  &:hover {
-    background-color: rgba(121, 128, 204, 0.1);
   }
 }
 </style>
