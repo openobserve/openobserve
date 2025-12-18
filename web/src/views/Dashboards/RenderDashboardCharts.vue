@@ -617,10 +617,10 @@ export default defineComponent({
           // Check if the variables have loaded (length > 0)
           if (checkIfVariablesAreLoaded(variablesData.value)) {
             needsVariablesAutoUpdate = false;
-          }
-          // Auto-update committed state on first load (legacy mode only)
-          if (!variablesManager) {
-            currentVariablesDataRef.value = { __global: variablesData.value };
+            // Auto-update committed state on first load (legacy mode only)
+            if (!variablesManager) {
+              currentVariablesDataRef.value = { __global: variablesData.value };
+            }
           }
         }
 

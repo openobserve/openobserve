@@ -666,16 +666,16 @@ export default defineComponent({
           return;
         }
       }
-      currentDashboardData.data = await getDashboard(
+      const dashboard = await getDashboard(
         store,
         route.query.dashboard,
         route.query.folder ?? "default",
       );
 
       if (
-        !currentDashboardData?.data ||
-        typeof currentDashboardData.data !== "object" ||
-        !Object.keys(currentDashboardData.data).length
+        !dashboard ||
+        typeof dashboard !== "object" ||
+        !Object.keys(dashboard).length
       ) {
         goBackToDashboardList();
         return;
@@ -684,23 +684,25 @@ export default defineComponent({
       // Initialize variables manager ONLY if there are scoped variables (tabs or panels)
       // For legacy dashboards with only global variables, use the legacy approach
       const hasScopedVariables =
-        currentDashboardData.data?.variables?.list?.some(
+        dashboard?.variables?.list?.some(
           (v: any) => v.scope === "tabs" || v.scope === "panels",
         );
 
       if (hasScopedVariables) {
         try {
           await variablesManager.initialize(
-            currentDashboardData.data.variables.list,
-            currentDashboardData.data,
+            dashboard.variables.list,
+            dashboard,
           );
 
           // Load variable values from URL if present
           variablesManager.loadFromUrl(route);
 
-          // Immediately commit the loaded values so they're available for API calls
+          // PERFORM INITIAL COMMIT!
+          // This ensures that when the dashboard renders (in the next step),
+          // variables are ALREADY in the committed state (even if values are null).
+          // This allows panels to correctly identify their dependencies from the start.
           variablesManager.commitAll();
-          console.log("[ViewDashboard] Committed variables loaded from URL on initial load");
 
           // Track that we're using the scoped variables manager
           usingScopedVariablesManager.value = true;
@@ -719,14 +721,18 @@ export default defineComponent({
         usingScopedVariablesManager.value = false;
       }
 
+      // NOW set the reactive dashboard data to trigger rendering
+      // By this point, the variables manager is fully initialized and structurally committed.
+      currentDashboardData.data = dashboard;
+
       // set selected tab from query params
-      const selectedTab = currentDashboardData?.data?.tabs?.find(
+      const selectedTab = dashboard?.tabs?.find(
         (tab: any) => tab.tabId === route.query.tab,
       );
 
       selectedTabId.value = selectedTab
         ? selectedTab.tabId
-        : currentDashboardData?.data?.tabs?.[0]?.tabId;
+        : dashboard?.tabs?.[0]?.tabId;
 
       // If using manager, set the selected tab as visible
       if (hasScopedVariables && selectedTabId.value) {
@@ -734,12 +740,7 @@ export default defineComponent({
       }
 
       // if variables data is null, set it to empty list
-      if (
-        !(
-          currentDashboardData.data?.variables &&
-          currentDashboardData.data?.variables?.list.length
-        )
-      ) {
+      if (!(dashboard?.variables && dashboard?.variables?.list.length)) {
         variablesData.isVariablesLoading = false;
         variablesData.values = [];
         refreshedVariablesData.isVariablesLoading = false;
@@ -855,6 +856,10 @@ export default defineComponent({
     };
 
     const getQueryParamsForDuration = (data: any) => {
+      if (!data) {
+        return {};
+      }
+
       if (data.relativeTimePeriod) {
         return {
           period: data.relativeTimePeriod,
@@ -1066,8 +1071,15 @@ export default defineComponent({
     };
 
     // whenever the refreshInterval is changed, update the query params
-    watch([refreshInterval, selectedDate, selectedTabId], () => {
-      generateNewDashboardRunId();
+    watch(
+      [
+        refreshInterval,
+        selectedDate,
+        selectedTabId,
+        () => variablesManager.committedVariablesData,
+      ],
+      () => {
+        generateNewDashboardRunId();
 
       // Build variable params - prefer manager if available, otherwise use route.query
       let variableParams: Record<string, any> = {};
@@ -1109,7 +1121,7 @@ export default defineComponent({
           searchtype: route.query.searchtype,
         },
       });
-    });
+    }, { deep: true });
 
   
     const onDeletePanel = async (panelId: any) => {
@@ -1350,6 +1362,30 @@ export default defineComponent({
         showJsonEditorDialog.value = false;
       }
     });
+
+    // Initial commitment once all variables have settled (for manager mode)
+    let initialCommitDone = false;
+    watch(
+      () => [
+        variablesManager.isLoading.value,
+        variablesManager.variablesData.isInitialized,
+      ],
+      ([loading, initialized]) => {
+        if (
+          initialized &&
+          !loading &&
+          !initialCommitDone &&
+          usingScopedVariablesManager.value
+        ) {
+          console.log(
+            "[ViewDashboard] Variables settled, performing initial commit",
+          );
+          variablesManager.commitAll();
+          initialCommitDone = true;
+        }
+      },
+      { immediate: true },
+    );
 
     return {
       currentDashboardData,
