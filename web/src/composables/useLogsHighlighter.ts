@@ -354,8 +354,13 @@ export function useLogsHighlighter() {
     if (/^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)$/i.test(trimmed))
       return "http-method";
 
-    // Status codes
-    if (/^[1-5]\d{2}$/.test(trimmed)) return "status-code";
+    // HTTP Status codes - only match valid status codes
+    // 1xx: Informational (100-103)
+    // 2xx: Success (200-208, 226)
+    // 3xx: Redirection (300-308)
+    // 4xx: Client Error (400-431, 451)
+    // 5xx: Server Error (500-511)
+    if (/^(1(0[0-3])|2(0[0-8]|26)|3(0[0-8])|4(0[0-9]|1[0-9]|2[0-9]|3[01]|51)|5(0[0-9]|1[01]))$/.test(trimmed)) return "status-code";
 
     // UUIDs
     if (

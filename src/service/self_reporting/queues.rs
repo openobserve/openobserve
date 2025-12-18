@@ -327,6 +327,14 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
         for (org, values) in per_org_map.into_iter() {
             let trigger_stream = StreamParams::new(&org, TRIGGERS_STREAM, StreamType::Logs);
 
+            // before pushing to own org ensure that we have a proper triggers stream schema in
+            // place
+            if let Err(e) = super::triggers_schema::ensure_triggers_stream_initialized(&org).await {
+                log::warn!(
+                    "[SELF-REPORTING] Failed to ensure triggers stream initialized for {org}: {e}"
+                );
+            }
+
             if let Err(e) = super::ingestion::ingest_reporting_data(values, trigger_stream).await {
                 log::error!("error in ingesting trigger data for {org} : {e}");
             }

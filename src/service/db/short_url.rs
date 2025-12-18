@@ -64,10 +64,10 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     log::info!("Start watching short URLs");
 
     // Spawn a background task for garbage collection
-    let config = get_config();
+    let cfg = get_config();
     tokio::spawn(run_gc_task(
         days_to_minutes(SHORT_URL_GC_INTERVAL),
-        days_to_minutes(config.limit.short_url_retention_days),
+        days_to_minutes(cfg.limit.short_url_retention_days),
     ));
 
     loop {

@@ -696,21 +696,21 @@ describe("ViewDashboard", () => {
   });
 
   describe("Share Functionality", () => {
-    it("should handle share functionality", async () => {
+    it("should render share button component", async () => {
       wrapper = createWrapper();
       await flushPromises();
-      
-      // Test the shareLink object exists
-      expect(wrapper.vm.shareLink).toBeDefined();
-      expect(typeof wrapper.vm.shareLink.execute).toBe('function');
+
+      // Test that dashboardShareURL computed property exists
+      expect(wrapper.vm.dashboardShareURL).toBeDefined();
+      expect(typeof wrapper.vm.dashboardShareURL).toBe('string');
     });
 
-    it("should show loading state when sharing", async () => {
+    it("should generate correct share URL", async () => {
       wrapper = createWrapper();
       await flushPromises();
-      
-      // Test loading state exists
-      expect(wrapper.vm.shareLink.isLoading).toBeDefined();
+
+      // Test dashboardShareURL is a valid URL
+      expect(wrapper.vm.dashboardShareURL).toBeTruthy();
     });
   });
 
@@ -956,21 +956,13 @@ describe("ViewDashboard", () => {
       expect(typeof wrapper.vm.onMovePanel).toBe('function');
     });
 
-    it("should handle share link generation error", async () => {
+    it("should generate share URL without errors", async () => {
       wrapper = createWrapper();
       await flushPromises();
-      
-      // Test shareLink exists and can handle errors
-      expect(wrapper.vm.shareLink).toBeDefined();
-      expect(typeof wrapper.vm.shareLink.execute).toBe('function');
-    });
 
-    it("should handle clipboard copy failure", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-      
-      // Test shareLink can handle clipboard errors
-      expect(wrapper.vm.shareLink).toBeDefined();
+      // Test dashboardShareURL can be generated without errors
+      expect(wrapper.vm.dashboardShareURL).toBeDefined();
+      expect(typeof wrapper.vm.dashboardShareURL).toBe('string');
     });
 
     it("should handle fullscreen API errors", async () => {

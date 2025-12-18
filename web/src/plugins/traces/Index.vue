@@ -35,7 +35,6 @@ style="min-height: auto">
           class="card-container"
           @searchdata="searchData"
           @onChangeTimezone="refreshTimezone"
-          @shareLink="copyTracesUrl"
           @update:activeTab="activeTab = $event"
         />
       </div>
