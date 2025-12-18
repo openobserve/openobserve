@@ -336,14 +336,13 @@ export default defineComponent({
     const route = useRoute();
     const store = useStore();
 
-    // Initialize or inject variables manager
-    const injectedManager = inject("variablesManager", null);
-    const variablesManager = injectedManager || useVariablesManager();
+    // IMPORTANT: Always create a NEW isolated instance for ViewPanel
+    // ViewPanel should NEVER share the variables manager with the parent dashboard
+    // This ensures that variable changes in ViewPanel don't affect the parent dashboard
+    const variablesManager = useVariablesManager();
 
-    // Provide to child components
-    if (!injectedManager) {
-      provide("variablesManager", variablesManager);
-    }
+    // Provide to child components (ViewPanel's own isolated instance)
+    provide("variablesManager", variablesManager);
 
     const currentVariablesDataRef: any = reactive({});
 
