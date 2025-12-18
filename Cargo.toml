@@ -129,6 +129,7 @@ rayon.workspace = true
 regex.workspace = true
 regex-syntax.workspace = true
 reqwest.workspace = true
+rquickjs = { version = "0.6", features = ["array-buffer", "classes"] }
 rust-embed-for-web = "11.2.1"
 rustls.workspace = true
 rustls-pemfile.workspace = true
