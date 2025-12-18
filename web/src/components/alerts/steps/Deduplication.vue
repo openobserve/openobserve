@@ -41,11 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           color="input-border"
           bg-color="input-bg"
           class="showLabelOnTop no-case"
-          :class="
-            store.state.theme === 'dark' ? 'input-box-bg-dark input-border-dark' : 'input-box-bg-light input-border-light'
-          "
-          filled
           dense
+          borderless
           multiple
           use-chips
           use-input
@@ -83,20 +80,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw-text-sm tw-text-gray-600 dark:tw-text-gray-400 tw-mb-2">
           {{ t("alerts.deduplication.timeWindowHint") }}
         </div>
-        <q-input
-          v-model.number="localDeduplication.time_window_minutes"
-          type="number"
-          dense
-          filled
-          min="1"
-          suffix="minutes"
-          :placeholder="t('alerts.placeholders.autoUsesCheckInterval')"
-          :class="
-            store.state.theme === 'dark' ? 'input-box-bg-dark input-border-dark' : 'input-box-bg-light input-border-light'
-          "
-          @update:model-value="emitUpdate"
-          style="max-width: 300px"
-        />
+        <div class="tw-flex tw-items-center">
+          <div style="width: 210px; margin-left: 0 !important">
+            <q-input
+              v-model.number="localDeduplication.time_window_minutes"
+              type="number"
+              dense
+              borderless
+              min="1"
+              :placeholder="t('alerts.placeholders.autoUsesCheckInterval')"
+              :class="
+                store.state.theme === 'dark' ? 'input-box-bg-dark input-border-dark' : 'input-box-bg-light input-border-light'
+              "
+              style="background: none;"
+              @update:model-value="emitUpdate"
+            />
+          </div>
+          <div
+            style="min-width: 90px; margin-left: 0 !important; height: 36px; font-weight: normal"
+            :style="store.state.theme === 'dark' ? 'border: 1px solid #2c2c2c' : ''"
+            :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'"
+            class="flex justify-center items-center"
+          >
+            {{ t("alerts.minutes") }}
+          </div>
+        </div>
       </div>
     </div>
   </div>
