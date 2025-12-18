@@ -164,7 +164,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-else>
         <!-- Aggregation Toggle -->
         <div class="flex justify-start items-center tw-font-semibold tw-pb-3 tw-mb-4">
-          <div style="width: 190px">{{ t("common.aggregation") }}</div>
+          <div class="flex items-center" style="width: 190px">
+            {{ t("common.aggregation") }}
+            <q-icon
+              name="info"
+              size="17px"
+              class="q-ml-xs cursor-pointer"
+              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+            >
+              <q-tooltip anchor="center right" self="center left" max-width="300px">
+                <span style="font-size: 14px">
+                  Enable to summarize data using functions like count, sum, avg, etc. before triggering the alert.<br />
+                  Example: Alert when average response time exceeds 500ms instead of individual events.
+                </span>
+              </q-tooltip>
+            </q-icon>
+          </div>
           <q-toggle
             v-model="localIsAggregationEnabled"
             size="md"
@@ -179,8 +194,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="localIsAggregationEnabled && formData.query_condition.aggregation"
           class="flex items-start no-wrap q-mr-sm tw-pb-4 tw-mb-4"
         >
-          <div class="tw-font-semibold" style="width: 190px">
+          <div class="flex items-center tw-font-semibold" style="width: 190px">
             {{ t("alerts.groupBy") }}
+            <q-icon
+              name="info"
+              size="17px"
+              class="q-ml-xs cursor-pointer"
+              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+            >
+              <q-tooltip anchor="center right" self="center left" max-width="300px">
+                <span style="font-size: 14px">
+                  Group the aggregated data by specific fields to create separate alerts for each unique value.<br />
+                  Example: Group by "hostname" to get individual alerts per server, or by "status_code" to track errors separately.
+                </span>
+              </q-tooltip>
+            </q-icon>
           </div>
           <div class="flex justify-start items-center flex-wrap" style="width: calc(100% - 190px)">
             <template
@@ -251,8 +279,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <q-tooltip anchor="center right" self="center left" max-width="300px">
                 <span style="font-size: 14px">
-                  The threshold above/below which the alert will trigger. <br />
-                  e.g. if the threshold is >100 and the query returns a value of 101 then the alert will trigger.
+                  Defines when the alert should trigger based on the event count or aggregated value.<br />
+                  Example: If set to "> 100", the alert triggers when the count exceeds 100 events.
                 </span>
               </q-tooltip>
             </q-icon>
