@@ -15,7 +15,7 @@ export default class ChartTypeSelector {
     await chartOption.click();
   }
 
-  //  Stream Type select
+  //  Stream Type select - waits for stream list to load after selection
   async selectStreamType(type) {
     // Click the dropdown
     await this.page.locator('[data-test="index-dropdown-stream_type"]').click();
@@ -25,24 +25,55 @@ export default class ChartTypeSelector {
       .locator("div")
       .nth(2)
       .click();
+
+    // CRITICAL: Wait for stream list API call to complete after changing type
+    await this.page.waitForLoadState("networkidle");
+    await this.page.waitForTimeout(1000);
   }
 
-  // Stream select
-  async selectStream(streamName) {
+  // Stream select with retry mechanism (no page reload to preserve context)
+  async selectStream(streamName, maxRetries = 3) {
     const streamInput = this.page.locator(
       '[data-test="index-dropdown-stream"]'
     );
-    await streamInput.click();
-    await streamInput.press("Control+a");
-    await streamInput.fill(streamName);
 
-    const streamOption = this.page
-      .getByRole("option", { name: streamName, exact: true })
-      .locator("div")
-      .nth(2);
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Close any open dropdown first
+        await this.page.keyboard.press("Escape");
+        await this.page.waitForTimeout(500);
 
-    await streamOption.waitFor({ state: "visible", timeout: 5000 });
-    await streamOption.click();
+        await streamInput.click();
+        await this.page.waitForTimeout(500);
+
+        // DEBUG: Log all available options in dropdown
+        const allOptions = await this.page.locator('[role="listbox"] [role="option"]').allTextContents();
+        console.log(`[DEBUG] Attempt ${attempt}: Looking for "${streamName}". Available options (${allOptions.length}):`, allOptions.slice(0, 10));
+
+        await streamInput.press("Control+a");
+        await streamInput.fill(streamName);
+        await this.page.waitForTimeout(1500);
+
+        const streamOption = this.page
+          .getByRole("option", { name: streamName, exact: true })
+          .locator("div")
+          .nth(2);
+
+        await streamOption.waitFor({ state: "visible", timeout: 15000 });
+        await streamOption.click();
+        return; // Success
+      } catch (error) {
+        if (attempt === maxRetries) {
+          // Final attempt: log full diagnostic info
+          const finalOptions = await this.page.locator('[role="listbox"] [role="option"]').allTextContents().catch(() => []);
+          console.log(`[DEBUG] FAILED after ${maxRetries} attempts. Final options:`, finalOptions);
+          throw error;
+        }
+        // Close dropdown and wait before retry (don't reload - loses context!)
+        await this.page.keyboard.press("Escape");
+        await this.page.waitForTimeout(3000);
+      }
+    }
   }
 
   // Search field and added for X, Y,Breakdown etc.

@@ -18,7 +18,6 @@
 const {
   test,
   expect,
-  navigateToBase,
 } = require("../utils/enhanced-baseFixtures.js");
 const { waitForDashboardPage } = require("./utils/dashCreation.js");
 const PageManager = require("../../pages/page-manager");
@@ -31,11 +30,49 @@ const generateDashboardName = (testId) => `FuncTest_${testId}`;
 const generateStreamName = (testId) => `func_test_${testId}`;
 const generateTestId = () => Math.random().toString(36).substring(2, 10);
 
+/**
+ * Navigate directly to dashboards page with org_identifier
+ * This ensures the correct org context is set for all API calls
+ */
+const navigateToDashboards = async (page) => {
+  const dashboardUrl = `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${process.env["ORGNAME"]}`;
+  testLogger.info(`Navigating to dashboards page with org_identifier: ${dashboardUrl}`);
+  await page.goto(dashboardUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+  await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+  await page.waitForTimeout(2000);
+};
+
 const getAuthToken = async () => {
   const basicAuthCredentials = Buffer.from(
     `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
   ).toString("base64");
   return `Basic ${basicAuthCredentials}`;
+};
+
+const verifyStreamExists = async (streamName, maxWaitMs = 60000) => {
+  const orgId = process.env["ORGNAME"];
+  const baseUrl = process.env["INGESTION_URL"] || "http://localhost:5080";
+  const headers = { Authorization: await getAuthToken() };
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < maxWaitMs) {
+    try {
+      const response = await fetch(`${baseUrl}/api/${orgId}/streams?type=logs`, { headers });
+      if (response.ok) {
+        const data = await response.json();
+        const streams = data.list || [];
+        if (streams.some(s => s.name === streamName)) {
+          testLogger.info(`Stream ${streamName} verified as available`);
+          return true;
+        }
+      }
+    } catch (e) {
+      // Ignore errors, continue polling
+    }
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  }
+  testLogger.info(`Stream ${streamName} not found after ${maxWaitMs}ms`);
+  return false;
 };
 
 const ingestTestData = async (streamName, data) => {
@@ -54,6 +91,10 @@ const ingestTestData = async (streamName, data) => {
     const responseText = await fetchResponse.text();
     throw new Error(`Ingestion failed: ${fetchResponse.status} - ${responseText}`);
   }
+
+  testLogger.info("Verifying stream is indexed (polling up to 60 seconds)...");
+  await verifyStreamExists(streamName, 60000);
+
   return fetchResponse.json();
 };
 
@@ -105,6 +146,12 @@ async function createDashboardAndAddFirstPanel(page, pm, dashboardName) {
   await pm.dashboardCreate.waitForDashboardUIStable();
   await pm.dashboardCreate.createDashboard(dashboardName);
   testLogger.info(`Created dashboard: ${dashboardName}`);
+
+  // Reload page to ensure fresh streams list is loaded after ingestion
+  testLogger.info("Reloading page to refresh streams list...");
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForTimeout(2000);
+
   await pm.dashboardCreate.addPanel();
 }
 
@@ -138,11 +185,11 @@ test.describe("Dashboard Functions", () => {
 
     testLogger.info(`Test 1: Starting with testId=${testId}`);
 
-    // Setup: Ingest test data
+    // Setup: Ingest test data (includes stream verification polling)
     await ingestTestData(STREAM_NAME, testRecords);
-    await new Promise(resolve => setTimeout(resolve, 3000));
 
-    await navigateToBase(page);
+    await navigateToDashboards(page);
+
     const pm = new PageManager(page);
 
     try {
@@ -250,11 +297,11 @@ test.describe("Dashboard Functions", () => {
 
     testLogger.info(`Test 2: Starting with testId=${testId}`);
 
-    // Setup: Ingest test data
+    // Setup: Ingest test data (includes stream verification polling)
     await ingestTestData(STREAM_NAME, testRecords);
-    await new Promise(resolve => setTimeout(resolve, 3000));
 
-    await navigateToBase(page);
+    await navigateToDashboards(page);
+
     const pm = new PageManager(page);
 
     try {
