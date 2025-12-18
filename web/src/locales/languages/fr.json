@@ -617,7 +617,11 @@
     "streamRouting": "Routage des flux",
     "testFunction": "Fonction de test",
     "errorDetails": "Erreur",
-    "function_definition": "Définition de la fonction"
+    "function_definition": "Définition de la fonction",
+    "transformType": "Type de transformation",
+    "vrlType": "VRL (langage de remappage vectoriel)",
+    "jsType": "JavaScript (ES 2023)",
+    "vrlfunction": "Fonction VRL"
   },
   "confirmDialog": {
     "cancel": "Annuler",

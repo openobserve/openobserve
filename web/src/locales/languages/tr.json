@@ -617,7 +617,11 @@
     "streamRouting": "Akış Yönlendirmesi",
     "testFunction": "Test Fonksiyonu",
     "errorDetails": "Hata",
-    "function_definition": "Fonksiyon Tanımı"
+    "function_definition": "Fonksiyon Tanımı",
+    "transformType": "Dönüştürme Türü",
+    "vrlType": "VRL (Vektör Yeniden Eşleme Dili)",
+    "jsType": "JavaScript (ES2023)",
+    "vrlfunction": "VRL Fonksiyonu"
   },
   "confirmDialog": {
     "cancel": "İptal",

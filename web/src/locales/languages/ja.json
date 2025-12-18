@@ -634,7 +634,11 @@
     "streamRouting": "ストリームルーティング",
     "testFunction": "関数をテスト",
     "errorDetails": "エラー",
-    "function_definition": "関数定義"
+    "function_definition": "関数定義",
+    "transformType": "トランスフォームタイプ",
+    "vrlType": "VRL (ベクターリマップ言語)",
+    "jsType": "ジャバスクリプト (2023)",
+    "vrlfunction": "VRL ファンクション"
   },
   "confirmDialog": {
     "cancel": "キャンセル",

@@ -617,7 +617,11 @@
     "streamRouting": "스트림 라우팅",
     "testFunction": "테스트 기능",
     "errorDetails": "오류",
-    "function_definition": "함수 정의"
+    "function_definition": "함수 정의",
+    "transformType": "트랜스폼 타입",
+    "vrlType": "VRL (벡터 리맵 언어)",
+    "jsType": "자바스크립트 (ES2023)",
+    "vrlfunction": "VRL 함수"
   },
   "confirmDialog": {
     "cancel": "취소",

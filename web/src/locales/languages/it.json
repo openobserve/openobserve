@@ -617,7 +617,11 @@
     "streamRouting": "Routing dello streaming",
     "testFunction": "Funzione di test",
     "errorDetails": "Errore",
-    "function_definition": "Definizione della funzione"
+    "function_definition": "Definizione della funzione",
+    "transformType": "Tipo di trasformazione",
+    "vrlType": "VRL (linguaggio di rimappatura vettoriale)",
+    "jsType": "JavaScript (ES2023)",
+    "vrlfunction": "Funzione VRL"
   },
   "confirmDialog": {
     "cancel": "Annulla",
