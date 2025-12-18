@@ -502,7 +502,9 @@ test.describe("Logs Regression Bugs", () => {
     await searchInput.fill(searchTerm);
     testLogger.info(`Entered search term: "${searchTerm}"`);
 
-    await page.waitForTimeout(1500); // Wait for search to filter
+    // Wait for table filtering to complete
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(500); // Small buffer for UI update
 
     // Get pagination text after search
     const filteredPaginationText = await paginationLocator.textContent().catch(() => 'N/A');
