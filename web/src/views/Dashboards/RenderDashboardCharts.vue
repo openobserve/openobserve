@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : undefined) || false
             "
             :variablesData="getMergedVariablesForPanel(panels[0]?.id)"
-            :currentVariablesData="getLiveVariablesForPanel()"
+            :currentVariablesData="getLiveVariablesForPanel(panels[0]?.id)"
             :forceLoad="forceLoad"
             :searchType="searchType"
             :runId="runId"
@@ -182,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   shouldRefreshWithoutCacheObj?.[item?.id] || false
                 "
                 :variablesData="getMergedVariablesForPanel(item.id)"
-                :currentVariablesData="getLiveVariablesForPanel()"
+                :currentVariablesData="getLiveVariablesForPanel(item.id)"
                 :width="getPanelLayout(item, 'w')"
                 :height="getPanelLayout(item, 'h')"
                 :forceLoad="forceLoad"
@@ -422,15 +422,21 @@ export default defineComponent({
 
     // Helper to get merged variables for a panel (global + tab + panel)
     const getMergedVariablesForPanel = (panelId: string) => {
-      if (!variablesManager) {
-        // Fallback to legacy behavior: panel-specific override takes precedence over __global
-        return currentVariablesDataRef.value?.[panelId] || currentVariablesDataRef.value['__global'] || { values: [] };
+      // Priority 1: Check for panel-specific committed/frozen override
+      // This happens when user clicks Refresh on a specific panel
+      if (currentVariablesDataRef.value?.[panelId]) {
+        return currentVariablesDataRef.value[panelId];
       }
 
+      if (!variablesManager) {
+        // Fallback to legacy behavior: __global mechanism
+        return currentVariablesDataRef.value['__global'] || { values: [] };
+      }
+
+      // Priority 2: Use manager's committed state
       // CRITICAL: Use COMMITTED state (not live state)!
       // This prevents panels from reloading on every variable change
       // Panels only reload when user clicks Refresh (which commits the changes)
-      // This is the same pattern as currentVariablesDataRef.__global in main branch
       const mergedVars = variablesManager.getCommittedVariablesForPanel(panelId, selectedTabId.value);
 
       // Convert to old format for backward compatibility
@@ -443,15 +449,15 @@ export default defineComponent({
 
     // Helper to get LIVE (uncommitted) variables for a panel
     // Used for detecting changes and showing yellow refresh icon
-    const getLiveVariablesForPanel = () => {
+    const getLiveVariablesForPanel = (panelId: string) => {
       if (!variablesManager) {
         // Legacy mode: use variablesData ref
         return variablesData.value;
       }
 
-      // Get live variables for the selected tab
-      // This allows panel to detect uncommitted changes
-      const liveVars = variablesManager.getVariablesForPanel('', selectedTabId.value);
+      // Get live variables for the selected tab and panel
+      // This allows panel to detect uncommitted changes including panel-scoped ones
+      const liveVars = variablesManager.getVariablesForPanel(panelId, selectedTabId.value);
 
       // Convert to old format for backward compatibility
       return {
@@ -538,10 +544,10 @@ export default defineComponent({
           // Convert manager's variables to legacy format for backward compatibility
           const allGlobalVars = variablesManager.variablesData.global;
           currentVariablesDataRef.value = {
-            __global: {
+            __global: JSON.parse(JSON.stringify({
               isVariablesLoading: variablesManager.isLoading.value,
               values: allGlobalVars
-            }
+            }))
           };
         }
       },
@@ -618,7 +624,7 @@ export default defineComponent({
             needsVariablesAutoUpdate = false;
             // Auto-update committed state on first load (legacy mode only)
             if (!variablesManager) {
-              currentVariablesDataRef.value = { __global: variablesData.value };
+              currentVariablesDataRef.value = { __global: JSON.parse(JSON.stringify(variablesData.value)) };
             }
           }
         }
@@ -1025,17 +1031,21 @@ export default defineComponent({
         // Legacy mode: store current variablesData as panel-specific override
         currentVariablesDataRef.value = {
           ...currentVariablesDataRef.value,
-          [panelId]: variablesData.value,
+          [panelId]: JSON.parse(JSON.stringify(variablesData.value)),
         };
       } else {
-        // Manager mode: get merged variables for this panel and store as override
+        // Manager mode: commit ONLY the panel scope if needed, 
+        // but the main reload driver is the local override in currentVariablesDataRef
+        variablesManager.commitScope("panels", panelId);
+        
+        // Get merged variables for this panel and store as override
         const panelVars = variablesManager.getVariablesForPanel(panelId, selectedTabId.value);
         currentVariablesDataRef.value = {
           ...currentVariablesDataRef.value,
-          [panelId]: {
+          [panelId]: JSON.parse(JSON.stringify({
             isVariablesLoading: variablesManager.isLoading.value,
             values: panelVars
-          },
+          })),
         };
       }
     };
