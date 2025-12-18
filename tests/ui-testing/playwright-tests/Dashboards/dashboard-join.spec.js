@@ -44,7 +44,7 @@ const generateStreamNames = (testId) => ({
   APP_USERS: `join_${testId}_users`,
   SESSIONS: `join_${testId}_sessions`,
 });
-const generateTestId = () => Math.random().toString(36).substring(2, 10);
+const generateTestId = () => `${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
 
 /**
  * Navigate directly to dashboards page with org_identifier

@@ -223,6 +223,7 @@ test.describe("Dashboard Functions", () => {
       await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
       await pm.chartTypeSelector.searchAndAddField("user_name", "y");
 
+      // UI shows "Distinct" for COUNT-DISTINCT function; label displays as "count"
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "Distinct");
 
       await pm.dashboardCreate.applyButton();

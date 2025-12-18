@@ -1,6 +1,8 @@
 // pages/chartTypeSelector.js
 // Methods : selectChartType, selectStreamType, searchAndAddField,  selectStream
 
+const testLogger = require("../../playwright-tests/utils/test-logger.js");
+
 export default class ChartTypeSelector {
   constructor(page) {
     this.page = page;
@@ -46,9 +48,9 @@ export default class ChartTypeSelector {
         await streamInput.click();
         await this.page.waitForTimeout(500);
 
-        // DEBUG: Log all available options in dropdown
+        // Log all available options in dropdown for debugging
         const allOptions = await this.page.locator('[role="listbox"] [role="option"]').allTextContents();
-        console.log(`[DEBUG] Attempt ${attempt}: Looking for "${streamName}". Available options (${allOptions.length}):`, allOptions.slice(0, 10));
+        testLogger.debug(`Attempt ${attempt}: Looking for "${streamName}". Available options (${allOptions.length}): ${allOptions.slice(0, 10).join(', ')}`);
 
         await streamInput.press("Control+a");
         await streamInput.fill(streamName);
@@ -66,7 +68,7 @@ export default class ChartTypeSelector {
         if (attempt === maxRetries) {
           // Final attempt: log full diagnostic info
           const finalOptions = await this.page.locator('[role="listbox"] [role="option"]').allTextContents().catch(() => []);
-          console.log(`[DEBUG] FAILED after ${maxRetries} attempts. Final options:`, finalOptions);
+          testLogger.error(`FAILED after ${maxRetries} attempts. Final options: ${finalOptions.join(', ')}`);
           throw error;
         }
         // Close dropdown and wait before retry (don't reload - loses context!)

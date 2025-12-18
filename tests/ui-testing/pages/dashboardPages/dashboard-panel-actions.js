@@ -139,12 +139,10 @@ export default class DashboardactionPage {
   /**
    * Verify no data element is hidden (data is present)
    * @param {Function} expect - Playwright expect function
-   * @returns {Promise<boolean>} True if no errors/data present
    */
   async verifyNoErrors(expect) {
     const noErrors = await this.noDataElement.isHidden();
     expect(noErrors).toBeTruthy();
-    return noErrors;
   }
 
   /**
