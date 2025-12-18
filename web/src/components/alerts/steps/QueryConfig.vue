@@ -45,18 +45,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Custom Query Builder -->
       <template v-if="localTab === 'custom'">
-        <FilterGroup
-          :stream-fields="columns"
-          :stream-fields-map="streamFieldsMap"
-          :show-sql-preview="true"
-          :sql-query="generatedSqlQuery"
-          :group="inputData.conditions"
-          :depth="0"
-          @add-condition="updateGroup"
-          @add-group="updateGroup"
-          @remove-group="removeConditionGroup"
-          @input:update="onInputUpdate"
-        />
+        <q-form ref="customConditionsForm" greedy>
+          <FilterGroup
+            :stream-fields="columns"
+            :stream-fields-map="streamFieldsMap"
+            :show-sql-preview="true"
+            :sql-query="generatedSqlQuery"
+            :group="inputData.conditions"
+            :depth="0"
+            @add-condition="updateGroup"
+            @add-group="updateGroup"
+            @remove-group="removeConditionGroup"
+            @input:update="onInputUpdate"
+          />
+        </q-form>
       </template>
 
       <!-- SQL/PromQL Preview Mode -->
@@ -112,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, type PropType, defineAsyncComponent } from "vue";
+import { defineComponent, ref, computed, type PropType, defineAsyncComponent, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { b64EncodeUnicode } from "@/utils/zincutils";
@@ -193,6 +195,7 @@ export default defineComponent({
 
     const localTab = ref(props.tab);
     const viewSqlEditor = ref(false);
+    const customConditionsForm = ref(null);
 
     // Local query values
     const localSqlQuery = ref(props.sqlQuery);
@@ -307,6 +310,71 @@ export default defineComponent({
       emit("validate-sql");
     };
 
+    // Validation function for Step 2
+    const validate = async () => {
+      // Custom mode: Check if conditions have empty columns or values
+      if (localTab.value === 'custom') {
+        return await validateCustomMode();
+      }
+
+      // SQL mode: Check for empty query and backend validation errors
+      if (localTab.value === 'sql') {
+        return validateSqlMode();
+      }
+
+      // PromQL mode: No validation required
+      return true;
+    };
+
+    // Validate custom mode conditions
+    const validateCustomMode = async () => {
+      const conditions = props.inputData.conditions;
+
+      // If no conditions added at all, allow navigation
+      if (!conditions || !conditions.conditions || conditions.conditions.length === 0) {
+        return true;
+      }
+
+      // Use Quasar form validation
+      if (customConditionsForm.value && typeof (customConditionsForm.value as any).validate === 'function') {
+        const validationResult = (customConditionsForm.value as any).validate();
+
+        // Await if async
+        const isValid = validationResult instanceof Promise ? await validationResult : validationResult;
+
+        // Focus first error field if validation failed
+        if (!isValid) {
+          await nextTick();
+          const firstErrorField = document.querySelector('.q-field--error input, .q-field--error textarea, .q-field--error .q-select') as HTMLElement;
+          if (firstErrorField) {
+            firstErrorField.focus();
+          }
+        }
+
+        return isValid;
+      }
+
+      // If form validation is not available, return true as safe fallback
+      return true;
+    };
+
+    // Validate SQL mode
+    const validateSqlMode = () => {
+      const sqlQuery = props.sqlQuery;
+
+      // Check if SQL query is empty
+      if (!sqlQuery || sqlQuery.trim() === '') {
+        return false;
+      }
+
+      // Check if there's a backend validation error
+      if (props.sqlQueryErrorMsg && props.sqlQueryErrorMsg.trim() !== '') {
+        return false;
+      }
+
+      return true;
+    };
+
     return {
       t,
       store,
@@ -327,6 +395,8 @@ export default defineComponent({
       handleVrlFunctionUpdate,
       handleValidateSql,
       functionsList,
+      validate,
+      customConditionsForm,
     };
   },
 });

@@ -109,6 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           caption=""
           icon="settings"
           :done="wizardStep > 1"
+          :disable="1 > lastValidStep"
         >
           <!-- 70/30 Split Layout with Equal Heights -->
           <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
@@ -155,6 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           caption=""
           icon="search"
           :done="wizardStep > 2"
+          :disable="2 > lastValidStep"
         >
           <!-- 70/30 Split Layout with Equal Heights -->
           <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
@@ -162,6 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw-flex-[0_0_68%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
                 <QueryConfig
+                  ref="step2Ref"
                   :tab="formData.query_condition.type || 'custom'"
                   :multiTimeRange="formData.query_condition.multi_time_range"
                   :columns="filteredColumns"
@@ -210,6 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           caption=""
           icon="compare_arrows"
           :done="wizardStep > 3"
+          :disable="3 > lastValidStep"
         >
           <!-- 70/30 Split Layout with Equal Heights -->
           <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
@@ -250,6 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           caption=""
           icon="tune"
           :done="wizardStep > 4"
+          :disable="4 > lastValidStep"
         >
           <!-- 70/30 Split Layout with Equal Heights -->
           <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
@@ -295,6 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           caption=""
           icon="filter_list"
           :done="wizardStep > 5"
+          :disable="5 > lastValidStep"
         >
           <!-- 70/30 Split Layout with Equal Heights -->
           <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
@@ -331,6 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           caption=""
           icon="settings_applications"
           :done="false"
+          :disable="6 > lastValidStep"
         >
           <!-- 70/30 Split Layout with Equal Heights -->
           <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
@@ -1135,8 +1142,8 @@ export default defineComponent({
     const wizardStep = ref(1);
     const wizardStepper = ref(null);
     const step1Ref = ref(null);
+    const step2Ref = ref(null);
     const lastValidStep = ref(1); // Track the last successfully validated step
-    const isNavigatingProgrammatically = ref(false); // Flag to prevent watch loops
 
     // Computed property for step captions to avoid flickering
     const currentStepCaption = computed(() => {
@@ -2005,42 +2012,6 @@ export default defineComponent({
       );
     };
 
-    // Watch for header navigation clicks and validate
-    watch(wizardStep, async (newStep, oldStep) => {
-      // Skip if we're navigating programmatically (to avoid loops)
-      if (isNavigatingProgrammatically.value) {
-        return;
-      }
-
-      // Allow backward navigation (user clicking on previous steps)
-      if (newStep < oldStep) {
-        lastValidStep.value = newStep;
-        return;
-      }
-
-      // For forward navigation, validate the previous step
-      if (newStep > oldStep) {
-        isNavigatingProgrammatically.value = true;
-
-        // First, revert to old step
-        wizardStep.value = oldStep;
-
-        // Validate the current (old) step
-        const isValid = await validateStep(oldStep);
-
-        if (isValid) {
-          // Validation passed, allow navigation
-          wizardStep.value = newStep;
-          lastValidStep.value = newStep;
-        } else {
-          // Validation failed, stay on current step
-          // Focus will be handled by validateStep
-        }
-
-        isNavigatingProgrammatically.value = false;
-      }
-    });
-
     // Wizard step navigation logic
     const goToNextStep = async () => {
       // Validate current step before moving to next
@@ -2048,9 +2019,6 @@ export default defineComponent({
       if (!isValid) {
         return; // Stop navigation if validation fails
       }
-
-      // Mark as programmatic navigation to avoid triggering watch
-      isNavigatingProgrammatically.value = true;
 
       if (formData.value.is_real_time === 'true') {
         // For real-time alerts: 1 -> 2 -> 4 -> 6 (skip 3 and 5)
@@ -2067,10 +2035,6 @@ export default defineComponent({
       }
 
       lastValidStep.value = wizardStep.value;
-
-      // Reset flag after navigation
-      await nextTick();
-      isNavigatingProgrammatically.value = false;
     };
 
     // Validate a specific step (used by both Continue button and header navigation)
@@ -2087,8 +2051,44 @@ export default defineComponent({
         }
       }
 
-      // Add validation for other steps here in the future
+
       // Step 2: Query Config
+      if (stepNumber === 2) {
+        if (step2Ref.value && (step2Ref.value as any).validate) {
+          const validationResult = (step2Ref.value as any).validate();
+
+          // Handle async validation
+          const isValid = validationResult instanceof Promise
+            ? await validationResult
+            : validationResult;
+
+          if (!isValid) {
+            // Don't show toast notification for custom mode
+            // The fields themselves should show validation errors
+            const queryType = formData.value.query_condition.type || 'custom';
+
+            // Only show toast for SQL mode
+            if (queryType === 'sql') {
+              let errorMsg = '';
+              if (sqlQueryErrorMsg.value) {
+                errorMsg = `SQL validation error: ${sqlQueryErrorMsg.value}`;
+              } else {
+                errorMsg = 'Please provide a valid SQL query.';
+              }
+
+              q.notify({
+                type: 'negative',
+                message: errorMsg,
+                timeout: 2000,
+              });
+            }
+
+            return false;
+          }
+        }
+      }
+
+      // Add validation for other steps here in the future
       // Step 3: Compare with Past
       // Step 4: Alert Settings
       // Step 5: Deduplication
@@ -2251,6 +2251,8 @@ export default defineComponent({
       goToNextStep,
       goToPreviousStep,
       isLastStep,
+      step2Ref,
+      lastValidStep,
     };
   },
 
@@ -2794,6 +2796,7 @@ export default defineComponent({
 
   :deep(.q-stepper__tab--done) {
     color: #4caf50;
+    cursor: pointer;
   }
 
   :deep(.q-stepper__dot) {
