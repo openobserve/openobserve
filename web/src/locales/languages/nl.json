@@ -276,7 +276,8 @@
     "actionLabel": "Actie",
     "transformLabel": "Transformeren",
     "addToDashboard": "Aan dashboard toevoegen",
-    "selectStream": "Selecteer Stream"
+    "selectStream": "Selecteer Stream",
+    "pattern_summary": "Toont 1 tot 50 van de {totalEvents} -gebeurtenissen en {PatternsFound} -patronen gevonden in {logsAnalyzed} -gebeurtenissen in {totalTime} ms."
   },
   "menu": {
     "home": "Home",
