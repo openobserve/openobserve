@@ -1161,21 +1161,23 @@ async fn queue_services_from_parquet(
     let fqn_priority =
         crate::service::db::system_settings::get_fqn_priority_dimensions(org_id).await;
 
-    // Get config values for channel/batch sizes
+    // Get config values for channel capacity
     let ss_config = &o2_enterprise::enterprise::common::config::get_config().service_streams;
     let channel_capacity = ss_config.channel_capacity;
-    let batch_size = ss_config.record_batch_size;
 
     // Create bounded channel for backpressure - drops records if consumer can't keep up
-    let (tx, mut rx) = mpsc::channel::<Vec<HashMap<String, serde_json::Value>>>(channel_capacity);
+    // ARROW-NATIVE: Channel now sends RecordBatch directly (no HashMap conversion!)
+    let (tx, mut rx) = mpsc::channel::<arrow::record_batch::RecordBatch>(channel_capacity);
 
     // Clone data needed for producer task
     let parquet_bytes = Bytes::copy_from_slice(parquet_data);
 
-    // Spawn producer task to read parquet and send batches through channel
+    // Spawn producer task to read parquet and send Arrow batches through channel
+    // ARROW-NATIVE: No HashMap conversion! Sends RecordBatch directly.
     let producer_handle = tokio::spawn(async move {
         let mut records_sent = 0u64;
         let mut records_dropped = 0u64;
+        let mut batches_sent = 0u64;
 
         let reader_result = get_recordbatch_reader_from_bytes(&parquet_bytes).await;
         let (_schema, mut reader) = match reader_result {
@@ -1185,9 +1187,6 @@ async fn queue_services_from_parquet(
                 return (records_sent, records_dropped);
             }
         };
-
-        let mut current_batch: Vec<HashMap<String, serde_json::Value>> =
-            Vec::with_capacity(batch_size);
 
         use futures::StreamExt;
         while let Some(batch_result) = reader.next().await {
@@ -1204,68 +1203,35 @@ async fn queue_services_from_parquet(
                 continue;
             }
 
-            // Process each row in the batch
-            for row_idx in 0..num_rows {
-                let mut record = HashMap::new();
-
-                // Extract all string columns
-                for (col_idx, field) in batch.schema().fields().iter().enumerate() {
-                    let column = batch.column(col_idx);
-
-                    use arrow::array::Array;
-                    if let Some(array) = column.as_any().downcast_ref::<arrow::array::StringArray>()
-                        && !array.is_null(row_idx)
-                    {
-                        let value = array.value(row_idx);
-                        if !value.is_empty() {
-                            record.insert(
-                                field.name().clone(),
-                                serde_json::Value::String(value.to_string()),
-                            );
-                        }
-                    }
+            // Send Arrow batch directly (no conversion!)
+            match tx.try_send(batch) {
+                Ok(()) => {
+                    batches_sent += 1;
+                    records_sent += num_rows as u64;
                 }
-
-                if !record.is_empty() {
-                    current_batch.push(record);
-
-                    // Send batch when full
-                    if current_batch.len() >= batch_size {
-                        let batch_to_send =
-                            std::mem::replace(&mut current_batch, Vec::with_capacity(batch_size));
-                        let batch_len = batch_to_send.len() as u64;
-
-                        // Use try_send to avoid blocking - drop records if channel full
-                        match tx.try_send(batch_to_send) {
-                            Ok(()) => records_sent += batch_len,
-                            Err(mpsc::error::TrySendError::Full(_)) => {
-                                records_dropped += batch_len;
-                                log::debug!(
-                                    "[ServiceStreams] Channel full, dropped {} records",
-                                    batch_len
-                                );
-                            }
-                            Err(mpsc::error::TrySendError::Closed(_)) => {
-                                // Consumer closed, stop producing
-                                return (records_sent, records_dropped);
-                            }
-                        }
-                    }
+                Err(mpsc::error::TrySendError::Full(dropped_batch)) => {
+                    let dropped = dropped_batch.num_rows() as u64;
+                    records_dropped += dropped;
+                    log::debug!("[ServiceStreams] Channel full, dropped {} records", dropped);
+                }
+                Err(mpsc::error::TrySendError::Closed(_)) => {
+                    // Consumer closed, stop producing
+                    log::debug!(
+                        "[ServiceStreams] Consumer closed, stopping producer (sent {} batches, {} records)",
+                        batches_sent,
+                        records_sent
+                    );
+                    return (records_sent, records_dropped);
                 }
             }
         }
 
-        // Send remaining records
-        if !current_batch.is_empty() {
-            let batch_len = current_batch.len() as u64;
-            match tx.try_send(current_batch) {
-                Ok(()) => records_sent += batch_len,
-                Err(mpsc::error::TrySendError::Full(_)) => {
-                    records_dropped += batch_len;
-                }
-                Err(mpsc::error::TrySendError::Closed(_)) => {}
-            }
-        }
+        log::debug!(
+            "[ServiceStreams] Producer finished: sent {} batches ({} records), dropped {} records",
+            batches_sent,
+            records_sent,
+            records_dropped
+        );
 
         (records_sent, records_dropped)
     });
@@ -1283,13 +1249,14 @@ async fn queue_services_from_parquet(
     > = HashMap::new();
     let mut total_records_processed = 0u64;
 
-    // Process batches from channel
+    // Process Arrow batches from channel
+    // ARROW-NATIVE: Process RecordBatch directly (no HashMap conversion!)
     while let Some(batch) = rx.recv().await {
-        let batch_len = batch.len();
+        let batch_len = batch.num_rows();
 
-        // Process batch using optimized method
+        // Process Arrow batch using Arrow-native method
         let services = processor
-            .process_records(stream_type, stream_name, &batch)
+            .process_arrow_batch(&batch, stream_type, &stream_name)
             .await;
 
         // Merge discovered services

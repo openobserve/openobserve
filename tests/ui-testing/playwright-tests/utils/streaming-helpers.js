@@ -6,12 +6,17 @@ const testLogger = require('./test-logger.js');
  *
  * Usage:
  * ```javascript
- * import { waitForStreamComplete, waitForTableWithData } from '../utils/streaming-helpers.js';
+ * import { waitForStreamComplete, waitForValuesStreamComplete, waitForTableWithData } from '../utils/streaming-helpers.js';
  *
  * // Wait for a streaming API to complete
  * const streamPromise = waitForStreamComplete(page);
  * await someAction();
  * await streamPromise;
+ *
+ * // Wait for values stream to complete
+ * const valuesStreamPromise = waitForValuesStreamComplete(page);
+ * await page.click('#field-dropdown');
+ * await valuesStreamPromise;
  *
  * // Wait for table to have data
  * await waitForTableWithData(page);
@@ -75,6 +80,65 @@ export async function waitForStreamComplete(page, timeout = 15000) {
     new Promise((resolve) => {
       setTimeout(() => {
         testLogger.warn('Stream wait timeout - continuing anyway');
+        resolve();
+      }, timeout);
+    })
+  ]);
+}
+
+/**
+ * Waits for a values stream API call to complete by listening for the 'data: [[DONE]]' marker.
+ * This is specifically designed for the _values_stream endpoint.
+ *
+ * The function monitors the _values_stream endpoint and resolves when it receives
+ * the completion marker 'data: [[DONE]]' in the response body.
+ *
+ * @param {import('@playwright/test').Page} page - The Playwright page object
+ * @param {number} timeout - Maximum time to wait in milliseconds (default: 15000)
+ * @returns {Promise<void>} Resolves when values stream completes or times out
+ *
+ * @example
+ * // Start listening before triggering the request
+ * const streamPromise = waitForValuesStreamComplete(page);
+ * await page.click('#field-dropdown');
+ * await streamPromise; // Wait for values streaming to finish
+ */
+export async function waitForValuesStreamComplete(page, timeout = 15000) {
+  return Promise.race([
+    new Promise((resolve) => {
+      const responseHandler = async (response) => {
+        const url = response.url();
+
+        // Check if this is a values stream endpoint
+        if (url.includes('_values_stream')) {
+
+          try {
+            // Read the response body as text
+            const body = await response.text();
+
+            // Check if stream has completed with 'data: [[DONE]]' marker
+            if (body.includes('data: [[DONE]]')) {
+              testLogger.info(`Values stream completed for: ${url.split('/').pop()}`);
+              page.off('response', responseHandler);
+              resolve();
+            }
+          } catch (error) {
+            // Response body might not be available or already consumed
+            testLogger.debug(`Could not read response body: ${error.message}`);
+          }
+        }
+      };
+
+      page.on('response', responseHandler);
+
+      // Clean up listener if it somehow doesn't resolve
+      setTimeout(() => {
+        page.off('response', responseHandler);
+      }, timeout + 1000);
+    }),
+    new Promise((resolve) => {
+      setTimeout(() => {
+        testLogger.warn('Values stream wait timeout - continuing anyway');
         resolve();
       }, timeout);
     })

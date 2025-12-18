@@ -101,7 +101,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Set relative time
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.applyDashboardBtn();
 
     // Cancel adding the breakdown field
@@ -155,7 +155,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Set the date-time range and apply changes
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.applyDashboardBtn();
 
     // Change chart types and verify
@@ -220,7 +220,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Set the date-time range and apply changes
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.applyDashboardBtn();
 
     // Save the dashboard panel
@@ -261,7 +261,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "b");
 
     // Set the date-time range
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.applyDashboardBtn();
 
     // Refresh the page
@@ -307,7 +307,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Set relative date-time and timezone
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
 
     // await pm.dashboardPanelActions.applyDashboardBtn();
 
@@ -393,7 +393,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Set relative date-time and timezone
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.savePanel();
 
@@ -436,7 +436,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Set relative date-time
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
 
     // Configure no value replacement
     await pm.dashboardPanelConfigs.openConfigPanel();
