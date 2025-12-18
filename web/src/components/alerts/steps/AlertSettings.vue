@@ -172,8 +172,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- For Scheduled Alerts -->
       <template v-else>
-        <!-- Aggregation Toggle -->
-        <div class="flex justify-start items-center tw-font-semibold tw-pb-3 tw-mb-4">
+        <!-- Aggregation Toggle (only for custom queries, not SQL or PromQL) -->
+        <div v-if="queryType === 'custom'" class="flex justify-start items-center tw-font-semibold tw-pb-3 tw-mb-4">
           <div class="flex items-center" style="width: 190px">
             {{ t("common.aggregation") }}
             <q-icon
@@ -847,7 +847,11 @@ export default defineComponent({
     const alertSettingsForm = ref(null);
 
     // Local state for aggregation toggle
-    const localIsAggregationEnabled = ref(props.isAggregationEnabled);
+    // Only enable aggregation when query type is "custom" (not "sql" or "promql")
+    const queryType = computed(() => props.formData.query_condition?.type || "custom");
+    const localIsAggregationEnabled = ref(
+      queryType.value === "custom" && props.isAggregationEnabled
+    );
     const localDestinations = ref(props.destinations);
 
     // Timezone management
@@ -897,7 +901,23 @@ export default defineComponent({
     watch(
       () => props.isAggregationEnabled,
       (newVal) => {
-        localIsAggregationEnabled.value = newVal;
+        // Only enable aggregation if query type is "custom"
+        localIsAggregationEnabled.value = queryType.value === "custom" && newVal;
+      }
+    );
+
+    // Watch for query type changes
+    watch(
+      queryType,
+      (newType) => {
+        // Disable aggregation when switching to sql or promql
+        if (newType !== "custom") {
+          localIsAggregationEnabled.value = false;
+          emit("update:isAggregationEnabled", false);
+        } else {
+          // Re-enable aggregation if it was previously enabled
+          localIsAggregationEnabled.value = props.isAggregationEnabled;
+        }
       }
     );
 
@@ -999,6 +1019,30 @@ export default defineComponent({
 
     // Toggle aggregation
     const toggleAggregation = () => {
+      // Only allow aggregation toggle when query type is "custom"
+      if (queryType.value !== "custom") {
+        localIsAggregationEnabled.value = false;
+        return;
+      }
+
+      // Initialize aggregation object when enabling
+      if (localIsAggregationEnabled.value && !props.formData.query_condition.aggregation) {
+        props.formData.query_condition.aggregation = {
+          group_by: [""],
+          function: "avg",
+          having: {
+            column: "",
+            operator: "=",
+            value: "",
+          },
+        };
+      }
+
+      // Also initialize if aggregation exists but doesn't have function property
+      if (localIsAggregationEnabled.value && props.formData.query_condition.aggregation && !props.formData.query_condition.aggregation.function) {
+        props.formData.query_condition.aggregation.function = "avg";
+      }
+
       emit("update:isAggregationEnabled", localIsAggregationEnabled.value);
     };
 
@@ -1186,6 +1230,7 @@ export default defineComponent({
     return {
       t,
       store,
+      queryType,
       localIsAggregationEnabled,
       localDestinations,
       aggFunctions,
