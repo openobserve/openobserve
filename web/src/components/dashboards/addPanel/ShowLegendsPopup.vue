@@ -343,7 +343,6 @@ export default defineComponent({
     }
 
     .legend-text {
-      /* Removed flex: 1 to allow button to sit next to text */
       word-wrap: break-word;
       overflow-wrap: break-word;
       white-space: normal;

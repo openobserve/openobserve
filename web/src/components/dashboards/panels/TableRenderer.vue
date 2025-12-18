@@ -63,7 +63,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="copy-btn"
             @click.stop="copyCellContent(props.value, props.rowIndex, props.col.name)"
           >
-            <!-- <q-tooltip>{{ isCellCopied(props.rowIndex, props.col.name) ? 'Copied!' : 'Copy cell value' }}</q-tooltip> -->
           </q-btn>
         </div>
       </q-td>
