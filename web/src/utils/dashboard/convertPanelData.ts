@@ -73,6 +73,7 @@ export const convertPanelData = async (
             chartPanelRef,
             hoveredSeriesState,
             annotations,
+            metadata,
           )),
         };
       } else {

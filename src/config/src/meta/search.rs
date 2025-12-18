@@ -1637,6 +1637,13 @@ pub enum StreamResponses {
     },
     PromqlResponse {
         data: super::promql::QueryResult,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        trace_id: Option<String>,
+    },
+    PromqlMetadata {
+        step: i64,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        trace_id: Option<String>,
     },
     Progress {
         percent: usize,
@@ -1808,6 +1815,14 @@ impl StreamResponses {
             StreamResponses::PromqlResponse { .. } => {
                 let data = serde_json::to_string(self).unwrap_or_default();
                 let bytes = format_event("promql_response", &data);
+                StreamResponseChunks {
+                    chunks_iter: None,
+                    single_chunk: Some(Ok(bytes)),
+                }
+            }
+            StreamResponses::PromqlMetadata { .. } => {
+                let data = serde_json::to_string(self).unwrap_or_default();
+                let bytes = format_event("promql_metadata", &data);
                 StreamResponseChunks {
                     chunks_iter: None,
                     single_chunk: Some(Ok(bytes)),
