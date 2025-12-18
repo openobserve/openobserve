@@ -691,10 +691,9 @@ export default defineComponent({
         // Load variable values from URL if present
         variablesManager.loadFromUrl(route);
 
-        // PERFORM INITIAL COMMIT!
-        // This ensures that when the dashboard renders (in the next step),
-        // variables are ALREADY in the committed state (even if values are null).
-        // This allows panels to correctly identify their dependencies from the start.
+        // COMMIT IMMEDIATELY! loadFromUrl() marks variables with URL values as fully loaded,
+        // so we can commit right away without waiting for API calls.
+        // This allows instant rendering on page refresh with URL parameter values.
         variablesManager.commitAll();
 
         // Track that we're using the scoped variables manager

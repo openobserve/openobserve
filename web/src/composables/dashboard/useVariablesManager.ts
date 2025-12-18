@@ -796,7 +796,12 @@ export const useVariablesManager = () => {
         if (variable) {
           const parsedValue = parseValue(value, variable.type, variable.multiSelect);
           variable.value = parsedValue;
-          console.log(`[loadFromUrl] ✓ Set global var '${parsed.name}' = ${JSON.stringify(parsedValue)}`);
+          // CRITICAL: Mark as fully loaded so it doesn't try to fetch from API
+          // When restoring from URL, we already have the value we need
+          variable.isVariablePartialLoaded = true;
+          variable.isVariableLoadingPending = false;
+          variable.isLoading = false;
+          console.log(`[loadFromUrl] ✓ Set global var '${parsed.name}' = ${JSON.stringify(parsedValue)} (marked as loaded)`);
         } else {
           console.log(`[loadFromUrl] ✗ Global variable '${parsed.name}' not found`);
         }
@@ -807,7 +812,11 @@ export const useVariablesManager = () => {
           if (tabVar) {
             const parsedValue = parseValue(value, tabVar.type, tabVar.multiSelect);
             tabVar.value = parsedValue;
-            console.log(`[loadFromUrl] ✓ Set tab var '${parsed.name}' = ${JSON.stringify(parsedValue)}`);
+            // Mark as fully loaded
+            tabVar.isVariablePartialLoaded = true;
+            tabVar.isVariableLoadingPending = false;
+            tabVar.isLoading = false;
+            console.log(`[loadFromUrl] ✓ Set tab var '${parsed.name}' = ${JSON.stringify(parsedValue)} (marked as loaded)`);
           }
         });
 
@@ -816,7 +825,11 @@ export const useVariablesManager = () => {
           if (panelVar) {
             const parsedValue = parseValue(value, panelVar.type, panelVar.multiSelect);
             panelVar.value = parsedValue;
-            console.log(`[loadFromUrl] ✓ Set panel var '${parsed.name}' = ${JSON.stringify(parsedValue)}`);
+            // Mark as fully loaded
+            panelVar.isVariablePartialLoaded = true;
+            panelVar.isVariableLoadingPending = false;
+            panelVar.isLoading = false;
+            console.log(`[loadFromUrl] ✓ Set panel var '${parsed.name}' = ${JSON.stringify(parsedValue)} (marked as loaded)`);
           }
         });
       } else {
@@ -830,7 +843,11 @@ export const useVariablesManager = () => {
         if (variable) {
           const parsedValue = parseValue(value, variable.type, variable.multiSelect);
           variable.value = parsedValue;
-          console.log(`[loadFromUrl] ✓ Set ${parsed.scope} var '${parsed.name}' (${parsed.scope === 'tabs' ? 'tab=' + parsed.tabId : 'panel=' + parsed.panelId}) = ${JSON.stringify(parsedValue)}`);
+          // Mark as fully loaded
+          variable.isVariablePartialLoaded = true;
+          variable.isVariableLoadingPending = false;
+          variable.isLoading = false;
+          console.log(`[loadFromUrl] ✓ Set ${parsed.scope} var '${parsed.name}' (${parsed.scope === 'tabs' ? 'tab=' + parsed.tabId : 'panel=' + parsed.panelId}) = ${JSON.stringify(parsedValue)} (marked as loaded)`);
         } else {
           console.log(`[loadFromUrl] ✗ ${parsed.scope} variable '${parsed.name}' not found`);
         }
