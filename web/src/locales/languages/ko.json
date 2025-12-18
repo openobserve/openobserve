@@ -276,7 +276,8 @@
     "actionLabel": "액션",
     "transformLabel": "트랜스폼",
     "addToDashboard": "대시보드에 추가",
-    "selectStream": "스트림 선택"
+    "selectStream": "스트림 선택",
+    "pattern_summary": "{TotalTime} 밀리초 내에 {logsAnallets} 이벤트에서 발견된 {TotalEvents} 이벤트 및 {PatternsFound} 패턴 중 1~50개를 표시합니다."
   },
   "menu": {
     "home": "홈",
@@ -1067,7 +1068,15 @@
     "mapvalue": "가치",
     "customChartTypeSelector": "사용자 지정 차트 유형 선택기",
     "customChartTypeSelectorHint": "eCharts 라이브러리에서 차트 유형을 선택하여 기본 코드 구조를 시작하세요.",
-    "selectChartType": "차트 유형 선택"
+    "selectChartType": "차트 유형 선택",
+    "joins": "참여하다",
+    "addJoin": "조인 추가",
+    "removeJoin": "제거 조인",
+    "leftJoin": "왼쪽 조인",
+    "innerJoin": "내부 조인",
+    "rightJoin": "오른쪽 조인",
+    "addClause": "조항 추가",
+    "removeClause": "조항 제거"
   },
   "home": {
     "streams": "스트림",

@@ -276,7 +276,8 @@
     "actionLabel": "Action",
     "transformLabel": "Transformez",
     "addToDashboard": "Ajouter au tableau de bord",
-    "selectStream": "Sélectionnez Stream"
+    "selectStream": "Sélectionnez Stream",
+    "pattern_summary": "Affichage de 1 à 50 événements sur {TotalEvents} et des modèles {PatternsFound} trouvés dans les événements {LogsAnalyzed} en {TotalTime} ms."
   },
   "menu": {
     "home": "Accueil",
@@ -1067,7 +1068,15 @@
     "mapvalue": "Valeur",
     "customChartTypeSelector": "Sélecteur de type de graphique personnalisé",
     "customChartTypeSelectorHint": "Sélectionnez un type de graphique dans la bibliothèque eCharts pour commencer avec une structure de code de base",
-    "selectChartType": "Sélectionnez le type de graphique"
+    "selectChartType": "Sélectionnez le type de graphique",
+    "joins": "Rejoint",
+    "addJoin": "Ajouter Rejoindre",
+    "removeJoin": "Supprimer Rejoindre",
+    "leftJoin": "Rejoindre à gauche",
+    "innerJoin": "Jointure intérieure",
+    "rightJoin": "Adhérez à droite",
+    "addClause": "Ajouter une clause",
+    "removeClause": "Supprimer la clause"
   },
   "home": {
     "streams": "Ruisseaux",

@@ -276,7 +276,8 @@
     "actionLabel": "Actie",
     "transformLabel": "Transformeren",
     "addToDashboard": "Aan dashboard toevoegen",
-    "selectStream": "Selecteer Stream"
+    "selectStream": "Selecteer Stream",
+    "pattern_summary": "Toont 1 tot 50 van de {totalEvents} -gebeurtenissen en {PatternsFound} -patronen gevonden in {logsAnalyzed} -gebeurtenissen in {totalTime} ms."
   },
   "menu": {
     "home": "Home",
@@ -1067,7 +1068,15 @@
     "mapvalue": "Waarde",
     "customChartTypeSelector": "Aangepaste grafiektypekiezer",
     "customChartTypeSelectorHint": "Selecteer een diagramtype uit de eCharts bibliotheek om aan de slag te gaan met een eenvoudige codestructuur",
-    "selectChartType": "Diagramtype selecteren"
+    "selectChartType": "Diagramtype selecteren",
+    "joins": "Sluit zich aan",
+    "addJoin": "Join toevoegen",
+    "removeJoin": "Join verwijderen",
+    "leftJoin": "Links aansluiten",
+    "innerJoin": "Innerlijke verbinding",
+    "rightJoin": "Right Join",
+    "addClause": "Clausule toevoegen",
+    "removeClause": "Clausule verwijderen"
   },
   "home": {
     "streams": "Streams",

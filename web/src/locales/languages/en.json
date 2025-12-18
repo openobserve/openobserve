@@ -276,7 +276,8 @@
     "actionLabel": "Action",
     "transformLabel": "Transform",
     "addToDashboard": "Add To Dashboard",
-    "selectStream": "Select Stream"
+    "selectStream": "Select Stream",
+    "pattern_summary": "Showing 1 to 50 out of {totalEvents} events & {patternsFound} patterns found in {logsAnalyzed} events in {totalTime} ms."
   },
   "menu": {
     "home": "Home",
@@ -1182,6 +1183,14 @@
     "otherColumn": "Other Columns",
     "config": "Config",
     "filters": "Filters",
+    "joins": "Joins",
+    "addJoin": "Add Join",
+    "removeJoin": "Remove Join",
+    "leftJoin": "Left Join",
+    "innerJoin": "Inner Join",
+    "rightJoin": "Right Join",
+    "addClause": "Add Clause",
+    "removeClause": "Remove Clause",
     "customSql": "Custom SQL",
     "field": "Fields",
     "discard": "Discard",

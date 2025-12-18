@@ -1254,7 +1254,20 @@ async fn search_streaming(
     let req_trace_id = trace_id.to_string();
     let org_id = org_id.to_string();
     let user_email = user_email.to_string();
+    let req_step = req.step;
     actix_web::rt::spawn(async move {
+        // Send metadata first before any responses
+        let promql_metadata = StreamResponses::PromqlMetadata {
+            step: req_step,
+            trace_id: Some(req_trace_id.clone()),
+        };
+        if tx.send(Ok(promql_metadata)).await.is_err() {
+            log::warn!(
+                "[HTTP2_STREAM PromQL trace_id {req_trace_id}] Sender is closed, stop sending metadata to client",
+            );
+            return;
+        }
+
         let total_partitions = partitions.len();
         for (i, (start, end)) in partitions.into_iter().enumerate() {
             let mut req = req.clone();
@@ -1276,6 +1289,7 @@ async fn search_streaming(
                             result_type: data.get_type().to_string(),
                             result: data,
                         },
+                        trace_id: Some(req_trace_id.clone()),
                     };
                     if tx.send(Ok(res)).await.is_err() {
                         log::warn!(

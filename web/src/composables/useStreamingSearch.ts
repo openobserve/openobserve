@@ -51,7 +51,7 @@ const streamConnections = ref<Record<string, ReadableStreamDefaultReader<Uint8Ar
 const abortControllers = ref<Record<string, AbortController>>({});
 const errorOccurred = ref(false);
 
-type StreamResponseType = 'search_response_metadata' | 'search_response_hits' | 'progress' | 'error' | 'end' | 'pattern_extraction_result';
+type StreamResponseType = 'search_response_metadata' | 'search_response_hits' | 'progress' | 'error' | 'end' | 'pattern_extraction_result' | 'promql_response';
 
 const useHttpStreaming = () => {
   const onData = (traceId: string, type: StreamResponseType | 'end', response: any) => {
@@ -110,13 +110,13 @@ const useHttpStreaming = () => {
 
   const fetchQueryDataWithHttpStream = async (
     data: {
-      queryReq: SearchRequestPayload;
-      type: "search" | "histogram" | "pageCount" | "values";
+      queryReq: SearchRequestPayload | any;
+      type: "search" | "histogram" | "pageCount" | "values" | "promql";
       traceId: string;
       org_id: string;
-      pageType: string;
-      searchType: string;
-      meta: any;
+      pageType?: string;
+      searchType?: string;
+      meta?: any;
       clear_cache?: boolean;
     },
     handlers: {
@@ -161,13 +161,13 @@ const useHttpStreaming = () => {
 
   const initiateStreamConnection = async (
     data: {
-      queryReq: SearchRequestPayload;
-      type: "search" | "histogram" | "pageCount" | "values";
+      queryReq: SearchRequestPayload | any;
+      type: "search" | "histogram" | "pageCount" | "values" | "promql";
       traceId: string;
       org_id: string;
-      pageType: string;
-      searchType: string;
-      meta: any;
+      pageType?: string;
+      searchType?: string;
+      meta?: any;
       clear_cache?: boolean;
     },
     handlers: {
@@ -226,6 +226,18 @@ const useHttpStreaming = () => {
     } else if (type === "values") {
       const fieldsString = meta?.fields.join(",");
       url = `/_values_stream`;
+    } else if (type === "promql") {
+      // PromQL streaming endpoint
+      url = `/prometheus/api/v1/query_range?use_streaming=true&use_cache=${use_cache}&start=${queryReq.start_time}&end=${queryReq.end_time}&step=${queryReq.step}&query=${encodeURIComponent(queryReq.query)}`;
+      if (meta?.dashboard_id) url += `&dashboard_id=${meta?.dashboard_id}`;
+      if (meta?.dashboard_name) url += `&dashboard_name=${encodeURIComponent(meta?.dashboard_name)}`;
+      if (meta?.folder_id) url += `&folder_id=${meta?.folder_id}`;
+      if (meta?.folder_name) url += `&folder_name=${encodeURIComponent(meta?.folder_name)}`;
+      if (meta?.panel_id) url += `&panel_id=${meta?.panel_id}`;
+      if (meta?.panel_name) url += `&panel_name=${encodeURIComponent(meta?.panel_name)}`;
+      if (meta?.run_id) url += `&run_id=${meta?.run_id}`;
+      if (meta?.tab_id) url += `&tab_id=${meta?.tab_id}`;
+      if (meta?.tab_name) url += `&tab_name=${encodeURIComponent(meta?.tab_name)}`;
     }
 
     url = `${store.state.API_ENDPOINT}/api/${org_id}` + url;
@@ -233,17 +245,24 @@ const useHttpStreaming = () => {
     try {
       const spanId = getUUID().replace(/-/g, "").slice(0, 16);
       const traceparent = `00-${traceId}-${spanId}-01`;
+
       // Make the HTTP/2 streaming request
-      const response = await fetch(url, {
-        method: 'POST',
+      const fetchOptions: any = {
+        method: type === "promql" ? 'GET' : 'POST',
         credentials: 'include',
         headers: {
-          'Content-Type': 'application/json',
           'traceparent': traceparent,
         },
-        body: JSON.stringify((isMultiStream && type != "values") ? queryReq.query : queryReq),
         signal: abortController.signal,
-      });
+      };
+
+      // Add Content-Type and body only for POST requests
+      if (type !== "promql") {
+        fetchOptions.headers['Content-Type'] = 'application/json';
+        fetchOptions.body = JSON.stringify((isMultiStream && type != "values") ? queryReq.query : queryReq);
+      }
+
+      const response = await fetch(url, fetchOptions);
 
       if (!response.ok) {
         try {
@@ -273,6 +292,9 @@ const useHttpStreaming = () => {
               break;
             case 'pattern_extraction_result':
               onData(eventTraceId, 'pattern_extraction_result', data);
+              break;
+            case 'promql_response':
+              onData(eventTraceId, 'promql_response', data);
               break;
             case 'progress':
               onData(eventTraceId, 'progress', data);
@@ -515,10 +537,23 @@ const useHttpStreaming = () => {
     }
   }
 
+  const convertToPromQLResponse = (traceId: string, response: any, type: StreamResponseType) => {
+    // Backend sends: PromqlResponse { data: QueryResult { result_type, result } }
+    // We need to extract the QueryResult and return it in a format compatible with the old API
+    return {
+      content: {
+        results: response.data || response, // This contains { result_type, result }
+        trace_id: traceId,
+      },
+      type: "promql_response",
+    }
+  }
+
   const wsMapper = {
     'search_response_metadata': convertToWsResponse,
     'search_response_hits': convertToWsResponse,
     'pattern_extraction_result': convertToPatternResult,
+    'promql_response': convertToPromQLResponse,
     'progress': convertToWsEventProgress,
     'error': convertToWsError,
     'end': convertToWsEnd,

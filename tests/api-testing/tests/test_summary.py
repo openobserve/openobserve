@@ -493,8 +493,8 @@ def test_summary(create_session, base_url, base_url_sc, org_id):
         dashboard = dashboards[0]
         # Try v7 first, then v6, then v5
         dashboard_id = None
-        if dashboard.get('v7'):
-            dashboard_id = dashboard['v7']['dashboardId']
+        if dashboard.get('v8'):
+            dashboard_id = dashboard['v8']['dashboardId']
         elif dashboard.get('v6'):
             dashboard_id = dashboard['v6']['dashboardId']
         elif dashboard.get('v5'):

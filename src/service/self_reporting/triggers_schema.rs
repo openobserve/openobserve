@@ -39,7 +39,7 @@ static INITIALIZED_ORGS: Lazy<DashSet<String>> = Lazy::new(DashSet::new);
 /// * `org_id` - The organization ID to initialize the triggers stream for
 ///
 /// # Behavior
-/// - Only applies to non-META organizations when ZO_USAGE_REPORT_TO_OWN_ORG is enabled
+/// - Only applies when ZO_USAGE_REPORT_TO_OWN_ORG is enabled
 /// - Uses lock-free per-org tracking to ensure initialization happens only once per restart
 /// - Auto-generates field list from TriggerData struct via reflection
 /// - Creates schema directly without ingesting sample data
@@ -48,8 +48,8 @@ static INITIALIZED_ORGS: Lazy<DashSet<String>> = Lazy::new(DashSet::new);
 pub async fn ensure_triggers_stream_initialized(org_id: &str) -> Result<()> {
     let cfg = get_config();
 
-    // Only initialize for non-META orgs when usage_report_to_own_org is enabled
-    if !cfg.common.usage_report_to_own_org || org_id == config::META_ORG_ID {
+    // Only initialize when usage_report_to_own_org is enabled
+    if !cfg.common.usage_report_to_own_org {
         return Ok(());
     }
 
@@ -88,16 +88,7 @@ async fn initialize_triggers_stream_schema(org_id: &str) -> Result<()> {
     let stream_name = usage::TRIGGERS_STREAM;
     let stream_type = StreamType::Logs;
 
-    // Check if stream exists
-    let schema_result = infra::schema::get(org_id, stream_name, stream_type).await;
-
-    if schema_result.is_ok() {
-        // Stream already exists, schema will evolve naturally through ingestion
-        log::debug!("[SELF-REPORTING] Triggers stream {org_id}/{stream_name} already exists");
-        return Ok(());
-    }
-
-    // Stream doesn't exist - create schema using reflection
+    // Stream doesn't exist or has no fields - create schema using reflection
     log::info!(
         "[SELF-REPORTING] Creating triggers stream schema for {org_id}/{stream_name} via reflection"
     );
@@ -113,15 +104,25 @@ async fn initialize_triggers_stream_schema(org_id: &str) -> Result<()> {
 
     // Infer Arrow schema from the JSON (uses OpenObserve's schema inference)
     // Pass as iterator of a single map
-    let schema =
+    let expected_schema =
         config::utils::schema::infer_json_schema_from_map(std::iter::once(json_map), stream_type)?;
 
+    if infra::schema::get(org_id, stream_name, stream_type)
+        .await
+        .is_ok_and(|ref schema| schema.eq(&expected_schema))
+    {
+        // Stream already exists with all fields
+        log::debug!(
+            "[SELF-REPORTING] Triggers stream {org_id}/{stream_name} already exists with expected schema"
+        );
+        return Ok(());
+    }
     // Create the schema using merge (which creates if doesn't exist)
     match infra::schema::merge(
         org_id,
         stream_name,
         stream_type,
-        &schema,
+        &expected_schema,
         Some(config::utils::time::now_micros()),
     )
     .await
@@ -129,7 +130,7 @@ async fn initialize_triggers_stream_schema(org_id: &str) -> Result<()> {
         Ok(_) => {
             log::info!(
                 "[SELF-REPORTING] Successfully created triggers stream schema for {org_id}/{stream_name} with {} fields",
-                schema.fields().len()
+                expected_schema.fields().len()
             );
             Ok(())
         }

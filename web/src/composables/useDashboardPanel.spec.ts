@@ -274,7 +274,7 @@ describe("useDashboardPanel", () => {
       const initialLength =
         panel.dashboardPanelData.data.queries[0].fields.x.length;
 
-      panel.removeXAxisItem("timestamp");
+      panel.removeXAxisItemByIndex(0);
 
       expect(
         panel.dashboardPanelData.data.queries[0].fields.x.length,
@@ -286,7 +286,7 @@ describe("useDashboardPanel", () => {
       const initialLength =
         panel.dashboardPanelData.data.queries[0].fields.y.length;
 
-      panel.removeYAxisItem("count");
+      panel.removeYAxisItemByIndex(0);
 
       expect(
         panel.dashboardPanelData.data.queries[0].fields.y.length,
@@ -570,11 +570,11 @@ describe("useDashboardPanel", () => {
 
     it("should handle invalid input gracefully", () => {
       expect(() => {
-        panel.removeXAxisItem("nonexistent");
+        panel.removeXAxisItemByIndex(999); // Non-existent index
       }).not.toThrow();
 
       expect(() => {
-        panel.removeYAxisItem("nonexistent");
+        panel.removeYAxisItemByIndex(999); // Non-existent index
       }).not.toThrow();
     });
 
@@ -1077,9 +1077,9 @@ describe("useDashboardPanel", () => {
       ).toBeGreaterThan(0);
 
       // Remove fields
-      panel.removeXAxisItem("timestamp");
-      panel.removeYAxisItem("count");
-      panel.removeBreakdownItem("level");
+      panel.removeXAxisItemByIndex(0);
+      panel.removeYAxisItemByIndex(0);
+      panel.removeBreakdownItemByIndex(0);
     });
 
     it("should handle query operations", () => {
@@ -1174,12 +1174,12 @@ describe("useDashboardPanel", () => {
       // Verify z-axis field was added
       if (panel.dashboardPanelData.data.queries[0].fields.z.length > 0) {
         expect(
-          panel.dashboardPanelData.data.queries[0].fields.z[0].column,
+          panel.dashboardPanelData.data.queries[0].fields.z[0].args[0].value.field,
         ).toBe("count");
       }
 
       // Remove z-axis field
-      panel.removeZAxisItem("count");
+      panel.removeZAxisItemByIndex(0);
     });
 
     it("should handle different query types and custom queries", () => {
@@ -1593,7 +1593,7 @@ describe("useDashboardPanel", () => {
           panel.dashboardPanelData.data.queries[0].fields.y[0].column ||
           panel.dashboardPanelData.data.queries[0].fields.y[0].name;
         if (fieldName) {
-          panel.removeYAxisItem(fieldName);
+          panel.removeYAxisItemByIndex(0);
           // Just verify the function executed without throwing
           expect(
             panel.dashboardPanelData.data.queries[0].fields.y.length,
@@ -1807,7 +1807,7 @@ describe("useDashboardPanel", () => {
       if (panel.dashboardPanelData.data.queries[0].fields.y.length > 0) {
         const fieldCount =
           panel.dashboardPanelData.data.queries[0].fields.y.length;
-        panel.removeYAxisItem("test_field_count");
+        panel.removeYAxisItemByIndex(0);
         // Field count should remain valid
         expect(
           panel.dashboardPanelData.data.queries[0].fields.y.length,
@@ -2618,7 +2618,7 @@ describe("useDashboardPanel", () => {
         // Should have timestamp field added
         const timestampField =
           panel.dashboardPanelData.data.queries[0].fields.x.find(
-            (field: any) => (field.column || field.name) === "_timestamp",
+            (field: any) => field.args?.[0]?.value?.field === "_timestamp",
           );
         expect(timestampField).toBeDefined();
       } else {
@@ -2648,9 +2648,9 @@ describe("useDashboardPanel", () => {
 
       // Test removing non-existent items
       expect(() => {
-        panel.removeXAxisItem("non_existent_field");
-        panel.removeYAxisItem("non_existent_field");
-        panel.removeBreakdownItem("non_existent_field");
+        panel.removeXAxisItemByIndex(0);
+        panel.removeYAxisItemByIndex(0);
+        panel.removeBreakdownItemByIndex(0);
       }).not.toThrow();
     });
 
@@ -2774,8 +2774,8 @@ describe("useDashboardPanel", () => {
 
         // Test removing fields safely
         expect(() => {
-          panel.removeXAxisItem("safe_test_field");
-          panel.removeYAxisItem("non_existent");
+          panel.removeXAxisItemByIndex(0);
+          panel.removeYAxisItemByIndex(0);
         }).not.toThrow();
       });
 
@@ -3300,7 +3300,7 @@ describe("useDashboardPanel", () => {
               "timestamp";
             const initialXCount =
               panel.dashboardPanelData.data.queries[0].fields.x.length;
-            panel.removeXAxisItem(fieldToRemove);
+            panel.removeXAxisItemByIndex(0);
             expect(
               panel.dashboardPanelData.data.queries[0].fields.x.length,
             ).toBeLessThanOrEqual(initialXCount);
@@ -3313,7 +3313,7 @@ describe("useDashboardPanel", () => {
               "count";
             const initialYCount =
               panel.dashboardPanelData.data.queries[0].fields.y.length;
-            panel.removeYAxisItem(fieldToRemove);
+            panel.removeYAxisItemByIndex(0);
             expect(
               panel.dashboardPanelData.data.queries[0].fields.y.length,
             ).toBeLessThanOrEqual(initialYCount);
@@ -3328,7 +3328,7 @@ describe("useDashboardPanel", () => {
                 .name || "category";
             const initialBreakdownCount =
               panel.dashboardPanelData.data.queries[0].fields.breakdown.length;
-            panel.removeBreakdownItem(fieldToRemove);
+            panel.removeBreakdownItemByIndex(0);
             expect(
               panel.dashboardPanelData.data.queries[0].fields.breakdown.length,
             ).toBeLessThanOrEqual(initialBreakdownCount);
@@ -3727,21 +3727,21 @@ describe("useDashboardPanel", () => {
 
     it("should test removeXAxisItem with field name", () => {
       panel.addXAxisItem({ name: "test_field" });
-      panel.removeXAxisItem("test_field");
+      panel.removeXAxisItemByIndex(0);
       
       expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.x)).toBe(true);
     });
 
     it("should test removeYAxisItem functionality", () => {
       panel.addYAxisItem({ name: "metric_field" });
-      panel.removeYAxisItem("metric_field");
+      panel.removeYAxisItemByIndex(0);
       
       expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.y)).toBe(true);
     });
 
     it("should test removeBreakdownItem operation", () => {
       panel.addBreakDownAxisItem({ name: "group_field" });
-      panel.removeBreakdownItem("group_field");
+      panel.removeBreakdownItemByIndex(0);
       
       expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.breakdown)).toBe(true);
     });
@@ -3981,9 +3981,9 @@ describe("useDashboardPanel", () => {
 
     it("should handle error conditions gracefully", () => {
       // Test with invalid field names
-      panel.removeXAxisItem("non_existent_field");
-      panel.removeYAxisItem("non_existent_field");
-      panel.removeBreakdownItem("non_existent_field");
+      panel.removeXAxisItemByIndex(0);
+      panel.removeYAxisItemByIndex(0);
+      panel.removeBreakdownItemByIndex(0);
       
       expect(panel.dashboardPanelData).toBeDefined();
     });
@@ -4358,7 +4358,7 @@ describe("useDashboardPanel", () => {
       panel.addXAxisItem({ name: "field1" });
       panel.addYAxisItem({ name: "field2" });
       panel.addBreakDownAxisItem({ name: "field3" });
-      panel.removeXAxisItem("field1");
+      panel.removeXAxisItemByIndex(0);
       
       expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.x)).toBe(true);
     });
@@ -4368,7 +4368,7 @@ describe("useDashboardPanel", () => {
       
       // Perform operations
       panel.addXAxisItem({ name: "test" });
-      panel.removeXAxisItem("test");
+      panel.removeXAxisItemByIndex(0);
       
       // State should be consistent (though not necessarily identical)
       expect(panel.dashboardPanelData).toBeDefined();
@@ -4549,9 +4549,9 @@ describe("useDashboardPanel", () => {
       panel.addFilteredItem({ column: "filter_field", operator: "=", value: "test" });
       
       // Remove all fields
-      panel.removeXAxisItem("x_field");
-      panel.removeYAxisItem("y_field");
-      panel.removeBreakdownItem("breakdown_field");
+      panel.removeXAxisItemByIndex(0);
+      panel.removeYAxisItemByIndex(0);
+      panel.removeBreakdownItemByIndex(0);
       panel.removeFilterItem(0);
       
       expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.x)).toBe(true);
@@ -4666,9 +4666,9 @@ describe("useDashboardPanel", () => {
       
       try {
         // Attempt operations that might fail
-        panel.removeXAxisItem("non_existent");
-        panel.removeYAxisItem("non_existent");
-        panel.removeBreakdownItem("non_existent");
+        panel.removeXAxisItemByIndex(0);
+        panel.removeYAxisItemByIndex(0);
+        panel.removeBreakdownItemByIndex(0);
         panel.removeFilterItem(999);
         
         expect(panel.dashboardPanelData).toBeDefined();
@@ -4718,6 +4718,1027 @@ describe("useDashboardPanel", () => {
       expect(panel.dashboardPanelData.data).toBeDefined();
       expect(panel.dashboardPanelData.meta).toBeDefined();
       expect(panel.dashboardPanelData.layout).toBeDefined();
+    });
+  });
+
+  describe("100% Coverage - Uncovered Lines", () => {
+    let panel: ReturnType<typeof useDashboardPanelData>;
+
+    beforeEach(() => {
+      panel = useDashboardPanelData();
+      panel.dashboardPanelData.meta.dateTime = {
+        start_time: new Date("2024-01-01"),
+        end_time: new Date("2024-01-02")
+      };
+    });
+
+    it("should cover addFilteredItem error path with response.data.error_detail", async () => {
+      const mockError = {
+        response: {
+          data: {
+            error_detail: "A".repeat(350) + " detailed error message"
+          }
+        }
+      };
+
+      vi.mocked(mockValuesWebSocket.fetchFieldValues).mockRejectedValueOnce(mockError);
+
+      const row = { name: "test_field", stream: "test_stream" };
+
+      try {
+        await panel.addFilteredItem(row);
+      } catch (e) {
+        // Expected to be caught internally
+      }
+
+      expect(mockNotifications.showErrorNotification).toHaveBeenCalled();
+      const errorArg = mockNotifications.showErrorNotification.mock.calls[0][0];
+      expect(errorArg).toContain("...");
+      expect(errorArg.length).toBeLessThanOrEqual(305);
+    });
+
+    it("should cover addFilteredItem error path with response.data.message", async () => {
+      const mockError = {
+        response: {
+          data: {
+            message: "Short error message"
+          }
+        }
+      };
+
+      vi.mocked(mockValuesWebSocket.fetchFieldValues).mockRejectedValueOnce(mockError);
+
+      const row = { name: "test_field2", stream: "test_stream2" };
+
+      try {
+        await panel.addFilteredItem(row);
+      } catch (e) {
+        // Expected to be caught internally
+      }
+
+      expect(mockNotifications.showErrorNotification).toHaveBeenCalledWith("Short error message");
+    });
+
+    it("should cover addFilteredItem error path with generic error", async () => {
+      const mockError = {};
+
+      vi.mocked(mockValuesWebSocket.fetchFieldValues).mockRejectedValueOnce(mockError);
+
+      const row = { name: "test_field3", stream: "test_stream3" };
+
+      try {
+        await panel.addFilteredItem(row);
+      } catch (e) {
+        // Expected to be caught internally
+      }
+
+      expect(mockNotifications.showErrorNotification).toHaveBeenCalledWith("Something went wrong!");
+    });
+
+    it("should cover loadFilterItem error path with long error message", async () => {
+      const mockError = {
+        response: {
+          data: {
+            error_detail: "B".repeat(400) + " very long error"
+          }
+        }
+      };
+
+      vi.mocked(mockValuesWebSocket.fetchFieldValues).mockRejectedValueOnce(mockError);
+
+      const row = { field: "test_field" };
+
+      try {
+        await panel.loadFilterItem(row);
+      } catch (e) {
+        // Expected to be caught internally
+      }
+
+      expect(mockNotifications.showErrorNotification).toHaveBeenCalled();
+    });
+
+    it("should cover loadFilterItem with streamAlias parameter", async () => {
+      vi.mocked(mockValuesWebSocket.fetchFieldValues).mockResolvedValueOnce({});
+
+      const row = { field: "test_field", streamAlias: "stream_alias" };
+
+      await panel.loadFilterItem(row);
+
+      expect(mockValuesWebSocket.fetchFieldValues).toHaveBeenCalled();
+    });
+
+    it("should cover resetAggregationFunction for html chart type preserving stream", () => {
+      panel.dashboardPanelData.data.type = "html";
+      panel.dashboardPanelData.data.queries[0].fields.stream = "preserved_stream";
+      panel.dashboardPanelData.data.queries[0].fields.stream_type = "metrics";
+
+      panel.resetAggregationFunction();
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.stream).toBe("preserved_stream");
+      expect(panel.dashboardPanelData.data.queries[0].fields.stream_type).toBe("metrics");
+      expect(panel.dashboardPanelData.data.markdownContent).toBe("");
+    });
+
+    it("should cover resetAggregationFunction for markdown chart type preserving stream", () => {
+      panel.dashboardPanelData.data.type = "markdown";
+      panel.dashboardPanelData.data.queries[0].fields.stream = "preserved_stream_md";
+      panel.dashboardPanelData.data.queries[0].fields.stream_type = "logs";
+
+      panel.resetAggregationFunction();
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.stream).toBe("preserved_stream_md");
+      expect(panel.dashboardPanelData.data.queries[0].fields.stream_type).toBe("logs");
+      expect(panel.dashboardPanelData.data.htmlContent).toBe("");
+    });
+
+    it("should cover resetAggregationFunction for custom_chart type preserving stream", () => {
+      panel.dashboardPanelData.data.type = "custom_chart";
+      panel.dashboardPanelData.data.queries[0].fields.stream = "preserved_custom";
+      panel.dashboardPanelData.data.queries[0].fields.stream_type = "traces";
+
+      panel.resetAggregationFunction();
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.stream).toBe("preserved_custom");
+      expect(panel.dashboardPanelData.data.queries[0].fields.stream_type).toBe("traces");
+      expect(panel.dashboardPanelData.data.markdownContent).toBe("");
+      expect(panel.dashboardPanelData.data.htmlContent).toBe("");
+    });
+
+    it("should cover resetAggregationFunction for sankey chart type", () => {
+      panel.dashboardPanelData.data.type = "sankey";
+      panel.dashboardPanelData.data.queries[0].fields.x = [{ name: "x1" }];
+      panel.dashboardPanelData.data.queries[0].fields.latitude = { name: "lat" };
+
+      panel.resetAggregationFunction();
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.x).toEqual([]);
+      expect(panel.dashboardPanelData.data.queries[0].fields.latitude).toBeNull();
+      expect(panel.dashboardPanelData.data.queries[0].config.limit).toBe(0);
+    });
+
+    it("should cover updateXYFieldsOnCustomQueryChange with latitude field change", () => {
+      const oldFields = [{ name: "old_lat" }];
+      const newFields = [{ name: "new_lat" }];
+
+      panel.dashboardPanelData.meta.stream.customQueryFields = newFields;
+      panel.dashboardPanelData.data.queries[0].fields.latitude = {
+        alias: "old_lat",
+        column: "old_lat"
+      };
+
+      panel.updateXYFieldsOnCustomQueryChange(oldFields);
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.latitude.alias).toBe("new_lat");
+    });
+
+    it("should cover updateXYFieldsOnCustomQueryChange with longitude field change", () => {
+      const oldFields = [{ name: "old_lng" }];
+      const newFields = [{ name: "new_lng" }];
+
+      panel.dashboardPanelData.meta.stream.customQueryFields = newFields;
+      panel.dashboardPanelData.data.queries[0].fields.longitude = {
+        alias: "old_lng",
+        column: "old_lng"
+      };
+
+      panel.updateXYFieldsOnCustomQueryChange(oldFields);
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.longitude.alias).toBe("new_lng");
+    });
+
+    it("should cover updateXYFieldsOnCustomQueryChange with weight field change", () => {
+      const oldFields = [{ name: "old_weight" }];
+      const newFields = [{ name: "new_weight" }];
+
+      panel.dashboardPanelData.meta.stream.customQueryFields = newFields;
+      panel.dashboardPanelData.data.queries[0].fields.weight = {
+        alias: "old_weight",
+        column: "old_weight"
+      };
+
+      panel.updateXYFieldsOnCustomQueryChange(oldFields);
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.weight.alias).toBe("new_weight");
+    });
+
+    it("should cover updateXYFieldsOnCustomQueryChange with name field change", () => {
+      const oldFields = [{ name: "old_name" }];
+      const newFields = [{ name: "new_name" }];
+
+      panel.dashboardPanelData.meta.stream.customQueryFields = newFields;
+      panel.dashboardPanelData.data.queries[0].fields.name = {
+        alias: "old_name",
+        column: "old_name"
+      };
+
+      panel.updateXYFieldsOnCustomQueryChange(oldFields);
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.name.alias).toBe("new_name");
+    });
+
+    it("should cover updateXYFieldsOnCustomQueryChange with value_for_maps field change", () => {
+      const oldFields = [{ name: "old_value" }];
+      const newFields = [{ name: "new_value" }];
+
+      panel.dashboardPanelData.meta.stream.customQueryFields = newFields;
+      panel.dashboardPanelData.data.queries[0].fields.value_for_maps = {
+        alias: "old_value",
+        column: "old_value"
+      };
+
+      panel.updateXYFieldsOnCustomQueryChange(oldFields);
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.value_for_maps.alias).toBe("new_value");
+    });
+
+    it("should cover updateXYFieldsOnCustomQueryChange with source field change", () => {
+      const oldFields = [{ name: "old_src" }];
+      const newFields = [{ name: "new_src" }];
+
+      panel.dashboardPanelData.meta.stream.customQueryFields = newFields;
+      panel.dashboardPanelData.data.queries[0].fields.source = {
+        alias: "old_src",
+        column: "old_src"
+      };
+
+      panel.updateXYFieldsOnCustomQueryChange(oldFields);
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.source.alias).toBe("new_src");
+    });
+
+    it("should cover updateXYFieldsOnCustomQueryChange with target field change", () => {
+      const oldFields = [{ name: "old_tgt" }];
+      const newFields = [{ name: "new_tgt" }];
+
+      panel.dashboardPanelData.meta.stream.customQueryFields = newFields;
+      panel.dashboardPanelData.data.queries[0].fields.target = {
+        alias: "old_tgt",
+        column: "old_tgt"
+      };
+
+      panel.updateXYFieldsOnCustomQueryChange(oldFields);
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.target.alias).toBe("new_tgt");
+    });
+
+    it("should cover updateXYFieldsOnCustomQueryChange with value field change", () => {
+      const oldFields = [{ name: "old_val" }];
+      const newFields = [{ name: "new_val" }];
+
+      panel.dashboardPanelData.meta.stream.customQueryFields = newFields;
+      panel.dashboardPanelData.data.queries[0].fields.value = {
+        alias: "old_val",
+        column: "old_val"
+      };
+
+      panel.updateXYFieldsOnCustomQueryChange(oldFields);
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.value.alias).toBe("new_val");
+    });
+
+    it("should cover updateXYFieldsOnCustomQueryChange with breakdown field change", () => {
+      const oldFields = [{ name: "old_breakdown" }];
+      const newFields = [{ name: "new_breakdown" }];
+
+      panel.dashboardPanelData.meta.stream.customQueryFields = newFields;
+      panel.dashboardPanelData.data.queries[0].fields.breakdown = [{
+        alias: "old_breakdown",
+        column: "old_breakdown"
+      }];
+
+      panel.updateXYFieldsOnCustomQueryChange(oldFields);
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.breakdown[0].alias).toBe("new_breakdown");
+    });
+
+    it("should cover updateXYFieldsOnCustomQueryChange with z field change", () => {
+      const oldFields = [{ name: "old_z" }];
+      const newFields = [{ name: "new_z" }];
+
+      panel.dashboardPanelData.meta.stream.customQueryFields = newFields;
+      panel.dashboardPanelData.data.queries[0].fields.x = [];
+      panel.dashboardPanelData.data.queries[0].fields.y = [];
+      panel.dashboardPanelData.data.queries[0].fields.breakdown = [];
+      panel.dashboardPanelData.data.queries[0].fields.z = [{
+        alias: "old_z",
+        column: "old_z"
+      }];
+
+      panel.updateXYFieldsOnCustomQueryChange(oldFields);
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.z[0].alias).toBe("new_z");
+    });
+
+    it("should cover updateXYFieldsForCustomQueryMode removing derived latitude", () => {
+      panel.dashboardPanelData.data.queryType = "sql";
+      panel.dashboardPanelData.data.queries[0].customQuery = true;
+      panel.dashboardPanelData.data.queries[0].fields.latitude = {
+        alias: "derived_lat",
+        isDerived: true,
+        args: []
+      };
+      panel.dashboardPanelData.meta.stream.customQueryFields = [];
+
+      panel.updateXYFieldsForCustomQueryMode();
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.latitude).toBeNull();
+    });
+
+    it("should cover updateXYFieldsForCustomQueryMode removing derived longitude", () => {
+      panel.dashboardPanelData.data.queryType = "sql";
+      panel.dashboardPanelData.data.queries[0].customQuery = true;
+      panel.dashboardPanelData.data.queries[0].fields.longitude = {
+        alias: "derived_lng",
+        isDerived: true,
+        args: []
+      };
+      panel.dashboardPanelData.meta.stream.customQueryFields = [];
+
+      panel.updateXYFieldsForCustomQueryMode();
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.longitude).toBeNull();
+    });
+
+    it("should cover updateXYFieldsForCustomQueryMode removing derived weight", () => {
+      panel.dashboardPanelData.data.queryType = "sql";
+      panel.dashboardPanelData.data.queries[0].customQuery = true;
+      panel.dashboardPanelData.data.queries[0].fields.weight = {
+        alias: "derived_wt",
+        isDerived: true,
+        args: []
+      };
+      panel.dashboardPanelData.meta.stream.customQueryFields = [];
+
+      panel.updateXYFieldsForCustomQueryMode();
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.weight).toBeNull();
+    });
+
+    it("should cover updateXYFieldsForCustomQueryMode removing derived source", () => {
+      panel.dashboardPanelData.data.queryType = "sql";
+      panel.dashboardPanelData.data.queries[0].customQuery = true;
+      panel.dashboardPanelData.data.queries[0].fields.source = {
+        alias: "derived_src",
+        isDerived: true,
+        args: []
+      };
+      panel.dashboardPanelData.meta.stream.customQueryFields = [];
+
+      panel.updateXYFieldsForCustomQueryMode();
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.source).toBeNull();
+    });
+
+    it("should cover updateXYFieldsForCustomQueryMode removing derived target", () => {
+      panel.dashboardPanelData.data.queryType = "sql";
+      panel.dashboardPanelData.data.queries[0].customQuery = true;
+      panel.dashboardPanelData.data.queries[0].fields.target = {
+        alias: "derived_tgt",
+        isDerived: true,
+        args: []
+      };
+      panel.dashboardPanelData.meta.stream.customQueryFields = [];
+
+      panel.updateXYFieldsForCustomQueryMode();
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.target).toBeNull();
+    });
+
+    it("should cover updateXYFieldsForCustomQueryMode removing derived value", () => {
+      panel.dashboardPanelData.data.queryType = "sql";
+      panel.dashboardPanelData.data.queries[0].customQuery = true;
+      panel.dashboardPanelData.data.queries[0].fields.value = {
+        alias: "derived_val",
+        isDerived: true,
+        args: []
+      };
+      panel.dashboardPanelData.meta.stream.customQueryFields = [];
+
+      panel.updateXYFieldsForCustomQueryMode();
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.value).toBeNull();
+    });
+
+    it("should cover updateXYFieldsForCustomQueryMode removing derived name", () => {
+      panel.dashboardPanelData.data.queryType = "sql";
+      panel.dashboardPanelData.data.queries[0].customQuery = true;
+      panel.dashboardPanelData.data.queries[0].fields.name = {
+        alias: "derived_name",
+        isDerived: true,
+        args: []
+      };
+      panel.dashboardPanelData.meta.stream.customQueryFields = [];
+
+      panel.updateXYFieldsForCustomQueryMode();
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.name).toBeNull();
+    });
+
+    it("should cover updateXYFieldsForCustomQueryMode removing derived value_for_maps", () => {
+      panel.dashboardPanelData.data.queryType = "sql";
+      panel.dashboardPanelData.data.queries[0].customQuery = true;
+      panel.dashboardPanelData.data.queries[0].fields.value_for_maps = {
+        alias: "derived_vfm",
+        isDerived: true,
+        args: []
+      };
+      panel.dashboardPanelData.meta.stream.customQueryFields = [];
+
+      panel.updateXYFieldsForCustomQueryMode();
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.value_for_maps).toBeNull();
+    });
+
+    it("should cover updateXYFieldsForCustomQueryMode with custom field types for special fields", () => {
+      panel.dashboardPanelData.data.queryType = "sql";
+      panel.dashboardPanelData.data.queries[0].customQuery = true;
+      panel.dashboardPanelData.data.queries[0].fields.latitude = { alias: "lat", column: "lat", isDerived: false, args: [] };
+      panel.dashboardPanelData.data.queries[0].fields.longitude = { alias: "lng", column: "lng", isDerived: false, args: [] };
+      panel.dashboardPanelData.data.queries[0].fields.weight = { alias: "wt", column: "wt", isDerived: false, args: [] };
+      panel.dashboardPanelData.data.queries[0].fields.name = { alias: "nm", column: "nm", isDerived: false, args: [] };
+      panel.dashboardPanelData.data.queries[0].fields.value_for_maps = { alias: "vfm", column: "vfm", isDerived: false, args: [] };
+      panel.dashboardPanelData.data.queries[0].fields.source = { alias: "src", column: "src", isDerived: false, args: [] };
+      panel.dashboardPanelData.data.queries[0].fields.target = { alias: "tgt", column: "tgt", isDerived: false, args: [] };
+      panel.dashboardPanelData.data.queries[0].fields.value = { alias: "val", column: "val", isDerived: false, args: [] };
+
+      panel.dashboardPanelData.meta.stream.customQueryFields = [
+        { name: "latitude" },
+        { name: "longitude" },
+        { name: "weight" },
+        { name: "name" },
+        { name: "value_for_maps" },
+        { name: "source" },
+        { name: "target" },
+        { name: "value" }
+      ];
+
+      panel.updateXYFieldsForCustomQueryMode();
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.latitude.alias).toBe("latitude");
+      expect(panel.dashboardPanelData.data.queries[0].fields.longitude.alias).toBe("longitude");
+      expect(panel.dashboardPanelData.data.queries[0].fields.weight.alias).toBe("weight");
+    });
+
+    it("should cover variable replacement patterns in updateQueryValue", async () => {
+      (global as any).parser = mockParser;
+      panel.dashboardPanelData.data.queryType = "sql";
+      panel.dashboardPanelData.data.queries[0].customQuery = true;
+      panel.dashboardPanelData.data.queries[0].query = "SELECT * FROM table WHERE id IN ${var:csv}";
+
+      mockParser.astify.mockReturnValue({
+        columns: [{ name: "id", alias: "id" }],
+        from: [{ table: "table" }]
+      });
+
+      await nextTick();
+
+      expect(panel.dashboardPanelData.data.queries[0].query).toContain("${var:csv}");
+    });
+
+    it("should cover singlequote variable pattern in updateQueryValue", async () => {
+      (global as any).parser = mockParser;
+      panel.dashboardPanelData.data.queryType = "sql";
+      panel.dashboardPanelData.data.queries[0].customQuery = true;
+      panel.dashboardPanelData.data.queries[0].query = "SELECT * WHERE name IN (${var:singlequote})";
+
+      mockParser.astify.mockReturnValue({
+        columns: [{ name: "name", alias: "name" }],
+        from: [{ table: "test" }]
+      });
+
+      await nextTick();
+
+      expect(panel.dashboardPanelData.data.queries[0].query).toBeDefined();
+    });
+
+    it("should cover doublequote variable pattern in updateQueryValue", async () => {
+      (global as any).parser = mockParser;
+      panel.dashboardPanelData.data.queryType = "sql";
+      panel.dashboardPanelData.data.queries[0].customQuery = true;
+      panel.dashboardPanelData.data.queries[0].query = 'SELECT * WHERE tags IN (${var:doublequote})';
+
+      mockParser.astify.mockReturnValue({
+        columns: [{ name: "tags", alias: "tags" }],
+        from: [{ table: "test" }]
+      });
+
+      await nextTick();
+
+      expect(panel.dashboardPanelData.data.queries[0].query).toBeDefined();
+    });
+
+    it("should cover pipe variable pattern in updateQueryValue", async () => {
+      (global as any).parser = mockParser;
+      panel.dashboardPanelData.data.queryType = "sql";
+      panel.dashboardPanelData.data.queries[0].customQuery = true;
+      panel.dashboardPanelData.data.queries[0].query = "SELECT * WHERE status REGEXP '${var:pipe}'";
+
+      mockParser.astify.mockReturnValue({
+        columns: [{ name: "status", alias: "status" }],
+        from: [{ table: "test" }]
+      });
+
+      await nextTick();
+
+      expect(panel.dashboardPanelData.data.queries[0].query).toBeDefined();
+    });
+
+    it("should cover convertSchemaToFields for table chart type", () => {
+      const extractedFields = {
+        group_by: ["level"],
+        projections: ["timestamp", "level", "count", "message"],
+        timeseries_field: "timestamp"
+      };
+
+      const fields = panel.convertSchemaToFields(extractedFields, "table");
+
+      expect(fields.x).toEqual(["timestamp", "level", "count", "message"]);
+      expect(fields.y).toEqual([]);
+      expect(fields.breakdown).toEqual([]);
+    });
+
+    it("should cover convertSchemaToFields with group_by but no timeseries_field", () => {
+      const extractedFields = {
+        group_by: ["level", "status"],
+        projections: ["level", "status", "count"],
+        timeseries_field: null
+      };
+
+      const fields = panel.convertSchemaToFields(extractedFields, "bar");
+
+      expect(fields.x.length).toBeGreaterThan(0);
+      expect(fields.breakdown.length).toBeGreaterThanOrEqual(0);
+    });
+
+    it("should cover setCustomQueryFields without dateTime", async () => {
+      panel.dashboardPanelData.meta.dateTime = null;
+
+      await panel.setCustomQueryFields();
+
+      // Should return early
+      expect(panel.dashboardPanelData.meta.dateTime).toBeNull();
+    });
+
+    it("should cover setCustomQueryFields with invalid dateTime", async () => {
+      panel.dashboardPanelData.meta.dateTime = {
+        start_time: "Invalid Date",
+        end_time: "Invalid Date"
+      };
+
+      await panel.setCustomQueryFields();
+
+      // Should return early due to invalid dates
+      expect(panel.dashboardPanelData.meta.dateTime.start_time).toBe("Invalid Date");
+    });
+
+    it("should cover getResultSchema with abort signal", async () => {
+      const abortController = new AbortController();
+      abortController.abort();
+
+      try {
+        await panel.getResultSchema("SELECT * FROM test", abortController.signal);
+      } catch (error: any) {
+        expect(error.name).toBe("AbortError");
+      }
+    });
+
+    it("should cover determineChartType with no timeseries and many group_by", () => {
+      const extractedFields = {
+        group_by: ["field1", "field2", "field3"],
+        projections: ["field1", "field2", "field3", "count"],
+        timeseries_field: null
+      };
+
+      const chartType = panel.determineChartType(extractedFields);
+
+      expect(chartType).toBe("table");
+    });
+
+    it("should cover makeAutoSQLQuery for geomap chart", async () => {
+      panel.dashboardPanelData.data.type = "geomap";
+      panel.dashboardPanelData.data.queries[0].customQuery = false;
+      panel.dashboardPanelData.meta.streamFields = { groupedFields: [{ name: "test" }] };
+
+      const query = await panel.makeAutoSQLQuery();
+
+      expect(query).toBeDefined();
+    });
+
+    it("should cover makeAutoSQLQuery for sankey chart", async () => {
+      panel.dashboardPanelData.data.type = "sankey";
+      panel.dashboardPanelData.data.queries[0].customQuery = false;
+      panel.dashboardPanelData.meta.streamFields = { groupedFields: [{ name: "test" }] };
+
+      const query = await panel.makeAutoSQLQuery();
+
+      expect(query).toBeDefined();
+    });
+
+    it("should cover makeAutoSQLQuery for maps chart", async () => {
+      panel.dashboardPanelData.data.type = "maps";
+      panel.dashboardPanelData.data.queries[0].customQuery = false;
+      panel.dashboardPanelData.meta.streamFields = { groupedFields: [{ name: "test" }] };
+
+      const query = await panel.makeAutoSQLQuery();
+
+      expect(query).toBeDefined();
+    });
+
+    it("should cover resetAggregationFunction for heatmap with multiple x fields", () => {
+      panel.dashboardPanelData.data.type = "heatmap";
+      panel.dashboardPanelData.data.queries[0].fields.x = [
+        { name: "field1", args: [] },
+        { name: "field2", args: [] },
+        { name: "field3", args: [] }
+      ];
+
+      panel.resetAggregationFunction();
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.x.length).toBe(1);
+    });
+
+    it("should cover resetAggregationFunction for heatmap with multiple y fields", () => {
+      panel.dashboardPanelData.data.type = "heatmap";
+      panel.dashboardPanelData.data.queries[0].fields.y = [
+        { name: "y1", functionName: "count", args: [{ value: "test" }] },
+        { name: "y2", functionName: "sum", args: [{ value: "test2" }] }
+      ];
+
+      panel.resetAggregationFunction();
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.y.length).toBe(1);
+    });
+
+    it("should cover resetAggregationFunction for heatmap with sql queryType", () => {
+      panel.dashboardPanelData.data.type = "heatmap";
+      panel.dashboardPanelData.data.queryType = "sql";
+      panel.dashboardPanelData.layout.currentQueryIndex = 1;
+      panel.dashboardPanelData.data.queries = [
+        { fields: { x: [], y: [], z: [] }, config: {} },
+        { fields: { x: [], y: [], z: [] }, config: {} }
+      ];
+
+      panel.resetAggregationFunction();
+
+      expect(panel.dashboardPanelData.layout.currentQueryIndex).toBe(0);
+      expect(panel.dashboardPanelData.data.queries.length).toBe(1);
+    });
+
+    it("should cover resetAggregationFunction for line chart with multiple x and empty breakdown", () => {
+      panel.dashboardPanelData.data.type = "line";
+      panel.dashboardPanelData.data.queries[0].fields.x = [
+        { name: "x1", args: [] },
+        { name: "x2", args: [] }
+      ];
+      panel.dashboardPanelData.data.queries[0].fields.breakdown = [];
+
+      panel.resetAggregationFunction();
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.breakdown.length).toBe(1);
+      expect(panel.dashboardPanelData.data.queries[0].fields.x.length).toBe(1);
+    });
+
+    it("should cover resetAggregationFunction for bar chart with multiple x and non-empty breakdown", () => {
+      panel.dashboardPanelData.data.type = "bar";
+      panel.dashboardPanelData.data.queries[0].fields.x = [
+        { name: "x1", args: [] },
+        { name: "x2", args: [] },
+        { name: "x3", args: [] }
+      ];
+      panel.dashboardPanelData.data.queries[0].fields.breakdown = [{ name: "b1" }];
+
+      panel.resetAggregationFunction();
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.x.length).toBe(1);
+      expect(panel.dashboardPanelData.data.queries[0].fields.breakdown.length).toBe(1);
+    });
+
+    it("should cover resetAggregationFunction for area chart with sql queryType", () => {
+      panel.dashboardPanelData.data.type = "area";
+      panel.dashboardPanelData.data.queryType = "sql";
+      panel.dashboardPanelData.data.queries = [
+        { fields: { x: [], y: [], z: [] }, config: {} },
+        { fields: { x: [], y: [], z: [] }, config: {} }
+      ];
+
+      panel.resetAggregationFunction();
+
+      expect(panel.dashboardPanelData.data.queries.length).toBe(1);
+    });
+
+    it("should cover resetAggregationFunction for pie chart with multiple x fields", () => {
+      panel.dashboardPanelData.data.type = "pie";
+      panel.dashboardPanelData.data.queries[0].fields.x = [
+        { name: "x1" },
+        { name: "x2" }
+      ];
+
+      panel.resetAggregationFunction();
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.x.length).toBe(1);
+    });
+
+    it("should cover resetAggregationFunction for donut chart with multiple y fields", () => {
+      panel.dashboardPanelData.data.type = "donut";
+      panel.dashboardPanelData.data.queries[0].fields.y = [
+        { name: "y1", functionName: "count", args: [] },
+        { name: "y2", functionName: "sum", args: [] }
+      ];
+
+      panel.resetAggregationFunction();
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.y.length).toBe(1);
+    });
+
+    it("should cover resetAggregationFunction for gauge with sql queryType", () => {
+      panel.dashboardPanelData.data.type = "gauge";
+      panel.dashboardPanelData.data.queryType = "sql";
+      panel.dashboardPanelData.data.queries = [
+        { fields: { x: [], y: [], z: [] }, config: { time_shift: ["1h"] } },
+        { fields: { x: [], y: [], z: [] }, config: {} }
+      ];
+
+      panel.resetAggregationFunction();
+
+      expect(panel.dashboardPanelData.data.queries.length).toBe(1);
+      expect(panel.dashboardPanelData.data.queries[0].config.time_shift).toEqual([]);
+    });
+
+    it("should cover resetAggregationFunction for metric chart with multiple y fields", () => {
+      panel.dashboardPanelData.data.type = "metric";
+      panel.dashboardPanelData.data.queries[0].fields.y = [
+        { name: "y1", functionName: null, isDerived: false, args: [] },
+        { name: "y2", functionName: "avg", isDerived: false, args: [] }
+      ];
+
+      panel.resetAggregationFunction();
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.y.length).toBe(1);
+      expect(panel.dashboardPanelData.data.queries[0].fields.x).toEqual([]);
+    });
+
+    it("should cover resetAggregationFunction for metric with sql queryType", () => {
+      panel.dashboardPanelData.data.type = "metric";
+      panel.dashboardPanelData.data.queryType = "sql";
+      panel.dashboardPanelData.data.queries = [
+        { fields: { x: [], y: [], z: [] }, config: {} },
+        { fields: { x: [], y: [], z: [] }, config: {} }
+      ];
+
+      panel.resetAggregationFunction();
+
+      expect(panel.dashboardPanelData.data.queries.length).toBe(1);
+    });
+
+    it("should cover resetAggregationFunction for geomap chart", () => {
+      panel.dashboardPanelData.data.type = "geomap";
+      panel.dashboardPanelData.data.queries[0].fields.x = [{ name: "x1" }];
+      panel.dashboardPanelData.data.queries[0].fields.y = [{ name: "y1" }];
+      panel.dashboardPanelData.data.queries[0].fields.z = [{ name: "z1" }];
+      panel.dashboardPanelData.data.queries[0].fields.name = { name: "nm" };
+      panel.dashboardPanelData.data.queries[0].fields.value_for_maps = { name: "vfm" };
+      panel.dashboardPanelData.data.queries[0].config.limit = 100;
+
+      panel.resetAggregationFunction();
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.x).toEqual([]);
+      expect(panel.dashboardPanelData.data.queries[0].fields.y).toEqual([]);
+      expect(panel.dashboardPanelData.data.queries[0].fields.z).toEqual([]);
+      expect(panel.dashboardPanelData.data.queries[0].fields.name).toBeNull();
+      expect(panel.dashboardPanelData.data.queries[0].fields.value_for_maps).toBeNull();
+      expect(panel.dashboardPanelData.data.queries[0].config.limit).toBe(0);
+    });
+
+    it("should cover resetAggregationFunction for maps chart", () => {
+      panel.dashboardPanelData.data.type = "maps";
+      panel.dashboardPanelData.data.queries[0].fields.x = [{ name: "x1" }];
+      panel.dashboardPanelData.data.queries[0].fields.y = [{ name: "y1" }];
+      panel.dashboardPanelData.data.queries[0].fields.latitude = { name: "lat" };
+      panel.dashboardPanelData.data.queries[0].fields.longitude = { name: "lng" };
+      panel.dashboardPanelData.data.queries[0].fields.weight = { name: "wt" };
+
+      panel.resetAggregationFunction();
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.x).toEqual([]);
+      expect(panel.dashboardPanelData.data.queries[0].fields.y).toEqual([]);
+      expect(panel.dashboardPanelData.data.queries[0].fields.latitude).toBeNull();
+      expect(panel.dashboardPanelData.data.queries[0].fields.longitude).toBeNull();
+      expect(panel.dashboardPanelData.data.queries[0].fields.weight).toBeNull();
+    });
+
+    it("should cover resetAggregationFunction for table with sql queryType", () => {
+      panel.dashboardPanelData.data.type = "table";
+      panel.dashboardPanelData.data.queryType = "sql";
+      panel.dashboardPanelData.data.queries = [
+        { fields: { x: [], y: [], z: [], breakdown: [] }, config: {} },
+        { fields: { x: [], y: [], z: [], breakdown: [] }, config: {} }
+      ];
+
+      panel.resetAggregationFunction();
+
+      expect(panel.dashboardPanelData.data.queries.length).toBe(1);
+    });
+
+    it("should cover addMapName with isDerived field", () => {
+      panel.dashboardPanelData.meta.stream.vrlFunctionFieldList = [{ name: "derived_name", type: "Utf8" }];
+
+      panel.addMapName({ name: "derived_name", streamAlias: "alias1" });
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.name).toBeDefined();
+      expect(panel.dashboardPanelData.data.queries[0].fields.name.alias).toBe("derived_name");
+    });
+
+    it("should cover addMapValue with isDerived field", () => {
+      panel.dashboardPanelData.meta.stream.vrlFunctionFieldList = [{ name: "derived_value", type: "Int64" }];
+
+      panel.addMapValue({ name: "derived_value", streamAlias: "alias2" });
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.value_for_maps).toBeDefined();
+      expect(panel.dashboardPanelData.data.queries[0].fields.value_for_maps.functionName).toBe("count");
+    });
+
+    it("should cover addLatitude with custom query mode", () => {
+      panel.dashboardPanelData.data.queries[0].customQuery = true;
+
+      panel.addLatitude({ name: "custom_lat", streamAlias: "stream1" });
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.latitude.alias).toBe("custom_lat");
+    });
+
+    it("should cover addLongitude with custom query mode", () => {
+      panel.dashboardPanelData.data.queries[0].customQuery = true;
+
+      panel.addLongitude({ name: "custom_lng", streamAlias: "stream2" });
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.longitude.alias).toBe("custom_lng");
+    });
+
+    it("should cover addWeight with isDerived true", () => {
+      panel.dashboardPanelData.meta.stream.vrlFunctionFieldList = [{ name: "derived_weight", type: "Float64" }];
+
+      panel.addWeight({ name: "derived_weight" });
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.weight.functionName).toBeNull();
+    });
+
+    it("should cover addWeight with isDerived false", () => {
+      panel.addWeight({ name: "normal_weight" });
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.weight.functionName).toBe("count");
+    });
+
+    it("should cover addSource with custom query and derived", () => {
+      panel.dashboardPanelData.data.queries[0].customQuery = true;
+      panel.dashboardPanelData.meta.stream.vrlFunctionFieldList = [{ name: "derived_src", type: "Utf8" }];
+
+      panel.addSource({ name: "derived_src", streamAlias: "s1" });
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.source.alias).toBe("derived_src");
+      expect(panel.dashboardPanelData.data.queries[0].fields.source.isDerived).toBe(true);
+    });
+
+    it("should cover addTarget with custom query and derived", () => {
+      panel.dashboardPanelData.data.queries[0].customQuery = true;
+      panel.dashboardPanelData.meta.stream.vrlFunctionFieldList = [{ name: "derived_tgt", type: "Utf8" }];
+
+      panel.addTarget({ name: "derived_tgt", streamAlias: "t1" });
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.target.alias).toBe("derived_tgt");
+      expect(panel.dashboardPanelData.data.queries[0].fields.target.isDerived).toBe(true);
+    });
+
+    it("should cover addValue with isDerived true", () => {
+      panel.dashboardPanelData.meta.stream.vrlFunctionFieldList = [{ name: "derived_val", type: "Int64" }];
+
+      panel.addValue({ name: "derived_val" });
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.value.functionName).toBeNull();
+    });
+
+    it("should cover addValue with isDerived false", () => {
+      panel.addValue({ name: "normal_val" });
+
+      expect(panel.dashboardPanelData.data.queries[0].fields.value.functionName).toBe("sum");
+    });
+
+    it("should cover addXAxisItem sortBy logic for timestamp", () => {
+      // Clear existing state
+      panel.dashboardPanelData.data.queries[0].fields.x = [];
+      panel.dashboardPanelData.data.type = "table";
+      (mockStore.state.zoConfig as any).timestamp_column = "_timestamp";
+
+      panel.addXAxisItem({ name: "_timestamp" });
+
+      const field1 = panel.dashboardPanelData.data.queries[0].fields.x[panel.dashboardPanelData.data.queries[0].fields.x.length - 1];
+      expect(field1.sortBy).toBe("DESC"); // table chart
+
+      // Clear for next test
+      panel.dashboardPanelData.data.queries[0].fields.x = [];
+      panel.dashboardPanelData.data.type = "bar";
+      panel.addXAxisItem({ name: "_timestamp" });
+
+      const field2 = panel.dashboardPanelData.data.queries[0].fields.x[panel.dashboardPanelData.data.queries[0].fields.x.length - 1];
+      expect(field2.sortBy).toBe("ASC"); // non-table chart
+    });
+
+    it("should cover addBreakDownAxisItem sortBy logic for timestamp", () => {
+      // Clear existing state
+      panel.dashboardPanelData.data.queries[0].fields.breakdown = [];
+      panel.dashboardPanelData.data.type = "table";
+      (mockStore.state.zoConfig as any).timestamp_column = "_timestamp";
+
+      panel.addBreakDownAxisItem({ name: "_timestamp" });
+
+      const field1 = panel.dashboardPanelData.data.queries[0].fields.breakdown[panel.dashboardPanelData.data.queries[0].fields.breakdown.length - 1];
+      expect(field1.sortBy).toBe("DESC");
+      expect(field1.functionName).toBe("histogram");
+
+      // Clear for next test
+      panel.dashboardPanelData.data.queries[0].fields.breakdown = [];
+      panel.dashboardPanelData.data.type = "bar";
+      panel.addBreakDownAxisItem({ name: "_timestamp" });
+
+      const field2 = panel.dashboardPanelData.data.queries[0].fields.breakdown[panel.dashboardPanelData.data.queries[0].fields.breakdown.length - 1];
+      expect(field2.sortBy).toBe("ASC");
+      expect(field2.functionName).toBe("histogram");
+    });
+
+    it("should cover addYAxisItem for heatmap chart (no functionName)", () => {
+      panel.dashboardPanelData.data.type = "heatmap";
+
+      panel.addYAxisItem({ name: "heatmap_field" });
+
+      const field = panel.dashboardPanelData.data.queries[0].fields.y.find((f: any) => f.args[0].value.field === "heatmap_field");
+      expect(field.functionName).toBeNull();
+    });
+
+    it("should cover addYAxisItem for non-heatmap with derived field", () => {
+      panel.dashboardPanelData.data.type = "bar";
+      panel.dashboardPanelData.meta.stream.vrlFunctionFieldList = [{ name: "derived_y", type: "Int64" }];
+
+      panel.addYAxisItem({ name: "derived_y" });
+
+      const field = panel.dashboardPanelData.data.queries[0].fields.y.find((f: any) => f.args[0].value.field === "derived_y");
+      expect(field.functionName).toBeNull();
+      expect(field.isDerived).toBe(true);
+    });
+
+    it("should cover addZAxisItem with derived field", () => {
+      panel.dashboardPanelData.meta.stream.vrlFunctionFieldList = [{ name: "derived_z", type: "Float64" }];
+
+      panel.addZAxisItem({ name: "derived_z" });
+
+      const field = panel.dashboardPanelData.data.queries[0].fields.z.find((f: any) => f.args[0].value.field === "derived_z");
+      expect(field.functionName).toBeNull();
+      expect(field.isDerived).toBe(true);
+    });
+
+    it("should cover addXAxisItem with custom query mode", () => {
+      // Clear existing state
+      panel.dashboardPanelData.data.queries[0].fields.x = [];
+      panel.dashboardPanelData.data.queries[0].customQuery = true;
+
+      panel.addXAxisItem({ name: "custom_x_field" });
+
+      const field = panel.dashboardPanelData.data.queries[0].fields.x[panel.dashboardPanelData.data.queries[0].fields.x.length - 1];
+      expect(field.label).toBe("custom_x_field");
+      expect(field.alias).toBe("custom_x_field");
+
+      // Reset custom query
+      panel.dashboardPanelData.data.queries[0].customQuery = false;
+    });
+
+    it("should cover addBreakDownAxisItem with custom query mode", () => {
+      // Clear existing state
+      panel.dashboardPanelData.data.queries[0].fields.breakdown = [];
+      panel.dashboardPanelData.data.queries[0].customQuery = true;
+
+      panel.addBreakDownAxisItem({ name: "custom_breakdown" });
+
+      const field = panel.dashboardPanelData.data.queries[0].fields.breakdown[panel.dashboardPanelData.data.queries[0].fields.breakdown.length - 1];
+      expect(field.label).toBe("custom_breakdown");
+      expect(field.alias).toBe("custom_breakdown");
+
+      // Reset custom query
+      panel.dashboardPanelData.data.queries[0].customQuery = false;
+    });
+
+    it("should cover getNewColorValue when all colors are used", () => {
+      // Fill all y-axis with colors
+      panel.dashboardPanelData.data.queries[0].fields.y = [];
+      const allColors = ["#5960b2", "#c23531", "#2f4554", "#61a0a8", "#d48265", "#91c7ae", "#749f83", "#ca8622"];
+      allColors.forEach((color, index) => {
+        panel.dashboardPanelData.data.queries[0].fields.y.push({
+          name: `field${index}`,
+          color: color,
+          args: []
+        });
+      });
+
+      panel.addYAxisItem({ name: "new_field" });
+
+      const newField = panel.dashboardPanelData.data.queries[0].fields.y[panel.dashboardPanelData.data.queries[0].fields.y.length - 1];
+      expect(newField.color).toBeDefined();
     });
   });
 });
