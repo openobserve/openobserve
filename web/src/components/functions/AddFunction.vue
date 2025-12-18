@@ -368,10 +368,8 @@ export default defineComponent({
           try {
             if (!beingUpdated.value) {
               formData.value.transType = parseInt(formData.value.transType);
-              //trans type is JS, remove params from form
-              if (formData.value.transType == 1) {
-                formData.value.params = "";
-              }
+              // Both VRL and JS use params field (e.g., "row")
+              // No need to clear params for JS
 
               callTransform = jsTransformService.create(
                 store.state.selectedOrganization.identifier,
@@ -379,10 +377,8 @@ export default defineComponent({
               );
             } else {
               formData.value.transType = parseInt(formData.value.transType);
-              //trans type is JS, remove params from form
-              if (formData.value.transType == 1) {
-                formData.value.params = "";
-              }
+              // Both VRL and JS use params field (e.g., "row")
+              // No need to clear params for JS
 
               callTransform = jsTransformService.update(
                 store.state.selectedOrganization.identifier,

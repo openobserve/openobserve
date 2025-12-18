@@ -651,6 +651,7 @@ const testFunction = async () => {
   const payload = {
     function: props.vrlFunction.function,
     events: JSON.parse(inputEvents.value),
+    trans_type: props.vrlFunction.transType ? parseInt(props.vrlFunction.transType) : undefined,
   };
   jstransform
     .test(store.state.selectedOrganization.identifier, payload)
