@@ -60,7 +60,8 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
             FN_ALREADY_EXIST,
         )))
     } else {
-        if !func.function.ends_with('.') {
+        // Only append "." for VRL functions, not JS
+        if func.trans_type.unwrap() == 0 && !func.function.ends_with('.') {
             func.function = format!("{} \n .", func.function);
         }
         // Validate function based on type
@@ -298,7 +299,8 @@ pub async fn update_function(
         return Ok(HttpResponse::Ok().json(func));
     }
 
-    if !func.function.ends_with('.') {
+    // Only append "." for VRL functions, not JS
+    if func.trans_type.unwrap() == 0 && !func.function.ends_with('.') {
         func.function = format!("{} \n .", func.function);
     }
     // Validate function based on type
@@ -452,19 +454,13 @@ async fn get_dependencies(org_id: &str, func_name: &str) -> Vec<PipelineDependen
 }
 
 fn extract_num_args(func: &mut Transform) {
-    if func.trans_type.unwrap() == 1 {
-        let src: String = func.function.to_owned();
-        let start_stream = src.find('(').unwrap();
-        let end_stream = src.find(')').unwrap();
-        let args = &src[start_stream + 1..end_stream].trim();
-        if args.is_empty() {
-            func.num_args = 0;
-        } else {
-            func.num_args = args.split(',').collect::<Vec<&str>>().len() as u8;
-        }
+    // For both VRL (0) and JS (1), extract from params field
+    // JS doesn't use Lua-style function(args) syntax
+    let params = func.params.to_owned();
+    if params.trim().is_empty() {
+        func.num_args = 0;
     } else {
-        let params = func.params.to_owned();
-        func.num_args = params.split(',').collect::<Vec<&str>>().len() as u8;
+        func.num_args = params.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).count() as u8;
     }
 }
 
@@ -493,7 +489,7 @@ mod tests {
         let mut vrl_trans = Transform {
             name: "vrl_trans".to_owned(),
             function: ". = parse_aws_vpc_flow_log!(row.message) \n .".to_owned(),
-            trans_type: Some(1),
+            trans_type: Some(0), // VRL function
             params: "row".to_owned(),
             num_args: 0,
             streams: Some(vec![StreamOrder {
@@ -541,7 +537,7 @@ mod tests {
             "original_field": "original_value"
         })];
 
-        let response = test_run_function(org_id, function, events).await.unwrap();
+        let response = test_run_function(org_id, function, events, Some(0)).await.unwrap(); // VRL function
         assert_eq!(response.status(), http::StatusCode::OK);
 
         let body: TestVRLResponse =
