@@ -956,18 +956,11 @@ export const usePanelDataLoader = (
 
             const handlePromQLResponse = (data: any, res: any) => {
               if (res?.type === "promql_response") {
-                // Backend sends: { content: { results: { result_type, result }, trace_id } }
+                // Backend sends: { content: { results: { result_type/resultType, result }, trace_id } }
                 // result is the actual PromQL data (vector/matrix with values)
                 // We need to extract and accumulate the result.result part
 
-                const newData = res?.content?.results; // This is { result_type, result }
-
-                // Debug logging
-                console.log(`[PromQL Streaming] Query ${queryIndex} received chunk:`, {
-                  result_type: newData?.result_type,
-                  result_length: Array.isArray(newData?.result) ? newData.result.length : 'not array',
-                  newData: newData
-                });
+                const newData = res?.content?.results; // This is { result_type/resultType, result }
 
                 if (!queryResults[queryIndex]) {
                   // First chunk - initialize with the structure
@@ -980,9 +973,33 @@ export const usePanelDataLoader = (
                   if (currentResult?.result && Array.isArray(currentResult.result) &&
                       newData?.result && Array.isArray(newData.result)) {
                     // Merge the result arrays (time series data)
+                    // For matrix type, we need to merge values arrays for matching metrics
+                    const mergedResult = [...currentResult.result];
+
+                    newData.result.forEach((newMetric: any) => {
+                      // Find if this metric already exists in current results
+                      const existingIndex = mergedResult.findIndex((existingMetric: any) => {
+                        // Compare metric labels to find matching time series
+                        return JSON.stringify(existingMetric.metric) === JSON.stringify(newMetric.metric);
+                      });
+
+                      if (existingIndex >= 0) {
+                        // Metric exists - merge the values arrays
+                        if (Array.isArray(mergedResult[existingIndex].values) && Array.isArray(newMetric.values)) {
+                          mergedResult[existingIndex] = {
+                            ...mergedResult[existingIndex],
+                            values: [...mergedResult[existingIndex].values, ...newMetric.values]
+                          };
+                        }
+                      } else {
+                        // New metric - add it to results
+                        mergedResult.push(newMetric);
+                      }
+                    });
+
                     queryResults[queryIndex] = {
                       ...newData,
-                      result: [...currentResult.result, ...newData.result]
+                      result: mergedResult
                     };
                   } else if (newData) {
                     // Replace with new data if structure is different
@@ -1030,10 +1047,6 @@ export const usePanelDataLoader = (
               // Mark this query as completed
               completedQueries.add(queryIndex);
 
-              // Debug logging
-              console.log(`[PromQL Streaming] Query ${queryIndex} completed. Total queries: ${panelSchema.value.queries.length}, Completed: ${completedQueries.size}`);
-              console.log(`[PromQL Streaming] Final data for query ${queryIndex}:`, queryResults[queryIndex]);
-
               // Final update with complete results
               state.data = [...queryResults];
               state.metadata = {
@@ -1044,7 +1057,6 @@ export const usePanelDataLoader = (
 
               // Only mark loading as complete when ALL queries are done
               if (completedQueries.size === panelSchema.value.queries.length) {
-                console.log('[PromQL Streaming] All queries completed. Final state.data:', state.data);
                 state.loading = false;
                 state.isOperationCancelled = false;
                 state.isPartialData = false;
