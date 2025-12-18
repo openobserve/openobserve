@@ -818,8 +818,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :isEditing="beingUpdated"
       />
     </q-dialog>
-<!-- 
-    <!-- Hidden ScheduledAlert for Editor Dialog Access -->
+    <!-- Hidden ScheduledAlert for Editor Dialog Access
     <scheduled-alert
       v-if="false"
       ref="scheduledAlertRef"
@@ -1136,6 +1135,8 @@ export default defineComponent({
     const wizardStep = ref(1);
     const wizardStepper = ref(null);
     const step1Ref = ref(null);
+    const lastValidStep = ref(1); // Track the last successfully validated step
+    const isNavigatingProgrammatically = ref(false); // Flag to prevent watch loops
 
     // Computed property for step captions to avoid flickering
     const currentStepCaption = computed(() => {
@@ -2004,8 +2005,53 @@ export default defineComponent({
       );
     };
 
+    // Watch for header navigation clicks and validate
+    watch(wizardStep, async (newStep, oldStep) => {
+      // Skip if we're navigating programmatically (to avoid loops)
+      if (isNavigatingProgrammatically.value) {
+        return;
+      }
+
+      // Allow backward navigation (user clicking on previous steps)
+      if (newStep < oldStep) {
+        lastValidStep.value = newStep;
+        return;
+      }
+
+      // For forward navigation, validate the previous step
+      if (newStep > oldStep) {
+        isNavigatingProgrammatically.value = true;
+
+        // First, revert to old step
+        wizardStep.value = oldStep;
+
+        // Validate the current (old) step
+        const isValid = await validateStep(oldStep);
+
+        if (isValid) {
+          // Validation passed, allow navigation
+          wizardStep.value = newStep;
+          lastValidStep.value = newStep;
+        } else {
+          // Validation failed, stay on current step
+          // Focus will be handled by validateStep
+        }
+
+        isNavigatingProgrammatically.value = false;
+      }
+    });
+
     // Wizard step navigation logic
-    const goToNextStep = () => {
+    const goToNextStep = async () => {
+      // Validate current step before moving to next
+      const isValid = await validateCurrentStep();
+      if (!isValid) {
+        return; // Stop navigation if validation fails
+      }
+
+      // Mark as programmatic navigation to avoid triggering watch
+      isNavigatingProgrammatically.value = true;
+
       if (formData.value.is_real_time === 'true') {
         // For real-time alerts: 1 -> 2 -> 4 -> 6 (skip 3 and 5)
         if (wizardStep.value === 2) {
@@ -2019,7 +2065,59 @@ export default defineComponent({
         // For scheduled alerts: normal progression 1 -> 2 -> 3 -> 4 -> 5 -> 6
         wizardStep.value = wizardStep.value + 1;
       }
+
+      lastValidStep.value = wizardStep.value;
+
+      // Reset flag after navigation
+      await nextTick();
+      isNavigatingProgrammatically.value = false;
     };
+
+    // Validate a specific step (used by both Continue button and header navigation)
+    const validateStep = async (stepNumber: number) => {
+      // Step 1: Alert Setup
+      if (stepNumber === 1) {
+        if (step1Ref.value && (step1Ref.value as any).validate) {
+          const isValid = await (step1Ref.value as any).validate();
+          if (!isValid) {
+            // Focus on the first invalid field
+            focusOnFirstError();
+            return false;
+          }
+        }
+      }
+
+      // Add validation for other steps here in the future
+      // Step 2: Query Config
+      // Step 3: Compare with Past
+      // Step 4: Alert Settings
+      // Step 5: Deduplication
+      // Step 6: Advanced
+
+      return true;
+    };
+
+    // Validate current step (convenience wrapper)
+    const validateCurrentStep = async () => {
+      return await validateStep(wizardStep.value);
+    };
+
+    // Focus on first error field
+    const focusOnFirstError = () => {
+      // Use nextTick to ensure DOM is updated with error states
+      nextTick(() => {
+        // Find the first field with error class
+        const errorField = document.querySelector('.q-field--error input, .q-field--error .q-select__dropdown-icon');
+        if (errorField) {
+          (errorField as HTMLElement).focus();
+          // Scroll to the error field
+          errorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
+    };
+
+    // Simpler approach: Remove header-nav and only allow Continue/Back buttons
+    // This way we don't fight with Quasar's navigation system
 
     const goToPreviousStep = () => {
       if (formData.value.is_real_time === 'true') {

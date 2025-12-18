@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Stream Type and Stream Name Row -->
-        <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4 tw-mb-4">
+        <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
           <!-- Stream Type -->
           <div class="form-field">
             <q-select
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :options="streamTypes"
               :label="t('alerts.streamType') + ' *'"
               :popup-content-style="{ textTransform: 'lowercase' }"
-              class="q-py-sm showLabelOnTop no-case"
+              class="showLabelOnTop no-case"
               stack-label
               borderless
               dense
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('alerts.stream_name') + ' *'"
               :loading="isFetchingStreams"
               color="input-border"
-              class="q-py-sm showLabelOnTop no-case"
+              class="showLabelOnTop no-case"
               stack-label
               dense
               use-input
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Alert Type (Scheduled/Real-time) -->
-        <div class="form-field tw-mb-4">
+        <div class="form-field tw-mb-4 tw-mt-4">
           <div class="tw-flex tw-items-center tw-gap-5">
             <q-radio
               data-test="add-alert-scheduled-alert-radio"
