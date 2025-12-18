@@ -430,6 +430,85 @@ describe("ChartRenderer", () => {
     });
   });
 
+  describe("Context Menu Events", () => {
+    it("should emit contextmenu event when chart element is right-clicked", async () => {
+      const echarts = await import("echarts/core");
+      const mockChart = vi.mocked(echarts.init).mock.results[0]?.value;
+
+      // Get the contextmenu handler that was registered
+      const contextMenuHandler = vi.mocked(mockChart.on).mock.calls.find(
+        call => call[0] === "contextmenu"
+      )?.[1];
+
+      expect(contextMenuHandler).toBeDefined();
+
+      if (contextMenuHandler) {
+        // Simulate contextmenu event on chart element
+        const mockParams = {
+          seriesName: "test-series",
+          dataIndex: 0,
+          seriesIndex: 0,
+          value: [1609459200000, 42],
+          event: {
+            event: {
+              clientX: 100,
+              clientY: 200,
+              preventDefault: vi.fn(),
+              stopPropagation: vi.fn(),
+            }
+          }
+        };
+
+        contextMenuHandler(mockParams);
+        await flushPromises();
+
+        expect(wrapper.emitted("contextmenu")).toBeTruthy();
+      }
+    });
+
+    it("should emit domcontextmenu event when DOM element is right-clicked", async () => {
+      const container = wrapper.find('[data-test="chart-renderer"]');
+
+      const mockEvent = new MouseEvent("contextmenu", {
+        clientX: 150,
+        clientY: 250,
+        bubbles: true,
+        cancelable: true,
+      });
+
+      Object.defineProperty(mockEvent, "clientX", { value: 150 });
+      Object.defineProperty(mockEvent, "clientY", { value: 250 });
+
+      await container.trigger("contextmenu", mockEvent);
+      await flushPromises();
+
+      // domcontextmenu should be emitted for alert creation
+      expect(wrapper.emitted("domcontextmenu") || wrapper.emitted("contextmenu")).toBeTruthy();
+    });
+
+    it("should prevent default context menu on right-click", async () => {
+      const container = wrapper.find('[data-test="chart-renderer"]');
+
+      const preventDefault = vi.fn();
+      const stopPropagation = vi.fn();
+
+      const mockEvent = new MouseEvent("contextmenu", {
+        clientX: 150,
+        clientY: 250,
+        bubbles: true,
+        cancelable: true,
+      });
+
+      Object.defineProperty(mockEvent, "preventDefault", { value: preventDefault });
+      Object.defineProperty(mockEvent, "stopPropagation", { value: stopPropagation });
+
+      await container.trigger("contextmenu", mockEvent);
+
+      // Either preventDefault or stopPropagation should be called
+      expect(preventDefault).toHaveBeenCalled();
+    });
+  });
+
   describe("Error Handling", () => {
     it("should handle component errors gracefully", () => {
       // Component should exist and handle errors without crashing

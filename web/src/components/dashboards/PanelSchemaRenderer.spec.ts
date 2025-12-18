@@ -1925,25 +1925,23 @@ describe("PanelSchemaRenderer", () => {
         x: 100,
         y: 200,
         value: 50,
-        seriesName: "test series",
       };
 
-      wrapper.vm.onChartContextMenu(mockEvent);
+      wrapper.vm.onChartDomContextMenu(mockEvent);
 
       expect(wrapper.vm.contextMenuVisible).toBe(false);
     });
 
-    it("should show context menu when alert creation is allowed", () => {
+    it("should show context menu when alert creation is allowed via domcontextmenu", () => {
       wrapper = createWrapper({ allowAlertCreation: true });
 
       const mockEvent = {
         x: 150,
         y: 250,
         value: 75,
-        seriesName: "test series",
       };
 
-      wrapper.vm.onChartContextMenu(mockEvent);
+      wrapper.vm.onChartDomContextMenu(mockEvent);
 
       expect(wrapper.vm.contextMenuVisible).toBe(true);
       expect(wrapper.vm.contextMenuPosition).toEqual({ x: 150, y: 250 });
@@ -1959,7 +1957,7 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.vm.contextMenuVisible).toBe(false);
     });
 
-    it("should emit contextmenu event", () => {
+    it("should emit contextmenu event for general usage", () => {
       wrapper = createWrapper({ allowAlertCreation: true });
 
       const mockEvent = {
@@ -1982,7 +1980,34 @@ describe("PanelSchemaRenderer", () => {
       });
     });
 
-    it("should handle alert creation with SQL query type", () => {
+    it("should handle domcontextmenu event separately from contextmenu", () => {
+      wrapper = createWrapper({ allowAlertCreation: true });
+
+      const contextMenuEvent = {
+        x: 100,
+        y: 200,
+        value: 50,
+        seriesName: "test series",
+      };
+
+      const domContextMenuEvent = {
+        x: 150,
+        y: 250,
+        value: 75,
+      };
+
+      // Call onChartContextMenu - should only emit event
+      wrapper.vm.onChartContextMenu(contextMenuEvent);
+      expect(wrapper.emitted("contextmenu")).toBeTruthy();
+      expect(wrapper.vm.contextMenuVisible).toBe(false);
+
+      // Call onChartDomContextMenu - should show context menu for alert creation
+      wrapper.vm.onChartDomContextMenu(domContextMenuEvent);
+      expect(wrapper.vm.contextMenuVisible).toBe(true);
+      expect(wrapper.vm.contextMenuValue).toBe(75);
+    });
+
+    it("should handle alert creation with SQL query type via domcontextmenu", () => {
       wrapper = createWrapper({
         allowAlertCreation: true,
         panelSchema: {
@@ -2002,18 +2027,16 @@ describe("PanelSchemaRenderer", () => {
         x: 100,
         y: 200,
         value: 50,
-        seriesName: "count",
       };
 
-      wrapper.vm.onChartContextMenu(mockEvent);
-      wrapper.vm.contextMenuVisible = true;
+      wrapper.vm.onChartDomContextMenu(mockEvent);
 
       // Test that context menu data is set
       expect(wrapper.vm.contextMenuValue).toBe(50);
       expect(wrapper.vm.contextMenuVisible).toBe(true);
     });
 
-    it("should handle alert creation with PromQL query type", () => {
+    it("should handle alert creation with PromQL query type via domcontextmenu", () => {
       wrapper = createWrapper({
         allowAlertCreation: true,
         panelSchema: {
@@ -2029,10 +2052,9 @@ describe("PanelSchemaRenderer", () => {
         x: 100,
         y: 200,
         value: 1,
-        seriesName: 'up{job="prometheus"}',
       };
 
-      wrapper.vm.onChartContextMenu(mockEvent);
+      wrapper.vm.onChartDomContextMenu(mockEvent);
 
       expect(wrapper.vm.contextMenuVisible).toBe(true);
       expect(wrapper.vm.contextMenuValue).toBe(1);
