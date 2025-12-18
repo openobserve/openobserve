@@ -34,10 +34,10 @@ const PageManager = require("../../pages/page-manager");
 const testLogger = require("../utils/test-logger.js");
 const { JoinHelper, getTableRowCount, verifyJoinChipVisible } = require("../../pages/dashboardPages/dashboard-joins.js");
 
-// Test data files
-const testAppUsers = require("../../MD_Files/joins_test/data/test_app_users.json");
-const testSessions = require("../../MD_Files/joins_test/data/test_sessions.json");
-const testWebRequests = require("../../MD_Files/joins_test/data/test_web_requests.json");
+// Test data files (from CI-accessible location)
+const testAppUsers = require("../../../test-data/joins/test_app_users.json");
+const testSessions = require("../../../test-data/joins/test_sessions.json");
+const testWebRequests = require("../../../test-data/joins/test_web_requests.json");
 
 const generateDashboardName = (testId) => `Joins_Test_${testId}`;
 const generateStreamNames = (testId) => ({
@@ -140,16 +140,6 @@ async function createDashboardAndAddFirstPanel(page, pm, dashboardName) {
   await pm.dashboardCreate.addPanel();
 }
 
-async function addNextPanel(page) {
-  // Wait for the save to complete and panel editor to close
-  await page.waitForTimeout(2000);
-
-  // Wait for the add panel button to be visible with longer timeout
-  const addPanelBtn = page.locator('[data-test="dashboard-panel-add"]');
-  await addPanelBtn.waitFor({ state: "visible", timeout: 30000 });
-  await addPanelBtn.click();
-}
-
 async function verifyJoinChipIsVisible(page, streamName, joinIndex = 0) {
   await verifyJoinChipVisible(page, streamName, joinIndex, expect);
 }
@@ -210,7 +200,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
 
       // === PANEL 2: LEFT JOIN ===
       testLogger.info("Panel 2: Testing LEFT JOIN");
-      await addNextPanel(page);
+      await pm.dashboardPanelActions.addNextPanel();
       await pm.dashboardPanelActions.addPanelName("left-join-panel");
 
       await pm.chartTypeSelector.selectChartType("table");
@@ -237,7 +227,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
 
       // === PANEL 3: RIGHT JOIN ===
       testLogger.info("Panel 3: Testing RIGHT JOIN");
-      await addNextPanel(page);
+      await pm.dashboardPanelActions.addNextPanel();
       await pm.dashboardPanelActions.addPanelName("right-join-panel");
 
       await pm.chartTypeSelector.selectChartType("table");
@@ -319,7 +309,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
 
       // === PANEL 2: 3-Way Join ===
       testLogger.info("Panel 2: Testing 3-Way Join");
-      await addNextPanel(page);
+      await pm.dashboardPanelActions.addNextPanel();
       await pm.dashboardPanelActions.addPanelName("three-way-join-panel");
 
       await pm.chartTypeSelector.selectChartType("table");
@@ -353,7 +343,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
 
       // === PANEL 3: Session Join with device/browser ===
       testLogger.info("Panel 3: Testing Session Join");
-      await addNextPanel(page);
+      await pm.dashboardPanelActions.addNextPanel();
       await pm.dashboardPanelActions.addPanelName("session-join-panel");
 
       await pm.chartTypeSelector.selectChartType("table");
@@ -436,7 +426,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
 
       // === PANEL 2: SUM-like grouping by plan ===
       testLogger.info("Panel 2: SUM-like grouping by plan");
-      await addNextPanel(page);
+      await pm.dashboardPanelActions.addNextPanel();
       await pm.dashboardPanelActions.addPanelName("sum-agg-panel");
 
       await pm.chartTypeSelector.selectChartType("table");
@@ -461,7 +451,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
 
       // === PANEL 3: AVG-like grouping ===
       testLogger.info("Panel 3: AVG-like grouping");
-      await addNextPanel(page);
+      await pm.dashboardPanelActions.addNextPanel();
       await pm.dashboardPanelActions.addPanelName("avg-agg-panel");
 
       await pm.chartTypeSelector.selectChartType("table");
@@ -486,7 +476,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
 
       // === PANEL 4: MIN/MAX-like grouping ===
       testLogger.info("Panel 4: MIN/MAX-like grouping");
-      await addNextPanel(page);
+      await pm.dashboardPanelActions.addNextPanel();
       await pm.dashboardPanelActions.addPanelName("minmax-agg-panel");
 
       await pm.chartTypeSelector.selectChartType("table");
@@ -563,7 +553,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
 
       // === PANEL 2: country field ===
       testLogger.info("Panel 2: country field");
-      await addNextPanel(page);
+      await pm.dashboardPanelActions.addNextPanel();
       await pm.dashboardPanelActions.addPanelName("country-panel");
 
       await pm.chartTypeSelector.selectChartType("table");
@@ -586,7 +576,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
 
       // === PANEL 3: bytes field ===
       testLogger.info("Panel 3: bytes field");
-      await addNextPanel(page);
+      await pm.dashboardPanelActions.addNextPanel();
       await pm.dashboardPanelActions.addPanelName("bytes-panel");
 
       await pm.chartTypeSelector.selectChartType("table");
@@ -609,7 +599,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
 
       // === PANEL 4: email field ===
       testLogger.info("Panel 4: email field");
-      await addNextPanel(page);
+      await pm.dashboardPanelActions.addNextPanel();
       await pm.dashboardPanelActions.addPanelName("email-panel");
 
       await pm.chartTypeSelector.selectChartType("table");
@@ -690,7 +680,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
 
       // === PANEL 2: LEFT JOIN showing NULLs ===
       testLogger.info("Panel 2: LEFT JOIN showing NULLs");
-      await addNextPanel(page);
+      await pm.dashboardPanelActions.addNextPanel();
       await pm.dashboardPanelActions.addPanelName("null-display-panel");
 
       await pm.chartTypeSelector.selectChartType("table");
@@ -718,7 +708,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
 
       // === PANEL 3: Session duration join ===
       testLogger.info("Panel 3: Session duration join");
-      await addNextPanel(page);
+      await pm.dashboardPanelActions.addNextPanel();
       await pm.dashboardPanelActions.addPanelName("duration-panel");
 
       await pm.chartTypeSelector.selectChartType("table");
@@ -744,7 +734,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
 
       // === PANEL 4: Not-Equal Join (!=) ===
       testLogger.info("Panel 4: Testing Not-Equal Join (!=)");
-      await addNextPanel(page);
+      await pm.dashboardPanelActions.addNextPanel();
       await pm.dashboardPanelActions.addPanelName("not-equal-join-panel");
 
       await pm.chartTypeSelector.selectChartType("table");
@@ -769,7 +759,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
 
       // === PANEL 5: Greater-than Join (>) ===
       testLogger.info("Panel 5: Testing Greater-than Join (>)");
-      await addNextPanel(page);
+      await pm.dashboardPanelActions.addNextPanel();
       await pm.dashboardPanelActions.addPanelName("greater-than-join-panel");
 
       await pm.chartTypeSelector.selectChartType("table");
@@ -794,7 +784,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
 
       // === PANEL 6: Self-Join ===
       testLogger.info("Panel 6: Testing Self-Join");
-      await addNextPanel(page);
+      await pm.dashboardPanelActions.addNextPanel();
       await pm.dashboardPanelActions.addPanelName("self-join-panel");
 
       await pm.chartTypeSelector.selectChartType("table");
@@ -878,22 +868,17 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       await page.waitForTimeout(2000);
 
       // Verify no errors
-      const noDataElement = page.locator('[data-test="no-data"]');
-      const noErrors = await noDataElement.isHidden();
-      expect(noErrors).toBeTruthy();
+      await pm.dashboardPanelActions.verifyNoErrors(expect);
       testLogger.info("Dynamic join operations completed successfully");
 
       // === UI Validation: Condition Management ===
       testLogger.info("Testing condition management UI validation");
 
       // Click on the remaining join to open popup
-      const joinItem = page.locator('[data-test="dashboard-join-item-0"]');
-      await joinItem.click();
-      await page.locator('[data-test="dashboard-join-pop-up"]').waitFor({ state: "visible", timeout: 10000 });
+      await joinHelper.openJoinItemPopup(0);
 
       // With single condition, remove button should be disabled
-      const removeBtn = page.locator('[data-test="dashboard-join-condition-remove-0"]');
-      await expect(removeBtn).toBeDisabled();
+      await joinHelper.verifyConditionRemoveButtonDisabled(0, expect);
       testLogger.info("Remove button correctly disabled with single condition");
 
       // Add another condition
@@ -901,8 +886,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       await page.waitForTimeout(500);
 
       // Now remove buttons should be enabled
-      const removeBtnFirst = page.locator('[data-test="dashboard-join-condition-remove-0"]');
-      await expect(removeBtnFirst).not.toBeDisabled();
+      await joinHelper.verifyConditionRemoveButtonEnabled(0, expect);
       testLogger.info("Remove buttons enabled with multiple conditions");
 
       // Remove the added condition
@@ -910,8 +894,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       await page.waitForTimeout(500);
 
       // Back to single condition, remove should be disabled again
-      const removeBtnAfter = page.locator('[data-test="dashboard-join-condition-remove-0"]');
-      await expect(removeBtnAfter).toBeDisabled();
+      await joinHelper.verifyConditionRemoveButtonDisabled(0, expect);
       testLogger.info("Remove button disabled again after removing to single condition");
 
       await joinHelper.closeJoinPopup();
@@ -969,15 +952,13 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       await pm.dashboardList.menuItem("dashboards-item");
 
       // Wait for dashboard list to load
-      const dashboardSearch = page.locator('[data-test="dashboard-search"]');
-      await dashboardSearch.waitFor({ state: 'visible', timeout: 30000 });
-      await page.waitForTimeout(2000);
+      await pm.dashboardPanelActions.waitForDashboardSearchVisible();
 
       // Search and open the dashboard
       await pm.dashboardCreate.searchDashboard(dashboardName);
       await page.waitForTimeout(2000);
 
-      const dashboardRow = page.getByRole("row", { name: new RegExp(`.*${dashboardName}`) });
+      const dashboardRow = pm.dashboardPanelActions.getDashboardRow(dashboardName);
       await expect(dashboardRow).toBeVisible({ timeout: 10000 });
       await dashboardRow.click();
       await page.waitForTimeout(3000);
@@ -1029,38 +1010,27 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       await page.waitForTimeout(2000);
 
       // Add a join but close popup before configuring conditions
-      const addJoinBtn = page.locator('[data-test="dashboard-add-join-btn"]');
-      await addJoinBtn.waitFor({ state: "visible", timeout: 10000 });
-      await addJoinBtn.click();
-      await page.waitForTimeout(1000);
+      await joinHelper.clickAddJoinButton();
+      await joinHelper.waitForJoinItem(0);
 
       // Click on the new join item to open popup
-      const newJoinItem = page.locator('[data-test="dashboard-join-item-0"]');
-      await newJoinItem.waitFor({ state: "visible", timeout: 10000 });
-      await newJoinItem.click();
-
-      // Wait for popup
-      await page.locator('[data-test="dashboard-join-pop-up"]').waitFor({ state: "visible", timeout: 10000 });
+      await joinHelper.openJoinItemPopup(0);
 
       // Select join type but don't configure fully - close popup
       await joinHelper.selectJoinType("inner");
       await page.waitForTimeout(500);
 
       // Close popup without completing configuration
-      await page.keyboard.press("Escape");
-      await page.waitForTimeout(500);
+      await joinHelper.closeJoinPopup();
       testLogger.info("Closed popup with incomplete join configuration");
 
       // Verify the incomplete join chip is still visible (even if not fully configured)
-      const incompleteJoinChip = page.locator('[data-test="dashboard-join-item-0"]');
-      const isChipVisible = await incompleteJoinChip.isVisible();
+      const isChipVisible = await joinHelper.isJoinChipVisible(0);
       testLogger.info(`Incomplete join chip visible: ${isChipVisible}`);
 
       // Remove the incomplete join
       if (isChipVisible) {
-        const removeBtn = page.locator('[data-test="dashboard-join-item-0-remove"]');
-        await removeBtn.click();
-        await page.waitForTimeout(500);
+        await joinHelper.removeJoin(0);
         testLogger.info("Removed incomplete join");
       }
 
@@ -1100,8 +1070,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       await page.waitForTimeout(500);
 
       // Verify join chip is gone
-      const joinChipAfterRemove = page.locator('[data-test="dashboard-join-item-0"]');
-      await expect(joinChipAfterRemove).not.toBeVisible({ timeout: 5000 });
+      await joinHelper.verifyJoinChipNotVisible(0, expect);
       testLogger.info("Join removed successfully");
 
       // Apply again - should still work

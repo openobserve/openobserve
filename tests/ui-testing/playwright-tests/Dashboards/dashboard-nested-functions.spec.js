@@ -24,14 +24,8 @@ const { waitForDashboardPage } = require("./utils/dashCreation.js");
 const PageManager = require("../../pages/page-manager");
 const testLogger = require("../utils/test-logger.js");
 
-// Test data - simple records for testing functions
-const testRecords = [
-  { user_id: 1, user_name: "Alice", email: "alice@test.com", score: 85 },
-  { user_id: 2, user_name: "Bob", email: "bob@test.com", score: 92 },
-  { user_id: 3, user_name: "Charlie", email: "charlie@test.com", score: 78 },
-  { user_id: 4, user_name: "Diana", email: "diana@test.com", score: 95 },
-  { user_id: 5, user_name: "Eve", email: "eve@test.com", score: 88 },
-];
+// Test data from external file
+const testRecords = require("../../../test-data/dashboard-functions/test_records.json");
 
 const generateDashboardName = (testId) => `FuncTest_${testId}`;
 const generateStreamName = (testId) => `func_test_${testId}`;
@@ -114,95 +108,11 @@ async function createDashboardAndAddFirstPanel(page, pm, dashboardName) {
   await pm.dashboardCreate.addPanel();
 }
 
-async function addNextPanel(page) {
-  // Wait for the save to complete and panel editor to close
-  await page.waitForTimeout(2000);
-
-  // Wait for the add panel button to be visible with longer timeout
-  const addPanelBtn = page.locator('[data-test="dashboard-panel-add"]');
-  await addPanelBtn.waitFor({ state: "visible", timeout: 30000 });
-  await addPanelBtn.click();
-}
-
 async function selectStreamAndChartType(page, pm, streamName, chartType = "table") {
   await pm.chartTypeSelector.selectChartType(chartType);
   await pm.chartTypeSelector.selectStreamType("logs");
   await pm.chartTypeSelector.selectStream(streamName);
-
-  // Wait for stream fields to load
   await page.waitForTimeout(2000);
-}
-
-async function savePanelWithName(page, panelName) {
-  const panelTitleInput = page.locator('[data-test="dashboard-panel-name"]');
-  await panelTitleInput.waitFor({ state: "visible", timeout: 10000 });
-  await panelTitleInput.fill(panelName);
-
-  const saveBtn = page.locator('[data-test="dashboard-panel-save"]');
-  await saveBtn.waitFor({ state: "visible", timeout: 5000 });
-  await saveBtn.click();
-
-  await page.waitForTimeout(2000);
-}
-
-/**
- * Open the Y-axis function configuration popup
- */
-async function openYAxisFunctionPopup(page, alias) {
-  const yAxisItem = page.locator(`[data-test="dashboard-y-item-${alias}"]`);
-  await yAxisItem.waitFor({ state: "visible", timeout: 10000 });
-  await yAxisItem.click();
-
-  await page.locator(`[data-test="dashboard-y-item-${alias}-menu"]`).waitFor({
-    state: "visible",
-    timeout: 10000,
-  });
-  await page.waitForTimeout(500);
-}
-
-/**
- * Select a function from the function dropdown
- */
-async function selectFunction(page, functionName) {
-  const dropdown = page.locator('[data-test="dashboard-function-dropdown"]').first();
-  await dropdown.waitFor({ state: "visible", timeout: 10000 });
-  await dropdown.click();
-  await page.waitForTimeout(300);
-
-  await page.keyboard.type(functionName);
-  await page.waitForTimeout(500);
-
-  const option = page.getByRole("option", { name: functionName, exact: false }).first();
-  await option.waitFor({ state: "visible", timeout: 10000 });
-  await option.click();
-  await page.waitForTimeout(500);
-}
-
-/**
- * Get table row count
- */
-async function getTableRowCount(page) {
-  await page.waitForTimeout(2000);
-  const rows = page.locator('[data-test="dashboard-panel-table"] tbody tr');
-  return await rows.count();
-}
-
-/**
- * Verify Y-axis label contains expected function name
- */
-async function verifyYAxisLabel(page, alias, expectedFunction) {
-  const yAxisLabel = page.locator(`[data-test="dashboard-y-item-${alias}"]`);
-  const labelText = await yAxisLabel.textContent();
-  testLogger.info(`Y-axis ${alias} label: ${labelText}`);
-  expect(labelText.toLowerCase()).toContain(expectedFunction.toLowerCase());
-}
-
-/**
- * Verify chart renders (table or chart-renderer)
- */
-async function verifyChartRenders(page) {
-  const chartRenderer = page.locator('[data-test="dashboard-panel-table"], [data-test="chart-renderer"]');
-  await expect(chartRenderer.first()).toBeVisible({ timeout: 15000 });
 }
 
 // ============================================================================
@@ -244,87 +154,79 @@ test.describe("Dashboard Functions", () => {
       await pm.chartTypeSelector.searchAndAddField("user_name", "x");
       await pm.chartTypeSelector.searchAndAddField("score", "y");
 
-      await openYAxisFunctionPopup(page, "y_axis_1");
-      await selectFunction(page, "count");
-      await page.keyboard.press("Escape");
-      await page.waitForTimeout(500);
+      await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
       await pm.dashboardCreate.applyButton();
       await page.waitForTimeout(3000);
 
-      await verifyChartRenders(page);
-      const countRows = await getTableRowCount(page);
+      await pm.dashboardPanelActions.verifyChartRenders(expect);
+      const countRows = await pm.dashboardPanelActions.getTableRowCount();
       expect(countRows).toBeGreaterThan(0);
-      await verifyYAxisLabel(page, "y_axis_1", "count");
+      await pm.chartTypeSelector.verifyYAxisLabel("y_axis_1", "count", expect);
       testLogger.info(`Panel 1 COUNT: ${countRows} rows`);
 
-      await savePanelWithName(page, "count-panel");
+      await pm.dashboardPanelActions.addPanelName("count-panel");
+      await pm.dashboardPanelActions.savePanel();
 
       // === PANEL 2: COUNT-DISTINCT Function ===
       testLogger.info("Panel 2: Testing COUNT-DISTINCT function");
-      await addNextPanel(page);
+      await pm.dashboardPanelActions.addNextPanel();
 
       await selectStreamAndChartType(page, pm, STREAM_NAME, "table");
       await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
       await pm.chartTypeSelector.searchAndAddField("user_name", "y");
 
-      await openYAxisFunctionPopup(page, "y_axis_1");
-      await selectFunction(page, "Distinct");
-      await page.keyboard.press("Escape");
-      await page.waitForTimeout(500);
+      await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "Distinct");
 
       await pm.dashboardCreate.applyButton();
       await page.waitForTimeout(3000);
 
-      await verifyChartRenders(page);
-      await verifyYAxisLabel(page, "y_axis_1", "count");
+      await pm.dashboardPanelActions.verifyChartRenders(expect);
+      await pm.chartTypeSelector.verifyYAxisLabel("y_axis_1", "count", expect);
       testLogger.info("Panel 2 COUNT-DISTINCT: Verified");
 
-      await savePanelWithName(page, "count-distinct-panel");
+      await pm.dashboardPanelActions.addPanelName("count-distinct-panel");
+      await pm.dashboardPanelActions.savePanel();
 
       // === PANEL 3: AVG Function ===
       testLogger.info("Panel 3: Testing AVG function");
-      await addNextPanel(page);
+      await pm.dashboardPanelActions.addNextPanel();
 
       await selectStreamAndChartType(page, pm, STREAM_NAME, "table");
       await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
       await pm.chartTypeSelector.searchAndAddField("score", "y");
 
-      await openYAxisFunctionPopup(page, "y_axis_1");
-      await selectFunction(page, "avg");
-      await page.keyboard.press("Escape");
-      await page.waitForTimeout(500);
+      await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "avg");
 
       await pm.dashboardCreate.applyButton();
       await page.waitForTimeout(3000);
 
-      await verifyChartRenders(page);
-      await verifyYAxisLabel(page, "y_axis_1", "avg");
+      await pm.dashboardPanelActions.verifyChartRenders(expect);
+      await pm.chartTypeSelector.verifyYAxisLabel("y_axis_1", "avg", expect);
       testLogger.info("Panel 3 AVG: Verified");
 
-      await savePanelWithName(page, "avg-panel");
+      await pm.dashboardPanelActions.addPanelName("avg-panel");
+      await pm.dashboardPanelActions.savePanel();
 
       // === PANEL 4: SUM Function ===
       testLogger.info("Panel 4: Testing SUM function");
-      await addNextPanel(page);
+      await pm.dashboardPanelActions.addNextPanel();
 
       await selectStreamAndChartType(page, pm, STREAM_NAME, "table");
       await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
       await pm.chartTypeSelector.searchAndAddField("score", "y");
 
-      await openYAxisFunctionPopup(page, "y_axis_1");
-      await selectFunction(page, "sum");
-      await page.keyboard.press("Escape");
-      await page.waitForTimeout(500);
+      await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "sum");
 
       await pm.dashboardCreate.applyButton();
       await page.waitForTimeout(3000);
 
-      await verifyChartRenders(page);
-      await verifyYAxisLabel(page, "y_axis_1", "sum");
+      await pm.dashboardPanelActions.verifyChartRenders(expect);
+      await pm.chartTypeSelector.verifyYAxisLabel("y_axis_1", "sum", expect);
       testLogger.info("Panel 4 SUM: Verified");
 
-      await savePanelWithName(page, "sum-panel");
+      await pm.dashboardPanelActions.addPanelName("sum-panel");
+      await pm.dashboardPanelActions.savePanel();
 
       testLogger.info("Test 1: Basic Aggregation Functions - ALL PANELS PASSED");
 
@@ -365,66 +267,53 @@ test.describe("Dashboard Functions", () => {
 
       // Add first Y-axis with COUNT
       await pm.chartTypeSelector.searchAndAddField("user_name", "y");
-      await openYAxisFunctionPopup(page, "y_axis_1");
-      await selectFunction(page, "count");
-      await page.keyboard.press("Escape");
-      await page.waitForTimeout(500);
+      await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
       // Add second Y-axis with SUM
       await pm.chartTypeSelector.searchAndAddField("score", "y");
-      await openYAxisFunctionPopup(page, "y_axis_2");
-      await selectFunction(page, "sum");
-      await page.keyboard.press("Escape");
-      await page.waitForTimeout(500);
+      await pm.chartTypeSelector.configureYAxisFunction("y_axis_2", "sum");
 
       // Add third Y-axis with AVG
       await pm.chartTypeSelector.searchAndAddField("score", "y");
-      await openYAxisFunctionPopup(page, "y_axis_3");
-      await selectFunction(page, "avg");
-      await page.keyboard.press("Escape");
-      await page.waitForTimeout(500);
+      await pm.chartTypeSelector.configureYAxisFunction("y_axis_3", "avg");
 
       await pm.dashboardCreate.applyButton();
       await page.waitForTimeout(3000);
 
-      await verifyChartRenders(page);
-      await verifyYAxisLabel(page, "y_axis_1", "count");
-      await verifyYAxisLabel(page, "y_axis_2", "sum");
-      await verifyYAxisLabel(page, "y_axis_3", "avg");
+      await pm.dashboardPanelActions.verifyChartRenders(expect);
+      await pm.chartTypeSelector.verifyYAxisLabel("y_axis_1", "count", expect);
+      await pm.chartTypeSelector.verifyYAxisLabel("y_axis_2", "sum", expect);
+      await pm.chartTypeSelector.verifyYAxisLabel("y_axis_3", "avg", expect);
       testLogger.info("Panel 1 Multiple Y-axis: All 3 functions verified");
 
-      await savePanelWithName(page, "multi-y-axis-panel");
+      await pm.dashboardPanelActions.addPanelName("multi-y-axis-panel");
+      await pm.dashboardPanelActions.savePanel();
 
       // === PANEL 2: MIN and MAX Functions ===
       testLogger.info("Panel 2: Testing MIN and MAX functions");
-      await addNextPanel(page);
+      await pm.dashboardPanelActions.addNextPanel();
 
       await selectStreamAndChartType(page, pm, STREAM_NAME, "table");
       await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
 
       // Add Y-axis with MIN
       await pm.chartTypeSelector.searchAndAddField("score", "y");
-      await openYAxisFunctionPopup(page, "y_axis_1");
-      await selectFunction(page, "min");
-      await page.keyboard.press("Escape");
-      await page.waitForTimeout(500);
+      await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "min");
 
       // Add Y-axis with MAX
       await pm.chartTypeSelector.searchAndAddField("score", "y");
-      await openYAxisFunctionPopup(page, "y_axis_2");
-      await selectFunction(page, "max");
-      await page.keyboard.press("Escape");
-      await page.waitForTimeout(500);
+      await pm.chartTypeSelector.configureYAxisFunction("y_axis_2", "max");
 
       await pm.dashboardCreate.applyButton();
       await page.waitForTimeout(3000);
 
-      await verifyChartRenders(page);
-      await verifyYAxisLabel(page, "y_axis_1", "min");
-      await verifyYAxisLabel(page, "y_axis_2", "max");
+      await pm.dashboardPanelActions.verifyChartRenders(expect);
+      await pm.chartTypeSelector.verifyYAxisLabel("y_axis_1", "min", expect);
+      await pm.chartTypeSelector.verifyYAxisLabel("y_axis_2", "max", expect);
       testLogger.info("Panel 2 MIN/MAX: Both functions verified");
 
-      await savePanelWithName(page, "min-max-panel");
+      await pm.dashboardPanelActions.addPanelName("min-max-panel");
+      await pm.dashboardPanelActions.savePanel();
 
       testLogger.info("Test 2: Advanced Aggregation Functions - ALL PANELS PASSED");
 

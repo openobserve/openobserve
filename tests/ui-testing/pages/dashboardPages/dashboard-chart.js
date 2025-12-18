@@ -152,4 +152,64 @@ export default class ChartTypeSelector {
       { timeout: 15000 }
     );
   }
+
+  // ===== Y-AXIS FUNCTION CONFIGURATION METHODS =====
+
+  /**
+   * Open the Y-axis function configuration popup
+   * @param {string} alias - The Y-axis alias (e.g., "y_axis_1", "y_axis_2")
+   */
+  async openYAxisFunctionPopup(alias) {
+    const yAxisItem = this.page.locator(`[data-test="dashboard-y-item-${alias}"]`);
+    await yAxisItem.waitFor({ state: "visible", timeout: 10000 });
+    await yAxisItem.click();
+
+    const menuLocator = this.page.locator(`[data-test="dashboard-y-item-${alias}-menu"]`);
+    await menuLocator.waitFor({ state: "visible", timeout: 10000 });
+    await this.page.waitForTimeout(500);
+  }
+
+  /**
+   * Select a function from the function dropdown
+   * @param {string} functionName - The function to select (e.g., "count", "sum", "avg", "min", "max", "Distinct")
+   */
+  async selectFunction(functionName) {
+    const dropdown = this.page.locator('[data-test="dashboard-function-dropdown"]').first();
+    await dropdown.waitFor({ state: "visible", timeout: 10000 });
+    await dropdown.click();
+    await this.page.waitForTimeout(300);
+
+    await this.page.keyboard.type(functionName);
+    await this.page.waitForTimeout(500);
+
+    const option = this.page.getByRole("option", { name: functionName, exact: false }).first();
+    await option.waitFor({ state: "visible", timeout: 10000 });
+    await option.click();
+    await this.page.waitForTimeout(500);
+  }
+
+  /**
+   * Verify Y-axis label contains expected function name
+   * @param {string} alias - The Y-axis alias (e.g., "y_axis_1")
+   * @param {string} expectedFunction - The expected function name in the label
+   * @param {Function} expect - Playwright expect function
+   */
+  async verifyYAxisLabel(alias, expectedFunction, expect) {
+    const yAxisLabel = this.page.locator(`[data-test="dashboard-y-item-${alias}"]`);
+    const labelText = await yAxisLabel.textContent();
+    expect(labelText.toLowerCase()).toContain(expectedFunction.toLowerCase());
+    return labelText;
+  }
+
+  /**
+   * Configure a Y-axis field with a function in one method
+   * @param {string} alias - The Y-axis alias (e.g., "y_axis_1")
+   * @param {string} functionName - The function to apply (e.g., "count", "sum")
+   */
+  async configureYAxisFunction(alias, functionName) {
+    await this.openYAxisFunctionPopup(alias);
+    await this.selectFunction(functionName);
+    await this.page.keyboard.press("Escape");
+    await this.page.waitForTimeout(500);
+  }
 }
