@@ -91,6 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Interesting Fields Toggle (when no user defined schema) -->
     <div v-else-if="showQuickMode">
       <q-btn-toggle
+
         no-caps
         :model-value="showOnlyInterestingFields"
         @update:model-value="$emit('toggle-interesting-fields', $event)"
