@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="custom-chart-type-selector-popup"
+    :class="[$q.dark.isActive ? 'dark-mode' : 'light-mode']"
     data-test="custom-chart-type-selector-popup"
     style="
       padding: 0;
@@ -28,7 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Header -->
     <div
       class="flex justify-between items-center q-pa-md header"
-      style="border-bottom: 2px solid #e0e0e0; background-color: #f5f5f5"
+      style="border-bottom: 2px solid #e0e0e0"
+      :class="[$q.dark.isActive ? 'header-dark' : 'header-light']"
     >
       <div class="flex items-center q-table__title">
         <q-icon name="bar_chart" size="sm" class="q-mr-sm" />
@@ -67,15 +69,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex" style="height: calc(100% - 60px); overflow: hidden">
       <!-- Left Sidebar -->
       <div
-        class="sidebar q-pa-md scroll"
-        style="
-          width: 160px;
-          height: 100%;
-          border-right: 1px solid #e0e0e0;
-          overflow-y: auto;
-          background-color: #fafafa;
-          flex-shrink: 0;
-        "
+        class="sidebar custom-chart-sidebar q-pa-md scroll"
+        :class="[$q.dark.isActive ? 'sidebar-dark' : 'sidebar-light']"
+        style="width: 160px; height: 100%; overflow-y: auto; flex-shrink: 0"
       >
         <div class="text-subtitle2 q-mb-md text-weight-bold">Chart Types</div>
         <q-list dense>
@@ -103,6 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         ref="contentArea"
         class="content-area q-pa-md scroll"
+        :class="[$q.dark.isActive ? 'content-area-dark' : 'content-area-light']"
         style="flex: 1; height: 100%; overflow-y: auto; overflow-x: hidden"
         @scroll="handleScroll"
       >
@@ -191,6 +188,7 @@ import {
   inject,
 } from "vue";
 import { useI18n } from "vue-i18n";
+import { useQuasar } from "quasar";
 import type { ChartType, ChartCategory } from "./customChartExampleTypes";
 import { chartTypesData } from "./customChartExampleTypes";
 import CustomChartConfirmDialog from "@/components/dashboards/addPanel/customChartExamples/CustomChartConfirmDialog.vue";
@@ -204,6 +202,7 @@ export default defineComponent({
   emits: ["close", "select"],
   setup(props, { emit }) {
     const { t } = useI18n();
+    const $q = useQuasar();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
       "dashboard",
@@ -347,6 +346,7 @@ export default defineComponent({
       searchQuery,
       filteredCategories,
       currentQuery,
+      $q,
     };
   },
 });
@@ -357,8 +357,36 @@ export default defineComponent({
   background-color: white;
   border-radius: 8px;
   overflow: hidden;
+  &.dark-mode {
+    background-color: #23272e;
+    color: #e0e0e0;
+  }
+  &.light-mode {
+    background-color: white;
+    color: #222;
+  }
 }
 
+.header-light {
+  border-bottom: 2px solid #e0e0e0;
+  background-color: #f5f5f5;
+}
+.header-dark {
+  border-bottom: 2px solid #353535;
+  background-color: #23272e;
+  color: #e0e0e0;
+}
+
+// Only apply border to the custom chart sidebar, not all .sidebar
+.custom-chart-sidebar.sidebar-light {
+  background-color: #fafafa;
+  border-right: 1px solid #e0e0e0;
+}
+.custom-chart-sidebar.sidebar-dark {
+  background-color: #23272e;
+  border-right: 1px solid #353535;
+  color: #e0e0e0;
+}
 .sidebar {
   .sidebar-item {
     border-radius: 4px;
@@ -375,8 +403,25 @@ export default defineComponent({
       font-weight: 600;
     }
   }
+  &.sidebar-dark .sidebar-item {
+    &:hover {
+      background-color: #353535;
+    }
+    &.active-category {
+      background-color: #1976d2;
+      color: #fff;
+    }
+  }
 }
 
+.content-area-light {
+  background-color: #fff;
+  color: #222;
+}
+.content-area-dark {
+  background-color: #23272e;
+  color: #e0e0e0;
+}
 .content-area {
   .chart-category-section {
     scroll-margin-top: 20px;
@@ -385,17 +430,15 @@ export default defineComponent({
   .chart-card {
     transition: all 0.2s ease;
     height: 100%;
-
-    &:hover {
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      transform: translateY(-2px);
-    }
-
+    background-color: #fff;
     &.selected-chart {
       border: 2px solid var(--q-primary);
       box-shadow: 0 4px 12px rgba(var(--q-primary-rgb), 0.3);
     }
-
+    &:hover {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      transform: translateY(-2px);
+    }
     .chart-image-container {
       width: 100%;
       height: 150px;
@@ -411,6 +454,21 @@ export default defineComponent({
         height: 100%;
         object-fit: cover;
       }
+    }
+  }
+  &.content-area-dark .chart-card {
+    background-color: #23272e;
+    border: 1px solid #353535;
+    color: #e0e0e0;
+    .chart-image-container {
+      background-color: #23272e;
+    }
+    &:hover {
+      box-shadow: 0 4px 12px rgba(25, 118, 210, 0.15);
+    }
+    &.selected-chart {
+      border: 2px solid #1976d2;
+      box-shadow: 0 4px 12px rgba(25, 118, 210, 0.3);
     }
   }
 }
@@ -431,5 +489,14 @@ export default defineComponent({
 
 .scroll::-webkit-scrollbar-thumb:hover {
   background: #555;
+}
+.dark-mode .scroll::-webkit-scrollbar-track {
+  background: #23272e;
+}
+.dark-mode .scroll::-webkit-scrollbar-thumb {
+  background: #353535;
+}
+.dark-mode .scroll::-webkit-scrollbar-thumb:hover {
+  background: #1976d2;
 }
 </style>
