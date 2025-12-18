@@ -896,6 +896,69 @@ export const useVariablesManager = () => {
     return Array.isArray(value) ? value[0] : value;
   };
 
+  // ========== URL PARAMETER GENERATION ==========
+  /**
+   * Generates URL parameters for all variables with appropriate suffixes
+   * @param opts - Options for URL parameter generation
+   * @param opts.useLive - If true, uses live state; if false, uses committed state
+   * @returns Record of var-prefixed keys with appropriate scope suffixes
+   */
+  const getUrlParams = (opts?: { useLive: boolean }): Record<string, any> => {
+    const useLive = opts?.useLive ?? false;
+    const variableParams: Record<string, any> = {};
+
+    // Choose data source based on useLive flag
+    const sourceData = useLive ? variablesData : committedVariablesData;
+
+    // Helper to check if value is valid for URL
+    const hasValidValue = (value: any): boolean => {
+      if (value === null || value === undefined) return false;
+      if (value === "null") return false;
+      if (Array.isArray(value) && value.length === 0) return false;
+      if (Array.isArray(value) && value.every((v) => v === null || v === undefined || v === "")) return false;
+      return true;
+    };
+
+    // Global variables (no suffix)
+    sourceData.global.forEach((variable: any) => {
+      if (hasValidValue(variable.value)) {
+        let value = variable.value;
+        if (variable.type === "dynamic_filters") {
+          value = encodeURIComponent(JSON.stringify(value));
+        }
+        variableParams[`var-${variable.name}`] = value;
+      }
+    });
+
+    // Tab variables (use .t.[tabId] suffix)
+    Object.entries(sourceData.tabs).forEach(([tabId, variables]: [string, any]) => {
+      variables.forEach((variable: any) => {
+        if (hasValidValue(variable.value)) {
+          let value = variable.value;
+          if (variable.type === "dynamic_filters") {
+            value = encodeURIComponent(JSON.stringify(value));
+          }
+          variableParams[`var-${variable.name}.t.${tabId}`] = value;
+        }
+      });
+    });
+
+    // Panel variables (use .p.[panelId] suffix)
+    Object.entries(sourceData.panels).forEach(([panelId, variables]: [string, any]) => {
+      variables.forEach((variable: any) => {
+        if (hasValidValue(variable.value)) {
+          let value = variable.value;
+          if (variable.type === "dynamic_filters") {
+            value = encodeURIComponent(JSON.stringify(value));
+          }
+          variableParams[`var-${variable.name}.p.${panelId}`] = value;
+        }
+      });
+    });
+
+    return variableParams;
+  };
+
   // ========== RETURN API ==========
   return {
     // State
@@ -923,5 +986,6 @@ export const useVariablesManager = () => {
     isVariableReady,
     getDependentVariables,
     loadFromUrl,
+    getUrlParams,
   };
 };
