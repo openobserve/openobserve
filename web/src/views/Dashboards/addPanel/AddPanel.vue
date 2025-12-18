@@ -1829,12 +1829,10 @@ export default defineComponent({
 
           const errorMessageOnSave = await addPanel(
             store,
-            store.state.selectedOrganization.identifier,
             dashId,
-            currentDashboardData.data,
+            dashboardPanelData.data,
             route.query.folder ?? "default",
             route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
-            variablesToUpdate,
           );
           if (errorMessageOnSave instanceof Error) {
             errorData.errors.push(
