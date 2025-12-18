@@ -272,7 +272,13 @@ test.describe("Logs Regression Bugs", () => {
     // Wait for field expansion content to be visible (values or error message)
     const fieldExpansionContent = page.locator(pm.logsPage.fieldListItem(fieldToExpand));
     await fieldExpansionContent.waitFor({ state: 'visible', timeout: 10000 });
-    const contentText = await fieldExpansionContent.textContent().catch(() => '');
+    // Note: Using try-catch for safer error handling than .catch()
+    let contentText = '';
+    try {
+      contentText = await fieldExpansionContent.textContent() || '';
+    } catch (error) {
+      testLogger.debug(`Could not read field expansion content: ${error.message}`);
+    }
 
     // Primary assertion: NO 400 error (this was the bug)
     expect(contentText).not.toContain('400');
@@ -345,7 +351,13 @@ test.describe("Logs Regression Bugs", () => {
     // Wait for field expansion content to be visible (values or error message)
     const fieldExpansionContent = page.locator(pm.logsPage.fieldListItem(fieldToExpand));
     await fieldExpansionContent.waitFor({ state: 'visible', timeout: 10000 });
-    const contentText = await fieldExpansionContent.textContent().catch(() => '');
+    // Note: Using try-catch for safer error handling than .catch()
+    let contentText = '';
+    try {
+      contentText = await fieldExpansionContent.textContent() || '';
+    } catch (error) {
+      testLogger.debug(`Could not read field expansion content: ${error.message}`);
+    }
 
     // Primary assertion: NO 400 error (this was the bug)
     expect(contentText).not.toContain('400');
@@ -418,7 +430,13 @@ test.describe("Logs Regression Bugs", () => {
     // Wait for field expansion content to be visible (values or error message)
     const fieldExpansionContent = page.locator(pm.logsPage.fieldListItem(fieldToExpand));
     await fieldExpansionContent.waitFor({ state: 'visible', timeout: 10000 });
-    const contentText = await fieldExpansionContent.textContent().catch(() => '');
+    // Note: Using try-catch for safer error handling than .catch()
+    let contentText = '';
+    try {
+      contentText = await fieldExpansionContent.textContent() || '';
+    } catch (error) {
+      testLogger.debug(`Could not read field expansion content: ${error.message}`);
+    }
 
     // Primary assertion: NO 400 error (this was the bug)
     expect(contentText).not.toContain('400');
@@ -645,7 +663,12 @@ test.describe("Logs Regression Bugs", () => {
 
     // Verify results are displayed
     const resultTextLocator = page.locator(pm.logsPage.resultText);
-    const resultText = await resultTextLocator.textContent().catch(() => '');
+    let resultText = '';
+    try {
+      resultText = await resultTextLocator.textContent() || '';
+    } catch (error) {
+      testLogger.debug(`Could not read result text: ${error.message}`);
+    }
     expect(resultText).toBeTruthy();
     testLogger.info(`✓ Results displayed: ${resultText.substring(0, 50)}`);
 
@@ -967,7 +990,12 @@ test.describe("Logs Regression Bugs", () => {
     }
 
     // Verify results or at least that query executed
-    const resultText = await page.locator(pm.logsPage.resultText).textContent().catch(() => '');
+    let resultText = '';
+    try {
+      resultText = await page.locator(pm.logsPage.resultText).textContent() || '';
+    } catch (error) {
+      testLogger.debug(`Could not read result text: ${error.message}`);
+    }
 
     // PRIMARY ASSERTION 3: Query should execute and return results
     expect(resultText).toBeTruthy();
