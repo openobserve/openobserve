@@ -110,7 +110,7 @@
         ]"
         v-if="showJoinSummary"
       >
-        Performing 
+        Performing
         <span class="text-primary">{{ joinTypeLabel }} Join</span> between
         <span class="tw-font-semibold">{{ mainStream }}</span> and
         <span class="tw-font-semibold">{{ modelValue.stream }}</span>
@@ -622,6 +622,7 @@ export default defineComponent({
   display: flex;
   align-items: center;
   gap: 8px;
+  color: var(--q-primary);
 }
 
 .join-connector {
@@ -631,11 +632,13 @@ export default defineComponent({
   padding-top: 21px;
   padding-right: 10px;
   padding-left: 10px;
+  color: var(--q-primary);
 }
 
 .join-type-section {
   display: flex;
   flex-direction: column;
+  align-items: center;
 }
 
 .join-type-selector {
@@ -651,6 +654,7 @@ export default defineComponent({
   align-items: center;
   cursor: pointer;
   transition: opacity 0.2s;
+  color: var(--q-primary);
 
   &:hover {
     opacity: 0.8;

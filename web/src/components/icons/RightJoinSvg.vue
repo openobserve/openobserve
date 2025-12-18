@@ -11,15 +11,15 @@
       cy="6"
       r="5.5"
       transform="rotate(-180 14.295 6)"
-      stroke="#6571BD"
+      stroke="currentColor"
     />
     <circle
-      opacity="0.1"
+      opacity="0.3"
       cx="6.29504"
       cy="6"
       r="5.5"
       transform="rotate(-180 6.29504 6)"
-      stroke="black"
+      stroke="currentColor"
     />
   </svg>
 </template>

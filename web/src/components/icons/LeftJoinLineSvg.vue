@@ -6,8 +6,8 @@
     viewBox="0 0 53 4"
     fill="none"
   >
-    <path d="M7.67297 2H52.5971" stroke="#6571BD" stroke-dasharray="2 2" />
-    <ellipse cx="2.68132" cy="2" rx="1.99663" ry="2" fill="#6571BD" />
+    <path d="M7.67297 2H52.5971" stroke="currentColor" stroke-dasharray="2 2" />
+    <ellipse cx="2.68132" cy="2" rx="1.99663" ry="2" fill="currentColor" />
   </svg>
 </template>
 
