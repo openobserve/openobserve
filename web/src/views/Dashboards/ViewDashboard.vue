@@ -698,6 +698,10 @@ export default defineComponent({
           // Load variable values from URL if present
           variablesManager.loadFromUrl(route);
 
+          // Immediately commit the loaded values so they're available for API calls
+          variablesManager.commitAll();
+          console.log("[ViewDashboard] Committed variables loaded from URL on initial load");
+
           // Track that we're using the scoped variables manager
           usingScopedVariablesManager.value = true;
         } catch (error: any) {
@@ -1065,10 +1069,32 @@ export default defineComponent({
     watch([refreshInterval, selectedDate, selectedTabId], () => {
       generateNewDashboardRunId();
 
-      // Get variable params from manager instead of route.query to avoid race condition
-      const variableParams = getVariableParamsFromManager();
+      // Build variable params - prefer manager if available, otherwise use route.query
+      let variableParams: Record<string, any> = {};
 
-      console.log("[ViewDashboard] Watcher triggered - preserving variables from manager:", variableParams);
+      if (variablesManager) {
+        // Get from manager
+        variableParams = getVariableParamsFromManager();
+
+        // If manager returns empty but route.query has variables, use route.query
+        // This handles the case where page just loaded and manager hasn't committed yet
+        if (Object.keys(variableParams).length === 0) {
+          Object.keys(route.query).forEach((key) => {
+            if (key.startsWith("var-")) {
+              variableParams[key] = route.query[key];
+            }
+          });
+        }
+      } else {
+        // No manager, use route.query
+        Object.keys(route.query).forEach((key) => {
+          if (key.startsWith("var-")) {
+            variableParams[key] = route.query[key];
+          }
+        });
+      }
+
+      console.log("[ViewDashboard] Watcher triggered - preserving variables:", variableParams);
 
       router.replace({
         query: {
@@ -1078,7 +1104,7 @@ export default defineComponent({
           tab: selectedTabId.value,
           refresh: generateDurationLabel(refreshInterval.value),
           ...getQueryParamsForDuration(selectedDate.value),
-          ...variableParams, // Use variables from manager
+          ...variableParams, // Use variables from manager or route
           print: store.state.printMode,
           searchtype: route.query.searchtype,
         },
