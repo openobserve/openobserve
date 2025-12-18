@@ -44,45 +44,9 @@ body {
 
 // Alert field highlight animation
 .alert-field-highlight {
-  animation: alert-field-pulse 0.6s ease-in-out;
-  position: relative;
-
-  &::after {
-    content: '';
-    position: absolute;
-    top: -4px;
-    left: -4px;
-    right: -4px;
-    bottom: -4px;
-    border: 2px solid var(--q-primary);
-    border-radius: 0.375rem;
-    pointer-events: none;
-    animation: alert-field-border-fade 2.5s ease-out forwards;
-  }
-}
-
-@keyframes alert-field-pulse {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.01);
-  }
-}
-
-@keyframes alert-field-border-fade {
-  0% {
-    opacity: 1;
-    border-width: 2px;
-  }
-  70% {
-    opacity: 1;
-    border-width: 2px;
-  }
-  100% {
-    opacity: 0;
-    border-width: 1px;
-  }
+  border: 2px solid var(--q-primary) !important;
+  border-radius: 4px;
+  transition: border 0.3s ease;
 }
 
 .q-page {

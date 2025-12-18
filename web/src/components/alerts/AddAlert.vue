@@ -826,8 +826,36 @@ export default defineComponent({
       // Register fields with focus manager for clickable summary
       // Wait for next tick to ensure refs are available
       await nextTick();
-      focusManager.registerField('streamType', { ref: streamTypeFieldRef });
-      focusManager.registerField('stream', { ref: streamFieldRef });
+      focusManager.registerField('streamType', {
+        ref: streamTypeFieldRef,
+        onBeforeFocus: () => {
+          // Navigate to step 1 for wizard mode
+          if (wizardStep.value !== 1) {
+            wizardStep.value = 1;
+          }
+        }
+      });
+      focusManager.registerField('stream', {
+        ref: streamFieldRef,
+        onBeforeFocus: () => {
+          // Navigate to step 1 for wizard mode
+          if (wizardStep.value !== 1) {
+            wizardStep.value = 1;
+          }
+        }
+      });
+      focusManager.registerField('alertType', {
+        ref: streamTypeFieldRef, // Use any ref, we just need navigation
+        onBeforeFocus: () => {
+          // Navigate to step 1 for wizard mode
+          if (wizardStep.value !== 1) {
+            wizardStep.value = 1;
+          }
+        }
+      });
+      // Note: query, conditions, period, threshold, destinations, and silence fields
+      // are registered in their respective component watchers (step2Ref, step4Ref)
+      // with proper field refs for highlighting
     });
 
     // Track setTimeout IDs to clean them up properly
@@ -966,6 +994,114 @@ export default defineComponent({
         });
       }
     }, { immediate: true });
+
+    // Watch for step4Ref (AlertSettings) to register wizard mode field refs
+    watch(step4Ref, (newVal) => {
+      if (newVal) {
+        nextTick(() => {
+          // Register wizard mode fields with proper navigation and highlighting
+          if (newVal.periodFieldRef) {
+            focusManager.registerField('period', {
+              ref: newVal.periodFieldRef,
+              onBeforeFocus: () => {
+                if (wizardStep.value !== 4) {
+                  wizardStep.value = 4;
+                }
+              }
+            });
+          }
+          if (newVal.thresholdFieldRef) {
+            focusManager.registerField('threshold', {
+              ref: newVal.thresholdFieldRef,
+              onBeforeFocus: () => {
+                if (wizardStep.value !== 4) {
+                  wizardStep.value = 4;
+                }
+              }
+            });
+          }
+          if (newVal.silenceFieldRef) {
+            focusManager.registerField('silence', {
+              ref: newVal.silenceFieldRef,
+              onBeforeFocus: () => {
+                if (wizardStep.value !== 4) {
+                  wizardStep.value = 4;
+                }
+              }
+            });
+          }
+          if (newVal.destinationsFieldRef) {
+            focusManager.registerField('destinations', {
+              ref: newVal.destinationsFieldRef,
+              onBeforeFocus: () => {
+                if (wizardStep.value !== 4) {
+                  wizardStep.value = 4;
+                }
+              }
+            });
+          }
+        });
+      }
+    }, { immediate: true });
+
+    // Watch for step2Ref to register query field
+    watch(step2Ref, (newVal) => {
+      if (newVal) {
+        nextTick(() => {
+          // Determine which ref to use based on query type
+          const queryType = formData.value.query_condition?.type || 'custom';
+
+          // Register the query field with appropriate ref based on query type
+          if (queryType === 'custom' && newVal.customPreviewRef) {
+            focusManager.registerField('query', {
+              ref: newVal.customPreviewRef,
+              onBeforeFocus: () => {
+                if (wizardStep.value !== 2) {
+                  wizardStep.value = 2;
+                }
+              }
+            });
+          } else if ((queryType === 'sql' || queryType === 'promql') && newVal.sqlPromqlPreviewRef) {
+            focusManager.registerField('query', {
+              ref: newVal.sqlPromqlPreviewRef,
+              onBeforeFocus: () => {
+                if (wizardStep.value !== 2) {
+                  wizardStep.value = 2;
+                }
+              }
+            });
+          }
+        });
+      }
+    }, { immediate: true });
+
+    // Watch for query type changes and re-register with correct ref
+    watch(() => formData.value.query_condition?.type, (newType) => {
+      if (step2Ref.value && newType) {
+        nextTick(() => {
+          // Re-register the query field with the correct ref for the new type
+          if (newType === 'custom' && step2Ref.value.customPreviewRef) {
+            focusManager.registerField('query', {
+              ref: step2Ref.value.customPreviewRef,
+              onBeforeFocus: () => {
+                if (wizardStep.value !== 2) {
+                  wizardStep.value = 2;
+                }
+              }
+            });
+          } else if ((newType === 'sql' || newType === 'promql') && step2Ref.value.sqlPromqlPreviewRef) {
+            focusManager.registerField('query', {
+              ref: step2Ref.value.sqlPromqlPreviewRef,
+              onBeforeFocus: () => {
+                if (wizardStep.value !== 2) {
+                  wizardStep.value = 2;
+                }
+              }
+            });
+          }
+        });
+      }
+    });
 
     onUnmounted(() => {
       // Clean up alerts-specific context provider
@@ -1138,6 +1274,31 @@ export default defineComponent({
     watch(() => scheduledAlertRef.value?.viewSqlEditor?.value, (newValue) => {
       if (newValue !== undefined && newValue !== viewSqlEditorDialog.value) {
         viewSqlEditorDialog.value = newValue;
+      }
+    });
+
+    // Watch for SQL query changes and update preview
+    watch(() => formData.value.query_condition?.sql, (newValue) => {
+      if (getSelectedTab.value === 'sql') {
+        previewQuery.value = newValue ? newValue.trim() : '';
+      }
+    });
+
+    // Watch for PromQL query changes and update preview
+    watch(() => formData.value.query_condition?.promql, (newValue) => {
+      if (getSelectedTab.value === 'promql') {
+        previewQuery.value = newValue ? newValue.trim() : '';
+      }
+    });
+
+    // Watch for tab changes and update preview query
+    watch(() => formData.value.query_condition?.type, (newType) => {
+      if (newType === 'sql') {
+        previewQuery.value = formData.value.query_condition?.sql ? formData.value.query_condition.sql.trim() : '';
+      } else if (newType === 'promql') {
+        previewQuery.value = formData.value.query_condition?.promql ? formData.value.query_condition.promql.trim() : '';
+      } else if (newType === 'custom') {
+        previewQuery.value = generateSqlQueryLocal();
       }
     });
 

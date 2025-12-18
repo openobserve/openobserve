@@ -83,7 +83,7 @@ const handleSummaryClick = (event: MouseEvent) => {
 
 .summary-content {
   font-size: 0.8125rem;
-  line-height: 1.8;
+  line-height: 2.2;
   flex: 1;
   overflow-y: auto;
   padding: 1rem;

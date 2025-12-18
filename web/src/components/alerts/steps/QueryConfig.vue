@@ -46,18 +46,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Custom Query Builder -->
       <template v-if="localTab === 'custom'">
         <q-form ref="customConditionsForm" greedy>
-          <FilterGroup
-            :stream-fields="columns"
-            :stream-fields-map="streamFieldsMap"
-            :show-sql-preview="true"
-            :sql-query="generatedSqlQuery"
-            :group="inputData.conditions"
-            :depth="0"
-            @add-condition="updateGroup"
-            @add-group="updateGroup"
-            @remove-group="removeConditionGroup"
-            @input:update="onInputUpdate"
-          />
+          <div ref="customPreviewRef">
+            <FilterGroup
+              :stream-fields="columns"
+              :stream-fields-map="streamFieldsMap"
+              :show-sql-preview="true"
+              :sql-query="generatedSqlQuery"
+              :group="inputData.conditions"
+              :depth="0"
+              @add-condition="updateGroup"
+              @add-group="updateGroup"
+              @remove-group="removeConditionGroup"
+              @input:update="onInputUpdate"
+            />
+          </div>
         </q-form>
       </template>
 
@@ -68,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Preview Boxes Container -->
           <div class="tw-flex tw-gap-4 tw-w-full">
             <!-- SQL/PromQL Preview Box (50%) -->
-            <div class="preview-box tw-flex-1" :class="store.state.theme === 'dark' ? 'dark-mode-preview' : 'light-mode-preview'" style="height: 464px;">
+            <div ref="sqlPromqlPreviewRef" class="preview-box tw-flex-1" :class="store.state.theme === 'dark' ? 'dark-mode-preview' : 'light-mode-preview'" style="height: 464px;">
               <div class="preview-header tw-flex tw-items-center tw-justify-between tw-px-3 tw-py-2">
                 <span class="preview-title">{{ localTab === 'sql' ? 'SQL' : 'PromQL' }} Preview</span>
               </div>
@@ -196,6 +198,10 @@ export default defineComponent({
     const localTab = ref(props.tab);
     const viewSqlEditor = ref(false);
     const customConditionsForm = ref(null);
+
+    // Field refs for focus manager
+    const customPreviewRef = ref(null);
+    const sqlPromqlPreviewRef = ref(null);
 
     // Local query values
     const localSqlQuery = ref(props.sqlQuery);
@@ -397,6 +403,9 @@ export default defineComponent({
       functionsList,
       validate,
       customConditionsForm,
+      // Field refs for focus manager
+      customPreviewRef,
+      sqlPromqlPreviewRef,
     };
   },
 });

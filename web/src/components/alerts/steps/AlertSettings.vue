@@ -298,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div style="width: calc(100% - 190px)">
             <!-- With Aggregation -->
             <template v-if="localIsAggregationEnabled && formData.query_condition.aggregation">
-              <div class="flex tw-flex-col justify-start items-start tw-gap-2">
+              <div ref="thresholdFieldRef" class="flex tw-flex-col justify-start items-start tw-gap-2">
                 <div class="tw-flex tw-items-center">
                   <div class="q-mr-xs">
                     <q-select
@@ -372,7 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Without Aggregation -->
             <template v-else>
-              <div class="flex justify-start items-center">
+              <div ref="thresholdFieldRef" class="flex justify-start items-center">
                 <div>
                   <q-select
                     v-model="formData.trigger_condition.operator"
@@ -441,7 +441,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-icon>
           </div>
           <div>
-            <div class="flex items-center q-mr-sm" style="width: fit-content">
+            <div ref="periodFieldRef" class="flex items-center q-mr-sm" style="width: fit-content">
               <div style="width: 87px; margin-left: 0 !important" class="period-input-container">
                 <q-input
                   v-model="formData.trigger_condition.period"
@@ -649,7 +649,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-icon>
           </div>
           <div>
-            <div class="flex items-center q-mr-sm" style="width: fit-content">
+            <div ref="silenceFieldRef" class="flex items-center q-mr-sm" style="width: fit-content">
               <div
                 style="width: 87px; margin-left: 0 !important"
                 class="silence-notification-input"
@@ -710,6 +710,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div>
             <div class="flex items-center">
               <q-select
+                ref="destinationsFieldRef"
                 v-model="localDestinations"
                 :options="filteredDestinations"
                 class="no-case q-py-none"
@@ -845,6 +846,12 @@ export default defineComponent({
 
     // Form ref
     const alertSettingsForm = ref(null);
+
+    // Field refs for focus manager
+    const periodFieldRef = ref(null);
+    const thresholdFieldRef = ref(null);
+    const silenceFieldRef = ref(null);
+    const destinationsFieldRef = ref(null);
 
     // Local state for aggregation toggle
     // Only enable aggregation when query type is "custom" (not "sql" or "promql")
@@ -1259,6 +1266,11 @@ export default defineComponent({
       // Validation
       validate,
       alertSettingsForm,
+      // Field refs for focus manager
+      periodFieldRef,
+      thresholdFieldRef,
+      silenceFieldRef,
+      destinationsFieldRef,
     };
   },
 });
