@@ -294,21 +294,37 @@ export const useVariablesManager = () => {
     // Check 3: All parents ready?
     const parents = dependencyGraph.value[key]?.parents || [];
     const allVars = getAllVariablesFlat();
+    
+    console.log(`[canVariableLoad] Checking ${key}. Parents: ${JSON.stringify(parents)}`);
+    
     const allParentsReady = parents.every((parentKey) => {
       const parentVar = findVariableByKey(parentKey, allVars);
       // Parent MUST be marked as partially loaded - this is the authoritative flag
       // that indicates the variable is ready to be used in queries
-      if (!parentVar || parentVar.isVariablePartialLoaded !== true) {
+      if (!parentVar) {
+        console.log(`[canVariableLoad] Parent ${parentKey} not found for ${key}`);
         return false;
       }
+      
+      if (parentVar.isVariablePartialLoaded !== true) {
+        console.log(`[canVariableLoad] Parent ${parentKey} is NOT partially loaded for ${key}`);
+        return false;
+      }
+      
       // Additionally check that parent has a valid value
       const hasValue =
         parentVar.value !== null &&
         parentVar.value !== undefined &&
         (!Array.isArray(parentVar.value) || parentVar.value.length > 0);
+      
+      if (!hasValue) {
+        console.log(`[canVariableLoad] Parent ${parentKey} has no valid value for ${key}: ${JSON.stringify(parentVar.value)}`);
+      }
+      
       return hasValue;
     });
 
+    console.log(`[canVariableLoad] Result for ${key}: ${allParentsReady}`);
     return allParentsReady;
   };
 
@@ -543,12 +559,15 @@ export const useVariablesManager = () => {
       children.forEach((childKey) => {
         const childVar = findVariableByKey(childKey, allVars);
         if (childVar) {
-          console.log(`[updateVariableValue] Resetting child ${childVar.name}@${childVar.scope} from ${JSON.stringify(childVar.value)} to ${childVar.multiSelect ? '[]' : 'null'}`);
+          console.log(`[updateVariableValue] Resetting descendant ${childVar.name}@${childVar.scope} from ${JSON.stringify(childVar.value)} to ${childVar.multiSelect ? '[]' : 'null'}`);
 
           // Reset child's state completely - do this regardless of visibility
           // If the child is not visible now, it needs to be reset for when it becomes visible
           childVar.isVariablePartialLoaded = false;
           childVar.isLoading = false;
+          // IMPORTANT: Do NOT set isVariableLoadingPending = true here
+          // because we want sequential loading, not simultaneous loading.
+          childVar.isVariableLoadingPending = false;
 
           // Reset value and options
           if (childVar.multiSelect) {
@@ -557,14 +576,6 @@ export const useVariablesManager = () => {
             childVar.value = null;
           }
           childVar.options = [];
-
-          // Mark as pending to trigger reload only if visible
-          // If not visible, it will be marked pending when it becomes visible
-          if (childVar.type === "query_values") {
-            if (isVariableVisible(childVar)) {
-              childVar.isVariableLoadingPending = true;
-            }
-          }
 
           // Recursively reset this child's descendants
           resetDescendants(childKey);
@@ -575,6 +586,29 @@ export const useVariablesManager = () => {
     // Start the cascade from the changed variable
     const variableKey = getVariableKey(name, scope, tabId, panelId);
     resetDescendants(variableKey);
+
+    // After resetting all descendants, trigger ONLY the immediate children
+    // that are ready to load (i.e. all their parents are now ready)
+    const immediateChildrenKeys = dependencyGraph.value[variableKey]?.children || [];
+    const allVars = getAllVariablesFlat();
+    
+    immediateChildrenKeys.forEach(childKey => {
+      const childVar = findVariableByKey(childKey, allVars);
+      if (!childVar) {
+        console.log(`[updateVariableValue] Immediate child ${childKey} not found`);
+        return;
+      }
+      
+      const isVisible = isVariableVisible(childVar);
+      const canLoad = canVariableLoad(childVar);
+      
+      console.log(`[updateVariableValue] Checking immediate child ${childKey}: visible=${isVisible}, canLoad=${canLoad}`);
+      
+      if (isVisible && canLoad) {
+        console.log(`[updateVariableValue] Triggering immediate child ${childVar.name}@${childVar.scope} to load`);
+        childVar.isVariableLoadingPending = true;
+      }
+    });
   };
 
   // ========== VISIBILITY ==========
@@ -582,20 +616,14 @@ export const useVariablesManager = () => {
     tabsVisibility.value[tabId] = visible;
 
     if (visible) {
-      // Mark ONLY independent tab variables as pending
-      // Dependent variables will be marked by onVariablePartiallyLoaded when parents finish
+      // Mark variables as pending ONLY if they can actually load
+      // (i.e. all their parents are already ready)
       const tabVars = variablesData.tabs[tabId] || [];
       tabVars.forEach((v) => {
         if (v.type === "query_values" && !v.isVariablePartialLoaded) {
-          // Only mark as pending if this variable has no parents (is independent)
-          const key = getVariableKey(v.name, v.scope, v.tabId, v.panelId);
-          const parents = dependencyGraph.value[key]?.parents || [];
-
-          if (parents.length === 0) {
-            // Independent variable - safe to mark as pending immediately
+          if (canVariableLoad(v)) {
             v.isVariableLoadingPending = true;
           }
-          // Dependent variables will be triggered by onVariablePartiallyLoaded
         }
       });
     }
@@ -605,20 +633,14 @@ export const useVariablesManager = () => {
     panelsVisibility.value[panelId] = visible;
 
     if (visible) {
-      // Mark ONLY independent panel variables as pending
-      // Dependent variables will be marked by onVariablePartiallyLoaded when parents finish
+      // Mark variables as pending ONLY if they can actually load
+      // (i.e. all their parents are already ready)
       const panelVars = variablesData.panels[panelId] || [];
       panelVars.forEach((v) => {
         if (v.type === "query_values" && !v.isVariablePartialLoaded) {
-          // Only mark as pending if this variable has no parents (is independent)
-          const key = getVariableKey(v.name, v.scope, v.tabId, v.panelId);
-          const parents = dependencyGraph.value[key]?.parents || [];
-
-          if (parents.length === 0) {
-            // Independent variable - safe to mark as pending immediately
+          if (canVariableLoad(v)) {
             v.isVariableLoadingPending = true;
           }
-          // Dependent variables will be triggered by onVariablePartiallyLoaded
         }
       });
     }
