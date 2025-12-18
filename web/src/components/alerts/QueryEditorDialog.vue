@@ -543,10 +543,6 @@ const props = defineProps({
     type: Array as PropType<any[]>,
     default: () => [],
   },
-  selectedMultiWindowOffset: {
-    type: Array as PropType<any[]>,
-    default: () => [],
-  },
   savedFunctions: {
     type: Array as PropType<any[]>,
     default: () => [],
@@ -741,12 +737,7 @@ const onFunctionClear = () => {
   selectedFunction.value = null;
 };
 
-// Check if a multi-window offset is selected by UUID
-const checkIfMultiWindowOffsetIsSelected = (uuid: string) => {
-  return props.selectedMultiWindowOffset && props.selectedMultiWindowOffset.includes(uuid);
-};
-
-// Build multi-window query - matches ScheduledAlert.vue logic
+// Build multi-window query - includes all multi-windows automatically
 const buildMultiWindowQuery = (sql: string, fn: boolean, periodInMicroseconds: number) => {
   const queryToSend: any[] = [];
   const regex = /^(\d+)([smhdwM])$/;
@@ -762,26 +753,24 @@ const buildMultiWindowQuery = (sql: string, fn: boolean, periodInMicroseconds: n
 
   const now = Date.now() * 1000; // Current time in microseconds because we are using microseconds of unix timestamp
 
+  // Include all multi-windows (no selection needed)
   props.multiTimeRange.forEach((date: any) => {
-    // Only include time windows that are selected
-    if (checkIfMultiWindowOffsetIsSelected(date.uuid)) {
-      const individualQuery: any = {};
-      const match = date.offSet.match(regex);
-      if (match) {
-        const value = parseInt(match[1], 10);
-        const unit = match[2];
-        const offsetMicroseconds = value * unitToMicroseconds[unit];
+    const individualQuery: any = {};
+    const match = date.offSet.match(regex);
+    if (match) {
+      const value = parseInt(match[1], 10);
+      const unit = match[2];
+      const offsetMicroseconds = value * unitToMicroseconds[unit];
 
-        const endTime = now;
-        const startTime = endTime - offsetMicroseconds;
-        individualQuery.start_time = startTime - periodInMicroseconds;
-        individualQuery.end_time = startTime;
-        individualQuery.sql = sql;
-        individualQuery.query_fn = fn ? b64EncodeUnicode(vrlFunctionContent.value) : null;
-        queryToSend.push(individualQuery);
-      } else {
-        console.warn("Invalid format:", date);
-      }
+      const endTime = now;
+      const startTime = endTime - offsetMicroseconds;
+      individualQuery.start_time = startTime - periodInMicroseconds;
+      individualQuery.end_time = startTime;
+      individualQuery.sql = sql;
+      individualQuery.query_fn = fn ? b64EncodeUnicode(vrlFunctionContent.value) : null;
+      queryToSend.push(individualQuery);
+    } else {
+      console.warn("Invalid format:", date);
     }
   });
 

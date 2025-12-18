@@ -101,7 +101,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :columns="columns"
       :period="inputData.period"
       :multiTimeRange="inputData.multi_time_range"
-      :selectedMultiWindowOffset="selectedMultiWindowOffset"
       :savedFunctions="functionsList"
       :sqlQueryErrorMsg="sqlQueryErrorMsg"
       @update:sqlQuery="updateSqlQuery"
@@ -185,10 +184,6 @@ export default defineComponent({
     sqlQueryErrorMsg: {
       type: String,
       default: "",
-    },
-    selectedMultiWindowOffset: {
-      type: Array as PropType<any[]>,
-      default: () => [],
     },
   },
   emits: ["update:tab", "update-group", "remove-group", "input:update", "update:sqlQuery", "update:promqlQuery", "update:vrlFunction", "validate-sql"],
