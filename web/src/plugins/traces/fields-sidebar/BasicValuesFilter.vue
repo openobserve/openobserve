@@ -86,24 +86,24 @@
                   "
                 >
                   <q-btn
-                    class="o2-custom-button-hover tw-ml-[0.25rem] tw-mr-[0.25rem] !tw-border !tw-border-solid !tw-border-[var(--o2-border-color)]"
+                    class="o2-custom-button-hover tw:ml-[0.25rem] tw:mr-[0.25rem] !tw:border !tw:border-solid !tw:border-[var(--o2-border-color)]"
                     size="6px"
                     title="Include Term"
                     round
                     @click="addSearchTerm(`${row.name}='${value.key}'`)"
                   >
-                    <q-icon class="tw-h-[0.5rem] tw-w-[0.5rem]">
+                    <q-icon class="tw:h-[0.5rem] tw:w-[0.5rem]">
                       <EqualIcon></EqualIcon>
                     </q-icon>
                   </q-btn>
                   <q-btn
-                    class="o2-custom-button-hover !tw-border !tw-border-solid !tw-border-[var(--o2-border-color)]"
+                    class="o2-custom-button-hover !tw:border !tw:border-solid !tw:border-[var(--o2-border-color)]"
                     size="6px"
                     title="Exclude Term"
                     round
                     @click="addSearchTerm(`${row.name}!='${value.key}'`)"
                   >
-                    <q-icon class="tw-h-[0.5rem] tw-w-[0.5rem]">
+                    <q-icon class="tw:h-[0.5rem] tw:w-[0.5rem]">
                       <NotEqualIcon></NotEqualIcon>
                     </q-icon>
                   </q-btn>

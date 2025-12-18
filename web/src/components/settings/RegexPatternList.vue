@@ -1,9 +1,9 @@
 <template>
     <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);" 
     >
-    <div v-if="!showImportRegexPatternDialog" class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[68px] tw-border-b-[1px]"
+    <div v-if="!showImportRegexPatternDialog" class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
     >
-      <div class="q-table__title tw-font-[600]" data-test="regex-pattern-list-title">
+      <div class="q-table__title tw:font-[600]" data-test="regex-pattern-list-title">
             {{ t("regex_patterns.title") }}
           </div>
           <q-input
@@ -18,7 +18,7 @@
                 </template>
               </q-input>
           <q-btn
-            class="o2-secondary-button q-ml-sm tw-h-[36px]"
+            class="o2-secondary-button q-ml-sm tw:h-[36px]"
             no-caps
             flat
             :label="t(`regex_patterns.import`)"
@@ -27,7 +27,7 @@
           />
           <q-btn
             data-test="regex-pattern-list-add-pattern-btn"
-            class="o2-primary-button q-ml-sm tw-h-[36px]"
+            class="o2-primary-button q-ml-sm tw:h-[36px]"
             no-caps
             flat
             :label="t(`regex_patterns.create_pattern`)"
@@ -84,7 +84,7 @@
               </div>
             </template>
             <template v-else>
-              <div class="tw-flex tw-items-center tw-gap-1 tw-justify-center">
+              <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
                 <q-btn
                   :data-test="`regex-pattern-list-${props.row.id}-export-regex-pattern`"
                   padding="sm"
@@ -128,8 +128,8 @@
         </q-tr>
         </template>
         <template #bottom="scope">
-          <div class="tw-flex tw-items-center tw-justify-end tw-w-full tw-h-[48px]">
-            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
+          <div class="tw:flex tw:items-center tw:justify-end tw:w-full tw:h-[48px]">
+            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md">
                   {{ resultTotal }} {{ t('regex_patterns.bottom_header') }}
                 </div>
           <QTablePagination

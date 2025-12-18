@@ -16,25 +16,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="deduplication-config q-pa-none q-ma-none">
-    <div class="tw-w-full">
-      <div class="tw-w-full">
+    <div class="tw:w-full">
+      <div class="tw:w-full">
         <AlertsContainer
           :name="t('alerts.deduplication.title')"
           v-model:is-expanded="isExpanded"
           :label="t('alerts.deduplication.title')"
           :subLabel="t('alerts.deduplication.subtitle')"
           icon="filter_alt"
-          class="tw-w-full col-12 tw-pl-4 tw-pr-2 tw-py-2"
-          :iconClass="'tw-mt-[2px]'"
+          class="tw:w-full col-12 tw:pl-4 tw:pr-2 tw:py-2"
+          :iconClass="'tw:mt-[2px]'"
         />
       </div>
 
-      <div v-if="isExpanded" class="tw-w-full row alert-setup-container">
-        <q-separator class="tw-my-2"/>
-        <div class="q-mt-sm tw-w-full tw-pl-3">
+      <div v-if="isExpanded" class="tw:w-full row alert-setup-container">
+        <q-separator class="tw:my-2"/>
+        <div class="q-mt-sm tw:w-full tw:pl-3">
             <!-- Fingerprint Fields -->
-            <div class="tw-mb-4">
-              <div class="tw-font-semibold tw-pb-2 tw-flex tw-items-center">
+            <div class="tw:mb-4">
+              <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
                 {{ t("alerts.deduplication.fingerprintFields") }}
                 <q-icon
                   :name="outlinedInfo"
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-tooltip>
                 </q-icon>
               </div>
-              <div class="tw-text-sm tw-text-gray-600 dark:tw-text-gray-400 tw-mb-2">
+              <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
                 {{ t("alerts.deduplication.fingerprintFieldsHint") }}
               </div>
               <q-select
@@ -84,8 +84,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Time Window -->
-            <div class="tw-mb-4">
-              <div class="tw-font-semibold tw-pb-2 tw-flex tw-items-center">
+            <div class="tw:mb-4">
+              <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
                 {{ t("alerts.deduplication.timeWindow") }}
                 <q-icon
                   :name="outlinedInfo"
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-tooltip>
                 </q-icon>
               </div>
-              <div class="tw-text-sm tw-text-gray-600 dark:tw-text-gray-400 tw-mb-2">
+              <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
                 {{ t("alerts.deduplication.timeWindowHint") }}
               </div>
               <q-input

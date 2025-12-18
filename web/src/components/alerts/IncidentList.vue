@@ -136,8 +136,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Bottom pagination -->
         <template v-slot:bottom="scope">
-          <div class="bottom-btn tw-h-[48px]">
-            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[100px] tw-mr-md">
+          <div class="bottom-btn tw:h-[48px]">
+            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md">
               {{ pagination.rowsNumber }} {{ pagination.rowsNumber === 1 ? 'Incident' : 'Incidents' }}
             </div>
             <QTablePagination

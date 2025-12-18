@@ -26,10 +26,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <q-separator class="tw-mb-6" />
+    <q-separator class="tw:mb-6" />
 
     <!-- Enable Deduplication -->
-    <div class="tw-mb-6">
+    <div class="tw:mb-6">
       <q-checkbox
         v-model="localConfig.enabled"
         :label="t('alerts.correlation.enableOrgLevel')"
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Cross-Alert Deduplication -->
-    <div class="tw-mb-6" v-if="localConfig.enabled">
+    <div class="tw:mb-6" v-if="localConfig.enabled">
       <q-checkbox
         v-model="localConfig.alert_dedup_enabled"
         :label="t('alerts.correlation.enableCrossAlert')"
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw-text-sm tw-text-gray-600 dark:tw-text-gray-400 tw-mb-2">
         {{ t('alerts.correlation.fingerprintGroupsHint') }}
       </div>
-      <div class="tw-flex tw-flex-col tw-gap-2">
+      <div class="tw:flex tw:flex-col tw:gap-2">
         <q-checkbox
           v-for="group in localSemanticGroups"
           :key="group.id"
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           v-if="!localConfig.alert_fingerprint_groups || localConfig.alert_fingerprint_groups.length === 0"
-          class="tw-text-red-500 tw-text-sm tw-mt-1"
+          class="tw:text-red-500 tw:text-sm tw:mt-1"
         >
           {{ t('alerts.correlation.fingerprintGroupsRequired') }}
         </div>
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         color="primary"
         @click="saveSettings"
         :loading="saving"
-        class="tw-px-4"
+        class="tw:px-4"
       />
     </div>
   </div>

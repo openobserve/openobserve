@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="full-width q-mx-lg q-pt-xs">
-    <div class="row items-center no-wrap card-container tw-mx-[0.625rem]  tw-mb-[0.625rem]">
-      <div class="flex items-center justify-between tw-w-full card-container tw-h-[68px] tw-px-2 tw-py-3">
+    <div class="row items-center no-wrap card-container tw:mx-[0.625rem]  tw:mb-[0.625rem]">
+      <div class="flex items-center justify-between tw:w-full card-container tw:h-[68px] tw:px-2 tw:py-3">
         <div class="flex items-center">
           <div
           data-test="add-alert-back-btn"
@@ -383,7 +383,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-form>
       </div>
     </div>
-    <div class="tw-mx-2">
+    <div class="tw:mx-2">
       <div
           class="flex q-px-md full-width tw-py-3 card-container tw-justify-end"
           style="position: sticky; bottom: 0px; z-index: 2"

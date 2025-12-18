@@ -18,9 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div style="height: 100%; width: 100%">
     <div class="row" style="height: 100%">
-      <div class="tw-pl-[0.625rem]" style="overflow-y: auto;">
+      <div class="tw:pl-[0.625rem]" style="overflow-y: auto;">
       <div
-        class="col scroll card-container tw-mr-[0.625rem]"
+        class="col scroll card-container tw:mr-[0.625rem]"
         style="
           overflow-y: auto;
           height: 100%;
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: 100%; height: 100%"
         >
           <template #before>
-            <div class="tw-w-full tw-h-full">
+            <div class="tw:w-full tw:h-full">
             <div class="col scroll card-container" style="height: 100%; overflow-y: auto">
               <div class="column" style="height: 100%">
                 <div class="col-auto q-pa-sm">
@@ -278,28 +278,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="dashboardPanelData.data.type == 'html'"
-        class="col column tw-mr-[0.625rem]"
+        class="col column tw:mr-[0.625rem]"
         style="height: 100%; flex: 1"
       >
-        <div class="card-container tw-h-full tw-flex tw-flex-col">
+        <div class="card-container tw:h-full tw:flex tw:flex-col">
           <CustomHTMLEditor
             v-model="dashboardPanelData.data.htmlContent"
             style="flex: 1; min-height: 0"
           />
-          <DashboardErrorsComponent :errors="errorData" class="tw-flex-shrink-0" />
+          <DashboardErrorsComponent :errors="errorData" class="tw:flex-shrink-0" />
         </div>
       </div>
       <div
         v-if="dashboardPanelData.data.type == 'markdown'"
-        class="col column tw-mr-[0.625rem]"
+        class="col column tw:mr-[0.625rem]"
         style="height: 100%; flex: 1"
       >
-        <div class="card-container tw-h-full tw-flex tw-flex-col">
+        <div class="card-container tw:h-full tw:flex tw:flex-col">
           <CustomMarkdownEditor
             v-model="dashboardPanelData.data.markdownContent"
             style="flex: 1; min-height: 0"
           />
-          <DashboardErrorsComponent :errors="errorData" class="tw-flex-shrink-0" />
+          <DashboardErrorsComponent :errors="errorData" class="tw:flex-shrink-0" />
         </div>
       </div>
 

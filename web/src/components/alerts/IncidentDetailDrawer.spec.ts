@@ -722,16 +722,16 @@ describe("IncidentDetailDrawer.vue", () => {
       const content = "## Header 2";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain("tw-font-bold");
-      expect(formatted).toContain("tw-text-sm");
-      expect(formatted).toContain("tw-text-blue-600");
+      expect(formatted).toContain("tw:font-bold");
+      expect(formatted).toContain("tw:text-sm");
+      expect(formatted).toContain("tw:text-blue-600");
     });
 
     it("should format h3 headers", () => {
       const content = "### Header 3";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain("tw-font-semibold");
+      expect(formatted).toContain("tw:font-semibold");
     });
 
     it("should format unordered lists", () => {
@@ -754,8 +754,8 @@ describe("IncidentDetailDrawer.vue", () => {
       const content = "## Root Cause\n\n**Issue**: High CPU\n\n- Check process\n- Review logs";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain('<strong class="tw-font-semibold tw-text-gray-900">Issue</strong>');
-      expect(formatted).toContain("tw-font-bold");
+      expect(formatted).toContain('<strong class="tw:font-semibold tw:text-gray-900">Issue</strong>');
+      expect(formatted).toContain("tw:font-bold");
       expect(formatted).toContain("•");
     });
   });

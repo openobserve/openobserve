@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-slot:header="props">
         <q-tr
           :props="props"
-          class="!tw-bg-[var(--o2-table-header-bg)]"
+          class="!tw:bg-[var(--o2-table-header-bg)]"
         >
           <q-th
             v-for="col in props.cols"
@@ -57,15 +57,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="col.classes || ''"
             :props="props"
             :style="col.style"
-            class="!tw-bg-[var(--o2-table-header-bg)]"
+            class="!tw:bg-[var(--o2-table-header-bg)]"
           >
             {{ col.label }}
           </q-th>
         </q-tr>
       </template>
        <template #top="scope" v-if="!hideTopPagination">
-        <div class="tw-flex tw-items-center tw-justify-between tw-w-full q-py-xs  "> 
-          <span class="tw-font-bold tw-text-[14px] tw-w-full q-pa-none">
+        <div class="tw:flex tw:items-center tw:justify-between tw:w-full q-py-xs  "> 
+          <span class="tw:font-bold tw:text-[14px] tw:w-full q-pa-none">
           {{ rows.length }} {{ title }}
         </span>
         <QTablePagination
@@ -115,8 +115,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-tr>
       </template>
       <template  #bottom="scope">
-        <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
-          <div v-if="showBottomPaginationWithTitle" class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
+        <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+          <div v-if="showBottomPaginationWithTitle" class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md">
             {{ resultTotal }} {{ title }}
           </div>
             <QTablePagination

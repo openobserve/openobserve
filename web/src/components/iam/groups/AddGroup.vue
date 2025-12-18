@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <q-card class="o2-side-dialog column full-height">
-    <q-card-section class="q-py-md tw-w-full">
+    <q-card-section class="q-py-md tw:w-full">
       <div class="row items-center no-wrap q-py-sm">
         <div class="col">
           <div data-test="add-group-section-title" style="font-size: 18px">
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-input
           v-model.trim="name"
           :label="t('common.name') + ' *'"
-          class="showLabelOnTop tw-mt-2"
+          class="showLabelOnTop tw:mt-2"
           stack-label
           hide-bottom-space
           borderless
@@ -58,10 +58,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-input>
 
-        <div class="flex justify-start tw-mt-6">
+        <div class="flex justify-start tw:mt-6">
           <q-btn
             v-close-popup
-            class="q-mr-md o2-secondary-button tw-h-[36px]"
+            class="q-mr-md o2-secondary-button tw:h-[36px]"
             :label="t('alerts.cancel')"
             no-caps
             flat
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-btn
             :disable="!name || !isValidGroupName"
-            class="o2-primary-button no-border tw-h-[36px]"
+            class="o2-primary-button no-border tw:h-[36px]"
             :label="t('alerts.save')"
             no-caps
             flat

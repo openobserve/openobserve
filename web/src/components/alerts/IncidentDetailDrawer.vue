@@ -269,18 +269,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Dimensions & Topology - side by side -->
         <div class="tw-flex tw-gap-3 tw-mb-4">
           <!-- Stable Dimensions -->
-          <div class="tw-flex-1 tw-min-w-0">
-            <div class="tw-text-xs tw-font-medium tw-mb-1">
+          <div class="tw:flex-1 tw:min-w-0">
+            <div class="tw:text-xs tw:font-medium tw:mb-1">
               {{ t("alerts.incidents.stableDimensions") }}
             </div>
-            <div class="info-box tw-rounded tw-p-2 tw-text-xs" :class="isDarkMode ? 'info-box-dark' : 'info-box-light'">
+            <div class="info-box tw:rounded tw:p-2 tw:text-xs" :class="isDarkMode ? 'info-box-dark' : 'info-box-light'">
               <div
                 v-for="(value, key) in incidentDetails.stable_dimensions"
                 :key="key"
-                class="tw-flex"
+                class="tw:flex"
               >
-                <span class="label-text tw-mr-1">{{ key }}:</span>
-                <span class="tw-font-mono tw-truncate">{{ value }}</span>
+                <span class="label-text tw:mr-1">{{ key }}:</span>
+                <span class="tw:font-mono tw:truncate">{{ value }}</span>
               </div>
               <div
                 v-if="Object.keys(incidentDetails.stable_dimensions).length === 0"
@@ -292,37 +292,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Topology Context -->
-          <div v-if="incidentDetails.topology_context" class="tw-flex-1 tw-min-w-0">
-            <div class="tw-text-xs tw-font-medium tw-mb-1">
+          <div v-if="incidentDetails.topology_context" class="tw:flex-1 tw:min-w-0">
+            <div class="tw:text-xs tw:font-medium tw:mb-1">
               {{ t("alerts.incidents.topology") }}
             </div>
-            <div class="info-box tw-rounded tw-p-2 tw-text-xs" :class="isDarkMode ? 'info-box-dark' : 'info-box-light'">
+            <div class="info-box tw:rounded tw:p-2 tw:text-xs" :class="isDarkMode ? 'info-box-dark' : 'info-box-light'">
               <div>
                 <span class="label-text">Service:</span>
-                <span class="tw-ml-1 tw-font-mono">{{ incidentDetails.topology_context.service }}</span>
+                <span class="tw:ml-1 tw:font-mono">{{ incidentDetails.topology_context.service }}</span>
               </div>
-              <div v-if="incidentDetails.topology_context.upstream_services.length" class="tw-mt-1">
+              <div v-if="incidentDetails.topology_context.upstream_services.length" class="tw:mt-1">
                 <span class="label-text">{{ t("alerts.incidents.upstreamServices") }}:</span>
-                <span class="tw-ml-1">
+                <span class="tw:ml-1">
                   <q-badge
                     v-for="svc in incidentDetails.topology_context.upstream_services"
                     :key="svc"
                     color="blue-grey-4"
                     :label="svc"
-                    class="tw-mr-1"
+                    class="tw:mr-1"
                     size="xs"
                   />
                 </span>
               </div>
-              <div v-if="incidentDetails.topology_context.downstream_services.length" class="tw-mt-1">
+              <div v-if="incidentDetails.topology_context.downstream_services.length" class="tw:mt-1">
                 <span class="label-text">{{ t("alerts.incidents.downstreamServices") }}:</span>
-                <span class="tw-ml-1">
+                <span class="tw:ml-1">
                   <q-badge
                     v-for="svc in incidentDetails.topology_context.downstream_services"
                     :key="svc"
                     color="blue-grey-4"
                     :label="svc"
-                    class="tw-mr-1"
+                    class="tw:mr-1"
                     size="xs"
                   />
                 </span>
@@ -389,11 +389,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="rcaLoading" class="rca-container tw-rounded tw-p-3 tw-flex-1 tw-overflow-auto tw-border" :class="isDarkMode ? 'tw-bg-gray-800 tw-border-gray-700' : 'tw-bg-blue-50 tw-border-blue-200'">
             <div class="tw-flex tw-items-center tw-gap-2 tw-mb-2">
               <q-spinner size="sm" color="primary" />
-              <span class="tw-text-sm">Analysis in progress...</span>
+              <span class="tw:text-sm">Analysis in progress...</span>
             </div>
             <div
               v-if="rcaStreamContent"
-              class="tw-text-sm tw-whitespace-pre-wrap rca-content"
+              class="tw:text-sm tw:whitespace-pre-wrap rca-content"
               v-html="formatRcaContent(rcaStreamContent)"
             />
           </div>
@@ -401,7 +401,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Existing analysis content -->
           <div v-else-if="hasExistingRca" class="rca-container tw-rounded tw-p-3 tw-flex-1 tw-overflow-auto tw-border" :class="isDarkMode ? 'tw-bg-gray-800 tw-border-gray-700' : 'tw-bg-blue-50 tw-border-blue-200'">
             <div
-              class="tw-text-sm tw-whitespace-pre-wrap rca-content"
+              class="tw:text-sm tw:whitespace-pre-wrap rca-content"
               v-html="formatRcaContent(incidentDetails.topology_context.suggested_root_cause)"
             />
           </div>

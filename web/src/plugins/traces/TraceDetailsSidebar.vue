@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex justify-start items-center q-px-sm tw-bg-[var(--o2-hover-accent)] tw-h-[2rem] tw-border tw-border-solid tw-border-t-[var(--o2-border-color)]"
+    class="flex justify-start items-center q-px-sm tw:bg-[var(--o2-hover-accent)] tw:h-[2rem] tw:border tw:border-solid tw:border-t-[var(--o2-border-color)]"
     data-test="trace-details-sidebar-header"
   >
     <div
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <q-btn
-        class="q-mx-xs view-span-logs-btn tw-border !tw-py-[0.3rem]"
+        class="q-mx-xs view-span-logs-btn tw:border !tw:py-[0.3rem]"
         size="10px"
         icon="search"
         dense
@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-separator style="width: 100%" />
   <q-tab-panels
     v-model="activeTab"
-    class="span_details_tab-panels tw-pb-[0.375rem]"
+    class="span_details_tab-panels tw:pb-[0.375rem]"
   >
     <q-tab-panel name="tags">
       <q-table
@@ -181,15 +181,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="tagColumns"
         :row-key="(row) => 'tr_' + row.name"
         :rows-per-page-options="[0]"
-        class="q-table o2-quasar-table o2-row-md o2-schema-table tw-w-full tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
+        class="q-table o2-quasar-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
         id="schemaFieldList"
         dense
       >
         <template v-slot:body-cell="props">
           <q-td
-            class="text-left !tw-text-[0.85rem]"
+            class="text-left !tw:text-[0.85rem]"
             :class="
-              props.col.name === 'field' ? 'tw-text-[var(--o2-json-key)]' : ''
+              props.col.name === 'field' ? 'tw:text-[var(--o2-json-key)]' : ''
             "
           >
             <span
@@ -213,14 +213,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="processColumns"
         :row-key="(row) => 'tr_' + row.name"
         :rows-per-page-options="[0]"
-        class="q-table o2-quasar-table o2-row-md o2-schema-table tw-w-full tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
+        class="q-table o2-quasar-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
         dense
       >
         <template v-slot:body-cell="props">
           <q-td
-            class="text-left !tw-text-[0.85rem]"
+            class="text-left !tw:text-[0.85rem]"
             :class="
-              props.col.name === 'field' ? 'tw-text-[var(--o2-json-key)]' : ''
+              props.col.name === 'field' ? 'tw:text-[var(--o2-json-key)]' : ''
             "
           >
             <span
@@ -252,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="eventColumns"
         row-key="name"
         :rows-per-page-options="[0]"
-        class="q-table o2-quasar-table o2-row-md o2-schema-table tw-w-full tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
+        class="q-table o2-quasar-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
         dense
         style="max-height: 400px"
       >
@@ -329,7 +329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="exceptionEventColumns"
         row-key="name"
         :rows-per-page-options="[0]"
-        class="q-table o2-quasar-table o2-row-md o2-schema-table tw-w-full tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
+        class="q-table o2-quasar-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
         dense
         style="max-height: 400px"
       >
@@ -429,11 +429,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="searchTableRef"
           style="max-height: 20rem"
           :items="spanLinks"
-          class="tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
+          class="tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
           data-test="trace-details-sidebar-links-table"
         >
           <template v-slot:before>
-            <thead class="thead-sticky text-left tw-bg-[var(--o2-hover-accent)] o2-quasar-table">
+            <thead class="thead-sticky text-left tw:bg-[var(--o2-hover-accent)] o2-quasar-table">
               <tr>
                 <th
                   v-for="(col, index) in linkColumns"
@@ -498,11 +498,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @close="activeTab = 'tags'"
       />
       <!-- Loading/Empty state when no data -->
-      <div v-else class="tw-flex tw-items-center tw-justify-center tw-h-full tw-py-20">
-        <div class="tw-text-center">
-          <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw-mb-4" />
-          <div v-else-if="correlationError" class="tw-text-base tw-text-red-500">{{ correlationError }}</div>
-          <div v-else class="tw-text-base tw-text-gray-500">{{ t('correlation.clickToLoadLogs') }}</div>
+      <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
+        <div class="tw:text-center">
+          <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw:mb-4" />
+          <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
+          <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadLogs') }}</div>
         </div>
       </div>
     </q-tab-panel>
@@ -527,11 +527,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @close="activeTab = 'tags'"
       />
       <!-- Loading/Empty state when no data -->
-      <div v-else class="tw-flex tw-items-center tw-justify-center tw-h-full tw-py-20">
-        <div class="tw-text-center">
-          <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw-mb-4" />
-          <div v-else-if="correlationError" class="tw-text-base tw-text-red-500">{{ correlationError }}</div>
-          <div v-else class="tw-text-base tw-text-gray-500">{{ t('correlation.clickToLoadMetrics') }}</div>
+      <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
+        <div class="tw:text-center">
+          <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw:mb-4" />
+          <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
+          <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadMetrics') }}</div>
         </div>
       </div>
     </q-tab-panel>
@@ -721,14 +721,14 @@ export default defineComponent({
         label: "Field",
         field: "field",
         align: "left" as const,
-        headerClasses: "!tw-text-left",
+        headerClasses: "!tw:text-left",
       },
       {
         name: "value",
         label: "Value",
         field: "value",
         align: "left" as const,
-        headerClasses: "!tw-text-left",
+        headerClasses: "!tw:text-left",
       },
     ];
 
@@ -745,14 +745,14 @@ export default defineComponent({
         label: "Field",
         field: "field",
         align: "left" as const,
-        headerClasses: "!tw-text-left",
+        headerClasses: "!tw:text-left",
       },
       {
         name: "value",
         label: "Value",
         field: "value",
         align: "left" as const,
-        headerClasses: "!tw-text-left",
+        headerClasses: "!tw:text-left",
       },
     ];
 

@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :breakpoint="500"
       role="navigation"
       aria-label="Main navigation"
-      class="card-container q-mt-xs tw-mb-[0.675rem]"
+      class="card-container q-mt-xs tw:mb-[0.675rem]"
     >
       <q-list class="leftNavList">
         <menu-link
@@ -1215,9 +1215,9 @@ export default defineComponent({
 }
 
 @media print {
-  .tw-h-full,
-  .tw-h-\[calc\(100vh-105px\)\],
-  .tw-overflow-y-auto {
+  .tw:h-full,
+  .tw:h-\[calc\(100vh-105px\)\],
+  .tw:overflow-y-auto {
     overflow: visible !important;
   }
 }

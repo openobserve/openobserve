@@ -36,10 +36,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Field Group Header -->
       <q-tr
         v-if="props.row.name === 'no-fields-found'"
-        class="tw-text-center tw-py-[0.725rem] tw-flex tw-items-center tw-justify-center"
+        class="tw:text-center tw:py-[0.725rem] tw:flex tw:items-center tw:justify-center"
       >
         <q-icon name="info" color="primary" size="xs" />
-        <span class="tw-pl-[0.375rem]">No matching fields found.</span>
+        <span class="tw:pl-[0.375rem]">No matching fields found.</span>
       </q-tr>
 
       <!-- Field Group Header -->
@@ -55,10 +55,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="cursor-pointer text-bold"
       >
         <q-td
-          class="field_list field-group-header !tw-flex tw-justify-between tw-items-center tw-rounded-[0.25rem]"
+          class="field_list field-group-header !tw:flex tw:justify-between tw:items-center tw:rounded-[0.25rem]"
           :class="[theme === 'dark' ? 'text-grey-5' : 'bg-grey-3']"
         >
-          <div class="tw-w-[calc(100%-1.25rem)] ellipsis">
+          <div class="tw:w-[calc(100%-1.25rem)] ellipsis">
             {{ props.row.name }} ({{
               showOnlyInterestingFields
                 ? interestingExpandedGroupRowsFieldCount[props.row.group]
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           clearable
           debounce="1"
           :placeholder="t('search.searchField')"
-          class="indexlist-search-input tw-mb-[0.25rem]"
+          class="indexlist-search-input tw:mb-[0.25rem]"
         >
           <template #prepend>
             <q-icon name="search" size="1.25rem" class="o2-search-input-icon" />

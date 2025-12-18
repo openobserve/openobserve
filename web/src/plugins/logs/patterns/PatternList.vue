@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw-flex-1 tw-overflow-hidden">
+  <div class="tw:flex-1 tw:overflow-hidden">
     <!-- Patterns Table -->
-    <div v-if="patterns?.length > 0" class="tw-flex tw-flex-col tw-h-full">
+    <div v-if="patterns?.length > 0" class="tw:flex tw:flex-col tw:h-full">
       <!-- Table Header -->
       <div
         class="tw-flex tw-items-center tw-border-b tw-border-[var(--o2-border-color)] tw-sticky tw-top-0 tw-z-10"
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :items="patterns"
         virtual-scroll-slice-size="5"
         v-slot="{ item: pattern, index }"
-        class="tw-flex-1"
+        class="tw:flex-1"
       >
         <PatternCard
           :pattern="pattern"
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Loading State -->
     <div
       v-else-if="loading"
-      class="tw-flex-1 tw-flex tw-flex-col tw-items-center tw-justify-center"
+      class="tw:flex-1 tw:flex tw:flex-col tw:items-center tw:justify-center"
     >
       <q-spinner-hourglass color="primary" size="3.125rem" />
       <div
@@ -92,9 +92,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Empty State -->
     <div
       v-else
-      class="tw-flex-1 tw-flex tw-flex-col tw-items-center tw-justify-center tw-p-[1.25rem] tw-text-center"
+      class="tw:flex-1 tw:flex tw:flex-col tw:items-center tw:justify-center tw:p-[1.25rem] tw:text-center"
     >
-      <div class="tw-text-[3rem] tw-mb-[1rem] tw-opacity-30">📊</div>
+      <div class="tw:text-[3rem] tw:mb-[1rem] tw:opacity-30">📊</div>
       <div
         class="text-h6 q-mb-sm"
         :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         No patterns found
       </div>
       <div
-        class="text-body2 tw-max-w-[31.25rem]"
+        class="text-body2 tw:max-w-[31.25rem]"
         :class="store.state.theme === 'dark' ? 'text-grey-6' : 'text-grey-8'"
       >
         <div v-if="totalLogsAnalyzed">

@@ -59,8 +59,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-        <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
-          <div class="card-container tw-h-[calc(100vh-127px)]">
+        <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
+          <div class="card-container tw:h-[calc(100vh-127px)]">
             <q-table
               ref="qTable"
               :rows="visibleRows"
@@ -234,8 +234,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #bottom="scope">
-                <div class="tw-flex tw-items-center tw-justify-end tw-w-full tw-h-[48px]">
-                  <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
+                <div class="tw:flex tw:items-center tw:justify-end tw:w-full tw:h-[48px]">
+                  <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md">
                     {{ resultTotal }} {{ t('function.enrichmentTables') }}
                   </div>
                 <QTablePagination

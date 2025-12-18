@@ -404,7 +404,7 @@ describe("AppGroups Component", () => {
 
   describe("Theme Support", () => {
     it("applies correct theme classes", () => {
-      const header = wrapper.find('.tw-flex.tw-justify-between.tw-items-center.tw-px-4.tw-py-3');
+      const header = wrapper.find('.tw:flex.tw:justify-between.tw:items-center.tw:px-4.tw:py-3');
       const table = wrapper.find('[data-test="iam-groups-table-section"]');
       
       expect(header.exists()).toBe(true);
@@ -430,7 +430,7 @@ describe("AppGroups Component", () => {
 
       await flushPromises();
       
-      const header = wrapper.find('.tw-flex.tw-justify-between.tw-items-center.tw-px-4.tw-py-3');
+      const header = wrapper.find('.tw:flex.tw:justify-between.tw:items-center.tw:px-4.tw:py-3');
       const table = wrapper.find('[data-test="iam-groups-table-section"]');
 
       expect(header.exists()).toBe(true);

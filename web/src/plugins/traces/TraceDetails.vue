@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 data-test="trace-details-view-logs-btn"
                 v-close-popup="true"
-                class="text-bold traces-view-logs-btn tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
+                class="text-bold traces-view-logs-btn tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
                 :label="
                   searchObj.meta.redirectedFromLogs
                     ? t('traces.backToLogs')
@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="flex items-center">
             <div
-              class="flex justify-center items-center tw-pl-2 trace-search-container"
+              class="flex justify-center items-center tw:pl-2 trace-search-container"
             >
               <q-input
                 data-test="trace-details-search-input"
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <p
                 data-test="trace-details-search-results"
-                class="tw-mr-1"
+                class="tw:mr-1"
                 v-if="searchResults"
               >
                 <small
@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="trace-details-search-prev-btn"
                 v-if="searchResults"
                 :disable="currentIndex === 0"
-                class="tw-mr-1 download-logs-btn flex"
+                class="tw:mr-1 download-logs-btn flex"
                 flat
                 round
                 title="Previous"
@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="trace-details-search-next-btn"
                 v-if="searchResults"
                 :disable="currentIndex + 1 === searchResults"
-                class="tw-mr-1 download-logs-btn flex"
+                class="tw:mr-1 download-logs-btn flex"
                 flat
                 round
                 title="Next"
@@ -212,12 +212,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <share-button
               data-test="trace-details-share-link-btn"
               :url="traceDetailsShareURL"
-              button-class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border !tw-h-[2.25rem] hover:tw-bg-[var(--o2-hover-accent)]"
+              button-class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border !tw:h-[2.25rem] hover:tw:bg-[var(--o2-hover-accent)]"
               button-size="xs"
             />
             <q-btn
               data-test="trace-details-close-btn"
-              class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border !tw-h-[2.25rem] hover:tw-bg-[var(--o2-hover-accent)]"
+              class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border !tw:h-[2.25rem] hover:tw:bg-[var(--o2-hover-accent)]"
               icon="cancel"
               size="xs"
               @click="routeToTracesList"
@@ -268,7 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 no-caps
                 size="11px"
-                class="q-px-sm visual-selection-btn tw-rounded-[0.25rem]"
+                class="q-px-sm visual-selection-btn tw:rounded-[0.25rem]"
                 @click="activeVisual = visual.value"
               >
                 <q-icon><component :is="visual.icon" /></q-icon>

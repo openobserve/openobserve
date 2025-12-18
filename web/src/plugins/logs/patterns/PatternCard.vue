@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <span
         v-if="pattern.is_anomaly"
-        class="text-negative text-weight-bold tw-text-[0.625rem]"
+        class="text-negative text-weight-bold tw:text-[0.625rem]"
         :data-test="`pattern-card-${index}-anomaly-badge`"
         >⚠️ {{ t("search.anomalyLabel") }}</span
       >
