@@ -199,6 +199,13 @@ export default defineComponent({
     const managerVariables = computed(() => {
       if (!useManager) return [];
 
+      // If showAllVisible is true, return all visible variables for this context
+      // This includes global + tab + panel variables
+      if (props.showAllVisible) {
+        return manager.getAllVisibleVariables(props.tabId, props.panelId) || [];
+      }
+
+      // Otherwise, return only variables from the specified scope
       const scopeKey = props.scope;
       let variables: any[] = [];
 
