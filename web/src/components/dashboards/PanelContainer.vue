@@ -470,6 +470,7 @@ export default defineComponent({
     "update:initial-variable-values",
     "onEditLayout",
     "update:runId",
+    "contextmenu",
   ],
   props: [
     "data",
