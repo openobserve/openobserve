@@ -178,25 +178,30 @@ export default defineComponent({
     const managerVariables = computed(() => {
       if (!useManager) return [];
 
+      let variables: any[] = [];
+
       // If showAllVisible is true, return all visible variables for this context
       // This includes global + tab + panel variables
       if (props.showAllVisible) {
-        return manager.getAllVisibleVariables(props.tabId, props.panelId) || [];
+        variables = manager.getAllVisibleVariables(props.tabId, props.panelId) || [];
+      } else {
+        // Otherwise, return only variables from the specified scope
+        const scopeKey = props.scope;
+
+        if (scopeKey === "global") {
+          variables = manager.variablesData.global || [];
+        } else if (scopeKey === "tabs" && props.tabId) {
+          variables = manager.variablesData.tabs[props.tabId] || [];
+        } else if (scopeKey === "panels" && props.panelId) {
+          variables = manager.variablesData.panels[props.panelId] || [];
+        }
       }
 
-      // Otherwise, return only variables from the specified scope
-      const scopeKey = props.scope;
-      let variables: any[] = [];
+      // Sort: dynamic filters should always appear at the end
+      const dynamicFilters = variables.filter(v => v.type === 'dynamic_filters');
+      const otherVariables = variables.filter(v => v.type !== 'dynamic_filters');
 
-      if (scopeKey === "global") {
-        variables = manager.variablesData.global || [];
-      } else if (scopeKey === "tabs" && props.tabId) {
-        variables = manager.variablesData.tabs[props.tabId] || [];
-      } else if (scopeKey === "panels" && props.panelId) {
-        variables = manager.variablesData.panels[props.panelId] || [];
-      }
-
-      return variables;
+      return [...otherVariables, ...dynamicFilters];
     });
 
     // variables data derived from the variables config list
