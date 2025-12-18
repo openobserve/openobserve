@@ -15,89 +15,86 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
+  <q-card
     class="show-legends-popup"
     data-test="dashboard-show-legends-popup"
-    style="padding: 5px 10px; min-width: min(600px, 90vw); background-color: white"
+    style="min-width: 700px"
   >
-    <!-- Header -->
-    <div
-      class="flex justify-between items-center q-px-md q-py-sm header tw-top-0 tw-sticky"
-      style="border-bottom: 2px solid gray; margin-bottom: 5px"
-    >
-      <div class="flex items-center q-table__title q-mr-md">
-        <span>{{ t("dashboard.legendsOfCharts") }}</span>
-      </div>
-      <div class="flex items-center">
-        <span class="legend-count q-mr-md" style="font-size: 14px; color: gray">
-          {{ t("dashboard.totalLegends", { count: legends.length }) }}
-        </span>
-        <q-btn
-          :icon="isAllCopied ? 'check' : 'content_copy'"
-          :label="isAllCopied ? 'Copied' : 'Copy all'"
-          class="q-px-sm q-mr-sm tw-border tw-border-solid tw-border-[var(--o2-border-color)] tw-font-normal"
-          no-caps
-          dense
-          size="sm"
-          @click.stop="copyAllLegends"
-          data-test="dashboard-show-legends-copy-all"
-        />
-        <q-btn
-          icon="close"
-          class="q-ml-xs"
-          unelevated
-          size="sm"
-          round
-          flat
-          :title="t('common.close')"
-          @click.stop="closePopup"
-          data-test="dashboard-show-legends-close"
-        ></q-btn>
-      </div>
-    </div>
-
-    <!-- Legends List -->
-    <div class="legends-content scroll">
+    <q-card-section>
+      <!-- Header -->
       <div
-        v-if="legends.length === 0"
-        class="no-legends q-pa-md text-center"
-        style="color: gray"
+        class="flex justify-between items-center q-px-md q-py-sm header tw-top-0 tw-sticky"
+        style="margin-bottom: 5px"
       >
-        {{ t("dashboard.noLegendsAvailable") }}
-      </div>
-      <div
-        v-else
-        class="legends-list"
-      >
-        <div
-          v-for="(legend, index) in legends"
-          :key="index"
-          class="legend-item q-px-sm q-py-xs"
-          :data-test="`dashboard-legend-item-${index}`"
-        >
-          <div class="flex items-center no-wrap">
-            <div
-              class="legend-color-box"
-              :style="{ backgroundColor: legend.color || '#5960b2' }"
-            ></div>
-            <div class="legend-text">
-              {{ legend.name }}
-            </div>
-            <q-btn
-              :icon="isLegendCopied(index) ? 'check' : 'content_copy'"
-              dense
-              size="xs"
-              no-caps
-              class="copy-btn q-ml-sm tw-font-normal"
-              @click.stop="copyLegend(legend.name, index)"
-            >
-              <q-tooltip>{{ isLegendCopied(index) ? 'Copied!' : 'Copy legend' }}</q-tooltip>
-            </q-btn>
-          </div>
+        <div class="flex items-center q-table__title q-mr-md">
+          <span>{{ t("dashboard.legendsOfCharts") }}</span>
+        </div>
+        <div class="flex items-center">
+          <span class="legend-count q-mr-md" style="font-size: 14px">
+            {{ t("dashboard.totalLegends", { count: legends.length }) }}
+          </span>
+          <q-btn
+            :icon="isAllCopied ? 'check' : 'content_copy'"
+            :label="isAllCopied ? 'Copied' : 'Copy all'"
+            class="q-px-sm q-mr-sm tw-border tw-border-solid tw-border-[var(--o2-border-color)] tw-font-normal"
+            no-caps
+            dense
+            size="sm"
+            @click.stop="copyAllLegends"
+            data-test="dashboard-show-legends-copy-all"
+          />
+          <q-btn
+            icon="close"
+            class="q-ml-xs"
+            unelevated
+            size="sm"
+            round
+            flat
+            :title="t('common.close')"
+            @click.stop="closePopup"
+            data-test="dashboard-show-legends-close"
+          ></q-btn>
         </div>
       </div>
-    </div>
-  </div>
+
+      <!-- Legends List -->
+      <q-card-section class="legends-content scroll">
+        <div v-if="legends.length === 0" class="no-legends q-pa-md text-center">
+          {{ t("dashboard.noLegendsAvailable") }}
+        </div>
+        <div v-else class="legends-list">
+          <div
+            v-for="(legend, index) in legends"
+            :key="index"
+            class="legend-item q-px-sm q-py-xs"
+            :data-test="`dashboard-legend-item-${index}`"
+          >
+            <div class="flex items-center no-wrap">
+              <div
+                class="legend-color-box"
+                :style="{ backgroundColor: legend.color || '#5960b2' }"
+              ></div>
+              <div class="legend-text">
+                {{ legend.name }}
+              </div>
+              <q-btn
+                :icon="isLegendCopied(index) ? 'check' : 'content_copy'"
+                dense
+                size="xs"
+                no-caps
+                class="copy-btn q-ml-sm tw-font-normal"
+                @click.stop="copyLegend(legend.name, index)"
+              >
+                <q-tooltip>{{
+                  isLegendCopied(index) ? "Copied!" : "Copy legend"
+                }}</q-tooltip>
+              </q-btn>
+            </div>
+          </div>
+        </div>
+      </q-card-section>
+    </q-card-section>
+  </q-card>
 </template>
 
 <script lang="ts">
@@ -142,7 +139,7 @@ export default defineComponent({
       // Calculate chart min/max for color scaling
       let chartMin = Infinity;
       let chartMax = -Infinity;
-      
+
       // Helper to update min/max
       const updateMinMax = (val: any) => {
         if (val !== null && val !== undefined && !isNaN(Number(val))) {
@@ -158,8 +155,8 @@ export default defineComponent({
           s.data.forEach((d: any) => {
             if (Array.isArray(d)) {
               // Usually [time, value] or [value, name]
-              d.forEach(v => updateMinMax(v));
-            } else if (typeof d === 'object' && d !== null) {
+              d.forEach((v) => updateMinMax(v));
+            } else if (typeof d === "object" && d !== null) {
               updateMinMax(d.value);
             } else {
               updateMinMax(d);
@@ -178,16 +175,20 @@ export default defineComponent({
       const resolveColor = (item: any, index: number, value: any = null) => {
         // 1. Try explicit color from itemStyle or lineStyle
         const explicitColor = item.itemStyle?.color || item.lineStyle?.color;
-        if (explicitColor && typeof explicitColor === 'string') {
+        if (explicitColor && typeof explicitColor === "string") {
           return explicitColor;
         }
 
         // 2. If panelSchema is available, use getSeriesColor logic
         if (props.panelData && props.panelData.config) {
           const colorConfig = props.panelData.config.color;
-          
+
           // If mode is palette-classic (or not set), use the palette loop
-          if (!colorConfig || !colorConfig.mode || colorConfig.mode === 'palette-classic') {
+          if (
+            !colorConfig ||
+            !colorConfig.mode ||
+            colorConfig.mode === "palette-classic"
+          ) {
             return colorPalette[index % colorPalette.length];
           }
 
@@ -200,7 +201,7 @@ export default defineComponent({
             chartMin,
             chartMax,
             theme,
-            colorConfig.colorBySeries
+            colorConfig.colorBySeries,
           );
 
           if (calculatedColor) return calculatedColor;
@@ -211,10 +212,17 @@ export default defineComponent({
       };
 
       // For pie/donut charts, extract from series[0].data
-      if (series.length > 0 && series[0].data && Array.isArray(series[0].data)) {
+      if (
+        series.length > 0 &&
+        series[0].data &&
+        Array.isArray(series[0].data)
+      ) {
         const firstSeriesData = series[0].data;
         // Check if it's pie/donut format (data has name property)
-        if (firstSeriesData.length > 0 && firstSeriesData[0].name !== undefined) {
+        if (
+          firstSeriesData.length > 0 &&
+          firstSeriesData[0].name !== undefined
+        ) {
           return firstSeriesData
             .filter((item: any) => item && item.name)
             .map((item: any, index: number) => ({
@@ -305,6 +313,7 @@ export default defineComponent({
 .show-legends-popup {
   .header {
     background-color: var(--q-background);
+    border-bottom: 2px solid var(--o2-border-color);
     z-index: 10;
   }
 
@@ -312,19 +321,6 @@ export default defineComponent({
     max-height: 400px;
     overflow-y: auto;
     padding: 3px 0;
-
-    &::-webkit-scrollbar {
-      width: 6px;
-      background: transparent;
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: #d1d5db;
-      border-radius: 4px;
-    }
-
-    scrollbar-width: thin;
-    scrollbar-color: #d1d5db transparent;
   }
 
   .legends-list {
@@ -334,8 +330,6 @@ export default defineComponent({
   }
 
   .legend-item {
-    border-bottom: 1px solid rgba(204, 204, 204, 0.3);
-    
     &:last-child {
       border-bottom: none;
     }
