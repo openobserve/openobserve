@@ -109,7 +109,7 @@
           <div class="col" style="height: 100%">
             <div class="layout-panel-container col" style="height: 100%">
               <VariablesValueSelector
-                :variablesConfig="filteredVariablesConfig"
+                :variablesConfig="currentDashboardData.data?.variables"
                 :showDynamicFilters="
                   currentDashboardData.data?.variables?.showDynamicFilters
                 "
@@ -262,7 +262,6 @@ import { isEqual } from "lodash-es";
 import { processQueryMetadataErrors } from "@/utils/zincutils";
 import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
 import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
-import { getScopeType } from "@/utils/dashboard/variables/variablesScopeUtils";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 
 export default defineComponent({
@@ -371,10 +370,7 @@ export default defineComponent({
     const refreshInterval = ref(0);
 
     // histogram interval
-    const histogramInterval: any = ref({
-      value: null,
-      label: "Auto",
-    });
+    const histogramInterval: any = ref(null);
 
     // array of histogram fields
     let histogramFields: any = ref([]);
@@ -424,7 +420,7 @@ export default defineComponent({
                 histogramExpr.args.type === "expr_list"
               ) {
                 // if selected histogramInterval is null then remove interval argument
-                if (!histogramInterval.value.value) {
+                if (!histogramInterval.value) {
                   histogramExpr.args.value = histogramExpr.args.value.slice(
                     0,
                     1,
@@ -440,13 +436,13 @@ export default defineComponent({
                     // Update existing interval value
                     histogramExpr.args.value[1] = {
                       type: "single_quote_string",
-                      value: `${histogramInterval.value.value}`,
+                      value: `${histogramInterval.value}`,
                     };
                   } else {
                     // create new arg for interval
                     histogramExpr.args.value.push({
                       type: "single_quote_string",
-                      value: `${histogramInterval.value.value}`,
+                      value: `${histogramInterval.value}`,
                     });
                   }
                 }
@@ -515,7 +511,7 @@ export default defineComponent({
           : dashboardPanelData.data.queries
               .map((q: any) =>
                 [...q.fields.x, ...q.fields.y, ...q.fields.z].find(
-                  (f: any) => f.aggregationFunction == "histogram",
+                  (f: any) => f.functionName == "histogram",
                 ),
               )
               .filter((field: any) => field != undefined);
@@ -528,10 +524,7 @@ export default defineComponent({
             histogramFields.value[i]?.args &&
             histogramFields.value[i]?.args[0]?.value
           ) {
-            histogramInterval.value = {
-              value: histogramFields.value[i]?.args[0]?.value,
-              label: histogramFields.value[i]?.args[0]?.value,
-            };
+            histogramInterval.value = histogramFields.value[i]?.args[0]?.value;
             break;
           }
         }
@@ -601,51 +594,6 @@ export default defineComponent({
         variablesData.values = [];
       }
     };
-
-    // Computed property to filter variables based on current panel and tab context
-    const filteredVariablesConfig = computed(() => {
-      // Get current panel ID and tab ID from route query parameters
-      const currentPanelId = (route.query.panelId as string) || props.panelId;
-      const currentTabId = route.query.tab as string;
-
-      // Return early if no variables are configured
-      if (
-        !currentDashboardData.data?.variables ||
-        !currentDashboardData.data.variables.list
-      ) {
-        return currentDashboardData.data?.variables || { list: [] };
-      }
-
-      // Filter variables based on scope
-      const filteredList = currentDashboardData.data.variables.list.filter(
-        (variable: any) => {
-          const scopeType = getScopeType(variable);
-
-          // Always include global variables
-          if (scopeType === "global") {
-            return true;
-          }
-
-          // Include tab-level variables if they belong to the current tab
-          if (scopeType === "tabs" && currentTabId) {
-            return variable.tabs.includes(currentTabId);
-          }
-
-          // Include panel-level variables if they belong to the current panel
-          if (scopeType === "panels" && currentPanelId) {
-            return variable.panels.includes(currentPanelId);
-          }
-
-          return false;
-        },
-      );
-
-      // Return the filtered variables config
-      return {
-        ...currentDashboardData.data.variables,
-        list: filteredList,
-      };
-    });
 
     watch(selectedDate, () => {
       updateDateTime(selectedDate.value);
@@ -811,7 +759,6 @@ export default defineComponent({
       errorMessage,
       outlinedWarning,
       symOutlinedDataInfoAlert,
-      filteredVariablesConfig,
     };
   },
 });
