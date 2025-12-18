@@ -408,21 +408,15 @@ describe("useVariablesManager", () => {
       ];
 
       manager.initialize(config, {});
+      // Commit to make values available for getUrlParams
+      manager.commitAll();
 
-      const mockRouter = {
-        replace: vi.fn(),
-      };
-      const mockRoute = {
-        query: {},
-      };
+      // Use new getUrlParams API
+      const urlParams = manager.getUrlParams({ useLive: false });
 
-      manager.syncToUrl(mockRouter, mockRoute);
-
-      expect(mockRouter.replace).toHaveBeenCalledWith(
+      expect(urlParams).toEqual(
         expect.objectContaining({
-          query: expect.objectContaining({
-            "var-country": "USA",
-          }),
+          "var-country": "USA",
         })
       );
     });
@@ -441,21 +435,15 @@ describe("useVariablesManager", () => {
 
       manager.initialize(config, {});
       manager.variablesData.tabs["tab-1"][0].value = "CA";
+      // Commit to make values available for getUrlParams
+      manager.commitAll();
 
-      const mockRouter = {
-        replace: vi.fn(),
-      };
-      const mockRoute = {
-        query: {},
-      };
+      // Use new getUrlParams API
+      const urlParams = manager.getUrlParams({ useLive: false });
 
-      manager.syncToUrl(mockRouter, mockRoute);
-
-      expect(mockRouter.replace).toHaveBeenCalledWith(
+      expect(urlParams).toEqual(
         expect.objectContaining({
-          query: expect.objectContaining({
-            "var-region.t.tab-1": "CA",
-          }),
+          "var-region.t.tab-1": "CA",
         })
       );
     });
@@ -474,21 +462,15 @@ describe("useVariablesManager", () => {
 
       manager.initialize(config, {});
       manager.variablesData.panels["panel-123"][0].value = "200";
+      // Commit to make values available for getUrlParams
+      manager.commitAll();
 
-      const mockRouter = {
-        replace: vi.fn(),
-      };
-      const mockRoute = {
-        query: {},
-      };
+      // Use new getUrlParams API
+      const urlParams = manager.getUrlParams({ useLive: false });
 
-      manager.syncToUrl(mockRouter, mockRoute);
-
-      expect(mockRouter.replace).toHaveBeenCalledWith(
+      expect(urlParams).toEqual(
         expect.objectContaining({
-          query: expect.objectContaining({
-            "var-status.p.panel-123": "200",
-          }),
+          "var-status.p.panel-123": "200",
         })
       );
     });

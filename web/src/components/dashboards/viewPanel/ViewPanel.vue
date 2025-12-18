@@ -263,6 +263,7 @@ import { processQueryMetadataErrors } from "@/utils/zincutils";
 import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
 import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
 import { getScopeType } from "@/utils/dashboard/variables/variablesScopeUtils";
+import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 
 export default defineComponent({
   name: "ViewPanel",
@@ -308,6 +309,15 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
+
+    // Initialize or inject variables manager
+    const injectedManager = inject("variablesManager", null);
+    const variablesManager = injectedManager || useVariablesManager();
+
+    // Provide to child components
+    if (!injectedManager) {
+      provide("variablesManager", variablesManager);
+    }
 
     const currentVariablesDataRef: any = reactive({});
 

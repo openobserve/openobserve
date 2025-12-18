@@ -780,7 +780,7 @@ import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRende
 import RelativeTime from "@/components/common/RelativeTime.vue";
 import { useLoading } from "@/composables/useLoading";
 import { debounce, isEqual } from "lodash-es";
-import { provide } from "vue";
+import { provide, inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
@@ -799,6 +799,7 @@ import {
 import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
 import { processQueryMetadataErrors } from "@/utils/zincutils";
 import { getScopeType } from "@/utils/dashboard/variables/variablesScopeUtils";
+import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("../../../components/dashboards/addPanel/ConfigPanel.vue");
@@ -854,6 +855,15 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
+
+    // Initialize or inject variables manager
+    const injectedManager = inject("variablesManager", null);
+    const variablesManager = injectedManager || useVariablesManager();
+
+    // Provide to child components
+    if (!injectedManager) {
+      provide("variablesManager", variablesManager);
+    }
     const {
       showErrorNotification,
       showPositiveNotification,
@@ -984,28 +994,33 @@ export default defineComponent({
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
 
-      // change route query params based on current variables values
-      // Only update URL for variables at the current level (_isCurrentLevel === true or undefined)
-      const variableObj: any = {};
+      // Use variablesManager if available for URL sync
+      let variableObj: any = {};
 
-      data.values.forEach((variable: any) => {
-        if (variable.type === "dynamic_filters") {
-          const filters = (variable.value || []).filter(
-            (item: any) => item.name && item.operator && item.value,
-          );
-          const encodedFilters = filters.map((item: any) => ({
-            name: item.name,
-            operator: item.operator,
-            value: item.value,
-          }));
-          variableObj[`var-${variable.name}`] = encodeURIComponent(
-            JSON.stringify(encodedFilters),
-          );
-        } else {
-          // Simple: just set var-name=value
-          variableObj[`var-${variable.name}`] = variable.value;
-        }
-      });
+      if (variablesManager && variablesManager.variablesData.isInitialized) {
+        // Manager mode: Use getUrlParams with useLive=true to sync live variable state
+        variableObj = variablesManager.getUrlParams({ useLive: true });
+      } else {
+        // Legacy mode: build URL params manually
+        data.values.forEach((variable: any) => {
+          if (variable.type === "dynamic_filters") {
+            const filters = (variable.value || []).filter(
+              (item: any) => item.name && item.operator && item.value,
+            );
+            const encodedFilters = filters.map((item: any) => ({
+              name: item.name,
+              operator: item.operator,
+              value: item.value,
+            }));
+            variableObj[`var-${variable.name}`] = encodeURIComponent(
+              JSON.stringify(encodedFilters),
+            );
+          } else {
+            // Simple: just set var-name=value
+            variableObj[`var-${variable.name}`] = variable.value;
+          }
+        });
+      }
 
       router.replace({
         query: {

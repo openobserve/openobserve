@@ -1014,61 +1014,12 @@ export default defineComponent({
       }
     });
 
-    // Helper to get current variable params from manager
+    // Get current variable params from manager (uses new centralized getUrlParams method)
     const getVariableParamsFromManager = (): Record<string, any> => {
-      const variableParams: Record<string, any> = {};
+      if (!variablesManager) return {};
 
-      if (!variablesManager) return variableParams;
-
-      const committedVars = variablesManager.committedVariablesData;
-
-      // Helper to check if value is valid for URL
-      const hasValidValue = (value: any): boolean => {
-        if (value === null || value === undefined) return false;
-        if (value === "null") return false;
-        if (Array.isArray(value) && value.length === 0) return false;
-        if (Array.isArray(value) && value.every((v) => v === null || v === undefined || v === "")) return false;
-        return true;
-      };
-
-      // Global variables
-      committedVars.global.forEach((variable: any) => {
-        if (hasValidValue(variable.value)) {
-          let value = variable.value;
-          if (variable.type === "dynamic_filters") {
-            value = encodeURIComponent(JSON.stringify(value));
-          }
-          variableParams[`var-${variable.name}`] = value;
-        }
-      });
-
-      // Tab variables
-      Object.entries(committedVars.tabs).forEach(([tabId, variables]: [string, any]) => {
-        variables.forEach((variable: any) => {
-          if (hasValidValue(variable.value)) {
-            let value = variable.value;
-            if (variable.type === "dynamic_filters") {
-              value = encodeURIComponent(JSON.stringify(value));
-            }
-            variableParams[`var-${variable.name}.t.${tabId}`] = value;
-          }
-        });
-      });
-
-      // Panel variables
-      Object.entries(committedVars.panels).forEach(([panelId, variables]: [string, any]) => {
-        variables.forEach((variable: any) => {
-          if (hasValidValue(variable.value)) {
-            let value = variable.value;
-            if (variable.type === "dynamic_filters") {
-              value = encodeURIComponent(JSON.stringify(value));
-            }
-            variableParams[`var-${variable.name}.p.${panelId}`] = value;
-          }
-        });
-      });
-
-      return variableParams;
+      // Use the centralized getUrlParams method with committed state (useLive: false)
+      return variablesManager.getUrlParams({ useLive: false });
     };
 
     // whenever the refreshInterval is changed, update the query params
