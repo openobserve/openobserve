@@ -505,7 +505,7 @@ export class LogsPage {
                     }
 
                     // Try by text
-                    const streamByText = this.page.getByText(stream, { exact: true }).first();
+                    const streamByText = this.page.locator("div.q-item").getByText(stream, { exact: true }).first();
                     const textVisible = await streamByText.isVisible({ timeout: 500 }).catch(() => false);
 
                     if (textVisible) {

@@ -77,6 +77,20 @@ export default class DashboardCreate {
     // Wait for and click the submit button
     await this.submitBtn.waitFor({ state: "visible", timeout: 30000 });
     await this.submitBtn.click();
+
+    // Wait for the success notification to confirm dashboard was created
+    await this.page.getByText('Dashboard added successfully.').waitFor({ state: 'visible', timeout: 15000 });
+
+    // Wait for navigation to the new dashboard view page
+    await this.page.waitForURL(/\/dashboards\/view/, { timeout: 30000 });
+
+    // Wait for the page to be fully loaded
+    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {
+      // Ignore timeout - continue anyway
+    });
+
+    // Additional wait for Vue components to mount
+    await this.page.waitForTimeout(2000);
   }
 
   //back to dashboard list

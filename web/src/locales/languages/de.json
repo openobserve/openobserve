@@ -1068,7 +1068,15 @@
     "mapvalue": "Wert",
     "customChartTypeSelector": "Benutzerdefinierter Diagrammtyp-Selektor",
     "customChartTypeSelectorHint": "Wählen Sie einen Diagrammtyp aus der eCharts-Bibliothek aus, um mit einer grundlegenden Codestruktur zu beginnen",
-    "selectChartType": "Wählen Sie den Diagrammtyp"
+    "selectChartType": "Wählen Sie den Diagrammtyp",
+    "joins": "Tritt bei",
+    "addJoin": "Join hinzufügen",
+    "removeJoin": "Join entfernen",
+    "leftJoin": "Linker Join",
+    "innerJoin": "Innere Verbindung",
+    "rightJoin": "Richtiger Beitritt",
+    "addClause": "Klausel hinzufügen",
+    "removeClause": "Klausel entfernen"
   },
   "home": {
     "streams": "Streams",

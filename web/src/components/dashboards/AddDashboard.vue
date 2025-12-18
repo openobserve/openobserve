@@ -236,7 +236,7 @@ export default defineComponent({
             name: "",
             description: "",
           };
-          await addDashboardForm.value.resetValidation();
+          await addDashboardForm.value?.resetValidation();
 
           showPositiveNotification("Dashboard added successfully.");
         } catch (err: any) {

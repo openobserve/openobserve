@@ -1068,7 +1068,15 @@
     "mapvalue": "Valor",
     "customChartTypeSelector": "Seletor de tipo de gráfico personalizado",
     "customChartTypeSelectorHint": "Selecione um tipo de gráfico na biblioteca eCharts para começar com uma estrutura de código básica",
-    "selectChartType": "Selecione o tipo de gráfico"
+    "selectChartType": "Selecione o tipo de gráfico",
+    "joins": "Junta-se",
+    "addJoin": "Adicionar junção",
+    "removeJoin": "Remover junção",
+    "leftJoin": "Junção à esquerda",
+    "innerJoin": "Junção interna",
+    "rightJoin": "Junção correta",
+    "addClause": "Adicionar cláusula",
+    "removeClause": "Remover cláusula"
   },
   "home": {
     "streams": "Transmissões",

@@ -107,6 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @error="errorDetail = $event"
           @click="onChartClick"
           @contextmenu="onChartContextMenu"
+          @domcontextmenu="onChartDomContextMenu"
         />
       </div>
       <div
@@ -571,13 +572,16 @@ export default defineComponent({
     const contextMenuData = ref<any>(null);
 
     const onChartContextMenu = (event: any) => {
-      // Only show context menu if alert creation is allowed
+      // Emit contextmenu event for general usage (drilldowns, annotations, etc.)
       emit("contextmenu", {
         ...event,
         panelTitle: panelSchema.value.title,
         panelId: panelSchema.value.id,
       });
+    };
 
+    const onChartDomContextMenu = (event: any) => {
+      // Handle DOM contextmenu event specifically for alert creation
       if (!allowAlertCreation.value) {
         return;
       }
@@ -2217,7 +2221,9 @@ export default defineComponent({
       contextMenuVisible,
       contextMenuPosition,
       contextMenuValue,
+      contextMenuData,
       onChartContextMenu,
+      onChartDomContextMenu,
       hideContextMenu,
       handleCreateAlert,
     };
