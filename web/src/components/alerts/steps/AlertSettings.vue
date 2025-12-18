@@ -1086,7 +1086,7 @@ export default defineComponent({
       // Check if there are any cron validation errors
       if (cronJobError.value) {
         console.log('[AlertSettings] Cron error:', cronJobError.value);
-        return false;
+        return { valid: false, message: cronJobError.value };
       }
 
       // For Real-Time Alerts
@@ -1099,17 +1099,17 @@ export default defineComponent({
           props.formData.trigger_condition.silence === ''
         ) {
           console.log('[AlertSettings] Silence notification validation failed');
-          return false;
+          return { valid: false, message: `${t('alerts.silenceNotification')} should be greater than or equal to 0` };
         }
 
         // Check destinations (required for both real-time and scheduled)
         if (!localDestinations.value || localDestinations.value.length === 0) {
           console.log('[AlertSettings] Destinations validation failed - no destinations selected');
-          return false;
+          return { valid: false, message: null }; // null means show inline error only
         }
 
         console.log('[AlertSettings] Real-time validation passed');
-        return true;
+        return { valid: true };
       }
 
       // For Scheduled Alerts
@@ -1120,41 +1120,47 @@ export default defineComponent({
         if (groupByFields && groupByFields.length > 0) {
           for (const field of groupByFields) {
             if (!field || field === '') {
-              return false;
+              return { valid: false, message: null }; // Show inline error only
             }
           }
         }
 
         // Validate threshold with aggregation
         if (!props.formData.query_condition.aggregation.having.column || props.formData.query_condition.aggregation.having.column === '') {
-          return false;
+          return { valid: false, message: null };
         }
         if (!props.formData.query_condition.aggregation.having.value || props.formData.query_condition.aggregation.having.value === '') {
-          return false;
+          return { valid: false, message: null };
+        }
+        if (!props.formData.query_condition.aggregation.having.operator) {
+          return { valid: false, message: null };
         }
       } else {
         // Validate threshold without aggregation
         if (!props.formData.trigger_condition.operator) {
-          return false;
+          return { valid: false, message: null };
         }
-        if (!Number(props.formData.trigger_condition.threshold)) {
-          return false;
+        const threshold = Number(props.formData.trigger_condition.threshold);
+        if (isNaN(threshold) || threshold < 1) {
+          return { valid: false, message: `${t('alerts.threshold')} should be greater than 0` };
         }
       }
 
       // Validate period
-      if (!Number(props.formData.trigger_condition.period)) {
-        return false;
+      const period = Number(props.formData.trigger_condition.period);
+      if (isNaN(period) || period < 1) {
+        return { valid: false, message: `${t('alerts.period')} should be greater than 0` };
       }
 
       // Validate frequency
       if (props.formData.trigger_condition.frequency_type === 'minutes') {
-        if (!Number(props.formData.trigger_condition.frequency)) {
-          return false;
+        const frequency = Number(props.formData.trigger_condition.frequency);
+        if (isNaN(frequency) || frequency < 1) {
+          return { valid: false, message: `${t('alerts.frequency')} should be greater than 0` };
         }
       } else if (props.formData.trigger_condition.frequency_type === 'cron') {
         if (!props.formData.trigger_condition.cron || !props.formData.trigger_condition.timezone) {
-          return false;
+          return { valid: false, message: null };
         }
       }
 
@@ -1165,16 +1171,16 @@ export default defineComponent({
         props.formData.trigger_condition.silence === null ||
         props.formData.trigger_condition.silence === ''
       ) {
-        return false;
+        return { valid: false, message: `${t('alerts.silenceNotification')} should be greater than or equal to 0` };
       }
 
       // Check destinations (required for both real-time and scheduled)
       if (!localDestinations.value || localDestinations.value.length === 0) {
         console.log('[AlertSettings] Destinations validation failed - no destinations selected');
-        return false;
+        return { valid: false, message: null }; // null means show inline error only
       }
 
-      return true;
+      return { valid: true };
     };
 
     return {

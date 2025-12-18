@@ -2097,13 +2097,26 @@ export default defineComponent({
           const validationResult = (step4Ref.value as any).validate();
 
           // Handle async validation
-          const isValid = validationResult instanceof Promise
+          const result = validationResult instanceof Promise
             ? await validationResult
             : validationResult;
 
-          console.log('[AddAlert] Step 4 validation result:', isValid);
+          console.log('[AddAlert] Step 4 validation result:', result);
+
+          // Handle validation result - could be boolean (backward compat) or object
+          const isValid = typeof result === 'boolean' ? result : result.valid;
+          const errorMessage = typeof result === 'object' ? result.message : null;
 
           if (!isValid) {
+            // Show toaster only if there's a specific error message
+            // If message is null, it means inline validation errors are sufficient
+            if (errorMessage) {
+              q.notify({
+                type: 'negative',
+                message: errorMessage,
+                timeout: 1500,
+              });
+            }
             return false;
           }
         }
@@ -2481,33 +2494,9 @@ export default defineComponent({
         this.formData.tz_offset = convertedDateTime.offset;
       }
 
-            //from here validation starts so if there are any errors we need to navigate user to that paricular field
-      //this is for main form validation
-      let isAlertValid = true;
-      let isScheduledAlertValid = true;
-      let isRealTimeAlertValid = true;
-        isAlertValid = await this.validateFormAndNavigateToErrorField(this.addAlertForm);
-        //we need to handle scheduled alert validation separately 
-        //if there are any scheduled alert errors then we need to navigate user to that field
-        if(this.formData.is_real_time == "false"){
-          isScheduledAlertValid = this.scheduledAlertRef?.$el?.querySelectorAll('.q-field--error').length == 0;
-        }
-        else{
-          isRealTimeAlertValid = this.realTimeAlertRef?.$el?.querySelectorAll('.q-field--error').length == 0;
-        }
-        if( isAlertValid && !isScheduledAlertValid){
-          this.navigateToErrorField(this.scheduledAlertRef); 
-        }
-        if( isAlertValid && !isRealTimeAlertValid){
-          this.navigateToErrorField(this.realTimeAlertRef);
-        }
-        if (!isAlertValid || !isScheduledAlertValid || !isRealTimeAlertValid) return false;
+      const payload = this.getAlertPayload();
 
-
-        const payload = this.getAlertPayload();
-        if (!this.validateInputs(payload)) return;
-
-        const dismiss = this.q.notify({
+      const dismiss = this.q.notify({
           spinner: true,
           message: "Please wait...",
           timeout: 2000,
