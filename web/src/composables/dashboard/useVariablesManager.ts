@@ -221,7 +221,7 @@ export const useVariablesManager = () => {
       ...Object.keys(variablesData.tabs),
       ...Object.keys(committedVariablesData.tabs),
     ]);
-    for (const tabId of allTabIds) {
+    for (const tabId of Array.from(allTabIds)) {
       if (
         !areVariableArraysEqual(
           variablesData.tabs[tabId] || [],
@@ -236,7 +236,7 @@ export const useVariablesManager = () => {
       ...Object.keys(variablesData.panels),
       ...Object.keys(committedVariablesData.panels),
     ]);
-    for (const panelId of allPanelIds) {
+    for (const panelId of Array.from(allPanelIds)) {
       if (
         !areVariableArraysEqual(
           variablesData.panels[panelId] || [],
@@ -391,6 +391,18 @@ export const useVariablesManager = () => {
       ...v,
       scope: v.scope || "global",
     }));
+
+    // Add "Dynamic filters" if enabled in dashboard
+    if (dashboard?.variables?.showDynamicFilters) {
+      migratedConfig.push({
+        name: "Dynamic filters",
+        type: "dynamic_filters",
+        label: "Dynamic filters",
+        scope: "global",
+        value: [],
+        options: [],
+      } as any);
+    }
 
     // Step 1: Expand variables for scopes
     const expandedVars = expandVariablesForScopes(migratedConfig);
@@ -782,7 +794,7 @@ export const useVariablesManager = () => {
       if (parsed.scope === "global") {
         const variable = getVariable(parsed.name, "global");
         if (variable) {
-          const parsedValue = parseValue(value, variable.multiSelect);
+          const parsedValue = parseValue(value, variable.type, variable.multiSelect);
           variable.value = parsedValue;
           console.log(`[loadFromUrl] ✓ Set global var '${parsed.name}' = ${JSON.stringify(parsedValue)}`);
         } else {
@@ -793,7 +805,7 @@ export const useVariablesManager = () => {
         Object.values(variablesData.tabs).forEach((tabVars) => {
           const tabVar = tabVars.find((v) => v.name === parsed.name);
           if (tabVar) {
-            const parsedValue = parseValue(value, tabVar.multiSelect);
+            const parsedValue = parseValue(value, tabVar.type, tabVar.multiSelect);
             tabVar.value = parsedValue;
             console.log(`[loadFromUrl] ✓ Set tab var '${parsed.name}' = ${JSON.stringify(parsedValue)}`);
           }
@@ -802,7 +814,7 @@ export const useVariablesManager = () => {
         Object.values(variablesData.panels).forEach((panelVars) => {
           const panelVar = panelVars.find((v) => v.name === parsed.name);
           if (panelVar) {
-            const parsedValue = parseValue(value, panelVar.multiSelect);
+            const parsedValue = parseValue(value, panelVar.type, panelVar.multiSelect);
             panelVar.value = parsedValue;
             console.log(`[loadFromUrl] ✓ Set panel var '${parsed.name}' = ${JSON.stringify(parsedValue)}`);
           }
@@ -816,7 +828,7 @@ export const useVariablesManager = () => {
           parsed.panelId,
         );
         if (variable) {
-          const parsedValue = parseValue(value, variable.multiSelect);
+          const parsedValue = parseValue(value, variable.type, variable.multiSelect);
           variable.value = parsedValue;
           console.log(`[loadFromUrl] ✓ Set ${parsed.scope} var '${parsed.name}' (${parsed.scope === 'tabs' ? 'tab=' + parsed.tabId : 'panel=' + parsed.panelId}) = ${JSON.stringify(parsedValue)}`);
         } else {
@@ -865,10 +877,19 @@ export const useVariablesManager = () => {
     };
   };
 
-  const parseValue = (value: any, multiSelect?: boolean): any => {
+  const parseValue = (value: any, type?: string, multiSelect?: boolean): any => {
     if (value === "" || value === undefined || value === null) {
-      return multiSelect ? [] : null;
+      return type === "dynamic_filters" || multiSelect ? [] : null;
     }
+
+    if (type === "dynamic_filters") {
+      try {
+        return JSON.parse(decodeURIComponent(value));
+      } catch (e) {
+        return [];
+      }
+    }
+
     if (multiSelect) {
       return Array.isArray(value) ? value : [value];
     }
