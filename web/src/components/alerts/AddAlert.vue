@@ -41,20 +41,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         </div>
         <div class="flex items-center tw-gap-2">
-          <!-- Wizard View Toggle -->
-          <q-btn-toggle
-            v-model="viewMode"
-            toggle-color="primary"
-            :options="[
-              { label: 'Classic', value: 'classic' },
-              { label: 'Wizard', value: 'wizard' }
-            ]"
-            dense
-            no-caps
-            unelevated
-            size="sm"
-            data-test="view-mode-toggle"
-          />
           <q-btn
             outline
             class="pipeline-icons q-px-sm hideOnPrintMode"
@@ -72,7 +58,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- WIZARD VIEW -->
     <div
-      v-if="viewMode === 'wizard'"
       class="wizard-view-container tw-mb-2"
       style="
         max-height: calc(100vh - 194px);
@@ -376,379 +361,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-form>
       </div>
     </div>
-
-    <!-- CLASSIC VIEW (Original) -->
-    <div
-      v-else
-      ref="addAlertFormRef"
-      style="
-        max-height: calc(100vh - 194px);
-        overflow: auto;
-        scroll-behavior: smooth;
-      "
-      class="tw-mb-2"
-    >
-      <div class="row flex items-start" style="width: 100%;">
-        <div class="col" :class="store.state.theme === 'dark' ? 'dark-mode1' : 'light-mode1'">
-          <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
-            <!-- alerts setup  section -->
-             <div class="tw-px-[0.625rem] tw-pb-[0.625rem] tw-w-full tw-h-full">
-            <div
-              class="flex justify-start items-center flex-wrap card-container"
-            >
-              <div class="tw-w-full tw-ml-2">
-                <AlertsContainer 
-                  name="query"
-                  v-model:is-expanded="expandState.alertSetup"
-                  label="Alert Setup"
-                  subLabel="Set the stage for your alert."
-                  icon="edit"
-                  class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
-                  :iconClass="'tw-mt-[2px]'"
-                />
-              </div>
-              <div v-if="expandState.alertSetup" class="tw-w-full row alert-setup-container o2-alert-tab-border tw-px-4 tw-pt-2 tw-pb-3">
-    
-              <div class="tw-w-full ">
-
-                <div
-                  class="alert-name-input flex justify-between items-center tw-gap-10 tw-pb-3"
-                  data-test="add-alert-name-input-container"
-                >
-                  <q-input
-                    data-test="add-alert-name-input row"
-                    v-model="formData.name"
-                    :label="t('alerts.name') + ' *'"
-                      class="showLabelOnTop col"
-                    stack-label
-                    dense
-                    borderless
-                    v-bind:readonly="beingUpdated"
-                    v-bind:disable="beingUpdated"
-                    :rules="[
-                      (val: any) =>
-                        !!val
-                          ? isValidResourceName(val) ||
-                            `Characters like :, ?, /, #, and spaces are not allowed.`
-                          : t('common.nameRequired'),
-                    ]"
-                    tabindex="0"
-                    hide-bottom-space
-                  />
-                  <div class="col" style="height: 68px;">
-                    <SelectFolderDropDown
-                      :disableDropdown="beingUpdated"
-                      :type="'alerts'"
-                      :style="'height: 36px;'"
-                      @folder-selected="updateActiveFolderId"
-                      :activeFolderId="activeFolderId"
-                  />
-                  </div>
-                
-                </div>
-              </div>
-
-              <div
-                  class="flex tw-w-full items-center justify-between row tw-gap-10 tw-pb-4"
-                  style="padding-top: 0px"
-                  data-test="add-alert-stream-type-select-container"
-                >
-                  <div
-                    data-test="add-alert-stream-type-select"
-                    class="tw-w-full col "
-                    style="padding-top: 0"
-
-                  >
-                    <q-select
-                      ref="streamTypeFieldRef"
-                      data-test="add-alert-stream-type-select-dropdown"
-                      v-model="formData.stream_type"
-                      :options="streamTypes"
-                      :label="t('alerts.streamType') + ' *'"
-                      :popup-content-style="{ textTransform: 'lowercase' }"
-                      class="q-py-sm showLabelOnTop no-case col"
-                      stack-label
-                      borderless
-                      dense
-                      hide-bottom-space
-                      v-bind:readonly="beingUpdated"
-                      v-bind:disable="beingUpdated"
-                      @update:model-value="updateStreams()"
-                      :rules="[(val: any) => !!val || 'Field is required!']"
-                    />
-                  </div>
-                  <div
-                    data-test="add-alert-stream-select"
-                    class="col"
-                    style="padding-top: 0"
-                  >
-                    <q-select
-                      ref="streamFieldRef"
-                      data-test="add-alert-stream-name-select-dropdown"
-                      v-model="formData.stream_name"
-                      :options="filteredStreams"
-                      :label="t('alerts.stream_name') + ' *'"
-                      :loading="isFetchingStreams"
-                      color="input-border"
-                      class="q-py-sm showLabelOnTop no-case col"
-                      stack-label
-                      dense
-                      use-input
-                      borderless
-                      hide-selected
-                      hide-bottom-space
-                      fill-input
-                      :input-debounce="400"
-                      v-bind:readonly="beingUpdated"
-                      v-bind:disable="beingUpdated"
-                      @filter="filterStreams"
-                      @update:model-value="
-                        updateStreamFields(formData.stream_name)
-                      "
-                      behavior="menu"
-                      :rules="[(val: any) => !!val || 'Field is required!']"
-                    />
-                  </div>
-                </div>
-                <div class="tw-flex tw-items-center tw-gap-5">
-                <q-radio
-                  data-test="add-alert-scheduled-alert-radio"
-                  v-bind:readonly="beingUpdated"
-                  v-bind:disable="beingUpdated"
-                  v-model="formData.is_real_time"
-                  :checked="formData.is_real_time"
-                  val="false"
-                  dense
-                  :label="t('alerts.scheduled')"
-                  class="q-ml-none o2-radio-button"
-                />
-                <q-radio
-                  data-test="add-alert-realtime-alert-radio"
-                  v-bind:readonly="beingUpdated"
-                  v-bind:disable="beingUpdated"
-                  v-model="formData.is_real_time"
-                  :checked="!formData.is_real_time"
-                  val="true"
-                  dense
-                  :label="t('alerts.realTime')"
-                  class="q-ml-none o2-radio-button"
-                  />
-              </div>
-              </div>
-            </div>
-          </div>
-
-            <div
-              v-if="formData.is_real_time === 'true'"
-              class="q-pa-none q-ma-none"
-              data-test="add-alert-query-input-title"
-            >
-              <real-time-alert
-                ref="realTimeAlertRef"
-                :columns="filteredColumns"
-                :streamFieldsMap="streamFieldsMap"
-                :generatedSqlQuery="generatedSqlQuery"
-                :conditions="formData.query_condition?.conditions || {}"
-                @input:update="onInputUpdate"
-                :expandState = expandState
-                @update:expandState="updateExpandState"
-                :trigger="formData.trigger_condition"
-                :destinations="formData.destinations"
-                :formattedDestinations="getFormattedDestinations"
-                @refresh:destinations="refreshDestinations"
-                @update:destinations="updateDestinations"
-                @update:group="updateGroup"
-                @remove:group="removeConditionGroup"
-
-              />
-            </div>
-            <div v-else class="q-pa-none q-ma-none  ">
-              <scheduled-alert
-                v-if="!isLoadingPanelData"
-                ref="scheduledAlertRef"
-                :columns="filteredColumns"
-                :streamFieldsMap="streamFieldsMap"
-                :generatedSqlQuery="generatedSqlQuery"
-                :conditions="formData.query_condition?.conditions || {}"
-                :expandState = expandState
-                :alertData="formData"
-                :sqlQueryErrorMsg="sqlQueryErrorMsg"
-                :vrlFunctionError="vrlFunctionError"
-                :showTimezoneWarning="showTimezoneWarning"
-                :selectedStream="formData.stream_name"
-                :selected-stream-type="formData.stream_type"
-                :destinations="formData.destinations"
-                :formattedDestinations="getFormattedDestinations"
-                v-model:trigger="formData.trigger_condition"
-                v-model:sql="formData.query_condition.sql"
-                v-model:promql="formData.query_condition.promql"
-                v-model:query_type="formData.query_condition.type"
-                v-model:aggregation="formData.query_condition.aggregation"
-                v-model:silence="formData.trigger_condition.silence"
-                v-model:promql_condition="
-                  formData.query_condition.promql_condition
-                "
-                v-model:multi_time_range="
-                  formData.query_condition.multi_time_range
-                "
-                v-model:vrl_function="formData.query_condition.vrl_function"
-                v-model:isAggregationEnabled="isAggregationEnabled"
-                v-model:showVrlFunction="showVrlFunction"
-                @update:group="updateGroup"
-                @remove:group="removeConditionGroup"
-                @input:update="onInputUpdate"
-                @validate-sql="validateSqlQuery"
-                @update:showVrlFunction="updateFunctionVisibility"
-                @update:multi_time_range="updateMultiTimeRange"
-                @update:expandState="updateExpandState"
-                @update:silence="updateSilence"
-                @refresh:destinations="refreshDestinations"
-                @update:destinations="updateDestinations"
-              />
-            </div>
-  
-            <!-- additional setup starts here -->
-             <div class="tw-px-[0.625rem] tw-w-full tw-h-full">
-                   <div
-              class="flex justify-start items-center q-pb-sm flex-wrap card-container"
-            >
-              <div class="tw-w-full tw-ml-2   ">
-                <AlertsContainer 
-                    name="advanced"
-                    v-model:is-expanded="expandState.advancedSetup"
-                    label="Advanced Setup"
-                    :icon="'add'"
-                   class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
-                    />
-            </div>
-            <div v-if="expandState.advancedSetup" class=" tw-w-full row alert-setup-container tw-px-4 tw-pt-2 tw-pb-3 o2-alert-tab-border" >
-
-            <div class="tw-w-full row">
-              <div v-if="expandState.advancedSetup" class="tw-mt-2 tw-w-full ">
-              <variables-input
-                :variables="formData.context_attributes"
-                @add:variable="addVariable"
-                @remove:variable="removeVariable"
-              />
-            </div>
-            <!-- TODO: make text area also similar to qinput -->
-            <div v-if="expandState.advancedSetup" class=" tw-w-full t">
-              <div data-test="add-alert-description-input tw-w-full " :class="store.state.theme === 'dark' ? '' : 'light-mode'">
-                <div class="flex items-center q-mb-sm ">
-                  <span class="text-bold custom-input-label">Description</span>
-                </div>
-                <q-input
-                  v-model="formData.description"
-                  color="input-border"
-                  bg-color="input-bg"
-                  class="showLabelOnTop q-mb-sm q-text-area-input"
-                  stack-label
-                  outlined
-                  filled
-                  dense
-                  tabindex="0"
-                  style="width: 100%; resize: none;"
-                  type="textarea"
-                  :placeholder="t('alerts.placeholders.typeSomething')"
-                  rows="5"
-                />
-              </div>
-              <div data-test="add-alert-row-input tw-w-full">
-                <div class="flex items-center justify-between q-mb-sm">
-                  <div class="flex items-center">
-                    <span class="text-bold custom-input-label">Row Template</span>
-                    <q-btn
-                      data-test="add-alert-row-input-info-btn"
-                      style="color: #A0A0A0;"
-                      no-caps
-                      padding="xs"
-                      class="q-ml-xs"
-                      size="sm"
-                      flat
-                      icon="info_outline"
-                    >
-                      <q-tooltip>
-                        Row Template is used to format the alert message.
-                      </q-tooltip>
-                    </q-btn>
-                  </div>
-                  <div class="flex items-center">
-                    <span class="text-caption q-mr-sm">Template Type:</span>
-                    <q-btn-toggle
-                      data-test="add-alert-row-template-type-toggle"
-                      v-model="formData.row_template_type"
-                      toggle-color="primary"
-                      :options="rowTemplateTypeOptions"
-                      dense
-                      no-caps
-                      unelevated
-                      size="sm"
-                    />
-                  </div>
-                </div>
-                <q-input
-                  data-test="add-alert-row-input-textarea"
-                  v-model="formData.row_template"
-                  color="input-border"
-                  bg-color="input-bg"
-                  class="row-template-input"
-                  :class="store.state.theme === 'dark' ? 'dark-mode-row-template' : 'light-mode-row-template'"
-                  stack-label
-                  outlined
-                  filled
-                  dense
-                  tabindex="0"
-                  style="width: 100%; resize: none;"
-                  type="textarea"
-                  :placeholder="rowTemplatePlaceholder"
-                  rows="5"
-                >
-
-              </q-input>
-              </div>
-            </div>
-            </div>
-
-            </div>
-            </div>
-            
-             </div>
-
-
-
-
-          </q-form>
-
-        </div>
-        <div
-          style="width: 430px; min-height: calc(100vh - 200px); position: sticky; top: 0 "
-          class=" col-2"
-        >
-          <div style="height: calc(100vh - 194px); display: flex; flex-direction: column; gap: 8px;">
-            <!-- Preview Alert - Top Half -->
-            <preview-alert
-              style="height: calc(50% - 4px); width: 100%;"
-              ref="previewAlertRef"
-              :formData="formData"
-              :query="previewQuery"
-              :selectedTab="formData.query_condition.type || 'custom'"
-              :isAggregationEnabled="isAggregationEnabled"
-            />
-
-            <!-- Alert Summary - Bottom Half -->
-            <alert-summary
-              style="height: calc(50% - 4px);"
-              :formData="formData"
-              :destinations="formData.destinations"
-              :focusManager="focusManager"
-            />
-          </div>
-
-        </div>
-        
-      </div>
-
-    </div>
     <div class="tw-mx-2">
       <div
           class="flex q-px-md full-width tw-py-3 card-container tw-justify-end"
@@ -757,29 +369,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- All Buttons (Right Side) -->
         <div class="tw-flex tw-items-center tw-gap-2">
           <!-- Wizard Navigation Buttons -->
-          <template v-if="viewMode === 'wizard'">
-            <q-btn
-              flat
-              label="Back"
-              icon="arrow_back"
-              class="o2-secondary-button tw-h-[36px]"
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-              :disable="wizardStep === 1"
-              no-caps
-              @click="goToPreviousStep"
-            />
-            <q-btn
-              flat
-              label="Continue"
-              icon-right="arrow_forward"
-              class="o2-secondary-button tw-h-[36px]"
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-              :disable="isLastStep"
-              no-caps
-              @click="goToNextStep"
-            />
-            <q-separator vertical class="tw-mx-2" style="height: 36px;" />
-          </template>
+          <q-btn
+            flat
+            label="Back"
+            icon="arrow_back"
+            class="o2-secondary-button tw-h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            :disable="wizardStep === 1"
+            no-caps
+            @click="goToPreviousStep"
+          />
+          <q-btn
+            flat
+            label="Continue"
+            icon-right="arrow_forward"
+            class="o2-secondary-button tw-h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            :disable="isLastStep"
+            no-caps
+            @click="goToNextStep"
+          />
+          <q-separator vertical class="tw-mx-2" style="height: 36px;" />
 
           <!-- Cancel and Save Buttons -->
           <q-btn
@@ -920,8 +530,6 @@ import {
   type SqlUtilsContext,
 } from "@/utils/alerts/alertSqlUtils";
 
-import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
-import AlertsContainer from "./AlertsContainer.vue";
 import JsonEditor from "../common/JsonEditor.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { createAlertsContextProvider, contextRegistry } from "@/composables/contextProviders";
@@ -1022,11 +630,6 @@ export default defineComponent({
   components: {
     ScheduledAlert: defineAsyncComponent(() => import("./ScheduledAlert.vue")),
     RealTimeAlert: defineAsyncComponent(() => import("./RealTimeAlert.vue")),
-    VariablesInput: defineAsyncComponent(() => import("./VariablesInput.vue")),
-    PreviewAlert: defineAsyncComponent(() => import("./PreviewAlert.vue")),
-    AlertSummary: defineAsyncComponent(() => import("./AlertSummary.vue")),
-    SelectFolderDropDown,
-    AlertsContainer,
     JsonEditor,
     HorizontalStepper,
     AlertSetup,
@@ -1135,9 +738,6 @@ export default defineComponent({
     const updateActiveFolderId = (folderId: any) => {
       activeFolderId.value = folderId.value;
     };
-
-    // View mode toggle: 'classic' or 'wizard'
-    const viewMode = ref('classic');
 
     // Wizard step state
     const wizardStep = ref(1);
@@ -2275,7 +1875,6 @@ export default defineComponent({
       focusManager,
       streamFieldRef,
       streamTypeFieldRef,
-      viewMode,
       wizardStep,
       wizardStepper,
       step1Ref,
