@@ -1166,6 +1166,7 @@ export const usePanelDataLoader = (
           state.isPartialData = false;
         }
       } else {
+        console.log("loadData: starting SQL query execution...", variablesData.value);
         // copy of current abortController
         // which is used to check whether the current query has been aborted
         const abortControllerRef = abortController;
@@ -2056,9 +2057,11 @@ export const usePanelDataLoader = (
   ) =>
     newDependentVariablesData?.some(
       (it: any) =>
-        (it.value == null ||
-          (Array.isArray(it.value) && it.value.length === 0)) &&
-        (it.isLoading || it.isVariableLoadingPending),
+        it.isLoading ||
+        it.isVariableLoadingPending ||
+        !it.isVariablePartialLoaded ||
+        it.value == null ||
+        (Array.isArray(it.value) && it.value.length === 0),
     );
 
   const getDependentVariablesData = () =>
