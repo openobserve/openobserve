@@ -146,6 +146,30 @@ export class LogsPage {
         this.queryEditorFullScreenBtn = '[data-test="logs-query-editor-full_screen-btn"]';
         this.queryEditorContainer = '.query-editor-container';
         this.expandOnFocusClass = '.expand-on-focus';
+
+        // ===== REGRESSION TEST LOCATORS =====
+        // Query history
+        this.queryHistoryButton = '[data-test="logs-search-bar-query-history-btn"]';
+        this.historyPanel = '.history-panel, [data-test*="history"]';
+
+        // Table and pagination CSS selectors
+        this.tableBottom = '.q-table__bottom';
+        this.tableBodyRow = 'tbody tr';
+        this.tableBodyRowWithIndex = 'tbody tr[data-index]';
+        this.tableHeaderCell = 'thead th';
+        this.tableHeaders = 'thead th';
+
+        // Dynamic field selectors (functions for field-specific locators)
+        this.fieldExpandButton = (fieldName) => `[data-test="log-search-expand-${fieldName}-field-btn"]`;
+        this.fieldListItem = (fieldName) => `[data-test="logs-field-list-item-${fieldName}"]`;
+        this.subfieldAddButton = (fieldName) => `[data-test*="logs-search-subfield-add-${fieldName}"]`;
+        this.allFieldExpandButtons = '[data-test*="log-search-expand-"][data-test$="-field-btn"]';
+        this.fieldIndexListButton = (fieldName) => `[data-test="log-search-index-list-${fieldName}-field-btn"]`;
+
+        // Additional regression test selectors
+        this.streamsSearchInputField = '[data-test="streams-search-stream-input"] input';
+        this.errorIndicators = '.error, [class*="error"], .q-notification--negative, .text-negative';
+        this.timestampInDetail = '[data-test*="timestamp"], .timestamp';
     }
 
 

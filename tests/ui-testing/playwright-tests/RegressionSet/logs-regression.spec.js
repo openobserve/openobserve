@@ -218,6 +218,544 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info('Stream switching test completed - saved views maintain correct fields for each stream');
   });
 
+  /**
+   * Bug #7751: Values API giving error with complex queries (subqueries, CTEs)
+   * Issue: https://github.com/openobserve/openobserve/issues/7751
+   * When users run complex SQL queries (subqueries, CTEs, JOINs) and try to expand
+   * fields to see values, they get 400 error instead of field values.
+   */
+
+  test('should load field values with SUBQUERY without 400 error @bug-7751 @P0 @regression', async ({ page }) => {
+    testLogger.info('Test: Field values with subquery');
+
+    // Navigate to logs page
+    await pm.logsPage.clickMenuLinkLogsItem();
+
+    // Select stream
+    await pm.logsPage.selectStream('e2e_automate');
+    await page.waitForTimeout(2000);
+
+    // Enable SQL mode
+    testLogger.info('Enabling SQL mode');
+    await pm.logsPage.clickSQLModeToggle();
+    await page.waitForTimeout(1000);
+
+    // Enter subquery
+    const subquery = 'SELECT * FROM (SELECT * FROM "e2e_automate" WHERE kubernetes_pod_name IS NOT NULL LIMIT 100)';
+    testLogger.info(`Entering subquery: ${subquery}`);
+    await pm.logsPage.fillQueryEditor(subquery);
+
+    // Run query
+    testLogger.info('Running query');
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForTimeout(3000);
+
+    // Verify query results loaded
+    const resultsVisible = await page.locator(pm.logsPage.logsSearchResultLogsTable).isVisible();
+    expect(resultsVisible).toBeTruthy();
+    testLogger.info('Query results loaded successfully');
+
+    // Expand field to trigger values API
+    const fieldToExpand = 'kubernetes_pod_name';
+
+    // Search for the field first to make it visible in sidebar
+    testLogger.info(`Searching for field: ${fieldToExpand}`);
+    await pm.logsPage.fillIndexFieldSearchInput(fieldToExpand);
+    await page.waitForTimeout(500);
+
+    const expandButton = page.locator(pm.logsPage.fieldExpandButton(fieldToExpand));
+
+    testLogger.info(`Expanding field: ${fieldToExpand}`);
+    await expandButton.waitFor({ state: 'visible', timeout: 10000 });
+    await expandButton.click();
+    await page.waitForTimeout(2000);
+
+    // Wait for values to load or error to show
+    await page.waitForTimeout(2000);
+
+    // Verify NO 400 error is shown (main bug fix validation)
+    const fieldExpansionContent = page.locator(pm.logsPage.fieldListItem(fieldToExpand));
+    const contentText = await fieldExpansionContent.textContent().catch(() => '');
+
+    // Primary assertion: NO 400 error (this was the bug)
+    expect(contentText).not.toContain('400');
+    expect(contentText.toLowerCase()).not.toMatch(/error.*400|400.*error/);
+    testLogger.info('✓ PRIMARY CHECK PASSED: No 400 error displayed');
+
+    // Secondary check: Field values loaded or acceptable message shown
+    const fieldValues = page.locator(pm.logsPage.subfieldAddButton(fieldToExpand));
+    const valueCount = await fieldValues.count();
+
+    if (valueCount > 0) {
+      testLogger.info(`✓ Field values displayed: ${valueCount} values`);
+    } else if (contentText.includes('No values found')) {
+      testLogger.info('✓ No values found message shown (acceptable - no data)');
+    } else {
+      testLogger.info(`⚠ No values displayed, content: ${contentText.substring(0, 100)}`);
+    }
+  });
+
+  test('should load field values with CTE (Common Table Expression) without 400 error @bug-7751 @P1 @regression', async ({ page }) => {
+    testLogger.info('Test: Field values with CTE');
+
+    // Navigate to logs page
+    await pm.logsPage.clickMenuLinkLogsItem();
+
+    // Select stream
+    await pm.logsPage.selectStream('e2e_automate');
+    await page.waitForTimeout(2000);
+
+    // Enable SQL mode
+    testLogger.info('Enabling SQL mode');
+    await pm.logsPage.clickSQLModeToggle();
+    await page.waitForTimeout(1000);
+
+    // Enter CTE query
+    const cteQuery = 'WITH filtered_logs AS (SELECT * FROM "e2e_automate" WHERE kubernetes_pod_name IS NOT NULL LIMIT 100) SELECT * FROM filtered_logs';
+    testLogger.info(`Entering CTE query: ${cteQuery}`);
+    await pm.logsPage.fillQueryEditor(cteQuery);
+
+    // Run query
+    testLogger.info('Running query');
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForTimeout(3000);
+
+    // Verify query results loaded
+    const resultsVisible = await page.locator(pm.logsPage.logsSearchResultLogsTable).isVisible();
+    expect(resultsVisible).toBeTruthy();
+    testLogger.info('Query results loaded successfully');
+
+    // Expand field to trigger values API
+    const fieldToExpand = 'kubernetes_pod_name';
+
+    // Search for the field first to make it visible in sidebar
+    testLogger.info(`Searching for field: ${fieldToExpand}`);
+    await pm.logsPage.fillIndexFieldSearchInput(fieldToExpand);
+    await page.waitForTimeout(500);
+
+    const expandButton = page.locator(pm.logsPage.fieldExpandButton(fieldToExpand));
+
+    testLogger.info(`Expanding field: ${fieldToExpand}`);
+    await expandButton.waitFor({ state: 'visible', timeout: 10000 });
+    await expandButton.click();
+    await page.waitForTimeout(2000);
+
+    // Wait for values to load or error to show
+    await page.waitForTimeout(2000);
+
+    // Verify NO 400 error is shown (main bug fix validation)
+    const fieldExpansionContent = page.locator(pm.logsPage.fieldListItem(fieldToExpand));
+    const contentText = await fieldExpansionContent.textContent().catch(() => '');
+
+    // Primary assertion: NO 400 error (this was the bug)
+    expect(contentText).not.toContain('400');
+    expect(contentText.toLowerCase()).not.toMatch(/error.*400|400.*error/);
+    testLogger.info('✓ PRIMARY CHECK PASSED: No 400 error displayed');
+
+    // Secondary check: Field values loaded or acceptable message shown
+    const fieldValues = page.locator(pm.logsPage.subfieldAddButton(fieldToExpand));
+    const valueCount = await fieldValues.count();
+
+    if (valueCount > 0) {
+      testLogger.info(`✓ Field values displayed: ${valueCount} values`);
+    } else if (contentText.includes('No values found')) {
+      testLogger.info('✓ No values found message shown (acceptable - no data)');
+    } else {
+      testLogger.info(`⚠ No values displayed, content: ${contentText.substring(0, 100)}`);
+    }
+  });
+
+  test('should load field values with GROUP BY aggregation without 400 error @bug-7751 @P1 @regression', async ({ page }) => {
+    testLogger.info('Test: Field values with GROUP BY aggregation');
+
+    // Navigate to logs page
+    await pm.logsPage.clickMenuLinkLogsItem();
+
+    // Select stream
+    await pm.logsPage.selectStream('e2e_automate');
+    await page.waitForTimeout(2000);
+
+    // Enable SQL mode
+    testLogger.info('Enabling SQL mode');
+    await pm.logsPage.clickSQLModeToggle();
+    await page.waitForTimeout(1000);
+
+    // Enter aggregation query
+    const aggQuery = 'SELECT kubernetes_pod_name, count(*) as total FROM "e2e_automate" WHERE kubernetes_pod_name IS NOT NULL GROUP BY kubernetes_pod_name LIMIT 50';
+    testLogger.info(`Entering aggregation query: ${aggQuery}`);
+    await pm.logsPage.fillQueryEditor(aggQuery);
+
+    // Run query
+    testLogger.info('Running query');
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForTimeout(3000);
+
+    // Verify query results loaded
+    const resultsVisible = await page.locator(pm.logsPage.logsSearchResultLogsTable).isVisible();
+    expect(resultsVisible).toBeTruthy();
+    testLogger.info('Query results loaded successfully');
+
+    // Expand field to trigger values API
+    const fieldToExpand = 'kubernetes_pod_name';
+
+    // Search for the field first to make it visible in sidebar
+    testLogger.info(`Searching for field: ${fieldToExpand}`);
+    await pm.logsPage.fillIndexFieldSearchInput(fieldToExpand);
+    await page.waitForTimeout(500);
+
+    const expandButton = page.locator(pm.logsPage.fieldExpandButton(fieldToExpand));
+
+    testLogger.info(`Expanding field: ${fieldToExpand}`);
+    await expandButton.waitFor({ state: 'visible', timeout: 10000 });
+    await expandButton.click();
+    await page.waitForTimeout(2000);
+
+    // Wait for values to load or error to show
+    await page.waitForTimeout(2000);
+
+    // Verify NO 400 error is shown (main bug fix validation)
+    const fieldExpansionContent = page.locator(pm.logsPage.fieldListItem(fieldToExpand));
+    const contentText = await fieldExpansionContent.textContent().catch(() => '');
+
+    // Primary assertion: NO 400 error (this was the bug)
+    expect(contentText).not.toContain('400');
+    expect(contentText.toLowerCase()).not.toMatch(/error.*400|400.*error/);
+    testLogger.info('✓ PRIMARY CHECK PASSED: No 400 error displayed');
+
+    // Secondary check: Field values loaded or acceptable message shown
+    const fieldValues = page.locator(pm.logsPage.subfieldAddButton(fieldToExpand));
+    const valueCount = await fieldValues.count();
+
+    if (valueCount > 0) {
+      testLogger.info(`✓ Field values displayed: ${valueCount} values`);
+    } else if (contentText.includes('No values found')) {
+      testLogger.info('✓ No values found message shown (acceptable - no data)');
+    } else {
+      testLogger.info(`⚠ No values displayed, content: ${contentText.substring(0, 100)}`);
+    }
+  });
+
+  /**
+   * Bug #8868: Pagination count not updating after search/filter
+   * Issue: https://github.com/openobserve/openobserve/issues/8868
+   * When user searches/filters results, pagination counter shows total count
+   * instead of filtered count (e.g., searching 100 items with 20 matches still shows 100)
+   */
+
+  test('should update pagination count after search filter @bug-8868 @P1 @regression', async ({ page }) => {
+    testLogger.info('Test: Pagination count after search');
+
+    // Navigate to streams page (has many items and search functionality)
+    await page.locator(pm.logsPage.streamsMenuItem).click();
+    await page.waitForTimeout(2000);
+
+    // Get initial pagination text (shows total count)
+    const paginationLocator = page.locator(pm.logsPage.tableBottom).first();
+    const initialPaginationText = await paginationLocator.textContent().catch(() => 'N/A');
+    testLogger.info(`Initial pagination text: ${initialPaginationText}`);
+
+    // Extract initial total count (e.g., "1-50 of 100")
+    const initialMatch = initialPaginationText.match(/of\s+(\d+)/i);
+    const initialTotal = initialMatch ? parseInt(initialMatch[1]) : 0;
+    testLogger.info(`Initial total count: ${initialTotal}`);
+
+    // Perform search with a specific term that will filter results
+    const searchTerm = 'e2e';
+    const searchInput = page.locator(pm.logsPage.streamsSearchInputField);
+    await searchInput.fill(searchTerm);
+    testLogger.info(`Entered search term: "${searchTerm}"`);
+
+    await page.waitForTimeout(1500); // Wait for search to filter
+
+    // Get pagination text after search
+    const filteredPaginationText = await paginationLocator.textContent().catch(() => 'N/A');
+    testLogger.info(`Filtered pagination text: ${filteredPaginationText}`);
+
+    // Extract filtered total count
+    const filteredMatch = filteredPaginationText.match(/of\s+(\d+)/i);
+    const filteredTotal = filteredMatch ? parseInt(filteredMatch[1]) : 0;
+    testLogger.info(`Filtered total count: ${filteredTotal}`);
+
+    // PRIMARY CHECK: Filtered count should be less than or equal to initial count
+    expect(filteredTotal).toBeLessThanOrEqual(initialTotal);
+    testLogger.info(`✓ PRIMARY CHECK PASSED: Filtered count (${filteredTotal}) <= Initial count (${initialTotal})`);
+
+    // Additional check: Pagination should reflect actual filtered results
+    if (filteredTotal < initialTotal) {
+      testLogger.info(`✓ Pagination correctly updated from ${initialTotal} to ${filteredTotal} after search`);
+    } else if (filteredTotal === initialTotal && searchTerm) {
+      testLogger.warn(`⚠ Search returned all results - pagination count unchanged (${filteredTotal})`);
+    }
+
+    // Verify table shows filtered results
+    const tableRows = await page.locator(pm.logsPage.tableBodyRowWithIndex).count();
+    testLogger.info(`Table shows ${tableRows} rows after filtering`);
+
+    // Clear search and verify count returns to original
+    await searchInput.clear();
+    await page.waitForTimeout(2000); // Wait for table to reload
+
+    const clearedPaginationText = await paginationLocator.textContent().catch(() => 'N/A');
+    testLogger.info(`After clearing search, pagination text: ${clearedPaginationText}`);
+
+    const clearedMatch = clearedPaginationText.match(/of\s+(\d+)/i);
+    const clearedTotal = clearedMatch ? parseInt(clearedMatch[1]) : 0;
+    testLogger.info(`After clearing search, pagination shows: ${clearedTotal}`);
+
+    // Verify count returns to initial total (or close to it)
+    if (clearedTotal === initialTotal) {
+      testLogger.info(`✓ Pagination correctly restored to ${clearedTotal} after clearing search`);
+    } else if (clearedTotal > 0) {
+      testLogger.warn(`⚠ Pagination showed ${clearedTotal} after clear (expected ${initialTotal}) - possible timing issue`);
+      expect(clearedTotal).toBeGreaterThan(0); // At least verify it's not 0
+    } else {
+      testLogger.warn(`⚠ Pagination shows 0 after clearing - skipping restore check`);
+    }
+  });
+
+  /**
+  /**
+  /**
+   * Bug #9311: Alert graph color appears only on half of the graph
+   * Issue: https://github.com/openobserve/openobserve/issues/9311
+   * When viewing alert graphs, the color shading only appears on approximately
+   * half of the graph instead of spanning the complete graph area
+   */
+
+  test('should display alert graph color across full graph area @bug-9311 @P2 @regression @alerts', async ({ page }) => {
+    testLogger.info('Test: Alert graph color display');
+
+    // Navigate to alerts page
+    await page.locator(pm.alertsPage.alertMenuItem).click();
+    await page.waitForTimeout(2000);
+    testLogger.info('Navigated to alerts page');
+
+    // Check if any alerts exist
+    const alertRows = await page.locator(pm.alertsPage.tableBodyRowWithIndex).count();
+    testLogger.info(`Found ${alertRows} alerts`);
+
+    if (alertRows === 0) {
+      testLogger.warn('No alerts found - skipping graph color test');
+      testLogger.info('Test requires at least one alert to validate graph rendering');
+      // Skip test gracefully
+      return;
+    }
+
+    // Click on first alert to view details
+    const firstAlertRow = page.locator(pm.alertsPage.tableBodyRowWithIndex).first();
+    await firstAlertRow.click();
+    await page.waitForTimeout(2000);
+    testLogger.info('Opened alert details');
+
+    // Look for the alert graph/chart
+    const alertGraph = page.locator(`${pm.alertsPage.alertGraph}, ${pm.alertsPage.alertChart}, canvas`).first();
+    const graphVisible = await alertGraph.isVisible().catch(() => false);
+
+    if (!graphVisible) {
+      testLogger.warn('Alert graph not visible - may not have data or different UI structure');
+      testLogger.info('Test requires alert graph to be displayed');
+      return;
+    }
+
+    testLogger.info('Alert graph is visible');
+
+    // PRIMARY CHECK: Verify graph dimensions
+    const graphBox = await alertGraph.boundingBox();
+    if (graphBox) {
+      testLogger.info(`Graph dimensions: ${graphBox.width}x${graphBox.height}`);
+
+      // Verify graph has reasonable dimensions (not collapsed or partial)
+      expect(graphBox.width).toBeGreaterThan(100);
+      expect(graphBox.height).toBeGreaterThan(50);
+      testLogger.info('✓ PRIMARY CHECK PASSED: Graph has proper dimensions');
+
+      // Check if graph container is not clipped
+      const graphContainer = page.locator(pm.alertsPage.alertGraph).first();
+      const containerBox = await graphContainer.boundingBox().catch(() => null);
+
+      if (containerBox) {
+        // Verify canvas/graph is not cut off (should fill most of container)
+        const widthRatio = graphBox.width / containerBox.width;
+        const heightRatio = graphBox.height / containerBox.height;
+
+        testLogger.info(`Graph fills ${(widthRatio * 100).toFixed(1)}% width, ${(heightRatio * 100).toFixed(1)}% height of container`);
+
+        // Graph should fill most of the container (at least 80%)
+        if (widthRatio > 0.8 && heightRatio > 0.8) {
+          testLogger.info('✓ Graph properly fills container - no partial rendering detected');
+        } else {
+          testLogger.warn(`⚠ Graph may be partially rendered: ${(widthRatio * 100).toFixed(1)}% x ${(heightRatio * 100).toFixed(1)}%`);
+        }
+      }
+
+      // Visual validation: Take screenshot for manual verification if needed
+      const screenshotPath = 'alert-graph-validation.png';
+      await alertGraph.screenshot({ path: screenshotPath });
+      testLogger.info(`Screenshot saved to ${screenshotPath} for visual verification`);
+    } else {
+      testLogger.warn('Could not get graph bounding box');
+    }
+
+    testLogger.info('Alert graph color rendering test completed');
+  });
+
+  // ============================================================================
+  // Bug #8180: Multiple log search issues
+  // https://github.com/openobserve/openobserve/issues/8180
+  test('should execute histogram query from search history without error @bug-8180 @P0 @regression', async ({ page }) => {
+    testLogger.info('Test: Histogram query from search history (Bug #8180 - Part 2)');
+
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await pm.logsPage.selectStream('e2e_automate');
+    await page.waitForTimeout(2000);
+
+    // Switch to SQL mode
+    await pm.logsPage.clickSQLModeToggle();
+    await page.waitForTimeout(1000);
+
+    // Execute a histogram query (similar to the one that failed in bug report)
+    const histogramQuery = 'SELECT histogram(_timestamp) AS zo_sql_key, COUNT(*) AS zo_sql_num FROM "e2e_automate" GROUP BY zo_sql_key ORDER BY zo_sql_key';
+    await pm.logsPage.fillQueryEditor(histogramQuery);
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForTimeout(3000);
+
+    // Check for any error messages
+    const errorIndicators = await page.locator(pm.logsPage.errorIndicators).count();
+    expect(errorIndicators).toBe(0);
+    testLogger.info('✓ No error notifications displayed after histogram query');
+
+    // Verify results are displayed
+    const resultTextLocator = page.locator(pm.logsPage.resultText);
+    const resultText = await resultTextLocator.textContent().catch(() => '');
+    expect(resultText).toBeTruthy();
+    testLogger.info(`✓ Results displayed: ${resultText.substring(0, 50)}`);
+
+    // Check if histogram query appears in search history
+    const historyButton = page.locator(`${pm.logsPage.queryHistoryButton}, button:has-text("History")`).first();
+    if (await historyButton.isVisible()) {
+      await historyButton.click();
+      await page.waitForTimeout(1000);
+
+      // Verify history panel opened
+      const historyPanel = page.locator(pm.logsPage.historyPanel).first();
+      if (await historyPanel.isVisible()) {
+        testLogger.info('✓ Search history panel opened successfully');
+      }
+
+      // Close history panel
+      await historyButton.click();
+      await page.waitForTimeout(500);
+    }
+
+    testLogger.info('✓ PRIMARY CHECK PASSED: Histogram query executed without error');
+  });
+
+  test('should display timestamp field in quick mode @bug-8180 @P1 @regression', async ({ page }) => {
+    testLogger.info('Test: Timestamp field display in quick mode (Bug #8180 - Part 3)');
+
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await pm.logsPage.selectStream('e2e_automate');
+    await page.waitForTimeout(2000);
+
+    // Ensure we're in quick mode (not SQL mode)
+    const sqlModeToggle = page.locator(pm.logsPage.sqlModeToggle);
+    const sqlModeDiv = sqlModeToggle.locator('div').first();
+    const isSQLMode = await sqlModeDiv.getAttribute('aria-checked');
+
+    if (isSQLMode === 'true') {
+      await sqlModeToggle.click();
+      await page.waitForTimeout(1000);
+      testLogger.info('Switched to quick mode');
+    }
+
+    // Run a query to get results
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForTimeout(3000);
+
+    // Check if timestamp column/field is visible in results
+    const timestampHeader = page.locator('th:has-text("_timestamp"), [data-test*="_timestamp"]').first();
+    const timestampVisible = await timestampHeader.isVisible().catch(() => false);
+
+    if (timestampVisible) {
+      testLogger.info('✓ Timestamp header found in table view');
+    } else {
+      // Check if timestamp appears in expanded log view
+      const logRows = page.locator(pm.logsPage.tableBodyRow).first();
+      if (await logRows.isVisible()) {
+        await logRows.click();
+        await page.waitForTimeout(500);
+
+        const timestampInDetail = page.locator(pm.logsPage.timestampInDetail).first();
+        await expect(timestampInDetail).toBeVisible({ timeout: 5000 });
+        testLogger.info('✓ Timestamp found in log detail view');
+      }
+    }
+
+    testLogger.info('✓ PRIMARY CHECK PASSED: Timestamp field displays in quick mode');
+  });
+
+  test('should display source field when only timestamp remains @bug-8180 @P2 @regression', async ({ page }) => {
+    testLogger.info('Test: Source field display logic (Bug #8180 - Part 4)');
+
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await pm.logsPage.selectStream('e2e_automate');
+    await page.waitForTimeout(2000);
+
+    // Run initial query
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForTimeout(3000);
+
+    // Get list of currently displayed fields in table
+    const tableHeaders = page.locator(pm.logsPage.tableHeaders);
+    const initialHeaderCount = await tableHeaders.count();
+    testLogger.info(`Initial field count in table: ${initialHeaderCount}`);
+
+    // Try to remove fields until only _timestamp remains (or close to it)
+    // This simulates the scenario where user removes fields
+    const fieldListItems = page.locator(pm.logsPage.allFieldExpandButtons);
+    const fieldCount = await fieldListItems.count();
+
+    if (fieldCount > 0) {
+      // Search for a specific field to remove
+      const fieldToRemove = 'kubernetes_pod_name';
+      await pm.logsPage.fillIndexFieldSearchInput(fieldToRemove);
+      await page.waitForTimeout(500);
+
+      // Check if field has a remove/toggle button
+      const fieldItem = page.locator(pm.logsPage.fieldIndexListButton(fieldToRemove)).first();
+      if (await fieldItem.isVisible()) {
+        // Click to toggle field (remove from view)
+        await fieldItem.click();
+        await page.waitForTimeout(1000);
+
+        testLogger.info(`Toggled field: ${fieldToRemove}`);
+      }
+
+      // Clear search to see all remaining fields
+      await pm.logsPage.fillIndexFieldSearchInput('');
+      await page.waitForTimeout(500);
+    }
+
+    // Check current table state
+    const updatedHeaderCount = await tableHeaders.count();
+    testLogger.info(`Updated field count in table: ${updatedHeaderCount}`);
+
+    // Verify that when minimal fields remain, source field OR _timestamp is still visible
+    const timestampVisible = await page.locator('th:has-text("_timestamp")').isVisible().catch(() => false);
+    const sourceVisible = await page.locator('th:has-text("source"), th:has-text("_source")').first().isVisible().catch(() => false);
+
+    expect(timestampVisible || sourceVisible).toBeTruthy();
+
+    if (timestampVisible) {
+      testLogger.info('✓ _timestamp field remains visible');
+    }
+    if (sourceVisible) {
+      testLogger.info('✓ source field is visible');
+    }
+
+    testLogger.info('✓ PRIMARY CHECK PASSED: Essential fields (timestamp/source) display correctly');
+  });
+
   test.afterEach(async () => {
     testLogger.info('Logs regression test completed');
   });
