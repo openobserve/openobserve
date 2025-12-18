@@ -166,13 +166,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @dragover="onDragOver"
               @drop="onDrop"
               @dragend="onDragEnd"
-              :style="
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].customQuery && props.pageIndex == customQueryFieldsLength
-                  ? 'border: 1px solid black'
-                  : ''
-              "
             >
               <div
                 v-if="props?.row?.isGroup"

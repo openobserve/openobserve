@@ -15,29 +15,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="custom-chart-type-selector-popup"
-    :class="[$q.dark.isActive ? 'dark-mode' : 'light-mode']"
+  <q-card
     data-test="custom-chart-type-selector-popup"
     style="
       padding: 0;
       width: 95vw;
       height: calc(100vh - 57px);
       max-width: 1800px;
+      overflow: hidden;
     "
   >
     <!-- Header -->
-    <div
-      class="flex justify-between items-center q-pa-md header"
-      style="border-bottom: 2px solid #e0e0e0"
-      :class="[$q.dark.isActive ? 'header-dark' : 'header-light']"
-    >
-      <div class="flex items-center q-table__title">
-        <q-icon name="bar_chart" size="sm" class="q-mr-sm" />
-        <span class="text-h6">Example of custom charts</span>
-      </div>
-      <div class="flex items-center q-gutter-sm">
-        <!-- Search Input -->
+    <q-card-section>
+      <div class="flex justify-between items-center q-pa-none">
+        <div class="flex items-center q-table__title">
+          <q-icon name="bar_chart" size="sm" class="q-mr-sm" />
+          <span class="text-h6">Example of custom charts</span>
+        </div>
+        <q-space />
         <q-input
           v-model="searchQuery"
           dense
@@ -63,108 +58,114 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="custom-chart-type-selector-close"
         />
       </div>
-    </div>
+    </q-card-section>
+
+    <q-separator />
 
     <!-- Main Content -->
-    <div class="flex" style="height: calc(100% - 60px); overflow: hidden">
-      <!-- Left Sidebar -->
-      <div
-        class="sidebar custom-chart-sidebar q-pa-md scroll"
-        :class="[$q.dark.isActive ? 'sidebar-dark' : 'sidebar-light']"
-        style="width: 160px; height: 100%; overflow-y: auto; flex-shrink: 0"
-      >
-        <div class="text-subtitle2 q-mb-md text-weight-bold">Chart Types</div>
-        <q-list dense>
-          <q-item
-            v-for="(category, index) in chartCategories"
-            :key="index"
-            clickable
-            v-ripple
-            :active="selectedCategory === category.chartLabel"
-            @click="scrollToCategory(category.chartLabel)"
-            class="sidebar-item"
-            :class="{
-              'active-category': selectedCategory === category.chartLabel,
-            }"
-            data-test="chart-category-item"
-          >
-            <q-item-section>
-              <q-item-label>{{ category.chartLabel }}</q-item-label>
-            </q-item-section>
-          </q-item>
-        </q-list>
-      </div>
-
-      <!-- Right Content Area -->
-      <div
-        ref="contentArea"
-        class="content-area q-pa-md scroll"
-        :class="[$q.dark.isActive ? 'content-area-dark' : 'content-area-light']"
-        style="flex: 1; height: 100%; overflow-y: auto; overflow-x: hidden"
-        @scroll="handleScroll"
-      >
-        <!-- No Results Message -->
-        <div
-          v-if="filteredCategories.length === 0"
-          class="flex justify-center items-center"
-          style="height: 100%"
+    <q-card-section
+      class="flex"
+      style="height: calc(100% - 60px); overflow: hidden; padding: 0"
+    >
+      <div class="row no-wrap" style="height: 100%; width: 100%">
+        <!-- Left Sidebar -->
+        <q-card
+          flat
+          class="sidebar q-pa-md"
+          style="width: 160px; height: 100%; flex-shrink: 0; overflow-y: auto"
         >
-          <div class="text-center">
-            <q-icon name="search_off" size="4rem" color="grey-5" />
-            <div class="text-h6 text-grey-7 q-mt-md">No results found</div>
-            <div class="text-body2 text-grey-6 q-mt-sm">
-              Try searching with different keywords
-            </div>
-          </div>
-        </div>
-
-        <!-- Chart Categories -->
-        <div
-          v-for="(category, categoryIndex) in filteredCategories"
-          :key="categoryIndex"
-          class="chart-category-section q-mb-xl"
-          :data-category="category.chartLabel"
-        >
-          <div class="text-h6 q-mb-md text-weight-medium">
-            {{ category.chartLabel }}
-          </div>
-          <div class="row q-col-gutter-md">
-            <div
-              v-for="(chart, chartIndex) in category.type"
-              :key="chartIndex"
-              class="col-xs-12 col-sm-6 col-md-4 col-lg-3"
+          <div class="text-subtitle2 q-mb-md text-weight-bold">Chart Types</div>
+          <q-list dense>
+            <q-item
+              v-for="(category, index) in chartCategories"
+              :key="index"
+              clickable
+              v-ripple
+              :active="selectedCategory === category.chartLabel"
+              @click="scrollToCategory(category.chartLabel)"
+              class="sidebar-item"
+              :class="{
+                'active-category': selectedCategory === category.chartLabel,
+              }"
+              data-test="chart-category-item"
             >
-              <q-card
-                flat
-                bordered
-                class="chart-card cursor-pointer"
-                :class="{
-                  'selected-chart': selectedChart?.value === chart.value,
-                }"
-                @click="selectChart(chart)"
-                data-test="chart-type-card"
+              <q-item-section>
+                <q-item-label>{{ category.chartLabel }}</q-item-label>
+              </q-item-section>
+            </q-item>
+          </q-list>
+        </q-card>
+
+        <!-- Right Content Area -->
+        <div
+          ref="contentArea"
+          class="content-area q-pa-md"
+          style="flex: 1; height: 100%; overflow-y: auto; overflow-x: hidden"
+          @scroll="handleScroll"
+        >
+          <!-- No Results Message -->
+          <div
+            v-if="filteredCategories.length === 0"
+            class="flex justify-center items-center"
+            style="height: 100%"
+          >
+            <div class="text-center">
+              <q-icon name="search_off" size="4rem" color="grey-5" />
+              <div class="text-h6 text-grey-7 q-mt-md">No results found</div>
+              <div class="text-body2 text-grey-6 q-mt-sm">
+                Try searching with different keywords
+              </div>
+            </div>
+          </div>
+
+          <!-- Chart Categories -->
+          <div
+            v-for="(category, categoryIndex) in filteredCategories"
+            :key="categoryIndex"
+            class="chart-category-section q-mb-xl"
+            :data-category="category.chartLabel"
+          >
+            <div class="text-h6 q-mb-md text-weight-medium">
+              {{ category.chartLabel }}
+            </div>
+            <div class="row q-col-gutter-md">
+              <div
+                v-for="(chart, chartIndex) in category.type"
+                :key="chartIndex"
+                class="col-xs-12 col-sm-6 col-md-4 col-lg-3"
               >
-                <q-card-section class="q-pa-sm">
-                  <div class="chart-image-container">
-                    <img
-                      :src="chart.asset"
-                      :alt="chart.label"
-                      class="chart-image"
-                      loading="lazy"
-                    />
-                  </div>
-                </q-card-section>
-                <q-card-section class="q-pt-none q-px-sm q-pb-sm">
-                  <div class="text-caption text-center text-weight-medium">
-                    {{ chart.label }}
-                  </div>
-                </q-card-section>
-              </q-card>
+                <q-card
+                  flat
+                  bordered
+                  class="chart-card cursor-pointer"
+                  :class="{
+                    'selected-chart': selectedChart?.value === chart.value,
+                  }"
+                  @click="selectChart(chart)"
+                  data-test="chart-type-card"
+                >
+                  <q-card-section class="q-pa-sm">
+                    <div class="chart-image-container">
+                      <img
+                        :src="chart.asset"
+                        :alt="chart.label"
+                        class="chart-image"
+                        loading="lazy"
+                      />
+                    </div>
+                  </q-card-section>
+                  <q-card-section class="q-pt-none q-px-sm q-pb-sm">
+                    <div class="text-caption text-center text-weight-medium">
+                      {{ chart.label }}
+                    </div>
+                  </q-card-section>
+                </q-card>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </q-card-section>
 
     <!-- Confirm Chart Selection Dialog -->
     <CustomChartConfirmDialog
@@ -175,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="cancelChartSelection"
       v-model="confirmChartSelectionDialog"
     />
-  </div>
+  </q-card>
 </template>
 
 <script lang="ts">
@@ -188,7 +189,6 @@ import {
   inject,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 import type { ChartType, ChartCategory } from "./customChartExampleTypes";
 import { chartTypesData } from "./customChartExampleTypes";
 import CustomChartConfirmDialog from "@/components/dashboards/addPanel/customChartExamples/CustomChartConfirmDialog.vue";
@@ -202,7 +202,6 @@ export default defineComponent({
   emits: ["close", "select"],
   setup(props, { emit }) {
     const { t } = useI18n();
-    const $q = useQuasar();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
       "dashboard",
@@ -346,47 +345,12 @@ export default defineComponent({
       searchQuery,
       filteredCategories,
       currentQuery,
-      $q,
     };
   },
 });
 </script>
 
 <style lang="scss" scoped>
-.custom-chart-type-selector-popup {
-  background-color: white;
-  border-radius: 8px;
-  overflow: hidden;
-  &.dark-mode {
-    background-color: #23272e;
-    color: #e0e0e0;
-  }
-  &.light-mode {
-    background-color: white;
-    color: #222;
-  }
-}
-
-.header-light {
-  border-bottom: 2px solid #e0e0e0;
-  background-color: #f5f5f5;
-}
-.header-dark {
-  border-bottom: 2px solid #353535;
-  background-color: #23272e;
-  color: #e0e0e0;
-}
-
-// Only apply border to the custom chart sidebar, not all .sidebar
-.custom-chart-sidebar.sidebar-light {
-  background-color: #fafafa;
-  border-right: 1px solid #e0e0e0;
-}
-.custom-chart-sidebar.sidebar-dark {
-  background-color: #23272e;
-  border-right: 1px solid #353535;
-  color: #e0e0e0;
-}
 .sidebar {
   .sidebar-item {
     border-radius: 4px;
@@ -403,25 +367,8 @@ export default defineComponent({
       font-weight: 600;
     }
   }
-  &.sidebar-dark .sidebar-item {
-    &:hover {
-      background-color: #353535;
-    }
-    &.active-category {
-      background-color: #1976d2;
-      color: #fff;
-    }
-  }
 }
 
-.content-area-light {
-  background-color: #fff;
-  color: #222;
-}
-.content-area-dark {
-  background-color: #23272e;
-  color: #e0e0e0;
-}
 .content-area {
   .chart-category-section {
     scroll-margin-top: 20px;
@@ -430,15 +377,17 @@ export default defineComponent({
   .chart-card {
     transition: all 0.2s ease;
     height: 100%;
-    background-color: #fff;
-    &.selected-chart {
-      border: 2px solid var(--q-primary);
-      box-shadow: 0 4px 12px rgba(var(--q-primary-rgb), 0.3);
-    }
+
     &:hover {
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
       transform: translateY(-2px);
     }
+
+    &.selected-chart {
+      border: 2px solid var(--q-primary);
+      box-shadow: 0 4px 12px rgba(var(--q-primary-rgb), 0.3);
+    }
+
     .chart-image-container {
       width: 100%;
       height: 150px;
@@ -456,47 +405,5 @@ export default defineComponent({
       }
     }
   }
-  &.content-area-dark .chart-card {
-    background-color: #23272e;
-    border: 1px solid #353535;
-    color: #e0e0e0;
-    .chart-image-container {
-      background-color: #23272e;
-    }
-    &:hover {
-      box-shadow: 0 4px 12px rgba(25, 118, 210, 0.15);
-    }
-    &.selected-chart {
-      border: 2px solid #1976d2;
-      box-shadow: 0 4px 12px rgba(25, 118, 210, 0.3);
-    }
-  }
-}
-
-// Custom scrollbar styling
-.scroll::-webkit-scrollbar {
-  width: 8px;
-}
-
-.scroll::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
-
-.scroll::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 4px;
-}
-
-.scroll::-webkit-scrollbar-thumb:hover {
-  background: #555;
-}
-.dark-mode .scroll::-webkit-scrollbar-track {
-  background: #23272e;
-}
-.dark-mode .scroll::-webkit-scrollbar-thumb {
-  background: #353535;
-}
-.dark-mode .scroll::-webkit-scrollbar-thumb:hover {
-  background: #1976d2;
 }
 </style>
