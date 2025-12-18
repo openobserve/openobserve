@@ -465,8 +465,12 @@ pub async fn search(
         )
     );
 
+    // pushdown filter for vortex
+    let pushdown_filter = FilterPushdown::new();
+    physical_plan = pushdown_filter.optimize(physical_plan, ctx.state().config_options())?;
+
     if cfg.common.feature_dynamic_pushdown_filter_enabled {
-        // pushdown filter
+        // pushdown filter for dynamic pushdown filter enabled
         let pushdown_filter = FilterPushdown::new_post_optimization();
         physical_plan = pushdown_filter.optimize(physical_plan, ctx.state().config_options())?;
     }
