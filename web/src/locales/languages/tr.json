@@ -1001,7 +1001,11 @@
     "colorBySeriesTitle": "Serilere göre renk",
     "colorBySeriesTooltip": "Grafiklerde daha iyi görsel ayrım için serilere renk uygulayın. Veri görselleştirmesini geliştirmek için her seri için renkleri özelleştirin.",
     "editColorBySeries": " Rengi seriye göre düzenle",
-    "applyColorBySeries": " Serilere göre renk uygulayın"
+    "applyColorBySeries": " Serilere göre renk uygulayın",
+    "showAllLegends": "Tüm Efsaneleri Göster",
+    "legendsOfCharts": "Grafiklerin efsaneleri",
+    "totalLegends": "Toplam: {count}",
+    "noLegendsAvailable": "Efsane yok"
   },
   "panel": {
     "header": "Panel",
@@ -1945,7 +1949,8 @@
     "period": "Dönem",
     "cron": "Cron",
     "type": "Tür",
-    "run_pipeline": "Boru Hattı Çalıştır"
+    "run_pipeline": "Boru Hattı Çalıştır",
+    "showLegends": "Efsaneleri Göster"
   },
   "alert_list": {
     "alert_details": "Uyarı Ayrıntıları"
