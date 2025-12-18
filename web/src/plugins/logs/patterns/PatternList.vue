@@ -20,43 +20,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="patterns?.length > 0" class="tw-flex tw-flex-col tw-h-full">
       <!-- Table Header -->
       <div
-        class="tw-flex tw-items-center tw-py-2 tw-px-3 tw-border-b tw-border-[var(--o2-border-color)] tw-sticky tw-top-0 tw-z-10"
-        :style="{
-          background: store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
-        }"
+        class="tw-flex tw-items-center tw-border-b tw-border-[var(--o2-border-color)] tw-sticky tw-top-0 tw-z-10"
+        style="background: var(--o2-table-header-bg); min-width: 100%;"
       >
         <!-- Pattern Column Header -->
-        <div class="tw-flex-1 tw-min-w-0 tw-pr-1">
+        <div class="tw-flex-1 tw-min-w-0 tw-px-2 tw-relative table-head tw-text-ellipsis tw-text-left">
           <span
-            class="tw-text-xs text-weight-bold"
-            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+            class="tw-font-bold"
+            :class="store.state.theme === 'dark' ? 'text-white' : 'text-grey-8'"
           >
             {{ t("search.patternColumnHeader") }}
           </span>
         </div>
 
         <!-- Occurrence Column Header -->
-        <div class="tw-w-16 tw-flex-shrink-0 tw-pr-1 tw-text-right">
+        <div class="tw-w-16 tw-flex-shrink-0 tw-px-2 tw-relative table-head tw-text-ellipsis tw-text-right">
           <span
-            class="tw-text-xs text-weight-bold"
-            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+            class="tw-font-bold"
+            :class="store.state.theme === 'dark' ? 'text-white' : 'text-grey-8'"
           >
             {{ t("search.occurrenceColumnHeader") }}
           </span>
         </div>
 
         <!-- Percentage Column Header -->
-        <div class="tw-w-14 tw-flex-shrink-0 tw-pr-1 tw-text-right">
+        <div class="tw-w-14 tw-flex-shrink-0 tw-px-2 tw-relative table-head tw-text-ellipsis tw-text-right">
           <span
-            class="tw-text-xs text-weight-bold"
-            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+            class="tw-font-bold"
+            :class="store.state.theme === 'dark' ? 'text-white' : 'text-grey-8'"
           >
             {{ t("search.percentageColumnHeader") }}
           </span>
         </div>
 
         <!-- Actions Column - No Header -->
-        <div class="tw-w-20 tw-flex-shrink-0">
+        <div class="tw-w-20 tw-flex-shrink-0 tw-px-2 tw-relative table-head">
         </div>
       </div>
 

@@ -276,7 +276,8 @@
     "actionLabel": "Eylem",
     "transformLabel": "Dönüştürün",
     "addToDashboard": "Kontrol Paneline Ekle",
-    "selectStream": "Akışı Seç"
+    "selectStream": "Akışı Seç",
+    "pattern_summary": "{totalTime} ms içinde {logsAnalyzed} olaylarında bulunan {totalEvents} olay ve {patternsFound} modelinden 1 ila 50 arası gösteriliyor."
   },
   "menu": {
     "home": "Ana Sayfa",

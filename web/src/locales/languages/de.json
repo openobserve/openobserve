@@ -276,7 +276,8 @@
     "actionLabel": "Aktion",
     "transformLabel": "Verwandeln",
     "addToDashboard": "Zum Dashboard hinzufügen",
-    "selectStream": "Wählen Sie Stream"
+    "selectStream": "Wählen Sie Stream",
+    "pattern_summary": "Es werden 1 bis 50 von {totalEvents} -Ereignissen und {patternsFound} -Mustern angezeigt, die in {logsAnalyzed} -Ereignissen in {totalTime} ms gefunden wurden."
   },
   "menu": {
     "home": "Startseite",

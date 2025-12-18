@@ -276,7 +276,8 @@
     "actionLabel": "アクション",
     "transformLabel": "トランスフォーム",
     "addToDashboard": "ダッシュボードに追加",
-    "selectStream": "[ストリーム] を選択"
+    "selectStream": "[ストリーム] を選択",
+    "pattern_summary": "{totalTime} ミリ秒で {logsAnalyzed} イベントで見つかった {totalEvents} イベントと {PatternsFound} パターンのうち 1 ～ 50 件を表示しています。"
   },
   "menu": {
     "home": "ホーム",
