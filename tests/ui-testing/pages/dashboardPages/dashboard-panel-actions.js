@@ -1,5 +1,5 @@
 // Dashboard actions page
-// Methods : AddPanelName, SavePanel, ApplyDashboardBtn
+// Methods : AddPanelName, SavePanel, ApplyDashboardBtn, AddNextPanel, GetTableRowCount, VerifyChartRenders
 
 export default class DashboardactionPage {
   constructor(page) {
@@ -8,6 +8,11 @@ export default class DashboardactionPage {
     this.panelNameInput = page.locator('[data-test="dashboard-panel-name"]');
     this.panelSaveBtn = page.locator('[data-test="dashboard-panel-save"]');
     this.applyDashboard = page.locator('[data-test="dashboard-apply"]');
+    this.addPanelBtn = page.locator('[data-test="dashboard-panel-add"]');
+    this.dashboardTable = page.locator('[data-test="dashboard-panel-table"]');
+    this.chartRenderer = page.locator('[data-test="dashboard-panel-table"], [data-test="chart-renderer"]');
+    this.noDataElement = page.locator('[data-test="no-data"]');
+    this.dashboardSearchInput = page.locator('[data-test="dashboard-search"]');
   }
 
   // Generate a unique panel name
@@ -87,5 +92,72 @@ export default class DashboardactionPage {
       .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
       .click();
     await this.page.locator(`[data-test="${actionTestId}"]`).click();
+  }
+
+  /**
+   * Click the add panel button to add a new panel after saving the previous one
+   * Waits for UI to stabilize before clicking
+   */
+  async addNextPanel() {
+    await this.page.waitForTimeout(2000);
+    await this.addPanelBtn.waitFor({ state: "visible", timeout: 30000 });
+    await this.addPanelBtn.click();
+  }
+
+  /**
+   * Get the count of data rows in the dashboard panel table
+   * Excludes empty header/footer rows within tbody
+   * @returns {Promise<number>} Number of data rows
+   */
+  async getTableRowCount() {
+    await this.page.waitForTimeout(2000);
+    const rows = this.dashboardTable.locator('tbody tr');
+    const totalRows = await rows.count();
+
+    let dataRowCount = 0;
+    for (let i = 0; i < totalRows; i++) {
+      const firstCell = rows.nth(i).locator('td').first();
+      const cellText = await firstCell.textContent().catch(() => '');
+      if (cellText && cellText.trim() !== '') {
+        dataRowCount++;
+      }
+    }
+    return dataRowCount;
+  }
+
+  /**
+   * Verify that the chart or table renders successfully
+   * @param {Function} expect - Playwright expect function
+   */
+  async verifyChartRenders(expect) {
+    await expect(this.chartRenderer.first()).toBeVisible({ timeout: 15000 });
+  }
+
+  /**
+   * Verify no data element is hidden (data is present)
+   * @param {Function} expect - Playwright expect function
+   * @returns {Promise<boolean>} True if no errors/data present
+   */
+  async verifyNoErrors(expect) {
+    const noErrors = await this.noDataElement.isHidden();
+    expect(noErrors).toBeTruthy();
+    return noErrors;
+  }
+
+  /**
+   * Wait for the dashboard search input to be visible
+   */
+  async waitForDashboardSearchVisible() {
+    await this.dashboardSearchInput.waitFor({ state: 'visible', timeout: 30000 });
+    await this.page.waitForTimeout(2000);
+  }
+
+  /**
+   * Get a dashboard row by name for clicking
+   * @param {string} dashboardName - Name of the dashboard
+   * @returns {Locator} The dashboard row locator
+   */
+  getDashboardRow(dashboardName) {
+    return this.page.getByRole("row", { name: new RegExp(`.*${dashboardName}`) });
   }
 }

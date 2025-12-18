@@ -234,6 +234,79 @@ export class JoinHelper {
     await expect(joinChip).toBeVisible({ timeout: 5000 });
     await expect(joinChip).toContainText(streamName);
   }
+
+  /**
+   * Open an existing join item's configuration popup
+   * @param {number} joinIndex - Index of the join to open (0-based)
+   */
+  async openJoinItemPopup(joinIndex) {
+    const joinItem = this.page.locator(`[data-test="dashboard-join-item-${joinIndex}"]`);
+    await joinItem.click();
+    await this.page.locator('[data-test="dashboard-join-pop-up"]').waitFor({
+      state: "visible",
+      timeout: 10000,
+    });
+  }
+
+  /**
+   * Verify that the condition remove button is disabled (when only one condition exists)
+   * @param {number} conditionIndex - Index of the condition
+   * @param {Function} expect - Playwright expect function
+   */
+  async verifyConditionRemoveButtonDisabled(conditionIndex, expect) {
+    const removeBtn = this.page.locator(`[data-test="dashboard-join-condition-remove-${conditionIndex}"]`);
+    await expect(removeBtn).toBeDisabled();
+  }
+
+  /**
+   * Verify that the condition remove button is enabled
+   * @param {number} conditionIndex - Index of the condition
+   * @param {Function} expect - Playwright expect function
+   */
+  async verifyConditionRemoveButtonEnabled(conditionIndex, expect) {
+    const removeBtn = this.page.locator(`[data-test="dashboard-join-condition-remove-${conditionIndex}"]`);
+    await expect(removeBtn).not.toBeDisabled();
+  }
+
+  /**
+   * Verify that a join chip is not visible (after removal)
+   * @param {number} joinIndex - Index of the join chip (0-based)
+   * @param {Function} expect - Playwright expect function
+   */
+  async verifyJoinChipNotVisible(joinIndex, expect) {
+    const joinChip = this.page.locator(`[data-test="dashboard-join-item-${joinIndex}"]`);
+    await expect(joinChip).not.toBeVisible({ timeout: 5000 });
+  }
+
+  /**
+   * Check if a join chip is visible
+   * @param {number} joinIndex - Index of the join to check
+   * @returns {Promise<boolean>} True if visible
+   */
+  async isJoinChipVisible(joinIndex) {
+    const joinChip = this.page.locator(`[data-test="dashboard-join-item-${joinIndex}"]`);
+    return await joinChip.isVisible();
+  }
+
+  /**
+   * Click the add join button only (without opening popup)
+   * Used for incomplete join scenarios
+   */
+  async clickAddJoinButton() {
+    const addJoinBtn = this.page.locator('[data-test="dashboard-add-join-btn"]');
+    await addJoinBtn.waitFor({ state: "visible", timeout: 10000 });
+    await addJoinBtn.click();
+    await this.page.waitForTimeout(1000);
+  }
+
+  /**
+   * Wait for join item to appear
+   * @param {number} joinIndex - Index of the join item to wait for
+   */
+  async waitForJoinItem(joinIndex) {
+    const joinItem = this.page.locator(`[data-test="dashboard-join-item-${joinIndex}"]`);
+    await joinItem.waitFor({ state: "visible", timeout: 10000 });
+  }
 }
 
 /**
