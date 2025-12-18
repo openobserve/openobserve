@@ -364,6 +364,39 @@ export default defineComponent({
     // inject selected tab, default will be default tab
     const selectedTabId = inject("selectedTabId", ref("default"));
 
+    // Helper function to set up panel visibility observers
+    const setupPanelObservers = async () => {
+      if (!variablesManager) return;
+
+      // Clean up existing observer
+      if (panelObserver.value) {
+        panelObserver.value.disconnect();
+        panelObserver.value = null;
+      }
+
+      // Wait for DOM to be ready
+      await nextTick();
+
+      // Create new IntersectionObserver
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          const panelId = entry.target.getAttribute('gs-id');
+          if (panelId) {
+            variablesManager.setPanelVisibility(panelId, entry.isIntersecting);
+          }
+        });
+      }, {
+        threshold: 0.1 // Panel is visible if 10% is in viewport
+      });
+
+      // Observe all current panel elements
+      const panelElements = gridStackContainer.value?.querySelectorAll('.grid-stack-item');
+      panelElements?.forEach((el: Element) => observer.observe(el));
+
+      // Store observer for cleanup
+      panelObserver.value = observer;
+    };
+
     // Inject variables manager from parent ViewDashboard
     const variablesManager = inject<ReturnType<typeof useVariablesManager>>("variablesManager", undefined);
 
@@ -809,6 +842,9 @@ export default defineComponent({
 
       gridStackUpdateInProgress = false;
       window.dispatchEvent(new Event("resize"));
+
+      // Re-setup panel observers for the new panels
+      await setupPanelObservers();
     };
 
     // Add a method to reset grid layout
@@ -909,26 +945,7 @@ export default defineComponent({
       await nextTick(); // Wait for grid initialization to complete
 
       // Set up IntersectionObserver for panel visibility (for lazy loading panel-scoped variables)
-      if (variablesManager) {
-        const observer = new IntersectionObserver((entries) => {
-          entries.forEach((entry) => {
-            const panelId = entry.target.getAttribute('gs-id');
-            if (panelId) {
-              variablesManager.setPanelVisibility(panelId, entry.isIntersecting);
-            }
-          });
-        }, {
-          threshold: 0.1 // Panel is visible if 10% is in viewport
-        });
-
-        // Observe all panels
-        await nextTick();
-        const panelElements = gridStackContainer.value?.querySelectorAll('.grid-stack-item');
-        panelElements?.forEach((el: Element) => observer.observe(el));
-
-        // Store observer for cleanup
-        panelObserver.value = observer;
-      }
+      await setupPanelObservers();
     });
 
     // Watch for tab visibility changes
