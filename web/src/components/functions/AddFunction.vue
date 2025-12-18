@@ -51,12 +51,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:before>
             <div class="q-px-md q-pt-sm q-pb-md tw:h-max card-container tw:h-[calc(100vh-128px)]">
               <q-form id="addFunctionForm" ref="addJSTransformForm">
+                <!-- Transform Type Selector -->
+                <div class="q-pb-sm o2-input">
+                  <q-select
+                    v-model="formData.transType"
+                    :options="transformTypeOptions"
+                    :label="t('function.transformType')"
+                    dense
+                    filled
+                    emit-value
+                    map-options
+                    data-test="function-transform-type-select"
+                    class="tw-mb-2"
+                  />
+                </div>
                 <div class="add-function-name-input q-pb-sm o2-input">
                   <FullViewContainer
                     name="function"
                     v-model:is-expanded="expandState.functions"
-                    :label="t('function.jsfunction') + '*'"
-                    class="tw:mt-1"
+                    :label="(formData.transType === '1' ? t('function.jsfunction') : t('function.vrlfunction')) + '*'"
+                    class="tw-mt-1"
                   />
                   <div
                     v-show="expandState.functions"
@@ -69,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="monaco-editor"
                       :style="{ height: `calc(100vh - (180px + ${heightOffset}px))` }"
                       v-model:query="formData.function"
-                      language="vrl"
+                      :language="formData.transType === '1' ? 'javascript' : 'vrl'"
                     />
                   </div>
                   <div class="text-subtitle2">
@@ -233,6 +247,12 @@ export default defineComponent({
 
     let compilationErr = ref("");
 
+    // Transform type options for the dropdown
+    const transformTypeOptions = ref([
+      { label: t("function.vrlType"), value: "0" },
+      { label: t("function.jsType"), value: "1" },
+    ]);
+
     const beingUpdated = computed(() => props.isUpdated);
 
     const streamTypes = ["logs", "metrics", "traces"];
@@ -315,14 +335,10 @@ export default defineComponent({
       );
     };
     const updateEditorContent = () => {
-      if (formData.value.transType == "1") {
-        prefixCode.value = `function(row)`;
-        suffixCode.value = `
-end`;
-      } else {
-        prefixCode.value = ``;
-        suffixCode.value = ``;
-      }
+      // JS functions don't need prefix/suffix, only VRL functions might
+      // For now, both VRL and JS are written as-is
+      prefixCode.value = ``;
+      suffixCode.value = ``;
 
       formData.value.function = `${prefixCode.value}
     ${formData.value.function}
@@ -352,7 +368,7 @@ end`;
           try {
             if (!beingUpdated.value) {
               formData.value.transType = parseInt(formData.value.transType);
-              //trans type is lua remove params from form
+              //trans type is JS, remove params from form
               if (formData.value.transType == 1) {
                 formData.value.params = "";
               }
@@ -363,7 +379,7 @@ end`;
               );
             } else {
               formData.value.transType = parseInt(formData.value.transType);
-              //trans type is lua remove params from form
+              //trans type is JS, remove params from form
               if (formData.value.transType == 1) {
                 formData.value.params = "";
               }
@@ -514,6 +530,7 @@ end`;
       splitterModel,
       closeAddFunction,
       confirmDialogMeta,
+      transformTypeOptions,
       resetConfirmDialog,
       cancelAddFunction,
       openChat,

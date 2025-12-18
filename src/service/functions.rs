@@ -63,11 +63,28 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
         if !func.function.ends_with('.') {
             func.function = format!("{} \n .", func.function);
         }
-        if func.trans_type.unwrap() == 0
-            && let Err(e) = compile_vrl_function(func.function.as_str(), &org_id)
-        {
-            return Ok(HttpResponse::BadRequest()
-                .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
+        // Validate function based on type
+        match func.trans_type.unwrap() {
+            0 => {
+                // VRL function
+                if let Err(e) = compile_vrl_function(func.function.as_str(), &org_id) {
+                    return Ok(HttpResponse::BadRequest()
+                        .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
+                }
+            }
+            1 => {
+                // JS function
+                if let Err(e) = crate::service::ingestion::compile_js_function(func.function.as_str(), &org_id) {
+                    return Ok(HttpResponse::BadRequest()
+                        .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
+                }
+            }
+            _ => {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    StatusCode::BAD_REQUEST,
+                    "Invalid transform type. Use 0 for VRL or 1 for JS.",
+                )));
+            }
         }
         extract_num_args(&mut func);
         if let Err(error) = db::functions::set(&org_id, &func.name, &func).await {
@@ -83,8 +100,40 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
     }
 }
 
-#[tracing::instrument(skip(org_id, function))]
+#[tracing::instrument(skip(org_id, function, trans_type))]
 pub async fn test_run_function(
+    org_id: &str,
+    function: String,
+    events: Vec<Value>,
+    trans_type: Option<u8>,
+) -> Result<HttpResponse, anyhow::Error> {
+    // Auto-detect transform type if not provided
+    let trans_type = trans_type.or_else(|| {
+        // Simple heuristic: if function contains VRL-specific syntax, assume VRL
+        // Otherwise, assume JS
+        if function.contains('!')
+            || function.trim().starts_with('.')
+            || function.contains("parse_")
+            || RESULT_ARRAY.is_match(&function)
+        {
+            Some(0) // VRL
+        } else {
+            Some(1) // JS
+        }
+    }).unwrap_or(0); // Default to VRL for backward compatibility
+
+    match trans_type {
+        0 => test_run_vrl_function(org_id, function, events).await,
+        1 => test_run_js_function(org_id, function, events).await,
+        _ => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            StatusCode::BAD_REQUEST,
+            "Invalid transform type. Use 0 for VRL or 1 for JS.",
+        ))),
+    }
+}
+
+#[tracing::instrument(skip(org_id, function))]
+async fn test_run_vrl_function(
     org_id: &str,
     mut function: String,
     events: Vec<Value>,
@@ -187,6 +236,51 @@ pub async fn test_run_function(
     Ok(HttpResponse::Ok().json(results))
 }
 
+#[tracing::instrument(skip(org_id, function))]
+async fn test_run_js_function(
+    org_id: &str,
+    function: String,
+    events: Vec<Value>,
+) -> Result<HttpResponse, anyhow::Error> {
+    // Compile the JS function
+    let js_config = match crate::service::ingestion::compile_js_function(&function, org_id) {
+        Ok(config) => config,
+        Err(e) => {
+            return Ok(HttpResponse::BadRequest()
+                .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
+        }
+    };
+
+    let mut transformed_events = vec![];
+
+    // Apply the function to each event
+    for event in events {
+        let (ret_val, err) = crate::service::ingestion::apply_js_fn(
+            &js_config,
+            event.clone(),
+            org_id,
+            &[String::new()],
+        );
+
+        if let Some(err) = err {
+            transformed_events.push(VRLResult::new(&err, event));
+        } else {
+            let transform = if !ret_val.is_null() && ret_val.is_object() {
+                config::utils::flatten::flatten(ret_val).unwrap_or("".into())
+            } else {
+                "".into()
+            };
+            transformed_events.push(VRLResult::new("", transform));
+        }
+    }
+
+    let results = TestVRLResponse {
+        results: transformed_events,
+    };
+
+    Ok(HttpResponse::Ok().json(results))
+}
+
 #[tracing::instrument(skip(func))]
 pub async fn update_function(
     org_id: &str,
@@ -207,12 +301,28 @@ pub async fn update_function(
     if !func.function.ends_with('.') {
         func.function = format!("{} \n .", func.function);
     }
-    if func.trans_type.unwrap() == 0
-        && let Err(e) = compile_vrl_function(&func.function, org_id)
-    {
-        return Ok(
-            HttpResponse::BadRequest().json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e))
-        );
+    // Validate function based on type
+    match func.trans_type.unwrap() {
+        0 => {
+            // VRL function
+            if let Err(e) = compile_vrl_function(&func.function, org_id) {
+                return Ok(HttpResponse::BadRequest()
+                    .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
+            }
+        }
+        1 => {
+            // JS function
+            if let Err(e) = crate::service::ingestion::compile_js_function(&func.function, org_id) {
+                return Ok(HttpResponse::BadRequest()
+                    .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
+            }
+        }
+        _ => {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                StatusCode::BAD_REQUEST,
+                "Invalid transform type. Use 0 for VRL or 1 for JS.",
+            )));
+        }
     }
     extract_num_args(&mut func);
 
@@ -372,13 +482,12 @@ mod tests {
     #[tokio::test]
     async fn test_functions() {
         let mut trans = Transform {
-            function: "function(row)  row.square = row[\"Year\"]*row[\"Year\"]  return row end"
-                .to_owned(),
+            function: "row.square = row.Year * row.Year;".to_owned(),
             name: "dummyfn".to_owned(),
             params: "row".to_owned(),
             streams: None,
             num_args: 0,
-            trans_type: Some(1),
+            trans_type: Some(1), // JS function
         };
 
         let mut vrl_trans = Transform {
