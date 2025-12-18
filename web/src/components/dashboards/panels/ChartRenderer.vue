@@ -409,6 +409,12 @@ export default defineComponent({
           dataIndex: params.dataIndex,
           seriesIndex: params.seriesIndex,
         });
+
+        emit("domcontextmenu", {
+          x: event.clientX,
+          y: event.clientY,
+          value: Number(dataPointValue),
+        });
       }
     };
 
