@@ -262,6 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw-flex-[0_0_68%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
                 <AlertSettings
+                  ref="step4Ref"
                   :formData="formData"
                   :isRealTime="formData.is_real_time"
                   :columns="filteredColumns"
@@ -1143,6 +1144,7 @@ export default defineComponent({
     const wizardStepper = ref(null);
     const step1Ref = ref(null);
     const step2Ref = ref(null);
+    const step4Ref = ref(null);
     const lastValidStep = ref(1); // Track the last successfully validated step
 
     // Computed property for step captions to avoid flickering
@@ -2088,9 +2090,27 @@ export default defineComponent({
         }
       }
 
-      // Add validation for other steps here in the future
-      // Step 3: Compare with Past
       // Step 4: Alert Settings
+      if (stepNumber === 4) {
+        console.log('[AddAlert] Validating step 4, step4Ref.value:', step4Ref.value);
+        if (step4Ref.value && (step4Ref.value as any).validate) {
+          const validationResult = (step4Ref.value as any).validate();
+
+          // Handle async validation
+          const isValid = validationResult instanceof Promise
+            ? await validationResult
+            : validationResult;
+
+          console.log('[AddAlert] Step 4 validation result:', isValid);
+
+          if (!isValid) {
+            return false;
+          }
+        }
+      }
+
+      // Add validation for other steps here in the future
+      // Step 3: Compare with Past (skipped - optional)
       // Step 5: Deduplication
       // Step 6: Advanced
 
@@ -2252,6 +2272,7 @@ export default defineComponent({
       goToPreviousStep,
       isLastStep,
       step2Ref,
+      step4Ref,
       lastValidStep,
     };
   },

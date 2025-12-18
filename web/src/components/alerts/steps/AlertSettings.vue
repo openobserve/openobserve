@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="step-alert-conditions" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
     <div class="step-content card-container tw-px-3 tw-py-4">
+      <q-form ref="alertSettingsForm" @submit.prevent>
       <!-- For Real-Time Alerts -->
       <template v-if="isRealTime === 'true'">
         <!-- Silence Notification (Cooldown) -->
@@ -87,75 +88,84 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div style="width: 190px" class="flex items-center tw-font-semibold">
             <span>{{ t("alerts.destination") }} *</span>
           </div>
-          <div class="tw-flex tw-items-center">
-            <q-select
-              v-model="localDestinations"
-              :options="filteredDestinations"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop no-case"
-              :class="
-                store.state.theme === 'dark' ? 'input-box-bg-dark input-border-dark' : 'input-box-bg-light input-border-light'
-              "
-              filled
-              dense
-              multiple
-              use-input
-              input-debounce="0"
-              @filter="filterDestinations"
-              style="width: 300px; max-width: 300px"
-              @update:model-value="emitDestinationsUpdate"
-            >
-              <template v-slot:selected>
-                <div v-if="localDestinations.length > 0" class="ellipsis">
-                  {{ localDestinations.join(", ") }}
-                </div>
-              </template>
-              <template v-slot:option="option">
-                <q-list dense>
-                  <q-item tag="label">
-                    <q-item-section avatar>
-                      <q-checkbox
-                        size="xs"
-                        dense
-                        v-model="localDestinations"
-                        :val="option.opt"
-                        @update:model-value="emitDestinationsUpdate"
-                      />
-                    </q-item-section>
-                    <q-item-section>
-                      <q-item-label class="ellipsis">{{ option.opt }}</q-item-label>
-                    </q-item-section>
+          <div class="tw-flex tw-flex-col">
+            <div class="tw-flex tw-items-center">
+              <q-select
+                v-model="localDestinations"
+                :options="filteredDestinations"
+                color="input-border"
+                bg-color="input-bg"
+                class="showLabelOnTop no-case"
+                :class="
+                  store.state.theme === 'dark' ? 'input-box-bg-dark input-border-dark' : 'input-box-bg-light input-border-light'
+                "
+                filled
+                dense
+                multiple
+                use-input
+                input-debounce="0"
+                @filter="filterDestinations"
+                style="width: 300px; max-width: 300px"
+                @update:model-value="emitDestinationsUpdate"
+              >
+                <template v-slot:selected>
+                  <div v-if="localDestinations.length > 0" class="ellipsis">
+                    {{ localDestinations.join(", ") }}
+                  </div>
+                </template>
+                <template v-slot:option="option">
+                  <q-list dense>
+                    <q-item tag="label">
+                      <q-item-section avatar>
+                        <q-checkbox
+                          size="xs"
+                          dense
+                          v-model="localDestinations"
+                          :val="option.opt"
+                          @update:model-value="emitDestinationsUpdate"
+                        />
+                      </q-item-section>
+                      <q-item-section>
+                        <q-item-label class="ellipsis">{{ option.opt }}</q-item-label>
+                      </q-item-section>
+                    </q-item>
+                  </q-list>
+                </template>
+                <template v-slot:no-option>
+                  <q-item>
+                    <q-item-section class="text-grey">No destinations available</q-item-section>
                   </q-item>
-                </q-list>
-              </template>
-              <template v-slot:no-option>
-                <q-item>
-                  <q-item-section class="text-grey">No destinations available</q-item-section>
-                </q-item>
-              </template>
-            </q-select>
-            <q-btn
-              icon="refresh"
-              class="iconHoverBtn q-ml-xs"
-              :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-              padding="xs"
-              unelevated
-              size="sm"
-              round
-              flat
-              title="Refresh latest Destinations"
-              @click="$emit('refresh:destinations')"
-              style="min-width: auto"
-            />
-            <q-btn
-              data-test="create-destination-btn"
-              label="Add New Destination"
-              class="text-bold no-border q-ml-sm"
-              color="primary"
-              no-caps
-              @click="routeToCreateDestination"
-            />
+                </template>
+              </q-select>
+              <q-btn
+                icon="refresh"
+                class="iconHoverBtn q-ml-xs"
+                :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
+                padding="xs"
+                unelevated
+                size="sm"
+                round
+                flat
+                title="Refresh latest Destinations"
+                @click="$emit('refresh:destinations')"
+                style="min-width: auto"
+              />
+              <q-btn
+                data-test="create-destination-btn"
+                label="Add New Destination"
+                class="text-bold no-border q-ml-sm"
+                color="primary"
+                no-caps
+                @click="routeToCreateDestination"
+              />
+            </div>
+            <div
+              v-if="!localDestinations || localDestinations.length === 0"
+              class="text-red-8 q-pt-xs"
+              style="font-size: 11px; line-height: 12px"
+            >
+              Field is required!
+            </div>
           </div>
         </div>
       </template>
@@ -685,7 +695,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Destinations -->
         <div class="flex items-start q-mr-sm tw-pb-4 tw-mb-4">
           <div class="tw-font-semibold flex items-center" style="width: 190px">
-            {{ t("alerts.destination") }}
+            {{ t("alerts.destination") + " *" }}
             <q-icon
               name="info"
               size="17px"
@@ -768,9 +778,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="routeToCreateDestination"
               />
             </div>
+            <div
+              v-if="!localDestinations || localDestinations.length === 0"
+              class="text-red-8 q-pt-xs"
+              style="font-size: 11px; line-height: 12px"
+            >
+              Field is required!
+            </div>
           </div>
         </div>
       </template>
+      </q-form>
     </div>
   </div>
 </template>
@@ -824,6 +842,9 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
+
+    // Form ref
+    const alertSettingsForm = ref(null);
 
     // Local state for aggregation toggle
     const localIsAggregationEnabled = ref(props.isAggregationEnabled);
@@ -1053,6 +1074,109 @@ export default defineComponent({
       window.open(url, "_blank");
     };
 
+    // Validation method - just call the inline validations that already exist
+    const validate = async () => {
+      console.log('[AlertSettings] Starting validation, isRealTime:', props.isRealTime);
+      console.log('[AlertSettings] localDestinations.value:', localDestinations.value);
+      console.log('[AlertSettings] silence:', props.formData.trigger_condition.silence);
+
+      // Validate cron/frequency first
+      validateFrequency();
+
+      // Check if there are any cron validation errors
+      if (cronJobError.value) {
+        console.log('[AlertSettings] Cron error:', cronJobError.value);
+        return false;
+      }
+
+      // For Real-Time Alerts
+      if (props.isRealTime === 'true') {
+        // Check silence notification
+        if (
+          props.formData.trigger_condition.silence < 0 ||
+          props.formData.trigger_condition.silence === undefined ||
+          props.formData.trigger_condition.silence === null ||
+          props.formData.trigger_condition.silence === ''
+        ) {
+          console.log('[AlertSettings] Silence notification validation failed');
+          return false;
+        }
+
+        // Check destinations (required for both real-time and scheduled)
+        if (!localDestinations.value || localDestinations.value.length === 0) {
+          console.log('[AlertSettings] Destinations validation failed - no destinations selected');
+          return false;
+        }
+
+        console.log('[AlertSettings] Real-time validation passed');
+        return true;
+      }
+
+      // For Scheduled Alerts
+      // Check if aggregation is enabled
+      if (localIsAggregationEnabled.value && props.formData.query_condition.aggregation) {
+        // Validate group by fields (if any are added, they must not be empty)
+        const groupByFields = props.formData.query_condition.aggregation.group_by;
+        if (groupByFields && groupByFields.length > 0) {
+          for (const field of groupByFields) {
+            if (!field || field === '') {
+              return false;
+            }
+          }
+        }
+
+        // Validate threshold with aggregation
+        if (!props.formData.query_condition.aggregation.having.column || props.formData.query_condition.aggregation.having.column === '') {
+          return false;
+        }
+        if (!props.formData.query_condition.aggregation.having.value || props.formData.query_condition.aggregation.having.value === '') {
+          return false;
+        }
+      } else {
+        // Validate threshold without aggregation
+        if (!props.formData.trigger_condition.operator) {
+          return false;
+        }
+        if (!Number(props.formData.trigger_condition.threshold)) {
+          return false;
+        }
+      }
+
+      // Validate period
+      if (!Number(props.formData.trigger_condition.period)) {
+        return false;
+      }
+
+      // Validate frequency
+      if (props.formData.trigger_condition.frequency_type === 'minutes') {
+        if (!Number(props.formData.trigger_condition.frequency)) {
+          return false;
+        }
+      } else if (props.formData.trigger_condition.frequency_type === 'cron') {
+        if (!props.formData.trigger_condition.cron || !props.formData.trigger_condition.timezone) {
+          return false;
+        }
+      }
+
+      // Validate silence notification
+      if (
+        props.formData.trigger_condition.silence < 0 ||
+        props.formData.trigger_condition.silence === undefined ||
+        props.formData.trigger_condition.silence === null ||
+        props.formData.trigger_condition.silence === ''
+      ) {
+        return false;
+      }
+
+      // Check destinations (required for both real-time and scheduled)
+      if (!localDestinations.value || localDestinations.value.length === 0) {
+        console.log('[AlertSettings] Destinations validation failed - no destinations selected');
+        return false;
+      }
+
+      return true;
+    };
+
     return {
       t,
       store,
@@ -1081,6 +1205,9 @@ export default defineComponent({
       // Cron validation
       cronJobError,
       validateFrequency,
+      // Validation
+      validate,
+      alertSettingsForm,
     };
   },
 });
