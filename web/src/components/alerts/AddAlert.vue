@@ -171,6 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:promqlQuery="(value) => formData.query_condition.promql = value"
                   @update:vrlFunction="(value) => formData.query_condition.vrl_function = value"
                   @validate-sql="validateSqlQuery"
+                  @clear-multi-windows="clearMultiWindows"
                 />
               </div>
 
@@ -1462,6 +1463,10 @@ export default defineComponent({
       }
     }
 
+    const clearMultiWindows = () => {
+      formData.value.query_condition.multi_time_range = [];
+    }
+
 
 // Method to handle the emitted changes and update the structure
   const updateGroup = (updatedGroup: any) => {
@@ -2047,6 +2052,7 @@ export default defineComponent({
       step2Ref,
       step4Ref,
       lastValidStep,
+      clearMultiWindows,
     };
   },
 

@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="step2-query-tabs"
             :tabs="tabOptions"
             class="tabs-selection-container"
-            v-model:active-tab="localTab"
+            :active-tab="localTab"
             @update:active-tab="updateTab"
           />
         </div>
@@ -112,6 +112,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:vrlFunction="handleVrlFunctionUpdate"
       @validate-sql="handleValidateSql"
     />
+
+    <!-- Multi-Window Confirmation Dialog -->
+    <CustomConfirmDialog
+      v-model="showMultiWindowDialog"
+      title="Clear Multi-Windows?"
+      :message="`Multi-windows are configured. To enable ${pendingTab === 'custom' ? 'Custom' : 'PromQL'} mode, we need to clear them. Do you want to proceed?`"
+      @confirm="handleConfirmClearMultiWindows"
+      @cancel="handleCancelClearMultiWindows"
+    />
   </div>
 </template>
 
@@ -123,6 +132,7 @@ import { b64EncodeUnicode } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
 import FilterGroup from "@/components/alerts/FilterGroup.vue";
 import QueryEditorDialog from "@/components/alerts/QueryEditorDialog.vue";
+import CustomConfirmDialog from "@/components/alerts/CustomConfirmDialog.vue";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue")
@@ -135,6 +145,7 @@ export default defineComponent({
     FilterGroup,
     QueryEditor,
     QueryEditorDialog,
+    CustomConfirmDialog,
   },
   props: {
     tab: {
@@ -190,7 +201,7 @@ export default defineComponent({
       default: "",
     },
   },
-  emits: ["update:tab", "update-group", "remove-group", "input:update", "update:sqlQuery", "update:promqlQuery", "update:vrlFunction", "validate-sql"],
+  emits: ["update:tab", "update-group", "remove-group", "input:update", "update:sqlQuery", "update:promqlQuery", "update:vrlFunction", "validate-sql", "clear-multi-windows"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
@@ -198,6 +209,8 @@ export default defineComponent({
     const localTab = ref(props.tab);
     const viewSqlEditor = ref(false);
     const customConditionsForm = ref(null);
+    const showMultiWindowDialog = ref(false);
+    const pendingTab = ref<string | null>(null);
 
     // Field refs for focus manager
     const customPreviewRef = ref(null);
@@ -211,10 +224,9 @@ export default defineComponent({
     // Get saved VRL functions from store
     const functionsList = computed(() => store.state.organizationData.functions || []);
 
+
     // Compute tab options based on stream type and alert type
     const tabOptions = computed(() => {
-      const hasComparisonWindow = props.multiTimeRange.length > 0;
-
       // For real-time alerts, only show Custom (no tabs needed)
       if (props.isRealTime === "true") {
         return [
@@ -231,8 +243,6 @@ export default defineComponent({
           {
             label: "Custom",
             value: "custom",
-            disabled: hasComparisonWindow,
-            tooltipLabel: hasComparisonWindow ? "Custom mode is disabled when comparison window is added." : "",
           },
           {
             label: "SQL",
@@ -241,8 +251,6 @@ export default defineComponent({
           {
             label: "PromQL",
             value: "promql",
-            disabled: hasComparisonWindow,
-            tooltipLabel: hasComparisonWindow ? "PromQL mode is disabled when comparison window is added." : "",
           },
         ];
       }
@@ -252,8 +260,6 @@ export default defineComponent({
         {
           label: "Custom",
           value: "custom",
-          disabled: hasComparisonWindow,
-          tooltipLabel: hasComparisonWindow ? "Custom mode is disabled when comparison window is added." : "",
         },
         {
           label: "SQL",
@@ -268,8 +274,39 @@ export default defineComponent({
     });
 
     const updateTab = (tab: string) => {
+      const hasComparisonWindow = props.multiTimeRange.length > 0;
+
+      // Check if switching to custom or promql while multi-windows are present
+      if ((tab === 'custom' || tab === 'promql') && hasComparisonWindow) {
+        // Show confirmation dialog
+        pendingTab.value = tab;
+        showMultiWindowDialog.value = true;
+        return;
+      }
+
+      // No multi-windows, proceed with tab change
       localTab.value = tab;
       emit("update:tab", tab);
+    };
+
+    const handleConfirmClearMultiWindows = () => {
+      // Clear multi-windows
+      emit("clear-multi-windows");
+
+      // Wait for next tick to ensure multi-windows are cleared, then switch tab
+      nextTick(() => {
+        if (pendingTab.value) {
+          localTab.value = pendingTab.value;
+          emit("update:tab", pendingTab.value);
+          pendingTab.value = null;
+        }
+        showMultiWindowDialog.value = false;
+      });
+    };
+
+    const handleCancelClearMultiWindows = () => {
+      pendingTab.value = null;
+      showMultiWindowDialog.value = false;
     };
 
     const updateGroup = (data: any) => {
@@ -406,6 +443,11 @@ export default defineComponent({
       // Field refs for focus manager
       customPreviewRef,
       sqlPromqlPreviewRef,
+      // Multi-window dialog
+      showMultiWindowDialog,
+      pendingTab,
+      handleConfirmClearMultiWindows,
+      handleCancelClearMultiWindows,
     };
   },
 });
