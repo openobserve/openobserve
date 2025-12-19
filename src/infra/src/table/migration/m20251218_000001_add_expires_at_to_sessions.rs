@@ -32,19 +32,37 @@ impl MigrationTrait for Migration {
         let default_expiry =
             chrono::Utc::now().timestamp_micros() + (default_expiry_hours * 60 * 60 * 1_000_000);
 
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(Sessions::Table)
-                    .add_column(
-                        ColumnDef::new(Sessions::ExpiresAt)
-                            .big_integer()
-                            .not_null()
-                            .default(default_expiry),
-                    )
-                    .to_owned(),
-            )
-            .await?;
+        // MySQL doesn't support IF NOT EXISTS in ALTER TABLE
+        // So we use add_column for MySQL and add_column_if_not_exists for others
+        if matches!(manager.get_database_backend(), sea_orm::DbBackend::MySql) {
+            manager
+                .alter_table(
+                    Table::alter()
+                        .table(Sessions::Table)
+                        .add_column(
+                            ColumnDef::new(Sessions::ExpiresAt)
+                                .big_integer()
+                                .not_null()
+                                .default(default_expiry),
+                        )
+                        .to_owned(),
+                )
+                .await?;
+        } else {
+            manager
+                .alter_table(
+                    Table::alter()
+                        .table(Sessions::Table)
+                        .add_column_if_not_exists(
+                            ColumnDef::new(Sessions::ExpiresAt)
+                                .big_integer()
+                                .not_null()
+                                .default(default_expiry),
+                        )
+                        .to_owned(),
+                )
+                .await?;
+        }
 
         // Create index on expires_at for efficient cleanup queries
         manager
