@@ -85,6 +85,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`variable-selector-${item.name}`"
         />
       </div>
+
+    </div>
       <!-- Add Variable Button -->
       <div v-if="showAddVariableButton" class="q-ml-xs q-mt-sm">
         <q-btn
@@ -99,7 +101,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-add-variable-btn"
         />
       </div>
-    </div>
   </div>
 </template>
 
@@ -2418,6 +2419,7 @@ export default defineComponent({
       loadVariableOptions,
       onVariableSearch,
       cancelAllVariableOperations,
+      openAddVariable: () => emit("openAddVariable"),
     };
   },
 });
