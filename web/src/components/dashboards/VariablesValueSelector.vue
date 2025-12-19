@@ -24,6 +24,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :key="item.name + index"
       :data-test="`dashboard-variable-${item.name}-container`"
     >
+      <!-- State indicators for testing -->
+      <div v-if="item.isLoading" :data-test="`${props.panelId ? 'panel-' + props.panelId + '-' : ''}variable-${item.name}-loading`" style="display:none"></div>
+      <div v-if="!item.isLoading && item.isVariablePartialLoaded" :data-test="`${props.panelId ? 'panel-' + props.panelId + '-' : ''}variable-${item.name}-loaded`" style="display:none"></div>
+      <div :data-test="`${props.panelId ? 'panel-' + props.panelId + '-' : ''}variable-${item.name}-value`" style="display:none">{{ item.value }}</div>
+
       <div v-if="item.type == 'query_values'">
         <VariableQueryValueSelector
           class="q-mr-lg q-mt-xs"
