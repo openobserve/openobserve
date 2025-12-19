@@ -99,8 +99,8 @@ export function generateAlertSummary(formData: any, destinations: any[], t?: (ke
     }
 
     if (queryText) {
-      // Truncate if longer than 60 characters
-      const maxLength = 60;
+      // Truncate if longer than 50 characters
+      const maxLength = 48;
       const truncatedQuery = queryText.length > maxLength
         ? queryText.substring(0, maxLength) + '...'
         : queryText;

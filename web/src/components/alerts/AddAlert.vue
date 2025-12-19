@@ -96,10 +96,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="wizardStep > 1"
           :disable="1 > lastValidStep"
         >
-          <!-- 70/30 Split Layout with Equal Heights -->
+          <!-- 60/40 Split Layout with Equal Heights -->
           <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
-            <!-- Left Column: Step Content (70%) -->
-            <div class="tw-flex-[0_0_68%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
+            <!-- Left Column: Step Content (60%) -->
+            <div class="tw-flex-[0_0_60%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
                 <AlertSetup
                   ref="step1Ref"
@@ -120,17 +120,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             </div>
 
-            <AlertWizardRightColumn
-              ref="previewAlertRef"
-              :formData="formData"
-              :previewQuery="previewQuery"
-              :generatedSqlQuery="generatedSqlQuery"
-              :selectedTab="formData.query_condition.type || 'custom'"
-              :isAggregationEnabled="isAggregationEnabled"
-              :destinations="formData.destinations"
-              :focusManager="focusManager"
-              :wizardStep="wizardStep"
-            />
+            <div class="tw-flex-1">
+              <AlertWizardRightColumn
+                ref="previewAlertRef"
+                :formData="formData"
+                :previewQuery="previewQuery"
+                :generatedSqlQuery="generatedSqlQuery"
+                :selectedTab="formData.query_condition.type || 'custom'"
+                :isAggregationEnabled="isAggregationEnabled"
+                :destinations="formData.destinations"
+                :focusManager="focusManager"
+                :wizardStep="wizardStep"
+              />
+            </div>
           </div>
         </q-step>
 
@@ -143,10 +145,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="wizardStep > 2"
           :disable="2 > lastValidStep"
         >
-          <!-- 70/30 Split Layout with Equal Heights -->
+          <!-- 60/40 Split Layout with Equal Heights -->
           <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
-            <!-- Left Column: Step Content (70%) -->
-            <div class="tw-flex-[0_0_68%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
+            <!-- Left Column: Step Content (60%) -->
+            <div class="tw-flex-[0_0_60%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
                 <QueryConfig
                   ref="step2Ref"
@@ -177,17 +179,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             </div>
 
-            <AlertWizardRightColumn
-              ref="previewAlertRef"
-              :formData="formData"
-              :previewQuery="previewQuery"
-              :generatedSqlQuery="generatedSqlQuery"
-              :selectedTab="formData.query_condition.type || 'custom'"
-              :isAggregationEnabled="isAggregationEnabled"
-              :destinations="formData.destinations"
-              :focusManager="focusManager"
-              :wizardStep="wizardStep"
-            />
+            <div class="tw-flex-1">
+              <AlertWizardRightColumn
+                ref="previewAlertRef"
+                :formData="formData"
+                :previewQuery="previewQuery"
+                :generatedSqlQuery="generatedSqlQuery"
+                :selectedTab="formData.query_condition.type || 'custom'"
+                :isAggregationEnabled="isAggregationEnabled"
+                :destinations="formData.destinations"
+                :focusManager="focusManager"
+                :wizardStep="wizardStep"
+              />
+            </div>
           </div>
         </q-step>
 
@@ -201,10 +205,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="wizardStep > 3"
           :disable="3 > lastValidStep"
         >
-          <!-- 70/30 Split Layout with Equal Heights -->
+          <!-- 60/40 Split Layout with Equal Heights -->
           <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
-            <!-- Left Column: Step Content (70%) -->
-            <div class="tw-flex-[0_0_68%] tw-flex tw-flex-col" style="height: 100%; overflow: hidden;">
+            <!-- Left Column: Step Content (60%) -->
+            <div class="tw-flex-[0_0_60%] tw-flex tw-flex-col" style="height: 100%; overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
                 <CompareWithPast
                   :multiTimeRange="formData.query_condition.multi_time_range"
@@ -219,17 +223,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             </div>
 
-            <AlertWizardRightColumn
-              ref="previewAlertRef"
-              :formData="formData"
-              :previewQuery="previewQuery"
-              :generatedSqlQuery="generatedSqlQuery"
-              :selectedTab="formData.query_condition.type || 'custom'"
-              :isAggregationEnabled="isAggregationEnabled"
-              :destinations="formData.destinations"
-              :focusManager="focusManager"
-              :wizardStep="wizardStep"
-            />
+            <div class="tw-flex-1">
+              <AlertWizardRightColumn
+                ref="previewAlertRef"
+                :formData="formData"
+                :previewQuery="previewQuery"
+                :generatedSqlQuery="generatedSqlQuery"
+                :selectedTab="formData.query_condition.type || 'custom'"
+                :isAggregationEnabled="isAggregationEnabled"
+                :destinations="formData.destinations"
+                :focusManager="focusManager"
+                :wizardStep="wizardStep"
+              />
+            </div>
           </div>
         </q-step>
 
@@ -242,10 +248,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="wizardStep > 4"
           :disable="4 > lastValidStep"
         >
-          <!-- 70/30 Split Layout with Equal Heights -->
+          <!-- 60/40 Split Layout with Equal Heights -->
           <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
-            <!-- Left Column: Step Content (70%) -->
-            <div class="tw-flex-[0_0_68%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
+            <!-- Left Column: Step Content (60%) -->
+            <div class="tw-flex-[0_0_60%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
                 <AlertSettings
                   ref="step4Ref"
@@ -265,17 +271,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             </div>
 
-            <AlertWizardRightColumn
-              ref="previewAlertRef"
-              :formData="formData"
-              :previewQuery="previewQuery"
-              :generatedSqlQuery="generatedSqlQuery"
-              :selectedTab="formData.query_condition.type || 'custom'"
-              :isAggregationEnabled="isAggregationEnabled"
-              :destinations="formData.destinations"
-              :focusManager="focusManager"
-              :wizardStep="wizardStep"
-            />
+            <div class="tw-flex-1">
+              <AlertWizardRightColumn
+                ref="previewAlertRef"
+                :formData="formData"
+                :previewQuery="previewQuery"
+                :generatedSqlQuery="generatedSqlQuery"
+                :selectedTab="formData.query_condition.type || 'custom'"
+                :isAggregationEnabled="isAggregationEnabled"
+                :destinations="formData.destinations"
+                :focusManager="focusManager"
+                :wizardStep="wizardStep"
+              />
+            </div>
           </div>
         </q-step>
 
@@ -289,10 +297,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="wizardStep > 5"
           :disable="5 > lastValidStep"
         >
-          <!-- 70/30 Split Layout with Equal Heights -->
+          <!-- 60/40 Split Layout with Equal Heights -->
           <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
-            <!-- Left Column: Step Content (70%) -->
-            <div class="tw-flex-[0_0_68%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
+            <!-- Left Column: Step Content (60%) -->
+            <div class="tw-flex-[0_0_60%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
                 <Deduplication
                   :deduplication="formData.deduplication"
@@ -303,17 +311,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             </div>
 
-            <AlertWizardRightColumn
-              ref="previewAlertRef"
-              :formData="formData"
-              :previewQuery="previewQuery"
-              :generatedSqlQuery="generatedSqlQuery"
-              :selectedTab="formData.query_condition.type || 'custom'"
-              :isAggregationEnabled="isAggregationEnabled"
-              :destinations="formData.destinations"
-              :focusManager="focusManager"
-              :wizardStep="wizardStep"
-            />
+            <div class="tw-flex-1">
+              <AlertWizardRightColumn
+                ref="previewAlertRef"
+                :formData="formData"
+                :previewQuery="previewQuery"
+                :generatedSqlQuery="generatedSqlQuery"
+                :selectedTab="formData.query_condition.type || 'custom'"
+                :isAggregationEnabled="isAggregationEnabled"
+                :destinations="formData.destinations"
+                :focusManager="focusManager"
+                :wizardStep="wizardStep"
+              />
+            </div>
           </div>
         </q-step>
 
@@ -326,10 +336,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="false"
           :disable="6 > lastValidStep"
         >
-          <!-- 70/30 Split Layout with Equal Heights -->
+          <!-- 60/40 Split Layout with Equal Heights -->
           <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
-            <!-- Left Column: Step Content (70%) -->
-            <div class="tw-flex-[0_0_68%] tw-flex tw-flex-col" style="height: 100%; overflow: hidden;">
+            <!-- Left Column: Step Content (60%) -->
+            <div class="tw-flex-[0_0_60%] tw-flex tw-flex-col" style="height: 100%; overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
                 <Advanced
                   :contextAttributes="formData.context_attributes"
@@ -345,17 +355,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             </div>
 
-            <AlertWizardRightColumn
-              ref="previewAlertRef"
-              :formData="formData"
-              :previewQuery="previewQuery"
-              :generatedSqlQuery="generatedSqlQuery"
-              :selectedTab="formData.query_condition.type || 'custom'"
-              :isAggregationEnabled="isAggregationEnabled"
-              :destinations="formData.destinations"
-              :focusManager="focusManager"
-              :wizardStep="wizardStep"
-            />
+            <div class="tw-flex-1">
+              <AlertWizardRightColumn
+                ref="previewAlertRef"
+                :formData="formData"
+                :previewQuery="previewQuery"
+                :generatedSqlQuery="generatedSqlQuery"
+                :selectedTab="formData.query_condition.type || 'custom'"
+                :isAggregationEnabled="isAggregationEnabled"
+                :destinations="formData.destinations"
+                :focusManager="focusManager"
+                :wizardStep="wizardStep"
+              />
+            </div>
           </div>
         </q-step>
       </q-stepper>
