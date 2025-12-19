@@ -327,7 +327,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       @variablesData="variablesDataUpdated"
                       @openAddVariable="handleOpenAddVariable"
-                      @openAddVariable="handleOpenAddVariable"
                       :initialVariableValues="initialVariableValues"
                       :showAddVariableButton="true"
                       :showAllVisible="true"
