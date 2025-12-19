@@ -1271,10 +1271,4 @@ export default defineComponent({
 .grid-stack-item-content {
   height: 100% !important;
 }
-
-.panel-with-variables {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
 </style>
