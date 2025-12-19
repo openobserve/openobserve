@@ -435,6 +435,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @last-triggered-at-update="handleLastTriggeredAtUpdate"
                         searchType="dashboards"
                         @series-data-update="seriesDataUpdate"
+                        @show-legends="showLegendsDialog = true"
+                        ref="panelSchemaRendererRef"
                       />
                       <q-dialog v-model="showViewPanel">
                         <QueryInspector
@@ -708,6 +710,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
+    <q-dialog v-model="showLegendsDialog">
+      <ShowLegendsPopup
+        :panelData="currentPanelData"
+        @close="showLegendsDialog = false"
+      />
+    </q-dialog>
   </div>
 </template>
 
@@ -771,6 +779,10 @@ const ConfigPanel = defineAsyncComponent(() => {
   return import("../../../components/dashboards/addPanel/ConfigPanel.vue");
 });
 
+const ShowLegendsPopup = defineAsyncComponent(() => {
+  return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
+});
+
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
 });
@@ -798,6 +810,7 @@ export default defineComponent({
     DashboardErrorsComponent,
     PanelSidebar,
     ConfigPanel,
+    ShowLegendsPopup,
     VariablesValueSelector,
     PanelSchemaRenderer,
     RelativeTime,
@@ -816,6 +829,8 @@ export default defineComponent({
     // This will be used to copy the chart data to the chart renderer component
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
     const chartData = ref();
+    const showLegendsDialog = ref(false);
+    const panelSchemaRendererRef: any = ref(null);
     const { t } = useI18n();
     const router = useRouter();
     const route = useRoute();
@@ -1943,6 +1958,26 @@ export default defineComponent({
         hoveredSeriesState.value.panelId = panelId ?? -1;
         hoveredSeriesState.value.hoveredTime = hoveredTime ?? null;
       },
+      setIndex: function (
+        dataIndex: number,
+        seriesIndex: number,
+        panelId: any,
+        hoveredTime?: any,
+      ) {
+        hoveredSeriesState.value.dataIndex = dataIndex ?? -1;
+        hoveredSeriesState.value.seriesIndex = seriesIndex ?? -1;
+        hoveredSeriesState.value.panelId = panelId ?? -1;
+        hoveredSeriesState.value.hoveredTime = hoveredTime ?? null;
+      },
+    });
+
+    const currentPanelData = computed(() => {
+      // panelData is a ref exposed by PanelSchemaRenderer
+      const rendererData = panelSchemaRendererRef.value?.panelData || {};
+      return {
+        ...rendererData,
+        config: dashboardPanelData.data.config || {},
+      };
     });
 
     // used provide and inject to share data between components
@@ -2159,6 +2194,9 @@ export default defineComponent({
       outlinedWarning,
       symOutlinedDataInfoAlert,
       outlinedRunningWithErrors,
+      showLegendsDialog,
+      currentPanelData,
+      panelSchemaRendererRef,
     };
   },
   methods: {
