@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-export const CURRENT_DASHBOARD_SCHEMA_VERSION = 7;
+export const CURRENT_DASHBOARD_SCHEMA_VERSION = 8;
 
 const convertPanelSchemaVersion = (data: any) => {
   if (!data || (typeof data === "object" && Object.keys(data).length === 0)) {
@@ -53,6 +53,97 @@ const convertPanelSchemaVersion = (data: any) => {
     ],
   };
 };
+
+const migrateV7FieldsToV8 = (fieldItem: any, isCustomQuery: boolean) => {
+  // if fieldItem is undefined, do nothing
+  if (!fieldItem) return;
+
+  // Check if aggregation function is histogram
+  const isHistogram = fieldItem.aggregationFunction === "histogram";
+
+  // mirgrate old args
+  // previously, args was only used for histogram interval
+  // so, add arg type as histogramInterval only if function is histogram
+  if (!fieldItem.args || !isHistogram) {
+    fieldItem.args = [];
+  } else {
+    fieldItem.args.forEach((arg: any) => {
+      if (!arg.type) {
+        arg.type = "histogramInterval";
+      }
+    });
+  }
+
+  // if customQuery then do nothing
+  // else need to shift column name to as first arg
+  if (isCustomQuery) {
+    fieldItem.type = "custom";
+  } else {
+    fieldItem.type = "build";
+    // prepend column in args
+    fieldItem.args.unshift({
+      type: "field",
+      value: {
+        field: fieldItem.column,
+        streamAlias: null,
+      },
+    });
+    delete fieldItem.column;
+  }
+
+  // rename aggregationFunction to functionName
+  if (fieldItem.aggregationFunction) {
+    fieldItem.functionName = fieldItem.aggregationFunction;
+    delete fieldItem.aggregationFunction;
+  } else {
+    // if no aggregationFunction then set functionName to null
+    fieldItem.functionName = null;
+  }
+};
+
+function migrateFields(
+  fields: any | any[],
+  isCustomQuery: boolean,
+  migrateFunction: (field: any, isCustomQuery: boolean) => void,
+) {
+  if (Array.isArray(fields)) {
+    fields.forEach((field: any) => migrateFunction(field, isCustomQuery));
+  } else {
+    migrateFunction(fields, isCustomQuery);
+  }
+}
+
+/**
+ * Migrates filter conditions by recursively processing nested structures
+ * Converts string column fields to objects with streamAlias and field properties
+ * @param filter The filter object to migrate
+ * @returns The migrated filter object
+ */
+function migrateFilterConditions(filter: any): any {
+  if (!filter) return filter;
+
+  if (filter.conditions && Array.isArray(filter.conditions)) {
+    // Process each condition recursively
+    filter.conditions = filter.conditions.map((condition: any) => {
+      // If it's a group, recursively process it
+      if (condition.filterType === "group") {
+        return migrateFilterConditions(condition);
+      }
+
+      // For regular conditions, convert string column to object with streamAlias and field
+      if (typeof condition.column === "string") {
+        condition.column = {
+          streamAlias: null,
+          field: condition.column,
+        };
+      }
+
+      return condition;
+    });
+  }
+
+  return filter;
+}
 
 export function convertDashboardSchemaVersion(data: any) {
   if (!data) {
@@ -200,6 +291,63 @@ export function convertDashboardSchemaVersion(data: any) {
 
       // update the version
       data.version = 7;
+    }
+
+    case 7: {
+      // need to traverse all panels
+      // for each panel
+      //   for each query
+      //      for each fields [x, y, z, breakdown, latitude, longitude, weight, source, target, value] Make sure that some of fields is not array
+      //          add type: "build"
+      //          field.column will go inside args array : {type: "field", value: field.column}
+      data.tabs.forEach((tabItem: any) => {
+        tabItem.panels.forEach((panelItem: any) => {
+          panelItem.queries.forEach((queryItem: any) => {
+            const {
+              x,
+              y,
+              z,
+              breakdown,
+              latitude,
+              longitude,
+              weight,
+              source,
+              target,
+              value,
+              name,
+              value_for_maps,
+            } = queryItem.fields;
+
+            // Migrate all fields
+            [
+              x,
+              y,
+              z,
+              breakdown,
+              latitude,
+              longitude,
+              weight,
+              source,
+              target,
+              value,
+              name,
+              value_for_maps,
+            ].forEach((field: any) => {
+              migrateFields(field, queryItem.customQuery, migrateV7FieldsToV8);
+            });
+
+            // Migrate the filters
+            // all column which is currently string will be converted to object with streamAlias and field
+            // make sure that conditions can be array based on filterType
+            queryItem.fields.filter = migrateFilterConditions(
+              queryItem.fields.filter,
+            );
+          });
+        });
+      });
+
+      // update the version
+      data.version = 8;
     }
   }
 

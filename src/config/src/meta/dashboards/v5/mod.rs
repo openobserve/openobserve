@@ -68,6 +68,7 @@ impl From<Dashboard> for super::Dashboard {
             v5: Some(value),
             v6: None,
             v7: None,
+            v8: None,
             version,
             hash,
             updated_at,

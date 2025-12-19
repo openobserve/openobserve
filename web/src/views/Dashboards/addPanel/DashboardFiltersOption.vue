@@ -82,9 +82,13 @@ export default defineComponent({
         ];
 
       if (filterType === "condition") {
+        const firstOption = schemaOptions.value[0];
         const defaultCondition = {
           type: "list",
-          column: `${schemaOptions.value[0]?.value}`,
+          column: {
+            field: firstOption?.value || '',
+            streamAlias: firstOption?.streamAlias
+          },
           filterType: "condition",
           operator: null,
           value: null,
@@ -97,7 +101,10 @@ export default defineComponent({
           conditions: [
             {
               type: "list",
-              column: `${schemaOptions.value[0]?.value}`,
+              column: {
+                field: schemaOptions.value[0]?.value || '',
+                streamAlias: schemaOptions.value[0]?.streamAlias
+              },
               filterType: "condition",
               operator: null,
               value: null,
@@ -113,9 +120,13 @@ export default defineComponent({
     };
 
     const addConditionToGroup = (group: any) => {
+      const firstOption = schemaOptions.value[0];
       group.conditions.push({
         type: "list",
-        column: `${schemaOptions.value[0]?.value}`,
+        column: {
+          field: firstOption?.value || '',
+          streamAlias: firstOption?.streamAlias
+        },
         filterType: "condition",
         operator: null,
         value: null,
@@ -129,7 +140,10 @@ export default defineComponent({
         conditions: [
           {
             type: "list",
-            column: `${schemaOptions.value[0]?.value}`,
+            column: {
+              field: schemaOptions.value[0]?.value || '',
+              streamAlias: schemaOptions.value[0]?.streamAlias
+            },
             filterType: "condition",
             operator: null,
             value: null,

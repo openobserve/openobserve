@@ -276,7 +276,8 @@
     "actionLabel": "Azione",
     "transformLabel": "Trasforma",
     "addToDashboard": "Aggiungi al pannello di controllo",
-    "selectStream": "Seleziona Stream"
+    "selectStream": "Seleziona Stream",
+    "pattern_summary": "Mostrando da 1 a 50 eventi su {totalEvents} e {patternsFound} pattern trovati in {logsAnalyzed} eventi in {totalTime} ms."
   },
   "menu": {
     "home": "Home",
@@ -1067,7 +1068,15 @@
     "mapvalue": "Valore",
     "customChartTypeSelector": "Selettore del tipo di grafico personalizzato",
     "customChartTypeSelectorHint": "Seleziona un tipo di grafico dalla libreria eCharts per iniziare con una struttura di codice di base",
-    "selectChartType": "Seleziona il tipo di grafico"
+    "selectChartType": "Seleziona il tipo di grafico",
+    "joins": "Si unisce",
+    "addJoin": "Aggiungi Unisciti",
+    "removeJoin": "Rimuovi Join",
+    "leftJoin": "Unisciti a sinistra",
+    "innerJoin": "Inner Join",
+    "rightJoin": "Unisciti a destra",
+    "addClause": "Aggiungi clausola",
+    "removeClause": "Rimuovi clausola"
   },
   "home": {
     "streams": "Stream",

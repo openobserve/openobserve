@@ -154,7 +154,7 @@ test.describe("visualization VRL testcases", () => {
 
     // Remove the existing X axis field and add the VRL field to the X axis
     await page
-      .locator('[data-test="dashboard-x-item-_timestamp-remove"]')
+      .locator('[data-test="dashboard-x-item-x_axis_1-remove"]')
       .click();
 
     await page

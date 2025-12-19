@@ -243,6 +243,7 @@ export default defineComponent({
     "onMovePanel",
     "panelsValues",
     "searchRequestTraceIds",
+    "chart:contextmenu",
   ],
   props: {
     viewOnly: {},

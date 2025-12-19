@@ -276,7 +276,8 @@
     "actionLabel": "アクション",
     "transformLabel": "トランスフォーム",
     "addToDashboard": "ダッシュボードに追加",
-    "selectStream": "[ストリーム] を選択"
+    "selectStream": "[ストリーム] を選択",
+    "pattern_summary": "{totalTime} ミリ秒で {logsAnalyzed} イベントで見つかった {totalEvents} イベントと {PatternsFound} パターンのうち 1 ～ 50 件を表示しています。"
   },
   "menu": {
     "home": "ホーム",
@@ -1083,7 +1084,15 @@
     "panelDuplicationFailed": "パネルを複製できませんでした",
     "customChartTypeSelector": "カスタムチャートタイプセレクター",
     "customChartTypeSelectorHint": "基本的なコード構造を始めるには、eCharts ライブラリからグラフの種類を選択します。",
-    "selectChartType": "チャートタイプを選択"
+    "selectChartType": "チャートタイプを選択",
+    "joins": "参加します",
+    "addJoin": "追加ジョイン",
+    "removeJoin": "[結合を削除]",
+    "leftJoin": "レフト・ジョイン",
+    "innerJoin": "インナー・ジョイン",
+    "rightJoin": "右結合",
+    "addClause": "条項を追加",
+    "removeClause": "条項を削除"
   },
   "home": {
     "streams": "ストリーム",
