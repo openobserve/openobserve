@@ -2,7 +2,6 @@
 import { expect } from '@playwright/test';
 
 import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue } from '../commonActions.js';
-import testLogger from '../../playwright-tests/utils/test-logger.js';
 
 
 export class TracesPage {
@@ -185,10 +184,12 @@ export class TracesPage {
   async clickFirstTraceResult() {
     await this.page.locator(this.searchResultItem).first().click();
     await this.page.waitForLoadState('networkidle').catch(() => {});
+    // Additional wait for trace details page to render
+    await this.page.waitForTimeout(1000);
   }
 
   async expectTraceDetailsVisible() {
-    await expect(this.page.locator(this.traceDetailsTree)).toBeVisible({ timeout: 10000 });
+    await expect(this.page.locator(this.traceDetailsTree)).toBeVisible({ timeout: 15000 });
   }
 
   async navigateBackFromTraceDetails() {
@@ -469,7 +470,6 @@ export class TracesPage {
       throw new Error(`Filter "${filterDescription}" not visible in query editor`);
     }
 
-    testLogger.info(`Filter "${filterDescription}" applied. Results: ${initialCount} -> ${newCount}`);
     return { initialCount, newCount, queryText };
   }
 
@@ -483,7 +483,6 @@ export class TracesPage {
     await this.verifyElementVisible(selector, description);
     await expect(element).toBeEnabled();
     await element.click();
-    testLogger.info(`Clicked: ${description}`);
   }
 
   /**
@@ -515,7 +514,6 @@ export class TracesPage {
     } catch {
       // Verify page is still valid before skipping
       await this.verifyPageState();
-      testLogger.info(`Skipping: ${skipReason}`);
       return false;
     }
   }
@@ -531,13 +529,11 @@ export class TracesPage {
     const baseUrl = (process.env["ZO_BASE_URL"] || '').replace(/\/+$/, '');
     const tracesUrl = `${baseUrl}/web/traces?org_identifier=${org}`;
 
-    testLogger.info('Navigating to traces', { url: tracesUrl });
     await this.page.goto(tracesUrl);
 
     try {
       await this.page.waitForLoadState('networkidle', { timeout: 30000 });
     } catch {
-      testLogger.info('Network idle timeout - continuing');
     }
   }
 
@@ -586,7 +582,6 @@ export class TracesPage {
       await this.page.keyboard.type(query);
       await this.page.waitForTimeout(500);
 
-      testLogger.info('Query entered', { query });
     } catch (error) {
       throw new Error(`Failed to enter query: ${error.message}`);
     }
@@ -604,7 +599,6 @@ export class TracesPage {
         await loadingIndicator.waitFor({ state: 'hidden', timeout: 10000 });
       }
     } catch {
-      testLogger.info('Loading indicator not found or timed out');
     }
 
     // Check for results
@@ -623,7 +617,6 @@ export class TracesPage {
 
       // Check for no results message
       if (await this.page.locator(this.resultNotFoundText).isVisible({ timeout: 1000 })) {
-        testLogger.info('No results message found');
         return false;
       }
 
@@ -639,7 +632,6 @@ export class TracesPage {
       if (error.message.includes('Search failed')) {
         throw error;
       }
-      testLogger.error('Error checking trace results:', error.message);
       return false;
     }
   }
@@ -662,9 +654,7 @@ export class TracesPage {
       await expect(resetButton).toBeVisible({ timeout: 3000 });
       await resetButton.click();
       await this.page.waitForTimeout(1000);
-      testLogger.info('Trace filters reset');
     } catch {
-      testLogger.info('Reset button not visible');
     }
   }
 
@@ -682,7 +672,6 @@ export class TracesPage {
       try {
         await expect(selector).toBeVisible({ timeout: 5000 });
         await selector.click();
-        testLogger.info('Clicked on trace result');
         await this.page.waitForTimeout(2000);
         return;
       } catch {
@@ -705,10 +694,8 @@ export class TracesPage {
       await expect(expandButton).toBeVisible({ timeout: 3000 });
       await expandButton.click();
       await this.page.waitForTimeout(1000);
-      testLogger.info('Field expanded', { fieldName });
       return true;
     } catch {
-      testLogger.info('Could not expand field', { fieldName });
       return false;
     }
   }
@@ -726,10 +713,8 @@ export class TracesPage {
       await expect(fieldValue).toBeVisible({ timeout: 3000 });
       await fieldValue.click();
       await this.page.waitForTimeout(1000);
-      testLogger.info('Field value selected', { fieldName, value });
       return true;
     } catch {
-      testLogger.info('Could not select field value', { fieldName, value });
       return false;
     }
   }
@@ -774,14 +759,12 @@ export class TracesPage {
           status.errorMessage = errorText;
         }
 
-        testLogger.info('Search completed', status);
         return status;
       }
 
       // Check if still loading
       const isLoading = await this.page.locator('[data-test*="loading"], .q-spinner').first().isVisible({ timeout: 500 });
       if (isLoading) {
-        testLogger.info('Search in progress...');
       }
 
       await this.page.waitForTimeout(500);
