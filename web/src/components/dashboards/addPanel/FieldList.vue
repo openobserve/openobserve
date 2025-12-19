@@ -723,8 +723,8 @@ export default defineComponent({
       ],
       async (newValues, oldValues) => {
         const currentIndex = dashboardPanelData.layout.currentQueryIndex;
-        const currentStream = newValues[2];
-        const currentStreamType = newValues[3];
+        const currentStream = newValues?.[2];
+        const currentStreamType = newValues?.[3];
 
         // Initialize tracking for this query if it doesn't exist
         if (!queryStreamTracking.value[currentIndex]) {
