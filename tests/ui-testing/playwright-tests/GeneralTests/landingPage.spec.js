@@ -29,7 +29,7 @@ test.describe("Landing Page Test Cases", () => {
   /**
    * Captures the current logs page state
    */
-  async function captureLogsState(page) {
+  async function captureLogsState(pm) {
     const state = {
       hasResults: false,
       queryText: ''
@@ -37,11 +37,11 @@ test.describe("Landing Page Test Cases", () => {
 
     try {
       // Check if results table is visible
-      const resultsTable = page.locator('[data-test="logs-search-result-logs-table"]');
+      const resultsTable = pm.homePage.getLogsResultsTable();
       state.hasResults = await resultsTable.isVisible({ timeout: 3000 }).catch(() => false);
 
       // Get query text
-      const queryEditor = page.locator('[data-test="logs-search-bar-query-editor"] .view-lines');
+      const queryEditor = pm.homePage.getQueryEditor();
       if (await queryEditor.isVisible({ timeout: 2000 }).catch(() => false)) {
         state.queryText = await queryEditor.textContent().catch(() => '');
       }
@@ -55,8 +55,8 @@ test.describe("Landing Page Test Cases", () => {
   /**
    * Verifies if state is preserved after returning to logs
    */
-  async function verifyStatePreserved(page, initialState) {
-    const currentState = await captureLogsState(page);
+  async function verifyStatePreserved(pm, initialState) {
+    const currentState = await captureLogsState(pm);
     const preserved = currentState.hasResults === initialState.hasResults;
     return { preserved, initial: initialState, current: currentState };
   }
@@ -83,9 +83,7 @@ test.describe("Landing Page Test Cases", () => {
 
     // Click refresh to run query
     try {
-      const refreshBtn = page.locator('[data-test="logs-search-bar-refresh-btn"]');
-      await refreshBtn.waitFor({ state: 'visible', timeout: 10000 });
-      await refreshBtn.click();
+      await pm.homePage.clickRefresh();
       await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     } catch (error) {
       testLogger.warn('Could not run query', { error: error.message });
@@ -94,7 +92,7 @@ test.describe("Landing Page Test Cases", () => {
     // Wait for results
     await page.waitForTimeout(2000);
 
-    return await captureLogsState(page);
+    return await captureLogsState(pm);
   }
 
   /**
@@ -107,10 +105,8 @@ test.describe("Landing Page Test Cases", () => {
         // Wait for sidebar to be interactive
         await page.waitForTimeout(500);
 
-        // Click on logs menu - ensure it's visible and clickable
-        const logsMenu = page.locator('[data-test="menu-link-\\/logs-item"]');
-        await logsMenu.waitFor({ state: 'visible', timeout: 10000 });
-        await logsMenu.click();
+        // Click on logs menu using page object method
+        await pm.homePage.clickLogsMenu();
 
         await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
@@ -159,11 +155,7 @@ test.describe("Landing Page Test Cases", () => {
         urlPattern: /org_identifier/,
         indicator: () => pm.homePage.homePageIndicator,
         uiChecks: async () => {
-          // Validate home page dashboard sections
-          await expect(pm.homePage.mainContent).toBeVisible({ timeout: 10000 });
-          await expect(page.getByText('Streams').first()).toBeVisible({ timeout: 5000 });
-          await expect(page.getByText('Function').first()).toBeVisible({ timeout: 5000 });
-          await expect(page.getByText('Scheduled').first()).toBeVisible({ timeout: 5000 });
+          await pm.homePage.validateHomePageElements();
           testLogger.info('Home: Validated main content, Streams, Function, Scheduled sections');
         }
       },
@@ -173,11 +165,7 @@ test.describe("Landing Page Test Cases", () => {
         urlPattern: /metrics/,
         indicator: () => pm.homePage.metricsPageIndicator,
         uiChecks: async () => {
-          // Validate metrics page key elements
-          await expect(page.locator('[data-test="metrics-apply"]').or(page.getByRole('button', { name: 'Run query' }))).toBeVisible({ timeout: 10000 });
-          await expect(page.locator('[data-test="metrics-date-picker"]')).toBeVisible({ timeout: 5000 });
-          await expect(page.getByText('Metrics').first()).toBeVisible({ timeout: 5000 });
-          await expect(page.getByText('Fields').first()).toBeVisible({ timeout: 5000 });
+          await pm.homePage.validateMetricsPageElements();
           testLogger.info('Metrics: Validated Run query button, date picker, Metrics title, Fields section');
         }
       },
@@ -187,10 +175,7 @@ test.describe("Landing Page Test Cases", () => {
         urlPattern: /traces/,
         indicator: () => pm.homePage.tracesPageIndicator,
         uiChecks: async () => {
-          // Validate traces page key elements
-          await expect(page.locator('[data-test="logs-search-bar-refresh-btn"]')).toBeVisible({ timeout: 10000 });
-          await expect(page.locator('[data-test="date-time-btn"]')).toBeVisible({ timeout: 5000 });
-          await expect(page.getByText('Traces').first()).toBeVisible({ timeout: 5000 });
+          await pm.homePage.validateTracesPageElements();
           testLogger.info('Traces: Validated refresh button, date picker, Traces title');
         }
       },
@@ -200,11 +185,7 @@ test.describe("Landing Page Test Cases", () => {
         urlPattern: /dashboards/,
         indicator: () => pm.homePage.dashboardsPageIndicator,
         uiChecks: async () => {
-          // Validate dashboards page key elements
-          await expect(page.locator('[data-test="dashboard-add"]')).toBeVisible({ timeout: 10000 });
-          await expect(page.locator('[data-test="dashboard-search"]')).toBeVisible({ timeout: 5000 });
-          await expect(page.locator('[data-test="dashboard-import"]')).toBeVisible({ timeout: 5000 });
-          await expect(page.locator('[data-test="dashboard-table"]')).toBeVisible({ timeout: 5000 });
+          await pm.homePage.validateDashboardsPageElements();
           testLogger.info('Dashboards: Validated add button, search input, import button, dashboard table');
         }
       },
@@ -214,11 +195,7 @@ test.describe("Landing Page Test Cases", () => {
         urlPattern: /streams/,
         indicator: () => pm.homePage.streamsPageIndicator,
         uiChecks: async () => {
-          // Validate streams page key elements
-          await expect(page.locator('[data-test="streams-search-stream-input"]')).toBeVisible({ timeout: 10000 });
-          await expect(page.locator('[data-test="log-stream-title-text"]')).toBeVisible({ timeout: 5000 });
-          await expect(page.locator('[data-test="log-stream-refresh-stats-btn"]')).toBeVisible({ timeout: 5000 });
-          await expect(page.locator('[data-test="log-stream-table"]')).toBeVisible({ timeout: 5000 });
+          await pm.homePage.validateStreamsPageElements();
           testLogger.info('Streams: Validated search input, title, refresh button, stream table');
         }
       },
@@ -228,10 +205,7 @@ test.describe("Landing Page Test Cases", () => {
         urlPattern: /alerts/,
         indicator: () => pm.homePage.alertsPageIndicator,
         uiChecks: async () => {
-          // Validate alerts page key elements - wait for page to fully load
-          await page.waitForTimeout(2000); // Allow alerts page to load
-          await expect(page.locator('[data-test="alert-list-page"]').or(page.locator('[data-test="alerts-page"]'))).toBeVisible({ timeout: 15000 });
-          await expect(page.locator('[data-test="alert-list-add-alert-btn"]')).toBeVisible({ timeout: 10000 });
+          await pm.homePage.validateAlertsPageElements();
           testLogger.info('Alerts: Validated alerts page container, add alert button');
         }
       },
@@ -241,9 +215,7 @@ test.describe("Landing Page Test Cases", () => {
         urlPattern: /ingestion/,
         indicator: () => pm.homePage.ingestionPageIndicator,
         uiChecks: async () => {
-          // Validate ingestion page key elements
-          await expect(page.locator('.ingestionPage')).toBeVisible({ timeout: 10000 });
-          await expect(page.getByRole('button', { name: /Reset Token/i })).toBeVisible({ timeout: 5000 });
+          await pm.homePage.validateIngestionPageElements();
           testLogger.info('Ingestion: Validated ingestion page container and Reset Token button');
         }
       },
@@ -276,7 +248,7 @@ test.describe("Landing Page Test Cases", () => {
       await page.waitForTimeout(500);
 
       // Verify state preservation
-      const verification = await verifyStatePreserved(page, initialState);
+      const verification = await verifyStatePreserved(pm, initialState);
       if (verification.preserved) {
         statePreservationResults.preserved.push(pageConfig.name);
         testLogger.info(`${pageConfig.name}: STATE PRESERVED`);
@@ -310,66 +282,48 @@ test.describe("Landing Page Test Cases", () => {
       {
         name: 'Settings - General',
         navigate: async () => {
-          // Navigate to Settings via UI - General is the default tab
           await pm.homePage.navigateToSettings();
         },
         urlPattern: /settings.*general/,
         uiChecks: async () => {
-          // Validate General Settings page elements
-          await expect(page.locator('.general-page-title')).toBeVisible({ timeout: 10000 });
-          await expect(page.locator('[data-test="dashboard-add-submit"]')).toBeVisible({ timeout: 5000 });
+          await pm.homePage.validateSettingsGeneralPageElements();
           testLogger.info('Settings - General: Validated title, save button');
         }
       },
       {
         name: 'Settings - Organization Parameters',
         navigate: async () => {
-          // Navigate to Settings, then click Organization Parameters tab
-          await pm.homePage.navigateToSettings();
-          // Organization tab doesn't have data-test, use text selector
-          await page.getByRole('tab', { name: /Organization/i }).waitFor({ state: 'visible', timeout: 10000 });
-          await page.getByRole('tab', { name: /Organization/i }).click();
+          await pm.homePage.navigateToOrganizationParameters();
         },
         urlPattern: /organization/,
         uiChecks: async () => {
-          // Validate Organization Parameters page elements - use specific selector to avoid strict mode violations
-          await expect(page.locator('[data-test="add-alert-submit-btn"]')).toBeVisible({ timeout: 10000 });
+          await pm.homePage.validateSettingsOrganizationPageElements();
           testLogger.info('Settings - Organization Parameters: Validated submit button');
         }
       },
       {
         name: 'Settings - Alert Destinations',
         navigate: async () => {
-          // Navigate to Settings, then click Alert Destinations tab
-          await pm.homePage.navigateToSettings();
-          await page.locator('[data-test="alert-destinations-tab"]').waitFor({ state: 'visible', timeout: 10000 });
-          await page.locator('[data-test="alert-destinations-tab"]').click();
+          await pm.homePage.navigateToAlertDestinations();
         },
         urlPattern: /alert_destinations/,
         uiChecks: async () => {
-          // Validate Alert Destinations page elements
-          await expect(page.locator('[data-test="alert-destination-list-add-alert-btn"]')).toBeVisible({ timeout: 10000 });
+          await pm.homePage.validateSettingsAlertDestinationsPageElements();
           testLogger.info('Settings - Alert Destinations: Validated add destination button');
         }
       },
       {
         name: 'Settings - Pipeline Destinations',
         navigate: async () => {
-          // Navigate to Settings, then click Pipeline Destinations tab (Enterprise only)
-          await pm.homePage.navigateToSettings();
-          const pipelineTab = page.locator('[data-test="pipeline-destinations-tab"]');
-          // Skip if not enterprise
-          if (!(await pipelineTab.isVisible({ timeout: 5000 }).catch(() => false))) {
+          const result = await pm.homePage.navigateToPipelineDestinations();
+          if (!result) {
             testLogger.info('Pipeline Destinations tab not visible (non-enterprise), skipping');
-            return false;
           }
-          await pipelineTab.click();
-          return true;
+          return result;
         },
         urlPattern: /pipeline_destinations/,
         uiChecks: async () => {
-          // Validate Pipeline Destinations page elements
-          await expect(page.locator('[data-test="pipeline-destination-list-add-btn"]')).toBeVisible({ timeout: 10000 });
+          await pm.homePage.validateSettingsPipelineDestinationsPageElements();
           testLogger.info('Settings - Pipeline Destinations: Validated add pipeline destination button');
         },
         skipIfNotVisible: true
@@ -377,36 +331,26 @@ test.describe("Landing Page Test Cases", () => {
       {
         name: 'Settings - Templates',
         navigate: async () => {
-          // Navigate to Settings, then click Templates tab
-          await pm.homePage.navigateToSettings();
-          await page.locator('[data-test="alert-templates-tab"]').waitFor({ state: 'visible', timeout: 10000 });
-          await page.locator('[data-test="alert-templates-tab"]').click();
+          await pm.homePage.navigateToTemplates();
         },
         urlPattern: /templates/,
         uiChecks: async () => {
-          // Validate Templates page elements
-          await expect(page.locator('[data-test="template-list-add-btn"]')).toBeVisible({ timeout: 10000 });
+          await pm.homePage.validateSettingsTemplatesPageElements();
           testLogger.info('Settings - Templates: Validated add template button');
         }
       },
       {
         name: 'Settings - Cipher Keys',
         navigate: async () => {
-          // Navigate to Settings, then click Cipher Keys tab (Enterprise only)
-          await pm.homePage.navigateToSettings();
-          const cipherTab = page.locator('[data-test="management-cipher-key-tab"]');
-          // Skip if not enterprise
-          if (!(await cipherTab.isVisible({ timeout: 5000 }).catch(() => false))) {
+          const result = await pm.homePage.navigateToCipherKeys();
+          if (!result) {
             testLogger.info('Cipher Keys tab not visible (non-enterprise), skipping');
-            return false;
           }
-          await cipherTab.click();
-          return true;
+          return result;
         },
         urlPattern: /cipher_keys/,
         uiChecks: async () => {
-          // Validate Cipher Keys page elements
-          await expect(page.locator('[data-test="cipher-keys-list-title"]')).toBeVisible({ timeout: 10000 });
+          await pm.homePage.validateSettingsCipherKeysPageElements();
           testLogger.info('Settings - Cipher Keys: Validated cipher keys list title');
         },
         skipIfNotVisible: true
@@ -414,22 +358,15 @@ test.describe("Landing Page Test Cases", () => {
       {
         name: 'Settings - Sensitive Data Redaction',
         navigate: async () => {
-          // Navigate to Settings, then click Regex Patterns / Sensitive Data Redaction tab (Enterprise only)
-          await pm.homePage.navigateToSettings();
-          const regexTab = page.locator('[data-test="regex-patterns-tab"]');
-          // Skip if not enterprise
-          if (!(await regexTab.isVisible({ timeout: 5000 }).catch(() => false))) {
+          const result = await pm.homePage.navigateToSensitiveDataRedaction();
+          if (!result) {
             testLogger.info('Sensitive Data Redaction tab not visible (non-enterprise), skipping');
-            return false;
           }
-          await regexTab.click();
-          return true;
+          return result;
         },
         urlPattern: /regex_patterns/,
         uiChecks: async () => {
-          // Validate Sensitive Data Redaction page elements - use specific selector to avoid strict mode violations
-          await expect(page.locator('[data-test="regex-pattern-list-title"]')).toBeVisible({ timeout: 10000 });
-          await expect(page.locator('[data-test="regex-pattern-list-add-pattern-btn"]')).toBeVisible({ timeout: 5000 });
+          await pm.homePage.validateSettingsSensitiveDataRedactionPageElements();
           testLogger.info('Settings - Sensitive Data Redaction: Validated title and add pattern button');
         },
         skipIfNotVisible: true
@@ -465,7 +402,7 @@ test.describe("Landing Page Test Cases", () => {
       await page.waitForTimeout(500);
 
       // Verify state preservation
-      const verification = await verifyStatePreserved(page, initialState);
+      const verification = await verifyStatePreserved(pm, initialState);
       if (verification.preserved) {
         statePreservationResults.preserved.push(pageConfig.name);
         testLogger.info(`${pageConfig.name}: STATE PRESERVED`);

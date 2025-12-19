@@ -594,4 +594,238 @@ export class HomePage {
             await this.switchToLightMode();
         }
     }
+
+    // ============================================================================
+    // LANDING PAGE VALIDATION METHODS
+    // ============================================================================
+
+    /**
+     * Get logs results table locator
+     */
+    getLogsResultsTable() {
+        return this.page.locator('[data-test="logs-search-result-logs-table"]');
+    }
+
+    /**
+     * Get query editor locator
+     */
+    getQueryEditor() {
+        return this.page.locator('[data-test="logs-search-bar-query-editor"] .view-lines');
+    }
+
+    /**
+     * Get refresh button locator
+     */
+    getRefreshButton() {
+        return this.page.locator('[data-test="logs-search-bar-refresh-btn"]');
+    }
+
+    /**
+     * Get logs menu sidebar item
+     */
+    getLogsMenuItem() {
+        return this.page.locator('[data-test="menu-link-\\/logs-item"]');
+    }
+
+    /**
+     * Click refresh button to run query
+     */
+    async clickRefresh() {
+        await this.getRefreshButton().waitFor({ state: 'visible', timeout: 10000 });
+        await this.getRefreshButton().click();
+    }
+
+    /**
+     * Click logs menu to navigate to logs page
+     */
+    async clickLogsMenu() {
+        await this.getLogsMenuItem().waitFor({ state: 'visible', timeout: 10000 });
+        await this.getLogsMenuItem().click();
+    }
+
+    /**
+     * Validate Home page UI elements
+     */
+    async validateHomePageElements() {
+        await expect(this.mainContent).toBeVisible({ timeout: 10000 });
+        await expect(this.page.getByText('Streams').first()).toBeVisible({ timeout: 5000 });
+        await expect(this.page.getByText('Function').first()).toBeVisible({ timeout: 5000 });
+        await expect(this.page.getByText('Scheduled').first()).toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Validate Metrics page UI elements
+     */
+    async validateMetricsPageElements() {
+        await expect(this.page.locator('[data-test="metrics-apply"]').or(this.page.getByRole('button', { name: 'Run query' }))).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator('[data-test="metrics-date-picker"]')).toBeVisible({ timeout: 5000 });
+        await expect(this.page.getByText('Metrics').first()).toBeVisible({ timeout: 5000 });
+        await expect(this.page.getByText('Fields').first()).toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Validate Traces page UI elements
+     */
+    async validateTracesPageElements() {
+        await expect(this.page.locator('[data-test="logs-search-bar-refresh-btn"]')).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator('[data-test="date-time-btn"]')).toBeVisible({ timeout: 5000 });
+        await expect(this.page.getByText('Traces').first()).toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Validate Dashboards page UI elements
+     */
+    async validateDashboardsPageElements() {
+        await expect(this.page.locator('[data-test="dashboard-add"]')).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator('[data-test="dashboard-search"]')).toBeVisible({ timeout: 5000 });
+        await expect(this.page.locator('[data-test="dashboard-import"]')).toBeVisible({ timeout: 5000 });
+        await expect(this.page.locator('[data-test="dashboard-table"]')).toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Validate Streams page UI elements
+     */
+    async validateStreamsPageElements() {
+        await expect(this.page.locator('[data-test="streams-search-stream-input"]')).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator('[data-test="log-stream-title-text"]')).toBeVisible({ timeout: 5000 });
+        await expect(this.page.locator('[data-test="log-stream-refresh-stats-btn"]')).toBeVisible({ timeout: 5000 });
+        await expect(this.page.locator('[data-test="log-stream-table"]')).toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Validate Alerts page UI elements
+     */
+    async validateAlertsPageElements() {
+        await this.page.waitForTimeout(2000);
+        await expect(this.page.locator('[data-test="alert-list-page"]').or(this.page.locator('[data-test="alerts-page"]'))).toBeVisible({ timeout: 15000 });
+        await expect(this.page.locator('[data-test="alert-list-add-alert-btn"]')).toBeVisible({ timeout: 10000 });
+    }
+
+    /**
+     * Validate Ingestion page UI elements
+     */
+    async validateIngestionPageElements() {
+        await expect(this.page.locator('.ingestionPage')).toBeVisible({ timeout: 10000 });
+        await expect(this.page.getByRole('button', { name: /Reset Token/i })).toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Validate Settings - General page UI elements
+     */
+    async validateSettingsGeneralPageElements() {
+        await expect(this.page.locator('.general-page-title')).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator('[data-test="dashboard-add-submit"]')).toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Navigate to Organization Parameters tab in Settings
+     */
+    async navigateToOrganizationParameters() {
+        await this.navigateToSettings();
+        await this.page.getByRole('tab', { name: /Organization/i }).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.getByRole('tab', { name: /Organization/i }).click();
+    }
+
+    /**
+     * Validate Settings - Organization Parameters page UI elements
+     */
+    async validateSettingsOrganizationPageElements() {
+        await expect(this.page.locator('[data-test="add-alert-submit-btn"]')).toBeVisible({ timeout: 10000 });
+    }
+
+    /**
+     * Navigate to Alert Destinations tab in Settings
+     */
+    async navigateToAlertDestinations() {
+        await this.navigateToSettings();
+        await this.page.locator('[data-test="alert-destinations-tab"]').waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.locator('[data-test="alert-destinations-tab"]').click();
+    }
+
+    /**
+     * Validate Settings - Alert Destinations page UI elements
+     */
+    async validateSettingsAlertDestinationsPageElements() {
+        await expect(this.page.locator('[data-test="alert-destination-list-add-alert-btn"]')).toBeVisible({ timeout: 10000 });
+    }
+
+    /**
+     * Navigate to Pipeline Destinations tab in Settings (Enterprise only)
+     * @returns {boolean} true if navigated, false if not available
+     */
+    async navigateToPipelineDestinations() {
+        await this.navigateToSettings();
+        const pipelineTab = this.page.locator('[data-test="pipeline-destinations-tab"]');
+        if (!(await pipelineTab.isVisible({ timeout: 5000 }).catch(() => false))) {
+            return false;
+        }
+        await pipelineTab.click();
+        return true;
+    }
+
+    /**
+     * Validate Settings - Pipeline Destinations page UI elements
+     */
+    async validateSettingsPipelineDestinationsPageElements() {
+        await expect(this.page.locator('[data-test="pipeline-destination-list-add-btn"]')).toBeVisible({ timeout: 10000 });
+    }
+
+    /**
+     * Navigate to Templates tab in Settings
+     */
+    async navigateToTemplates() {
+        await this.navigateToSettings();
+        await this.page.locator('[data-test="alert-templates-tab"]').waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.locator('[data-test="alert-templates-tab"]').click();
+    }
+
+    /**
+     * Validate Settings - Templates page UI elements
+     */
+    async validateSettingsTemplatesPageElements() {
+        await expect(this.page.locator('[data-test="template-list-add-btn"]')).toBeVisible({ timeout: 10000 });
+    }
+
+    /**
+     * Navigate to Cipher Keys tab in Settings (Enterprise only)
+     * @returns {boolean} true if navigated, false if not available
+     */
+    async navigateToCipherKeys() {
+        await this.navigateToSettings();
+        const cipherTab = this.page.locator('[data-test="management-cipher-key-tab"]');
+        if (!(await cipherTab.isVisible({ timeout: 5000 }).catch(() => false))) {
+            return false;
+        }
+        await cipherTab.click();
+        return true;
+    }
+
+    /**
+     * Validate Settings - Cipher Keys page UI elements
+     */
+    async validateSettingsCipherKeysPageElements() {
+        await expect(this.page.locator('[data-test="cipher-keys-list-title"]')).toBeVisible({ timeout: 10000 });
+    }
+
+    /**
+     * Navigate to Sensitive Data Redaction tab in Settings (Enterprise only)
+     * @returns {boolean} true if navigated, false if not available
+     */
+    async navigateToSensitiveDataRedaction() {
+        await this.navigateToSettings();
+        const regexTab = this.page.locator('[data-test="regex-patterns-tab"]');
+        if (!(await regexTab.isVisible({ timeout: 5000 }).catch(() => false))) {
+            return false;
+        }
+        await regexTab.click();
+        return true;
+    }
+
+    /**
+     * Validate Settings - Sensitive Data Redaction page UI elements
+     */
+    async validateSettingsSensitiveDataRedactionPageElements() {
+        await expect(this.page.locator('[data-test="regex-pattern-list-title"]')).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator('[data-test="regex-pattern-list-add-pattern-btn"]')).toBeVisible({ timeout: 5000 });
+    }
 }
