@@ -164,75 +164,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="store.state.theme == 'dark' ? 'dark' : ''"
           >
             <div class="grid-stack-item-content">
-              <!-- Panel with Panel-Level Variables -->
-              <div class="panel-with-variables">
-                <!-- Original Panel Container -->
-
-                <PanelContainer
-                  @onDeletePanel="onDeletePanel"
-                  @onViewPanel="onViewPanel"
-                  :viewOnly="viewOnly"
-                  :data="item"
-                  :dashboardId="dashboardData.dashboardId"
-                  :folderId="folderId"
-                  :reportId="reportId"
-                  :selectedTimeDate="
-                    currentTimeObj?.[item?.id] ||
-                    currentTimeObj['__global'] ||
-                    {}
-                  "
-                  :shouldRefreshWithoutCache="
-                    shouldRefreshWithoutCacheObj?.[item?.id] || false
-                  "
-                  :variablesData="getMergedVariablesForPanel(item.id)"
-                  :currentVariablesData="getLiveVariablesForPanel(item.id)"
-                  :width="getPanelLayout(item, 'w')"
-                  :height="getPanelLayout(item, 'h')"
-                  :forceLoad="forceLoad"
-                  :searchType="searchType"
-                  :runId="runId"
-                  :tabId="selectedTabId"
-                  :tabName="
-                    dashboardData?.tabs?.find(
-                      (tab: any) => tab.tabId === selectedTabId,
-                    )?.name
-                  "
-                  :dashboardName="dashboardName"
-                  :folderName="folderName"
-                  @updated:data-zoom="$emit('updated:data-zoom', $event)"
-                  @onMovePanel="onMovePanel"
-                  @refreshPanelRequest="refreshPanelRequest"
-                  @refresh="refreshDashboard"
-                  @update:initial-variable-values="updateInitialVariableValues"
-                  @onEditLayout="openEditLayout"
-                  @update:runId="updateRunId"
-                  @contextmenu="$emit('chart:contextmenu', $event)"
-                >
-                  <!-- Panel-Level Variables (shown below drag-allow section) -->
-                  <template #panel-variables>
-                    <div
-                      class="panel-variables-container q-px-xs q-py-xs"
-                      :data-test="`dashboard-panel-${item.id}-variables`"
-                    >
-                      <VariablesValueSelector
-                        v-if="
-                          variablesManager &&
-                          getPanelVariables(item.id).length > 0
-                        "
-                        :scope="'panels'"
-                        :panelId="item.id"
-                        :tabId="selectedTabId"
-                        :variablesConfig="{ list: getPanelVariables(item.id) }"
-                        :variablesManager="variablesManager"
-                        :selectedTimeDate="currentTimeObj['__global']"
-                        :initialVariableValues="initialVariableValues"
-                        :style="{ marginBottom: '8px' }"
-                        data-test="panel-variables-selector"
-                      />
-                    </div>
-                  </template>
-                </PanelContainer>
-              </div>
+              <PanelContainer
+                @onDeletePanel="onDeletePanel"
+                @onViewPanel="onViewPanel"
+                :viewOnly="viewOnly"
+                :data="item"
+                :dashboardId="dashboardData.dashboardId"
+                :folderId="folderId"
+                :reportId="reportId"
+                :selectedTimeDate="
+                  currentTimeObj?.[item?.id] || currentTimeObj['__global'] || {}
+                "
+                :shouldRefreshWithoutCache="
+                  shouldRefreshWithoutCacheObj?.[item?.id] || false
+                "
+                :variablesData="getMergedVariablesForPanel(item.id)"
+                :currentVariablesData="getLiveVariablesForPanel(item.id)"
+                :width="getPanelLayout(item, 'w')"
+                :height="getPanelLayout(item, 'h')"
+                :forceLoad="forceLoad"
+                :searchType="searchType"
+                :runId="runId"
+                :tabId="selectedTabId"
+                :tabName="
+                  dashboardData?.tabs?.find(
+                    (tab: any) => tab.tabId === selectedTabId,
+                  )?.name
+                "
+                :dashboardName="dashboardName"
+                :folderName="folderName"
+                :allowAlertCreation="allowAlertCreation"
+                @updated:data-zoom="$emit('updated:data-zoom', $event)"
+                @onMovePanel="onMovePanel"
+                @refreshPanelRequest="refreshPanelRequest"
+                @refresh="refreshDashboard"
+                @update:initial-variable-values="updateInitialVariableValues"
+                @onEditLayout="openEditLayout"
+                @update:runId="updateRunId"
+                @contextmenu="$emit('chart:contextmenu', $event)"
+              >
+                <!-- Panel-Level Variables (shown below drag-allow section) -->
+                <template #panel-variables>
+                  <div
+                    class="panel-variables-container q-px-xs q-py-xs"
+                    :data-test="`dashboard-panel-${item.id}-variables`"
+                  >
+                    <VariablesValueSelector
+                      v-if="
+                        variablesManager &&
+                        getPanelVariables(item.id).length > 0
+                      "
+                      :scope="'panels'"
+                      :panelId="item.id"
+                      :tabId="selectedTabId"
+                      :variablesConfig="{ list: getPanelVariables(item.id) }"
+                      :variablesManager="variablesManager"
+                      :selectedTimeDate="currentTimeObj['__global']"
+                      :initialVariableValues="initialVariableValues"
+                      :style="{ marginBottom: '8px' }"
+                      data-test="panel-variables-selector"
+                    />
+                  </div>
+                </template>
+              </PanelContainer>
             </div>
           </div>
         </div>
@@ -1262,11 +1256,5 @@ export default defineComponent({
 /* Ensure grid item content and panel container fill full height */
 .grid-stack-item-content {
   height: 100% !important;
-}
-
-.panel-with-variables {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
 }
 </style>
