@@ -7,12 +7,6 @@ const testLogger = require('../utils/test-logger.js');
 test.describe("Trace Details testcases", () => {
   test.describe.configure({ mode: 'serial' });
   let tracesPage;
-  // Remove trailing slash from base URL if present
-  const rawBaseUrl = process.env["ZO_BASE_URL"] ?? '';
-  const baseUrl = rawBaseUrl.endsWith('/')
-    ? rawBaseUrl.slice(0, -1)
-    : rawBaseUrl;
-  const tracesUrl = `${baseUrl}/web/traces?org_identifier=${process.env["ORGNAME"]}`;
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
@@ -22,7 +16,7 @@ test.describe("Trace Details testcases", () => {
     tracesPage = new TracesPage(page);
 
     // Navigate to traces and get to a trace detail
-    await page.goto(tracesUrl);
+    await tracesPage.navigateToTracesUrl();
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
     // Try to get to trace details - we have ingested data

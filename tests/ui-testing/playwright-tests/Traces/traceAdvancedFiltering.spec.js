@@ -22,11 +22,7 @@ test.describe("Trace Advanced Filtering testcases", () => {
     await page.waitForLoadState('networkidle');
 
     // Navigate to traces page
-    const org = process.env["ORGNAME"] || 'default';
-    const baseUrl = (process.env["ZO_BASE_URL"] || '').replace(/\/+$/, '');
-    const tracesUrl = `${baseUrl}/web/traces?org_identifier=${org}`;
-    await page.goto(tracesUrl);
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    await pm.tracesPage.navigateToTracesUrl();
 
     testLogger.info('Test setup completed for advanced trace filtering');
   });
