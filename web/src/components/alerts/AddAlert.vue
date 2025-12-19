@@ -132,6 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :destinations="formData.destinations"
                 :focusManager="focusManager"
                 :wizardStep="wizardStep"
+                :isUsingBackendSql="isUsingBackendSql"
               />
             </div>
           </div>
@@ -191,6 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :destinations="formData.destinations"
                 :focusManager="focusManager"
                 :wizardStep="wizardStep"
+                :isUsingBackendSql="isUsingBackendSql"
               />
             </div>
           </div>
@@ -235,6 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :destinations="formData.destinations"
                 :focusManager="focusManager"
                 :wizardStep="wizardStep"
+                :isUsingBackendSql="isUsingBackendSql"
               />
             </div>
           </div>
@@ -283,6 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :destinations="formData.destinations"
                 :focusManager="focusManager"
                 :wizardStep="wizardStep"
+                :isUsingBackendSql="isUsingBackendSql"
               />
             </div>
           </div>
@@ -323,6 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :destinations="formData.destinations"
                 :focusManager="focusManager"
                 :wizardStep="wizardStep"
+                :isUsingBackendSql="isUsingBackendSql"
               />
             </div>
           </div>
@@ -367,6 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :destinations="formData.destinations"
                 :focusManager="focusManager"
                 :wizardStep="wizardStep"
+                :isUsingBackendSql="isUsingBackendSql"
               />
             </div>
           </div>
@@ -719,6 +725,9 @@ export default defineComponent({
     const streamTypeFieldRef = ref(null);
 
     const previewQuery = ref("");
+
+    // Flag to track if we're using backend-generated SQL for preview
+    const isUsingBackendSql = ref(false);
 
     const sqlQueryErrorMsg = ref("");
 
@@ -1309,11 +1318,15 @@ export default defineComponent({
     watch(() => formData.value.query_condition?.type, (newType) => {
       if (newType === 'sql') {
         previewQuery.value = formData.value.query_condition?.sql ? formData.value.query_condition.sql.trim() : '';
+        isUsingBackendSql.value = false;
       } else if (newType === 'promql') {
         previewQuery.value = formData.value.query_condition?.promql ? formData.value.query_condition.promql.trim() : '';
+        isUsingBackendSql.value = false;
       } else if (newType === 'custom') {
+        // Start with local SQL, backend SQL will update it when ready
         previewQuery.value = generateSqlQueryLocal();
-        // Also trigger backend SQL generation for preview
+        isUsingBackendSql.value = false;
+        // Trigger backend SQL generation for preview
         debouncedGenerateSql();
       }
     });
@@ -1470,11 +1483,18 @@ export default defineComponent({
 
         if (response.data && response.data.sql) {
           generatedSqlQuery.value = response.data.sql;
+          // Update preview query with backend SQL
+          previewQuery.value = response.data.sql;
+          // Set flag to indicate we're using backend-generated SQL
+          isUsingBackendSql.value = true;
         }
       } catch (error) {
         console.error('Error generating SQL from backend:', error);
         // Fallback to local generation if API fails
-        generatedSqlQuery.value = generateSqlQueryLocal();
+        const localSql = generateSqlQueryLocal();
+        generatedSqlQuery.value = localSql;
+        previewQuery.value = localSql;
+        isUsingBackendSql.value = false;
       }
     };
 
@@ -1485,11 +1505,11 @@ export default defineComponent({
 
     const onInputUpdate = async (name: string, value: any) => {
       // Trigger SQL generation when conditions change
+      // SQL generation will automatically update previewQuery and trigger preview refresh
       if (formData.value.query_condition.type === 'custom') {
         debouncedGenerateSql();
-      }
-
-      if (showPreview.value) {
+      } else if (showPreview.value) {
+        // Only call preview directly if not in custom mode
         debouncedPreviewAlert();
       }
     };
@@ -2129,6 +2149,7 @@ export default defineComponent({
       generatedSqlQuery,
       previewQuery,
       previewAlertRef,
+      isUsingBackendSql,
       outlinedInfo,
       getTimezoneOffset,
       showVrlFunction,

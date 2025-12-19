@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :selectedTimeObj="dashboardPanelData.meta.dateTime"
         :variablesData="{}"
         searchType="UI"
+        :is_ui_histogram="isUsingBackendSql"
         style="height: 180px; width: 100%; overflow-x: hidden;"
       />
     </div>
@@ -144,6 +145,10 @@ const props = defineProps({
     type: String,
     default: "",
   },
+  isUsingBackendSql: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 onBeforeMount(() => {
@@ -194,7 +199,7 @@ const refreshData = () => {
   if (props.isAggregationEnabled) {
     yAxis.push({
       aggregationFunction: props.formData.query_condition.aggregation.function,
-      alias: "zo_sql_val",
+      alias: "zo_sql_num",
       color: null,
       column: store.state.zoConfig.timestamp_column || "_timestamp",
       label: t("alerts.numOfEvents"),
@@ -202,7 +207,7 @@ const refreshData = () => {
   } else {
     yAxis.push({
       aggregationFunction: "count",
-      alias: "zo_sql_val",
+      alias: "zo_sql_num",
       color: null,
       column: store.state.zoConfig.timestamp_column || "_timestamp",
       label: t("alerts.numOfEvents"),
@@ -250,6 +255,7 @@ watch(
     props.isAggregationEnabled,
     props.selectedTab,
     props.formData.query_condition?.aggregation,
+    props.isUsingBackendSql,
   ],
   () => {
     // Only refresh if we have a valid query and it's not in SQL mode

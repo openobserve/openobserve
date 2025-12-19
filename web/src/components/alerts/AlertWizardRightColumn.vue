@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :query="previewQuery"
           :selectedTab="selectedTab"
           :isAggregationEnabled="isAggregationEnabled"
+          :isUsingBackendSql="isUsingBackendSql"
         />
       </div>
     </div>
@@ -129,6 +130,10 @@ export default defineComponent({
       type: Number,
       required: false,
       default: 1,
+    },
+    isUsingBackendSql: {
+      type: Boolean,
+      default: false,
     },
   },
   setup(props, { expose }) {
