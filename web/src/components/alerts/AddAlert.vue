@@ -1313,8 +1313,25 @@ export default defineComponent({
         previewQuery.value = formData.value.query_condition?.promql ? formData.value.query_condition.promql.trim() : '';
       } else if (newType === 'custom') {
         previewQuery.value = generateSqlQueryLocal();
+        // Also trigger backend SQL generation for preview
+        debouncedGenerateSql();
       }
     });
+
+    // Watch for changes in conditions or stream to regenerate SQL
+    watch(
+      () => [
+        formData.value.query_condition?.conditions,
+        formData.value.stream_name,
+        formData.value.query_condition?.aggregation,
+      ],
+      () => {
+        if (formData.value.query_condition?.type === 'custom') {
+          debouncedGenerateSql();
+        }
+      },
+      { deep: true }
+    );
 
     const previewAlert = async () => {
       if (getSelectedTab.value === "custom"){
@@ -1348,23 +1365,92 @@ export default defineComponent({
       );
     };
 
-    // Computed SQL query for preview in FilterGroup
-    // Only generate when in custom tab with conditions
-    const generatedSqlQuery = computed(() => {
-      try {
-        if (formData.value.query_condition?.conditions &&
-            Object.keys(formData.value.query_condition.conditions).length > 0) {
-          return generateSqlQueryLocal();
-        }
-      } catch (e) {
-        console.error('Error generating SQL query for preview:', e);
+    // Generated SQL query for preview in FilterGroup
+    // This will be updated via API call when conditions change
+    const generatedSqlQuery = ref('');
+
+    // Helper function to check if all conditions have valid column and value
+    const allConditionsValid = (conditions: any): boolean => {
+      if (!conditions || typeof conditions !== 'object') {
+        return false;
       }
-      return '';
-    });
+
+      // If it's a condition (not a group), check if column and value are filled
+      if (conditions.filterType === 'condition') {
+        return !!(conditions.column && conditions.value !== undefined && conditions.value !== '');
+      }
+
+      // If it's a group, recursively check all nested conditions
+      if (conditions.filterType === 'group' && Array.isArray(conditions.conditions)) {
+        // All conditions must be valid (using .every() instead of .some())
+        return conditions.conditions.every((cond: any) => allConditionsValid(cond));
+      }
+
+      return false;
+    };
+
+    // Function to generate SQL from backend API
+    const generateSqlFromBackend = async () => {
+      try {
+        // Only generate if we have conditions and stream info
+        if (!formData.value.stream_name ||
+            !formData.value.query_condition?.conditions ||
+            Object.keys(formData.value.query_condition.conditions).length === 0) {
+          // Don't clear SQL, just skip the API call
+          return;
+        }
+
+        // Skip if not in custom mode
+        if (formData.value.query_condition.type !== 'custom') {
+          return;
+        }
+
+        // Check if all conditions have valid column and value
+        // If any condition is empty, skip the API call but keep the previous preview
+        if (!allConditionsValid(formData.value.query_condition.conditions)) {
+          // Don't clear the previous SQL, just skip the API call
+          return;
+        }
+
+        const payload = {
+          stream_name: formData.value.stream_name,
+          stream_type: formData.value.stream_type || 'logs',
+          query_condition: {
+            type: 'custom',
+            conditions: {
+              version: 2,
+              conditions: formData.value.query_condition.conditions,
+            },
+            aggregation: formData.value.query_condition.aggregation || null,
+          },
+        };
+
+        const response = await alertsService.generate_sql(
+          store.state.selectedOrganization.identifier,
+          payload
+        );
+
+        if (response.data && response.data.sql) {
+          generatedSqlQuery.value = response.data.sql;
+        }
+      } catch (error) {
+        console.error('Error generating SQL from backend:', error);
+        // Fallback to local generation if API fails
+        generatedSqlQuery.value = generateSqlQueryLocal();
+      }
+    };
+
+    // Debounced version for heavy debouncing (1 second)
+    const debouncedGenerateSql = debounce(generateSqlFromBackend, 1000);
 
     const debouncedPreviewAlert = debounce(previewAlert, 500);
 
     const onInputUpdate = async (name: string, value: any) => {
+      // Trigger SQL generation when conditions change
+      if (formData.value.query_condition.type === 'custom') {
+        debouncedGenerateSql();
+      }
+
       if (showPreview.value) {
         debouncedPreviewAlert();
       }
