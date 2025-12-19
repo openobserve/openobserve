@@ -129,7 +129,7 @@ rayon.workspace = true
 regex.workspace = true
 regex-syntax.workspace = true
 reqwest.workspace = true
-rquickjs = { version = "0.6", features = ["array-buffer", "classes"] }
+rquickjs.workspace = true
 rust-embed-for-web = "11.2.1"
 rustls.workspace = true
 rustls-pemfile.workspace = true
@@ -337,6 +337,7 @@ reqwest = { version = "0.12", default-features = false, features = [
     "deflate",
 ] }
 roaring = "0.11.2"
+rquickjs = { version = "0.6", features = ["array-buffer", "classes"] }
 rustls-pemfile = "2"
 rustls = { version = "0.23.20", default-features = false, features = [
     "std",
