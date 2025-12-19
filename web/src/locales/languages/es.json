@@ -276,7 +276,8 @@
     "actionLabel": "Acción",
     "transformLabel": "Transformar",
     "addToDashboard": "Agregar al panel",
-    "selectStream": "Selecciona Stream"
+    "selectStream": "Selecciona Stream",
+    "pattern_summary": "Se muestran de 1 a 50 de los eventos y {patternsFound} patrones de {totalEvents} encontrados en eventos de {logsAnalyzed} en {totalTime} ms."
   },
   "menu": {
     "home": "Inicio",
@@ -1064,7 +1065,18 @@
     "panelDuplicatedSuccessfully": "El panel se duplicó correctamente",
     "panelDuplicationFailed": "Falló la duplicación del panel",
     "mapname": "Nombre",
-    "mapvalue": "Valor"
+    "mapvalue": "Valor",
+    "customChartTypeSelector": "Selector de tipo de gráfico personalizado",
+    "customChartTypeSelectorHint": "Seleccione un tipo de gráfico de la biblioteca ECharts para comenzar con una estructura de código básica",
+    "selectChartType": "Seleccione el tipo de gráfico",
+    "joins": "Se une",
+    "addJoin": "Agregar unirse",
+    "removeJoin": "Eliminar Join",
+    "leftJoin": "Unirse a la izquierda",
+    "innerJoin": "Inner Join",
+    "rightJoin": "Únete a la derecha",
+    "addClause": "Agregar cláusula",
+    "removeClause": "Eliminar cláusula"
   },
   "home": {
     "streams": "Transmisiones",
@@ -1299,6 +1311,54 @@
     },
     "triggerAlert": "Activar",
     "alertTriggeredSuccess": "La alerta se activó correctamente",
+        "incidents": {
+      "title": "Incidentes",
+      "header": "Incidentes de alerta",
+      "noIncidents": "No se ha encontrado ningún incidente",
+      "id": "CARNÉ DE IDENTIDAD",
+      "status": "Estado",
+      "severity": "Gravedad",
+      "alertCount": "Alertas",
+      "firstAlertAt": "Primera alerta",
+      "lastAlertAt": "Última alerta",
+      "resolvedAt": "Resuelto en",
+      "title_field": "Título",
+      "correlationKey": "Clave de correlación",
+      "stableDimensions": "Dimensiones",
+      "topology": "Topología",
+      "upstreamServices": "Servicios upstream",
+      "downstreamServices": "Servicios descendentes",
+      "correlatedAlerts": "Alertas correlacionadas",
+      "alertName": "Nombre de alerta",
+      "alertFiredAt": "Disparado a",
+      "correlationReason": "Motivo de correlación",
+      "actions": "Acciones",
+      "acknowledge": "Reconocer",
+      "resolve": "Resolver",
+      "reopen": "Reabrir",
+      "viewDetails": "Ver detalles",
+      "statusOpen": "Abrir",
+      "statusAcknowledged": "Reconocido",
+      "statusResolved": "Resuelto",
+      "severityP1": "P1 - Crítico",
+      "severityP2": "P2 - Alto",
+      "severityP3": "P3 - Medio",
+      "severityP4": "P4 - Bajo",
+      "correlationServiceDiscovery": "Descubrimiento de servicios",
+      "correlationManualExtraction": "Extracción manual",
+      "correlationTemporal": "Temporal",
+      "filterByStatus": "Filtrar por estado",
+      "allStatuses": "Todos los estados",
+      "loading": "Cargando incidentes...",
+      "errorLoading": "No se pudieron cargar los incidentes",
+      "statusUpdated": "Estado del incidente actualizado",
+      "statusUpdateFailed": "No se pudo actualizar el estado del incidente",
+      "rootCauseAnalysis": "Análisis de la causa raíz",
+      "analyzeRca": "Analiza",
+      "rcaInProgress": "Analizando la causa raíz...",
+      "rcaCompleted": "Se completó el análisis de la causa raíz",
+      "noRcaYet": "No hay ningún análisis de causa raíz disponible. Haga clic en «Analizar» para empezar."
+    },
     "events": "Eventos",
     "multiWindow": "Comparar con el pasado",
     "multiWindowSubLabel": "Compare los resultados actuales con los datos de otro período",
@@ -1721,7 +1781,8 @@
     "viewLogs": "Ver registros",
     "backToLogs": "Volver a los registros",
     "RedMetrics": "Métricas RED",
-    "loadingStream": "Cargando Stream..."
+    "loadingStream": "Cargando Stream...",
+    "viewRelated": "Ver relacionado"
   },
   "invitation": {
     "pendingInvitations": "Invitaciones pendientes",
@@ -2034,6 +2095,14 @@
     "tracesFromService": "Rastros del servicio: {service}",
     "noTracesFound": "No se han encontrado rastros correlacionados",
     "noTracesDescription": "No se han encontrado rastros del servicio {service} en el intervalo de tiempo seleccionado",
-    "openTraceInNewWindow": "Abrir traza en una ventana nueva"
+    "openTraceInNewWindow": "Abrir traza en una ventana nueva",
+    "filters": "Filtros"
+  },
+  "sreChat": {
+    "emptyMessage": "Pregúntame cualquier cosa sobre tus alertas e incidencias",
+    "inputPlaceholder": "Pregúntele a SRE Assistant...",
+    "clearChatTitle": "Borrar chat",
+    "clearChatMessage": "¿Estás seguro de que quieres borrar esta conversación?",
+    "copiedToClipboard": "Copiado al portapapeles"
   }
 }

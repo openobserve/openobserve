@@ -856,10 +856,46 @@ export const usePanelDataLoader = (
 
       // Check if the query type is "promql"
       if (panelSchema.value.queryType == "promql") {
+        // copy of current abortController
+        // which is used to check whether the current query has been aborted
+        const abortControllerRef = abortController;
+
         try {
-          // Iterate through each query in the panel schema
-          const queryPromises = panelSchema.value.queries?.map(
-            async (it: any) => {
+          // Initialize state for PromQL streaming
+          state.data = [];
+          state.metadata = {
+            queries: [],
+          };
+          state.resultMetaData = [];
+          state.annotations = [];
+          state.isOperationCancelled = false;
+
+          // Start fetching annotations in parallel with queries
+          const annotationsPromise = (async () => {
+            try {
+              if (!shouldFetchAnnotations()) {
+                return [];
+              }
+              const annotationList = await refreshAnnotations(
+                startISOTimestamp,
+                endISOTimestamp,
+              );
+              return annotationList || [];
+            } catch (annotationError) {
+              console.error("Failed to fetch annotations:", annotationError);
+              return [];
+            }
+          })();
+
+          // Initialize result data and metadata arrays
+          const queryResults: any[] = [];
+          const queryMetadata: any[] = [];
+          const completedQueries = new Set<number>(); // Track completed queries
+
+          // Process each query using streaming
+          // Process all queries in parallel using Promise.all
+          await Promise.all(
+            panelSchema.value.queries.map(async (it, queryIndex) => {
               const { query: query1, metadata: metadata1 } = replaceQueryValue(
                 it.query,
                 startISOTimestamp,
@@ -882,79 +918,199 @@ export const usePanelDataLoader = (
                 queryType: panelSchema.value.queryType,
                 variables: [...(metadata1 || []), ...(metadata2 || [])],
               };
-              const { traceparent, traceId } = generateTraceContext();
-              addTraceId(traceId);
-              try {
-                const res = await callWithAbortController(
-                  () =>
-                    queryService.metrics_query_range({
-                      org_identifier:
-                        store.state.selectedOrganization.identifier,
-                      query: query,
-                      start_time: startISOTimestamp,
-                      end_time: endISOTimestamp,
-                      step: panelSchema.value.config.step_value ?? "0",
-                      dashboard_id: dashboardId?.value,
-                      dashboard_name: dashboardName?.value,
-                      folder_id: folderId?.value,
-                      folder_name: folderName?.value,
-                      panel_id: panelSchema.value.id,
-                      panel_name: panelSchema.value.title,
-                      run_id: runId?.value,
-                      tab_id: tabId?.value,
-                      tab_name: tabName?.value,
-                    }),
-                  abortController.signal,
-                );
+
+              queryMetadata[queryIndex] = metadata;
+              // Don't initialize queryResults[queryIndex] yet - let it be undefined
+              // This way we can detect the first chunk properly
+
+              const { traceId } = generateTraceContext();
+              const payload = {
+                queryReq: {
+                  query: query,
+                  start_time: startISOTimestamp,
+                  end_time: endISOTimestamp,
+                  step: panelSchema.value.config.step_value ?? "0",
+                },
+                type: "promql" as const,
+                traceId: traceId,
+                org_id: store.state.selectedOrganization.identifier,
+                meta: {
+                  dashboard_id: dashboardId?.value,
+                  dashboard_name: dashboardName?.value,
+                  folder_id: folderId?.value,
+                  folder_name: folderName?.value,
+                  panel_id: panelSchema.value.id,
+                  panel_name: panelSchema.value.title,
+                  run_id: runId?.value,
+                  tab_id: tabId?.value,
+                  tab_name: tabName?.value,
+                },
+              };
+
+              // if aborted, return
+              if (abortControllerRef?.signal?.aborted) {
+                // Set partial data flag on abort
+                state.isPartialData = true;
+                // Save current state to cache
+                saveCurrentStateToCache();
+                return;
+              }
+
+              const handlePromQLResponse = (data: any, res: any) => {
+                if (res?.type === "promql_response") {
+                  // Backend sends: { content: { results: { result_type/resultType, result }, trace_id } }
+                  // result is the actual PromQL data (vector/matrix with values)
+                  // We need to extract and accumulate the result.result part
+
+                  const newData = res?.content?.results; // This is { result_type/resultType, result }
+
+                  if (!queryResults[queryIndex]) {
+                    // First chunk - initialize with the structure
+                    queryResults[queryIndex] = newData;
+                  } else {
+                    // Subsequent chunks - merge the result arrays
+                    const currentResult = queryResults[queryIndex];
+
+                    // If both have result arrays, merge them
+                    if (
+                      currentResult?.result &&
+                      Array.isArray(currentResult.result) &&
+                      newData?.result &&
+                      Array.isArray(newData.result)
+                    ) {
+                      // Merge the result arrays (time series data)
+                      // For matrix type, we need to merge values arrays for matching metrics
+                      const mergedResult = [...currentResult.result];
+
+                      newData.result.forEach((newMetric: any) => {
+                        // Find if this metric already exists in current results
+                        const existingIndex = mergedResult.findIndex(
+                          (existingMetric: any) => {
+                            // Compare metric labels to find matching time series
+                            return (
+                              JSON.stringify(existingMetric.metric) ===
+                              JSON.stringify(newMetric.metric)
+                            );
+                          },
+                        );
+
+                        if (existingIndex >= 0) {
+                          // Metric exists - merge the values arrays
+                          if (
+                            Array.isArray(mergedResult[existingIndex].values) &&
+                            Array.isArray(newMetric.values)
+                          ) {
+                            mergedResult[existingIndex] = {
+                              ...mergedResult[existingIndex],
+                              values: [
+                                ...mergedResult[existingIndex].values,
+                                ...newMetric.values,
+                              ],
+                            };
+                          }
+                        } else {
+                          // New metric - add it to results
+                          mergedResult.push(newMetric);
+                        }
+                      });
+
+                      queryResults[queryIndex] = {
+                        ...newData,
+                        result: mergedResult,
+                      };
+                    } else if (newData) {
+                      // Replace with new data if structure is different
+                      queryResults[queryIndex] = newData;
+                    }
+                  }
+
+                  // Update state with accumulated results
+                  state.data = [...queryResults];
+                  state.metadata = {
+                    queries: queryMetadata,
+                  };
+
+                  // Clear error on successful response
+                  state.errorDetail = {
+                    message: "",
+                    code: "",
+                  };
+                }
+              };
+
+              const handlePromQLError = (data: any, err: any) => {
+                // Mark this query as completed (even with error)
+                completedQueries.add(queryIndex);
+
+                const errorMessage =
+                  err?.content?.message ||
+                  err?.content?.error ||
+                  "Unknown error";
+                const errorCode = err?.content?.code || "";
 
                 state.errorDetail = {
-                  message: "",
-                  code: "",
+                  message: errorMessage,
+                  code: errorCode,
                 };
-                return { result: res.data.data, metadata: metadata };
-              } catch (error) {
-                processApiError(error, "promql");
-                return { result: null, metadata: metadata };
-              } finally {
+
                 removeTraceId(traceId);
-              }
-            },
+
+                // Only mark loading as complete when ALL queries are done
+                if (
+                  completedQueries.size === panelSchema.value.queries.length
+                ) {
+                  state.loading = false;
+                  state.isOperationCancelled = false;
+                  state.isPartialData = false;
+                }
+              };
+
+              const handlePromQLComplete = (data: any, _: any) => {
+                // Mark this query as completed
+                completedQueries.add(queryIndex);
+
+                // Final update with complete results
+                state.data = [...queryResults];
+                state.metadata = {
+                  queries: queryMetadata,
+                };
+
+                removeTraceId(traceId);
+
+                // Only mark loading as complete when ALL queries are done
+                if (
+                  completedQueries.size === panelSchema.value.queries.length
+                ) {
+                  state.loading = false;
+                  state.isOperationCancelled = false;
+                  state.isPartialData = false;
+
+                  // Save to cache after all queries complete
+                  saveCurrentStateToCache();
+                }
+              };
+
+              const handlePromQLReset = (data: any, res: any) => {
+                // Reset handling if needed
+              };
+
+              fetchQueryDataWithHttpStream(payload, {
+                data: handlePromQLResponse,
+                error: handlePromQLError,
+                complete: handlePromQLComplete,
+                reset: handlePromQLReset,
+              });
+
+              addTraceId(traceId);
+            }),
           );
 
-          // Start fetching annotations in parallel with queries
-          const annotationsPromise = (async () => {
-            try {
-              if (!shouldFetchAnnotations()) {
-                return [];
-              }
-              const annotationList = await refreshAnnotations(
-                startISOTimestamp,
-                endISOTimestamp,
-              );
-              return annotationList || [];
-            } catch (annotationError) {
-              console.error("Failed to fetch annotations:", annotationError);
-              return [];
-            }
-          })();
-
-          // Wait for all query promises to resolve
-          const queryResults: any = await Promise.all(queryPromises);
-
-          state.loading = false;
-          state.data = queryResults.map((it: any) => it?.result);
-          state.metadata = {
-            queries: queryResults.map((it: any) => it?.metadata),
-          };
-
           // Wait for annotations to complete and update state
-          // The watcher in PanelSchemaRenderer will trigger re-render when this updates
           state.annotations = await annotationsPromise;
-
-          // this is async task, which will be executed in background(await is not required)
-          saveCurrentStateToCache();
         } catch (error) {
           state.loading = false;
+          state.isOperationCancelled = false;
+          state.isPartialData = false;
         }
       } else {
         // copy of current abortController
@@ -1201,7 +1357,8 @@ export const usePanelDataLoader = (
                       ) {
                         // Check if streaming_aggs is enabled
                         const streaming_aggs =
-                          state.resultMetaData[queryIndex]?.[0]?.streaming_aggs ?? false;
+                          state.resultMetaData[queryIndex]?.[0]
+                            ?.streaming_aggs ?? false;
 
                         // If streaming_aggs, replace the data (aggregation query)
                         if (streaming_aggs) {
@@ -1578,7 +1735,8 @@ export const usePanelDataLoader = (
         let variableValue = "";
         if (Array.isArray(variable.value)) {
           // If no data found (empty array), use SELECT_ALL_VALUE
-          const valueToUse = variable.value.length === 0 ? [SELECT_ALL_VALUE] : variable.value;
+          const valueToUse =
+            variable.value.length === 0 ? [SELECT_ALL_VALUE] : variable.value;
           const value =
             valueToUse
               .map(
@@ -1598,8 +1756,7 @@ export const usePanelDataLoader = (
             {
               placeHolder: `\${${variable.name}:doublequote}`,
               value:
-                valueToUse.map((value: any) => `"${value}"`).join(",") ||
-                '""',
+                valueToUse.map((value: any) => `"${value}"`).join(",") || '""',
             },
             {
               placeHolder: `\${${variable.name}:singlequote}`,
@@ -1630,7 +1787,8 @@ export const usePanelDataLoader = (
           });
         } else {
           // If no data found (null value), use SELECT_ALL_VALUE
-          const valueToUse = variable.value === null ? SELECT_ALL_VALUE : variable.value;
+          const valueToUse =
+            variable.value === null ? SELECT_ALL_VALUE : variable.value;
           variableValue = `${variable.escapeSingleQuotes ? escapeSingleQuotes(valueToUse) : valueToUse}`;
           if (
             query.includes(variableName) ||
@@ -2157,7 +2315,14 @@ export const usePanelDataLoader = (
       threshold: 0, // Adjust as needed
     });
 
-    if (chartPanelRef?.value) observer.observe(chartPanelRef?.value);
+    // Keep the working solution - setTimeout ensures the element is fully rendered
+    // This is necessary because IntersectionObserver checks immediately after observe()
+    // but the element might not be fully laid out yet (especially in popups/drawers)
+    setTimeout(() => {
+      if (chartPanelRef?.value) {
+        observer.observe(chartPanelRef?.value);
+      }
+    }, 0);
   });
 
   // remove intersection observer

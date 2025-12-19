@@ -1,0 +1,7 @@
+[
+  { "user_id": 1, "user_name": "Alice", "email": "alice@test.com", "score": 85 },
+  { "user_id": 2, "user_name": "Bob", "email": "bob@test.com", "score": 92 },
+  { "user_id": 3, "user_name": "Charlie", "email": "charlie@test.com", "score": 78 },
+  { "user_id": 4, "user_name": "Diana", "email": "diana@test.com", "score": 95 },
+  { "user_id": 5, "user_name": "Eve", "email": "eve@test.com", "score": 88 }
+]

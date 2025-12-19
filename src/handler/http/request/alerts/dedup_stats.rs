@@ -62,13 +62,8 @@ pub async fn get_dedup_summary(
     let alerts_data = match crate::service::db::alerts::alert::list(&org_id, None, None).await {
         Ok(data) => data,
         Err(e) => {
-            log::error!("Failed to list alerts for org {}: {}", org_id, e);
-            return Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    actix_web::http::StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                    e.to_string(),
-                )),
-            );
+            log::error!("Failed to list alerts for org {org_id}: {e}");
+            return Ok(MetaHttpResponse::internal_error(e));
         }
     };
 
@@ -87,14 +82,14 @@ pub async fn get_dedup_summary(
 
     // For suppressions/passed counts, we'll use database for now
     // In future, could query Prometheus metrics for time-series data
-    let (suppressions_total, passed_total) = match get_dedup_counts_from_db(&org_id).await {
-        Ok(counts) => counts,
-        Err(e) => {
-            log::warn!("Failed to get dedup counts from database: {}", e);
-            (0, 0)
-        }
-    };
+    #[cfg(feature = "enterprise")]
+    let (suppressions_total, passed_total) = get_dedup_counts_from_db(&org_id)
+        .await
+        .inspect_err(|e| log::warn!("Failed to get dedup counts from database: {e}"))
+        .unwrap_or_default();
 
+    #[cfg(not(feature = "enterprise"))]
+    let (suppressions_total, passed_total) = (0, 0);
     let suppression_rate = if suppressions_total + passed_total > 0 {
         suppressions_total as f64 / (suppressions_total + passed_total) as f64
     } else {
@@ -116,39 +111,27 @@ pub async fn get_dedup_summary(
 
 /// Get dedup counts from database
 /// Returns (suppressions, passed) counts based on occurrence_count
-async fn get_dedup_counts_from_db(_org_id: &str) -> Result<(i64, i64), anyhow::Error> {
-    #[cfg(feature = "enterprise")]
-    {
-        use infra::table::entity::alert_dedup_state;
-        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+#[cfg(feature = "enterprise")]
+async fn get_dedup_counts_from_db(org_id: &str) -> Result<(i64, i64), anyhow::Error> {
+    use infra::table::entity::alert_dedup_state;
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
-        let db = infra::db::ORM_CLIENT
-            .get()
-            .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let db = infra::db::ORM_CLIENT
+        .get()
+        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
 
-        // Get all dedup states for this org
-        let states = alert_dedup_state::Entity::find()
-            .filter(alert_dedup_state::Column::OrgId.eq(_org_id))
-            .all(db)
-            .await?;
+    // Get all dedup states for this org
+    let states = alert_dedup_state::Entity::find()
+        .filter(alert_dedup_state::Column::OrgId.eq(org_id))
+        .all(db)
+        .await?;
 
-        let mut suppressions = 0i64;
-        let mut passed = 0i64;
+    let passed = states.len() as i64;
 
-        for state in states {
-            // If occurrence_count > 1, then (count - 1) were suppressed
-            if state.occurrence_count > 1 {
-                suppressions += state.occurrence_count - 1;
-            }
-            // Each fingerprint represents 1 passed alert
-            passed += 1;
-        }
+    let suppressions = states
+        .iter()
+        .filter(|state| state.occurrence_count > 1)
+        .fold(0, |total, state| total + state.occurrence_count - 1);
 
-        Ok((suppressions, passed))
-    }
-
-    #[cfg(not(feature = "enterprise"))]
-    {
-        Ok((0, 0))
-    }
+    Ok((suppressions, passed))
 }

@@ -276,7 +276,8 @@
     "actionLabel": "Eylem",
     "transformLabel": "Dönüştürün",
     "addToDashboard": "Kontrol Paneline Ekle",
-    "selectStream": "Akışı Seç"
+    "selectStream": "Akışı Seç",
+    "pattern_summary": "{totalTime} ms içinde {logsAnalyzed} olaylarında bulunan {totalEvents} olay ve {patternsFound} modelinden 1 ila 50 arası gösteriliyor."
   },
   "menu": {
     "home": "Ana Sayfa",
@@ -1064,7 +1065,18 @@
     "panelDuplicatedSuccessfully": "Panel Başarıyla Çoğaltıldı",
     "panelDuplicationFailed": "Panel çoğaltma başarısız oldu",
     "mapname": "İsim",
-    "mapvalue": "Değer"
+    "mapvalue": "Değer",
+    "customChartTypeSelector": "Özel Grafik Türü Seçici",
+    "customChartTypeSelectorHint": "Temel kod yapısına başlamak için eCharts kitaplığından bir grafik türü seçin",
+    "selectChartType": "Grafik Türünü Seçin",
+    "joins": "Katılır",
+    "addJoin": "Katıl Ekle",
+    "removeJoin": "Katılmayı Kaldır",
+    "leftJoin": "Sol Katılım",
+    "innerJoin": "İç Katılım",
+    "rightJoin": "Sağ Katıl",
+    "addClause": "Madde Ekle",
+    "removeClause": "Maddeyi Kaldır"
   },
   "home": {
     "streams": "Akışlar",
@@ -1299,6 +1311,54 @@
     },
     "triggerAlert": "Tetikleyici",
     "alertTriggeredSuccess": "Uyarı başarıyla tetiklendi",
+       "incidents": {
+      "title": "Olaylar",
+      "header": "Uyarı Olayları",
+      "noIncidents": "Olay bulunamadı",
+      "id": "KİMLİK",
+      "status": "Durum",
+      "severity": "Şiddeti",
+      "alertCount": "Uyarılar",
+      "firstAlertAt": "İlk Uyarı",
+      "lastAlertAt": "Son Uyarı",
+      "resolvedAt": "Çözüldü:",
+      "title_field": "Başlık",
+      "correlationKey": "Korelasyon Anahtarı",
+      "stableDimensions": "Ölçüler",
+      "topology": "Topoloji",
+      "upstreamServices": "Yukarı Akım Hizmetleri",
+      "downstreamServices": "Downstream Hizmetler",
+      "correlatedAlerts": "İlişkili Uyarılar",
+      "alertName": "Uyarı Adı",
+      "alertFiredAt": "Ateş Edildi",
+      "correlationReason": "Korelasyon Nedeni",
+      "actions": "Eylemler",
+      "acknowledge": "Kabul etmek",
+      "resolve": "Çözmek",
+      "reopen": "Yeniden Açın",
+      "viewDetails": "Ayrıntıları Görüntüle",
+      "statusOpen": "Açık",
+      "statusAcknowledged": "Kabul Edildi",
+      "statusResolved": "Çözüldü",
+      "severityP1": "P1 - Kritik",
+      "severityP2": "P2 - Yüksek",
+      "severityP3": "P3 - Orta",
+      "severityP4": "P4 - Düşük",
+      "correlationServiceDiscovery": "Hizmet Keşfi",
+      "correlationManualExtraction": "Manuel Çıkarma",
+      "correlationTemporal": "Zamansal",
+      "filterByStatus": "Duruma göre filtrele",
+      "allStatuses": "Tüm Durumlar",
+      "loading": "Olaylar yükleniyor...",
+      "errorLoading": "Olaylar yüklenemedi",
+      "statusUpdated": "Olay durumu güncellendi",
+      "statusUpdateFailed": "Olay durumu güncellenemedi",
+      "rootCauseAnalysis": "Kök Sebep Analizi",
+      "analyzeRca": "Analiz",
+      "rcaInProgress": "Kök nedeni analiz etmek...",
+      "rcaCompleted": "Kök neden analizi tamamlandı",
+      "noRcaYet": "Kök neden analizi mevcut değildir. Başlamak için 'Analiz Et'i tıklayın."
+    },
     "events": "Olaylar",
     "multiWindow": "Geçmişle karşılaştırın",
     "multiWindowSubLabel": "Mevcut sonuçları başka bir zaman dilimine ait verilerle karşılaştırın",
@@ -1721,7 +1781,8 @@
     "viewLogs": "Günlükleri Görüntüle",
     "backToLogs": "Günlüklere Dön",
     "RedMetrics": "KIRMIZI Metrikler",
-    "loadingStream": "Akış Yükleniyor..."
+    "loadingStream": "Akış Yükleniyor...",
+    "viewRelated": "İlgili Görüntüle"
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",
@@ -2034,6 +2095,14 @@
     "tracesFromService": "Hizmetten gelen izler: {service}",
     "noTracesFound": "İlişkili iz bulunamadı",
     "noTracesDescription": "Seçilen zaman aralığında {service} hizmeti için iz bulunamadı",
-    "openTraceInNewWindow": "İzini yeni pencerede aç"
+    "openTraceInNewWindow": "İzini yeni pencerede aç",
+    "filters": "Filtreler"
+  },
+  "sreChat": {
+    "emptyMessage": "Uyarılarınız ve olaylarınız hakkında bana herhangi bir şey sorun",
+    "inputPlaceholder": "SRE Asistanına sor...",
+    "clearChatTitle": "Sohbeti Temizle",
+    "clearChatMessage": "Bu konuşmayı temizlemek istediğinden emin misin?",
+    "copiedToClipboard": "Panoya kopyalandı"
   }
 }

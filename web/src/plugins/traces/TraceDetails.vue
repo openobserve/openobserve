@@ -209,17 +209,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :size="`sm`"
               />
             </div>
-            <q-btn
+            <share-button
               data-test="trace-details-share-link-btn"
-              class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border !tw-h-[2.25rem] hover:tw-bg-[var(--o2-hover-accent)]"
-              size="xs"
-              icon="share"
-              @click="shareLink"
-            >
-              <q-tooltip>
-                {{ t('search.shareLink') }}
-              </q-tooltip>
-            </q-btn>
+              :url="traceDetailsShareURL"
+              button-class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border !tw-h-[2.25rem] hover:tw-bg-[var(--o2-hover-accent)]"
+              button-size="xs"
+            />
             <q-btn
               data-test="trace-details-close-btn"
               class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border !tw-h-[2.25rem] hover:tw-bg-[var(--o2-hover-accent)]"
@@ -373,6 +368,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :span="spanMap[selectedSpanId as string]"
                   :baseTracePosition="baseTracePosition"
                   :search-query="searchQuery"
+                  :stream-name="currentTraceStreamName"
+                  :service-streams-enabled="serviceStreamsEnabled"
                   @view-logs="redirectToLogs"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
@@ -417,6 +414,7 @@ import {
 } from "vue";
 import { cloneDeep } from "lodash-es";
 import SpanRenderer from "./SpanRenderer.vue";
+import ShareButton from "@/components/common/ShareButton.vue";
 import useTraces from "@/composables/useTraces";
 import { computed } from "vue";
 import TraceDetailsSidebar from "./TraceDetailsSidebar.vue";
@@ -427,6 +425,7 @@ import {
   formatTimeWithSuffix,
   getImageURL,
   convertTimeFromNsToMs,
+  convertTimeFromNsToUs,
 } from "@/utils/zincutils";
 import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
 import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
@@ -454,6 +453,7 @@ export default defineComponent({
   },
   components: {
     SpanRenderer,
+    ShareButton,
     TraceDetailsSidebar,
     TraceTree,
     TraceHeader,
@@ -464,11 +464,11 @@ export default defineComponent({
     ),
   },
 
-  emits: ["shareLink", "searchQueryUpdated"],
+  emits: ["searchQueryUpdated"],
   setup(props, { emit }) {
     const traceTree: any = ref([]);
     const spanMap: any = ref({});
-    const { searchObj, copyTracesUrl } = useTraces();
+    const { searchObj, getUrlQueryParams } = useTraces();
     const baseTracePosition: any = ref({});
     const collapseMapping: any = ref({});
     const traceRootSpan: any = ref(null);
@@ -553,6 +553,18 @@ export default defineComponent({
     const selectedStreamsString = computed(() =>
       searchObj.data.traceDetails.selectedLogStreams.join(", "),
     );
+
+    // Current trace stream name for correlation
+    const currentTraceStreamName = computed(() => {
+      return (router.currentRoute.value.query.stream as string) ||
+        searchObj.data.stream.selectedStream.value ||
+        '';
+    });
+
+    // Check if service streams feature is enabled
+    const serviceStreamsEnabled = computed(() => {
+      return store.state.zoConfig.service_streams_enabled !== false;
+    });
 
     const showTraceDetails = ref(false);
     const currentIndex = ref(0);
@@ -1130,8 +1142,10 @@ export default defineComponent({
       return {
         [store.state.zoConfig.timestamp_column]:
           span[store.state.zoConfig.timestamp_column],
+        startTimeUs: Math.floor(span.start_time / 1000),
         startTimeMs: convertTimeFromNsToMs(span.start_time),
         endTimeMs: convertTimeFromNsToMs(span.end_time),
+        endTimeUs: Math.floor(span.end_time / 1000),
         durationMs: span?.duration ? Number((span?.duration / 1000).toFixed(4)) : 0, // This key is standard, we use for calculating width of span block. This should always be in ms
         durationUs: span?.duration ? Number(span?.duration?.toFixed(4)) : 0, // This key is used for displaying duration in span block. We convert this us to ms, s in span block
         idleMs: span.idle_ns ? convertTime(span.idle_ns) : 0,
@@ -1297,12 +1311,34 @@ export default defineComponent({
       copyToClipboard(spanList.value[0]["trace_id"]);
     };
 
-    const shareLink = () => {
-      copyTracesUrl({
-        from: router.currentRoute.value.query.from as string,
-        to: router.currentRoute.value.query.to as string,
-      });
-    };
+    /**
+     * Computed property for trace details share URL
+     * Uses custom time range from router query params
+     */
+    const traceDetailsShareURL = computed(() => {
+      const queryParams = getUrlQueryParams(true);
+
+      // Override with custom time range from route
+      const customFrom = router.currentRoute.value.query.from as string;
+      const customTo = router.currentRoute.value.query.to as string;
+
+      if (customFrom) queryParams.from = customFrom;
+      if (customTo) queryParams.to = customTo;
+
+      const searchParams = new URLSearchParams();
+      for (const [key, value] of Object.entries(queryParams)) {
+        searchParams.append(key, String(value));
+      }
+      const queryString = searchParams.toString();
+
+      let shareURL = window.location.origin + window.location.pathname;
+
+      if (queryString != "") {
+        shareURL += "?" + queryString;
+      }
+
+      return shareURL;
+    });
 
     const redirectToLogs = () => {
       if (!searchObj.data.traceDetails.selectedTrace) {
@@ -1413,7 +1449,7 @@ export default defineComponent({
       toggleTimeline,
       copyToClipboard,
       copyTraceId,
-      shareLink,
+      traceDetailsShareURL,
       outlinedInfo,
       redirectToLogs,
       filteredStreamOptions,
@@ -1447,6 +1483,9 @@ export default defineComponent({
       validateSpan,
       calculateTracePosition,
       buildServiceTree,
+      // Correlation props
+      currentTraceStreamName,
+      serviceStreamsEnabled,
     };
   },
 });

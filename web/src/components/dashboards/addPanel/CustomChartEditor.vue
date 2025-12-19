@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   defineComponent,
   ref,
+  watch,
 } from "vue";
 import QueryEditor from "@/components/CodeQueryEditor.vue";
 import { useStore } from "vuex";
@@ -69,6 +70,13 @@ export default defineComponent({
     const dataToBeRendered = ref({});
     const store = useStore();
     const { dashboardPanelData } = useDashboardPanelData("dashboard");
+
+    // Watch for prop changes and update the editor content
+    watch(() => props.modelValue, (newValue) => {
+      if (newValue !== javascriptCodeContent.value) {
+        javascriptCodeContent.value = newValue;
+      }
+    });
 
     const layoutSplitterUpdated = () => {
       window.dispatchEvent(new Event("resize"));

@@ -363,6 +363,7 @@ pub async fn search(
         work_group,
         result_cache_ratio: Some(res.result_cache_ratio),
         dashboard_info,
+        peak_memory_usage: res.peak_memory_usage,
         ..Default::default()
     };
     report_request_usage_stats(
@@ -566,12 +567,19 @@ pub async fn prepare_cache_response(
                     cacher::get_ts_col_order_by(&v, TIMESTAMP_COL_NAME, is_aggregate)
                         .unwrap_or_default();
 
+                // For histogram queries, append interval and ts_column to file_path
+                // This matches the logic in check_cache function
+                if is_aggregate && let Some(interval) = v.histogram_interval {
+                    file_path = format!("{file_path}_{interval}_{ts_column}");
+                }
+
                 MultiCachedQueryResponse {
                     ts_column,
                     is_aggregate,
                     is_descending,
                     order_by: v.order_by,
                     limit: v.limit,
+                    file_path: file_path.clone(),
                     ..Default::default()
                 }
             }
@@ -679,6 +687,13 @@ pub fn merge_response(
         if !res.function_error.is_empty() {
             fn_error.extend(res.function_error.clone());
         }
+
+        cache_response.peak_memory_usage = Some(
+            cache_response
+                .peak_memory_usage
+                .unwrap_or(0.0)
+                .max(res.peak_memory_usage.unwrap_or(0.0)),
+        );
 
         cache_response.hits.extend(res.hits.clone());
     }

@@ -87,21 +87,53 @@ test.describe("dashboard streaming testcases", () => {
     );
 
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
+
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
+
+    await pm.dashboardPanelActions.waitForChartToRender();
+
 
     const variableInput = page.getByLabel("variablename", {
       exact: true,
     });
     await variableInput.waitFor({ state: "visible", timeout: 10000 });
+
+    // Wait for the _values API call when clicking on the variable input
+    const valuesApiPromise = page.waitForResponse(
+      response => response.url().includes('_values') || response.url().includes('/values'),
+      { timeout: 15000 }
+    );
+
     await variableInput.click();
+
+    // Wait for the API response to complete
+    try {
+      await valuesApiPromise;
+      await page.waitForTimeout(500); // Additional wait for dropdown to render
+    } catch (e) {
+      console.log("Warning: _values API response not detected, continuing...");
+    }
 
     // Type partial search terms to trigger multiple _values API calls with streaming enabled
     const searchTerms = ["zi", "zio", "ziox"];
     for (const term of searchTerms) {
+      // Wait for the _values API call for each search term
+      const valuesApiResponse = page.waitForResponse(
+        response => response.url().includes('_values') || response.url().includes('/values'),
+        { timeout: 15000 }
+      );
+
       await variableInput.fill(term);
-      // await page.waitForTimeout(1500);
-      // await page.waitForLoadState("networkidle");
+
+      // Wait for the API response to complete
+      try {
+        await valuesApiResponse;
+        await page.waitForTimeout(300); // Wait for dropdown to update with new results
+      } catch (e) {
+        console.log(`Warning: _values API response not detected for term "${term}", continuing...`);
+      }
     }
     // Select the final value
     const option = page.getByRole("option", { name: "ziox" });
@@ -262,7 +294,7 @@ test.describe("dashboard streaming testcases", () => {
 
     await pm.dashboardPanelActions.applyDashboardBtn();
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.waitForChartToRender();
 
 
