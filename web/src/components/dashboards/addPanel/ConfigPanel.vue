@@ -1635,7 +1635,7 @@ import StepAfter from "@/components/icons/dashboards/StepAfter.vue";
 import StepMiddle from "@/components/icons/dashboards/StepMiddle.vue";
 import { useStore } from "vuex";
 
-import { markRaw, watchEffect, watch } from "vue";
+import { markRaw, watchEffect } from "vue";
 import {
   shouldShowLegendsToggle,
   shouldShowLegendPosition,
