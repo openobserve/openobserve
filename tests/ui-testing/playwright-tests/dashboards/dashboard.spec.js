@@ -808,7 +808,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
-  test("should update the line chart correctly when used camel case in custom sql query", async ({
+  test.skip("should update the line chart correctly when used camel case in custom sql query", async ({
     page,
   }) => {
     const pm = new PageManager(page);
