@@ -13,3 +13,7 @@ node_modules
 /playwright/.cache/
 coverage/
 .nyc_output/
+
+# Test output logs
+test-output.log
+*.log
