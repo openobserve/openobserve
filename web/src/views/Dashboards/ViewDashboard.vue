@@ -708,9 +708,6 @@ export default defineComponent({
         } else if (error.message?.includes("Invalid dependency")) {
           showErrorNotification("Invalid variable dependency configuration");
         }
-      } else {
-        // Not using scoped variables manager
-        usingScopedVariablesManager.value = false;
       }
 
       // NOW set the reactive dashboard data to trigger rendering
