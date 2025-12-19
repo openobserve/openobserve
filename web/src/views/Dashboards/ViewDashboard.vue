@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               @trigger="refreshData"
               class="dashboard-icons hideOnPrintMode q-ml-sm"
-              style="padding-left: 0px; padding-right: 0px;"
+              style="padding-left: 0px; padding-right: 0px"
               size="sm"
             />
             <q-btn
@@ -378,6 +378,7 @@ import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { getUUID } from "@/utils/zincutils";
+import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import {
   createDashboardsContextProvider,
   contextRegistry,
@@ -424,6 +425,12 @@ export default defineComponent({
       showErrorNotification,
       showConfictErrorNotificationWithRefreshBtn,
     } = useNotifications();
+
+    // Initialize variables manager for scoped variables
+    const variablesManager = useVariablesManager();
+
+    // Provide to child components
+    provide("variablesManager", variablesManager);
 
     let moment: any = () => {};
 
@@ -552,50 +559,34 @@ export default defineComponent({
     // provide it to child components
     provide("selectedTabId", selectedTabId);
 
+    // Track if we're using the scoped variables manager
+    const usingScopedVariablesManager = ref(false);
+
     // variables data
     const variablesData = reactive({});
     const refreshedVariablesData = reactive({}); // Flag to track if variables have changed
 
     const variablesDataUpdated = (data: any) => {
+      // ONLY update the live variables data - DO NOT update URL
+      // URL updates should happen ONLY after commitAll() is called (on refresh button click)
+      // This follows the __global mechanism from the main branch design
       Object.assign(variablesData, data);
-      const variableObj = {};
-      data.values?.forEach((variable) => {
-        if (variable.type === "dynamic_filters") {
-          const filters = (variable.value || []).filter(
-            (item: any) => item.name && item.operator && item.value,
-          );
-          const encodedFilters = filters.map((item: any) => ({
-            name: item.name,
-            operator: item.operator,
-            value: item.value,
-          }));
-          variableObj[`var-${variable.name}`] = encodeURIComponent(
-            JSON.stringify(encodedFilters),
-          );
-        } else {
-          variableObj[`var-${variable.name}`] = variable.value;
-        }
-      });
-      router.replace({
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          dashboard: route.query.dashboard,
-          folder: route.query.folder,
-          tab: selectedTabId.value,
-          refresh: generateDurationLabel(refreshInterval.value),
-          ...getQueryParamsForDuration(selectedDate.value),
-          ...variableObj,
-          print: store.state.printMode,
-          searchtype: route.query.searchtype,
-        },
-      });
+
+      // NOTE: URL sync has been moved to refreshData() after commitAll()
+      // This ensures URL only reflects COMMITTED variable values, not live changes
     };
 
     const refreshedVariablesDataUpdated = (variablesData: any) => {
       Object.assign(refreshedVariablesData, variablesData);
     };
     const isVariablesChanged = computed(() => {
-      // Convert both objects to a consistent format for comparison
+      // If using variables manager, use its hasUncommittedChanges computed
+      // This is the proper way to detect live vs committed state differences
+      if (variablesManager) {
+        return variablesManager.hasUncommittedChanges.value;
+      }
+
+      // Legacy mode: Convert both objects to a consistent format for comparison
       const normalizeVariables = (obj) => {
         const normalized = JSON.parse(JSON.stringify(obj));
         // Sort arrays to ensure consistent ordering
@@ -675,37 +666,69 @@ export default defineComponent({
           return;
         }
       }
-      currentDashboardData.data = await getDashboard(
+      const dashboard = await getDashboard(
         store,
         route.query.dashboard,
         route.query.folder ?? "default",
       );
 
       if (
-        !currentDashboardData?.data ||
-        typeof currentDashboardData.data !== "object" ||
-        !Object.keys(currentDashboardData.data).length
+        !dashboard ||
+        typeof dashboard !== "object" ||
+        !Object.keys(dashboard).length
       ) {
         goBackToDashboardList();
         return;
       }
 
+      // Initialize variables manager for all dashboards to ensure consistent handling
+      try {
+        await variablesManager.initialize(
+          dashboard?.variables?.list || [],
+          dashboard,
+        );
+
+        // Load variable values from URL if present
+        variablesManager.loadFromUrl(route);
+
+        // COMMIT IMMEDIATELY! loadFromUrl() marks variables with URL values as fully loaded,
+        // so we can commit right away without waiting for API calls.
+        // This allows instant rendering on page refresh with URL parameter values.
+        variablesManager.commitAll();
+
+        // Track that we're using the scoped variables manager
+        usingScopedVariablesManager.value = true;
+      } catch (error: any) {
+        console.error("Error initializing variables manager:", error);
+        if (error.message?.includes("Circular dependency")) {
+          showErrorNotification(
+            "Circular dependency detected in dashboard variables",
+          );
+        } else if (error.message?.includes("Invalid dependency")) {
+          showErrorNotification("Invalid variable dependency configuration");
+        }
+      }
+
+      // NOW set the reactive dashboard data to trigger rendering
+      // By this point, the variables manager is fully initialized and structurally committed.
+      currentDashboardData.data = dashboard;
+
       // set selected tab from query params
-      const selectedTab = currentDashboardData?.data?.tabs?.find(
+      const selectedTab = dashboard?.tabs?.find(
         (tab: any) => tab.tabId === route.query.tab,
       );
 
       selectedTabId.value = selectedTab
         ? selectedTab.tabId
-        : currentDashboardData?.data?.tabs?.[0]?.tabId;
+        : dashboard?.tabs?.[0]?.tabId;
+
+      // If using manager, set the selected tab as visible
+      if (selectedTabId.value) {
+        variablesManager.setTabVisibility(selectedTabId.value, true);
+      }
 
       // if variables data is null, set it to empty list
-      if (
-        !(
-          currentDashboardData.data?.variables &&
-          currentDashboardData.data?.variables?.list.length
-        )
-      ) {
+      if (!(dashboard?.variables && dashboard?.variables?.list.length)) {
         variablesData.isVariablesLoading = false;
         variablesData.values = [];
         refreshedVariablesData.isVariablesLoading = false;
@@ -821,6 +844,10 @@ export default defineComponent({
     };
 
     const getQueryParamsForDuration = (data: any) => {
+      if (!data) {
+        return {};
+      }
+
       if (data.relativeTimePeriod) {
         return {
           period: data.relativeTimePeriod,
@@ -867,12 +894,20 @@ export default defineComponent({
         const allPanelIds = [];
         currentDashboardData.data.tabs?.forEach((tab: any) => {
           tab.panels?.forEach((panel: any) => {
-            if(panel.id){
+            if (panel.id) {
               allPanelIds.push(panel?.id);
               shouldRefreshWithoutCachePerPanel.value[panel.id] = false;
             }
           });
         });
+
+        // CRITICAL: Commit all live variable changes to committed state
+        // This is the key mechanism that prevents premature API calls
+        // Similar to updating currentVariablesDataRef.__global in main branch
+        if (variablesManager) {
+          variablesManager.commitAll();
+          // After committing, sync committed values to URL so only committed state is reflected in the URL
+        }
 
         // Refresh the dashboard
         dateTimePicker.value.refresh();
@@ -960,23 +995,89 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     });
 
-    // whenever the refreshInterval is changed, update the query params
-    watch([refreshInterval, selectedDate, selectedTabId], () => {
-      generateNewDashboardRunId();
-      router.replace({
-        query: {
-          ...route.query, // used to keep current variables data as is
-          org_identifier: store.state.selectedOrganization.identifier,
-          dashboard: route.query.dashboard,
-          folder: route.query.folder,
-          tab: selectedTabId.value,
-          refresh: generateDurationLabel(refreshInterval.value),
-          ...getQueryParamsForDuration(selectedDate.value),
-          print: store.state.printMode,
-          searchtype: route.query.searchtype,
-        },
-      });
+    // Watch for tab changes and update visibility in manager
+    watch(selectedTabId, (newTabId, oldTabId) => {
+      // Check if using manager (has scoped variables)
+      const hasScopedVariables =
+        currentDashboardData.data?.variables?.list?.some(
+          (v: any) => v.scope === "tabs" || v.scope === "panels",
+        );
+
+      if (hasScopedVariables && newTabId) {
+        // Set old tab as not visible
+        if (oldTabId) {
+          variablesManager.setTabVisibility(oldTabId, false);
+        }
+        // Set new tab as visible
+        variablesManager.setTabVisibility(newTabId, true);
+      }
     });
+
+    // Get current variable params from manager (uses new centralized getUrlParams method)
+    const getVariableParamsFromManager = (): Record<string, any> => {
+      if (!variablesManager) return {};
+
+      // Use the centralized getUrlParams method with committed state (useLive: false)
+      return variablesManager.getUrlParams({ useLive: false });
+    };
+
+    // whenever the refreshInterval is changed, update the query params
+    watch(
+      [
+        refreshInterval,
+        selectedDate,
+        selectedTabId,
+        () => variablesManager.committedVariablesData,
+      ],
+      () => {
+        generateNewDashboardRunId();
+
+        // Build variable params - prefer manager if available, otherwise use route.query
+        let variableParams: Record<string, any> = {};
+
+        if (variablesManager) {
+          // Get from manager
+          variableParams = getVariableParamsFromManager();
+
+          // If manager returns empty but route.query has variables, use route.query
+          // This handles the case where page just loaded and manager hasn't committed yet
+          if (Object.keys(variableParams).length === 0) {
+            Object.keys(route.query).forEach((key) => {
+              if (key.startsWith("var-")) {
+                variableParams[key] = route.query[key];
+              }
+            });
+          }
+        } else {
+          // No manager, use route.query
+          Object.keys(route.query).forEach((key) => {
+            if (key.startsWith("var-")) {
+              variableParams[key] = route.query[key];
+            }
+          });
+        }
+
+        console.log(
+          "[ViewDashboard] Watcher triggered - preserving variables:",
+          variableParams,
+        );
+
+        router.replace({
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+            dashboard: route.query.dashboard,
+            folder: route.query.folder,
+            tab: selectedTabId.value,
+            refresh: generateDurationLabel(refreshInterval.value),
+            ...getQueryParamsForDuration(selectedDate.value),
+            ...variableParams, // Use variables from manager or route
+            print: store.state.printMode,
+            searchtype: route.query.searchtype,
+          },
+        });
+      },
+      { deep: true },
+    );
 
     const onDeletePanel = async (panelId: any) => {
       try {
@@ -1216,6 +1317,30 @@ export default defineComponent({
         showJsonEditorDialog.value = false;
       }
     });
+
+    // Initial commitment once all variables have settled (for manager mode)
+    let initialCommitDone = false;
+    watch(
+      () => [
+        variablesManager.isLoading.value,
+        variablesManager.variablesData.isInitialized,
+      ],
+      ([loading, initialized]) => {
+        if (
+          initialized &&
+          !loading &&
+          !initialCommitDone &&
+          usingScopedVariablesManager.value
+        ) {
+          console.log(
+            "[ViewDashboard] Variables settled, performing initial commit",
+          );
+          variablesManager.commitAll();
+          initialCommitDone = true;
+        }
+      },
+      { immediate: true },
+    );
 
     return {
       currentDashboardData,

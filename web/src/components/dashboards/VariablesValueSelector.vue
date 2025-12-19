@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-for="(item, index) in variablesData.values"
       :key="item.name + index"
-      :data-test="`dashboard-variable-${item}-selector`"
+      :data-test="`dashboard-variable-${item.name}-container`"
     >
       <div v-if="item.type == 'query_values'">
         <VariableQueryValueSelector
@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="onVariablesValueUpdated(index)"
           :loadOptions="loadVariableOptions"
           @search="onVariableSearch(index, $event)"
+          :data-test="`variable-selector-${item.name}`"
         />
       </div>
       <div v-else-if="item.type == 'constant'">
@@ -44,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="item.label || item.name"
           dense
           readonly
-          data-test="dashboard-variable-constant-selector"
+          :data-test="`variable-selector-${item.name}`"
           @update:model-value="onVariablesValueUpdated(index)"
           borderless
           hide-bottom-space
@@ -59,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="item.value"
           :label="item.label || item.name"
           dense
-          data-test="dashboard-variable-textbox-selector"
+          :data-test="`variable-selector-${item.name}`"
           @update:model-value="onVariablesValueUpdated(index)"
           borderless
           hide-bottom-space
@@ -72,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="item.value"
           :variableItem="item"
           @update:model-value="onVariablesValueUpdated(index)"
+          :data-test="`variable-selector-${item.name}`"
         />
       </div>
       <div v-else-if="item.type == 'dynamic_filters'">
@@ -79,14 +81,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-mr-lg q-mt-xs"
           v-model="item.value"
           :variableItem="item"
+          @update:model-value="onVariablesValueUpdated(index)"
+          :data-test="`variable-selector-${item.name}`"
         />
       </div>
+
     </div>
+      <!-- Add Variable Button -->
+      <div v-if="showAddVariableButton" class="q-ml-xs q-mt-sm">
+        <q-btn
+          outline
+          no-caps
+          icon="add"
+          label="Add Variable"
+          color="primary"
+          size="md"
+          class="el-border"
+          @click="openAddVariable"
+          data-test="dashboard-add-variable-btn"
+        />
+      </div>
   </div>
 </template>
 
 <script lang="ts">
-import { getCurrentInstance, onMounted, onUnmounted, ref, watch } from "vue";
+import {
+  getCurrentInstance,
+  onMounted,
+  onUnmounted,
+  ref,
+  watch,
+  PropType,
+  inject,
+  computed,
+  nextTick,
+} from "vue";
 import { defineComponent, reactive } from "vue";
 import streamService from "../../services/stream";
 import { useStore } from "vuex";
@@ -103,16 +132,55 @@ import {
 import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+import { getVariableKey } from "@/composables/dashboard/useVariablesManager";
 
 export default defineComponent({
   name: "VariablesValueSelector",
-  props: [
-    "selectedTimeDate",
-    "variablesConfig",
-    "initialVariableValues",
-    "showDynamicFilters",
-  ],
-  emits: ["variablesData"],
+  props: {
+    selectedTimeDate: {
+      type: Object as PropType<any>,
+      required: false,
+    },
+    variablesConfig: {
+      type: Object as PropType<any>,
+      required: false,
+    },
+    initialVariableValues: {
+      type: Object as PropType<any>,
+      required: false,
+    },
+    showDynamicFilters: {
+      type: Boolean,
+      default: false,
+    },
+    // New props for scoped variables
+    scope: {
+      type: String as PropType<"global" | "tabs" | "panels">,
+      default: "global",
+    },
+    tabId: {
+      type: String,
+      default: undefined,
+    },
+    panelId: {
+      type: String,
+      default: undefined,
+    },
+    variablesManager: {
+      type: Object as PropType<any>,
+      default: undefined,
+    },
+    // When true, shows all visible variables (global + tab + panel) for the given context
+    showAllVisible: {
+      type: Boolean,
+      default: false,
+    },
+    showAddVariableButton: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  emits: ["variablesData", "openAddVariable"],
   components: {
     VariableQueryValueSelector,
     VariableAdHocValueSelector,
@@ -120,6 +188,49 @@ export default defineComponent({
   },
   setup(props: any, { emit }) {
     const store = useStore();
+    // Try to inject variablesManager from parent (for backward compatibility)
+
+    // Try to inject variablesManager from parent (for backward compatibility)
+    const injectedManager = inject<any>("variablesManager", undefined);
+    const manager = props.variablesManager || injectedManager;
+
+    // Determine if we're using the new manager-based approach
+    const useManager = !!manager;
+
+    // Computed property to get filtered variables from manager
+    const managerVariables = computed(() => {
+      if (!useManager) return [];
+
+      let variables: any[] = [];
+
+      // If showAllVisible is true, return all visible variables for this context
+      // This includes global + tab + panel variables
+      if (props.showAllVisible) {
+        variables =
+          manager.getAllVisibleVariables(props.tabId, props.panelId) || [];
+      } else {
+        // Otherwise, return only variables from the specified scope
+        const scopeKey = props.scope;
+
+        if (scopeKey === "global") {
+          variables = manager.variablesData.global || [];
+        } else if (scopeKey === "tabs" && props.tabId) {
+          variables = manager.variablesData.tabs[props.tabId] || [];
+        } else if (scopeKey === "panels" && props.panelId) {
+          variables = manager.variablesData.panels[props.panelId] || [];
+        }
+      }
+
+      // Sort: dynamic filters should always appear at the end
+      const dynamicFilters = variables.filter(
+        (v) => v.type === "dynamic_filters",
+      );
+      const otherVariables = variables.filter(
+        (v) => v.type !== "dynamic_filters",
+      );
+
+      return [...otherVariables, ...dynamicFilters];
+    });
 
     // variables data derived from the variables config list
     const variablesData: any = reactive({
@@ -127,107 +238,10 @@ export default defineComponent({
       values: [],
     });
 
-    // ================== FOR DEBUGGING PURPOSES ONLY ==================
-    // watch for changes in variablesData.values
-    let previousValues: any[] = [];
-    watch(
-      () => variablesData.values,
-      (newValues) => {
-        return;
-        // Track all changes to log them together
-        const changes: any[] = [];
-
-        // Compare each variable's properties
-        newValues.forEach((newVar: any, index: number) => {
-          const oldVar = previousValues[index];
-          if (!oldVar) {
-            changes.push({
-              variable: newVar.name,
-              type: "new_variable",
-            });
-            return;
-          }
-
-          // List of properties to watch
-          const propertiesToWatch = [
-            "value",
-            "isLoading",
-            "isVariablePartialLoaded",
-            "isVariableLoadingPending",
-            "options",
-          ];
-
-          // Check each property for changes
-          const variableChanges: any = {
-            name: newVar.name,
-            changes: [],
-          };
-
-          propertiesToWatch.forEach((prop) => {
-            // Get deep copies of values to avoid proxy objects
-            const newValue = JSON.parse(JSON.stringify(newVar[prop]));
-            const oldValue = JSON.parse(JSON.stringify(oldVar[prop]));
-
-            // For arrays (like options) or objects, compare stringified versions
-            const hasChanged =
-              Array.isArray(newValue) || typeof newValue === "object"
-                ? JSON.stringify(newValue) !== JSON.stringify(oldValue)
-                : newValue !== oldValue;
-
-            if (hasChanged) {
-              variableChanges.changes.push({
-                property: prop,
-                from: oldValue,
-                to: newValue,
-              });
-            }
-          });
-
-          if (variableChanges.changes.length > 0) {
-            changes.push(variableChanges);
-          }
-        });
-
-        // Log all changes together if there are any
-        if (changes.length > 0) {
-          console.group(`Variables changed at ${new Date().toISOString()}`);
-
-          changes.forEach((change) => {
-            if (change.type === "new_variable") {
-              console.log(`🆕 New variable added: ${change.variable}`);
-            } else {
-              console.groupCollapsed(`Variable: ${change.name}`);
-              change.changes.forEach((propertyChange: any) => {
-                console.log(
-                  `Property "${propertyChange.property}":`,
-                  "\nFrom:",
-                  typeof propertyChange.from === "object"
-                    ? JSON.stringify(propertyChange.from, null, 2)
-                    : propertyChange.from,
-                  "\nTo:",
-                  typeof propertyChange.to === "object"
-                    ? JSON.stringify(propertyChange.to, null, 2)
-                    : propertyChange.to,
-                );
-              });
-              console.groupEnd();
-            }
-          });
-
-          console.groupEnd();
-        }
-
-        // Store deep copy of current values for next comparison
-        previousValues = JSON.parse(JSON.stringify(newValues));
-      },
-      { deep: true },
-    );
-
+    // Utility function for logging (can be enabled for debugging)
     const variableLog = (name: string, message: string) => {
-      // console.log(`[Variable: ${name}] ${message}`);
+      // Uncomment for debugging: console.log(`[Variable: ${name}] ${message}`);
     };
-
-    // ================== [END] FOR DEBUGGING PURPOSES ONLY ==================
 
     // variables dependency graph
     let variablesDependencyGraph: any = {};
@@ -410,6 +424,7 @@ export default defineComponent({
             );
 
             // Process the first response
+            // Filter out only undefined values (keep null and empty strings)
             const newOptions = fieldHit.values
               .filter((value: any) => value.zo_sql_key !== undefined)
               .map((value: any) => ({
@@ -496,14 +511,37 @@ export default defineComponent({
 
                 handleQueryValuesLogic(variableObject, oldValues);
               } else {
+                // Don't auto-set value to first option if dropdown was just opened
+                // Only set default value during initial load or when explicitly needed
                 variableLog(
                   variableObject.name,
-                  `Old values not found, setting default value`,
+                  `Old values not found - keeping existing value if set`,
                 );
 
-                variableObject.value = variableObject.options.length
-                  ? variableObject.options[0].value
-                  : null;
+                // Only set to first option if current value is null/undefined/empty
+                if (
+                  variableObject.value === null ||
+                  variableObject.value === undefined ||
+                  (Array.isArray(variableObject.value) &&
+                    variableObject.value.length === 0)
+                ) {
+                  // Don't auto-select a blank option as default. Find the first non-blank option.
+                  if (variableObject.options.length) {
+                    // Find the first non-blank option
+                    const firstNonBlankOption = variableObject.options.find(
+                      (opt: any) => opt.value !== "" && opt.label !== "<blank>",
+                    );
+
+                    if (firstNonBlankOption) {
+                      variableObject.value = firstNonBlankOption.value;
+                    } else {
+                      // All options are blank - keep value unset
+                      variableObject.value = null;
+                    }
+                  } else {
+                    variableObject.value = null;
+                  }
+                }
               }
 
               const hasValueChanged =
@@ -513,36 +551,40 @@ export default defineComponent({
                     JSON.stringify(variableObject.value)
                   : originalValue !== variableObject.value;
 
-              if (hasValueChanged) {
-                finalizePartialVariableLoading(variableObject, true);
-              } else {
-                // just set the partially loaded state
-                variableObject.isVariablePartialLoaded = true;
+              // Check if variable now has a valid value (not null/undefined/empty)
+              const hasValidValue =
+                variableObject.value !== null &&
+                variableObject.value !== undefined &&
+                (!Array.isArray(variableObject.value) ||
+                  variableObject.value.length > 0);
+
+              // Mark as partially loaded
+              variableObject.isVariablePartialLoaded = true;
+
+              // Update oldVariablesData to track the new value
+              // This prevents duplicate child loads when value hasn't actually changed
+              oldVariablesData[variableObject.name] = variableObject.value;
+
+              // Only notify manager and trigger children if:
+              // 1. Value actually changed AND
+              // 2. Variable now has a valid value (not null/undefined/empty)
+              // This prevents child variables from firing multiple times before parent value is set
+              if (hasValueChanged && hasValidValue) {
+                // Notify manager if using manager mode (only when value changed and is valid)
+                if (useManager && manager) {
+                  const variableKey = getVariableKey(
+                    variableObject.name,
+                    variableObject.scope || "global",
+                    variableObject.tabId,
+                    variableObject.panelId,
+                  );
+                  manager.onVariablePartiallyLoaded(variableKey);
+                } else {
+                  // Only use legacy child loading if not using manager
+                  finalizePartialVariableLoading(variableObject, true);
+                }
               }
             }
-
-            // Check if value actually changed before loading child variables
-            // const hasValueChanged =
-            //   Array.isArray(originalValue) &&
-            //   Array.isArray(variableObject.value)
-            //     ? JSON.stringify(originalValue) !==
-            //       JSON.stringify(variableObject.value)
-            //     : originalValue !== variableObject.value;
-
-            // // Only load child variables if value actually changed
-            // if (hasValueChanged) {
-            //   const childVariables =
-            //     variablesDependencyGraph[variableObject.name]
-            //       ?.childVariables || [];
-            //   if (childVariables.length > 0) {
-            //     const childVariableObjects = variablesData.values.filter(
-            //       (variable: any) => childVariables.includes(variable.name),
-            //     );
-            //     childVariableObjects.forEach((childVariable: any) => {
-            //       loadSingleVariableDataByName(childVariable);
-            //     });
-            //   }
-            // }
           }
         }
       } catch (error) {
@@ -561,6 +603,22 @@ export default defineComponent({
       variableObject: any,
     ): any => {
       // Use HTTP2/streaming for all dashboard variable values
+      try {
+        console.debug(
+          `[VariableSearchDEBUG] initializeStreamingConnection for ${variableObject?.name} trace=${payload?.traceId || payload?.queryReq?.traceId || "(none)"} payloadPreview=`,
+          {
+            query: payload?.queryReq?.sql
+              ? String(payload.queryReq.sql).substring(0, 200)
+              : undefined,
+            fields: payload?.queryReq?.fields,
+          },
+        );
+      } catch (err) {
+        console.debug(
+          "[VariableSearchDEBUG] initializeStreamingConnection - unable to stringify payload",
+        );
+      }
+
       fetchQueryDataWithHttpStream(payload, {
         data: (p: any, r: any) => handleSearchResponse(p, r, variableObject),
         error: (p: any, r: any) => handleSearchError(p, r, variableObject),
@@ -617,6 +675,25 @@ export default defineComponent({
         meta: payload,
       };
       try {
+        // Log the payload and trace id for debugging
+        try {
+          console.debug(
+            `[VariableSearchDEBUG] fetchFieldValuesWithWebsocket for ${variableObject.name} payloadPreview=`,
+            {
+              sql: queryContext
+                ? String(queryContext).substring(0, 200)
+                : undefined,
+              start_time: payload.start_time,
+              end_time: payload.end_time,
+              field: payload.fields && payload.fields[0],
+            },
+          );
+        } catch (err) {
+          console.debug(
+            "[VariableSearchDEBUG] fetchFieldValuesWithWebsocket - unable to stringify payload",
+          );
+        }
+
         // Start new streaming connection
         initializeStreamingConnection(wsPayload, variableObject);
         addTraceId(variableObject.name, wsPayload.traceId);
@@ -779,8 +856,66 @@ export default defineComponent({
       });
     };
 
+    // Sync manager variables to local state when using manager
+    const syncManagerVariablesToLocal = () => {
+      if (!useManager) return;
+
+      const managedVars = managerVariables.value;
+      if (!managedVars || managedVars.length === 0) {
+        variablesData.values = [];
+        return;
+      }
+
+      // IMPORTANT: Use direct references to manager's variables, not copies
+      // This ensures changes in the component are reflected in the manager
+      variablesData.values = managedVars;
+
+      // Synchronize oldVariablesData with current manager state
+      // This is critical for child variables that get reset by the manager
+      // When a parent changes, manager resets children to [] or null
+      // We must update oldVariablesData so handleQueryValuesLogic doesn't restore old values
+      managedVars.forEach((v: any) => {
+        const oldValue = oldVariablesData[v.name];
+        const currentValue = v.value;
+
+        // Check if variable is in reset state (null or empty array)
+        const isCurrentlyReset =
+          currentValue === null ||
+          (Array.isArray(currentValue) && currentValue.length === 0);
+
+        // Check if variable has a valid value (was set from URL or user selection)
+        const hasValidValue =
+          currentValue !== null &&
+          currentValue !== undefined &&
+          (!Array.isArray(currentValue) || currentValue.length > 0);
+
+        // If currently reset AND variable is marked as pending (about to load)
+        // OR if options are empty (was reset), then clear oldVariablesData
+        // so it selects first option when data arrives
+        // UNLESS the variable has a valid value (from URL or user), in which case preserve it
+        if (
+          isCurrentlyReset &&
+          (v.isVariableLoadingPending || v.options.length === 0)
+        ) {
+          // Set to undefined so the selector properly handles first-time selection
+          oldVariablesData[v.name] = undefined;
+        } else if (hasValidValue && oldVariablesData[v.name] === undefined) {
+          // If variable has a valid value (e.g., from URL) and oldVariablesData is undefined,
+          // sync it so the value is preserved when API response arrives
+          oldVariablesData[v.name] = currentValue;
+        }
+      });
+    };
+
     onMounted(() => {
-      // make list of variables using variables config list
+      // Skip initialization if using manager - manager handles everything
+      if (useManager) {
+        // For manager mode, sync immediately on mount
+        syncManagerVariablesToLocal();
+        return;
+      }
+
+      // Legacy behavior: make list of variables using variables config list
       initializeVariablesData();
 
       // reject all promises
@@ -804,7 +939,12 @@ export default defineComponent({
     watch(
       () => props.variablesConfig,
       async () => {
-        // Reset initial load flag when config changes
+        // Skip if using manager - manager handles config changes
+        if (useManager) {
+          return;
+        }
+
+        // Legacy behavior: Reset initial load flag when config changes
         // isInitialLoad.value = true;
 
         // make list of variables using variables config list
@@ -820,6 +960,41 @@ export default defineComponent({
         // isInitialLoad.value = false;
       },
     );
+
+    // Declare functions that will be defined later (after loadSingleVariableDataByName)
+    // This allows watchers to reference them
+    let loadDependentVariable: (index: number) => Promise<void>;
+    let checkAndLoadPendingVariables: () => void;
+
+    // Watch manager variables for changes and sync to local state
+    // We need to watch with deep: true to detect when manager mutates individual variables
+    watch(
+      () => {
+        if (!useManager || !manager) return [];
+        // Watch the managerVariables computed property directly
+        // This handles both single-scope and showAllVisible modes
+        return managerVariables.value;
+      },
+      () => {
+        if (!useManager) return;
+
+        syncManagerVariablesToLocal();
+
+        // Check for pending variables that need to be loaded
+        // Use nextTick to ensure DOM and state are updated
+        nextTick(() => {
+          if (checkAndLoadPendingVariables) {
+            checkAndLoadPendingVariables();
+          }
+        });
+      },
+      { deep: true, immediate: true },
+    );
+
+    // Note: We don't need to watch for completion and trigger children here
+    // The manager's finalizeVariableLoading already handles triggering dependent children
+    // when a variable finishes loading. Adding a watcher here would be redundant
+    // and could cause issues since variablesData.values is a direct reference to manager's arrays.
 
     // you may need to query the data if the variable configs or the data/time changes
     // watch(
@@ -1185,10 +1360,11 @@ export default defineComponent({
         }
 
         // For variables with dependencies, check if they are ready
-        if (hasParentVariables) {
+        // SKIP dependency check if using manager - manager already handled this
+        if (hasParentVariables && !useManager) {
           variableLog(
             variableObject.name,
-            `Checking parent variables readiness`,
+            `Checking parent variables readiness (legacy mode)`,
           );
 
           const parentVariables =
@@ -1287,6 +1463,24 @@ export default defineComponent({
         // Set loading state
         variableObject.isLoading = true;
         variableObject.isVariablePartialLoaded = false;
+
+        // Update oldVariablesData to reflect the current (possibly reset) value
+        // This ensures handleQueryValuesLogic uses the correct baseline
+        // IMPORTANT: Don't overwrite if it's undefined (signals first-time load)
+        // syncManagerVariablesToLocal sets it to undefined to indicate variables should auto-select first option
+        // ALSO: Don't overwrite to null/empty - keep it undefined so first option gets selected
+        if (oldVariablesData[name] !== undefined) {
+          // Only update if the value is not null/empty (i.e., was explicitly set by user)
+          const hasValue =
+            variableObject.value !== null &&
+            variableObject.value !== undefined &&
+            (!Array.isArray(variableObject.value) ||
+              variableObject.value.length > 0);
+          if (hasValue) {
+            oldVariablesData[name] = variableObject.value;
+          }
+        }
+
         emitVariablesData();
 
         try {
@@ -1329,13 +1523,21 @@ export default defineComponent({
               `Initial load check for variable: ${variableObject.name}, value: ${JSON.stringify(variableObject)}`,
             );
             // check for value not null or in case of array it should not be empty array
-            // if the value is already set, we don't need to load it again
-            if (
+            // if the value is already set AND has options loaded, we don't need to load it again
+            // BUT if it has a value from URL but no options yet, we need to load options
+            const hasValue =
               variableObject.value !== null &&
               variableObject.value !== undefined &&
               (!Array.isArray(variableObject.value) ||
-                variableObject.value.length > 0)
-            ) {
+                variableObject.value.length > 0);
+
+            const hasOptions =
+              variableObject.options &&
+              Array.isArray(variableObject.options) &&
+              variableObject.options.length > 0;
+
+            if (hasValue && hasOptions) {
+              // Has both value and options - no need to reload
               finalizePartialVariableLoading(
                 variableObject,
                 true,
@@ -1345,6 +1547,7 @@ export default defineComponent({
               emitVariablesData();
               return true;
             }
+            // If has value but no options (e.g., from URL), continue to load options below
           }
 
           try {
@@ -1355,6 +1558,9 @@ export default defineComponent({
 
             // Use HTTP2/streaming for all dashboard variable values
             // We don't need to wait for the response here as it will be handled by the streaming handlers
+            console.debug(
+              `[VariableSearchDEBUG] handleVariableType will fetch values for ${variableObject.name} searchText='${String(searchText)}' queryPreview=${String(queryContext).substring(0, 200)}`,
+            );
             fetchFieldValuesWithWebsocket(variableObject, queryContext);
             return true;
           } catch (error) {
@@ -1380,6 +1586,53 @@ export default defineComponent({
         }
       }
     };
+
+    // ========== MANAGER-MODE FUNCTIONS ==========
+    // These functions are used when the component is in manager mode
+    // They must be defined after loadSingleVariableDataByName since they depend on it
+
+    // Load a specific dependent variable (called by manager when dependencies are ready)
+    loadDependentVariable = async (index: number) => {
+      const variable = variablesData.values[index];
+      if (!variable) return;
+
+      // Mark as loading
+      variable.isLoading = true;
+      variable.isVariableLoadingPending = false;
+
+      try {
+        // Use the legacy function that actually makes the API call
+        // Don't use loadVariableOptions as it delegates back to manager (circular)
+        await loadSingleVariableDataByName(variable, false);
+      } catch (error) {
+        console.error(
+          `[VariablesValueSelector] Error loading variable ${variable.name}:`,
+          error,
+        );
+        variable.isLoading = false;
+      }
+    };
+
+    // Load variables that are marked as pending by the manager
+    checkAndLoadPendingVariables = () => {
+      if (!useManager) return;
+
+      variablesData.values.forEach((variable: any, index: number) => {
+        // Only load query_values type that are marked as pending and not currently loading
+        if (
+          variable.type === "query_values" &&
+          variable.isVariableLoadingPending === true &&
+          variable.isLoading !== true
+        ) {
+          // Fire the API call for this variable
+          loadDependentVariable(index);
+        }
+      });
+    };
+
+    // Note: triggerDependentChildren is not needed - the manager handles this
+    // The manager's finalizeVariableLoading function automatically triggers children
+    // when a variable completes loading (see useVariablesManager.ts line 647-671)
 
     /**
      * Builds the query context for the given variable object.
@@ -1421,7 +1674,30 @@ export default defineComponent({
         : dummyQuery;
 
       // Replace variable placeholders with actual values
-      for (const variable of variablesData.values) {
+      // When using manager, get all visible variables (global + tab + panel)
+      // Otherwise, use local variablesData.values (legacy mode)
+      let variablesToResolve = variablesData.values;
+      if (useManager && manager) {
+        // Get all visible variables for this scope
+        // This includes global, tab-scoped (if in a tab), and panel-scoped (if in a panel)
+        variablesToResolve =
+          manager.getAllVisibleVariables(props.tabId, props.panelId) ||
+          variablesData.values;
+        console.log(
+          "[VariablesValueSelector] Resolving with variables:",
+          variablesToResolve.map((v: any) => `${v.name}@${v.scope}`).join(", "),
+        );
+      }
+
+      console.log(
+        `[VariablesValueSelector] Query BEFORE variable replacement:`,
+        queryContext,
+      );
+
+      for (const variable of variablesToResolve) {
+        console.log(
+          `[VariablesValueSelector] Checking variable ${variable.name}: isPartialLoaded=${variable.isVariablePartialLoaded}, value=${JSON.stringify(variable.value)}`,
+        );
         if (variable.isVariablePartialLoaded) {
           // Replace array values
           if (Array.isArray(variable.value)) {
@@ -1432,15 +1708,31 @@ export default defineComponent({
               `'$${variable.name}'`,
               arrayValues,
             );
+            console.log(
+              `[VariablesValueSelector] Replaced array '$${variable.name}' with ${arrayValues}`,
+            );
           } else if (variable.value !== null && variable.value !== undefined) {
             // Replace single values
+            const replacedValue = escapeSingleQuotes(variable.value);
             queryContext = queryContext.replace(
               `$${variable.name}`,
-              escapeSingleQuotes(variable.value),
+              replacedValue,
+            );
+            console.log(
+              `[VariablesValueSelector] Replaced single $${variable.name} with ${replacedValue}`,
             );
           }
+        } else {
+          console.log(
+            `[VariablesValueSelector] Skipping variable ${variable.name} - not partially loaded`,
+          );
         }
       }
+
+      console.log(
+        `[VariablesValueSelector] Query AFTER variable replacement:`,
+        queryContext,
+      );
 
       // Base64 encode the query context
       return b64EncodeUnicode(queryContext);
@@ -1488,13 +1780,16 @@ export default defineComponent({
 
       if (fieldHit) {
         // Extract the values for the specified field from the result
+        // Filter out undefined, null, and empty strings
         const newOptions = fieldHit.values
-          .filter((value: any) => value.zo_sql_key || value.zo_sql_key === "")
+          .filter(
+            (value: any) =>
+              value.zo_sql_key !== undefined &&
+              value.zo_sql_key !== null &&
+              value.zo_sql_key !== "",
+          )
           .map((value: any) => ({
-            // Use the zo_sql_key as the label if it is not empty, otherwise use "<blank>"
-            label:
-              value.zo_sql_key !== "" ? value.zo_sql_key.toString() : "<blank>",
-            // Use the zo_sql_key as the value
+            label: value.zo_sql_key.toString(),
             value: value.zo_sql_key.toString(),
           }));
 
@@ -1547,13 +1842,16 @@ export default defineComponent({
                 ? validOldValues
                 : validOldValues[0];
             } else {
-              // If no valid old values, use first option
+              // If no valid old values, use first non-blank option
+              const firstNonBlank = newOptions.find(
+                (opt: any) => opt.value !== "" && opt.label !== "<blank>",
+              );
               variableObject.value = variableObject.multiSelect
-                ? newOptions.length > 0
-                  ? [newOptions[0].value]
+                ? firstNonBlank
+                  ? [firstNonBlank.value]
                   : []
-                : newOptions.length > 0
-                  ? newOptions[0].value
+                : firstNonBlank
+                  ? firstNonBlank.value
                   : null;
             }
           } else {
@@ -1565,13 +1863,16 @@ export default defineComponent({
             }
           }
         } else {
-          // Set default value to the first option if no old values are available
+          // Set default value to the first non-blank option if no old values are available
+          const firstNonBlank = newOptions.find(
+            (opt: any) => opt.value !== "" && opt.label !== "<blank>",
+          );
           variableObject.value = variableObject.multiSelect
-            ? newOptions.length > 0
-              ? [newOptions[0].value]
+            ? firstNonBlank
+              ? [firstNonBlank.value]
               : []
-            : newOptions.length > 0
-              ? newOptions[0].value
+            : firstNonBlank
+              ? firstNonBlank.value
               : null;
         }
       } else {
@@ -1655,11 +1956,7 @@ export default defineComponent({
 
         variableObject.isVariablePartialLoaded = success;
 
-        // Update old variables data
-        // oldVariablesData[name] = variableObject.value;
-
-        // Don't load child variables on dropdown open events
-        // Load child variables if any
+        // Update old variables data and determine whether to load children
         const childVariables =
           variablesDependencyGraph[name]?.childVariables || [];
 
@@ -1668,19 +1965,36 @@ export default defineComponent({
           `finalizePartialVariableLoading: child variables: ${JSON.stringify(childVariables)}`,
         );
 
-        if (childVariables.length > 0) {
+        // Only load child variables if this is the initial load, or the variable value actually changed
+        const previousValue = oldVariablesData[name];
+        const currentValue = variableObject.value;
+        const valueChanged =
+          Array.isArray(previousValue) && Array.isArray(currentValue)
+            ? JSON.stringify(previousValue) !== JSON.stringify(currentValue)
+            : previousValue !== currentValue;
+
+        variableLog(
+          variableObject.name,
+          `finalizePartialVariableLoading: prev=${JSON.stringify(previousValue)} curr=${JSON.stringify(currentValue)} changed=${valueChanged}`,
+        );
+
+        if (childVariables.length > 0 && (isInitialLoad || valueChanged)) {
           const childVariableObjects = variablesData.values.filter(
             (variable: any) => childVariables.includes(variable.name),
           );
 
-          variableLog(
-            variableObject.name,
-            `Old Varilables Data: ${JSON.stringify(oldVariablesData)}`,
-          );
           for (const childVariable of childVariableObjects) {
             await loadSingleVariableDataByName(childVariable, false);
           }
+        } else {
+          variableLog(
+            variableObject.name,
+            "Skipping child load: no change and not initial load",
+          );
         }
+
+        // Finally, update the old variable value snapshot
+        oldVariablesData[name] = variableObject.value;
       } catch (error) {
         // console.error(`Error finalizing partial variable loading for ${variableObject.name}:`, error);
       }
@@ -1692,12 +2006,16 @@ export default defineComponent({
      * @returns {Promise<void>} - A promise that resolves when the options have been loaded.
      */
     const loadVariableOptions = async (variableObject: any) => {
+      console.log("variableObject", variableObject);
+
+      // If options already loaded and variable is partially loaded, skip fetching on open
+
       // Check if there's already a loading request in progress
       if (variableObject.isLoading) {
         return;
       }
+
       try {
-        // When a dropdown is opened, only load the variable data
         await loadSingleVariableDataByName(variableObject);
       } catch (error) {
         variableLog(
@@ -1864,6 +2182,23 @@ export default defineComponent({
         return;
       }
 
+      // If using manager, delegate to manager's updateVariableValue
+      if (useManager && manager) {
+        try {
+          await manager.updateVariableValue(
+            currentVariable.name,
+            props.scope,
+            props.tabId,
+            props.panelId,
+            currentVariable.value,
+          );
+          return; // Manager handles all downstream updates
+        } catch (error) {
+          console.error("Error updating variable via manager:", error);
+          // Fall through to legacy behavior on error
+        }
+      }
+
       // For multiSelect, filter out values not present in options only if options are fully loaded
       if (
         currentVariable.multiSelect &&
@@ -2002,9 +2337,77 @@ export default defineComponent({
 
       const variableName = variableItem.name;
 
+      // If variables are still loading (either manager-level or local), defer search until loading finishes
+      const managerLoading =
+        useManager &&
+        manager &&
+        (manager as any).isLoading &&
+        (manager as any).isLoading.value;
+      const localLoading = variablesData.values.some(
+        (v: any) => v.isLoading === true || v.isVariablePartialLoaded === false,
+      );
+
+      console.debug(
+        `[VariableSearchDEBUG] onVariableSearch: name=${variableName} filterText='${String(filterText)}' managerLoading=${managerLoading} localLoading=${localLoading}`,
+      );
+
+      // Also emit a high level log for telemetry in case Playwright steps miss console.debug output
+      console.log(
+        `[VariablesValueSelector] onVariableSearch called for ${variableName} (filter='${String(filterText)}')`,
+      );
+
+      if (managerLoading || localLoading) {
+        console.log(
+          `[VariablesValueSelector] Variables still loading, deferring search for ${variableName}`,
+        );
+        const stop = watch(
+          () =>
+            useManager && manager && (manager as any).isLoading
+              ? (manager as any).isLoading.value
+              : variablesData.values.some(
+                  (v: any) =>
+                    v.isLoading === true || v.isVariablePartialLoaded === false,
+                ),
+          (val) => {
+            if (!val) {
+              stop();
+              // Re-run the search once loading has completed
+              cancelAllVariableOperations(variableName);
+              console.debug(
+                `[VariableSearchDEBUG] re-running deferred search for ${variableName} with filter='${String(filterText)}'`,
+              );
+              loadSingleVariableDataByName(
+                variableItem,
+                false,
+                filterText,
+              ).catch(() => {});
+            }
+          },
+        );
+        return;
+      }
+
+      // If there's no filter text (user did not type), treat this as an open event.
+      // In that case, only load options if they are not already present/loaded.
+      if (
+        !filterText ||
+        (typeof filterText === "string" && filterText.trim() === "")
+      ) {
+        // Delegate to loadVariableOptions which contains the logic to avoid unnecessary fetches
+        cancelAllVariableOperations(variableName);
+        console.debug(
+          `[VariableSearchDEBUG] open-event for ${variableName} - delegating to loadVariableOptions`,
+        );
+        await loadVariableOptions(variableItem);
+        return;
+      }
+
       // Cancel any previous API calls for this variable immediately
       cancelAllVariableOperations(variableName);
 
+      console.debug(
+        `[VariableSearchDEBUG] executing search API for ${variableName} with filter='${String(filterText)}'`,
+      );
       await loadSingleVariableDataByName(variableItem, false, filterText);
     };
 
@@ -2016,6 +2419,7 @@ export default defineComponent({
       loadVariableOptions,
       onVariableSearch,
       cancelAllVariableOperations,
+      openAddVariable: () => emit("openAddVariable"),
     };
   },
 });

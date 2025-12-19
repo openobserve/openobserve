@@ -9,7 +9,8 @@
   "devDependencies": {
     "@playwright/test": "1.50.0",
     "@types/node": "^20.12.2",
-    "dotenv": "^17.2.1"
+    "dotenv": "^17.2.1",
+    "winston": "^3.11.0"
   },
   "dependencies": {
     "@google-cloud/local-auth": "^2.1.0",
@@ -21,7 +22,6 @@
     "playwright-core": "1.50.0",
     "playwright-firefox": "1.50.0",
     "playwright-webkit": "1.50.0",
-    "pngjs": "^7.0.0",
-    "winston": "^3.11.0"
+    "pngjs": "^7.0.0"
   }
 }

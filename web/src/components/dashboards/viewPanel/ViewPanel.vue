@@ -122,6 +122,9 @@
                 :initialVariableValues="getInitialVariablesData()"
                 @variablesData="variablesDataUpdated"
                 data-test="dashboard-viewpanel-variables-value-selector"
+                :showAllVisible="true"
+                :tabId="currentTabId"
+                :panelId="currentPanelId"
               />
               <div style="flex: 1; overflow: hidden">
                 <div
@@ -267,6 +270,7 @@ import { isEqual } from "lodash-es";
 import { processQueryMetadataErrors } from "@/utils/zincutils";
 import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
 import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
+import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 
 export default defineComponent({
   name: "ViewPanel",
@@ -312,6 +316,14 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
+
+    // IMPORTANT: Always create a NEW isolated instance for ViewPanel
+    // ViewPanel should NEVER share the variables manager with the parent dashboard
+    // This ensures that variable changes in ViewPanel don't affect the parent dashboard
+    const variablesManager = useVariablesManager();
+
+    // Provide to child components (ViewPanel's own isolated instance)
+    provide("variablesManager", variablesManager);
 
     const currentVariablesDataRef: any = reactive({});
 
@@ -578,6 +590,27 @@ export default defineComponent({
       );
       currentDashboardData.data = data;
 
+      // Initialize variables manager with dashboard variables
+      try {
+        await variablesManager.initialize(
+          currentDashboardData.data?.variables?.list || [],
+          currentDashboardData.data,
+        );
+
+        // Mark current tab and panel as visible so their variables can load
+        const tabId = (route.query.tab as string) ?? currentDashboardData.data?.tabs?.[0]?.tabId;
+        if (tabId) {
+          variablesManager.setTabVisibility(tabId, true);
+        }
+
+        // Mark the panel as visible
+        if (props.panelId) {
+          variablesManager.setPanelVisibility(props.panelId, true);
+        }
+      } catch (error) {
+        console.error("Error initializing variables manager:", error);
+      }
+
       // if variables data is null, set it to empty list
       if (
         !(
@@ -714,6 +747,15 @@ export default defineComponent({
 
     // [END] cancel running queries
 
+    // Computed properties for current tab and panel IDs
+    const currentTabId = computed(() => {
+      return (route.query.tab as string) ?? currentDashboardData.data?.tabs?.[0]?.tabId;
+    });
+
+    const currentPanelId = computed(() => {
+      return props.panelId;
+    });
+
     return {
       t,
       setTimeForVariables,
@@ -754,6 +796,8 @@ export default defineComponent({
       errorMessage,
       outlinedWarning,
       symOutlinedDataInfoAlert,
+      currentTabId,
+      currentPanelId,
     };
   },
 });
