@@ -1311,7 +1311,7 @@
     },
     "triggerAlert": "Trigger",
     "alertTriggeredSuccess": "Avviso attivato con successo",
-        "incidents": {
+    "incidents": {
       "title": "Incidenti",
       "header": "Incidenti di avviso",
       "noIncidents": "Nessun incidente trovato",

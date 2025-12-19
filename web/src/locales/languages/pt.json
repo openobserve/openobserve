@@ -1311,7 +1311,7 @@
     },
     "triggerAlert": "Gatilho",
     "alertTriggeredSuccess": "Alerta acionado com sucesso",
-        "incidents": {
+    "incidents": {
       "title": "Incidentes",
       "header": "Incidentes de alerta",
       "noIncidents": "Nenhum incidente encontrado",

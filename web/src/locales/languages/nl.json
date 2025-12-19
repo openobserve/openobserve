@@ -1311,7 +1311,7 @@
     },
     "triggerAlert": "Trigger",
     "alertTriggeredSuccess": "Waarschuwing succesvol geactiveerd",
-        "incidents": {
+    "incidents": {
       "title": "Incidenten",
       "header": "Waarschuwingsincidenten",
       "noIncidents": "Geen incidenten gevonden",

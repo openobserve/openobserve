@@ -1311,7 +1311,7 @@
     },
     "triggerAlert": "Gâchette",
     "alertTriggeredSuccess": "Alerte déclenchée avec succès",
-        "incidents": {
+    "incidents": {
       "title": "Incidents",
       "header": "Incidents d'alerte",
       "noIncidents": "Aucun incident n'a été détecté",
