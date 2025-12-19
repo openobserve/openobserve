@@ -506,7 +506,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :showAllVisible="true"
               :tabId="currentTabId"
               :panelId="currentPanelId"
-              :showAddVariableButton="true"
             />
             <CustomHTMLEditor
               v-model="dashboardPanelData.data.htmlContent"
@@ -535,6 +534,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :initialVariableValues="initialVariableValues"
               class="tw:flex-shrink-0 q-mb-sm"
               :showAddVariableButton="true"
+              :showAllVisible="true"
+              :tabId="currentTabId"
+              :panelId="currentPanelId"
             />
             <CustomMarkdownEditor
               v-model="dashboardPanelData.data.markdownContent"
@@ -1019,6 +1021,7 @@ export default defineComponent({
     let routeQueryParamsOnMount: any = {};
 
     // ======= [START] default variable values
+
     const initialVariableValues: any = { value: {} };
     Object.keys(route.query).forEach((key) => {
       if (key.startsWith("var-")) {
@@ -1094,73 +1097,6 @@ export default defineComponent({
 
     const currentDashboardData: any = reactive({
       data: {},
-    });
-
-    // Cache the filtered variables config to prevent unnecessary re-renders
-    const cachedFilteredConfig = ref<any>(null);
-    let previousFilterKey = "";
-
-    // Filter variables for UI display: show only global + current tab + current panel
-    const filteredVariablesConfig = computed(() => {
-      console.log('[AddPanel] Computing filteredVariablesConfig', currentDashboardData.data);
-      if (!currentDashboardData.data?.variables?.list) {
-        return { list: [], showDynamicFilters: false };
-      }
-
-      const currentPanelId = route.query.panelId as string;
-      const currentTabId = route.query.tab as string;
-      const allVars = currentDashboardData.data.variables.list;
-
-      // Create a key to detect actual changes
-      const filterKey = `${currentPanelId}-${currentTabId}-${allVars.map((v: any) => v.name).join(',')}`;
-
-      // If nothing changed, return cached result
-      if (filterKey === previousFilterKey && cachedFilteredConfig.value) {
-        return cachedFilteredConfig.value;
-      }
-
-      previousFilterKey = filterKey;
-
-      // Filter to show only: global + current tab + current panel variables
-      const filteredVars = allVars.filter((v: any) => {
-        const scopeType = getScopeType(v);
-
-        if (scopeType === "global") {
-          return true; // Always show global
-        }
-
-        if (scopeType === "tabs") {
-          // Show if variable is scoped to current tab
-          return v.tabs && v.tabs.includes(currentTabId);
-        }
-
-        if (scopeType === "panels") {
-          // In EDIT mode: show if variable is scoped to current panel
-          // In ADD mode: show if variable uses "current_panel"
-          if (currentPanelId) {
-            return v.panels && v.panels.includes(currentPanelId);
-          } else {
-            return v.panels && v.panels.includes("current_panel");
-          }
-        }
-
-        return false;
-      });
-
-      console.log('[AddPanel] Filtered variables:', {
-        total: allVars.length,
-        filtered: filteredVars.length,
-        names: filteredVars.map((v: any) => v.name)
-      });
-
-      const result = {
-        ...currentDashboardData.data.variables,
-        list: filteredVars,
-        showDynamicFilters: currentDashboardData.data.variables?.showDynamicFilters || false,
-      };
-
-      cachedFilteredConfig.value = result;
-      return result;
     });
 
     // this is used to activate the watcher only after on mounted
@@ -2423,6 +2359,23 @@ export default defineComponent({
 
     // [END] O2 AI Context Handler
 
+    // Computed properties for current tab and panel IDs
+    const currentTabId = computed(() => {
+      return (
+        (route.query.tab as string) ??
+        currentDashboardData.data?.tabs?.[0]?.tabId
+      );
+    });
+
+    const currentPanelId = computed(() => {
+      // In edit mode, use the panelId from query params
+      if (editMode.value && route.query.panelId) {
+        return route.query.panelId as string;
+      }
+      // In add mode, use the panel ID from dashboardPanelData (after it's generated)
+      return dashboardPanelData.data.id || undefined;
+    });
+
     /**
      * Opens the Add Variable panel
      */
@@ -2566,6 +2519,19 @@ export default defineComponent({
       handleOpenAddVariable,
       handleCloseAddVariable,
       handleSaveVariable,
+      isAddVariableOpen,
+      selectedVariableToEdit,
+      handleOpenAddVariable,
+      handleCloseAddVariable,
+      handleSaveVariable,
+      currentTabId,
+      currentPanelId,
+      errorMessage,
+      handleLimitNumberOfSeriesWarningMessage,
+      handleResultMetadataUpdate,
+      outlinedWarning,
+      symOutlinedDataInfoAlert,
+      outlinedRunningWithErrors,
       isAddVariableOpen,
       selectedVariableToEdit,
       handleOpenAddVariable,
