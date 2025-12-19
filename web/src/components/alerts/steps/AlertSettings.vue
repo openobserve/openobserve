@@ -451,7 +451,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   min="1"
                   style="background: none"
                   debounce="300"
-                  @update:model-value="emitTriggerUpdate"
+                  @update:model-value="handlePeriodChange"
                 />
               </div>
               <div
@@ -1126,6 +1126,32 @@ export default defineComponent({
       emit("update:trigger", props.formData.trigger_condition);
     };
 
+    // Handle period change and sync with frequency, silence, and cron
+    const handlePeriodChange = () => {
+      const periodValue = Number(props.formData.trigger_condition.period);
+
+      if (periodValue && periodValue > 0) {
+        // Always sync frequency, regardless of current mode
+        // This ensures frequency is up-to-date when user switches to minutes mode
+        props.formData.trigger_condition.frequency = periodValue;
+
+        // Always sync cron expression, regardless of current mode
+        // This ensures cron is up-to-date when user switches to cron mode
+        const cronExpression = convertMinutesToCron(periodValue);
+        props.formData.trigger_condition.cron = cronExpression;
+
+        // Ensure timezone is set
+        if (!props.formData.trigger_condition.timezone) {
+          props.formData.trigger_condition.timezone = browserTimezone.value || Intl.DateTimeFormat().resolvedOptions().timeZone;
+        }
+
+        // Always sync silence notification
+        props.formData.trigger_condition.silence = periodValue;
+      }
+
+      emitTriggerUpdate();
+    };
+
     const emitAggregationUpdate = () => {
       emit("update:aggregation", props.formData.query_condition.aggregation);
     };
@@ -1276,6 +1302,7 @@ export default defineComponent({
       emitDestinationsUpdate,
       routeToCreateDestination,
       handleFrequencyTypeChange,
+      handlePeriodChange,
       // Timezone-related
       browserTimezone,
       filteredTimezone,
