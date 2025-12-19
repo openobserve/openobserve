@@ -128,10 +128,34 @@ export default class DashboardCreate {
     await confirmDeleteButton.click();
   }
 
-  //Add Panel to dashboard
+  //Add Panel to dashboard (when dashboard is empty)
   async addPanel() {
     await this.addPanelIfEmptyBtn.waitFor({ state: "visible", timeout: 15000 });
     await this.addPanelIfEmptyBtn.click();
+  }
+
+  //Add Panel to dashboard (when dashboard already has panels)
+  async addPanelToExistingDashboard() {
+    const addPanelBtn = this.page.locator('[data-test="dashboard-panel-add"]');
+    await addPanelBtn.waitFor({ state: "visible", timeout: 15000 });
+    await addPanelBtn.click();
+  }
+
+  //Add Panel - works for both empty and non-empty dashboards
+  async addPanelSmart() {
+    const addPanelBtn = this.page.locator('[data-test="dashboard-panel-add"]');
+    const addPanelIfEmptyBtn = this.addPanelIfEmptyBtn;
+
+    // Try the "add panel" button first (for dashboards with panels)
+    const addBtnVisible = await addPanelBtn.isVisible({ timeout: 2000 }).catch(() => false);
+    if (addBtnVisible) {
+      await addPanelBtn.click();
+      return;
+    }
+
+    // Fall back to "add panel if empty" button
+    await addPanelIfEmptyBtn.waitFor({ state: "visible", timeout: 15000 });
+    await addPanelIfEmptyBtn.click();
   }
 
   //Apply dashboard button

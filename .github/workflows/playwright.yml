@@ -179,6 +179,8 @@ jobs:
                 "dashboard-tabs-setting.spec.js",
                 "dashboard-variables-setting.spec.js",
                 "dashboard-transpose.spec.js",
+                "dashboard-join.spec.js",
+                "dashboard-nested-functions.spec.js",
               ]
           - testfolder: "Dashboards-Charts"
             browser: "chrome"
