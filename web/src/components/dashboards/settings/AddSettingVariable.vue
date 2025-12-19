@@ -602,6 +602,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 popup-no-route-dismiss
                 popup-content-style="z-index: 10001"
                 data-test="dashboard-variable-tabs-select"
+                :rules="[
+                  (val: any) =>
+                    (variableData.scope !== 'tabs' &&
+                      variableData.scope !== 'panels') ||
+                    (val && val.length > 0) ||
+                    'At least one tab is required',
+                ]"
               >
                 <template v-slot:option="{ opt, selected, toggleOption }">
                   <q-item
@@ -655,6 +662,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 emit-value
                 map-options
                 data-test="dashboard-variable-panels-select"
+                :rules="[
+                  (val: any) =>
+                    variableData.scope !== 'panels' ||
+                    (val && val.length > 0) ||
+                    'At least one panel is required',
+                ]"
               >
                 <template v-slot:option="{ opt, selected, toggleOption }">
                   <!-- Tab separator -->
@@ -1310,7 +1323,7 @@ export default defineComponent({
 
         variableData.panels = panels;
       }
-      
+
       // If called from Add Panel, emit the variable data instead of saving to DB
       if (props.isFromAddPanel) {
         emit("save", {
@@ -1320,7 +1333,7 @@ export default defineComponent({
         });
         return;
       }
-      
+
       // Original logic: save to database via API
       if (editMode.value) {
         try {
