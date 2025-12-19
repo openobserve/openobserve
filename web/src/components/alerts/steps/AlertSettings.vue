@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- For Scheduled Alerts -->
       <template v-else>
         <!-- Aggregation Toggle (only for custom queries, not SQL or PromQL) -->
-        <div v-if="queryType === 'custom'" class="flex justify-start items-center tw-font-semibold tw-pb-3 tw-mb-4">
+        <div v-if="queryType === 'custom'" class="flex justify-start items-center tw-font-semibold alert-settings-row">
           <div class="flex items-center" style="width: 190px">
             {{ t("common.aggregation") }}
             <q-icon
@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Group By Fields (shown when aggregation is enabled) -->
         <div
           v-if="localIsAggregationEnabled && formData.query_condition.aggregation"
-          class="flex items-start no-wrap q-mr-sm tw-pb-4 tw-mb-4"
+          class="flex items-start no-wrap q-mr-sm alert-settings-row"
         >
           <div class="flex items-center tw-font-semibold" style="width: 190px">
             {{ t("alerts.groupBy") }}
@@ -278,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Threshold -->
-        <div class="flex justify-start items-start q-mb-xs no-wrap tw-pb-4 tw-mb-4">
+        <div class="flex justify-start items-start q-mb-xs no-wrap alert-settings-row">
           <div class="tw-font-semibold flex items-center" style="width: 190px">
             {{ t("alerts.threshold") + " *" }}
             <q-icon
@@ -423,7 +423,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Period -->
-        <div class="flex items-center q-mr-sm tw-pb-4 tw-mb-4">
+        <div class="flex items-start q-mr-sm alert-settings-row">
           <div class="tw-font-semibold flex items-center" style="width: 190px">
             {{ t("alerts.period") + " *" }}
             <q-icon
@@ -473,46 +473,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- Cron Toggle -->
-        <div class="flex items-center q-mr-sm tw-pb-4 tw-mb-4">
-          <div class="tw-font-semibold flex items-center" style="width: 172px">
-            {{ t("alerts.crontitle") + " *" }}
-            <q-icon
-              name="info"
-              size="17px"
-              class="q-ml-xs cursor-pointer"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-            >
-              <q-tooltip anchor="center right" self="center left" max-width="300px">
-                <span style="font-size: 14px">Configure the option to enable a cron job.</span>
-              </q-tooltip>
-            </q-icon>
-          </div>
-          <div class="tw-pb-2">
-            <div class="flex items-center q-mr-sm" style="width: fit-content">
-              <div style="width: 87px; margin-left: 0 !important">
-                <q-toggle
-                  v-model="formData.trigger_condition.frequency_type"
-                  :true-value="'cron'"
-                  class="q-mt-sm o2-toggle-button-sm tw-h-[36px] tw-ml-1"
-                  :false-value="'minutes'"
-                  @update:model-value="emitTriggerUpdate"
-                  size="md"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Frequency -->
-        <div class="flex items-center q-mr-sm tw-pb-4 tw-mb-4" style="min-height: 78px">
+        <!-- Frequency (with inline interval/cron toggle) -->
+        <div class="flex items-start q-mr-sm alert-settings-row">
           <div class="tw-font-semibold flex items-center" style="width: 190px">
             {{ t("alerts.frequency") + " *" }}
             <q-icon
               name="info"
               size="17px"
               class="q-ml-xs cursor-pointer"
-              :class="store.state.theme === 'dark' ? 'text-grey-5 ' : 'text-grey-7'"
+              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
             >
               <q-tooltip anchor="center right" self="center left" max-width="auto">
                 <span style="font-size: 14px" v-if="formData.trigger_condition.frequency_type === 'minutes'">
@@ -545,82 +514,106 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-icon>
             </template>
           </div>
-          <div>
-            <div class="flex items-center" style="width: fit-content">
-              <div
-                :style="
-                  formData.trigger_condition.frequency_type === 'minutes'
-                    ? 'width: 87px; margin-left: 0 !important'
-                    : 'width: fit-content !important'
-                "
-              >
-                <q-input
-                  v-if="formData.trigger_condition.frequency_type === 'minutes'"
-                  v-model="formData.trigger_condition.frequency"
-                  type="number"
-                  dense
-                  borderless
-                  min="1"
-                  style="background: none;"
-                  debounce="300"
-                  @update:model-value="emitTriggerUpdate"
-                />
-                <div v-else class="tw-flex tw-items-center">
+          <div class="tw-flex tw-flex-col" style="min-height: 78px">
+            <!-- Interval/Cron Mode Buttons -->
+            <div class="tw-flex frequency-toggle-group tw-mb-3">
+              <q-btn
+                :label="t('alerts.interval')"
+                :outline="formData.trigger_condition.frequency_type === 'cron'"
+                :unelevated="formData.trigger_condition.frequency_type === 'minutes'"
+                :color="formData.trigger_condition.frequency_type === 'minutes' ? 'primary' : 'grey-7'"
+                no-caps
+                size="sm"
+                class="tw-px-4 frequency-toggle-btn frequency-toggle-left"
+                :class="formData.trigger_condition.frequency_type === 'minutes' ? 'active' : 'inactive'"
+                style="min-width: 90px"
+                @click="formData.trigger_condition.frequency_type = 'minutes'; emitTriggerUpdate()"
+              />
+              <q-btn
+                label="Cron Schedule"
+                :outline="formData.trigger_condition.frequency_type === 'minutes'"
+                :unelevated="formData.trigger_condition.frequency_type === 'cron'"
+                :color="formData.trigger_condition.frequency_type === 'cron' ? 'primary' : 'grey-7'"
+                no-caps
+                size="sm"
+                class="tw-px-4 frequency-toggle-btn frequency-toggle-right"
+                :class="formData.trigger_condition.frequency_type === 'cron' ? 'active' : 'inactive'"
+                style="min-width: 130px"
+                @click="formData.trigger_condition.frequency_type = 'cron'; emitTriggerUpdate()"
+              />
+            </div>
+
+            <!-- Input Fields Container (fixed height to prevent shifting) -->
+            <div class="tw-flex tw-items-start" style="min-height: 36px">
+              <!-- Interval Mode -->
+              <div v-if="formData.trigger_condition.frequency_type === 'minutes'" class="tw-flex tw-items-center">
+                <div style="width: 87px; margin-left: 0 !important">
                   <q-input
-                    v-model="formData.trigger_condition.cron"
+                    v-model="formData.trigger_condition.frequency"
+                    type="number"
                     dense
                     borderless
-                    :label="t('reports.cron') + ' *'"
-                    style="background: none; width: 180px"
-                    class="showLabelOnTop"
-                    stack-label
+                    min="1"
+                    style="background: none"
                     debounce="300"
                     @update:model-value="emitTriggerUpdate"
                   />
-                  <q-select
-                    v-model="formData.trigger_condition.timezone"
-                    :options="filteredTimezone"
-                    @blur="
-                      browserTimezone =
-                        browserTimezone === ''
-                          ? Intl.DateTimeFormat().resolvedOptions().timeZone
-                          : browserTimezone
-                    "
-                    use-input
-                    @filter="timezoneFilterFn"
-                    input-debounce="0"
-                    dense
-                    borderless
-                    emit-value
-                    fill-input
-                    hide-selected
-                    :title="formData.trigger_condition.timezone"
-                    :label="t('logStream.timezone') + ' *'"
-                    :display-value="`Timezone: ${browserTimezone}`"
-                    class="showLabelOnTop q-ml-sm"
-                    stack-label
-                    style="width: 210px"
-                    @update:model-value="emitTriggerUpdate"
-                  />
+                </div>
+                <div
+                  style="min-width: 90px; margin-left: 0 !important; height: 36px; font-weight: normal"
+                  :style="store.state.theme === 'dark' ? 'border: 1px solid #2c2c2c' : ''"
+                  :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'"
+                  class="flex justify-center items-center"
+                >
+                  {{ t("alerts.minutes") }}
                 </div>
               </div>
-              <div
-                v-if="formData.trigger_condition.frequency_type === 'minutes'"
-                style="min-width: 90px; margin-left: 0 !important; height: 36px; font-weight: normal"
-                :style="store.state.theme === 'dark' ? 'border: 1px solid #2c2c2c' : ''"
-                :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'"
-                class="flex justify-center items-center"
-              >
-                {{ t("alerts.minutes") }}
+
+              <!-- Cron Mode -->
+              <div v-else class="tw-flex tw-items-center tw-gap-2">
+                <q-input
+                  v-model="formData.trigger_condition.cron"
+                  dense
+                  borderless
+                  placeholder="Cron Expression *"
+                  style="background: none; width: 180px"
+                  debounce="300"
+                  @update:model-value="emitTriggerUpdate"
+                />
+                <q-select
+                  v-model="formData.trigger_condition.timezone"
+                  :options="filteredTimezone"
+                  @blur="
+                    browserTimezone =
+                      browserTimezone === ''
+                        ? Intl.DateTimeFormat().resolvedOptions().timeZone
+                        : browserTimezone
+                  "
+                  use-input
+                  @filter="timezoneFilterFn"
+                  input-debounce="0"
+                  dense
+                  borderless
+                  emit-value
+                  fill-input
+                  hide-selected
+                  :title="formData.trigger_condition.timezone"
+                  placeholder="Timezone *"
+                  :display-value="`${browserTimezone || 'Select timezone'}`"
+                  style="width: 210px"
+                  @update:model-value="emitTriggerUpdate"
+                />
               </div>
             </div>
+
+            <!-- Error Message -->
             <div
               v-if="
                 (formData.trigger_condition.frequency_type === 'minutes' && !Number(formData.trigger_condition.frequency)) ||
                 (formData.trigger_condition.frequency_type === 'cron' && (!formData.trigger_condition.cron || !formData.trigger_condition.timezone)) ||
                 cronJobError
               "
-              class="text-red-8 q-pt-xs"
+              class="text-red-8 tw-mt-1"
               style="font-size: 11px; line-height: 12px"
             >
               {{ cronJobError || "Field is required!" }}
@@ -629,7 +622,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
-        <div class="flex items-start q-mr-sm tw-pb-4 tw-mb-4">
+        <div class="flex items-start q-mr-sm alert-settings-row">
           <div class="tw-font-semibold flex items-center" style="width: 190px">
             {{ t("alerts.silenceNotification") + " *" }}
             <q-icon
@@ -693,7 +686,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Destinations -->
-        <div class="flex items-start q-mr-sm tw-pb-4 tw-mb-4">
+        <div class="flex items-start q-mr-sm alert-settings-row">
           <div class="tw-font-semibold flex items-center" style="width: 190px">
             {{ t("alerts.destination") + " *" }}
             <q-icon
@@ -1330,6 +1323,63 @@ export default defineComponent({
 
     .step-subtitle {
       color: #5c5c5c;
+    }
+  }
+}
+
+// Consistent spacing for alert settings rows
+.alert-settings-row {
+  margin-bottom: 24px !important;
+  padding-bottom: 0 !important;
+}
+
+// Frequency toggle buttons styling
+.frequency-toggle-group {
+  display: flex;
+  width: fit-content;
+}
+
+.frequency-toggle-btn {
+  border: 1px solid !important;
+  border-radius: 0 !important;
+  transition: all 0.2s ease;
+  margin: 0 !important;
+
+  &.active {
+    border-color: var(--q-primary) !important;
+    background-color: var(--q-primary) !important;
+    color: white !important;
+    z-index: 1;
+  }
+
+  &.inactive {
+    border-color: #d0d0d0 !important;
+    background-color: transparent !important;
+  }
+}
+
+.frequency-toggle-left {
+  border-radius: 4px 0 0 4px !important;
+}
+
+.frequency-toggle-right {
+  border-left: none !important;
+  border-radius: 0 4px 4px 0 !important;
+}
+
+.dark-mode {
+  .frequency-toggle-btn {
+    &.inactive {
+      border-color: #404040 !important;
+      color: #bdbdbd !important;
+    }
+  }
+}
+
+.light-mode {
+  .frequency-toggle-btn {
+    &.inactive {
+      color: #5c5c5c !important;
     }
   }
 }

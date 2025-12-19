@@ -15,7 +15,7 @@
     "legend": "Legend",
     "weight": "Weight",
     "label": "Label",
-    "aggregation": "Summarize data",
+    "aggregation": "Aggregate data",
     "list": "List",
     "condition": "Condition",
     "operator": "Operator",
