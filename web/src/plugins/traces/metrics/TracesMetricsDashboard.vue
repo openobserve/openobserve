@@ -101,7 +101,7 @@ class="tw:mx-1 tw:text-red-500" />
 
     <!-- Charts Section -->
     <div
-      class="charts-container !tw:pt-[0.25rem]"
+      class="charts-container tw:pt-[0.25rem]!"
       v-show="searchObj.meta.showHistogram"
     >
       <RenderDashboardCharts

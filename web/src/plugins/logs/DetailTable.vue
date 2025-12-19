@@ -624,14 +624,14 @@ export default defineComponent({
         label: t("search.sourceName"),
         field: "field",
         align: "left" as const,
-        headerClasses: "!tw:text-left",
+        headerClasses: "tw:text-left!",
       },
       {
         name: "value",
         label: t("search.sourceValue"),
         field: "value",
         align: "left" as const,
-        headerClasses: "!tw:text-left",
+        headerClasses: "tw:text-left!",
       },
     ];
 

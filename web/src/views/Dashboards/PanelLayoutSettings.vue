@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="q-pa-none !tw:w-[300px]"
+    class="q-pa-none tw:w-[300px]!"
     :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
     style="min-height: inherit"
   >

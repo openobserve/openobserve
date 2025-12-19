@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="search-bar-component" id="searchBarComponent">
-    <div class="row !tw:m-0 tw:p-[0.375rem]">
+    <div class="row tw:m-0 tw:p-[0.375rem]!">
       <div class="float-right col flex items-center">
         <!-- Tab Toggle Buttons -->
         <div v-if="store.state.zoConfig.service_graph_enabled" class="button-group logs-visualize-toggle element-box-shadow tw:mr-[0.375rem]">
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-caps
                 size="sm"
                 icon="search"
-                class="button button-left tw:flex tw:justify-center tw:items-center no-border no-outline !tw:rounded-r-none q-px-sm tw:h-[2rem]"
+                class="button button-left tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-r-none q-px-sm tw:h-[2rem]!"
               >
                 <q-tooltip>
                   {{ t("common.search") }}
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-caps
                 size="sm"
                 icon="hub"
-                class="button button-right tw:flex tw:justify-center tw:items-center no-border no-outline !tw:rounded-l-none q-px-sm tw:h-[2rem]"
+                class="button button-right tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none q-px-sm tw:h-[2rem]!"
               >
                 <q-tooltip>
                   Service Maps

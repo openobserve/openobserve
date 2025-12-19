@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="cursor-pointer text-bold"
       >
         <q-td
-          class="field_list field-group-header !tw:flex tw:justify-between tw:items-center tw:rounded-[0.25rem]"
+          class="field_list field-group-header tw:flex! tw:justify-between tw:items-center tw:rounded-[0.25rem]"
           :class="[theme === 'dark' ? 'text-grey-5' : 'bg-grey-3']"
         >
           <div class="tw:w-[calc(100%-1.25rem)] ellipsis">

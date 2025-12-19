@@ -86,7 +86,7 @@
                   "
                 >
                   <q-btn
-                    class="o2-custom-button-hover tw:ml-[0.25rem] tw:mr-[0.25rem] !tw:border !tw:border-solid !tw:border-[var(--o2-border-color)]"
+                    class="o2-custom-button-hover tw:ml-[0.25rem] tw:mr-[0.25rem] tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]!"
                     size="6px"
                     title="Include Term"
                     round
@@ -97,7 +97,7 @@
                     </q-icon>
                   </q-btn>
                   <q-btn
-                    class="o2-custom-button-hover !tw:border !tw:border-solid !tw:border-[var(--o2-border-color)]"
+                    class="o2-custom-button-hover tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]!"
                     size="6px"
                     title="Exclude Term"
                     round

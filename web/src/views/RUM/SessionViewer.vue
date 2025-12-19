@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="col-12 row card-container tw:overflow-hidden tw:mb-[0.325rem] !tw:h-[calc(100%-58px)]"
+      class="col-12 row card-container tw:overflow-hidden tw:mb-[0.325rem] tw:h-[calc(100%-58px)]!"
     >
       <div class="col-9 full-height">
         <VideoPlayer

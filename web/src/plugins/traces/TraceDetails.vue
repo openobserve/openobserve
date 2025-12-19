@@ -212,12 +212,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <share-button
               data-test="trace-details-share-link-btn"
               :url="traceDetailsShareURL"
-              button-class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border !tw:h-[2.25rem] hover:tw:bg-[var(--o2-hover-accent)]"
+              button-class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border tw:h-[2.25rem]! hover:tw:bg-[var(--o2-hover-accent)]"
               button-size="xs"
             />
             <q-btn
               data-test="trace-details-close-btn"
-              class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border !tw:h-[2.25rem] hover:tw:bg-[var(--o2-hover-accent)]"
+              class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border tw:h-[2.25rem]! hover:tw:bg-[var(--o2-hover-accent)]"
               icon="cancel"
               size="xs"
               @click="routeToTracesList"

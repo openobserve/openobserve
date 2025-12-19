@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <img
           :src="ip"
           alt="IP"
-          class="q-mr-sm inline-block !tw:w-[1.875rem] !tw:h-auto"
+          class="q-mr-sm inline-block tw:w-[1.875rem]! tw:h-auto!"
         />
         <div class="inline-block">
           <div class="q-pl-xs">IP</div>
