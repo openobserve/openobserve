@@ -28,9 +28,10 @@ async function globalSetup() {
   try {
     testLogger.info('Performing global login authentication');
     
-    // Navigate to login page
-    await page.goto(process.env["ZO_BASE_URL"]);
-    testLogger.debug('Navigated to base URL', { url: process.env["ZO_BASE_URL"] });
+    // Navigate to login page with org identifier to establish correct org context
+    const loginUrl = `${process.env["ZO_BASE_URL"]}?org_identifier=${process.env["ORGNAME"]}`;
+    await page.goto(loginUrl);
+    testLogger.debug('Navigated to base URL with org', { url: loginUrl });
 
     await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(2000);
