@@ -1118,110 +1118,6 @@ export default defineComponent({
       },
     );
 
-    // Watch for changes in initialVariableValues (from parent) and reload dependent variables
-    watch(
-      () => JSON.stringify(props.initialVariableValues?.value || {}),
-      async (newVal, oldVal) => {
-        if (!oldVal || oldVal === "{}") {
-          return; // Skip initial load
-        }
-        if (newVal === oldVal) return; // No changes
-
-        // Prevent re-entry while we're already processing a parent change
-        if (isProcessingParentChange.value) {
-          return;
-        }
-
-        // Compare old and new values to find what changed
-        const oldValues = oldVal ? JSON.parse(oldVal) : {};
-        const newValues = newVal ? JSON.parse(newVal) : {};
-        const changedVars: string[] = [];
-
-        Object.keys(newValues).forEach((varName) => {
-          if (
-            JSON.stringify(oldValues[varName]) !==
-            JSON.stringify(newValues[varName])
-          ) {
-            changedVars.push(varName);
-          }
-        });
-
-        if (changedVars.length === 0) {
-          return;
-        }
-
-        // Get list of local variable names (only current-level variables)
-        const localVarNames = variablesData.values
-          .filter((v: any) => v._isCurrentLevel === true)
-          .map((v: any) => v.name);
-
-        // Filter out changes that came from our own variables (to prevent self-triggering)
-        const externalChangedVars = changedVars.filter(
-          (varName) => !localVarNames.includes(varName),
-        );
-
-        if (externalChangedVars.length === 0) {
-          return;
-        }
-
-        // IMPORTANT: Update variablesData.values with new parent values BEFORE reloading
-        // This ensures child variables use the NEW parent values when they build queries
-        variablesData.values.forEach((v: any) => {
-          if (newValues[v.name] !== undefined) {
-            v.value = newValues[v.name];
-          }
-        });
-
-        // Also update oldVariablesData for change detection
-        Object.keys(newValues).forEach((varName) => {
-          oldVariablesData[varName] = newValues[varName];
-        });
-
-        // Check which variables depend on changed EXTERNAL parent variables
-        const affectedVariables = variablesData.values.filter((v: any) => {
-          // Only check current-level variables
-          if (v._isCurrentLevel !== true) return false;
-
-          const deps = variablesDependencyGraph[v.name]?.parentVariables || [];
-          return deps.some((dep: string) => externalChangedVars.includes(dep));
-        });
-
-        if (affectedVariables.length === 0) {
-          return;
-        }
-
-        // Set flag to prevent re-entry
-        isProcessingParentChange.value = true;
-
-        try {
-          // Sort variables by dependency order (independent first)
-          const sortedVariables = affectedVariables.sort((a: any, b: any) => {
-            const aDeps =
-              variablesDependencyGraph[a.name]?.parentVariables || [];
-            const bDeps =
-              variablesDependencyGraph[b.name]?.parentVariables || [];
-            // Variables with fewer dependencies load first
-            return aDeps.length - bDeps.length;
-          });
-
-          // Reload affected variables SEQUENTIALLY to prevent multiple simultaneous API calls
-          for (const variable of sortedVariables) {
-            variable.isVariableLoadingPending = true;
-            variable.isVariablePartialLoaded = false;
-            variable.isLoading = true;
-            variable.value = variable.multiSelect ? [] : null;
-            variable.options = [];
-
-            // Wait for this variable to complete before starting next
-            await loadSingleVariableDataByName(variable, false);
-          }
-        } finally {
-          // Always clear the flag when done
-          isProcessingParentChange.value = false;
-        }
-      },
-    );
-
     const emitVariablesData = () => {
       emit("variablesData", {
         isVariablesLoading: variablesData.isVariablesLoading,
@@ -2048,12 +1944,7 @@ export default defineComponent({
 
       // Set loading state for all variables
       variablesData.values.forEach((variable: any) => {
-        if (
-          variable._isCurrentLevel === true ||
-          variable._isCurrentLevel === undefined
-        ) {
-          variable.isVariableLoadingPending = true;
-        }
+        variable.isVariableLoadingPending = true;
       });
 
       // Find all independent variables (variables with no dependencies)
