@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
     <div>
     <div class="card-container tw:mb-[0.625rem]">
-      <div class="tw:flex tw:flex-row tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
+      <div class="tw:flex tw:flex-row tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px]"
     >
       <div
           class="q-table__title tw:font-[600]"

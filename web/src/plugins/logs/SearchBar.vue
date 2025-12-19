@@ -1241,12 +1241,12 @@ class="q-pr-sm q-pt-xs" />
       <q-btn
         data-test="logs-query-editor-full_screen-btn"
         :title="isFocused ? t('search.collapse') : t('search.expand')"
-        dense
-        size="10px"
-        round
         color="primary"
+        round
+        dense
+        size="sm"
         @click="isFocused = !isFocused"
-        class="tw:absolute tw:top-[3.3rem] tw:right-[1.2rem] tw:z-50"
+        class="q-pa-xs absolute tw:absolute tw:top-[3.3rem] tw:right-[1.2rem] tw:z-50"
       >
       <Maximize size='0.8rem' v-if="!isFocused" />
       <Minimize size="0.8rem" v-else />

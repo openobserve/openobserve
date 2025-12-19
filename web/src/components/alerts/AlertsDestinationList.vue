@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-page class="q-pa-none" style="height: calc(100vh - 88px); min-height: inherit" >
 
     <div v-if="!showDestinationEditor && !showImportDestination" >
-      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
+      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px]"
       >
         <div class="q-table__title tw:font-[600]" data-test="alert-destinations-list-title">
             {{ t("alert_destinations.header") }}

@@ -1,7 +1,7 @@
 <template>
     <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);" 
     >
-    <div v-if="!showImportRegexPatternDialog" class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
+    <div v-if="!showImportRegexPatternDialog" class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px]"
     >
       <div class="q-table__title tw:font-[600]" data-test="regex-pattern-list-title">
             {{ t("regex_patterns.title") }}

@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 v-if="props?.row?.isGroup"
-                class="tw-pl-2 tw-py-1 tw-font-semibold tw-bg-gray-200"
+                class="tw:pl-2 tw:py-1 tw:font-semibold tw:bg-gray-200"
               >
                 {{ props?.row?.groupName }}
               </div>

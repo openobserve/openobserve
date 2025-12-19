@@ -396,9 +396,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :filter="filterQuery"
           :filter-method="filterData"
           :loading="loading"
-          class="nodes-list-table tw:border-l tw:border-solid tw:border-gray-1200 tw:rounded-none"
+          class="nodes-list-table tw:rounded-none"
           dense
-          style="width: 100%; height: calc(100vh - 50px); overflow-y: auto;"
+          style="width: 100%; height: calc(100vh - 50px); overflow-y: auto; border-left: 1px solid lightgray;"
         >
           <template #no-data><NoData /></template>
           <template #top="scope">

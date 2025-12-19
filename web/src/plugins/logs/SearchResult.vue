@@ -182,13 +182,13 @@ color="warning" size="sm"> </q-icon>
             !searchObj.loading
           "
         >
-          <h3 class="text-center">
+          <div class="text-center">
             <span class="histogram-empty__message">
               <q-icon name="warning"
 color="warning" size="xs"></q-icon> No data
               found for histogram.</span
             >
-          </h3>
+          </div>
         </div>
 
         <div

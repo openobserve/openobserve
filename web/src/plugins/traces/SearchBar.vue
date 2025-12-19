@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Show search controls only when on Search tab -->
         <template v-if="activeTab === 'search'">
           <div
-            class="q-pr-xs tw:mr-[0.375rem] tw:flex tw:items-center tw:justify-center tw:border-solid tw:border tw:border-[var(--o2-border-color)] tw:rounded-[0.375rem]"
+            class="q-pr-xs tw:flex tw:items-center tw:justify-center tw:border-solid tw:border tw:border-[var(--o2-border-color)] tw:rounded-[0.375rem]"
           >
             <q-toggle
               data-test="traces-search-bar-show-metrics-toggle-btn"
@@ -84,9 +84,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             data-test="traces-search-bar-reset-filters-btn"
             no-caps
-            size="13px"
+            flat
+            dense
             icon="restart_alt"
-            class="tw:flex tw:justify-center tw:items-center tw:w-[2rem] tw:min-h-[2rem] tw:h-[2rem] tw:mr-[0.375rem] tw:rounded-[0.375rem] el-border"
+            class="toolbar-reset-btn element-box-shadow"
             @click="resetFilters"
           >
             <q-tooltip>
@@ -126,18 +127,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             data-test="logs-search-bar-refresh-btn"
             data-cy="search-bar-refresh-button"
-            dense
-            flat
             :title="t('search.runQuery')"
-            class="q-pa-none o2-primary-button tw:h-[30px] element-box-shadow"
+            dense
+            class="o2-primary-button element-box-shadow q-px-sm"
             @click="searchData"
             :loading="isLoading"
             :disable="isLoading"
+            style="min-height: 30px;"
             >{{ t("search.runQuery") }}</q-btn
           >
         </div>
         <q-btn
-          class="tw:mr-[0.375rem] float-left download-logs-btn q-pa-sm tw:min-h-[2rem] el-border"
+          class="q-mr-sm float-left download-logs-btn q-pa-sm tw:min-h-[2rem] el-border"
           size="sm"
           :disable="!searchObj.data.queryResults?.hits?.length"
           icon="download"
@@ -703,6 +704,32 @@ export default defineComponent({
     .q-icon {
       margin-right: 0;
     }
+  }
+
+  .toolbar-reset-btn {
+    padding: 0.25rem 0.375rem; // 4px 6px
+    margin-left: 0.25rem; // 8px
+    border: 0.0625rem solid var(--o2-border-color); // 1px
+    border-radius: 0.375rem; // 6px
+    transition: all 0.2s ease;
+    min-height: 1.875rem; // 30px
+
+    .q-icon {
+      font-size: 1.215rem; // 16px
+    }
+
+    &:hover {
+      background-color: var(--o2-hover-accent);
+    }
+
+    &.theme-dark {
+      border-color: var(--o2-border-color) !important;
+    }
+  }
+
+  .q-dark .toolbar-reset-btn,
+  .dark-theme .toolbar-reset-btn {
+    border-color: var(--o2-border-color);
   }
 }
 </style>

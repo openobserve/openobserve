@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <q-btn-dropdown
-              class="text-bold no-border tw:px-0"
+              class="text-bold no-border q-px-none"
               no-caps
               auto-close
               dropdown-icon="keyboard_arrow_down"

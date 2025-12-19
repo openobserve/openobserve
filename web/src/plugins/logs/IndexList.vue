@@ -78,13 +78,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       class="index-table q-mt-xs"
     >
-      <h3
+      <div
         data-test="logs-search-no-field-found-text"
-        class="text-center col-10 q-mx-none"
+        class="text-center q-mx-none q-mt-md"
       >
         <q-icon name="info" color="primary" size="xs" />
         {{ t("search.noFieldFoundInStream") }}
-      </h3>
+      </div>
     </div>
     <div v-else class="index-table q-mt-xs">
       <FieldList

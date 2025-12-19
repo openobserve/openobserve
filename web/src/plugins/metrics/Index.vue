@@ -64,7 +64,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
             class="tw:text-xs tw:font-bold no-border"
             data-test="metrics-cancel"
-            padding="sm md"
             color="negative"
             no-caps
             :label="t('panel.cancel')"
@@ -74,7 +73,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else
             class="q-pa-none o2-primary-button tw:h-[30px] element-box-shadow"
             data-test="metrics-apply"
-            padding="sm"
             :loading="disable"
             :disable="disable"
             no-caps
