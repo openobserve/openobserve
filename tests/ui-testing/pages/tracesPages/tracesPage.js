@@ -2,7 +2,7 @@
 import { expect } from '@playwright/test';
 
 import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue } from '../commonActions.js';
-const testLogger = require('../../playwright-tests/utils/test-logger.js');
+import testLogger from '../../playwright-tests/utils/test-logger.js';
 
 
 export class TracesPage {

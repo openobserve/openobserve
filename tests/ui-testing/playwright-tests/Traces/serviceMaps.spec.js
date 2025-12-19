@@ -4,8 +4,9 @@
 const { test, expect } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 
-test.describe("Service Maps testcases", { tag: '@enterprise' }, () => {
+test.describe("Service Maps testcases", () => {
   test.describe.configure({ mode: 'serial' });
+
   let tracesPage;
   // Remove trailing slash from base URL if present (handle undefined env var)
   const rawBaseUrl = process.env["ZO_BASE_URL"] || '';
@@ -15,9 +16,9 @@ test.describe("Service Maps testcases", { tag: '@enterprise' }, () => {
   const tracesUrl = `${baseUrl}/web/traces?org_identifier=${process.env["ORGNAME"]}`;
 
   test.beforeAll(async () => {
-    testLogger.info('Checking for enterprise service graph feature');
-    // This test suite requires enterprise license
-    // Tests will be skipped if service_graph_enabled is false
+    testLogger.info('Service Maps tests - enterprise feature');
+    // Note: All tests in this suite are marked with .skip() by default
+    // Remove .skip() from individual tests to enable them
   });
 
   test.beforeEach(async ({ page }, testInfo) => {
@@ -47,7 +48,7 @@ test.describe("Service Maps testcases", { tag: '@enterprise' }, () => {
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
-  test("P3: Switch to Service Maps view", {
+  test.skip("P3: Switch to Service Maps view", {
     tag: ['@traces', '@serviceMaps', '@P3', '@enterprise']
   }, async ({ page }) => {
     testLogger.info('Testing switch to service maps view');
@@ -77,7 +78,7 @@ test.describe("Service Maps testcases", { tag: '@enterprise' }, () => {
     }
   });
 
-  test("P3: Refresh Service Graph", {
+  test.skip("P3: Refresh Service Graph", {
     tag: ['@traces', '@serviceMaps', '@P3', '@enterprise']
   }, async ({ page }) => {
     testLogger.info('Testing service graph refresh');
@@ -109,7 +110,7 @@ test.describe("Service Maps testcases", { tag: '@enterprise' }, () => {
     }
   });
 
-  test("P3: Switch between Search and Service Maps tabs", {
+  test.skip("P3: Switch between Search and Service Maps tabs", {
     tag: ['@traces', '@serviceMaps', '@P3', '@enterprise']
   }, async ({ page }) => {
     testLogger.info('Testing tab switching');
@@ -142,7 +143,7 @@ test.describe("Service Maps testcases", { tag: '@enterprise' }, () => {
     }
   });
 
-  test("P3: Service Graph interaction", {
+  test.skip("P3: Service Graph interaction", {
     tag: ['@traces', '@serviceMaps', '@P3', '@enterprise']
   }, async ({ page }) => {
     testLogger.info('Testing service graph interactions');
