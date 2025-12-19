@@ -360,13 +360,12 @@ pub async fn search(
         }
 
         // Validate query fields if requested
-        if validate_query {
-            if let Err(e) =
+        if validate_query
+            && let Err(e) =
                 utils::validate_query_fields(&org_id, &stream_name, stream_type, &req.query.sql)
                     .await
-            {
-                return Ok(map_error_to_http_response(&e, Some(trace_id)));
-            }
+        {
+            return Ok(map_error_to_http_response(&e, Some(trace_id)));
         }
 
         // Check permissions on stream
