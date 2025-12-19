@@ -602,7 +602,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="height: calc(100vh - 99px); overflow-y: auto"
               >
                 <div class="col scroll" style="height: 100%; display: flex; flex-direction: column;">
-                  <div style="height: 500px; flex-shrink: 0;">
+                  <div style="height: 500px; flex-shrink: 0; overflow: hidden;">
                     <q-splitter
                       class="query-editor-splitter"
                       v-model="splitterModel"
