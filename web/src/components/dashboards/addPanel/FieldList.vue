@@ -688,7 +688,15 @@ export default defineComponent({
     );
 
     // Track stream/type per query index to detect changes within each specific query
-    const queryStreamTracking = ref<Record<number, { stream: string | null; streamType: string | null }>>({});
+    const queryStreamTracking = ref<
+      Record<
+        number,
+        {
+          stream: string | null | undefined;
+          streamType: string | null | undefined;
+        }
+      >
+    >({});
 
     // Initialize tracking for all existing queries
     dashboardPanelData.data.queries.forEach((query: any, index: number) => {
