@@ -1295,6 +1295,10 @@ export default defineComponent({
             route.query.panelId as string,
             true,
           );
+        } else {
+          // In add mode (new panel), mark "current_panel" as visible
+          // This allows variables scoped to "current_panel" to load
+          variablesManager.setPanelVisibility("current_panel", true);
         }
       } catch (error) {
         console.error("Error initializing variables manager:", error);
@@ -1370,7 +1374,7 @@ export default defineComponent({
       const normalizeVariables = (obj: any) => {
         const normalized = JSON.parse(JSON.stringify(obj));
         // Sort arrays to ensure consistent ordering
-        if (normalized.values) {
+        if (normalized.values && Array.isArray(normalized.values)) {
           normalized.values = normalized.values
             .map((variable: any) => {
               if (Array.isArray(variable.value)) {
@@ -1608,23 +1612,17 @@ export default defineComponent({
 
     const goBack = async () => {
       // Clean up variables created during this session (on discard)
-      if (variablesCreatedInSession.value.length > 0) {
-        const dashId = route.query.dashboard + "";
-        const folderId = route.query.folder ?? "default";
-        
-        // Delete all variables that were created during this edit session
-        for (const variableName of variablesCreatedInSession.value) {
-          try {
-            await deleteVariable(store, dashId, variableName, folderId);
-          } catch (error) {
-            console.error(`Failed to delete variable ${variableName}:`, error);
-          }
-        }
-        
-        // Clear the tracking array
-        variablesCreatedInSession.value = [];
+      // Remove variables that were created in this session from the dashboard data
+      if (variablesCreatedInSession.value.length > 0 && currentDashboardData.data?.variables?.list) {
+        currentDashboardData.data.variables.list = currentDashboardData.data.variables.list.filter(
+          (v: any) => !variablesCreatedInSession.value.includes(v.name)
+        );
       }
-      
+
+      // Clear the tracking arrays
+      variablesCreatedInSession.value = [];
+      variablesWithCurrentPanel.value = [];
+
       return router.push({
         path: "/dashboards/view",
         query: {
@@ -1676,6 +1674,14 @@ export default defineComponent({
       if (from.path === "/dashboards/add_panel" && isPanelConfigChanged.value) {
         const confirmMessage = t("dashboard.unsavedMessage");
         if (window.confirm(confirmMessage)) {
+          // User confirmed navigation - clean up variables created during this session
+          if (variablesCreatedInSession.value.length > 0 && currentDashboardData.data?.variables?.list) {
+            currentDashboardData.data.variables.list = currentDashboardData.data.variables.list.filter(
+              (v: any) => !variablesCreatedInSession.value.includes(v.name)
+            );
+          }
+          variablesCreatedInSession.value = [];
+          variablesWithCurrentPanel.value = [];
           // User confirmed, allow navigation
           next();
         } else {
@@ -1821,9 +1827,30 @@ export default defineComponent({
           dashboardPanelData.data.id = panelId;
           chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
 
+          // Replace "current_panel" with actual panel ID in variables before saving
+          if (variablesWithCurrentPanel.value.length > 0) {
+            variablesWithCurrentPanel.value.forEach((variableName) => {
+              const variable = currentDashboardData.data?.variables?.list?.find(
+                (v: any) => v.name === variableName,
+              );
+              if (variable && variable.panels) {
+                variable.panels = variable.panels.map((id: string) =>
+                  id === "current_panel" ? panelId : id
+                );
+              }
+            });
+          }
+
           // Prepare variables to update (if any were created during this session)
           const variablesToUpdate = variablesCreatedInSession.value.length > 0
             ? { variableNames: variablesCreatedInSession.value, newPanelId: panelId }
+            : undefined;
+
+          // Prepare list of new variable objects to add to dashboard
+          const newVariablesList = variablesCreatedInSession.value.length > 0
+            ? variablesCreatedInSession.value.map((name: string) =>
+                currentDashboardData.data?.variables?.list?.find((v: any) => v.name === name)
+              ).filter((v: any) => v !== undefined)
             : undefined;
 
           const errorMessageOnSave = await addPanel(
@@ -1832,6 +1859,8 @@ export default defineComponent({
             dashboardPanelData.data,
             route.query.folder ?? "default",
             route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
+            variablesToUpdate,
+            newVariablesList
           );
           if (errorMessageOnSave instanceof Error) {
             errorData.errors.push(
@@ -2369,8 +2398,9 @@ export default defineComponent({
       if (editMode.value && route.query.panelId) {
         return route.query.panelId as string;
       }
-      // In add mode, use the panel ID from dashboardPanelData (after it's generated)
-      return dashboardPanelData.data.id || undefined;
+      // In add mode, use "current_panel" as the panel ID before the panel is saved
+      // This allows variables scoped to "current_panel" to be visible
+      return dashboardPanelData.data.id || "current_panel";
     });
 
     /**
@@ -2393,43 +2423,151 @@ export default defineComponent({
     /**
      * Handles saving a variable - reloads dashboard to reflect the saved variable
      */
-    const handleSaveVariable = async () => {
+    const handleSaveVariable = async (payload: any) => {
+      console.log(
+        `[handleSaveVariable] Saving variable: ${JSON.stringify(payload)}`
+      );
       isAddVariableOpen.value = false;
-      
-      // Before reloading, check if this was a new variable (not an edit)
-      const wasNewVariable = !selectedVariableToEdit.value;
-      
-      selectedVariableToEdit.value = null;
-      
-      // Refresh the dashboard data to include the newly saved variable
-      await loadDashboard();
-      
-      // If it was a new variable, track it for potential cleanup on discard
-      if (wasNewVariable) {
-        // Find the newly added variable(s) by comparing with initial list
-        const currentVariableNames =
-          currentDashboardData.data?.variables?.list?.map((v: any) => v.name) ||
-          [];
-        const newVariables = currentVariableNames.filter(
-          (name: string) => !initialVariableNames.value.includes(name),
+
+      const { variableData, isEdit, oldVariableName } = payload || {};
+
+      // If payload is missing, return (should not happen)
+      if (!variableData) {
+        console.log(
+          `[handleSaveVariable] Payload is missing, cannot save variable`
         );
-        // Add any new variables to our tracking list (avoid duplicates)
-        newVariables.forEach((name: string) => {
-          if (!variablesCreatedInSession.value.includes(name)) {
-            variablesCreatedInSession.value.push(name);
-          }
-          
-          // Check if this variable uses "current_panel" reference
-          const variable = currentDashboardData.data?.variables?.list?.find(
-            (v: any) => v.name === name,
-          );
-          if (variable?.panels?.includes("current_panel")) {
-            if (!variablesWithCurrentPanel.value.includes(name)) {
-              variablesWithCurrentPanel.value.push(name);
-            }
-          }
-        });
+        return;
       }
+
+      if (!currentDashboardData.data.variables) {
+        currentDashboardData.data.variables = { list: [] };
+      }
+
+      const variablesList = currentDashboardData.data.variables.list;
+
+      if (isEdit) {
+        // Find and update
+        const index = variablesList.findIndex(
+          (v: any) => v.name === oldVariableName,
+        );
+        if (index !== -1) {
+          variablesList[index] = variableData;
+          console.log(
+            `[handleSaveVariable] Updated variable: ${oldVariableName} to ${variableData.name}`
+          );
+          // Also update tracking
+          if (
+            variablesCreatedInSession.value.includes(oldVariableName) &&
+            oldVariableName !== variableData.name
+          ) {
+            const trackIndex =
+              variablesCreatedInSession.value.indexOf(oldVariableName);
+            variablesCreatedInSession.value[trackIndex] = variableData.name;
+            console.log(
+              `[handleSaveVariable] Updated tracking for variable: ${oldVariableName} to ${variableData.name}`
+            );
+          }
+          if (
+            variablesWithCurrentPanel.value.includes(oldVariableName) &&
+            oldVariableName !== variableData.name
+          ) {
+            const trackIndex =
+              variablesWithCurrentPanel.value.indexOf(oldVariableName);
+            variablesWithCurrentPanel.value[trackIndex] = variableData.name;
+            console.log(
+              `[handleSaveVariable] Updated tracking for variable: ${oldVariableName} to ${variableData.name}`
+            );
+          }
+        }
+      } else {
+        // Add new
+        variablesList.push(variableData);
+        console.log(
+          `[handleSaveVariable] Added new variable: ${variableData.name}`
+        );
+        // Track
+        if (!variablesCreatedInSession.value.includes(variableData.name)) {
+          variablesCreatedInSession.value.push(variableData.name);
+          console.log(
+            `[handleSaveVariable] Added tracking for variable: ${variableData.name}`
+          );
+        }
+      }
+
+      // Update variablesWithCurrentPanel tracking
+      const usesCurrentPanel =
+        variableData.panels && variableData.panels.includes("current_panel");
+      if (usesCurrentPanel) {
+        if (!variablesWithCurrentPanel.value.includes(variableData.name)) {
+          variablesWithCurrentPanel.value.push(variableData.name);
+          console.log(
+            `[handleSaveVariable] Added tracking for variable: ${variableData.name} to current_panel`
+          );
+        }
+      } else {
+        // If it was tracked but no longer uses current_panel, remove it
+        const idx = variablesWithCurrentPanel.value.indexOf(variableData.name);
+        if (idx !== -1) {
+          variablesWithCurrentPanel.value.splice(idx, 1);
+          console.log(
+            `[handleSaveVariable] Removed tracking for variable: ${variableData.name} from current_panel`
+          );
+        }
+      }
+
+      selectedVariableToEdit.value = null;
+
+      // Re-initialize manager with updated list
+      await variablesManager.initialize(
+        variablesList,
+        currentDashboardData.data,
+      );
+      console.log(
+        `[handleSaveVariable] Re-initialized manager with updated list: ${JSON.stringify(variablesList)}`
+      );
+
+      // Restore visibility
+      // 1. Tab visibility
+      const tabId = currentTabId.value;
+      if (tabId) {
+        variablesManager.setTabVisibility(tabId, true);
+        console.log(
+          `[handleSaveVariable] Restored visibility for tab: ${tabId}`
+        );
+      }
+
+      // 2. Panel visibility (Edit Mode)
+      if (editMode.value && route.query.panelId) {
+        variablesManager.setPanelVisibility(
+          route.query.panelId as string,
+          true,
+        );
+        console.log(
+          `[handleSaveVariable] Restored visibility for panel: ${route.query.panelId}`
+        );
+      } else {
+        // 3. Panel visibility (Add Mode - current_panel)
+        // In add mode, mark "current_panel" as visible so variables can load
+        variablesManager.setPanelVisibility("current_panel", true);
+        console.log(
+          `[handleSaveVariable] Restored visibility for panel: current_panel`
+        );
+      }
+
+      // 4. Additionally, if any variable uses "current_panel", ensure it's visible
+      if (variablesWithCurrentPanel.value.length > 0) {
+        variablesManager.setPanelVisibility("current_panel", true);
+        console.log(
+          `[handleSaveVariable] Restored visibility for panel: current_panel`
+        );
+      }
+
+      // 5. Trigger variable data reload to ensure new variables are displayed
+      // Wait for Vue to process the manager updates
+      await nextTick();
+
+      // The VariablesValueSelector components should automatically pick up
+      // the new variables from the manager through their computed properties
     };
 
     return {
