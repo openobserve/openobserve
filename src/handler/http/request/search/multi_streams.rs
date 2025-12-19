@@ -72,7 +72,10 @@ use crate::{
     operation_id = "SearchSQLMultiStream",
     summary = "Search across multiple streams",
     description = "Executes SQL queries that can span across multiple data streams within the organization. This enables cross-stream analytics, joins, and aggregations to analyze data relationships and patterns across different log streams, metrics, or traces. The query engine automatically handles data from different streams and returns unified results.",
-    params(("org_id" = String, Path, description = "Organization name")),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("validate" = bool, Query, description = "Validate query fields against stream schema and User-Defined Schema (UDS). When enabled, returns error if queried fields are not in schema or not allowed by UDS"),
+    ),
     request_body(
         content = inline(search::MultiStreamRequest),
         description = "Search query",
