@@ -639,7 +639,7 @@ export class TracesPage {
       if (error.message.includes('Search failed')) {
         throw error;
       }
-      console.error('Error checking trace results:', error.message);
+      testLogger.error('Error checking trace results:', error.message);
       return false;
     }
   }
