@@ -83,6 +83,7 @@ mod m20251204_000001_create_alert_incidents_table;
 mod m20251207_000001_create_system_settings_table;
 mod m20251219_000001_add_org_id_to_search_queue;
 mod m20251221_000001_create_enrichment_table_urls;
+mod m20251218_000001_add_expires_at_to_sessions;
 
 pub struct Migrator;
 
@@ -155,6 +156,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20251207_000001_create_system_settings_table::Migration),
             Box::new(m20251219_000001_add_org_id_to_search_queue::Migration),
             Box::new(m20251221_000001_create_enrichment_table_urls::Migration),
+            Box::new(m20251218_000001_add_expires_at_to_sessions::Migration),
         ]
     }
 }
