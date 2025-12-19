@@ -45,7 +45,7 @@ test.describe("Enrichment Table Regression Bugs", () => {
     }
 
     // Check if enrichment tables are displayed
-    const enrichmentSearch = page.locator('[data-test="enrichment-tables-search-input"]');
+    const enrichmentSearch = page.locator(pm.enrichmentPage.enrichmentTablesSearchInput);
     const searchVisible = await enrichmentSearch.isVisible().catch(() => false);
 
     if (searchVisible) {
