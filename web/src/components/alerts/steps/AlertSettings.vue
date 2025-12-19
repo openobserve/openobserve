@@ -527,7 +527,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw-px-4 frequency-toggle-btn frequency-toggle-left"
                 :class="formData.trigger_condition.frequency_type === 'minutes' ? 'active' : 'inactive'"
                 style="min-width: 90px"
-                @click="formData.trigger_condition.frequency_type = 'minutes'; emitTriggerUpdate()"
+                @click="handleFrequencyTypeChange('minutes')"
               />
               <q-btn
                 label="Cron Schedule"
@@ -539,7 +539,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw-px-4 frequency-toggle-btn frequency-toggle-right"
                 :class="formData.trigger_condition.frequency_type === 'cron' ? 'active' : 'inactive'"
                 style="min-width: 130px"
-                @click="formData.trigger_condition.frequency_type = 'cron'; emitTriggerUpdate()"
+                @click="handleFrequencyTypeChange('cron')"
               />
             </div>
 
@@ -795,6 +795,7 @@ import { useRouter } from "vue-router";
 import {
   getCronIntervalDifferenceInSeconds,
   isAboveMinRefreshInterval,
+  convertMinutesToCron,
 } from "@/utils/zincutils";
 
 export default defineComponent({
@@ -1015,6 +1016,32 @@ export default defineComponent({
           );
         }
       });
+    };
+
+    // Handle frequency type change with conversion
+    const handleFrequencyTypeChange = (type: 'minutes' | 'cron') => {
+      // If switching to cron and we have a frequency value, convert it
+      // Only convert if there's no existing cron expression
+      if (type === 'cron' && props.formData.trigger_condition.frequency_type === 'minutes') {
+        const frequencyMinutes = Number(props.formData.trigger_condition.frequency);
+        const existingCron = props.formData.trigger_condition.cron;
+
+        // Only convert if we have a frequency value and no existing cron expression
+        if (frequencyMinutes && frequencyMinutes > 0 && (!existingCron || existingCron.trim() === '')) {
+          // Convert minutes to cron expression (6-field format: second minute hour day month dayOfWeek)
+          const cronExpression = convertMinutesToCron(frequencyMinutes);
+          props.formData.trigger_condition.cron = cronExpression;
+
+          // Set timezone if not already set
+          if (!props.formData.trigger_condition.timezone) {
+            props.formData.trigger_condition.timezone = browserTimezone.value || Intl.DateTimeFormat().resolvedOptions().timeZone;
+          }
+        }
+      }
+
+      // Update the frequency type
+      props.formData.trigger_condition.frequency_type = type;
+      emitTriggerUpdate();
     };
 
     // Toggle aggregation
@@ -1248,6 +1275,7 @@ export default defineComponent({
       emitAggregationUpdate,
       emitDestinationsUpdate,
       routeToCreateDestination,
+      handleFrequencyTypeChange,
       // Timezone-related
       browserTimezone,
       filteredTimezone,
