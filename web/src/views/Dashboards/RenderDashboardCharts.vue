@@ -782,14 +782,14 @@ export default defineComponent({
           cellHeight: "17px", // Base cell height
           margin: 2, // Minimal margin between panels
           draggable: {
-            enable: !props.viewOnly && !saveDashboardData.isLoading, // Enable dragging unless view-only or saving
+            enable: !props.viewOnly && !saveDashboardData.isLoading.value, // Enable dragging unless view-only or saving
             handle: ".drag-allow", // Only allow dragging from specific handle
           },
           resizable: {
-            enable: !props.viewOnly && !saveDashboardData.isLoading, // Enable resizing unless view-only or saving
+            enable: !props.viewOnly && !saveDashboardData.isLoading.value, // Enable resizing unless view-only or saving
           },
-          disableResize: props.viewOnly || saveDashboardData.isLoading, // Disable resize in view-only
-          disableDrag: props.viewOnly || saveDashboardData.isLoading, // Disable drag in view-only
+          disableResize: props.viewOnly || saveDashboardData.isLoading.value, // Disable resize in view-only
+          disableDrag: props.viewOnly || saveDashboardData.isLoading.value, // Disable drag in view-only
           acceptWidgets: false, // Don't accept external widgets
           removable: false, // Don't allow removal by dragging out
           animate: false, // Disable animations for better performance
@@ -978,7 +978,7 @@ export default defineComponent({
     // disable resize and drag for view only mode and when saving dashboard
     // do it based on watcher on viewOnly and saveDashboardData.isLoading
     watch(
-      () => props.viewOnly || saveDashboardData.isLoading,
+      () => props.viewOnly || saveDashboardData.isLoading.value,
       async (newValue) => {
         if (gridStackInstance) {
           gridStackInstance.setStatic(newValue === true);
