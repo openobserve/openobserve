@@ -1324,6 +1324,7 @@ export default defineComponent({
         formData.value.query_condition?.conditions,
         formData.value.stream_name,
         formData.value.query_condition?.aggregation,
+        isAggregationEnabled.value,
       ],
       () => {
         if (formData.value.query_condition?.type === 'custom') {
@@ -1389,6 +1390,32 @@ export default defineComponent({
       return false;
     };
 
+    // Helper function to validate aggregation having clause
+    const isAggregationValid = (): boolean => {
+      // If aggregation is disabled, it's valid (will be removed from payload)
+      if (!isAggregationEnabled.value) {
+        return true;
+      }
+
+      const aggregation = formData.value.query_condition.aggregation;
+
+      // If aggregation is enabled but no aggregation object, skip
+      if (!aggregation) {
+        return false;
+      }
+
+      // If having clause exists, validate it has required fields
+      if (aggregation.having) {
+        const { column, operator, value } = aggregation.having;
+        // All having fields must be filled
+        return !!(column && operator && value !== undefined && value !== '');
+      }
+
+      // If no having clause but aggregation is enabled, it's still valid
+      // (group_by can exist without having)
+      return true;
+    };
+
     // Function to generate SQL from backend API
     const generateSqlFromBackend = async () => {
       try {
@@ -1412,7 +1439,14 @@ export default defineComponent({
           return;
         }
 
-        const payload = {
+        // Validate aggregation (having clause if present)
+        if (!isAggregationValid()) {
+          // Don't clear the previous SQL, just skip the API call
+          return;
+        }
+
+        // Prepare payload
+        const payload: any = {
           stream_name: formData.value.stream_name,
           stream_type: formData.value.stream_type || 'logs',
           query_condition: {
@@ -1421,9 +1455,13 @@ export default defineComponent({
               version: 2,
               conditions: formData.value.query_condition.conditions,
             },
-            aggregation: formData.value.query_condition.aggregation || null,
           },
         };
+
+        // Only include aggregation if enabled
+        if (isAggregationEnabled.value && formData.value.query_condition.aggregation) {
+          payload.query_condition.aggregation = formData.value.query_condition.aggregation;
+        }
 
         const response = await alertsService.generate_sql(
           store.state.selectedOrganization.identifier,
