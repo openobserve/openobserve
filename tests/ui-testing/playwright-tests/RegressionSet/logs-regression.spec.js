@@ -233,26 +233,24 @@ test.describe("Logs Regression Bugs", () => {
 
     // Select stream
     await pm.logsPage.selectStream('e2e_automate');
-    await page.waitForTimeout(2000);
 
-    // Enable SQL mode
-    testLogger.info('Enabling SQL mode');
-    await pm.logsPage.clickSQLModeToggle();
-    await page.waitForTimeout(1000);
+    // Set date/time range
+    await pm.logsPage.clickDateTimeButton();
+    await pm.logsPage.clickRelative15MinButton();
 
     // Enter subquery
-    const subquery = 'SELECT * FROM (SELECT * FROM "e2e_automate" WHERE kubernetes_pod_name IS NOT NULL LIMIT 100)';
+    const subquery = 'SELECT * FROM (SELECT * FROM "e2e_automate" WHERE kubernetes_pod_name IS NOT NULL LIMIT 10)';
     testLogger.info(`Entering subquery: ${subquery}`);
-    await pm.logsPage.fillQueryEditor(subquery);
+    await pm.logsPage.clickQueryEditor();
+    await pm.logsPage.typeInQueryEditor(subquery);
+    await pm.logsPage.waitForTimeout(500);
 
     // Run query
     testLogger.info('Running query');
     await pm.logsPage.clickRefreshButton();
-    await page.waitForTimeout(3000);
 
-    // Verify query results loaded
-    const resultsVisible = await page.locator(pm.logsPage.logsSearchResultLogsTable).isVisible();
-    expect(resultsVisible).toBeTruthy();
+    // Wait for results table to load
+    await pm.logsPage.expectLogTableColumnSourceVisible();
     testLogger.info('Query results loaded successfully');
 
     // Expand field to trigger values API
@@ -261,13 +259,35 @@ test.describe("Logs Regression Bugs", () => {
     // Search for the field first to make it visible in sidebar
     testLogger.info(`Searching for field: ${fieldToExpand}`);
     await pm.logsPage.fillIndexFieldSearchInput(fieldToExpand);
-    await page.waitForTimeout(500);
 
     const expandButton = page.locator(pm.logsPage.fieldExpandButton(fieldToExpand));
 
     testLogger.info(`Expanding field: ${fieldToExpand}`);
     await expandButton.waitFor({ state: 'visible', timeout: 10000 });
+
+    // Set up values API response waiter BEFORE clicking expand
+    testLogger.info('Setting up values API listener');
+    const valuesApiResponse = page.waitForResponse(
+      response => response.url().includes('/_values') && response.status() !== 0,
+      { timeout: 20000 }
+    );
+
+    testLogger.info('Clicking expand to trigger values API call');
     await expandButton.click();
+
+    // Wait for values API response
+    let apiResponse;
+    try {
+      apiResponse = await valuesApiResponse;
+      testLogger.info(`✓ Values API responded with status: ${apiResponse.status()}`);
+
+      // PRIMARY ASSERTION: Values API should NOT return 400 (this was the bug #7751)
+      expect(apiResponse.status()).not.toBe(400);
+      testLogger.info('✓ PRIMARY CHECK PASSED: Values API did not return 400 error');
+    } catch (error) {
+      testLogger.warn(`Values API response timeout or error: ${error.message}`);
+      // If API times out, we'll still check the UI for 400 errors below
+    }
 
     // Wait for field expansion content to be visible (values or error message)
     const fieldExpansionContent = page.locator(pm.logsPage.fieldListItem(fieldToExpand));
@@ -280,28 +300,20 @@ test.describe("Logs Regression Bugs", () => {
       testLogger.debug(`Could not read field expansion content: ${error.message}`);
     }
 
-    // Primary assertion: NO 400 error (this was the bug)
+    // Secondary assertion: NO 400 error in UI
     expect(contentText).not.toContain('400');
     expect(contentText.toLowerCase()).not.toMatch(/error.*400|400.*error/);
-    testLogger.info('✓ PRIMARY CHECK PASSED: No 400 error displayed');
+    testLogger.info('✓ SECONDARY CHECK PASSED: No 400 error displayed in UI');
 
-    // Secondary check: Field values loaded or acceptable message shown
-    const fieldValues = page.locator(pm.logsPage.subfieldAddButton(fieldToExpand));
+    // TERTIARY ASSERTION: Verify field values actually appear in dropdown
+    // Wait for at least one field value to load (proves dropdown populated successfully)
+    const firstFieldValue = page.locator(`[data-test^="logs-search-subfield-add-${fieldToExpand}-"]`).first();
+    await firstFieldValue.waitFor({ state: 'visible', timeout: 5000 });
+
+    const fieldValues = page.locator(`[data-test^="logs-search-subfield-add-${fieldToExpand}-"]`);
     const valueCount = await fieldValues.count();
-
-    // Note: Field values may not load if there's no data or if UI is still loading
-    // The primary check (no 400 error) is the critical assertion for this bug
-    const hasValues = valueCount > 0;
-    const hasNoValuesMessage = contentText.includes('No values found');
-
-    if (hasValues) {
-      testLogger.info(`✓ Field values displayed: ${valueCount} values`);
-    } else if (hasNoValuesMessage) {
-      testLogger.info('✓ No values found message shown (acceptable - no data)');
-    } else {
-      testLogger.warn(`⚠ Field values UI may still be loading - content: ${contentText.substring(0, 100)}`);
-      testLogger.info('Primary check (no 400 error) passed - this is the critical validation for bug #7751');
-    }
+    expect(valueCount).toBeGreaterThanOrEqual(1);
+    testLogger.info(`✓ TERTIARY CHECK PASSED: ${valueCount} field value(s) displayed in dropdown`);
   });
 
   test('should load field values with CTE (Common Table Expression) without 400 error @bug-7751 @P1 @regression', async ({ page }) => {
@@ -312,26 +324,24 @@ test.describe("Logs Regression Bugs", () => {
 
     // Select stream
     await pm.logsPage.selectStream('e2e_automate');
-    await page.waitForTimeout(2000);
 
-    // Enable SQL mode
-    testLogger.info('Enabling SQL mode');
-    await pm.logsPage.clickSQLModeToggle();
-    await page.waitForTimeout(1000);
+    // Set date/time range
+    await pm.logsPage.clickDateTimeButton();
+    await pm.logsPage.clickRelative15MinButton();
 
-    // Enter CTE query
-    const cteQuery = 'WITH filtered_logs AS (SELECT * FROM "e2e_automate" WHERE kubernetes_pod_name IS NOT NULL LIMIT 100) SELECT * FROM filtered_logs';
+    // Enter CTE query (no clear, just type)
+    const cteQuery = 'WITH filtered_logs AS (SELECT * FROM "e2e_automate" WHERE kubernetes_pod_name IS NOT NULL LIMIT 10) SELECT * FROM filtered_logs';
     testLogger.info(`Entering CTE query: ${cteQuery}`);
-    await pm.logsPage.fillQueryEditor(cteQuery);
+    await pm.logsPage.clickQueryEditor();
+    await pm.logsPage.typeInQueryEditor(cteQuery);
+    await pm.logsPage.waitForTimeout(500);
 
     // Run query
     testLogger.info('Running query');
     await pm.logsPage.clickRefreshButton();
-    await page.waitForTimeout(3000);
 
-    // Verify query results loaded
-    const resultsVisible = await page.locator(pm.logsPage.logsSearchResultLogsTable).isVisible();
-    expect(resultsVisible).toBeTruthy();
+    // Wait for results table to load
+    await pm.logsPage.expectLogTableColumnSourceVisible();
     testLogger.info('Query results loaded successfully');
 
     // Expand field to trigger values API
@@ -340,13 +350,35 @@ test.describe("Logs Regression Bugs", () => {
     // Search for the field first to make it visible in sidebar
     testLogger.info(`Searching for field: ${fieldToExpand}`);
     await pm.logsPage.fillIndexFieldSearchInput(fieldToExpand);
-    await page.waitForTimeout(500);
 
     const expandButton = page.locator(pm.logsPage.fieldExpandButton(fieldToExpand));
 
     testLogger.info(`Expanding field: ${fieldToExpand}`);
     await expandButton.waitFor({ state: 'visible', timeout: 10000 });
+
+    // Set up values API response waiter BEFORE clicking expand
+    testLogger.info('Setting up values API listener');
+    const valuesApiResponse = page.waitForResponse(
+      response => response.url().includes('/_values') && response.status() !== 0,
+      { timeout: 20000 }
+    );
+
+    testLogger.info('Clicking expand to trigger values API call');
     await expandButton.click();
+
+    // Wait for values API response
+    let apiResponse;
+    try {
+      apiResponse = await valuesApiResponse;
+      testLogger.info(`✓ Values API responded with status: ${apiResponse.status()}`);
+
+      // PRIMARY ASSERTION: Values API should NOT return 400 (this was the bug #7751)
+      expect(apiResponse.status()).not.toBe(400);
+      testLogger.info('✓ PRIMARY CHECK PASSED: Values API did not return 400 error');
+    } catch (error) {
+      testLogger.warn(`Values API response timeout or error: ${error.message}`);
+      // If API times out, we'll still check the UI for 400 errors below
+    }
 
     // Wait for field expansion content to be visible (values or error message)
     const fieldExpansionContent = page.locator(pm.logsPage.fieldListItem(fieldToExpand));
@@ -359,28 +391,20 @@ test.describe("Logs Regression Bugs", () => {
       testLogger.debug(`Could not read field expansion content: ${error.message}`);
     }
 
-    // Primary assertion: NO 400 error (this was the bug)
+    // Secondary assertion: NO 400 error in UI
     expect(contentText).not.toContain('400');
     expect(contentText.toLowerCase()).not.toMatch(/error.*400|400.*error/);
-    testLogger.info('✓ PRIMARY CHECK PASSED: No 400 error displayed');
+    testLogger.info('✓ SECONDARY CHECK PASSED: No 400 error displayed in UI');
 
-    // Secondary check: Field values loaded or acceptable message shown
-    const fieldValues = page.locator(pm.logsPage.subfieldAddButton(fieldToExpand));
+    // TERTIARY ASSERTION: Verify field values actually appear in dropdown
+    // Wait for at least one field value to load (proves dropdown populated successfully)
+    const firstFieldValue = page.locator(`[data-test^="logs-search-subfield-add-${fieldToExpand}-"]`).first();
+    await firstFieldValue.waitFor({ state: 'visible', timeout: 5000 });
+
+    const fieldValues = page.locator(`[data-test^="logs-search-subfield-add-${fieldToExpand}-"]`);
     const valueCount = await fieldValues.count();
-
-    // Note: Field values may not load if there's no data or if UI is still loading
-    // The primary check (no 400 error) is the critical assertion for this bug
-    const hasValues = valueCount > 0;
-    const hasNoValuesMessage = contentText.includes('No values found');
-
-    if (hasValues) {
-      testLogger.info(`✓ Field values displayed: ${valueCount} values`);
-    } else if (hasNoValuesMessage) {
-      testLogger.info('✓ No values found message shown (acceptable - no data)');
-    } else {
-      testLogger.warn(`⚠ Field values UI may still be loading - content: ${contentText.substring(0, 100)}`);
-      testLogger.info('Primary check (no 400 error) passed - this is the critical validation for bug #7751');
-    }
+    expect(valueCount).toBeGreaterThanOrEqual(1);
+    testLogger.info(`✓ TERTIARY CHECK PASSED: ${valueCount} field value(s) displayed in dropdown`);
   });
 
   test('should load field values with GROUP BY aggregation without 400 error @bug-7751 @P1 @regression', async ({ page }) => {
@@ -391,26 +415,24 @@ test.describe("Logs Regression Bugs", () => {
 
     // Select stream
     await pm.logsPage.selectStream('e2e_automate');
-    await page.waitForTimeout(2000);
 
-    // Enable SQL mode
-    testLogger.info('Enabling SQL mode');
-    await pm.logsPage.clickSQLModeToggle();
-    await page.waitForTimeout(1000);
+    // Set date/time range
+    await pm.logsPage.clickDateTimeButton();
+    await pm.logsPage.clickRelative15MinButton();
 
-    // Enter aggregation query
-    const aggQuery = 'SELECT kubernetes_pod_name, count(*) as total FROM "e2e_automate" WHERE kubernetes_pod_name IS NOT NULL GROUP BY kubernetes_pod_name LIMIT 50';
+    // Enter aggregation query (no clear, just type)
+    const aggQuery = 'SELECT kubernetes_pod_name, count(*) as total FROM "e2e_automate" WHERE kubernetes_pod_name IS NOT NULL GROUP BY kubernetes_pod_name LIMIT 10';
     testLogger.info(`Entering aggregation query: ${aggQuery}`);
-    await pm.logsPage.fillQueryEditor(aggQuery);
+    await pm.logsPage.clickQueryEditor();
+    await pm.logsPage.typeInQueryEditor(aggQuery);
+    await pm.logsPage.waitForTimeout(500);
 
     // Run query
     testLogger.info('Running query');
     await pm.logsPage.clickRefreshButton();
-    await page.waitForTimeout(3000);
 
-    // Verify query results loaded
-    const resultsVisible = await page.locator(pm.logsPage.logsSearchResultLogsTable).isVisible();
-    expect(resultsVisible).toBeTruthy();
+    // Wait for results table to load
+    await pm.logsPage.expectLogTableColumnSourceVisible();
     testLogger.info('Query results loaded successfully');
 
     // Expand field to trigger values API
@@ -419,13 +441,35 @@ test.describe("Logs Regression Bugs", () => {
     // Search for the field first to make it visible in sidebar
     testLogger.info(`Searching for field: ${fieldToExpand}`);
     await pm.logsPage.fillIndexFieldSearchInput(fieldToExpand);
-    await page.waitForTimeout(500);
 
     const expandButton = page.locator(pm.logsPage.fieldExpandButton(fieldToExpand));
 
     testLogger.info(`Expanding field: ${fieldToExpand}`);
     await expandButton.waitFor({ state: 'visible', timeout: 10000 });
+
+    // Set up values API response waiter BEFORE clicking expand
+    testLogger.info('Setting up values API listener');
+    const valuesApiResponse = page.waitForResponse(
+      response => response.url().includes('/_values') && response.status() !== 0,
+      { timeout: 20000 }
+    );
+
+    testLogger.info('Clicking expand to trigger values API call');
     await expandButton.click();
+
+    // Wait for values API response
+    let apiResponse;
+    try {
+      apiResponse = await valuesApiResponse;
+      testLogger.info(`✓ Values API responded with status: ${apiResponse.status()}`);
+
+      // PRIMARY ASSERTION: Values API should NOT return 400 (this was the bug #7751)
+      expect(apiResponse.status()).not.toBe(400);
+      testLogger.info('✓ PRIMARY CHECK PASSED: Values API did not return 400 error');
+    } catch (error) {
+      testLogger.warn(`Values API response timeout or error: ${error.message}`);
+      // If API times out, we'll still check the UI for 400 errors below
+    }
 
     // Wait for field expansion content to be visible (values or error message)
     const fieldExpansionContent = page.locator(pm.logsPage.fieldListItem(fieldToExpand));
@@ -438,28 +482,20 @@ test.describe("Logs Regression Bugs", () => {
       testLogger.debug(`Could not read field expansion content: ${error.message}`);
     }
 
-    // Primary assertion: NO 400 error (this was the bug)
+    // Secondary assertion: NO 400 error in UI
     expect(contentText).not.toContain('400');
     expect(contentText.toLowerCase()).not.toMatch(/error.*400|400.*error/);
-    testLogger.info('✓ PRIMARY CHECK PASSED: No 400 error displayed');
+    testLogger.info('✓ SECONDARY CHECK PASSED: No 400 error displayed in UI');
 
-    // Secondary check: Field values loaded or acceptable message shown
-    const fieldValues = page.locator(pm.logsPage.subfieldAddButton(fieldToExpand));
+    // TERTIARY ASSERTION: Verify field values actually appear in dropdown
+    // Wait for at least one field value to load (proves dropdown populated successfully)
+    const firstFieldValue = page.locator(`[data-test^="logs-search-subfield-add-${fieldToExpand}-"]`).first();
+    await firstFieldValue.waitFor({ state: 'visible', timeout: 5000 });
+
+    const fieldValues = page.locator(`[data-test^="logs-search-subfield-add-${fieldToExpand}-"]`);
     const valueCount = await fieldValues.count();
-
-    // Note: Field values may not load if there's no data or if UI is still loading
-    // The primary check (no 400 error) is the critical assertion for this bug
-    const hasValues = valueCount > 0;
-    const hasNoValuesMessage = contentText.includes('No values found');
-
-    if (hasValues) {
-      testLogger.info(`✓ Field values displayed: ${valueCount} values`);
-    } else if (hasNoValuesMessage) {
-      testLogger.info('✓ No values found message shown (acceptable - no data)');
-    } else {
-      testLogger.warn(`⚠ Field values UI may still be loading - content: ${contentText.substring(0, 100)}`);
-      testLogger.info('Primary check (no 400 error) passed - this is the critical validation for bug #7751');
-    }
+    expect(valueCount).toBeGreaterThanOrEqual(1);
+    testLogger.info(`✓ TERTIARY CHECK PASSED: ${valueCount} field value(s) displayed in dropdown`);
   });
 
   /**
