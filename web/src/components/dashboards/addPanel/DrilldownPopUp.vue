@@ -412,6 +412,9 @@ export default defineComponent({
     const { dashboardPanelData } = useDashboardPanelData(
       dashboardPanelDataPageKey
     );
+
+    // Inject variablesManager to access all dashboard variables
+    const variablesManager = inject<any>("variablesManager", null);
     
     const getDefaultDrilldownData = () => ({
       name: "",
@@ -668,13 +671,36 @@ export default defineComponent({
     //want label for dropdown in input and value for its input value
     const selectedValue = computed(() => {
       let selectedValues: any = [];
-      const variableListName =
-        props?.variablesData?.values
-          ?.filter((variable: any) => variable.type !== "dynamic_filters")
-          ?.map((variable: any) => ({
-            label: variable.name,
-            value: "${" + variable.name + "}",
-          })) ?? [];
+
+      // Get all dashboard variables (global, tabs, and panels) from variablesManager
+      // If manager is not available, fall back to props.variablesData
+      let allVariables: any[] = [];
+
+      if (variablesManager && variablesManager.variablesData) {
+        // Collect all variables from all scopes
+        const globalVars = variablesManager.variablesData.global || [];
+        const tabVars = Object.values(variablesManager.variablesData.tabs || {}).flat();
+        const panelVars = Object.values(variablesManager.variablesData.panels || {}).flat();
+
+        // Combine all variables and remove duplicates by name
+        const allVarsMap = new Map();
+        [...globalVars, ...tabVars, ...panelVars].forEach((variable: any) => {
+          if (!allVarsMap.has(variable.name)) {
+            allVarsMap.set(variable.name, variable);
+          }
+        });
+        allVariables = Array.from(allVarsMap.values());
+      } else {
+        // Fallback to props.variablesData
+        allVariables = props?.variablesData?.values || [];
+      }
+
+      const variableListName = allVariables
+        ?.filter((variable: any) => variable.type !== "dynamic_filters")
+        ?.map((variable: any) => ({
+          label: variable.name,
+          value: "${" + variable.name + "}",
+        })) ?? [];
 
       if (dashboardPanelData.data.type === "sankey") {
         selectedValues = [
