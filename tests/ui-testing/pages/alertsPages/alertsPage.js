@@ -68,6 +68,13 @@ export class AlertsPage {
         this.alertDeleteOption = 'Delete';
         this.alertDeletedMessage = 'Alert deleted';
 
+        // Alert graph/chart locators (for regression test Bug #9311)
+        this.alertGraph = '[data-test="alert-graph"]';
+        this.alertChart = '.alert-chart';
+
+        // Table locators
+        this.tableBodyRowWithIndex = 'tbody tr[data-index]';
+
         // Store the generated folder name and alert name
         this.currentFolderName = '';
         this.currentAlertName = '';
