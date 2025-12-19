@@ -91,8 +91,7 @@ const handleSummaryClick = (event: MouseEvent) => {
 
 .summary-text {
   margin: 0;
-  white-space: pre-wrap;
-  word-wrap: break-word;
+  white-space: pre-line;
   letter-spacing: 0.03em;
 
   // Styles for bold section labels (using :deep for v-html content with markdown **text**)
@@ -107,9 +106,9 @@ const handleSummaryClick = (event: MouseEvent) => {
     cursor: pointer;
     color: var(--q-primary);
     font-weight: 600;
-    padding: 0.25rem 0.625rem;
-    margin: 0 0.1875rem;
-    border-radius: 0.375rem;
+    padding: 0.125rem 0.375rem;
+    margin: 0 0.125rem;
+    border-radius: 0.25rem;
     background: linear-gradient(
       135deg,
       color-mix(in srgb, var(--q-primary) 8%, transparent),
@@ -119,10 +118,9 @@ const handleSummaryClick = (event: MouseEvent) => {
     display: inline;
     position: relative;
     box-shadow: 0 0 0 0.0625rem color-mix(in srgb, var(--q-primary) 15%, transparent);
-    line-height: 1.4;
+    line-height: 1.6;
     vertical-align: baseline;
-    white-space: normal;
-    word-break: break-word;
+    white-space: nowrap;
 
     &:hover {
       background: linear-gradient(
