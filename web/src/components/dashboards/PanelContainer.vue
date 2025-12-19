@@ -1055,7 +1055,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .panelcontainer {
-  height: calc(100% - 24px);
+  height: 100%;
   display: flex;
   flex-direction: column;
 }
