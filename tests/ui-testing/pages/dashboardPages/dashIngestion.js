@@ -2,6 +2,7 @@
 import logsdata from "../../test-data/logs_data.json";
 import geoMapdata from "../../test-data/geo_map.json";
 import dashboardChartJsonData from "../../test-data/dashboard_chart_json.json";
+// Using require() for testLogger as it exports via module.exports (CommonJS)
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 // Exported function to remove UTF characters
@@ -42,8 +43,9 @@ const ingestData = async (streamName, data, errorContext = "Ingestion") => {
     );
 
     if (!fetchResponse.ok) {
+      const responseText = await fetchResponse.text().catch(() => 'Unable to read response');
       throw new Error(
-        `HTTP error! status: ${fetchResponse.status}, response: ${fetchResponse}`
+        `HTTP error! status: ${fetchResponse.status}, response: ${responseText}`
       );
     }
 

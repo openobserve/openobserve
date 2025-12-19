@@ -1,4 +1,4 @@
-// dashboardlogin.js   
+// dashLogin.js
 export const login = async (page) => {  
     await page.goto(process.env["ZO_BASE_URL"], { waitUntil: "networkidle" });
     
@@ -25,6 +25,4 @@ export const login = async (page) => {
     await page.waitForURL(process.env["ZO_BASE_URL"] + "/web/", {
       waitUntil: "networkidle",
     });
-    
   }
-    

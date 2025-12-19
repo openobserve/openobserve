@@ -120,7 +120,10 @@ export default class DashboardactionPage {
     let dataRowCount = 0;
     for (let i = 0; i < totalRows; i++) {
       const firstCell = rows.nth(i).locator('td').first();
-      const cellText = await firstCell.textContent().catch(() => '');
+      const cellText = await firstCell.textContent().catch((err) => {
+        // Cell may be detached or empty - return empty string to skip counting
+        return '';
+      });
       if (cellText && cellText.trim() !== '') {
         dataRowCount++;
       }
