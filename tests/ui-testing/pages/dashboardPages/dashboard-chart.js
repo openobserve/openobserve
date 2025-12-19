@@ -215,7 +215,8 @@ export default class ChartTypeSelector {
     await this.page.keyboard.type(functionName);
     await this.page.waitForTimeout(500);
 
-    const option = this.page.getByRole("option", { name: functionName, exact: false }).first();
+    // Use case-insensitive contains match - filtering by typing already narrows options
+    const option = this.page.getByRole("option", { name: new RegExp(functionName, 'i') }).first();
     await option.waitFor({ state: "visible", timeout: 10000 });
     await option.click();
     await this.page.waitForTimeout(500);

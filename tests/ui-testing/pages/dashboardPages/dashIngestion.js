@@ -18,8 +18,8 @@ const getAuthToken = async () => {
   return `Basic ${basicAuthCredentials}`;
 };
 
-// page is passed here to access the page object (currently not used)
-export const ingestion = async (page, streamName = "e2e_automate") => {
+// Common ingestion helper - extracts shared logic for all ingestion functions
+const ingestData = async (streamName, data, errorContext = "Ingestion") => {
   if (!process.env["ORGNAME"] || !process.env["INGESTION_URL"]) {
     throw new Error("Required environment variables are not set");
   }
@@ -37,7 +37,7 @@ export const ingestion = async (page, streamName = "e2e_automate") => {
       {
         method: "POST",
         headers,
-        body: JSON.stringify(logsdata),
+        body: JSON.stringify(data),
       }
     );
 
@@ -49,83 +49,24 @@ export const ingestion = async (page, streamName = "e2e_automate") => {
 
     return await fetchResponse.json();
   } catch (error) {
-    testLogger.error("Ingestion failed", { error });
+    testLogger.error(`${errorContext} failed`, { error });
     throw error;
   }
 };
 
-// Dashboard maps ingestion
+// page is passed here to access the page object (currently not used)
+export const ingestion = async (page, streamName = "e2e_automate") => {
+  return ingestData(streamName, logsdata, "Ingestion");
+};
 
 // Ingestion function for Geomap and Maps chart
 const ingestionForMaps = async (page, streamName = "geojson") => {
-  if (!process.env["ORGNAME"] || !process.env["INGESTION_URL"]) {
-    throw new Error("Required environment variables are not set");
-  }
-
-  const orgId = process.env["ORGNAME"];
-
-  try {
-    const headers = {
-      "Content-Type": "application/json",
-      Authorization: await getAuthToken(),
-    };
-
-    const fetchResponse = await fetch(
-      `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
-      {
-        method: "POST",
-        headers,
-        body: JSON.stringify(geoMapdata),
-      }
-    );
-
-    if (!fetchResponse.ok) {
-      throw new Error(
-        `HTTP error! status: ${fetchResponse.status}, response: ${fetchResponse}`
-      );
-    }
-
-    return await fetchResponse.json();
-  } catch (error) {
-    testLogger.error("Ingestion failed", { error });
-    throw error;
-  }
+  return ingestData(streamName, geoMapdata, "Maps ingestion");
 };
 
 // Ingestion function for Dashboard Chart JSON data
 const ingestionForDashboardChartJson = async (page, streamName = "kubernetes") => {
-  if (!process.env["ORGNAME"] || !process.env["INGESTION_URL"]) {
-    throw new Error("Required environment variables are not set");
-  }
-
-  const orgId = process.env["ORGNAME"];
-
-  try {
-    const headers = {
-      "Content-Type": "application/json",
-      Authorization: await getAuthToken(),
-    };
-
-    const fetchResponse = await fetch(
-      `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
-      {
-        method: "POST",
-        headers,
-        body: JSON.stringify(dashboardChartJsonData),
-      }
-    );
-
-    if (!fetchResponse.ok) {
-      throw new Error(
-        `HTTP error! status: ${fetchResponse.status}, response: ${fetchResponse}`
-      );
-    }
-
-    return await fetchResponse.json();
-  } catch (error) {
-    testLogger.error("Dashboard Chart JSON ingestion failed", { error });
-    throw error;
-  }
+  return ingestData(streamName, dashboardChartJsonData, "Dashboard Chart JSON ingestion");
 };
 
 // Export only the required functions

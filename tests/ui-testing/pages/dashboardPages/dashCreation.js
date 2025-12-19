@@ -1,6 +1,6 @@
 import { expect } from "playwright/test";
 import logData from "../../fixtures/log.json";
-import testLogger from '../../playwright-tests/utils/test-logger.js';
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 // Function to wait for the dashboard page to load
 export const waitForDashboardPage = async function (page) {
@@ -63,7 +63,7 @@ export async function deleteDashboard(page, dashboardName) {
   testLogger.info('Deleting dashboard', { dashboardName });
 
   // Wait for page to be fully loaded
-// ✅ Wait for either the Dashboard API or Folder API (whichever comes first)
+  // Wait for either the Dashboard API or Folder API (whichever comes first)
   await Promise.race([
     page.waitForResponse(
       (response) => {

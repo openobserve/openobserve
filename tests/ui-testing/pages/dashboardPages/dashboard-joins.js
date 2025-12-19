@@ -6,6 +6,8 @@
  * configurable join conditions.
  */
 
+const testLogger = require("../../playwright-tests/utils/test-logger.js");
+
 /**
  * Helper class for join operations in dashboard panel builder
  */
@@ -327,7 +329,10 @@ export async function getTableRowCount(page) {
   let dataRowCount = 0;
   for (let i = 0; i < totalRows; i++) {
     const firstCell = rows.nth(i).locator('td').first();
-    const cellText = await firstCell.textContent().catch(() => '');
+    const cellText = await firstCell.textContent().catch((err) => {
+      testLogger.debug(`Could not get cell text: ${err.message}`);
+      return '';
+    });
     if (cellText && cellText.trim() !== '') {
       dataRowCount++;
     }
