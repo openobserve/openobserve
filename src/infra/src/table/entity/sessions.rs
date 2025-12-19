@@ -26,6 +26,7 @@ pub struct Model {
     pub access_token: String,
     pub created_at: i64,
     pub updated_at: i64,
+    pub expires_at: i64,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
