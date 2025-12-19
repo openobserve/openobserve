@@ -16,6 +16,7 @@ class EnrichmentPage {
         // Navigation locators
         this.pipelineMenuItem = '[data-test="menu-link-\\/pipeline-item"]';
         this.enrichmentTableTab = '[data-test="function-enrichment-table-tab"]';
+        this.enrichmentTablesSearchInput = '[data-test="enrichment-tables-search-input"]';
         
         // Logs table locators
         this.timestampColumn = '[data-test="log-table-column-0-_timestamp"]';
