@@ -1001,7 +1001,11 @@
     "colorBySeriesTitle": "Farbe nach Serie",
     "colorBySeriesTooltip": "Wenden Sie Farben auf Reihen an, um die visuelle Unterscheidung in Diagrammen zu verbessern. Passen Sie die Farben für jede Reihe an, um die Datenvisualisierung zu verbessern.",
     "editColorBySeries": " Farbe nach Serie bearbeiten",
-    "applyColorBySeries": " Farbe reihenweise auftragen"
+    "applyColorBySeries": " Farbe reihenweise auftragen",
+    "showAllLegends": "Zeige alle Legenden",
+    "legendsOfCharts": "Legenden der Charts",
+    "totalLegends": "Summe: {count}",
+    "noLegendsAvailable": "Keine Legenden verfügbar"
   },
   "panel": {
     "header": "Panel",
@@ -1945,7 +1949,8 @@
     "period": "Zeitraum",
     "cron": "Cron",
     "type": "Typ",
-    "run_pipeline": "Pipeline ausführen"
+    "run_pipeline": "Pipeline ausführen",
+    "showLegends": "Legends anzeigen"
   },
   "alert_list": {
     "alert_details": "Details zur Warnung"
