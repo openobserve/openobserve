@@ -621,7 +621,10 @@
     "transformType": "Type de transformation",
     "vrlType": "VRL (langage de remappage vectoriel)",
     "jsType": "JavaScript (ES 2023)",
-    "vrlfunction": "Fonction VRL"
+    "vrlfunction": "Fonction VRL",
+    "javascript": "JavaScript",
+    "jsFunctionHint": "Utilisez l'objet row pour accéder aux champs du journal et les modifier. Exemple : row.new_field = row.existing_field + « traité » ;",
+    "vrlFunctionHint": "Utilisez le «. » pour représenter l'événement en cours. Exemple : .new_field = .existing_field + « traité »"
   },
   "confirmDialog": {
     "cancel": "Annuler",

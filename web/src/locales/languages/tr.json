@@ -621,7 +621,10 @@
     "transformType": "Dönüştürme Türü",
     "vrlType": "VRL (Vektör Yeniden Eşleme Dili)",
     "jsType": "JavaScript (ES2023)",
-    "vrlfunction": "VRL Fonksiyonu"
+    "vrlfunction": "VRL Fonksiyonu",
+    "javascript": "JavaScript",
+    "jsFunctionHint": "Günlük alanlarına erişmek ve değiştirmek için `row` nesnesini kullanın. Örnek: Row.new_field = Row.existing_field + 'processed';",
+    "vrlFunctionHint": "Geçerli olayı temsil etmek için `.` tuşunu kullanın. Örnek: .new_field = .existing_field + 'işlenmiş'"
   },
   "confirmDialog": {
     "cancel": "İptal",
