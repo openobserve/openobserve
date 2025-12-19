@@ -199,7 +199,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   :dashboardName="dashboardName"
                   :folderName="folderName"
-                  :panelVariablesConfig="getPanelVariablesConfig(item.id)"
                   @updated:data-zoom="$emit('updated:data-zoom', $event)"
                   @onMovePanel="onMovePanel"
                   @refreshPanelRequest="refreshPanelRequest"
@@ -496,50 +495,6 @@ export default defineComponent({
 
     // Helper to get LIVE (uncommitted) variables for a panel
     // Used for detecting changes and showing yellow refresh icon
-    const getLiveVariablesForPanel = () => {
-      if (!variablesManager) {
-        // Legacy mode: use variablesData ref
-        return variablesData.value;
-      }
-
-      // Get live variables for the selected tab
-      // This allows panel to detect uncommitted changes
-      const liveVars = variablesManager.getVariablesForPanel(
-        "",
-        selectedTabId.value,
-      );
-
-      // Convert to old format for backward compatibility
-      return {
-        isVariablesLoading: variablesManager.isLoading.value,
-        values: liveVars,
-      };
-    };
-
-    // Helper to get LIVE (uncommitted) variables for a panel
-    // Used for detecting changes and showing yellow refresh icon
-    const getLiveVariablesForPanel = () => {
-      if (!variablesManager) {
-        // Legacy mode: use variablesData ref
-        return variablesData.value;
-      }
-
-      // Get live variables for the selected tab
-      // This allows panel to detect uncommitted changes
-      const liveVars = variablesManager.getVariablesForPanel(
-        "",
-        selectedTabId.value,
-      );
-
-      // Convert to old format for backward compatibility
-      return {
-        isVariablesLoading: variablesManager.isLoading.value,
-        values: liveVars,
-      };
-    };
-
-    // Helper to get LIVE (uncommitted) variables for a panel
-    // Used for detecting changes and showing yellow refresh icon
     const getLiveVariablesForPanel = (panelId: string) => {
       if (!variablesManager) {
         // Legacy mode: use variablesData ref
@@ -708,6 +663,7 @@ export default defineComponent({
     });
 
     let needsVariablesAutoUpdate = true;
+
     const variablesDataUpdated = (data: any) => {
       try {
         // Update the live variables data (immediate UI state)
@@ -733,6 +689,7 @@ export default defineComponent({
         return;
       }
     };
+
     // ======= [END] dashboard PrintMode =======
 
     const hoveredSeriesState = ref({

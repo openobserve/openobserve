@@ -24,11 +24,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :key="item.name + index"
       :data-test="`dashboard-variable-${item.name}-container`"
     >
-      <!-- State indicators for testing -->
-      <div v-if="item.isLoading" :data-test="`${props.panelId ? 'panel-' + props.panelId + '-' : ''}variable-${item.name}-loading`" style="display:none"></div>
-      <div v-if="!item.isLoading && item.isVariablePartialLoaded" :data-test="`${props.panelId ? 'panel-' + props.panelId + '-' : ''}variable-${item.name}-loaded`" style="display:none"></div>
-      <div :data-test="`${props.panelId ? 'panel-' + props.panelId + '-' : ''}variable-${item.name}-value`" style="display:none">{{ item.value }}</div>
-
       <div v-if="item.type == 'query_values'">
         <VariableQueryValueSelector
           class="q-mr-lg q-mt-xs"
@@ -91,18 +86,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <!-- Add Variable Button -->
-    <div v-if="showAddVariableButton" class="q-ml-xs q-mt-sm">
-      <q-btn
-        outline
-        no-caps
-        icon="add"
-        label="Add Variable"
-        color="primary"
-        size="md"
-        class="el-border"
-        @click="openAddVariable"
-        data-test="dashboard-add-variable-btn"
-      />
+      <div v-if="showAddVariableButton" class="q-ml-xs q-mt-sm">
+        <q-btn
+          outline
+          no-caps
+          icon="add"
+          label="Add Variable"
+          color="primary"
+          size="md"
+          class="el-border"
+          @click="openAddVariable"
+          data-test="dashboard-add-variable-btn"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -190,9 +186,9 @@ export default defineComponent({
     VariableCustomValueSelector,
   },
   setup(props: any, { emit }) {
-    const store = useStore();    
+    const store = useStore();
     // Try to inject variablesManager from parent (for backward compatibility)
-  
+
     // Try to inject variablesManager from parent (for backward compatibility)
     const injectedManager = inject<any>("variablesManager", undefined);
     const manager = props.variablesManager || injectedManager;
@@ -209,7 +205,8 @@ export default defineComponent({
       // If showAllVisible is true, return all visible variables for this context
       // This includes global + tab + panel variables
       if (props.showAllVisible) {
-        variables = manager.getAllVisibleVariables(props.tabId, props.panelId) || [];
+        variables =
+          manager.getAllVisibleVariables(props.tabId, props.panelId) || [];
       } else {
         // Otherwise, return only variables from the specified scope
         const scopeKey = props.scope;
@@ -224,8 +221,12 @@ export default defineComponent({
       }
 
       // Sort: dynamic filters should always appear at the end
-      const dynamicFilters = variables.filter(v => v.type === 'dynamic_filters');
-      const otherVariables = variables.filter(v => v.type !== 'dynamic_filters');
+      const dynamicFilters = variables.filter(
+        (v) => v.type === "dynamic_filters",
+      );
+      const otherVariables = variables.filter(
+        (v) => v.type !== "dynamic_filters",
+      );
 
       return [...otherVariables, ...dynamicFilters];
     });
@@ -583,7 +584,6 @@ export default defineComponent({
                 }
               }
             }
-
           }
         }
       } catch (error) {
@@ -723,14 +723,6 @@ export default defineComponent({
 
       // make list of variables using variables config list
       // set initial variables values from props
-      console.log("[VariablesValueSelector] initializeVariablesData:", {
-        propsInitialVariableValues: props.initialVariableValues,
-        valueObject: props.initialVariableValues?.value,
-        valueKeys: props.initialVariableValues?.value
-          ? Object.keys(props.initialVariableValues.value)
-          : [],
-      });
-
       props?.variablesConfig?.list?.forEach((item: any) => {
         let initialValue =
           item.type == "dynamic_filters"
@@ -1603,7 +1595,6 @@ export default defineComponent({
       const variable = variablesData.values[index];
       if (!variable) return;
 
-
       // Mark as loading
       variable.isLoading = true;
       variable.isVariableLoadingPending = false;
@@ -1632,7 +1623,6 @@ export default defineComponent({
           variable.isVariableLoadingPending === true &&
           variable.isLoading !== true
         ) {
-
           // Fire the API call for this variable
           loadDependentVariable(index);
         }
@@ -1853,7 +1843,7 @@ export default defineComponent({
             } else {
               // If no valid old values, use first non-blank option
               const firstNonBlank = newOptions.find(
-                (opt: any) => opt.value !== "" && opt.label !== "<blank>"
+                (opt: any) => opt.value !== "" && opt.label !== "<blank>",
               );
               variableObject.value = variableObject.multiSelect
                 ? firstNonBlank
@@ -1874,7 +1864,7 @@ export default defineComponent({
         } else {
           // Set default value to the first non-blank option if no old values are available
           const firstNonBlank = newOptions.find(
-            (opt: any) => opt.value !== "" && opt.label !== "<blank>"
+            (opt: any) => opt.value !== "" && opt.label !== "<blank>",
           );
           variableObject.value = variableObject.multiSelect
             ? firstNonBlank
@@ -2025,9 +2015,7 @@ export default defineComponent({
       }
 
       try {
-        
-
-          await loadSingleVariableDataByName(variableObject);
+        await loadSingleVariableDataByName(variableObject);
       } catch (error) {
         variableLog(
           variableObject.name,
@@ -2430,7 +2418,6 @@ export default defineComponent({
       loadVariableOptions,
       onVariableSearch,
       cancelAllVariableOperations,
-      openAddVariable,
     };
   },
 });
