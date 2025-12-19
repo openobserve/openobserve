@@ -1,6 +1,32 @@
 @import "tailwindcss" prefix(tw);
 
-@plugin "@tailwindcss/typography";
+@layer base {
+  h5 {
+    font-size: 1.5rem;
+    font-weight: 400;
+    line-height: 2rem;
+    letter-spacing: normal;
+    margin: revert;
+  }
+
+  h6 {
+    font-size: 1.25rem;
+    font-weight: 500;
+    line-height: 2rem;
+    letter-spacing: 0.0125em;
+    margin: revert;
+  }
+  .q-menu .q-item .q-item__label{
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    width: auto;
+  }
+  /* ... */
+}
+
+
+/* @plugin "@tailwindcss/typography"; */
 
 /* @theme {
   --color-primary: rgb(var(--q-primary));
@@ -21,7 +47,7 @@
     border-color: var(--color-gray-200, currentcolor);
   }
 } */
-
+/* 
 h5 {
   font-size: 1.5rem;
   font-weight: 400;
