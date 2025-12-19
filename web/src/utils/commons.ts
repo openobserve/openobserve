@@ -244,6 +244,7 @@ export const addPanel = async (
   folderId: any,
   tabId: any,
   variablesToUpdate?: { variableNames: string[], newPanelId: string },
+  newVariables?: any[],
 ) => {
   try {
     // get the object of panel data
@@ -251,6 +252,29 @@ export const addPanel = async (
     // call the update dashboard function
 
     const currentDashboard = await getDashboard(store, dashboardId, folderId);
+
+    // Add new variables first (from Add Panel session)
+    if (newVariables && newVariables.length > 0) {
+      if (!currentDashboard.variables) {
+        currentDashboard.variables = { list: [] };
+      }
+      if (!currentDashboard.variables.list) {
+        currentDashboard.variables.list = [];
+      }
+
+      newVariables.forEach((v: any) => {
+        // Check for duplicates
+        const index = currentDashboard.variables.list.findIndex(
+          (existing: any) => existing.name === v.name,
+        );
+        if (index === -1) {
+          currentDashboard.variables.list.push(v);
+        } else {
+          // If it exists, overwrite it (in case it was updated)
+          currentDashboard.variables.list[index] = v;
+        }
+      });
+    }
 
     // Update variables if needed (for variables created from Add Panel that use "current_panel")
     if (variablesToUpdate && variablesToUpdate.variableNames.length > 0) {
