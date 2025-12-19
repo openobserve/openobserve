@@ -75,7 +75,9 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
             }
             1 => {
                 // JS function
-                if let Err(e) = crate::service::ingestion::compile_js_function(func.function.as_str(), &org_id) {
+                if let Err(e) =
+                    crate::service::ingestion::compile_js_function(func.function.as_str(), &org_id)
+                {
                     return Ok(HttpResponse::BadRequest()
                         .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
                 }
@@ -109,19 +111,21 @@ pub async fn test_run_function(
     trans_type: Option<u8>,
 ) -> Result<HttpResponse, anyhow::Error> {
     // Auto-detect transform type if not provided
-    let trans_type = trans_type.or_else(|| {
-        // Simple heuristic: if function contains VRL-specific syntax, assume VRL
-        // Otherwise, assume JS
-        if function.contains('!')
-            || function.trim().starts_with('.')
-            || function.contains("parse_")
-            || RESULT_ARRAY.is_match(&function)
-        {
-            Some(0) // VRL
-        } else {
-            Some(1) // JS
-        }
-    }).unwrap_or(0); // Default to VRL for backward compatibility
+    let trans_type = trans_type
+        .or_else(|| {
+            // Simple heuristic: if function contains VRL-specific syntax, assume VRL
+            // Otherwise, assume JS
+            if function.contains('!')
+                || function.trim().starts_with('.')
+                || function.contains("parse_")
+                || RESULT_ARRAY.is_match(&function)
+            {
+                Some(0) // VRL
+            } else {
+                Some(1) // JS
+            }
+        })
+        .unwrap_or(0); // Default to VRL for backward compatibility
 
     match trans_type {
         0 => test_run_vrl_function(org_id, function, events).await,
@@ -460,7 +464,11 @@ fn extract_num_args(func: &mut Transform) {
     if params.trim().is_empty() {
         func.num_args = 0;
     } else {
-        func.num_args = params.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).count() as u8;
+        func.num_args = params
+            .split(',')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .count() as u8;
     }
 }
 
@@ -537,7 +545,9 @@ mod tests {
             "original_field": "original_value"
         })];
 
-        let response = test_run_function(org_id, function, events, Some(0)).await.unwrap(); // VRL function
+        let response = test_run_function(org_id, function, events, Some(0))
+            .await
+            .unwrap(); // VRL function
         assert_eq!(response.status(), http::StatusCode::OK);
 
         let body: TestVRLResponse =

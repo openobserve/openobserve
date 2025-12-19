@@ -67,6 +67,9 @@ impl Transform {
     pub fn is_result_array_skip_vrl(&self) -> bool {
         self.is_vrl() && RESULT_ARRAY_SKIP_VRL.is_match(&self.function)
     }
+    pub fn is_result_array_js(&self) -> bool {
+        self.is_js() && RESULT_ARRAY.is_match(&self.function)
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -74,7 +77,7 @@ pub struct TestVRLRequest {
     pub function: String,         // Transform function as a string (VRL or JS)
     pub events: Vec<json::Value>, // List of events (JSON objects)
     #[serde(default)]
-    pub trans_type: Option<u8>,   // Optional: 0=vrl, 1=js. Auto-detected if not provided
+    pub trans_type: Option<u8>, // Optional: 0=vrl, 1=js. Auto-detected if not provided
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

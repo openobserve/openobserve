@@ -56,7 +56,7 @@ use crate::{
         meta::{ingestion::IngestionRequest, stream::SchemaRecords},
         utils::{
             functions::get_vrl_compiler_config,
-            js::{compile_js_function as compile_js_func, apply_js_fn as apply_js},
+            js::{apply_js_fn as apply_js, compile_js_function as compile_js_func},
         },
     },
     service::{

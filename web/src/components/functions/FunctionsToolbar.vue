@@ -61,6 +61,38 @@
           </q-icon>
         </div>
       </q-form>
+      <!-- Transform Type Radio Buttons -->
+      <div class="tw-ml-6 tw-flex tw-items-center tw-gap-4">
+        <div class="tw-flex tw-items-center tw-gap-1" data-test="function-transform-type-vrl-radio">
+          <q-radio
+            :model-value="transType"
+            @update:model-value="(val) => emit('update:transType', val)"
+            val="0"
+            size="xs"
+          />
+          <span class="tw-text-[13px] tw-font-medium">{{ transformTypeOptions[0]?.label }}</span>
+        </div>
+        <div class="tw-flex tw-items-center tw-gap-1" data-test="function-transform-type-js-radio">
+          <q-radio
+            :model-value="transType"
+            @update:model-value="(val) => emit('update:transType', val)"
+            val="1"
+            size="xs"
+          />
+          <span class="tw-text-[13px] tw-font-medium">{{ transformTypeOptions[1]?.label }}</span>
+        </div>
+        <!-- Info icon with tooltip -->
+        <q-icon
+          name="info_outline"
+          size="xs"
+          class="tw-cursor-pointer"
+        >
+          <q-tooltip class="bg-grey-8">
+            <div class="tw-font-semibold tw-mb-1">{{ transType === '1' ? t('function.javascript') : t('function.vrl') }} Tip:</div>
+            <div>{{ transType === '1' ? t('function.jsFunctionHint') : t('function.vrlFunctionHint') }}</div>
+          </q-tooltip>
+        </q-icon>
+      </div>
     </div>
     <div class="add-function-actions flex justify-center tw:gap-2">
       <q-btn
@@ -130,7 +162,6 @@ import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import config from "../../aws-exports";
 import { getImageURL } from "@/utils/zincutils";
 const { t } = useI18n();
@@ -154,9 +185,17 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  transType: {
+    type: String,
+    default: "0",
+  },
+  transformTypeOptions: {
+    type: Array,
+    default: () => [],
+  },
 });
 
-const emit = defineEmits(["test", "save", "update:name", "back", "cancel", "open:chat"]);
+const emit = defineEmits(["test", "save", "update:name", "back", "cancel", "open:chat", "update:transType"]);
 
 const addFunctionForm = ref(null);
 

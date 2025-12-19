@@ -20,8 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:pl-4 tw:pr-2 tw:h-[68px]">
           <FunctionsToolbar
             v-model:name="formData.name"
+            v-model:trans-type="formData.transType"
             ref="functionsToolbarRef"
             :disable-name="beingUpdated"
+            :transform-type-options="transformTypeOptions"
             @test="onTestFunction"
             @save="onSubmit"
             @back="closeAddFunction"
@@ -32,8 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
       </div>
     </div>
-  
-    <div class="tw:flex">
+
+    <div class="tw-flex">
 
 
       <div
@@ -51,20 +53,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:before>
             <div class="q-px-md q-pt-sm q-pb-md tw:h-max card-container tw:h-[calc(100vh-128px)]">
               <q-form id="addFunctionForm" ref="addJSTransformForm">
-                <!-- Transform Type Selector -->
-                <div class="q-pb-sm o2-input">
-                  <q-select
-                    v-model="formData.transType"
-                    :options="transformTypeOptions"
-                    :label="t('function.transformType')"
-                    dense
-                    filled
-                    emit-value
-                    map-options
-                    data-test="function-transform-type-select"
-                    class="tw-mb-2"
-                  />
-                </div>
                 <div class="add-function-name-input q-pb-sm o2-input">
                   <FullViewContainer
                     name="function"
@@ -247,10 +235,10 @@ export default defineComponent({
 
     let compilationErr = ref("");
 
-    // Transform type options for the dropdown
-    const transformTypeOptions = ref([
-      { label: t("function.vrlType"), value: "0" },
-      { label: t("function.jsType"), value: "1" },
+    // Transform type options for radio buttons
+    const transformTypeOptions = computed(() => [
+      { label: t("function.vrl"), value: "0" },
+      { label: t("function.javascript"), value: "1" },
     ]);
 
     const beingUpdated = computed(() => props.isUpdated);

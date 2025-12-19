@@ -57,6 +57,11 @@ pub fn compile_js_function(func: &str, _org_id: &str) -> Result<JSRuntimeConfig,
         }
     }
 
+    // Strip #ResultArray# marker for compilation validation
+    // The marker is invalid JS syntax (# is not a comment in JS)
+    // We keep it in storage but remove it for compilation check
+    let func_for_compilation = strip_result_array_marker(func);
+
     // Try to compile the function to check syntax
     JS_CONTEXT.with(|ctx| {
         ctx.with(|ctx| {
@@ -74,7 +79,7 @@ pub fn compile_js_function(func: &str, _org_id: &str) -> Result<JSRuntimeConfig,
                     }}
                 }})();
                 "#,
-                func
+                func_for_compilation
             );
 
             ctx.eval::<bool, _>(test_code)
@@ -85,11 +90,33 @@ pub fn compile_js_function(func: &str, _org_id: &str) -> Result<JSRuntimeConfig,
             let params = vec!["row".to_string()];
 
             Ok(JSRuntimeConfig {
-                function: func.to_string(),
+                function: func.to_string(), // Store original with marker
                 params,
             })
         })
     })
+}
+
+/// Strip #ResultArray# and #ResultArray#SkipVRL# markers from JS function
+/// These markers are used to detect result-array mode but are invalid JS syntax
+fn strip_result_array_marker(func: &str) -> String {
+    let mut result = func.to_string();
+
+    // Remove #ResultArray#SkipVRL# (more specific pattern first)
+    result = regex::Regex::new(
+        r"(?m)^#[ \s]*Result[ \s]*Array[ \s]*#[ \s]*Skip[ \s]*VRL[ \s]*#[ \s]*\n?",
+    )
+    .unwrap()
+    .replace_all(&result, "")
+    .to_string();
+
+    // Remove #ResultArray#
+    result = regex::Regex::new(r"(?m)^#[ \s]*Result[ \s]*Array[ \s]*#[ \s]*\n?")
+        .unwrap()
+        .replace_all(&result, "")
+        .to_string();
+
+    result
 }
 
 /// Apply a JS function to transform data
@@ -126,9 +153,18 @@ pub fn apply_js_fn(
                 return (row.clone(), Some(format!("Failed to set orgId: {}", e)));
             }
 
-            if let Err(e) = globals.set("streamName", stream_name.get(0).unwrap_or(&String::new()).as_str()) {
-                return (row.clone(), Some(format!("Failed to set streamName: {}", e)));
+            if let Err(e) = globals.set(
+                "streamName",
+                stream_name.get(0).unwrap_or(&String::new()).as_str(),
+            ) {
+                return (
+                    row.clone(),
+                    Some(format!("Failed to set streamName: {}", e)),
+                );
             }
+
+            // Strip #ResultArray# marker for execution (invalid JS syntax)
+            let func_for_execution = strip_result_array_marker(&js_config.function);
 
             // Create execution wrapper that parses input and stringifies output
             let exec_code = format!(
@@ -139,7 +175,7 @@ pub fn apply_js_fn(
                     return JSON.stringify(row);
                 }})();
                 "#,
-                js_config.function
+                func_for_execution
             );
 
             // Execute the function
@@ -166,8 +202,9 @@ pub fn apply_js_fn(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use serde_json::json;
+
+    use super::*;
 
     #[test]
     fn test_init_js_runtime() {
@@ -237,6 +274,70 @@ mod tests {
         "#;
         let result = compile_js_function(func, "test_org");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_compile_js_with_result_array_marker() {
+        // #ResultArray# marker should not cause compilation error
+        let func = r#"#ResultArray#
+row.transformed = true;
+row.type = "result_array";"#;
+        let result = compile_js_function(func, "test_org");
+        assert!(result.is_ok());
+
+        // Verify original function is preserved in config
+        let config = result.unwrap();
+        assert!(config.function.contains("#ResultArray#"));
+    }
+
+    #[test]
+    fn test_compile_js_with_result_array_skip_vrl() {
+        // #ResultArray#SkipVRL# marker should not cause compilation error
+        let func = r#"#ResultArray#SkipVRL#
+row.transformed = true;"#;
+        let result = compile_js_function(func, "test_org");
+        assert!(result.is_ok());
+
+        let config = result.unwrap();
+        assert!(config.function.contains("#ResultArray#SkipVRL#"));
+    }
+
+    #[test]
+    fn test_apply_js_with_result_array_marker() {
+        // Function with #ResultArray# should execute correctly
+        let func = r#"#ResultArray#
+row.processed = true;
+row.value = 42;"#;
+        let config = compile_js_function(func, "test_org").unwrap();
+        let input = json!({"original": "test"});
+        let (output, error) = apply_js_fn(&config, input, "test_org", &["test_stream".to_string()]);
+
+        assert!(error.is_none());
+        assert_eq!(output["original"], "test");
+        assert_eq!(output["processed"], true);
+        assert_eq!(output["value"], 42);
+    }
+
+    #[test]
+    fn test_strip_result_array_marker() {
+        // Test basic #ResultArray# stripping
+        let func1 = "#ResultArray#\nrow.field = 1;";
+        let stripped1 = strip_result_array_marker(func1);
+        assert!(!stripped1.contains("#ResultArray#"));
+        assert!(stripped1.contains("row.field = 1;"));
+
+        // Test #ResultArray#SkipVRL# stripping
+        let func2 = "#ResultArray#SkipVRL#\nrow.field = 2;";
+        let stripped2 = strip_result_array_marker(func2);
+        assert!(!stripped2.contains("#ResultArray#"));
+        assert!(!stripped2.contains("SkipVRL"));
+        assert!(stripped2.contains("row.field = 2;"));
+
+        // Test with whitespace variations
+        let func3 = "# Result Array #\nrow.field = 3;";
+        let stripped3 = strip_result_array_marker(func3);
+        assert!(!stripped3.contains("# Result Array #"));
+        assert!(stripped3.contains("row.field = 3;"));
     }
 
     // Note: Runtime error testing is complex because QuickJS validates during compilation
