@@ -155,7 +155,7 @@ pub fn apply_js_fn(
 
             if let Err(e) = globals.set(
                 "streamName",
-                stream_name.get(0).unwrap_or(&String::new()).as_str(),
+                stream_name.first().unwrap_or(&String::new()).as_str(),
             ) {
                 return (
                     row.clone(),
