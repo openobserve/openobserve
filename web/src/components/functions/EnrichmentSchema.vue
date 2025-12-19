@@ -89,7 +89,7 @@
             </div>
           </div>
           <div class="flex items-center justify-between tw:gap-4 tw:mt-4">
-            <div class="tw:text-sm display-total-fields">
+            <div class="tw:text-sm display-total-fields o2-primary-button">
                 All Fields ({{ schemaData.schema.length }})
             </div>
                 <q-input
@@ -335,7 +335,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: $primary;
     color: white;
   }
 

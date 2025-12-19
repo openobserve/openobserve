@@ -313,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       no-caps
                       :disable="isDialogOpen"
                       class="o2-secondary-button tw:h-[36px] tw:w-[32px] q-my-sm"
-                      style="min-width: 0px !important; min-height: 0px !important;"
+                      style="min-width: 0px !important;"
                       flat
                       @click.stop="openDialog"
                       title="Add Field(s)"
