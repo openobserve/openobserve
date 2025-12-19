@@ -75,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           flat
           class="alert-wizard-stepper"
           header-nav
+          keep-alive
         >
         <!-- Persistent Step Caption (Between Header and Content) -->
         <template v-slot:message>
@@ -1870,7 +1871,6 @@ export default defineComponent({
 
       // Step 4: Alert Settings
       if (stepNumber === 4) {
-        console.log('[AddAlert] Validating step 4, step4Ref.value:', step4Ref.value);
         if (step4Ref.value && (step4Ref.value as any).validate) {
           const validationResult = (step4Ref.value as any).validate();
 
@@ -1878,8 +1878,6 @@ export default defineComponent({
           const result = validationResult instanceof Promise
             ? await validationResult
             : validationResult;
-
-          console.log('[AddAlert] Step 4 validation result:', result);
 
           // Handle validation result - could be boolean (backward compat) or object
           const isValid = typeof result === 'boolean' ? result : result.valid;
@@ -2065,6 +2063,7 @@ export default defineComponent({
       step4Ref,
       lastValidStep,
       clearMultiWindows,
+      validateStep,
     };
   },
 
@@ -2212,19 +2211,70 @@ export default defineComponent({
       // When user updated query and click on save
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      // Ensure all accordion sections are expanded before validation
-      this.expandState.alertSetup = true;
-      this.expandState.queryMode = true;
-      this.expandState.thresholds = true;
-      this.expandState.realTimeMode = true;
-      this.expandState.advancedSetup = true;
-      await nextTick(); // Wait for DOM to update with all expanded sections
+      // FINAL VALIDATION CHECKPOINT
+      // Validate all steps before submission to catch any errors from navigating back
+
+      // Validate Step 1: Alert Setup
+      if (this.$refs.step1Ref && (this.$refs.step1Ref as any).validate) {
+        const isValid = await (this.$refs.step1Ref as any).validate();
+        if (!isValid) {
+          this.wizardStep = 1;
+          this.q.notify({
+            type: "negative",
+            message: "Please complete Alert Setup step correctly.",
+            timeout: 2000,
+          });
+          return false;
+        }
+      }
+
+      // Validate Step 2: Query Config
+      if (this.$refs.step2Ref && (this.$refs.step2Ref as any).validate) {
+        const validationResult = (this.$refs.step2Ref as any).validate();
+        const isValid = validationResult instanceof Promise
+          ? await validationResult
+          : validationResult;
+        if (!isValid) {
+          this.wizardStep = 2;
+          this.q.notify({
+            type: "negative",
+            message: "Please complete Query Configuration step correctly.",
+            timeout: 2000,
+          });
+          return false;
+        }
+      }
+
+      // Validate Step 3: Compare with Past (only if not real-time)
+      // Step 3 is optional, no strict validation needed
+
+      // Validate Step 4: Alert Settings
+      if (this.$refs.step4Ref && (this.$refs.step4Ref as any).validate) {
+        const validationResult = (this.$refs.step4Ref as any).validate();
+        const result = validationResult instanceof Promise
+          ? await validationResult
+          : validationResult;
+
+        // Handle validation result - could be boolean (backward compat) or object
+        const isValid = typeof result === 'boolean' ? result : result.valid;
+
+        if (!isValid) {
+          this.wizardStep = 4;
+          this.q.notify({
+            type: "negative",
+            message: "Please complete Alert Settings step correctly.",
+            timeout: 2000,
+          });
+          return false;
+        }
+      }
 
       if (
         this.formData.is_real_time == "false" &&
         this.formData.query_condition.type == "sql" &&
         !this.getParser(this.formData.query_condition.sql)
       ) {
+        this.wizardStep = 2; // Navigate to query step
         this.q.notify({
           type: "negative",
           message: "Selecting all Columns in SQL query is not allowed.",
@@ -2233,14 +2283,6 @@ export default defineComponent({
         return false;
       }
 
-      // if (this.formData.stream_name == "") {
-      //   this.q.notify({
-      //     type: "negative",
-      //     message: "Please select stream name.",
-      //     timeout: 1500,
-      //   });
-      //   return false;
-      // }
 
       if (
         this.formData.is_real_time == "false" &&
