@@ -110,7 +110,7 @@ pub enum Error {
         source:
             tokio::sync::mpsc::error::SendError<(crate::WriterSignal, crate::ProcessedBatch, bool)>,
     },
-    #[snafu(display("MemoryTableOverflowError"))]
+    #[snafu(display("MemoryTableError"))]
     MemoryTableOverflowError {},
     #[snafu(display("MemoryCircuitBreakerError"))]
     MemoryCircuitBreakerError {},
