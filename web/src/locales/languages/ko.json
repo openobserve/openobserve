@@ -1001,7 +1001,11 @@
     "colorBySeriesTitle": "시리즈별 색상",
     "colorBySeriesTooltip": "차트에서 시각적으로 더 잘 구분할 수 있도록 시리즈에 색상을 적용하세요.각 시리즈의 색상을 사용자 지정하여 데이터 시각화를 향상시키세요.",
     "editColorBySeries": " 시리즈별 색상 편집",
-    "applyColorBySeries": " 시리즈별 색상 적용"
+    "applyColorBySeries": " 시리즈별 색상 적용",
+    "showAllLegends": "모든 레전드 보기",
+    "legendsOfCharts": "레전드 오브 차트",
+    "totalLegends": "합계: {개수}",
+    "noLegendsAvailable": "레전드 없음"
   },
   "panel": {
     "header": "패널",
@@ -2015,7 +2019,8 @@
     "period": "기간",
     "cron": "크론",
     "type": "타입",
-    "run_pipeline": "파이프라인 실행"
+    "run_pipeline": "파이프라인 실행",
+    "showLegends": "쇼 레전드"
   },
   "alert_list": {
     "alert_details": "경고 세부 정보"

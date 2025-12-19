@@ -1001,7 +1001,11 @@
     "colorBySeriesTitle": "Couleur par série",
     "colorBySeriesTooltip": "Appliquez des couleurs aux séries pour une meilleure distinction visuelle dans les graphiques. Personnalisez les couleurs de chaque série afin d'améliorer la visualisation des données.",
     "editColorBySeries": " Modifier la couleur par série",
-    "applyColorBySeries": " Appliquer la couleur par série"
+    "applyColorBySeries": " Appliquer la couleur par série",
+    "showAllLegends": "Afficher toutes les légendes",
+    "legendsOfCharts": "Les légendes des cartes",
+    "totalLegends": "Total : {count}",
+    "noLegendsAvailable": "Aucune légende disponible"
   },
   "panel": {
     "header": "Panneau",
@@ -2015,7 +2019,8 @@
     "period": "Période",
     "cron": "Cron",
     "type": "Tapez",
-    "run_pipeline": "Exécuter un pipeline"
+    "run_pipeline": "Exécuter un pipeline",
+    "showLegends": "Afficher les légendes"
   },
   "alert_list": {
     "alert_details": "Détails de l'alerte"
