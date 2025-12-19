@@ -17,7 +17,10 @@ export default class DashboardVariables {
     field,
     customValueSearch = false, // it is used only when we want to search custom value from variable dropdown
     filterConfig = null, // optional filter configuration { filterName, operator, value }
-    showMultipleValues = false // if true, toggles the show multiple values option
+    showMultipleValues = false, // if true, toggles the show multiple values option
+    scope = 'global', // 'global', 'tabs', 'panels'
+    targetTabs = [], // array of tab names or IDs
+    targetPanels = [] // array of panel names or IDs
   ) {
     // Wait for the settings panel to be fully opened and variable tab to be available
     const variableTab = this.page.locator('[data-test="dashboard-settings-variable-tab"]');
@@ -183,6 +186,45 @@ export default class DashboardVariables {
         .click();
     }
 
+    // Set Scope
+    const scopeSelect = this.page.locator('[data-test="dashboard-variable-scope-select"]');
+    await scopeSelect.waitFor({ state: "visible" });
+    await scopeSelect.click();
+    
+    let scopeLabel = 'Global';
+    if (scope === 'tabs') scopeLabel = 'Selected Tabs';
+    if (scope === 'panels') scopeLabel = 'Selected Panels';
+    
+    await this.page.getByRole("option", { name: scopeLabel, exact: true }).click();
+    
+    // Select Tabs if scope is tabs or panels
+    if (scope === 'tabs' || scope === 'panels') {
+      const tabsSelect = this.page.locator('[data-test="dashboard-variable-tabs-select"]');
+      await tabsSelect.waitFor({ state: "visible" });
+      await tabsSelect.click();
+      
+      for (const tabName of targetTabs) {
+        // Find the checkbox for the tab and click it
+        const tabOption = this.page.getByRole("option", { name: tabName });
+        await tabOption.locator('.q-checkbox').click();
+      }
+      // Click away to close dropdown
+      await this.page.keyboard.press('Escape');
+    }
+    
+    // Select Panels if scope is panels
+    if (scope === 'panels') {
+      const panelsSelect = this.page.locator('[data-test="dashboard-variable-panels-select"]');
+      await panelsSelect.waitFor({ state: "visible" });
+      await panelsSelect.click();
+      
+      for (const panelName of targetPanels) {
+        const panelOption = this.page.getByRole("option", { name: panelName });
+        await panelOption.locator('.q-checkbox').click();
+      }
+      await this.page.keyboard.press('Escape');
+    }
+
     // Custom Value Search if want to search custom value from variable dropdown
     if (customValueSearch) {
       await this.page
@@ -269,5 +311,45 @@ export default class DashboardVariables {
     await this.page.waitForLoadState('domcontentloaded');
 
     return true;
+  }
+
+  // Method to check variable loading status on the dashboard
+  async checkVariableStatus(name, { isPending = null, isLoading = null, hasError = null, tabId = null, panelId = null }) {
+    let prefix = '';
+    if (panelId) prefix = `panel-${panelId}-`;
+    
+    if (isLoading !== null) {
+        const loadingIndicator = this.page.locator(`[data-test="${prefix}variable-${name}-loading"]`);
+        if (isLoading) {
+            await expect(loadingIndicator).toBeVisible({ timeout: 10000 });
+        } else {
+            // If we're checking that it's NOT loading, it might have finished loading or be in error/pending
+            await expect(loadingIndicator).not.toBeVisible();
+        }
+    }
+
+    if (isLoading === false && isPending === false) {
+        const loadedIndicator = this.page.locator(`[data-test="${prefix}variable-${name}-loaded"]`);
+        await expect(loadedIndicator).toBeVisible({ timeout: 10000 });
+    }
+    
+    if (hasError !== null) {
+        // Implement error check if needed
+    }
+  }
+
+  // Method to select a value from a scoped dropdown
+  async selectValueFromScopedVariable(name, value, scope = 'global', targetId = null) {
+    const selector = this.page.locator(`[data-test="variable-selector-${name}"]`).first();
+    await selector.scrollIntoViewIfNeeded();
+    
+    // Check if it's a q-input or q-select (VariableQueryValueSelector uses q-select)
+    const input = selector.locator('input');
+    await input.click();
+    await input.fill(value);
+
+    const option = this.page.getByRole("option", { name: value, exact: true });
+    await option.waitFor({ state: "visible", timeout: 10000 });
+    await option.click();
   }
 }

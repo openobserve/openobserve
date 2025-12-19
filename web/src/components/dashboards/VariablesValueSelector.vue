@@ -22,8 +22,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-for="(item, index) in variablesData.values"
       :key="item.name + index"
-      :data-test="`dashboard-variable-${item}-selector`"
+      :data-test="`dashboard-variable-${item.name}-container`"
     >
+      <!-- State indicators for testing -->
+      <div v-if="item.isLoading" :data-test="`${props.panelId ? 'panel-' + props.panelId + '-' : ''}variable-${item.name}-loading`" style="display:none"></div>
+      <div v-if="!item.isLoading && item.isVariablePartialLoaded" :data-test="`${props.panelId ? 'panel-' + props.panelId + '-' : ''}variable-${item.name}-loaded`" style="display:none"></div>
+      <div :data-test="`${props.panelId ? 'panel-' + props.panelId + '-' : ''}variable-${item.name}-value`" style="display:none">{{ item.value }}</div>
+
       <div v-if="item.type == 'query_values'">
         <VariableQueryValueSelector
           class="q-mr-lg q-mt-xs"
@@ -33,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="onVariablesValueUpdated(index)"
           :loadOptions="loadVariableOptions"
           @search="onVariableSearch(index, $event)"
+          :data-test="`variable-selector-${item.name}`"
         />
       </div>
       <div v-else-if="item.type == 'constant'">
@@ -44,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="item.label || item.name"
           dense
           readonly
-          data-test="dashboard-variable-constant-selector"
+          :data-test="`variable-selector-${item.name}`"
           @update:model-value="onVariablesValueUpdated(index)"
           borderless
           hide-bottom-space
@@ -59,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="item.value"
           :label="item.label || item.name"
           dense
-          data-test="dashboard-variable-textbox-selector"
+          :data-test="`variable-selector-${item.name}`"
           @update:model-value="onVariablesValueUpdated(index)"
           borderless
           hide-bottom-space
@@ -72,6 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="item.value"
           :variableItem="item"
           @update:model-value="onVariablesValueUpdated(index)"
+          :data-test="`variable-selector-${item.name}`"
         />
       </div>
       <div v-else-if="item.type == 'dynamic_filters'">
@@ -80,6 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="item.value"
           :variableItem="item"
           @update:model-value="onVariablesValueUpdated(index)"
+          :data-test="`variable-selector-${item.name}`"
         />
       </div>
     </div>
