@@ -1266,4 +1266,15 @@ export default defineComponent({
 .grid-stack-item-content {
   box-sizing: border-box;
 }
+
+/* Ensure grid item content and panel container fill full height */
+.grid-stack-item-content {
+  height: 100% !important;
+}
+
+.panel-with-variables {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
 </style>
