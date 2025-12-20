@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import useNotifications from "@/composables/useNotifications";
 import { exportFile, copyToClipboard, useQuasar } from "quasar";
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, watch } from "vue";
 import { findFirstValidMappedValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { useStore } from "vuex";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
@@ -103,6 +103,11 @@ export default defineComponent({
   },
   emits: ["row-click"],
   setup(props: any) {
+    console.log("=== [TableRenderer] Component mounted ===");
+    console.log("Props data:", props.data);
+    console.log("Props data.rows:", props.data?.rows);
+    console.log("Props data.columns:", props.data?.columns);
+
     const tableRef: any = ref(null);
     const store = useStore();
     const $q = useQuasar();
@@ -110,6 +115,16 @@ export default defineComponent({
 
     const { showErrorNotification, showPositiveNotification } =
       useNotifications();
+
+    // Watch for data changes
+    watch(() => props.data, (newData) => {
+      console.log("=== [TableRenderer] Data changed ===");
+      console.log("New data:", newData);
+      console.log("Rows:", newData?.rows);
+      console.log("Columns:", newData?.columns);
+      console.log("Rows count:", newData?.rows?.length);
+      console.log("Columns count:", newData?.columns?.length);
+    }, { deep: true, immediate: true });
     function wrapCsvValue(val: any, formatFn?: any, row?: any) {
       let formatted = formatFn !== void 0 ? formatFn(val, row) : val;
 

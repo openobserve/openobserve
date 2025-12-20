@@ -43,11 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <TableRenderer
           v-else-if="panelSchema.type == 'table'"
-          :data="
-            panelData.chartType == 'table'
-              ? panelData
-              : { options: { backgroundColor: 'transparent' } }
-          "
+          :data="tableRendererData"
           :value-mapping="panelSchema?.config?.mappings ?? []"
           @row-click="onChartClick"
           ref="tableRendererRef"
@@ -987,6 +983,14 @@ export default defineComponent({
     watch(
       panelData,
       () => {
+        // Debug logging for table charts
+        if (panelSchema.value.type === "table" && panelSchema.value.queryType === "promql") {
+          console.log("=== [PanelSchemaRenderer] panelData updated ===");
+          console.log("panelData:", panelData.value);
+          console.log("panelData.tableData:", panelData.value?.tableData);
+          console.log("panelData.options:", panelData.value?.options);
+          console.log("panelData.isTable:", panelData.value?.isTable);
+        }
         emit("series-data-update", panelData.value);
       },
       { deep: true },
@@ -2212,6 +2216,40 @@ export default defineComponent({
       emit("is-partial-data-update", newValue);
     });
 
+    // Computed property for table data with logging
+    const tableRendererData = computed(() => {
+      if (panelSchema.value.type === "table") {
+        let tableData;
+
+        if (panelSchema.value.queryType === "promql") {
+          // For PromQL tables, the data is in panelData.options (same as pie/donut)
+          // The TableConverter returns {columns, rows, ...} which gets placed in options
+          tableData = panelData.value?.options || { rows: [], columns: [] };
+          console.log("=== [PanelSchemaRenderer] Computing tableRendererData for PromQL ===");
+          console.log("panelData.value:", panelData.value);
+          console.log("panelData.value.options:", panelData.value?.options);
+          console.log("tableData:", tableData);
+        } else if (panelData.value?.chartType == "table") {
+          tableData = panelData.value;
+          console.log("=== [PanelSchemaRenderer] Computing tableRendererData for SQL ===");
+          console.log("tableData:", tableData);
+        } else {
+          tableData = { options: { backgroundColor: "transparent" } };
+          console.log("=== [PanelSchemaRenderer] Computing tableRendererData - fallback ===");
+        }
+
+        console.log("Final table data structure:", {
+          hasRows: !!tableData?.rows,
+          rowsCount: tableData?.rows?.length,
+          hasColumns: !!tableData?.columns,
+          columnsCount: tableData?.columns?.length,
+        });
+
+        return tableData;
+      }
+      return { options: { backgroundColor: "transparent" } };
+    });
+
     return {
       store,
       chartPanelRef,
@@ -2223,6 +2261,7 @@ export default defineComponent({
       noData,
       metadata,
       tableRendererRef,
+      tableRendererData,
       onChartClick,
       onDataZoom,
       drilldownArray,
