@@ -91,6 +91,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="space"></div>
 
+    <!-- PromQL Chart-Specific Configuration -->
+    <PromQLChartConfig
+      v-if="promqlMode"
+      :chart-type="dashboardPanelData.data.type"
+    />
+
+    <div class="space"></div>
+
     <div v-if="showTrellisConfig" class="q-mb-sm">
       <q-select
         :label="t('dashboard.trellisLayout')"
@@ -1633,6 +1641,7 @@ import Smooth from "@/components/icons/dashboards/Smooth.vue";
 import StepBefore from "@/components/icons/dashboards/StepBefore.vue";
 import StepAfter from "@/components/icons/dashboards/StepAfter.vue";
 import StepMiddle from "@/components/icons/dashboards/StepMiddle.vue";
+import PromQLChartConfig from "./PromQLChartConfig.vue";
 import { useStore } from "vuex";
 
 import { markRaw, watchEffect } from "vue";
@@ -1665,6 +1674,7 @@ export default defineComponent({
     StepBefore,
     StepAfter,
     StepMiddle,
+    PromQLChartConfig,
   },
   props: ["dashboardPanelData", "variablesData", "panelData"],
   setup(props) {
