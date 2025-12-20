@@ -38,6 +38,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               item.id != 'area-stacked' &&
               item.id != 'metric' &&
               item.id != 'gauge' &&
+              item.id != 'pie' &&
+              item.id != 'donut' &&
+              item.id != 'table' &&
+              item.id != 'heatmap' &&
+              item.id != 'h-bar' &&
+              item.id != 'stacked' &&
+              item.id != 'h-stacked' &&
+              item.id != 'geomap' &&
+              item.id != 'sankey' &&
               item.id != 'html' &&
               item.id != 'markdown' &&
               item.id != 'custom_chart') ||
