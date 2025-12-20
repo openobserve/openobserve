@@ -34,8 +34,6 @@ export class TableConverter implements PromQLChartConverter {
     console.log("Processed Data:", processedData);
     console.log("Panel Schema:", panelSchema);
 
-    const config = panelSchema.config || {};
-
     // Build columns from metric labels + value
     const columns = this.buildColumns(processedData, panelSchema);
     console.log("Built Columns:", columns);
@@ -45,14 +43,13 @@ export class TableConverter implements PromQLChartConverter {
     console.log("Built Rows:", rows);
     console.log("Rows count:", rows.length);
 
+    // Return the same structure as SQL tables (convertTableData)
+    // TableRenderer component (q-table) handles pagination, sorting, filtering automatically
     const result = {
-      columns,
       rows,
-      // Table-specific configuration
-      pagination: config.pagination !== false,
-      pageSize: config.page_size || 10,
-      sortable: config.sortable !== false,
-      filterable: config.filterable !== false,
+      columns,
+      // Required by interface but not used for tables
+      series: [],
     };
 
     console.log("=== [TableConverter] Conversion complete ===");
@@ -112,9 +109,9 @@ export class TableConverter implements PromQLChartConverter {
       },
     } as any);
 
-    // Add timestamp column if time-series data
+    // Always add timestamp column if time-series data
     const hasTimeSeriesData = processedData.some((qd) => qd.timestamps.length > 1);
-    if (hasTimeSeriesData && config.show_timestamp !== false) {
+    if (hasTimeSeriesData) {
       columns.unshift({
         name: "timestamp",
         field: "timestamp",
@@ -146,39 +143,22 @@ export class TableConverter implements PromQLChartConverter {
       queryData.series.forEach((seriesData, sIndex) => {
         console.log(`Query ${qIndex}, Series ${sIndex} - values length:`, seriesData.values?.length);
         console.log(`Query ${qIndex}, Series ${sIndex} - metric:`, seriesData.metric);
-        // For instant queries or aggregated data: one row per series
-        if (
-          queryData.timestamps.length === 1 ||
-          seriesData.values.length === 1 ||
-          config.aggregate_rows !== false
-        ) {
-          const value = applyAggregation(seriesData.values, aggregation);
 
-          const row: any = {
-            ...seriesData.metric,
-            value,
-          };
+        // For PromQL tables, always aggregate to one row per series
+        // This provides a clean summary view of metrics
+        const value = applyAggregation(seriesData.values, aggregation);
 
-          // Add timestamp if it's a single value
-          if (queryData.timestamps.length === 1) {
-            row.timestamp = queryData.timestamps[0][1];
-          }
+        const row: any = {
+          ...seriesData.metric,
+          value,
+        };
 
-          rows.push(row);
+        // Add timestamp if it's a single value
+        if (queryData.timestamps.length === 1) {
+          row.timestamp = queryData.timestamps[0][1];
         }
-        // For range queries without aggregation: one row per timestamp
-        else {
-          seriesData.values.forEach(([ts, value]) => {
-            const timestamp = queryData.timestamps.find(([t]) => t === ts)?.[1];
 
-            const row: any = {
-              timestamp,
-              ...seriesData.metric,
-              value: parseFloat(value),
-            };
-            rows.push(row);
-          });
-        }
+        rows.push(row);
       });
     });
 

@@ -235,92 +235,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Table Configuration -->
-    <div v-if="chartType === 'table'" class="table-config">
-      <div class="q-mb-sm text-subtitle2">Table Configuration</div>
-
-      <!-- Show timestamp column -->
-      <q-toggle
-        v-model="showTimestampColumn"
-        :label="t('dashboard.showTimestamp')"
-        class="q-py-sm"
-        data-test="dashboard-config-table-show-timestamp"
-      >
-        <q-tooltip class="bg-grey-8" max-width="250px">
-          Show timestamp column for time-series data
-        </q-tooltip>
-      </q-toggle>
-
-      <!-- Page size -->
-      <q-input
-        v-model.number="pageSize"
-        :label="t('dashboard.pageSize')"
-        type="number"
-        placeholder="10"
-        borderless
-        dense
-        class="q-py-sm showLabelOnTop"
-        stack-label
-        data-test="dashboard-config-table-page-size"
-      >
-        <template v-slot:label>
-          <div class="row items-center all-pointer-events">
-            {{ t("dashboard.pageSize") }}
-            <q-icon class="q-ml-xs" size="20px" name="info" />
-            <q-tooltip class="bg-grey-8" max-width="250px">
-              Number of rows to display per page. Default: 10
-            </q-tooltip>
-          </div>
-        </template>
-      </q-input>
-
-      <!-- Enable sorting -->
-      <q-toggle
-        v-model="enableSorting"
-        :label="t('dashboard.enableSorting')"
-        class="q-py-sm"
-        data-test="dashboard-config-table-enable-sorting"
-      >
-        <q-tooltip class="bg-grey-8" max-width="250px">
-          Allow users to sort table columns
-        </q-tooltip>
-      </q-toggle>
-
-      <!-- Enable filtering -->
-      <q-toggle
-        v-model="enableFiltering"
-        :label="t('dashboard.enableFiltering')"
-        class="q-py-sm"
-        data-test="dashboard-config-table-enable-filtering"
-      >
-        <q-tooltip class="bg-grey-8" max-width="250px">
-          Show search box to filter table rows
-        </q-tooltip>
-      </q-toggle>
-
-      <!-- Enable pagination -->
-      <q-toggle
-        v-model="enablePagination"
-        :label="t('dashboard.enablePagination')"
-        class="q-py-sm"
-        data-test="dashboard-config-table-enable-pagination"
-      >
-        <q-tooltip class="bg-grey-8" max-width="250px">
-          Enable pagination for large datasets
-        </q-tooltip>
-      </q-toggle>
-
-      <!-- Aggregate rows toggle -->
-      <q-toggle
-        v-model="aggregateRows"
-        :label="t('dashboard.aggregateRows')"
-        class="q-py-sm"
-        data-test="dashboard-config-table-aggregate-rows"
-      >
-        <q-tooltip class="bg-grey-8" max-width="250px">
-          Aggregate time-series data to single row per series. Otherwise show all data points.
-        </q-tooltip>
-      </q-toggle>
-    </div>
   </div>
 </template>
 
@@ -473,67 +387,6 @@ export default defineComponent({
       },
     });
 
-    // Table configuration
-    const showTimestampColumn = computed({
-      get: () => dashboardPanelData.data.config?.show_timestamp !== false,
-      set: (value: boolean) => {
-        if (!dashboardPanelData.data.config) {
-          dashboardPanelData.data.config = {};
-        }
-        dashboardPanelData.data.config.show_timestamp = value;
-      },
-    });
-
-    const pageSize = computed({
-      get: () => dashboardPanelData.data.config?.page_size || 10,
-      set: (value: number) => {
-        if (!dashboardPanelData.data.config) {
-          dashboardPanelData.data.config = {};
-        }
-        dashboardPanelData.data.config.page_size = value;
-      },
-    });
-
-    const enableSorting = computed({
-      get: () => dashboardPanelData.data.config?.sortable !== false,
-      set: (value: boolean) => {
-        if (!dashboardPanelData.data.config) {
-          dashboardPanelData.data.config = {};
-        }
-        dashboardPanelData.data.config.sortable = value;
-      },
-    });
-
-    const enableFiltering = computed({
-      get: () => dashboardPanelData.data.config?.filterable !== false,
-      set: (value: boolean) => {
-        if (!dashboardPanelData.data.config) {
-          dashboardPanelData.data.config = {};
-        }
-        dashboardPanelData.data.config.filterable = value;
-      },
-    });
-
-    const enablePagination = computed({
-      get: () => dashboardPanelData.data.config?.pagination !== false,
-      set: (value: boolean) => {
-        if (!dashboardPanelData.data.config) {
-          dashboardPanelData.data.config = {};
-        }
-        dashboardPanelData.data.config.pagination = value;
-      },
-    });
-
-    const aggregateRows = computed({
-      get: () => dashboardPanelData.data.config?.aggregate_rows !== false,
-      set: (value: boolean) => {
-        if (!dashboardPanelData.data.config) {
-          dashboardPanelData.data.config = {};
-        }
-        dashboardPanelData.data.config.aggregate_rows = value;
-      },
-    });
-
     return {
       t,
       aggregationOptions,
@@ -548,12 +401,6 @@ export default defineComponent({
       sankeyTargetLabel,
       sankeyOrient,
       sankeyCurveness,
-      showTimestampColumn,
-      pageSize,
-      enableSorting,
-      enableFiltering,
-      enablePagination,
-      aggregateRows,
     };
   },
 });
