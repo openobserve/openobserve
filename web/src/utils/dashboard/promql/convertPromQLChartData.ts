@@ -105,7 +105,7 @@ export async function convertPromQLChartData(
 
   // Step 4: Delegate to chart-specific converter
   // Each converter knows how to transform data for its chart type(s)
-  const chartConfig = converter.convert(processedData, panelSchema, store, extras);
+  const chartConfig = converter.convert(processedData, panelSchema, store, extras, chartPanelRef);
   console.log("Chart Config from Converter:", chartConfig);
 
   // Step 5: Apply common chart configurations

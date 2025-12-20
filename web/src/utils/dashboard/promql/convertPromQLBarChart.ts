@@ -15,7 +15,8 @@
 
 import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
-import { buildCategoryXAxis, buildCategoryYAxis, buildValueAxis } from "./shared/axisBuilder";
+import { buildCategoryXAxis, buildCategoryYAxis, buildValueAxis, buildTooltip } from "./shared/axisBuilder";
+import { buildLegendConfig } from "./shared/gridBuilder";
 
 /**
  * Converter for bar chart variants (h-bar, stacked, h-stacked)
@@ -27,7 +28,8 @@ export class BarConverter implements PromQLChartConverter {
     processedData: ProcessedPromQLData[],
     panelSchema: any,
     store: any,
-    extras: any
+    extras: any,
+    chartPanelRef?: any
   ) {
     const chartType = panelSchema.type;
     const config = panelSchema.config || {};
@@ -115,18 +117,9 @@ export class BarConverter implements PromQLChartConverter {
         containLabel: true,
         ...(config.axis_width && { left: config.axis_width }),
       },
-      tooltip: {
-        trigger: "axis",
-        axisPointer: {
-          type: isHorizontal ? "shadow" : "line",
-        },
-      },
+      tooltip: buildTooltip(panelSchema, "axis"),
       ...(isStacked && {
-        legend: {
-          show: config.show_legend !== false,
-          orient: config.legend_orient || "horizontal",
-          bottom: "0%",
-        },
+        legend: buildLegendConfig(panelSchema, chartPanelRef, series),
       }),
     };
   }

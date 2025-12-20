@@ -26,7 +26,8 @@ export class HeatmapConverter implements PromQLChartConverter {
     processedData: ProcessedPromQLData[],
     panelSchema: any,
     store: any,
-    extras: any
+    extras: any,
+    chartPanelRef?: any
   ) {
     const config = panelSchema.config || {};
 

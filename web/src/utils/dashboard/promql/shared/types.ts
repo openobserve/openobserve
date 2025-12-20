@@ -64,7 +64,8 @@ export interface PromQLChartConverter {
     processedData: ProcessedPromQLData[],
     panelSchema: any,
     store: any,
-    extras: any
+    extras: any,
+    chartPanelRef?: any
   ): {
     series: any[];
     xAxis?: any;

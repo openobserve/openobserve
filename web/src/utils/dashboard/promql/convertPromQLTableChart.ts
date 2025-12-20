@@ -28,7 +28,8 @@ export class TableConverter implements PromQLChartConverter {
     processedData: ProcessedPromQLData[],
     panelSchema: any,
     store: any,
-    extras: any
+    extras: any,
+    chartPanelRef?: any
   ) {
     console.log("=== [TableConverter] Starting conversion ===");
     console.log("Processed Data:", processedData);

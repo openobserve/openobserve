@@ -15,7 +15,8 @@
 
 import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
 import { fillMissingTimestamps } from "./shared/dataProcessor";
-import { buildXAxis, buildYAxis } from "./shared/axisBuilder";
+import { buildXAxis, buildYAxis, buildTooltip } from "./shared/axisBuilder";
+import { buildDynamicGrid, buildLegendConfig } from "./shared/gridBuilder";
 import { getSeriesColor } from "../colorPalette";
 
 /**
@@ -28,7 +29,8 @@ export class TimeSeriesConverter implements PromQLChartConverter {
     processedData: ProcessedPromQLData[],
     panelSchema: any,
     store: any,
-    extras: any
+    extras: any,
+    chartPanelRef?: any
   ) {
     const chartType = panelSchema.type;
     const series: any[] = [];
@@ -127,25 +129,9 @@ export class TimeSeriesConverter implements PromQLChartConverter {
       series,
       xAxis: buildXAxis(panelSchema, store, hasData),
       yAxis: buildYAxis(panelSchema),
-      grid: {
-        left: "3%",
-        right: "4%",
-        bottom: "3%",
-        containLabel: true,
-        ...(config.axis_width && { left: config.axis_width }),
-      },
-      tooltip: {
-        trigger: "axis",
-        axisPointer: {
-          type: "cross",
-        },
-        ...(config.tooltip_format && {
-          valueFormatter: (value: any) => {
-            // Apply custom tooltip formatting if needed
-            return value;
-          },
-        }),
-      },
+      grid: buildDynamicGrid(panelSchema, chartPanelRef, series),
+      tooltip: buildTooltip(panelSchema, "axis"),
+      legend: buildLegendConfig(panelSchema, chartPanelRef, series),
     };
   }
 
@@ -177,7 +163,7 @@ export class TimeSeriesConverter implements PromQLChartConverter {
             focus: "series",
           },
           lineStyle: {
-            width: config.line_width ?? 1.5,
+            width: config.line_thickness ?? 1.5,
           },
         };
 
@@ -189,7 +175,7 @@ export class TimeSeriesConverter implements PromQLChartConverter {
             focus: "series",
           },
           lineStyle: {
-            width: config.line_width ?? 1.5,
+            width: config.line_thickness ?? 1.5,
           },
         };
 
@@ -216,7 +202,7 @@ export class TimeSeriesConverter implements PromQLChartConverter {
             focus: "series",
           },
           lineStyle: {
-            width: config.line_width ?? 1.5,
+            width: config.line_thickness ?? 1.5,
           },
         };
     }

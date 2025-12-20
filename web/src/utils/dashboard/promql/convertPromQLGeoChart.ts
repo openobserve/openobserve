@@ -27,7 +27,8 @@ export class GeoConverter implements PromQLChartConverter {
     processedData: ProcessedPromQLData[],
     panelSchema: any,
     store: any,
-    extras: any
+    extras: any,
+    chartPanelRef?: any
   ) {
     const config: GeoMapConfig & Record<string, any> = panelSchema.config || {};
     const aggregation = config.aggregation || "last";

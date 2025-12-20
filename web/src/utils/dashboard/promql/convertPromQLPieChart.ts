@@ -15,6 +15,8 @@
 
 import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
+import { buildTooltip } from "./shared/axisBuilder";
+import { buildPieChartConfig, buildLegendConfig } from "./shared/gridBuilder";
 
 /**
  * Converter for pie and donut charts
@@ -27,7 +29,8 @@ export class PieConverter implements PromQLChartConverter {
     processedData: ProcessedPromQLData[],
     panelSchema: any,
     store: any,
-    extras: any
+    extras: any,
+    chartPanelRef?: any
   ) {
     console.log("=== [Pie Converter] Starting conversion ===");
     console.log("Processed Data:", processedData);
@@ -67,12 +70,20 @@ export class PieConverter implements PromQLChartConverter {
       data.sort((a, b) => b.value - a.value);
     }
 
+    // Get dynamic radius and center position based on legend and chart alignment
+    const { radius, center } = buildPieChartConfig(
+      panelSchema,
+      chartPanelRef,
+      data,
+      chartType === "donut"
+    );
+
     const series = [
       {
         type: "pie",
 
-        // Donut = pie with inner radius
-        radius: chartType === "donut" ? ["40%", "70%"] : "70%",
+        // Dynamic radius based on available space and chart type
+        radius,
 
         data,
 
@@ -94,22 +105,15 @@ export class PieConverter implements PromQLChartConverter {
           show: config.show_label_line !== false,
         },
 
-        // Center position
-        center: config.center_position || ["50%", "50%"],
+        // Dynamic center position based on chart alignment
+        center,
       },
     ];
 
     const result = {
       series,
-      tooltip: {
-        trigger: "item",
-        formatter: config.tooltip_format || "{b}: {c} ({d}%)",
-      },
-      legend: {
-        orient: config.legend_orient || "vertical",
-        left: config.legend_position || "left",
-        show: config.show_legend !== false,
-      },
+      tooltip: buildTooltip(panelSchema, "item"),
+      legend: buildLegendConfig(panelSchema, chartPanelRef, series),
     };
 
     console.log("=== [Pie Converter] Conversion complete ===");

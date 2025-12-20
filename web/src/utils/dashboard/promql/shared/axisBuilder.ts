@@ -13,6 +13,66 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
+
+/**
+ * Build tooltip configuration with unit formatting and decimals
+ *
+ * @param panelSchema - Panel configuration schema
+ * @param triggerType - Tooltip trigger type (axis or item)
+ * @returns Tooltip configuration object for ECharts
+ */
+export function buildTooltip(panelSchema: any, triggerType: "axis" | "item" = "axis"): any {
+  const config = panelSchema.config || {};
+  const decimals = config.decimals ?? 2;
+  const unit = config.unit;
+  const unitCustom = config.unit_custom;
+
+  return {
+    trigger: triggerType,
+    textStyle: {
+      fontSize: 12,
+    },
+    axisPointer: {
+      type: "cross",
+    },
+    formatter: (params: any) => {
+      if (!params || (Array.isArray(params) && params.length === 0)) {
+        return "";
+      }
+
+      // Handle single item (for pie/donut charts)
+      if (!Array.isArray(params)) {
+        params = [params];
+      }
+
+      let tooltip = "";
+
+      // Add axis label (timestamp for time-series)
+      if (params[0]?.axisValue) {
+        tooltip += `<div style="margin-bottom: 4px;"><strong>${params[0].axisValue}</strong></div>`;
+      }
+
+      // Add series data with unit formatting
+      params.forEach((param: any) => {
+        if (param.seriesName) {
+          const marker = param.marker || "";
+          const value = param.value?.[1] ?? param.value;
+
+          // Apply unit formatting
+          const formattedValue = formatUnitValue(
+            getUnitValue(value, unit, unitCustom, decimals)
+          );
+
+          tooltip += `<div>${marker} ${param.seriesName}: <strong>${formattedValue}</strong></div>`;
+        }
+      });
+
+      return tooltip;
+    },
+  };
+}
+
 /**
  * Build X-axis configuration for time-series charts
  *
@@ -50,13 +110,19 @@ export function buildXAxis(panelSchema: any, store: any, hasData: boolean = true
  * Build Y-axis configuration for time-series charts
  *
  * @param panelSchema - Panel configuration schema
+ * @param queryIndex - Index of the query (for multi-query support)
  * @returns Y-axis configuration object for ECharts
  */
-export function buildYAxis(panelSchema: any): any {
+export function buildYAxis(panelSchema: any, queryIndex: number = 0): any {
   const config = panelSchema.config || {};
   const showGridlines = config.show_grid !== false; // Default to true
 
-  return {
+  // Get Y-axis label from query configuration (same as SQL)
+  const query = panelSchema.queries?.[queryIndex];
+  const yAxisLabel = query?.fields?.y?.[0]?.label || "";
+
+  // Build Y-axis configuration
+  const yAxis: any = {
     type: "value",
     axisLabel: {
       show: config.axis_label !== false,
@@ -76,6 +142,27 @@ export function buildYAxis(panelSchema: any): any {
       },
     }),
   };
+
+  // Add Y-axis min/max if configured (same as SQL)
+  if (config.y_axis_min !== undefined) {
+    yAxis.min = config.y_axis_min;
+  }
+  if (config.y_axis_max !== undefined) {
+    yAxis.max = config.y_axis_max;
+  }
+
+  // Add axis name if label exists (same as SQL)
+  if (yAxisLabel) {
+    yAxis.name = yAxisLabel;
+    yAxis.nameLocation = "middle";
+    yAxis.nameGap = 50; // Default gap, can be made dynamic later
+    yAxis.nameTextStyle = {
+      fontWeight: "bold",
+      fontSize: 14,
+    };
+  }
+
+  return yAxis;
 }
 
 /**
@@ -145,7 +232,7 @@ export function buildValueAxis(panelSchema: any): any {
   const config = panelSchema.config || {};
   const showGridlines = config.show_grid !== false;
 
-  return {
+  const valueAxis: any = {
     type: "value",
     axisLabel: {
       show: config.axis_label !== false,
@@ -159,4 +246,14 @@ export function buildValueAxis(panelSchema: any): any {
       },
     }),
   };
+
+  // Add Y-axis min/max if configured (applies to X-axis for h-bar)
+  if (config.y_axis_min !== undefined) {
+    valueAxis.min = config.y_axis_min;
+  }
+  if (config.y_axis_max !== undefined) {
+    valueAxis.max = config.y_axis_max;
+  }
+
+  return valueAxis;
 }
