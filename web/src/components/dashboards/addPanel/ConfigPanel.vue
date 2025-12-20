@@ -2180,16 +2180,31 @@ export default defineComponent({
       }
     };
 
-    const dashboardSelectfieldPromQlList = computed(() =>
-      props.dashboardPanelData.meta.stream.selectedStreamFields.map(
-        (it: any) => {
-          return {
-            label: it.name,
-            value: it.name,
-          };
-        },
-      ),
-    );
+    const dashboardSelectfieldPromQlList = computed(() => {
+      // Get fields from groupedFields based on current query's stream
+      const currentQuery =
+        props.dashboardPanelData.data.queries[
+          props.dashboardPanelData.layout.currentQueryIndex
+        ];
+      const currentStream = currentQuery?.fields?.stream;
+
+      if (!currentStream) return [];
+
+      // Find the current stream in groupedFields
+      const streamFields =
+        props.dashboardPanelData.meta.streamFields.groupedFields.find(
+          (group: any) => group.name === currentStream,
+        );
+
+      if (!streamFields?.schema) return [];
+
+      return streamFields.schema.map((it: any) => {
+        return {
+          label: it.name,
+          value: it.name,
+        };
+      });
+    });
 
     const timeShifts = [];
 

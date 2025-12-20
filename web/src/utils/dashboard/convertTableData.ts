@@ -190,7 +190,7 @@ export const convertTableData = (
   // identify histogram fields for auto and custom sql
   if (panelSchema?.queries[0]?.customQuery === false) {
     for (const field of columnData) {
-      if (field?.aggregationFunction === "histogram") {
+      if (field?.functionName === "histogram") {
         histogramFields.push(field.alias);
       } else {
         const sample = tableRows
@@ -207,7 +207,7 @@ export const convertTableData = (
   } else {
     // need sampling to identify timeseries data
     for (const field of columnData) {
-      if (field?.aggregationFunction === "histogram") {
+      if (field?.functionName === "histogram") {
         histogramFields.push(field.alias);
       } else {
         const sample = tableRows

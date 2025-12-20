@@ -51,56 +51,53 @@ describe("PatternStatistics", () => {
     ).toBe(true);
   });
 
-  describe("Statistics Cards", () => {
-    it("should display logs scanned card with correct value", () => {
-      const logsScannedCard = wrapper.find(
-        '[data-test="pattern-stats-logs-scanned-card"]',
-      );
-      expect(logsScannedCard.exists()).toBe(true);
+  describe("Summary Text", () => {
+    it("should display summary with correct statistics", () => {
+      const summaryElement = wrapper.find('[data-test="pattern-statistics"]');
+      const summaryText = summaryElement.text();
 
-      const logsScannedValue = wrapper.find(
-        '[data-test="pattern-stats-logs-scanned-value"]',
-      );
-      expect(logsScannedValue.text()).toBe("1,000");
+      // Check that summary contains the key statistics
+      expect(summaryText).toContain("1,000"); // logs analyzed
+      expect(summaryText).toContain("42"); // patterns found
+      expect(summaryText).toContain("events");
+      expect(summaryText).toContain("patterns found");
+      expect(summaryText).toContain("ms");
     });
 
-    it("should display patterns found card with correct value", () => {
-      const patternsFoundCard = wrapper.find(
-        '[data-test="pattern-stats-patterns-found-card"]',
-      );
-      expect(patternsFoundCard.exists()).toBe(true);
+    it("should display correct format", () => {
+      const summaryElement = wrapper.find('[data-test="pattern-statistics"]');
+      const summaryText = summaryElement.text();
 
-      const patternsFoundValue = wrapper.find(
-        '[data-test="pattern-stats-patterns-found-value"]',
-      );
-      expect(patternsFoundValue.text()).toBe("42");
+      // Check the full format
+      expect(summaryText).toMatch(/Showing 1 to 50 out of \d+/);
+      expect(summaryText).toMatch(/\d+ patterns found in \d+/);
     });
 
-    it("should display coverage card with correct value", () => {
-      const coverageCard = wrapper.find(
-        '[data-test="pattern-stats-coverage-card"]',
-      );
-      expect(coverageCard.exists()).toBe(true);
+    it("should handle totalEvents prop", async () => {
+      await wrapper.setProps({
+        statistics: mockStatistics,
+        totalEvents: 5000,
+      });
 
-      const coverageValue = wrapper.find(
-        '[data-test="pattern-stats-coverage-value"]',
-      );
-      expect(coverageValue.text()).toBe("87.5%");
+      const summaryElement = wrapper.find('[data-test="pattern-statistics"]');
+      const summaryText = summaryElement.text();
+
+      expect(summaryText).toContain("5,000"); // totalEvents
     });
 
-    it("should display processing time card with correct value", () => {
-      const processingTimeCard = wrapper.find(
-        '[data-test="pattern-stats-processing-time-card"]',
-      );
-      expect(processingTimeCard.exists()).toBe(true);
+    it("should combine histogram time with extraction time", async () => {
+      await wrapper.setProps({
+        statistics: mockStatistics,
+        histogramTime: 50,
+      });
 
-      const processingTimeValue = wrapper.find(
-        '[data-test="pattern-stats-processing-time-value"]',
-      );
-      expect(processingTimeValue.text()).toBe("150ms");
+      const summaryElement = wrapper.find('[data-test="pattern-statistics"]');
+      const summaryText = summaryElement.text();
+
+      // Should show 50 (histogram) + 150 (extraction) = 200ms
+      expect(summaryText).toContain("200 ms");
     });
   });
-
 
   describe("Empty Statistics", () => {
     it("should display zero values when statistics are null", async () => {
@@ -108,20 +105,11 @@ describe("PatternStatistics", () => {
         statistics: null,
       });
 
-      const patternsFoundValue = wrapper.find(
-        '[data-test="pattern-stats-patterns-found-value"]',
-      );
-      expect(patternsFoundValue.text()).toBe("0");
+      const summaryElement = wrapper.find('[data-test="pattern-statistics"]');
+      const summaryText = summaryElement.text();
 
-      const coverageValue = wrapper.find(
-        '[data-test="pattern-stats-coverage-value"]',
-      );
-      expect(coverageValue.text()).toBe("0.0%");
-
-      const processingTimeValue = wrapper.find(
-        '[data-test="pattern-stats-processing-time-value"]',
-      );
-      expect(processingTimeValue.text()).toBe("0ms");
+      expect(summaryText).toContain("0 patterns found");
+      expect(summaryText).toContain("0 events");
     });
   });
 });

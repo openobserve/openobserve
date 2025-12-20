@@ -16,7 +16,6 @@
 use actix_web::{HttpRequest, HttpResponse, get, web};
 use chrono::{Duration, Utc};
 use config::{
-    META_ORG_ID,
     meta::{
         search::{Query, Request as SearchRequest},
         self_reporting::usage::TRIGGERS_STREAM,
@@ -394,7 +393,7 @@ pub async fn get_pipeline_history(
 
     let total_count = match SearchService::search(
         &trace_id,
-        META_ORG_ID,
+        &org_id,
         StreamType::Logs,
         Some(user_email.user_id.clone()),
         &count_req,
@@ -454,7 +453,7 @@ pub async fn get_pipeline_history(
     // Execute search against _meta organization's triggers stream
     let search_result = match SearchService::search(
         &trace_id,
-        META_ORG_ID,
+        &org_id,
         StreamType::Logs,
         Some(user_email.user_id.clone()),
         &data_req,

@@ -276,7 +276,8 @@
     "actionLabel": "Aktion",
     "transformLabel": "Verwandeln",
     "addToDashboard": "Zum Dashboard hinzufügen",
-    "selectStream": "Wählen Sie Stream"
+    "selectStream": "Wählen Sie Stream",
+    "pattern_summary": "Es werden 1 bis 50 von {totalEvents} -Ereignissen und {patternsFound} -Mustern angezeigt, die in {logsAnalyzed} -Ereignissen in {totalTime} ms gefunden wurden."
   },
   "menu": {
     "home": "Startseite",
@@ -1000,7 +1001,11 @@
     "colorBySeriesTitle": "Farbe nach Serie",
     "colorBySeriesTooltip": "Wenden Sie Farben auf Reihen an, um die visuelle Unterscheidung in Diagrammen zu verbessern. Passen Sie die Farben für jede Reihe an, um die Datenvisualisierung zu verbessern.",
     "editColorBySeries": " Farbe nach Serie bearbeiten",
-    "applyColorBySeries": " Farbe reihenweise auftragen"
+    "applyColorBySeries": " Farbe reihenweise auftragen",
+    "showAllLegends": "Zeige alle Legenden",
+    "legendsOfCharts": "Legenden der Charts",
+    "totalLegends": "Summe: {count}",
+    "noLegendsAvailable": "Keine Legenden verfügbar"
   },
   "panel": {
     "header": "Panel",
@@ -1067,7 +1072,15 @@
     "mapvalue": "Wert",
     "customChartTypeSelector": "Benutzerdefinierter Diagrammtyp-Selektor",
     "customChartTypeSelectorHint": "Wählen Sie einen Diagrammtyp aus der eCharts-Bibliothek aus, um mit einer grundlegenden Codestruktur zu beginnen",
-    "selectChartType": "Wählen Sie den Diagrammtyp"
+    "selectChartType": "Wählen Sie den Diagrammtyp",
+    "joins": "Tritt bei",
+    "addJoin": "Join hinzufügen",
+    "removeJoin": "Join entfernen",
+    "leftJoin": "Linker Join",
+    "innerJoin": "Innere Verbindung",
+    "rightJoin": "Richtiger Beitritt",
+    "addClause": "Klausel hinzufügen",
+    "removeClause": "Klausel entfernen"
   },
   "home": {
     "streams": "Streams",
@@ -1936,7 +1949,8 @@
     "period": "Zeitraum",
     "cron": "Cron",
     "type": "Typ",
-    "run_pipeline": "Pipeline ausführen"
+    "run_pipeline": "Pipeline ausführen",
+    "showLegends": "Legends anzeigen"
   },
   "alert_list": {
     "alert_details": "Details zur Warnung"

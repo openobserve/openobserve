@@ -276,7 +276,8 @@
     "actionLabel": "Acción",
     "transformLabel": "Transformar",
     "addToDashboard": "Agregar al panel",
-    "selectStream": "Selecciona Stream"
+    "selectStream": "Selecciona Stream",
+    "pattern_summary": "Se muestran de 1 a 50 de los eventos y {patternsFound} patrones de {totalEvents} encontrados en eventos de {logsAnalyzed} en {totalTime} ms."
   },
   "menu": {
     "home": "Inicio",
@@ -1000,7 +1001,11 @@
     "colorBySeriesTitle": "Color por serie",
     "colorBySeriesTooltip": "Aplica colores a las series para lograr una mejor distinción visual en los gráficos. Personalice los colores de cada serie para mejorar la visualización de los datos.",
     "editColorBySeries": " Edición de colores por serie",
-    "applyColorBySeries": " Aplicar color por serie"
+    "applyColorBySeries": " Aplicar color por serie",
+    "showAllLegends": "Mostrar todas las leyendas",
+    "legendsOfCharts": "Leyendas de las listas",
+    "totalLegends": "Total: {count}",
+    "noLegendsAvailable": "No hay leyendas disponibles"
   },
   "panel": {
     "header": "Panel",
@@ -1067,7 +1072,15 @@
     "mapvalue": "Valor",
     "customChartTypeSelector": "Selector de tipo de gráfico personalizado",
     "customChartTypeSelectorHint": "Seleccione un tipo de gráfico de la biblioteca ECharts para comenzar con una estructura de código básica",
-    "selectChartType": "Seleccione el tipo de gráfico"
+    "selectChartType": "Seleccione el tipo de gráfico",
+    "joins": "Se une",
+    "addJoin": "Agregar unirse",
+    "removeJoin": "Eliminar Join",
+    "leftJoin": "Unirse a la izquierda",
+    "innerJoin": "Inner Join",
+    "rightJoin": "Únete a la derecha",
+    "addClause": "Agregar cláusula",
+    "removeClause": "Eliminar cláusula"
   },
   "home": {
     "streams": "Transmisiones",
@@ -1936,7 +1949,8 @@
     "period": "Período",
     "cron": "Cron",
     "type": "Tipo",
-    "run_pipeline": "Ejecute Pipeline"
+    "run_pipeline": "Ejecute Pipeline",
+    "showLegends": "Mostrar leyendas"
   },
   "alert_list": {
     "alert_details": "Detalles de la alerta"

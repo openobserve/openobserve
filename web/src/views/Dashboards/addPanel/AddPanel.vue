@@ -435,6 +435,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @last-triggered-at-update="handleLastTriggeredAtUpdate"
                         searchType="dashboards"
                         @series-data-update="seriesDataUpdate"
+                        @show-legends="showLegendsDialog = true"
+                        ref="panelSchemaRendererRef"
                       />
                       <q-dialog v-model="showViewPanel">
                         <QueryInspector
@@ -602,7 +604,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="height: calc(100vh - 99px); overflow-y: auto"
               >
                 <div class="col scroll" style="height: 100%; display: flex; flex-direction: column;">
-                  <div style="height: 500px; flex-shrink: 0;">
+                  <div style="height: 500px; flex-shrink: 0; overflow: hidden;">
                     <q-splitter
                       class="query-editor-splitter"
                       v-model="splitterModel"
@@ -708,6 +710,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
+    <q-dialog v-model="showLegendsDialog">
+      <ShowLegendsPopup
+        :panelData="currentPanelData"
+        @close="showLegendsDialog = false"
+      />
+    </q-dialog>
   </div>
 </template>
 
@@ -771,6 +779,10 @@ const ConfigPanel = defineAsyncComponent(() => {
   return import("../../../components/dashboards/addPanel/ConfigPanel.vue");
 });
 
+const ShowLegendsPopup = defineAsyncComponent(() => {
+  return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
+});
+
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
 });
@@ -798,6 +810,7 @@ export default defineComponent({
     DashboardErrorsComponent,
     PanelSidebar,
     ConfigPanel,
+    ShowLegendsPopup,
     VariablesValueSelector,
     PanelSchemaRenderer,
     RelativeTime,
@@ -816,6 +829,8 @@ export default defineComponent({
     // This will be used to copy the chart data to the chart renderer component
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
     const chartData = ref();
+    const showLegendsDialog = ref(false);
+    const panelSchemaRendererRef: any = ref(null);
     const { t } = useI18n();
     const router = useRouter();
     const route = useRoute();
@@ -831,6 +846,7 @@ export default defineComponent({
       resetDashboardPanelDataAndAddTimeField,
       resetAggregationFunction,
       validatePanel,
+      makeAutoSQLQuery,
     } = useDashboardPanelData("dashboard");
     const editMode = ref(false);
     const selectedDate: any = ref(null);
@@ -1069,7 +1085,16 @@ export default defineComponent({
       //event listener before unload and data is updated
       window.addEventListener("beforeunload", beforeUnloadHandler);
       // console.time("add panel loadDashboard");
-      loadDashboard();
+      await loadDashboard();
+      
+      // Call makeAutoSQLQuery after dashboard data is loaded
+      // Only generate SQL if we're in auto query mode
+      if (!editMode.value && 
+          !dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery) {
+        await makeAutoSQLQuery();
+      }
 
       registerAiContextHandler();
 
@@ -1219,7 +1244,10 @@ export default defineComponent({
       const normalizedRefreshed = normalizeVariables(updatedVariablesData);
       const variablesChanged = !isEqual(normalizedCurrent, normalizedRefreshed);
 
-      const configChanged = !isEqual(chartData.value, dashboardPanelData.data);
+      const configChanged = !isEqual(
+        JSON.parse(JSON.stringify(chartData.value ?? {})),
+        JSON.parse(JSON.stringify(dashboardPanelData.data ?? {})),
+      );
       let configNeedsApiCall = false;
 
       if (configChanged) {
@@ -1272,6 +1300,75 @@ export default defineComponent({
         window.dispatchEvent(new Event("resize"));
         // console.timeEnd("watch:dashboardPanelData.layout.isConfigPanelOpen");
       },
+    );
+
+    // Generate the query when the fields are updated
+    watch(
+      () => [
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.x,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.y,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.breakdown,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.z,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.filter,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.latitude,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.longitude,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.weight,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.source,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.target,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.value,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.name,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.value_for_maps,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.limit,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].joins,
+      ],
+      () => {
+        // only continue if current mode is auto query generation
+        if (
+          !dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery
+        ) {
+          // makeAutoSQLQuery is async function
+          makeAutoSQLQuery();
+        }
+      },
+      { deep: true },
     );
 
     // resize the chart when query editor is opened and closed
@@ -1861,6 +1958,26 @@ export default defineComponent({
         hoveredSeriesState.value.panelId = panelId ?? -1;
         hoveredSeriesState.value.hoveredTime = hoveredTime ?? null;
       },
+      setIndex: function (
+        dataIndex: number,
+        seriesIndex: number,
+        panelId: any,
+        hoveredTime?: any,
+      ) {
+        hoveredSeriesState.value.dataIndex = dataIndex ?? -1;
+        hoveredSeriesState.value.seriesIndex = seriesIndex ?? -1;
+        hoveredSeriesState.value.panelId = panelId ?? -1;
+        hoveredSeriesState.value.hoveredTime = hoveredTime ?? null;
+      },
+    });
+
+    const currentPanelData = computed(() => {
+      // panelData is a ref exposed by PanelSchemaRenderer
+      const rendererData = panelSchemaRendererRef.value?.panelData || {};
+      return {
+        ...rendererData,
+        config: dashboardPanelData.data.config || {},
+      };
     });
 
     // used provide and inject to share data between components
@@ -2077,6 +2194,9 @@ export default defineComponent({
       outlinedWarning,
       symOutlinedDataInfoAlert,
       outlinedRunningWithErrors,
+      showLegendsDialog,
+      currentPanelData,
+      panelSchemaRendererRef,
     };
   },
   methods: {

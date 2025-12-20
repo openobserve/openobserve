@@ -127,7 +127,7 @@ test.describe("dashboard UI testcases", () => {
         '[data-test="dashboard-panel-table"] thead tr th',
         (headerCells) =>
           headerCells.map((cell) =>
-            cell.textContent.trim().replace(/^arrow_upward/, "")
+            cell.textContent.trim().replace(/^arrow_upward/, "").replace(/content_copy/g, '').trim()
           )
       );
 
@@ -136,9 +136,11 @@ test.describe("dashboard UI testcases", () => {
         (rows) =>
           rows
             .map((row) =>
-              Array.from(row.querySelectorAll("td"), (cell) =>
-                cell.textContent.trim()
-              )
+              Array.from(row.querySelectorAll("td"), (cell) => {
+                // Get the span element that contains the actual text, excluding the button
+                const textSpan = cell.querySelector('span.q-mr-xs');
+                return textSpan ? textSpan.textContent.trim() : cell.textContent.trim().replace(/content_copy/g, '').trim();
+              })
             )
             .filter((row) => row.length > 0 && row.some((cell) => cell !== ""))
       );
@@ -330,7 +332,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.selectChartType("table");
     
     // Now we can access the field removal buttons
-    await pm.chartTypeSelector.removeField("_timestamp", "x");
+    await pm.chartTypeSelector.removeField("x_axis_1", "x");
 
     // Open Custom SQL editor
     await page.locator('[data-test="dashboard-customSql"]').click();
@@ -352,7 +354,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.searchAndAddField("xAxis", "y");
     
     // Set relative time range  
-     await pm.dashboardTimeRefresh.setRelative("6", "w");    
+     await pm.dashboardTimeRefresh.setRelative("30", "m");    
 
     await pm.dashboardPanelActions.waitForChartToRender();
 
