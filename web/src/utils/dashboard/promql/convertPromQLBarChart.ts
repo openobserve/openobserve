@@ -17,6 +17,7 @@ import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
 import { buildCategoryXAxis, buildCategoryYAxis, buildValueAxis, buildTooltip } from "./shared/axisBuilder";
 import { buildLegendConfig } from "./shared/gridBuilder";
+import { formatDate } from "../convertDataIntoUnitValue";
 
 /**
  * Converter for bar chart variants (h-bar, stacked, h-stacked)
@@ -49,7 +50,11 @@ export class BarConverter implements PromQLChartConverter {
         // Build categories from timestamps (only once)
         if (categories.length === 0) {
           queryData.timestamps.forEach(([, formatted]) => {
-            categories.push(formatted.toString());
+            // Handle both Date objects and ISO strings
+            const formattedString = formatted instanceof Date
+              ? formatDate(formatted)
+              : formatted.toString();
+            categories.push(formattedString);
           });
         }
 
