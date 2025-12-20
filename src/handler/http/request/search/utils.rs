@@ -397,6 +397,15 @@ JOIN "test1" AS b"#;
 
 #[cfg(test)]
 mod validate_query_edge_cases {
+    //! Edge case tests for query field validation across different UDS configurations.
+    //!
+    //! **Validation Strategy:** Based on DataFusion CLI testing,
+    //! OpenObserve implements STRICT validation that aligns with DataFusion's behavior:
+    //! - All fields must exist in the stream's schema
+    //! - All fields must be in the stream's UDS (if UDS is defined)
+    //! - Validation is per-table in JOIN queries
+    //! - Applies to all query types: SELECT, JOIN, subquery, CTE, UNION
+
     use super::*;
 
     mod helpers {
@@ -621,7 +630,6 @@ JOIN "test1" AS b ON a._timestamp = b._timestamp"#;
         }
 
         #[tokio::test]
-        #[ignore] // TODO: Enable once validation strategy is decided
         async fn test_join_oly_old_uds_test1_no_uds() {
             let ctx = init_test_context(
                 "join_mixed_uds",
@@ -640,17 +648,18 @@ JOIN "test1" AS b ON a._timestamp = b._timestamp"#;
 
             ctx.cleanup().await;
 
-            // TODO: Decide validation strategy
-            println!(
-                "JOIN (oly old UDS, test1 no UDS) - oly: {:?}, test1: {:?}",
-                result_oly, result_test1
+            // DataFusion uses STRICT validation: oly.continent not in UDS should fail
+            assert!(
+                result_oly.is_err(),
+                "Should fail when field not in oly's UDS"
             );
-            // Option 1 (Strict): assert!(result_oly.is_err()); // oly.continent not in UDS
-            // Option 2 (Permissive): assert!(result_oly.is_ok()); // Allow, return NULL
+            assert!(
+                result_test1.is_ok(),
+                "Should pass for test1 (no UDS restrictions)"
+            );
         }
 
         #[tokio::test]
-        #[ignore] // TODO: Enable once validation strategy is decided
         async fn test_join_both_new_uds() {
             let ctx = init_test_context(
                 "join_both_new_uds",
@@ -669,11 +678,7 @@ JOIN "test1" AS b ON a._timestamp = b._timestamp"#;
 
             ctx.cleanup().await;
 
-            // Should PASS: both have continent in UDS
-            println!(
-                "JOIN (both new UDS) - oly: {:?}, test1: {:?}",
-                result_oly, result_test1
-            );
+            // Should PASS: both have continent in UDS (aligns with DataFusion)
             assert!(
                 result_oly.is_ok() && result_test1.is_ok(),
                 "Should pass when field in both UDS"
@@ -681,7 +686,6 @@ JOIN "test1" AS b ON a._timestamp = b._timestamp"#;
         }
 
         #[tokio::test]
-        #[ignore] // TODO: Enable once validation strategy is decided
         async fn test_join_mixed_fields() {
             let ctx = init_test_context(
                 "join_mixed_fields",
@@ -698,8 +702,7 @@ JOIN "test1" AS b ON a._timestamp = b._timestamp"#;
 
             ctx.cleanup().await;
 
-            // Should FAIL: a.continent not in oly UDS (but a.name is OK)
-            println!("JOIN (mixed fields) - oly: {:?}", result_oly);
+            // Should FAIL: a.continent not in oly UDS (DataFusion strict validation)
             assert!(result_oly.is_err(), "Should fail when any field not in UDS");
         }
 
@@ -708,7 +711,6 @@ JOIN "test1" AS b ON a._timestamp = b._timestamp"#;
         // ========================================================================
 
         #[tokio::test]
-        #[ignore] // TODO: Enable once validation strategy is decided
         async fn test_subquery_field_in_where_not_in_uds() {
             let ctx = init_test_context(
                 "subquery_where",
@@ -727,8 +729,11 @@ WHERE a.continent IN (
 
             ctx.cleanup().await;
 
-            // TODO: Decide - Should fail because a.continent not in UDS?
-            println!("SUBQUERY (WHERE clause): {:?}", result);
+            // DataFusion strict validation: a.continent not in UDS should fail
+            assert!(
+                result.is_err(),
+                "Should fail when WHERE clause uses field not in UDS"
+            );
         }
 
         #[tokio::test]
@@ -749,7 +754,11 @@ FROM "oly" AS a"#;
 
             ctx.cleanup().await;
 
-            assert!(result.is_err(), "Should fail when any field not in UDS");
+            // DataFusion strict validation: a.continent not in UDS should fail
+            assert!(
+                result.is_err(),
+                "Should fail when subquery references field not in UDS"
+            );
         }
 
         // ========================================================================
@@ -777,11 +786,14 @@ GROUP BY continent"#;
 
             ctx.cleanup().await;
 
-            assert!(result.is_err(), "Should fail when any field not in UDS");
+            // DataFusion strict validation: continent not in UDS should fail
+            assert!(
+                result.is_err(),
+                "Should fail when CTE uses field not in UDS"
+            );
         }
 
         #[tokio::test]
-        #[ignore] // TODO: Enable once validation strategy is decided
         async fn test_cte_with_join() {
             let ctx = init_test_context(
                 "cte_join",
@@ -806,10 +818,14 @@ JOIN test1_continents AS b ON a._timestamp = b._timestamp"#;
 
             ctx.cleanup().await;
 
-            // TODO: Decide - CTE with JOIN
-            println!(
-                "CTE (with JOIN) - oly: {:?}, test1: {:?}",
-                result_oly, result_test1
+            // DataFusion strict validation: oly's continent not in UDS should fail
+            assert!(
+                result_oly.is_err(),
+                "Should fail when CTE references field not in oly's UDS"
+            );
+            assert!(
+                result_test1.is_ok(),
+                "Should pass for test1 (no UDS restrictions)"
             );
         }
 
@@ -818,7 +834,6 @@ JOIN test1_continents AS b ON a._timestamp = b._timestamp"#;
         // ========================================================================
 
         #[tokio::test]
-        #[ignore] // TODO: Enable once validation strategy is decided
         async fn test_union_oly_old_uds_test1_no_uds() {
             let ctx = init_test_context(
                 "union_mixed",
@@ -837,15 +852,18 @@ SELECT continent FROM "test1""#;
 
             ctx.cleanup().await;
 
-            // TODO: Decide - UNION with mixed UDS
-            println!(
-                "UNION (mixed UDS) - oly: {:?}, test1: {:?}",
-                result_oly, result_test1
+            // DataFusion strict validation: validates per-table
+            assert!(
+                result_oly.is_err(),
+                "Should fail when oly's continent not in UDS"
+            );
+            assert!(
+                result_test1.is_ok(),
+                "Should pass for test1 (no UDS restrictions)"
             );
         }
 
         #[tokio::test]
-        #[ignore] // TODO: Enable once validation strategy is decided
         async fn test_union_all_with_where() {
             let ctx = init_test_context(
                 "union_all_where",
@@ -862,8 +880,11 @@ SELECT continent FROM "test1" WHERE continent = 'Asia'"#;
 
             ctx.cleanup().await;
 
-            // TODO: Decide - UNION ALL with WHERE on non-UDS field
-            println!("UNION ALL (with WHERE): {:?}", result_oly);
+            // DataFusion strict validation: continent not in oly's UDS should fail
+            assert!(
+                result_oly.is_err(),
+                "Should fail when UNION uses field not in UDS"
+            );
         }
 
         // ========================================================================
@@ -871,7 +892,6 @@ SELECT continent FROM "test1" WHERE continent = 'Asia'"#;
         // ========================================================================
 
         #[tokio::test]
-        #[ignore] // TODO: Enable once validation strategy is decided
         async fn test_complex_cte_join_subquery() {
             let ctx = init_test_context(
                 "complex_mixed",
@@ -894,8 +914,11 @@ JOIN "test1" AS b ON a._timestamp = b._timestamp"#;
 
             ctx.cleanup().await;
 
-            // TODO: Decide - Complex query with CTE + JOIN + subquery
-            println!("COMPLEX (CTE + JOIN + Subquery): {:?}", result);
+            // DataFusion strict validation: continent not in oly's UDS should fail
+            assert!(
+                result.is_err(),
+                "Should fail when complex query uses field not in UDS"
+            );
         }
     }
 }
