@@ -929,6 +929,10 @@
     "oneFieldConfigMessage": "Add 1 field or configure it from the Config",
     "configLabel": "Config",
     "showLegendsLabel": "Show Legends",
+    "showAllLegends": "Show All Legends",
+    "legendsOfCharts": "Legends of charts",
+    "totalLegends": "Total: {count}",
+    "noLegendsAvailable": "No legends available",
     "wraptext": "Wrap table cells",
     "tableTranspose": "Transpose",
     "tableDynamicColumns": "Allow Dynamic Columns",
@@ -2005,7 +2009,8 @@
     "period": "Period",
     "cron": "Cron",
     "type": "Type",
-    "run_pipeline":"Run Pipeline"
+    "run_pipeline": "Run Pipeline",
+    "showLegends": "Show Legends"
   },
   "alert_list":{
     "alert_details":"Alert Details"

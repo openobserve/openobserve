@@ -166,13 +166,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @dragover="onDragOver"
               @drop="onDrop"
               @dragend="onDragEnd"
-              :style="
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].customQuery && props.pageIndex == customQueryFieldsLength
-                  ? 'border: 1px solid black'
-                  : ''
-              "
             >
               <div
                 v-if="props?.row?.isGroup"
@@ -687,6 +680,27 @@ export default defineComponent({
       },
     );
 
+    // Track stream/type per query index to detect changes within each specific query
+    const queryStreamTracking = ref<
+      Record<
+        number,
+        {
+          stream: string | null | undefined;
+          streamType: string | null | undefined;
+        }
+      >
+    >({});
+
+    // Initialize tracking for all existing queries
+    dashboardPanelData.data.queries.forEach((query: any, index: number) => {
+      if (!queryStreamTracking.value[index]) {
+        queryStreamTracking.value[index] = {
+          stream: query?.fields?.stream || null,
+          streamType: query?.fields?.stream_type || null,
+        };
+      }
+    });
+
     // update the selected stream fields list
     watch(
       () => [
@@ -694,12 +708,45 @@ export default defineComponent({
         dashboardPanelData.meta.stream.streamResultsType,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream,
+        ]?.fields?.stream,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream_type,
+        ]?.fields?.stream_type,
+        dashboardPanelData.layout.currentQueryIndex, // Track index changes
       ],
-      async () => {
+      async (newValues, oldValues) => {
+        const currentIndex = dashboardPanelData.layout.currentQueryIndex;
+        const currentStream = newValues?.[2];
+        const currentStreamType = newValues?.[3];
+
+        // Initialize tracking for this query if it doesn't exist
+        if (!queryStreamTracking.value[currentIndex]) {
+          queryStreamTracking.value[currentIndex] = {
+            stream: currentStream,
+            streamType: currentStreamType,
+          };
+          // Don't apply default query for newly tracked query
+          return;
+        }
+
+        // Get the previous stream/type for THIS specific query (not the previous query)
+        const previousForThisQuery = queryStreamTracking.value[currentIndex];
+
+        // Check if stream or streamType changed FOR THIS SPECIFIC QUERY
+        const streamChangedForThisQuery = previousForThisQuery.stream !== currentStream;
+        const streamTypeChangedForThisQuery = previousForThisQuery.streamType !== currentStreamType;
+
+        // Update tracking for this query
+        queryStreamTracking.value[currentIndex] = {
+          stream: currentStream,
+          streamType: currentStreamType,
+        };
+
+        // Only proceed if stream or streamType actually changed within THIS query
+        if (!streamChangedForThisQuery && !streamTypeChangedForThisQuery) {
+          return;
+        }
+
         // get the selected stream fields based on the selected stream type
         const fields: any = dashboardPanelData.meta.stream.streamResults.find(
           (it: any) =>
@@ -727,6 +774,7 @@ export default defineComponent({
             // NOTE: For the metrics page, we added one watch that resets the query on stream change.
             // Because of that, the default query overrides the original/saved query on the edit panel.
             // To prevent this, we added the dashboardPanelDataPageKey condition.
+            // IMPORTANT: Only set default query if stream or stream_type actually changed
             if (promqlMode.value && dashboardPanelDataPageKey === "metrics") {
               // set the query
               dashboardPanelData.data.queries[
