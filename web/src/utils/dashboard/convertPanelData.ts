@@ -100,10 +100,27 @@ export const convertPanelData = async (
       }
     }
     case "table": {
-      return {
-        chartType: panelSchema.type,
-        ...convertTableData(panelSchema, data, store),
-      };
+      // Check if PromQL query type
+      if (panelSchema?.queryType == "promql") {
+        return {
+          chartType: panelSchema.type,
+          ...(await convertPromQLData(
+            panelSchema,
+            data,
+            store,
+            chartPanelRef,
+            hoveredSeriesState,
+            annotations,
+            metadata,
+          )),
+        };
+      } else {
+        // SQL query type
+        return {
+          chartType: panelSchema.type,
+          ...convertTableData(panelSchema, data, store),
+        };
+      }
     }
     case "geomap": {
       return {

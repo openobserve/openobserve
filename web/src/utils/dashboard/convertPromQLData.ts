@@ -33,6 +33,7 @@ import {
   calculateBottomLegendHeight,
   calculateRightLegendWidth,
 } from "./legendConfiguration";
+import { convertPromQLChartData } from "./promql/convertPromQLChartData";
 
 let moment: any;
 let momentInitialized = false;
@@ -81,6 +82,11 @@ export const convertPromQLData = async (
   annotations: any,
   metadata: any = null,
 ) => {
+  console.log("=== [convertPromQLData] ENTRY POINT ===");
+  console.log("Panel Type:", panelSchema?.type);
+  console.log("Query Type:", panelSchema?.queryType);
+  console.log("Search Query Data length:", searchQueryData?.length);
+
   // console.time("convertPromQLData");
 
   // Set gridlines visibility based on config.show_gridlines (default: true)
@@ -97,9 +103,75 @@ export const convertPromQLData = async (
     !searchQueryData[0] ||
     !panelSchema
   ) {
+    console.log("=== [convertPromQLData] NO DATA - Returning null ===");
+    console.log("Checks:", {
+      isArray: Array.isArray(searchQueryData),
+      length: searchQueryData?.length,
+      hasFirst: !!searchQueryData?.[0],
+      hasPanelSchema: !!panelSchema
+    });
     // console.timeEnd("convertPromQLData");
     return { options: null };
   }
+
+  // ========== NEW MODULAR CHART SYSTEM ==========
+  // Delegate to new modular converter for newly supported chart types
+  const NEW_CHART_TYPES = [
+    "pie",
+    "donut",
+    "table",
+    "heatmap",
+    "h-bar",
+    "stacked",
+    "h-stacked",
+    "geomap",
+    "sankey",
+  ];
+  console.log("=== [convertPromQLData] Checking for new chart system ===");
+  console.log("Panel type:", panelSchema.type);
+  console.log("NEW_CHART_TYPES:", NEW_CHART_TYPES);
+  console.log("Includes?", NEW_CHART_TYPES.includes(panelSchema.type));
+
+  if (NEW_CHART_TYPES.includes(panelSchema.type)) {
+    console.log(`=== [convertPromQLData] YES - Processing ${panelSchema.type} with new system ===`);
+
+    try {
+      const result = await convertPromQLChartData(searchQueryData, {
+        panelSchema,
+        store,
+        chartPanelRef,
+        hoveredSeriesState,
+        annotations,
+        metadata,
+      });
+
+      console.log("=== [convertPromQLData] Converter returned result ===");
+      console.log("Result:", result);
+
+      // Apply annotations if present (only for ECharts-based charts)
+      if (annotations && annotations.length > 0 && panelSchema.type !== "table") {
+        const annotationResults = await getAnnotationsData(
+          annotations,
+          store,
+          panelSchema,
+        );
+        if (annotationResults && result.options) {
+          result.options.annotations = annotationResults;
+        }
+      }
+
+      console.log("=== [convertPromQLData] Returning result ===");
+      return result;
+    } catch (error) {
+      console.error(`Error converting ${panelSchema.type} chart:`, error);
+      console.error("Error stack:", error);
+      // Fall back to legacy system if new system fails
+      console.warn(`Falling back to legacy converter for ${panelSchema.type}`);
+    }
+  } else {
+    console.log(`=== [convertPromQLData] NO - ${panelSchema.type} not in NEW_CHART_TYPES, using legacy system ===`);
+  }
+  // ========== END NEW MODULAR CHART SYSTEM ==========
 
   // Initialize extras object
   let extras: any = {};

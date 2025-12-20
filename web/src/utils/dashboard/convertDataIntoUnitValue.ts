@@ -1461,6 +1461,15 @@ export const validatePanel = (
       "html",
       "markdown",
       "custom_chart",
+      "table",
+      "sankey",
+      "heatmap",
+      "geomap",
+      "donut",
+      "pie",
+      "h-bar",
+      "stacked",
+      "h-stacked",
     ];
     if (!allowedChartTypes.includes(panelData?.data?.type)) {
       errors.push(
