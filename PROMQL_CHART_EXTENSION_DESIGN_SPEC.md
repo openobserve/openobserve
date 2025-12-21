@@ -67,7 +67,7 @@ Extend OpenObserve's PromQL query support to include **all chart types** (pie, d
 - ✅ Helpful error messages when labels missing
 
 #### 1.4.4 Aggregation Options (9 Types)
-For single-value charts (pie, donut, gauge, metric, h-bar, table):
+For single-value charts (pie, donut, gauge, metric, h-bar):
 1. **last** - Latest value (default)
 2. **first** - Oldest value
 3. **min** - Minimum value
@@ -78,12 +78,36 @@ For single-value charts (pie, donut, gauge, metric, h-bar, table):
 8. **range** - Max - Min
 9. **diff** - Last - First
 
+For **table charts** - **Multi-select aggregation support**:
+- Users can select multiple aggregation functions
+- Each selected aggregation creates a separate column
+- Column naming format: `value_{aggregation}` (e.g., `value_last`, `value_sum`, `value_avg`)
+- If only one aggregation is selected, column name is simply `value`
+- Default: `last` aggregation only
+
 #### 1.4.5 Table Flexibility
 - ✅ Auto-column detection from metric labels (default)
 - ✅ Custom column configuration
+- ✅ Multi-select aggregation with dynamic columns
 - ✅ 8 column types: string, number, timestamp, duration, bytes, boolean, link, json
 - ✅ Pagination with configurable page size
 - ✅ Sortable/filterable columns
+
+**Example Table Configuration:**
+```json
+{
+  "config": {
+    "table_aggregations": ["last", "sum", "avg", "max"]
+  }
+}
+```
+
+**Resulting Columns:**
+- All metric labels (job, instance, etc.)
+- `value_last` - Latest value
+- `value_sum` - Sum of all values
+- `value_avg` - Average value
+- `value_max` - Maximum value
 
 #### 1.4.6 Custom Chart Safety
 - ✅ **Zero changes** to custom chart code path
@@ -645,7 +669,6 @@ export class PieConverter implements PromQLChartConverter {
 
 ```typescript
 import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
-import { getInstantValue } from "./shared/dataProcessor";
 import { getUnitValue, formatUnitValue } from "../../convertDataIntoUnitValue";
 
 export class TableConverter implements PromQLChartConverter {
@@ -657,11 +680,14 @@ export class TableConverter implements PromQLChartConverter {
     store: any,
     extras: any,
   ) {
-    // Build columns from metric labels + value
-    const columns = this.buildColumns(processedData, panelSchema);
+    // Get selected aggregations (default: ['last'])
+    const aggregations = panelSchema.config?.table_aggregations || ['last'];
 
-    // Build rows from series data
-    const rows = this.buildRows(processedData, panelSchema);
+    // Build columns from metric labels + aggregated value columns
+    const columns = this.buildColumns(processedData, panelSchema, aggregations);
+
+    // Build rows from series data with aggregated values
+    const rows = this.buildRows(processedData, panelSchema, aggregations);
 
     return {
       columns,
@@ -672,6 +698,7 @@ export class TableConverter implements PromQLChartConverter {
   private buildColumns(
     processedData: ProcessedPromQLData[],
     panelSchema: any,
+    aggregations: string[],
   ): any[] {
     // Collect all unique label keys
     const labelKeys = new Set<string>();
@@ -693,22 +720,27 @@ export class TableConverter implements PromQLChartConverter {
       sortable: true,
     }));
 
-    // Add value column
-    columns.push({
-      name: "value",
-      field: "value",
-      label: "Value",
-      align: "right",
-      sortable: true,
-      format: (val: any) => {
-        const unitValue = getUnitValue(
-          val,
-          panelSchema.config?.unit,
-          panelSchema.config?.unit_custom,
-          panelSchema.config?.decimals,
-        );
-        return formatUnitValue(unitValue);
-      },
+    // Add value columns for each selected aggregation
+    aggregations.forEach((agg) => {
+      const columnName = aggregations.length === 1 ? "value" : `value_${agg}`;
+      const columnLabel = aggregations.length === 1 ? "Value" : `Value (${agg})`;
+
+      columns.push({
+        name: columnName,
+        field: columnName,
+        label: columnLabel,
+        align: "right",
+        sortable: true,
+        format: (val: any) => {
+          const unitValue = getUnitValue(
+            val,
+            panelSchema.config?.unit,
+            panelSchema.config?.unit_custom,
+            panelSchema.config?.decimals,
+          );
+          return formatUnitValue(unitValue);
+        },
+      });
     });
 
     // Add timestamp column (if time-series data)
@@ -728,36 +760,71 @@ export class TableConverter implements PromQLChartConverter {
   private buildRows(
     processedData: ProcessedPromQLData[],
     panelSchema: any,
+    aggregations: string[],
   ): any[] {
     const rows: any[] = [];
 
     processedData.forEach((queryData) => {
       queryData.series.forEach((seriesData) => {
-        // For instant queries: one row per series
-        if (queryData.timestamps.length === 1 || seriesData.values.length === 1) {
-          const row: any = {
-            ...seriesData.metric,
-            value: parseFloat(getInstantValue(seriesData.values)),
-          };
-          rows.push(row);
-        }
-        // For range queries: one row per timestamp
-        else {
-          seriesData.values.forEach(([ts, value]) => {
-            const timestamp = queryData.timestamps.find(([t]) => t === ts)?.[1];
+        const row: any = {
+          ...seriesData.metric,
+        };
 
-            const row: any = {
-              timestamp,
-              ...seriesData.metric,
-              value: parseFloat(value),
-            };
-            rows.push(row);
-          });
-        }
+        // Calculate each aggregation for the series
+        aggregations.forEach((agg) => {
+          const columnName = aggregations.length === 1 ? "value" : `value_${agg}`;
+          row[columnName] = this.calculateAggregation(seriesData.values, agg);
+        });
+
+        rows.push(row);
       });
     });
 
     return rows;
+  }
+
+  /**
+   * Calculate aggregation value for a series
+   */
+  private calculateAggregation(
+    values: Array<[number, string]>,
+    aggregation: string,
+  ): number {
+    if (!values || values.length === 0) return 0;
+
+    const numericValues = values.map(([, val]) => parseFloat(val));
+
+    switch (aggregation) {
+      case "last":
+        return numericValues[numericValues.length - 1];
+
+      case "first":
+        return numericValues[0];
+
+      case "min":
+        return Math.min(...numericValues);
+
+      case "max":
+        return Math.max(...numericValues);
+
+      case "avg":
+        return numericValues.reduce((a, b) => a + b, 0) / numericValues.length;
+
+      case "sum":
+        return numericValues.reduce((a, b) => a + b, 0);
+
+      case "count":
+        return numericValues.length;
+
+      case "range":
+        return Math.max(...numericValues) - Math.min(...numericValues);
+
+      case "diff":
+        return numericValues[numericValues.length - 1] - numericValues[0];
+
+      default:
+        return numericValues[numericValues.length - 1]; // default to last
+    }
   }
 }
 ```
@@ -1112,6 +1179,58 @@ describe("PromQL Chart Conversion Integration", () => {
     // ... test pie chart conversion
   });
 
+  it("should convert table with multiple aggregations", async () => {
+    const mockResponse = fetchMockPromQLResponse("table_chart.json");
+    const mockContext = {
+      panelSchema: {
+        type: "table",
+        config: {
+          table_aggregations: ["last", "sum", "avg"],
+        },
+      },
+      store: mockStore,
+    };
+
+    const result = await convertPromQLChartData(mockResponse, mockContext);
+
+    // Verify columns are created for each aggregation
+    expect(result.options.columns).toContainEqual(
+      expect.objectContaining({ field: "value_last" })
+    );
+    expect(result.options.columns).toContainEqual(
+      expect.objectContaining({ field: "value_sum" })
+    );
+    expect(result.options.columns).toContainEqual(
+      expect.objectContaining({ field: "value_avg" })
+    );
+
+    // Verify rows have aggregated values
+    expect(result.options.rows[0]).toHaveProperty("value_last");
+    expect(result.options.rows[0]).toHaveProperty("value_sum");
+    expect(result.options.rows[0]).toHaveProperty("value_avg");
+  });
+
+  it("should convert table with single aggregation using simple 'value' column", async () => {
+    const mockResponse = fetchMockPromQLResponse("table_chart.json");
+    const mockContext = {
+      panelSchema: {
+        type: "table",
+        config: {
+          table_aggregations: ["last"],
+        },
+      },
+      store: mockStore,
+    };
+
+    const result = await convertPromQLChartData(mockResponse, mockContext);
+
+    // Verify single aggregation uses 'value' column name
+    expect(result.options.columns).toContainEqual(
+      expect.objectContaining({ field: "value" })
+    );
+    expect(result.options.rows[0]).toHaveProperty("value");
+  });
+
   it("should handle empty results gracefully", async () => {
     // ... test edge case
   });
@@ -1132,6 +1251,35 @@ test("PromQL pie chart renders correctly", async ({ page }) => {
   // Verify data is correct
   const tooltipContent = await page.locator(".echarts-tooltip").textContent();
   expect(tooltipContent).toContain("api: 42 (35%)");
+});
+
+test("PromQL table with multi-aggregation renders correctly", async ({ page }) => {
+  await page.goto("/dashboards/test-promql-table");
+
+  // Verify table is visible
+  await expect(page.locator(".q-table")).toBeVisible();
+
+  // Verify aggregation columns are present
+  await expect(page.locator("th:has-text('Value (last)')")).toBeVisible();
+  await expect(page.locator("th:has-text('Value (sum)')")).toBeVisible();
+  await expect(page.locator("th:has-text('Value (avg)')")).toBeVisible();
+
+  // Verify data in first row
+  const firstRow = page.locator("tbody tr").first();
+  await expect(firstRow.locator("td").nth(2)).toContainText("42.5"); // value_last
+  await expect(firstRow.locator("td").nth(3)).toContainText("2550.0"); // value_sum
+  await expect(firstRow.locator("td").nth(4)).toContainText("42.5"); // value_avg
+});
+
+test("PromQL table with single aggregation uses 'value' column", async ({ page }) => {
+  await page.goto("/dashboards/test-promql-table-single");
+
+  // Verify table is visible
+  await expect(page.locator(".q-table")).toBeVisible();
+
+  // Verify only 'Value' column (not value_last)
+  await expect(page.locator("th:has-text('Value')")).toBeVisible();
+  await expect(page.locator("th:has-text('Value (last)')")).not.toBeVisible();
 });
 ```
 
@@ -1437,13 +1585,28 @@ sum by (job) (up)
 
 **For Table:**
 ```promql
-# Show all metrics with labels
+# Range query to show metrics over time with aggregations
+rate(http_requests_total[5m])
+
+# With table_aggregations: ['last', 'sum', 'avg', 'max']
+# Result table will show:
+# job  | instance | value_last | value_sum | value_avg | value_max
+# api  | server1  | 42.5       | 2550.0    | 42.5      | 45.2
+# web  | server2  | 31.2       | 1872.0    | 31.2      | 33.8
+# db   | server3  | 15.6       | 936.0     | 15.6      | 17.1
+```
+
+**For Table (Single Aggregation):**
+```promql
+# Instant query with single aggregation
 up
 
-# Result:
-# instance="10.0.0.1", job="api", value=1
-# instance="10.0.0.2", job="web", value=1
-# instance="10.0.0.3", job="db", value=0
+# With table_aggregations: ['last'] (or default)
+# Result table will show:
+# instance    | job | value
+# 10.0.0.1    | api | 1
+# 10.0.0.2    | web | 1
+# 10.0.0.3    | db  | 0
 ```
 
 **For Heatmap:**
@@ -1525,7 +1688,65 @@ function isChartTypeSupported(chartType: string): boolean {
 }
 ```
 
-### 7.2 Query Configuration Hints
+### 8.2 Table Aggregation Configuration
+
+**File:** `src/components/dashboards/addPanel/PanelConfig.vue` (or similar)
+
+Add a multi-select dropdown for table aggregation options:
+
+```vue
+<template>
+  <!-- Show only when chart type is 'table' -->
+  <q-select
+    v-if="panelSchema.type === 'table'"
+    v-model="panelSchema.config.table_aggregations"
+    :options="aggregationOptions"
+    label="Table Aggregations"
+    multiple
+    chips
+    dense
+    outlined
+    hint="Select aggregation functions to display as columns"
+    class="q-mb-md"
+  >
+    <template v-slot:hint>
+      Each aggregation creates a column: value_last, value_sum, etc.
+    </template>
+  </q-select>
+</template>
+
+<script>
+const aggregationOptions = [
+  { label: 'Last', value: 'last' },
+  { label: 'First', value: 'first' },
+  { label: 'Min', value: 'min' },
+  { label: 'Max', value: 'max' },
+  { label: 'Average', value: 'avg' },
+  { label: 'Sum', value: 'sum' },
+  { label: 'Count', value: 'count' },
+  { label: 'Range (Max-Min)', value: 'range' },
+  { label: 'Diff (Last-First)', value: 'diff' },
+];
+</script>
+```
+
+**Example Output:**
+
+If user selects `['last', 'sum', 'avg']`, the table will show:
+
+| job | instance | value_last | value_sum | value_avg |
+|-----|----------|------------|-----------|-----------|
+| api | server1  | 42.5       | 425.0     | 42.5      |
+| web | server2  | 31.2       | 312.0     | 31.2      |
+
+If user selects only `['last']`, the table will show:
+
+| job | instance | value |
+|-----|----------|-------|
+| api | server1  | 42.5  |
+| web | server2  | 31.2  |
+
+### 8.3 Query Configuration Hints
 
 Add helper text in the query editor when specific chart types are selected:
 
@@ -1541,7 +1762,7 @@ Add helper text in the query editor when specific chart types are selected:
 
 **Hints:**
 - **Pie/Donut:** "Use instant queries or the latest value from range queries will be used"
-- **Table:** "All metric labels will be displayed as columns"
+- **Table:** "All metric labels will be displayed as columns. Select aggregations to calculate multiple values per metric."
 - **Heatmap:** "Use range queries with multiple series for best results"
 - **GeoMap:** "Ensure metrics have 'lat', 'lon', and 'weight' labels"
 - **Maps:** "Ensure metrics have 'name' (location name) and 'value' labels"
