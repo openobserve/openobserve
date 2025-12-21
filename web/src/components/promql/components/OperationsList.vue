@@ -1,114 +1,132 @@
 <template>
   <div class="operations-list">
-    <div class="text-subtitle2 q-mb-sm">
-      <q-icon name="functions" class="q-mr-xs" />
-      Operations
-      <q-btn
-        flat
-        dense
-        round
-        icon="add"
-        size="sm"
-        color="primary"
-        @click="showOperationSelector = true"
-        class="q-ml-sm"
-      >
-        <q-tooltip>Add operation</q-tooltip>
-      </q-btn>
-    </div>
-
-    <!-- Empty State -->
-    <div v-if="localOperations.length === 0" class="text-grey-7 q-pa-md text-center">
-      No operations added yet. Click + to add an operation.
-    </div>
-
-    <!-- Operations List with Drag and Drop (Horizontal) -->
-    <div class="operations-scroll-wrapper">
-      <draggable
-        v-show="localOperations.length > 0"
-        v-model="localOperations"
-        :item-key="getItemKey"
-        @change="onDragEnd"
-        handle=".drag-handle"
-        class="operations-container-horizontal"
-      >
-        <template v-for="(element, index) in localOperations">
-          <q-card flat bordered class="operation-item-horizontal q-mr-sm">
-            <q-card-section class="q-pa-sm">
-              <!-- Header Row: Drag Handle + Name + Remove -->
-              <div class="row items-center justify-between q-mb-sm">
-                <div class="row items-center">
-                  <q-icon name="drag_indicator" color="grey-6" size="sm" class="drag-handle cursor-grab q-mr-xs" />
-                  <div class="text-weight-medium">
-                    {{ getOperationDef(element.id)?.name || element.id }}
-                  </div>
-                </div>
+    <div style="display: flex; flex-direction: row" class="q-pl-md">
+      <div class="layout-name">{{ t("panel.operations") }}</div>
+      <span class="layout-separator">:</span>
+      <div class="axis-container scroll row">
+        <!-- Operations with Drag and Drop -->
+        <draggable
+          v-model="localOperations"
+          :item-key="getItemKey"
+          @change="onDragEnd"
+          handle=".drag-handle"
+          class="operations-container"
+        >
+          <template v-for="(element, index) in localOperations">
+            <div class="operation-item">
+              <q-btn-group>
                 <q-btn
-                  flat
+                  square
+                  icon="drag_indicator"
+                  no-caps
                   dense
-                  round
-                  icon="close"
-                  color="negative"
-                  size="xs"
-                  @click="removeOperation(index)"
+                  flat
+                  size="sm"
+                  class="drag-handle"
+                  :data-test="`promql-operation-drag-${index}`"
                 >
-                  <q-tooltip>Remove</q-tooltip>
+                  <q-tooltip>Drag to reorder</q-tooltip>
                 </q-btn>
-              </div>
-
-              <!-- Operation Parameters -->
-              <div class="column q-gutter-xs">
-                <template
-                  v-for="(param, paramIndex) in getOperationDef(element.id)?.params"
-                  :key="paramIndex"
+                <q-btn
+                  square
+                  icon-right="arrow_drop_down"
+                  no-caps
+                  dense
+                  :no-wrap="true"
+                  color="primary"
+                  size="sm"
+                  :label="computedLabel(element)"
+                  class="q-pl-sm"
+                  :data-test="`promql-operation-${index}`"
                 >
-                  <!-- Number Parameter -->
-                  <q-input
-                    v-if="param.type === 'number'"
-                    v-model.number="element.params[paramIndex]"
-                    type="number"
-                    :label="param.name"
-                    dense
-                    borderless
-                    stack-label
-                    hide-bottom-space
-                    class="showLabelOnTop"
-                    @update:model-value="onOperationChange"
-                  />
+                  <q-menu class="q-pa-md">
+                    <div style="width: 350px">
+                      <div class="text-weight-medium q-mb-sm">
+                        {{ getOperationDef(element.id)?.name || element.id }}
+                      </div>
+                      <div class="text-caption text-grey-7 q-mb-md">
+                        {{ getOperationDef(element.id)?.documentation }}
+                      </div>
 
-                  <!-- String Parameter -->
-                  <q-input
-                    v-else-if="param.type === 'string'"
-                    v-model="element.params[paramIndex]"
-                    :label="param.name"
-                    :placeholder="param.placeholder"
-                    dense
-                    borderless
-                    stack-label
-                    hide-bottom-space
-                    class="showLabelOnTop"
-                    @update:model-value="onOperationChange"
-                  />
+                      <!-- Operation Parameters -->
+                      <template
+                        v-for="(param, paramIndex) in getOperationDef(element.id)?.params"
+                        :key="paramIndex"
+                      >
+                        <!-- Number Parameter -->
+                        <q-input
+                          v-if="param.type === 'number'"
+                          v-model.number="element.params[paramIndex]"
+                          type="number"
+                          :label="param.name"
+                          dense
+                          borderless
+                          stack-label
+                          hide-bottom-space
+                          class="showLabelOnTop q-mb-sm"
+                          @update:model-value="onOperationChange"
+                          :data-test="`promql-operation-param-${paramIndex}`"
+                        />
 
-                  <!-- Select Parameter (if options provided) -->
-                  <q-select
-                    v-else-if="param.options"
-                    v-model="element.params[paramIndex]"
-                    :options="param.options"
-                    :label="param.name"
-                    dense
-                    borderless
-                    stack-label
-                    hide-bottom-space
-                    class="showLabelOnTop"
-                    @update:model-value="onOperationChange"
-                  />
-                </template>
-              </div>
-            </q-card-section>
-          </q-card>
-        </template>
-      </draggable>
+                        <!-- String Parameter -->
+                        <q-input
+                          v-else-if="param.type === 'string'"
+                          v-model="element.params[paramIndex]"
+                          :label="param.name"
+                          :placeholder="param.placeholder"
+                          dense
+                          borderless
+                          stack-label
+                          hide-bottom-space
+                          class="showLabelOnTop q-mb-sm"
+                          @update:model-value="onOperationChange"
+                          :data-test="`promql-operation-param-${paramIndex}`"
+                        />
+
+                        <!-- Select Parameter (if options provided) -->
+                        <q-select
+                          v-else-if="param.options"
+                          v-model="element.params[paramIndex]"
+                          :options="param.options"
+                          :label="param.name"
+                          dense
+                          borderless
+                          stack-label
+                          hide-bottom-space
+                          class="showLabelOnTop q-mb-sm"
+                          @update:model-value="onOperationChange"
+                          :data-test="`promql-operation-param-${paramIndex}`"
+                        />
+                      </template>
+                    </div>
+                  </q-menu>
+                </q-btn>
+                <q-btn
+                  size="xs"
+                  dense
+                  @click="removeOperation(index)"
+                  icon="close"
+                  :data-test="`promql-operation-remove-${index}`"
+                />
+              </q-btn-group>
+            </div>
+          </template>
+        </draggable>
+
+        <!-- Add Button -->
+        <q-btn
+          flat
+          dense
+          icon="add"
+          size="sm"
+          color="primary"
+          @click="showOperationSelector = true"
+          class="add-operation-btn"
+          data-test="promql-add-operation"
+        >
+          <q-tooltip>Add operation</q-tooltip>
+        </q-btn>
+      </div>
     </div>
 
     <!-- Operation Selector Dialog -->
@@ -172,6 +190,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
 import { VueDraggableNext as draggable } from "vue-draggable-next";
 import {
   QueryBuilderOperation,
@@ -187,11 +206,27 @@ const emit = defineEmits<{
   "update:operations": [value: QueryBuilderOperation[]];
 }>();
 
+const { t } = useI18n();
 const localOperations = ref<QueryBuilderOperation[]>([...props.operations]);
 const showOperationSelector = ref(false);
 const searchQuery = ref("");
 
 const categories = computed(() => promQueryModeller.getCategories());
+
+const computedLabel = (operation: QueryBuilderOperation): string => {
+  const opDef = getOperationDef(operation.id);
+  if (!opDef) return operation.id;
+
+  // Show operation name with parameters if any
+  if (operation.params && operation.params.length > 0 && operation.params.some(p => p !== "" && p !== null && p !== undefined)) {
+    const paramsStr = operation.params
+      .filter(p => p !== "" && p !== null && p !== undefined)
+      .join(", ");
+    return `${opDef.name}(${paramsStr})`;
+  }
+
+  return opDef.name;
+};
 
 onMounted(() => {
   console.log("OperationsList mounted");
@@ -261,57 +296,46 @@ const onOperationChange = () => {
 
 <style scoped lang="scss">
 .operations-list {
-  padding: 16px;
-  background: #f5f5f5;
-  border-radius: 4px;
+  margin-bottom: 8px;
 }
 
-// Horizontal scroll wrapper
-.operations-scroll-wrapper {
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding-bottom: 8px;
-
-  // Custom scrollbar styling
-  &::-webkit-scrollbar {
-    height: 8px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 4px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 4px;
-
-    &:hover {
-      background: #555;
-    }
-  }
-}
-
-// Horizontal operations container
-.operations-container-horizontal {
+.layout-name {
+  font-size: 14px;
+  white-space: nowrap;
+  min-width: 130px;
   display: flex;
-  flex-direction: row;
-  gap: 12px;
-  min-height: 120px;
-  padding: 4px 0;
+  align-items: center;
 }
 
-// Horizontal operation card
-.operation-item-horizontal {
-  min-width: 200px;
-  max-width: 280px;
-  flex-shrink: 0;
-  transition: all 0.2s;
+.layout-separator {
+  display: flex;
+  align-items: center;
+  margin-left: 2px;
+  margin-right: 2px;
+}
 
-  &:hover {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-    transform: translateY(-2px);
-  }
+.axis-container {
+  margin: 5px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.operations-container {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.operation-item {
+  display: flex;
+  align-items: center;
+}
+
+.add-operation-btn {
+  margin-left: 4px;
 }
 
 .drag-handle {
@@ -322,7 +346,9 @@ const onOperationChange = () => {
   }
 }
 
-.cursor-grab {
-  cursor: grab;
+.q-menu {
+  box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
+  transform: translateY(0.5rem);
+  border-radius: 0px;
 }
 </style>
