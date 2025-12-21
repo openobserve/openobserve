@@ -36,6 +36,7 @@ export class GeoConverter implements PromQLChartConverter {
     // Get label names for geo coordinates
     const latLabel = config.lat_label || "latitude" || "lat";
     const lonLabel = config.lon_label || "longitude" || "lon";
+    const weightLabel = config.weight_label || "weight" || "value";
     const nameLabel = config.name_label || "name";
 
     const geoData: any[] = [];
@@ -50,18 +51,21 @@ export class GeoConverter implements PromQLChartConverter {
         if (!lat || !lon) {
           errors.push(
             `Series "${seriesData.name}" missing geo coordinates. ` +
-              `Expected labels: "${latLabel}", "${lonLabel}"`
+              `Expected labels: "${latLabel}", "${lonLabel}", "${weightLabel}"`
           );
           return;
         }
 
-        const value = applyAggregation(seriesData.values, aggregation);
+        // Use weight from metric label or aggregate from values
+        const weight = seriesData.metric[weightLabel]
+          ? parseFloat(seriesData.metric[weightLabel])
+          : applyAggregation(seriesData.values, aggregation);
 
         geoData.push({
           name,
-          value: [parseFloat(lon), parseFloat(lat), value],
+          value: [parseFloat(lon), parseFloat(lat), weight],
           itemStyle: {
-            color: this.getColorByValue(value, config),
+            color: this.getColorByValue(weight, config),
           },
         });
 
@@ -76,7 +80,7 @@ export class GeoConverter implements PromQLChartConverter {
     if (geoData.length === 0) {
       return {
         error: true,
-        message: `No valid geo data found. Ensure metrics have "${latLabel}" and "${lonLabel}" labels.`,
+        message: `No valid geo data found. Ensure metrics have "${latLabel}", "${lonLabel}", and "${weightLabel}" labels.`,
         series: [],
       };
     }
