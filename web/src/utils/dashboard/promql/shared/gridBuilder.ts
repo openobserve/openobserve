@@ -130,58 +130,49 @@ export function buildLegendConfig(
   // Get chart dimensions
   const { chartWidth, chartHeight } = getChartDimensions(chartPanelRef);
 
-  // Base legend configuration
+  // Base legend configuration (match line chart legend config exactly)
   const legend: any = {
     show: true,
     type: legendType,
     orient: legendPosition === "bottom" || legendPosition === "top" ? "horizontal" : "vertical",
+    padding: [10, 20, 10, 10],
+    textStyle: {
+      width: 150, // Same as line charts
+      overflow: "truncate",
+      rich: {
+        a: { fontWeight: "bold" },
+        b: { fontStyle: "normal" },
+      },
+    },
+    tooltip: {
+      show: true,
+      padding: 10,
+      textStyle: {
+        fontSize: 12,
+      },
+    },
   };
 
-  // Position legend based on configuration
-  switch (legendPosition) {
-    case "bottom":
-      legend.bottom = "0%";
-      legend.left = "center";
-      // Calculate and set height
-      const bottomHeight = calculateBottomLegendHeight(
+  // Position legend based on configuration (match line chart positioning exactly)
+  if (legendPosition === "right" || legendPosition === "vertical") {
+    legend.left = null;
+    legend.right = 0;
+    legend.top = "center";
+    // Calculate width for scroll legends
+    if (legendType === "scroll") {
+      const rightWidth = calculateRightLegendWidth(
         seriesData.length,
         chartWidth,
+        chartHeight,
         seriesData,
-        chartHeight
+        true
       );
-      legend.top = chartHeight - bottomHeight + 10;
-      legend.height = bottomHeight - 20;
-      break;
-
-    case "top":
-      legend.top = "0%";
-      legend.left = "center";
-      break;
-
-    case "right":
-      legend.right = "0%";
-      legend.top = "middle";
-      // Calculate width for scroll legends
-      if (legendType === "scroll") {
-        const rightWidth = calculateRightLegendWidth(
-          seriesData.length,
-          chartWidth,
-          chartHeight,
-          seriesData,
-          true
-        );
-        legend.width = rightWidth - 20;
-      }
-      break;
-
-    case "left":
-      legend.left = "0%";
-      legend.top = "middle";
-      break;
-
-    default:
-      legend.bottom = "0%";
-      legend.left = "center";
+      legend.width = rightWidth - 20;
+    }
+  } else {
+    // Bottom, top, or default positioning (same as line charts)
+    legend.left = "0";
+    legend.top = "bottom";
   }
 
   return legend;
