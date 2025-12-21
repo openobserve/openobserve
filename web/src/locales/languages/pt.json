@@ -1080,7 +1080,10 @@
     "innerJoin": "Junção interna",
     "rightJoin": "Junção correta",
     "addClause": "Adicionar cláusula",
-    "removeClause": "Remover cláusula"
+    "removeClause": "Remover cláusula",
+    "metric": "Métrico",
+    "labelFilters": "Filtros de etiqueta",
+    "operations": "Operações"
   },
   "home": {
     "streams": "Transmissões",
