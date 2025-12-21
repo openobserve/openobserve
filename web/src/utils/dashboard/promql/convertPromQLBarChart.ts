@@ -18,6 +18,7 @@ import { applyAggregation } from "./shared/dataProcessor";
 import { buildCategoryXAxis, buildCategoryYAxis, buildValueAxis, buildTooltip } from "./shared/axisBuilder";
 import { buildLegendConfig } from "./shared/gridBuilder";
 import { getSeriesColor } from "../colorPalette";
+import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
 
 /**
  * Converter for bar chart variants (h-bar, stacked, h-stacked)
@@ -112,6 +113,23 @@ export class BarConverter implements PromQLChartConverter {
             stack: "total",
             data,
             ...(color && { color }),
+            // Label configuration (same as SQL charts)
+            label: {
+              show: config?.label_option?.position != null,
+              position: config?.label_option?.position || "top",
+              rotate: config?.label_option?.rotate || 0,
+              // Add unit formatting to labels
+              formatter: (params: any) => {
+                return formatUnitValue(
+                  getUnitValue(
+                    params.value,
+                    config?.unit,
+                    config?.unit_custom,
+                    config?.decimals
+                  )
+                );
+              },
+            },
             emphasis: {
               focus: "series",
             },
@@ -170,6 +188,23 @@ export class BarConverter implements PromQLChartConverter {
       series.push({
         type: "bar",
         data: dataItems,
+        // Label configuration (same as SQL charts)
+        label: {
+          show: config?.label_option?.position != null,
+          position: config?.label_option?.position || "top",
+          rotate: config?.label_option?.rotate || 0,
+          // Add unit formatting to labels
+          formatter: (params: any) => {
+            return formatUnitValue(
+              getUnitValue(
+                params.value,
+                config?.unit,
+                config?.unit_custom,
+                config?.decimals
+              )
+            );
+          },
+        },
         emphasis: {
           focus: "series",
         },
