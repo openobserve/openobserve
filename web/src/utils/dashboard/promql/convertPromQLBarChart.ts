@@ -17,6 +17,7 @@ import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
 import { buildCategoryXAxis, buildCategoryYAxis, buildValueAxis, buildTooltip } from "./shared/axisBuilder";
 import { buildLegendConfig } from "./shared/gridBuilder";
+import { getSeriesColor } from "../colorPalette";
 
 /**
  * Converter for bar chart variants (h-bar, stacked, h-stacked)
@@ -42,9 +43,26 @@ export class BarConverter implements PromQLChartConverter {
     // Get aggregation function
     const aggregation = config.aggregation || "last";
 
+    // Calculate min/max for color scaling
+    let chartMin = Infinity;
+    let chartMax = -Infinity;
+
     if (isStacked) {
       // For stacked charts, each series becomes a stack component
       // Categories are timestamps (formatted for display)
+
+      // First pass: calculate min/max
+      processedData.forEach((queryData) => {
+        queryData.series.forEach((seriesData) => {
+          const numericValues = seriesData.values.map(([_, val]) => parseFloat(val));
+          numericValues.forEach(val => {
+            if (val < chartMin) chartMin = val;
+            if (val > chartMax) chartMax = val;
+          });
+        });
+      });
+
+      // Second pass: build series with colors
       processedData.forEach((queryData) => {
         // Build categories from timestamps (only once)
         if (categories.length === 0) {
@@ -75,11 +93,25 @@ export class BarConverter implements PromQLChartConverter {
             return value;
           });
 
+          // Get numeric values for color calculation
+          const numericValues = seriesData.values.map(([_, val]) => parseFloat(val));
+
+          const color = getSeriesColor(
+            config.color || null,
+            seriesData.name,
+            numericValues,
+            chartMin,
+            chartMax,
+            store.state.theme,
+            config.color?.colorBySeries
+          );
+
           series.push({
             name: seriesData.name,
             type: "bar",
             stack: "total",
             data,
+            ...(color && { color }),
             emphasis: {
               focus: "series",
             },
@@ -92,19 +124,52 @@ export class BarConverter implements PromQLChartConverter {
     } else {
       // For non-stacked h-bar: use instant/aggregated values
       // Categories are series names
-      const data: number[] = [];
+      const dataItems: Array<{ value: number; itemStyle?: { color: string } }> = [];
+
+      // First pass: calculate min/max and collect data
+      const seriesDataCollection: Array<{ name: string; value: number; rawValues: Array<[number, string]> }> = [];
 
       processedData.forEach((queryData) => {
         queryData.series.forEach((seriesData) => {
           const value = applyAggregation(seriesData.values, aggregation);
-          data.push(value);
+
+          if (value < chartMin) chartMin = value;
+          if (value > chartMax) chartMax = value;
+
+          seriesDataCollection.push({
+            name: seriesData.name,
+            value,
+            rawValues: seriesData.values,
+          });
+
           categories.push(seriesData.name);
         });
       });
 
+      // Second pass: apply colors
+      seriesDataCollection.forEach((seriesData) => {
+        const numericValues = seriesData.rawValues.map(([_, val]) => parseFloat(val));
+
+        const color = getSeriesColor(
+          config.color || null,
+          seriesData.name,
+          numericValues,
+          chartMin,
+          chartMax,
+          store.state.theme,
+          config.color?.colorBySeries
+        );
+
+        dataItems.push(
+          color
+            ? { value: seriesData.value, itemStyle: { color } }
+            : { value: seriesData.value }
+        );
+      });
+
       series.push({
         type: "bar",
-        data,
+        data: dataItems,
         emphasis: {
           focus: "series",
         },

@@ -126,6 +126,17 @@ export function buildYAxis(panelSchema: any, queryIndex: number = 0): any {
     type: "value",
     axisLabel: {
       show: config.axis_label !== false,
+      // Add unit formatting to Y-axis labels
+      formatter: (value: any) => {
+        return formatUnitValue(
+          getUnitValue(
+            value,
+            config?.unit,
+            config?.unit_custom,
+            config?.decimals
+          )
+        );
+      },
     },
     splitLine: {
       show: showGridlines,
@@ -139,6 +150,17 @@ export function buildYAxis(panelSchema: any, queryIndex: number = 0): any {
       axisLabel: {
         show: config.axis_label !== false,
         width: config.axis_width,
+        // Preserve unit formatter when axis_width is set
+        formatter: (value: any) => {
+          return formatUnitValue(
+            getUnitValue(
+              value,
+              config?.unit,
+              config?.unit_custom,
+              config?.decimals
+            )
+          );
+        },
       },
     }),
   };
@@ -236,6 +258,17 @@ export function buildValueAxis(panelSchema: any): any {
     type: "value",
     axisLabel: {
       show: config.axis_label !== false,
+      // Add unit formatting to value axis labels
+      formatter: (value: any) => {
+        return formatUnitValue(
+          getUnitValue(
+            value,
+            config?.unit,
+            config?.unit_custom,
+            config?.decimals
+          )
+        );
+      },
     },
     splitLine: {
       show: showGridlines,

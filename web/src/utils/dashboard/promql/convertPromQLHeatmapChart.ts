@@ -14,6 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
+import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
+import { getColorPalette } from "../colorPalette";
 
 /**
  * Converter for heatmap charts
@@ -58,6 +60,19 @@ export class HeatmapConverter implements PromQLChartConverter {
 
     const xAxisData = processedData[0]?.timestamps.map(([, formatted]) => formatted) || [];
 
+    // Get color range from configuration or use theme-based palette
+    let colorRange: string[];
+    if (config.color_range && Array.isArray(config.color_range) && config.color_range.length > 0) {
+      colorRange = config.color_range;
+    } else if (config.color?.fixedColor && Array.isArray(config.color.fixedColor) && config.color.fixedColor.length > 0) {
+      colorRange = config.color.fixedColor;
+    } else {
+      // Use theme-based color palette
+      const themePalette = getColorPalette(store.state.theme);
+      // Select a subset of colors for heatmap gradient
+      colorRange = [themePalette[10], themePalette[5], themePalette[0]]; // Cool to warm gradient
+    }
+
     return {
       series: [
         {
@@ -65,6 +80,18 @@ export class HeatmapConverter implements PromQLChartConverter {
           data,
           label: {
             show: config.show_label === true,
+            // Add unit formatting to labels if shown
+            formatter: (params: any) => {
+              const value = params.data[2]; // Value is at index 2 in [x, y, value]
+              return formatUnitValue(
+                getUnitValue(
+                  value,
+                  config?.unit,
+                  config?.unit_custom,
+                  config?.decimals
+                )
+              );
+            },
           },
           emphasis: {
             itemStyle: {
@@ -100,14 +127,34 @@ export class HeatmapConverter implements PromQLChartConverter {
         left: config.visual_map_position || "center",
         bottom: "0%",
         inRange: {
-          color: config.color_range || ["#50a3ba", "#eac736", "#d94e5d"],
+          color: colorRange,
+        },
+        // Add unit formatting to visual map labels
+        formatter: (value: number) => {
+          return formatUnitValue(
+            getUnitValue(
+              value,
+              config?.unit,
+              config?.unit_custom,
+              config?.decimals
+            )
+          );
         },
       },
       tooltip: {
         position: "top",
         formatter: (params: any) => {
           const [timeIndex, seriesIndex, value] = params.data;
-          return `${seriesNames[seriesIndex]}<br/>${xAxisData[timeIndex]}: ${value}`;
+          // Format value with units
+          const formattedValue = formatUnitValue(
+            getUnitValue(
+              value,
+              config?.unit,
+              config?.unit_custom,
+              config?.decimals
+            )
+          );
+          return `${seriesNames[seriesIndex]}<br/>${xAxisData[timeIndex]}: <strong>${formattedValue}</strong>`;
         },
       },
       grid: {
