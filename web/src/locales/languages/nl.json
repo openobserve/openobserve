@@ -1083,7 +1083,8 @@
     "removeClause": "Clausule verwijderen",
     "metric": "Metrisch",
     "labelFilters": "Filters voor etiketten",
-    "operations": "Operaties"
+    "operations": "Operaties",
+    "promQLBuilder": "ProMQL Builder"
   },
   "home": {
     "streams": "Streams",

@@ -1099,7 +1099,8 @@
     "removeClause": "条項を削除",
     "metric": "メトリック",
     "labelFilters": "ラベルフィルター",
-    "operations": "オペレーション"
+    "operations": "オペレーション",
+    "promQLBuilder": "プロムQLビルダー"
   },
   "home": {
     "streams": "ストリーム",

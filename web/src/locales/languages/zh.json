@@ -1083,7 +1083,8 @@
     "removeClause": "移除条款",
     "metric": "公制",
     "labelFilters": "标签筛选器",
-    "operations": "运营"
+    "operations": "运营",
+    "promQLBuilder": "PromQL 生成器"
   },
   "home": {
     "streams": "数据流",

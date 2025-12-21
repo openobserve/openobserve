@@ -1083,7 +1083,8 @@
     "removeClause": "Maddeyi Kaldır",
     "metric": "Metrik",
     "labelFilters": "Etiket Filtreleri",
-    "operations": "Operasyonlar"
+    "operations": "Operasyonlar",
+    "promQLBuilder": "PromQL Oluşturucu"
   },
   "home": {
     "streams": "Akışlar",

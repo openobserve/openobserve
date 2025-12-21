@@ -1083,7 +1083,8 @@
     "removeClause": "Supprimer la clause",
     "metric": "Métrique",
     "labelFilters": "Filtres d'étiquettes",
-    "operations": "Opérations"
+    "operations": "Opérations",
+    "promQLBuilder": "Générateur ProMQL"
   },
   "home": {
     "streams": "Ruisseaux",
