@@ -1080,7 +1080,10 @@
     "innerJoin": "Inner Join",
     "rightJoin": "Unisciti a destra",
     "addClause": "Aggiungi clausola",
-    "removeClause": "Rimuovi clausola"
+    "removeClause": "Rimuovi clausola",
+    "metric": "Metrico",
+    "labelFilters": "Filtri per etichette",
+    "operations": "Operazioni"
   },
   "home": {
     "streams": "Stream",

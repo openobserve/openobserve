@@ -1080,7 +1080,10 @@
     "innerJoin": "Innerlijke verbinding",
     "rightJoin": "Right Join",
     "addClause": "Clausule toevoegen",
-    "removeClause": "Clausule verwijderen"
+    "removeClause": "Clausule verwijderen",
+    "metric": "Metrisch",
+    "labelFilters": "Filters voor etiketten",
+    "operations": "Operaties"
   },
   "home": {
     "streams": "Streams",

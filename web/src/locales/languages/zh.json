@@ -1080,7 +1080,10 @@
     "innerJoin": "内部加入",
     "rightJoin": "右键加入",
     "addClause": "添加条款",
-    "removeClause": "移除条款"
+    "removeClause": "移除条款",
+    "metric": "公制",
+    "labelFilters": "标签筛选器",
+    "operations": "运营"
   },
   "home": {
     "streams": "数据流",

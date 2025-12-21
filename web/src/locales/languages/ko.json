@@ -1080,7 +1080,10 @@
     "innerJoin": "내부 조인",
     "rightJoin": "오른쪽 조인",
     "addClause": "조항 추가",
-    "removeClause": "조항 제거"
+    "removeClause": "조항 제거",
+    "metric": "미터법",
+    "labelFilters": "라벨 필터",
+    "operations": "오퍼레이션"
   },
   "home": {
     "streams": "스트림",
