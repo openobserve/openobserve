@@ -1025,7 +1025,11 @@
     "enableSorting": "Sorteren inschakelen",
     "enableFiltering": "Filteren inschakelen",
     "enablePagination": "Paginering inschakelen",
-    "aggregateRows": "Geaggregeerde tijdreeksgegevens"
+    "aggregateRows": "Geaggregeerde tijdreeksgegevens",
+    "visibleColumns": "Zichtbare kolommen",
+    "hiddenColumns": "Verborgen kolommen",
+    "stickyFirstColumn": "Sticky eerste kolom",
+    "stickyColumns": "Kleverige kolommen"
   },
   "panel": {
     "header": "Paneel",

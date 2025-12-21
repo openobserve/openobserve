@@ -1025,7 +1025,11 @@
     "enableSorting": "Sortierung aktivieren",
     "enableFiltering": "Filterung aktivieren",
     "enablePagination": "Paginierung aktivieren",
-    "aggregateRows": "Aggregierte Zeitreihendaten"
+    "aggregateRows": "Aggregierte Zeitreihendaten",
+    "visibleColumns": "Sichtbare Spalten",
+    "hiddenColumns": "Versteckte Spalten",
+    "stickyFirstColumn": "Klebrige erste Spalte",
+    "stickyColumns": "Klebrige Spalten"
   },
   "panel": {
     "header": "Panel",

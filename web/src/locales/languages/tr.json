@@ -1025,7 +1025,11 @@
     "enableSorting": "Sıralamayı Etkinleştir",
     "enableFiltering": "Filtrelemeyi Etkinleştir",
     "enablePagination": "Sayfalandırmayı Etkinleştir",
-    "aggregateRows": "Toplu Zaman Serisi Verileri"
+    "aggregateRows": "Toplu Zaman Serisi Verileri",
+    "visibleColumns": "Görünür Sütunlar",
+    "hiddenColumns": "Gizli Sütunlar",
+    "stickyFirstColumn": "Yapışkan İlk Sütun",
+    "stickyColumns": "Yapışkan Sütunlar"
   },
   "panel": {
     "header": "Panel",

@@ -1025,7 +1025,11 @@
     "enableSorting": "Habilitar la clasificación",
     "enableFiltering": "Habilitar el filtrado",
     "enablePagination": "Habilitar paginación",
-    "aggregateRows": "Datos agregados de series temporales"
+    "aggregateRows": "Datos agregados de series temporales",
+    "visibleColumns": "Columnas visibles",
+    "hiddenColumns": "Columnas ocultas",
+    "stickyFirstColumn": "Primera columna adhesiva",
+    "stickyColumns": "Columnas adhesivas"
   },
   "panel": {
     "header": "Panel",

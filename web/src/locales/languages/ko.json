@@ -1025,7 +1025,11 @@
     "enableSorting": "정렬 활성화",
     "enableFiltering": "필터링 활성화",
     "enablePagination": "페이지 매김 활성화",
-    "aggregateRows": "시계열 데이터 집계"
+    "aggregateRows": "시계열 데이터 집계",
+    "visibleColumns": "보이는 컬럼",
+    "hiddenColumns": "히든 컬럼",
+    "stickyFirstColumn": "스티키 퍼스트 컬럼",
+    "stickyColumns": "스티키 컬럼"
   },
   "panel": {
     "header": "패널",

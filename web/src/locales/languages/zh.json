@@ -1025,7 +1025,11 @@
     "enableSorting": "启用排序",
     "enableFiltering": "启用筛选",
     "enablePagination": "启用分页",
-    "aggregateRows": "聚合时间序列数据"
+    "aggregateRows": "聚合时间序列数据",
+    "visibleColumns": "可见列",
+    "hiddenColumns": "隐藏的专栏",
+    "stickyFirstColumn": "置顶第一列",
+    "stickyColumns": "置顶专栏"
   },
   "panel": {
     "header": "面板",

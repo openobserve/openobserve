@@ -1025,7 +1025,11 @@
     "enableSorting": "Activer le tri",
     "enableFiltering": "Activer le filtrage",
     "enablePagination": "Activer la pagination",
-    "aggregateRows": "Données de séries chronologiques agrégées"
+    "aggregateRows": "Données de séries chronologiques agrégées",
+    "visibleColumns": "Colonnes visibles",
+    "hiddenColumns": "Colonnes masquées",
+    "stickyFirstColumn": "Première colonne collante",
+    "stickyColumns": "Colonnes adhésives"
   },
   "panel": {
     "header": "Panneau",
