@@ -125,7 +125,7 @@ export const convertPromQLData = async (
     "stacked",
     "h-stacked",
     "geomap",
-    "sankey",
+    "maps",
   ];
   console.log("=== [convertPromQLData] Checking for new chart system ===");
   console.log("Panel type:", panelSchema.type);

@@ -1462,7 +1462,7 @@ export const validatePanel = (
       "markdown",
       "custom_chart",
       "table",
-      "sankey",
+      "maps",
       "heatmap",
       "geomap",
       "donut",

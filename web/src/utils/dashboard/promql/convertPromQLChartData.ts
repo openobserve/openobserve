@@ -23,7 +23,7 @@ import { MetricConverter } from "./convertPromQLMetricChart";
 import { HeatmapConverter } from "./convertPromQLHeatmapChart";
 import { BarConverter } from "./convertPromQLBarChart";
 import { GeoConverter } from "./convertPromQLGeoChart";
-import { SankeyConverter } from "./convertPromQLSankeyChart";
+import { MapsConverter } from "./convertPromQLMapsChart";
 
 /**
  * Registry of all chart type converters
@@ -38,7 +38,7 @@ const CONVERTER_REGISTRY = [
   new HeatmapConverter(),
   new BarConverter(),
   new GeoConverter(),
-  new SankeyConverter(),
+  new MapsConverter(),
 ];
 
 /**
