@@ -234,9 +234,8 @@ export class BarConverter implements PromQLChartConverter {
         ...(config.axis_width && { left: config.axis_width }),
       },
       tooltip: buildTooltip(panelSchema, "axis"),
-      ...(isStacked && {
-        legend: buildLegendConfig(panelSchema, chartPanelRef, series),
-      }),
+      // Legend config will be applied by applyLegendConfiguration in convertPromQLChartData
+      // This ensures consistent behavior with SQL charts (applies to stacked and non-stacked)
     };
   }
 }

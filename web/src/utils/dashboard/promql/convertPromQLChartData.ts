@@ -24,6 +24,7 @@ import { HeatmapConverter } from "./convertPromQLHeatmapChart";
 import { BarConverter } from "./convertPromQLBarChart";
 import { GeoConverter } from "./convertPromQLGeoChart";
 import { MapsConverter } from "./convertPromQLMapsChart";
+import { applyLegendConfiguration } from "../legendConfiguration";
 
 /**
  * Registry of all chart type converters
@@ -122,15 +123,28 @@ export async function convertPromQLChartData(
     }),
   };
 
-  console.log("Final Options:", options);
+  console.log("Final Options (before legend config):", options);
 
-  // Step 6: Apply annotations (if applicable)
+  // Step 6: Apply comprehensive legend configuration (same as SQL charts)
+  // This handles plain vs scroll types, grid adjustments, and proper positioning
+  // Skip for table charts as they don't use ECharts legends
+  if (chartType !== "table") {
+    applyLegendConfiguration(
+      panelSchema,
+      chartPanelRef,
+      hoveredSeriesState,
+      options
+    );
+    console.log("Final Options (after legend config):", options);
+  }
+
+  // Step 7: Apply annotations (if applicable)
   // Annotations are mark lines/areas that overlay on the chart
   if (annotations?.length && chartConfig.series) {
     applyAnnotations(options, annotations, processedData);
   }
 
-  // Step 7: Handle empty data case
+  // Step 8: Handle empty data case
   // For ECharts: check series length
   // For tables: check columns length
   const hasEChartsData = options?.series?.length > 0;

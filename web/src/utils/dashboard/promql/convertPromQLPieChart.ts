@@ -171,7 +171,8 @@ export class PieConverter implements PromQLChartConverter {
     const result = {
       series,
       tooltip: buildTooltip(panelSchema, "item"),
-      legend: buildLegendConfig(panelSchema, chartPanelRef, series),
+      // Legend config will be applied by applyLegendConfiguration in convertPromQLChartData
+      // This ensures consistent behavior with SQL charts
     };
 
     console.log("=== [Pie Converter] Conversion complete ===");
