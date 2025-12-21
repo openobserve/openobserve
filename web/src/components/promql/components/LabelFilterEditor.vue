@@ -1,128 +1,130 @@
 <template>
   <div class="label-filter-editor">
-    <div class="text-subtitle2 q-mb-sm">
-      <q-icon name="label" class="q-mr-xs" />
-      Label Filters
-      <q-btn
-        flat
-        dense
-        round
-        icon="add"
-        size="sm"
-        color="primary"
-        @click="addLabel"
-        class="q-ml-sm"
-      >
-        <q-tooltip>Add label filter</q-tooltip>
-      </q-btn>
-    </div>
-
-    <div v-if="localLabels.length === 0" class="text-grey-7 q-pa-md text-center">
-      No label filters added yet. Click + to add a filter.
-    </div>
-
-    <div v-else class="labels-list">
-      <q-card
-        v-for="(label, index) in localLabels"
-        :key="label.label"
-        flat
-        bordered
-        class="label-item q-mb-sm"
-      >
-        <q-card-section class="row items-center q-pa-sm">
-          <!-- Label Name -->
-          <div class="col-3">
-            <q-select
-              v-model="label.label"
-              :options="availableLabels"
-              label="Label"
-              dense
-              borderless
-              stack-label
-              hide-bottom-space
-              class="showLabelOnTop"
-              use-input
-              fill-input
-              hide-selected
-              input-debounce="0"
-              @update:model-value="onLabelChange"
-              :loading="loadingLabels"
-              clearable
-            >
-              <template v-slot:no-option>
-                <q-item>
-                  <q-item-section class="text-grey">
-                    {{ loadingLabels ? 'Loading labels...' : 'No labels found' }}
-                  </q-item-section>
-                </q-item>
-              </template>
-            </q-select>
-          </div>
-
-          <!-- Operator -->
-          <div class="col-2 q-px-sm">
-            <q-select
-              v-model="label.op"
-              :options="operators"
-              label="Operator"
-              dense
-              borderless
-              stack-label
-              hide-bottom-space
-              class="showLabelOnTop"
-              @update:model-value="onLabelChange"
-            />
-          </div>
-
-          <!-- Value -->
-          <div class="col-6">
-            <q-select
-              v-model="label.value"
-              :options="labelValuesMap.get(label.label) || []"
-              label="Value"
-              dense
-              borderless
-              stack-label
-              hide-bottom-space
-              class="showLabelOnTop"
-              use-input
-              fill-input
-              hide-selected
-              input-debounce="0"
-              @filter="(val, update) => filterLabelValues(val, update, label.label)"
-              @update:model-value="onLabelChange"
-              :disable="!label.label"
-              clearable
-            >
-              <template v-slot:no-option>
-                <q-item>
-                  <q-item-section class="text-grey">
-                    {{ !label.label ? 'Select a label first' : 'No values found' }}
-                  </q-item-section>
-                </q-item>
-              </template>
-              <template v-slot:hint>
-                {{ getOperatorHint(label.op) }}
-              </template>
-            </q-select>
-          </div>
-
-          <!-- Remove Button -->
-          <div class="col-1 text-right">
+    <div style="display: flex; flex-direction: row" class="q-pl-md">
+      <div class="layout-name">{{ t("panel.labelFilters") }}</div>
+      <span class="layout-separator">:</span>
+      <div class="axis-container scroll row">
+        <!-- Label Filter Items -->
+        <div
+          v-for="(label, index) in localLabels"
+          :key="index"
+          class="label-filter-item"
+        >
+          <q-btn-group>
             <q-btn
-              flat
+              square
+              icon-right="arrow_drop_down"
+              no-caps
               dense
-              round
-              icon="delete"
-              color="negative"
+              :no-wrap="true"
+              color="primary"
               size="sm"
-              @click="removeLabel(index)"
+              :label="computedLabel(label)"
+              class="q-pl-sm"
+              :data-test="`promql-label-filter-${index}`"
             >
-              <q-tooltip>Remove filter</q-tooltip>
+              <q-menu class="q-pa-md">
+                <div style="width: 350px">
+                  <!-- Label Selection -->
+                  <q-select
+                    v-model="label.label"
+                    :options="availableLabels"
+                    label="Label"
+                    dense
+                    borderless
+                    stack-label
+                    hide-bottom-space
+                    class="showLabelOnTop q-mb-sm"
+                    use-input
+                    fill-input
+                    hide-selected
+                    input-debounce="0"
+                    @update:model-value="onLabelChange"
+                    :loading="loadingLabels"
+                    clearable
+                    data-test="promql-label-select"
+                  >
+                    <template v-slot:no-option>
+                      <q-item>
+                        <q-item-section class="text-grey">
+                          {{ loadingLabels ? 'Loading labels...' : 'No labels found' }}
+                        </q-item-section>
+                      </q-item>
+                    </template>
+                  </q-select>
+
+                  <!-- Operator Selection -->
+                  <q-select
+                    v-model="label.op"
+                    :options="operatorOptions"
+                    label="Operator"
+                    dense
+                    borderless
+                    stack-label
+                    hide-bottom-space
+                    class="showLabelOnTop q-mb-sm"
+                    @update:model-value="onLabelChange"
+                    data-test="promql-operator-select"
+                  />
+
+                  <!-- Value Selection -->
+                  <q-select
+                    v-model="label.value"
+                    :options="labelValuesMap.get(label.label) || []"
+                    label="Value"
+                    dense
+                    borderless
+                    stack-label
+                    hide-bottom-space
+                    class="showLabelOnTop"
+                    use-input
+                    fill-input
+                    hide-selected
+                    input-debounce="0"
+                    @filter="(val, update) => filterLabelValues(val, update, label.label)"
+                    @update:model-value="onLabelChange"
+                    :disable="!label.label"
+                    clearable
+                    data-test="promql-value-select"
+                  >
+                    <template v-slot:no-option>
+                      <q-item>
+                        <q-item-section class="text-grey">
+                          {{ !label.label ? 'Select a label first' : 'No values found' }}
+                        </q-item-section>
+                      </q-item>
+                    </template>
+                    <template v-slot:hint>
+                      {{ getOperatorHint(label.op) }}
+                    </template>
+                  </q-select>
+                </div>
+              </q-menu>
             </q-btn>
-          </div>
-        </q-card-section>
-      </q-card>
+            <q-btn
+              size="xs"
+              dense
+              @click="removeLabel(index)"
+              icon="close"
+              :data-test="`promql-label-filter-remove-${index}`"
+            />
+          </q-btn-group>
+        </div>
+
+        <!-- Add Button -->
+        <q-btn
+          flat
+          dense
+          icon="add"
+          size="sm"
+          color="primary"
+          @click="addLabel"
+          class="add-filter-btn"
+          data-test="promql-add-label-filter"
+        >
+          <q-tooltip>Add label filter</q-tooltip>
+        </q-btn>
+      </div>
     </div>
   </div>
 </template>
@@ -130,6 +132,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import { QueryBuilderLabelFilter } from "@/components/promql/types";
 import metricsService from "@/services/metrics";
 
@@ -142,18 +145,24 @@ const emit = defineEmits<{
   "update:labels": [value: QueryBuilderLabelFilter[]];
 }>();
 
+const { t } = useI18n();
 const store = useStore();
 const localLabels = ref<QueryBuilderLabelFilter[]>([...props.labels]);
 const availableLabels = ref<string[]>([]);
 const labelValuesMap = ref<Map<string, string[]>>(new Map()); // Maps label key to its values
 const loadingLabels = ref(false);
 
-const operators = [
-  { label: "= (equals)", value: "=" },
-  { label: "!= (not equals)", value: "!=" },
-  { label: "=~ (regex match)", value: "=~" },
-  { label: "!~ (regex not match)", value: "!~" },
-];
+const operatorOptions = ["=", "!=", "=~", "!~"];
+
+const computedLabel = (label: QueryBuilderLabelFilter): string => {
+  if (!label.label) {
+    return "Select label";
+  }
+  if (!label.value) {
+    return label.label;
+  }
+  return `${label.label} ${label.op} ${label.value}`;
+};
 
 // Watch for metric changes to fetch available labels
 watch(
@@ -309,21 +318,44 @@ const getOperatorHint = (op: string): string => {
 
 <style scoped lang="scss">
 .label-filter-editor {
-  padding: 16px;
-  background: #f5f5f5;
-  border-radius: 4px;
+  margin-bottom: 8px;
 }
 
-.labels-list {
-  max-height: 400px;
-  overflow-y: auto;
+.layout-name {
+  font-size: 14px;
+  white-space: nowrap;
+  min-width: 130px;
+  display: flex;
+  align-items: center;
 }
 
-.label-item {
-  transition: all 0.2s;
+.layout-separator {
+  display: flex;
+  align-items: center;
+  margin-left: 2px;
+  margin-right: 2px;
+}
 
-  &:hover {
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  }
+.axis-container {
+  margin: 5px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.label-filter-item {
+  display: flex;
+  align-items: center;
+}
+
+.add-filter-btn {
+  margin-left: 4px;
+}
+
+.q-menu {
+  box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
+  transform: translateY(0.5rem);
+  border-radius: 0px;
 }
 </style>
