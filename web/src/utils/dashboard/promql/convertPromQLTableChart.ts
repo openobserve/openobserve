@@ -59,14 +59,18 @@ export class TableConverter implements PromQLChartConverter {
   }
 
   /**
-   * Build table columns from metric labels and value
+   * Build table columns from metric labels and value(s)
+   * Supports multi-aggregation: creates separate columns for each selected aggregation
    */
   private buildColumns(processedData: ProcessedPromQLData[], panelSchema: any): any[] {
     const config = panelSchema.config || {};
 
+    // Get selected aggregations (default: ['last'])
+    const aggregations = config.table_aggregations || [config.aggregation || 'last'];
+
     console.log("=== [buildColumns] Starting ===");
     console.log("processedData length:", processedData.length);
-    console.log("processedData[0]:", processedData[0]);
+    console.log("Aggregations:", aggregations);
 
     // Collect all unique label keys across all series
     const labelKeys = new Set<string>();
@@ -92,23 +96,28 @@ export class TableConverter implements PromQLChartConverter {
       sortable: true,
     }));
 
-    // Add value column
-    columns.push({
-      name: "value",
-      field: "value",
-      label: "Value",
-      align: "right",
-      sortable: true,
-      format: (val: any) => {
-        const unitValue = getUnitValue(
-          val,
-          config?.unit,
-          config?.unit_custom,
-          config?.decimals
-        );
-        return formatUnitValue(unitValue);
-      },
-    } as any);
+    // Add value columns for each selected aggregation
+    aggregations.forEach((agg: string) => {
+      const columnName = aggregations.length === 1 ? "value" : `value_${agg}`;
+      const columnLabel = aggregations.length === 1 ? "Value" : `Value (${agg})`;
+
+      columns.push({
+        name: columnName,
+        field: columnName,
+        label: columnLabel,
+        align: "right",
+        sortable: true,
+        format: (val: any) => {
+          const unitValue = getUnitValue(
+            val,
+            config?.unit,
+            config?.unit_custom,
+            config?.decimals
+          );
+          return formatUnitValue(unitValue);
+        },
+      } as any);
+    });
 
     // Always add timestamp column if time-series data
     const hasTimeSeriesData = processedData.some((qd) => qd.timestamps.length > 1);
@@ -122,19 +131,23 @@ export class TableConverter implements PromQLChartConverter {
       });
     }
 
+    console.log("Built columns:", columns.map(c => c.name));
     return columns;
   }
 
   /**
    * Build table rows from processed data
+   * Supports multi-aggregation: calculates all selected aggregations for each series
    */
   private buildRows(processedData: ProcessedPromQLData[], panelSchema: any): any[] {
     const config = panelSchema.config || {};
     const rows: any[] = [];
-    const aggregation = config.aggregation || "last";
+
+    // Get selected aggregations (default: ['last'])
+    const aggregations = config.table_aggregations || [config.aggregation || 'last'];
 
     console.log("=== [buildRows] Starting ===");
-    console.log("Aggregation:", aggregation);
+    console.log("Aggregations:", aggregations);
     console.log("processedData length:", processedData.length);
 
     processedData.forEach((queryData, qIndex) => {
@@ -145,14 +158,16 @@ export class TableConverter implements PromQLChartConverter {
         console.log(`Query ${qIndex}, Series ${sIndex} - values length:`, seriesData.values?.length);
         console.log(`Query ${qIndex}, Series ${sIndex} - metric:`, seriesData.metric);
 
-        // For PromQL tables, always aggregate to one row per series
-        // This provides a clean summary view of metrics
-        const value = applyAggregation(seriesData.values, aggregation);
-
+        // Create row with metric labels
         const row: any = {
           ...seriesData.metric,
-          value,
         };
+
+        // Calculate each aggregation for the series
+        aggregations.forEach((agg: string) => {
+          const columnName = aggregations.length === 1 ? "value" : `value_${agg}`;
+          row[columnName] = applyAggregation(seriesData.values, agg);
+        });
 
         // Add timestamp if it's a single value
         if (queryData.timestamps.length === 1) {
@@ -168,6 +183,7 @@ export class TableConverter implements PromQLChartConverter {
       return rows.slice(0, config.row_limit);
     }
 
+    console.log("Built rows count:", rows.length);
     return rows;
   }
 }

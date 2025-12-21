@@ -105,6 +105,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-input>
 
       <q-input
+        v-model="geoWeightLabel"
+        :label="t('dashboard.geoWeightLabel')"
+        placeholder="weight"
+        borderless
+        dense
+        class="q-py-sm showLabelOnTop"
+        stack-label
+        data-test="dashboard-config-geo-weight-label"
+      >
+        <template v-slot:label>
+          <div class="row items-center all-pointer-events">
+            {{ t("dashboard.geoWeightLabel") }}
+            <q-icon class="q-ml-xs" size="20px" name="info" />
+            <q-tooltip class="bg-grey-8" max-width="250px">
+              Name of the metric label containing weight values. Default: "weight"
+            </q-tooltip>
+          </div>
+        </template>
+      </q-input>
+
+      <q-input
         v-model="geoNameLabel"
         :label="t('dashboard.geoNameLabel')"
         placeholder="name"
@@ -151,90 +172,105 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <!-- Sankey Label Configuration -->
-    <div v-if="chartType === 'sankey'" class="sankey-config">
-      <div class="q-mb-sm text-subtitle2">Sankey Configuration</div>
+    <!-- Maps Label Configuration -->
+    <div v-if="chartType === 'maps'" class="maps-config">
+      <div class="q-mb-sm text-subtitle2">Maps Configuration</div>
 
       <q-input
-        v-model="sankeySourceLabel"
-        :label="t('dashboard.sankeySourceLabel')"
-        placeholder="source"
+        v-model="mapsNameLabel"
+        :label="t('dashboard.mapsNameLabel')"
+        placeholder="country or location"
         borderless
         dense
         class="q-py-sm showLabelOnTop"
         stack-label
-        data-test="dashboard-config-sankey-source-label"
+        data-test="dashboard-config-maps-name-label"
       >
         <template v-slot:label>
           <div class="row items-center all-pointer-events">
-            {{ t("dashboard.sankeySourceLabel") }}
+            {{ t("dashboard.mapsNameLabel") }}
             <q-icon class="q-ml-xs" size="20px" name="info" />
-            <q-tooltip class="bg-grey-8" max-width="250px">
-              Name of the metric label containing source node names. Default: "source"
-            </q-tooltip>
-          </div>
-        </template>
-      </q-input>
-
-      <q-input
-        v-model="sankeyTargetLabel"
-        :label="t('dashboard.sankeyTargetLabel')"
-        placeholder="target"
-        borderless
-        dense
-        class="q-py-sm showLabelOnTop"
-        stack-label
-        data-test="dashboard-config-sankey-target-label"
-      >
-        <template v-slot:label>
-          <div class="row items-center all-pointer-events">
-            {{ t("dashboard.sankeyTargetLabel") }}
-            <q-icon class="q-ml-xs" size="20px" name="info" />
-            <q-tooltip class="bg-grey-8" max-width="250px">
-              Name of the metric label containing target node names. Default: "target"
+            <q-tooltip class="bg-grey-8" max-width="300px">
+              Name of the metric label containing location names (e.g., country, region). Default: "name"
             </q-tooltip>
           </div>
         </template>
       </q-input>
 
       <q-select
-        v-model="sankeyOrient"
-        :options="['horizontal', 'vertical']"
-        :label="t('dashboard.sankeyOrient')"
+        v-model="mapsMapType"
+        :options="['world', 'USA', 'China']"
+        :label="t('dashboard.mapsMapType')"
         borderless
         dense
         class="q-py-sm showLabelOnTop"
         stack-label
-        data-test="dashboard-config-sankey-orient"
-      />
-
-      <q-input
-        v-model.number="sankeyCurveness"
-        :label="t('dashboard.sankeyCurveness')"
-        type="number"
-        placeholder="0.5"
-        min="0"
-        max="1"
-        step="0.1"
-        borderless
-        dense
-        class="q-py-sm showLabelOnTop"
-        stack-label
-        data-test="dashboard-config-sankey-curveness"
+        data-test="dashboard-config-maps-type"
       >
         <template v-slot:label>
           <div class="row items-center all-pointer-events">
-            {{ t("dashboard.sankeyCurveness") }}
+            {{ t("dashboard.mapsMapType") }}
             <q-icon class="q-ml-xs" size="20px" name="info" />
             <q-tooltip class="bg-grey-8" max-width="250px">
-              Curvature of flow links (0-1). Default: 0.5
+              Map type to display. Default: "world"
             </q-tooltip>
           </div>
         </template>
-      </q-input>
+      </q-select>
+
+      <q-toggle
+        v-model="mapsEnableRoam"
+        :label="t('dashboard.mapsEnableRoam')"
+        class="q-py-sm"
+        data-test="dashboard-config-maps-enable-roam"
+      />
     </div>
 
     <!-- Table Configuration -->
+    <div v-if="chartType === 'table'" class="table-config">
+      <div class="q-mb-sm text-subtitle2">Table Aggregations</div>
+
+      <q-select
+        v-model="tableAggregations"
+        :options="aggregationOptions"
+        :label="t('dashboard.tableAggregations')"
+        multiple
+        borderless
+        dense
+        class="q-py-md showLabelOnTop"
+        stack-label
+        emit-value
+        map-options
+        data-test="dashboard-config-table-aggregations"
+      >
+        <template v-slot:label>
+          <div class="row items-center all-pointer-events">
+            {{ t("dashboard.tableAggregations") }}
+            <q-icon class="q-ml-xs" size="20px" name="info" />
+            <q-tooltip class="bg-grey-8" max-width="350px">
+              <b>Table Aggregations - </b>
+              Select multiple aggregation functions to display as columns.
+              <br /><br />
+              Single aggregation: creates a "value" column
+              <br />
+              Multiple aggregations: creates "value_last", "value_sum", etc.
+              <br /><br />
+              Example: Selecting "last", "sum", "avg" will create three value columns.
+            </q-tooltip>
+          </div>
+        </template>
+        <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
+          <q-item v-bind="itemProps">
+            <q-item-section side>
+              <q-checkbox :model-value="selected" @update:model-value="toggleOption(opt)" />
+            </q-item-section>
+            <q-item-section>
+              <q-item-label>{{ opt.label }}</q-item-label>
+            </q-item-section>
+          </q-item>
+        </template>
+      </q-select>
+    </div>
   </div>
 </template>
 
@@ -272,12 +308,11 @@ export default defineComponent({
     const chartsWithAggregation = [
       "pie",
       "donut",
-      "table",
       "gauge",
       "metric",
       "h-bar",
       "geomap",
-      "sankey",
+      "maps",
     ];
 
     const showAggregationConfig = computed(() =>
@@ -346,44 +381,55 @@ export default defineComponent({
       },
     });
 
-    // Sankey configuration
-    const sankeySourceLabel = computed({
-      get: () => dashboardPanelData.data.config?.source_label || "source",
+    const geoWeightLabel = computed({
+      get: () => dashboardPanelData.data.config?.weight_label || "weight",
       set: (value: string) => {
         if (!dashboardPanelData.data.config) {
           dashboardPanelData.data.config = {};
         }
-        dashboardPanelData.data.config.source_label = value;
+        dashboardPanelData.data.config.weight_label = value;
       },
     });
 
-    const sankeyTargetLabel = computed({
-      get: () => dashboardPanelData.data.config?.target_label || "target",
+    // Maps configuration
+    const mapsNameLabel = computed({
+      get: () => dashboardPanelData.data.config?.name_label || "name",
       set: (value: string) => {
         if (!dashboardPanelData.data.config) {
           dashboardPanelData.data.config = {};
         }
-        dashboardPanelData.data.config.target_label = value;
+        dashboardPanelData.data.config.name_label = value;
       },
     });
 
-    const sankeyOrient = computed({
-      get: () => dashboardPanelData.data.config?.orient || "horizontal",
+    const mapsMapType = computed({
+      get: () => dashboardPanelData.data.config?.map_type || "world",
       set: (value: string) => {
         if (!dashboardPanelData.data.config) {
           dashboardPanelData.data.config = {};
         }
-        dashboardPanelData.data.config.orient = value;
+        dashboardPanelData.data.config.map_type = value;
       },
     });
 
-    const sankeyCurveness = computed({
-      get: () => dashboardPanelData.data.config?.curveness || 0.5,
-      set: (value: number) => {
+    const mapsEnableRoam = computed({
+      get: () => dashboardPanelData.data.config?.enable_roam !== false,
+      set: (value: boolean) => {
         if (!dashboardPanelData.data.config) {
           dashboardPanelData.data.config = {};
         }
-        dashboardPanelData.data.config.curveness = value;
+        dashboardPanelData.data.config.enable_roam = value;
+      },
+    });
+
+    // Table aggregations configuration
+    const tableAggregations = computed({
+      get: () => dashboardPanelData.data.config?.table_aggregations || ["last"],
+      set: (value: string[]) => {
+        if (!dashboardPanelData.data.config) {
+          dashboardPanelData.data.config = {};
+        }
+        dashboardPanelData.data.config.table_aggregations = value;
       },
     });
 
@@ -394,13 +440,14 @@ export default defineComponent({
       aggregationValue,
       geoLatLabel,
       geoLonLabel,
+      geoWeightLabel,
       geoNameLabel,
       geoSymbolSize,
       geoEnableRoam,
-      sankeySourceLabel,
-      sankeyTargetLabel,
-      sankeyOrient,
-      sankeyCurveness,
+      mapsNameLabel,
+      mapsMapType,
+      mapsEnableRoam,
+      tableAggregations,
     };
   },
 });
@@ -409,7 +456,7 @@ export default defineComponent({
 <style scoped lang="scss">
 .promql-chart-config {
   .geomap-config,
-  .sankey-config,
+  .maps-config,
   .table-config {
     padding: 16px 0;
     border-top: 1px solid rgba(0, 0, 0, 0.12);
