@@ -1105,7 +1105,10 @@
     "innerJoin": "Jointure intérieure",
     "rightJoin": "Adhérez à droite",
     "addClause": "Ajouter une clause",
-    "removeClause": "Supprimer la clause"
+    "removeClause": "Supprimer la clause",
+    "metric": "Métrique",
+    "labelFilters": "Filtres d'étiquettes",
+    "operations": "Opérations"
   },
   "home": {
     "streams": "Ruisseaux",

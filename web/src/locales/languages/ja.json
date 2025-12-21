@@ -1121,7 +1121,10 @@
     "innerJoin": "インナー・ジョイン",
     "rightJoin": "右結合",
     "addClause": "条項を追加",
-    "removeClause": "条項を削除"
+    "removeClause": "条項を削除",
+    "metric": "メトリック",
+    "labelFilters": "ラベルフィルター",
+    "operations": "オペレーション"
   },
   "home": {
     "streams": "ストリーム",

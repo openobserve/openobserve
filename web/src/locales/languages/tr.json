@@ -1105,7 +1105,10 @@
     "innerJoin": "İç Katılım",
     "rightJoin": "Sağ Katıl",
     "addClause": "Madde Ekle",
-    "removeClause": "Maddeyi Kaldır"
+    "removeClause": "Maddeyi Kaldır",
+    "metric": "Metrik",
+    "labelFilters": "Etiket Filtreleri",
+    "operations": "Operasyonlar"
   },
   "home": {
     "streams": "Akışlar",

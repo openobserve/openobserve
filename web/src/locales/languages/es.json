@@ -1105,7 +1105,10 @@
     "innerJoin": "Inner Join",
     "rightJoin": "Únete a la derecha",
     "addClause": "Agregar cláusula",
-    "removeClause": "Eliminar cláusula"
+    "removeClause": "Eliminar cláusula",
+    "metric": "Métrico",
+    "labelFilters": "Filtros de etiquetas",
+    "operations": "Operaciones"
   },
   "home": {
     "streams": "Transmisiones",
