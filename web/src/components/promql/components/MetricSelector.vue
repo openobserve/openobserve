@@ -10,8 +10,11 @@
       use-input
       input-debounce="300"
       label="Metric Name"
-      outlined
+      borderless
       dense
+      stack-label
+      hide-bottom-space
+      class="showLabelOnTop"
       @filter="filterMetrics"
       @update:model-value="onMetricSelect"
       clearable
