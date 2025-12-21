@@ -30,11 +30,11 @@
 ## 1. Executive Summary
 
 ### 1.1 Purpose
-Extend OpenObserve's PromQL query support to include **all chart types** (pie, donut, table, h-bar, stacked, h-stacked, heatmap, geomap, sankey) while maintaining a clean, modular, maintainable architecture.
+Extend OpenObserve's PromQL query support to include **all chart types** (pie, donut, table, h-bar, stacked, h-stacked, heatmap, geomap, maps) while maintaining a clean, modular, maintainable architecture.
 
 ### 1.2 Current State
 - **Supported:** line, area, area-stacked, bar, scatter, gauge, metric, html, markdown, custom_chart (10 types)
-- **Unsupported:** pie, donut, table, h-bar, stacked, h-stacked, heatmap, geomap, sankey (9 types)
+- **Unsupported:** pie, donut, table, h-bar, stacked, h-stacked, heatmap, geomap, maps (9 types)
 - **✅ Multi-Query Support:** Already supported - multiple PromQL queries can be combined in a single panel
 - **Current File:** `convertPromQLData.ts` (1,190 lines) - monolithic implementation
 
@@ -61,8 +61,8 @@ Extend OpenObserve's PromQL query support to include **all chart types** (pie, d
 - ✅ No shared dependencies
 
 #### 1.4.3 Configurable Labels
-- ✅ **GeoMap:** Custom `lat_label`, `lon_label`, `name_label`
-- ✅ **Sankey:** Custom `source_label`, `target_label`
+- ✅ **GeoMap:** Custom `lat`, `lon`, `weight` fields
+- ✅ **Maps:** Custom `name`, `value` fields
 - ✅ UI configuration for custom label names
 - ✅ Helpful error messages when labels missing
 
@@ -126,8 +126,8 @@ openobserve/web/src/utils/dashboard/
 │   ├── convertPromQLMetricChart.ts        # NEW: Metric text (extracted)
 │   ├── convertPromQLHeatmapChart.ts       # NEW: Heatmap
 │   ├── convertPromQLBarChart.ts           # NEW: H-Bar/Stacked/H-Stacked
-│   ├── convertPromQLGeoChart.ts           # NEW: GeoMap
-│   ├── convertPromQLSankeyChart.ts        # NEW: Sankey
+│   ├── convertPromQLGeoChart.ts           # NEW: GeoMap (lat, lon, weight)
+│   ├── convertPromQLMapsChart.ts          # NEW: Maps (name, value)
 │   │
 │   └── shared/                            # NEW: Shared utilities
 │       ├── types.ts                       # Type definitions
@@ -242,7 +242,7 @@ import { MetricConverter } from "./convertPromQLMetricChart";
 import { HeatmapConverter } from "./convertPromQLHeatmapChart";
 import { BarConverter } from "./convertPromQLBarChart";
 import { GeoConverter } from "./convertPromQLGeoChart";
-import { SankeyConverter } from "./convertPromQLSankeyChart";
+import { MapsConverter } from "./convertPromQLMapsChart";
 
 /**
  * Registry of all chart type converters
@@ -256,7 +256,7 @@ const CONVERTER_REGISTRY = [
   new HeatmapConverter(),
   new BarConverter(),
   new GeoConverter(),
-  new SankeyConverter(),
+  new MapsConverter(),
 ];
 
 /**
@@ -1034,8 +1034,8 @@ export const convertPromQLData = async (
 ### 4.4 Phase 4: Advanced Charts (Week 5)
 
 **Tasks:**
-1. Implement `GeoConverter` (geomap)
-2. Implement `SankeyConverter` (sankey)
+1. Implement `GeoConverter` (geomap with lat, lon, weight)
+2. Implement `MapsConverter` (maps with name, value)
 3. Add documentation for PromQL chart usage
 4. Performance testing and optimization
 
@@ -1422,8 +1422,8 @@ export class PieConverter implements PromQLChartConverter {
 | **stacked** | range | Time-series values | 🆕 New | ✅ Yes |
 | **h-stacked** | range | Time-series values | 🆕 New | ✅ Yes |
 | **heatmap** | range | Time-series values (matrix) | 🆕 New | ✅ Yes |
-| **geomap** | instant | Geo coordinates in labels | 🆕 New | ✅ Yes |
-| **sankey** | instant | Source/target in labels | 🆕 New | ✅ Yes |
+| **geomap** | instant | Geo coordinates (lat, lon, weight) | 🆕 New | ✅ Yes |
+| **maps** | instant | Location name and value | 🆕 New | ✅ Yes |
 
 ### 7.2 Example PromQL Queries
 
@@ -1456,18 +1456,19 @@ rate(http_requests_total[5m])
 
 **For GeoMap:**
 ```promql
-# Requires custom labels with lat/lon
+# Requires custom labels with lat, lon, and weight
 node_info{lat=~".*", lon=~".*"}
 
-# Example: lat="37.7749", lon="-122.4194", value=100
+# Example: lat="37.7749", lon="-122.4194", weight=100
 ```
 
-**For Sankey:**
+**For Maps:**
 ```promql
-# Requires source/target labels
-sum by (source, target) (traffic_bytes)
+# Requires location name and value
+sum by (country) (requests_total)
 
-# Example: source="frontend", target="backend", value=1024
+# Example: name="United States", value=5000
+# Or: name="Germany", value=3000
 ```
 
 ---
@@ -1513,10 +1514,8 @@ const PROMQL_SUPPORTED_CHARTS = [
   'table', 'heatmap',
   // Bar variants
   'h-bar', 'stacked', 'h-stacked',
-  // Geo
-  'geomap',
-  // Flow
-  'sankey',
+  // Geo & Maps
+  'geomap', 'maps',
   // Static
   'html', 'markdown', 'custom_chart',
 ];
@@ -1544,8 +1543,8 @@ Add helper text in the query editor when specific chart types are selected:
 - **Pie/Donut:** "Use instant queries or the latest value from range queries will be used"
 - **Table:** "All metric labels will be displayed as columns"
 - **Heatmap:** "Use range queries with multiple series for best results"
-- **GeoMap:** "Ensure metrics have 'lat' and 'lon' labels"
-- **Sankey:** "Metrics should have 'source' and 'target' labels"
+- **GeoMap:** "Ensure metrics have 'lat', 'lon', and 'weight' labels"
+- **Maps:** "Ensure metrics have 'name' (location name) and 'value' labels"
 
 ---
 
@@ -1679,15 +1678,16 @@ OpenObserve supports all chart types with PromQL queries:
   - Shows value intensity over time
   - Example: `rate(requests[5m])`
 
-## Geo Charts
+## Geo & Map Charts
 - **GeoMap** 🆕
-  - Requires lat/lon labels
+  - Shows data on geographical coordinates
+  - Requires lat, lon, weight labels
   - Example: `node_info{lat=~".*", lon=~".*"}`
 
-## Flow Charts
-- **Sankey** 🆕
-  - Requires source/target labels
-  - Example: `sum by (source, target) (traffic)`
+- **Maps** 🆕
+  - Shows data by location name
+  - Requires name (location) and value
+  - Example: `sum by (country) (requests_total)`
 
 ...
 ```
