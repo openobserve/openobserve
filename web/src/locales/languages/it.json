@@ -1108,7 +1108,8 @@
     "removeClause": "Rimuovi clausola",
     "metric": "Metrico",
     "labelFilters": "Filtri per etichette",
-    "operations": "Operazioni"
+    "operations": "Operazioni",
+    "promQLBuilder": "Generatore ProMQL"
   },
   "home": {
     "streams": "Stream",

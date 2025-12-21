@@ -1108,7 +1108,8 @@
     "removeClause": "Remover cláusula",
     "metric": "Métrico",
     "labelFilters": "Filtros de etiqueta",
-    "operations": "Operações"
+    "operations": "Operações",
+    "promQLBuilder": "Construtor ProMQL"
   },
   "home": {
     "streams": "Transmissões",
