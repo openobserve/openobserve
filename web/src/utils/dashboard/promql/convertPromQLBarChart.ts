@@ -17,7 +17,6 @@ import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
 import { buildCategoryXAxis, buildCategoryYAxis, buildValueAxis, buildTooltip } from "./shared/axisBuilder";
 import { buildLegendConfig } from "./shared/gridBuilder";
-import { formatDate } from "../convertDataIntoUnitValue";
 
 /**
  * Converter for bar chart variants (h-bar, stacked, h-stacked)
@@ -45,16 +44,28 @@ export class BarConverter implements PromQLChartConverter {
 
     if (isStacked) {
       // For stacked charts, each series becomes a stack component
-      // Categories are timestamps
+      // Categories are timestamps (formatted for display)
       processedData.forEach((queryData) => {
         // Build categories from timestamps (only once)
         if (categories.length === 0) {
-          queryData.timestamps.forEach(([, formatted]) => {
-            // Handle both Date objects and ISO strings
-            const formattedString = formatted instanceof Date
-              ? formatDate(formatted)
-              : formatted.toString();
-            categories.push(formattedString);
+          queryData.timestamps.forEach(([ts, formatted]) => {
+            // Extract just the time portion from the formatted timestamp
+            // formatted can be Date object or ISO string
+            let timeString: string;
+            if (formatted instanceof Date) {
+              // Format as HH:MM:SS
+              const hours = String(formatted.getHours()).padStart(2, '0');
+              const minutes = String(formatted.getMinutes()).padStart(2, '0');
+              const seconds = String(formatted.getSeconds()).padStart(2, '0');
+              timeString = `${hours}:${minutes}:${seconds}`;
+            } else {
+              // ISO string - extract time portion
+              const dateStr = formatted.toString();
+              // Try to extract time (HH:MM:SS) from datetime string
+              const timeMatch = dateStr.match(/(\d{2}:\d{2}:\d{2})/);
+              timeString = timeMatch ? timeMatch[1] : dateStr;
+            }
+            categories.push(timeString);
           });
         }
 
