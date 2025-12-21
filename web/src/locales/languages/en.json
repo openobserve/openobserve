@@ -1215,6 +1215,7 @@
     "filters": "Filters",
     "labelFilters": "Label Filters",
     "operations": "Operations",
+    "promQLBuilder": "PromQL Builder",
     "joins": "Joins",
     "addJoin": "Add Join",
     "removeJoin": "Remove Join",
