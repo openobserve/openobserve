@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               item.id != 'stacked' &&
               item.id != 'h-stacked' &&
               item.id != 'geomap' &&
-              item.id != 'sankey' &&
+              item.id != 'maps' &&
               item.id != 'html' &&
               item.id != 'markdown' &&
               item.id != 'custom_chart') ||

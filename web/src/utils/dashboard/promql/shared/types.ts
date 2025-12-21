@@ -123,17 +123,25 @@ export interface TableColumnConfig {
 
 /**
  * Configuration options for geomap charts
+ * Requires lat, lon, weight fields
  */
 export interface GeoMapConfig {
   lat_label?: string;
   lon_label?: string;
+  weight_label?: string;
   name_label?: string;
 }
 
 /**
- * Configuration options for sankey charts
+ * Configuration options for maps charts
+ * Requires name (location) and value fields
  */
-export interface SankeyConfig {
-  source_label?: string;
-  target_label?: string;
+export interface MapsConfig {
+  name_label?: string;
+  map_type?: string;
+  enable_roam?: boolean;
+  min_value?: number;
+  max_value?: number;
+  color_range?: string[];
+  color_thresholds?: Array<{ value: number; color: string }>;
 }
