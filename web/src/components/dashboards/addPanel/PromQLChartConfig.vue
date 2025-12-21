@@ -242,6 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         emit-value
         map-options
         data-test="dashboard-config-table-aggregations"
+        :display-value="getTableAggregationsDisplay"
       >
         <template v-slot:label>
           <div class="row items-center all-pointer-events">
@@ -270,12 +271,188 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-item>
         </template>
       </q-select>
+
+      <!-- Column Filters -->
+      <div class="q-mb-sm text-subtitle2 q-mt-md">Column Filters</div>
+
+      <q-select
+        v-model="visibleColumns"
+        :options="visibleColumnsFilteredOptions"
+        :label="t('dashboard.visibleColumns')"
+        multiple
+        use-input
+        :use-chips="false"
+        input-debounce="0"
+        new-value-mode="add-unique"
+        @filter="filterVisibleColumns"
+        @new-value="createColumnValue"
+        hide-selected
+        borderless
+        dense
+        class="q-py-sm showLabelOnTop"
+        stack-label
+        data-test="dashboard-config-visible-columns"
+        :display-value="getVisibleColumnsDisplay"
+      >
+        <template v-slot:label>
+          <div class="row items-center all-pointer-events">
+            {{ t("dashboard.visibleColumns") }}
+            <q-icon class="q-ml-xs" size="18px" name="info">
+              <q-tooltip class="bg-grey-8" max-width="400px">
+                <b>Visible Columns</b>
+                <br /><br />
+                Specify which metric label columns to show in the table.
+                <br /><br />
+                <b>How to use:</b><br />
+                • Select from dropdown (loaded from stream fields)<br />
+                • Type custom column names and press Enter<br />
+                • Leave empty to show all columns
+                <br /><br />
+                <b>Note:</b> This takes precedence over "Hidden Columns" if both are set.
+              </q-tooltip>
+            </q-icon>
+          </div>
+        </template>
+        <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
+          <q-item v-bind="itemProps">
+            <q-item-section side>
+              <q-checkbox :model-value="selected" @update:model-value="toggleOption(opt)" />
+            </q-item-section>
+            <q-item-section>
+              <q-item-label>{{ opt }}</q-item-label>
+            </q-item-section>
+          </q-item>
+        </template>
+      </q-select>
+
+      <q-select
+        v-model="hiddenColumns"
+        :options="hiddenColumnsFilteredOptions"
+        :label="t('dashboard.hiddenColumns')"
+        multiple
+        use-input
+        :use-chips="false"
+        input-debounce="0"
+        new-value-mode="add-unique"
+        @filter="filterHiddenColumns"
+        @new-value="createColumnValue"
+        hide-selected
+        borderless
+        dense
+        class="q-py-sm showLabelOnTop"
+        stack-label
+        data-test="dashboard-config-hidden-columns"
+        :display-value="getHiddenColumnsDisplay"
+      >
+        <template v-slot:label>
+          <div class="row items-center all-pointer-events">
+            {{ t("dashboard.hiddenColumns") }}
+            <q-icon class="q-ml-xs" size="18px" name="info">
+              <q-tooltip class="bg-grey-8" max-width="400px">
+                <b>Hidden Columns</b>
+                <br /><br />
+                Specify which metric label columns to hide from the table.
+                <br /><br />
+                <b>How to use:</b><br />
+                • Select from dropdown (loaded from stream fields)<br />
+                • Type custom column names and press Enter<br />
+                • All other columns will be shown
+                <br /><br />
+                <b>Tip:</b> Useful for hiding internal labels like __name__, le (histogram buckets), quantile, etc.
+              </q-tooltip>
+            </q-icon>
+          </div>
+        </template>
+        <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
+          <q-item v-bind="itemProps">
+            <q-item-section side>
+              <q-checkbox :model-value="selected" @update:model-value="toggleOption(opt)" />
+            </q-item-section>
+            <q-item-section>
+              <q-item-label>{{ opt }}</q-item-label>
+            </q-item-section>
+          </q-item>
+        </template>
+      </q-select>
+
+      <!-- Sticky Columns -->
+      <div class="q-mb-sm text-subtitle2 q-mt-md">Sticky Columns</div>
+
+      <q-toggle
+        v-model="stickyFirstColumn"
+        class="q-py-sm"
+        data-test="dashboard-config-sticky-first-column"
+      >
+        <template v-slot:default>
+          <div class="row items-center all-pointer-events">
+            {{ t("dashboard.stickyFirstColumn") }}
+            <q-icon class="q-ml-xs" size="20px" name="info" />
+            <q-tooltip class="bg-grey-8" max-width="300px">
+              <b>Sticky First Column - </b>
+              Makes the first column stay fixed when scrolling horizontally.
+              <br /><br />
+              Useful for keeping the primary identifier visible (e.g., job, instance).
+            </q-tooltip>
+          </div>
+        </template>
+      </q-toggle>
+
+      <q-select
+        v-model="stickyColumns"
+        :options="stickyColumnsFilteredOptions"
+        :label="t('dashboard.stickyColumns')"
+        multiple
+        use-input
+        :use-chips="false"
+        input-debounce="0"
+        new-value-mode="add-unique"
+        @filter="filterStickyColumns"
+        @new-value="createColumnValue"
+        hide-selected
+        borderless
+        dense
+        class="q-py-sm showLabelOnTop"
+        stack-label
+        data-test="dashboard-config-sticky-columns"
+        :disable="stickyFirstColumn"
+        :display-value="getStickyColumnsDisplay"
+      >
+        <template v-slot:label>
+          <div class="row items-center all-pointer-events">
+            {{ t("dashboard.stickyColumns") }}
+            <q-icon class="q-ml-xs" size="18px" name="info">
+              <q-tooltip class="bg-grey-8" max-width="400px">
+                <b>Sticky Columns</b>
+                <br /><br />
+                Specify which columns should remain fixed when scrolling horizontally.
+                <br /><br />
+                <b>How to use:</b><br />
+                • Select from dropdown (loaded from stream fields)<br />
+                • Type custom column names and press Enter<br />
+                • Columns will stay visible during horizontal scroll
+                <br /><br />
+                <b>Note:</b> Disabled when "Sticky First Column" is enabled.
+              </q-tooltip>
+            </q-icon>
+          </div>
+        </template>
+        <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
+          <q-item v-bind="itemProps">
+            <q-item-section side>
+              <q-checkbox :model-value="selected" @update:model-value="toggleOption(opt)" />
+            </q-item-section>
+            <q-item-section>
+              <q-item-label>{{ opt }}</q-item-label>
+            </q-item-section>
+          </q-item>
+        </template>
+      </q-select>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, computed } from "vue";
+import { defineComponent, computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 
@@ -433,6 +610,184 @@ export default defineComponent({
       },
     });
 
+    // Get available column options from stream fields
+    const availableColumnOptions = computed(() => {
+      // Get fields from groupedFields based on current query's stream
+      // This is the same data source used for the Label config in ConfigPanel.vue
+      const currentQuery =
+        dashboardPanelData.data.queries?.[
+          dashboardPanelData.layout?.currentQueryIndex ?? 0
+        ];
+      const currentStream = currentQuery?.fields?.stream;
+
+      if (!currentStream || !dashboardPanelData.meta?.streamFields?.groupedFields) {
+        return [];
+      }
+
+      // Find the current stream in groupedFields
+      const streamFields = dashboardPanelData.meta.streamFields.groupedFields.find(
+        (group: any) => group.name === currentStream
+      );
+
+      if (!streamFields?.schema) {
+        return [];
+      }
+
+      // Extract field names from schema
+      const fieldNames = streamFields.schema.map((field: any) => field.name).filter(Boolean);
+
+      // Return unique field names
+      return [...new Set(fieldNames)] as string[];
+    });
+
+    // Filtered options for each multiselect (for search/autocomplete)
+    const visibleColumnsFilteredOptions = ref<string[]>([]);
+    const hiddenColumnsFilteredOptions = ref<string[]>([]);
+    const stickyColumnsFilteredOptions = ref<string[]>([]);
+
+    // Filter function for visible columns autocomplete
+    const filterVisibleColumns = (val: string, update: (fn: () => void) => void) => {
+      update(() => {
+        const options = availableColumnOptions.value;
+        if (val === "") {
+          visibleColumnsFilteredOptions.value = options;
+        } else {
+          const needle = val.toLowerCase();
+          visibleColumnsFilteredOptions.value = options.filter(
+            (v) => v.toLowerCase().includes(needle)
+          );
+        }
+      });
+    };
+
+    // Filter function for hidden columns autocomplete
+    const filterHiddenColumns = (val: string, update: (fn: () => void) => void) => {
+      update(() => {
+        const options = availableColumnOptions.value;
+        if (val === "") {
+          hiddenColumnsFilteredOptions.value = options;
+        } else {
+          const needle = val.toLowerCase();
+          hiddenColumnsFilteredOptions.value = options.filter(
+            (v) => v.toLowerCase().includes(needle)
+          );
+        }
+      });
+    };
+
+    // Filter function for sticky columns autocomplete
+    const filterStickyColumns = (val: string, update: (fn: () => void) => void) => {
+      update(() => {
+        const options = availableColumnOptions.value;
+        if (val === "") {
+          stickyColumnsFilteredOptions.value = options;
+        } else {
+          const needle = val.toLowerCase();
+          stickyColumnsFilteredOptions.value = options.filter(
+            (v) => v.toLowerCase().includes(needle)
+          );
+        }
+      });
+    };
+
+    // Handler for creating new column values
+    const createColumnValue = (val: string, done: (value: string) => void) => {
+      // Trim and validate the value
+      const trimmedVal = val.trim();
+      if (trimmedVal.length > 0) {
+        done(trimmedVal);
+      }
+    };
+
+    // Table column filters - visible columns
+    const visibleColumns = computed({
+      get: () => dashboardPanelData.data.config?.visible_columns || [],
+      set: (value: string[]) => {
+        if (!dashboardPanelData.data.config) {
+          dashboardPanelData.data.config = {};
+        }
+        dashboardPanelData.data.config.visible_columns = value && value.length > 0 ? value : undefined;
+      },
+    });
+
+    // Table column filters - hidden columns
+    const hiddenColumns = computed({
+      get: () => dashboardPanelData.data.config?.hidden_columns || [],
+      set: (value: string[]) => {
+        if (!dashboardPanelData.data.config) {
+          dashboardPanelData.data.config = {};
+        }
+        dashboardPanelData.data.config.hidden_columns = value && value.length > 0 ? value : undefined;
+      },
+    });
+
+    // Sticky first column toggle
+    const stickyFirstColumn = computed({
+      get: () => dashboardPanelData.data.config?.sticky_first_column || false,
+      set: (value: boolean) => {
+        if (!dashboardPanelData.data.config) {
+          dashboardPanelData.data.config = {};
+        }
+        dashboardPanelData.data.config.sticky_first_column = value;
+        // Clear sticky_columns when sticky_first_column is enabled
+        if (value) {
+          dashboardPanelData.data.config.sticky_columns = undefined;
+        }
+      },
+    });
+
+    // Sticky columns multiselect
+    const stickyColumns = computed({
+      get: () => dashboardPanelData.data.config?.sticky_columns || [],
+      set: (value: string[]) => {
+        if (!dashboardPanelData.data.config) {
+          dashboardPanelData.data.config = {};
+        }
+        dashboardPanelData.data.config.sticky_columns = value && value.length > 0 ? value : undefined;
+      },
+    });
+
+    // Display value for table aggregations (compact format: first item + count)
+    const getTableAggregationsDisplay = computed(() => {
+      const selected = tableAggregations.value || [];
+      if (selected.length === 0) return "";
+
+      // Map the selected values to their labels
+      const labels = selected
+        .map((val: string) => {
+          const option = aggregationOptions.find((opt) => opt.value === val);
+          return option ? option.value : val;
+        })
+        .filter(Boolean);
+
+      if (labels.length === 1) return labels[0];
+      return `${labels[0]} (+${labels.length - 1} more)`;
+    });
+
+    // Display value for visible columns (compact format: first item + count)
+    const getVisibleColumnsDisplay = computed(() => {
+      const selected = visibleColumns.value || [];
+      if (selected.length === 0) return "";
+      if (selected.length === 1) return selected[0];
+      return `${selected[0]} (+${selected.length - 1} more)`;
+    });
+
+    // Display value for hidden columns (compact format: first item + count)
+    const getHiddenColumnsDisplay = computed(() => {
+      const selected = hiddenColumns.value || [];
+      if (selected.length === 0) return "";
+      if (selected.length === 1) return selected[0];
+      return `${selected[0]} (+${selected.length - 1} more)`;
+    });
+
+    // Display value for sticky columns (compact format: first item + count)
+    const getStickyColumnsDisplay = computed(() => {
+      const selected = stickyColumns.value || [];
+      if (selected.length === 0) return "";
+      if (selected.length === 1) return selected[0];
+      return `${selected[0]} (+${selected.length - 1} more)`;
+    });
+
     return {
       t,
       aggregationOptions,
@@ -448,6 +803,21 @@ export default defineComponent({
       mapsMapType,
       mapsEnableRoam,
       tableAggregations,
+      getTableAggregationsDisplay,
+      visibleColumnsFilteredOptions,
+      hiddenColumnsFilteredOptions,
+      stickyColumnsFilteredOptions,
+      filterVisibleColumns,
+      filterHiddenColumns,
+      filterStickyColumns,
+      createColumnValue,
+      visibleColumns,
+      hiddenColumns,
+      getVisibleColumnsDisplay,
+      getHiddenColumnsDisplay,
+      stickyFirstColumn,
+      stickyColumns,
+      getStickyColumnsDisplay,
     };
   },
 });
@@ -460,6 +830,12 @@ export default defineComponent({
   .table-config {
     padding: 16px 0;
     border-top: 1px solid rgba(0, 0, 0, 0.12);
+  }
+
+  // Fix icon cropping in labels
+  :deep(.q-field__label) {
+    padding-top: 4px;
+    padding-bottom: 4px;
   }
 }
 </style>

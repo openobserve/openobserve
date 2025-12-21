@@ -35,8 +35,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @row-click="(...args: any) => $emit('row-click', ...args)"
     hide-no-data
   >
+    <template v-slot:header-cell="props">
+      <q-th :props="props" :class="props.col.stickyClass">
+        {{ props.col.label }}
+      </q-th>
+    </template>
     <template v-slot:body-cell="props">
-      <q-td :props="props" :style="getStyle(props)" class="copy-cell-td">
+      <q-td
+        :props="props"
+        :style="getStyle(props)"
+        :class="['copy-cell-td', props.col.stickyClass]"
+      >
         <div
           class="flex items-center no-wrap copy-cell-content"
         >
@@ -385,6 +394,37 @@ export default defineComponent({
 
   &:hover .copy-btn {
     opacity: 1;
+  }
+}
+
+// Sticky column support for table charts
+.my-sticky-virtscroll-table {
+  // Sticky columns: first column
+  :deep(thead tr th.sticky-column),
+  :deep(tbody tr td.sticky-column) {
+    position: sticky !important;
+    left: 0;
+    z-index: 2 !important;
+    background-color: #fff !important;
+  }
+
+  // Ensure header sticky columns have higher z-index
+  :deep(thead tr th.sticky-column) {
+    z-index: 3 !important;
+  }
+
+  // Add shadow to sticky columns for better visibility
+  :deep(tbody tr td.sticky-column) {
+    box-shadow: 2px 0 5px -2px rgba(0, 0, 0, 0.1);
+  }
+}
+
+// Dark mode support for sticky columns
+.my-sticky-virtscroll-table.q-dark {
+  :deep(thead tr th.sticky-column),
+  :deep(tbody tr td.sticky-column) {
+    background-color: $dark-page !important;
+    box-shadow: 2px 0 5px -2px rgba(0, 0, 0, 0.5);
   }
 }
 </style>

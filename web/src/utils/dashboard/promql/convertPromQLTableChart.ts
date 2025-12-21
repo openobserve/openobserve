@@ -61,6 +61,8 @@ export class TableConverter implements PromQLChartConverter {
   /**
    * Build table columns from metric labels and value(s)
    * Supports multi-aggregation: creates separate columns for each selected aggregation
+   * Supports column filtering: show/hide specific columns via config
+   * Supports sticky columns: mark columns as sticky to keep them visible while scrolling
    */
   private buildColumns(processedData: ProcessedPromQLData[], panelSchema: any): any[] {
     const config = panelSchema.config || {};
@@ -87,14 +89,41 @@ export class TableConverter implements PromQLChartConverter {
 
     console.log("Label keys collected:", Array.from(labelKeys));
 
+    // Apply column filter if configured
+    // config.visible_columns: array of column names to show (if not set, show all)
+    // config.hidden_columns: array of column names to hide (if not set, hide none)
+    let filteredLabelKeys = Array.from(labelKeys);
+
+    if (config.visible_columns && Array.isArray(config.visible_columns) && config.visible_columns.length > 0) {
+      // If visible_columns is specified, only show those columns
+      filteredLabelKeys = filteredLabelKeys.filter(key => config.visible_columns.includes(key));
+      console.log("Filtered by visible_columns:", filteredLabelKeys);
+    } else if (config.hidden_columns && Array.isArray(config.hidden_columns) && config.hidden_columns.length > 0) {
+      // If hidden_columns is specified, hide those columns
+      filteredLabelKeys = filteredLabelKeys.filter(key => !config.hidden_columns.includes(key));
+      console.log("Filtered by hidden_columns:", filteredLabelKeys);
+    }
+
+    // Get sticky columns configuration
+    // config.sticky_columns: array of column names to make sticky (or "first" to make first column sticky)
+    const stickyColumns = config.sticky_columns || [];
+    const makeFirstSticky = config.sticky_first_column || false;
+
     // Create columns for each label
-    const columns = Array.from(labelKeys).map((key) => ({
-      name: key,
-      field: key,
-      label: key,
-      align: "left",
-      sortable: true,
-    }));
+    const columns = filteredLabelKeys.map((key, index) => {
+      const isSticky = stickyColumns.includes(key) || (makeFirstSticky && index === 0);
+
+      return {
+        name: key,
+        field: key,
+        label: key,
+        align: "left",
+        sortable: true,
+        // Mark column as sticky for CSS styling
+        sticky: isSticky,
+        stickyClass: isSticky ? "sticky-column" : undefined,
+      };
+    });
 
     // Add value columns for each selected aggregation
     aggregations.forEach((agg: string) => {
