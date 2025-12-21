@@ -22,36 +22,42 @@
       No operations added yet. Click + to add an operation.
     </div>
 
-    <!-- Operations List with Drag and Drop -->
-    <draggable
-      v-show="localOperations.length > 0"
-      v-model="localOperations"
-      :item-key="getItemKey"
-      @change="onDragEnd"
-      handle=".drag-handle"
-      class="operations-container"
-    >
-      <template v-for="(element, index) in localOperations">
-        <q-card flat bordered class="operation-item q-mb-sm">
-          <q-card-section class="row items-center q-pa-sm">
-            <!-- Drag Handle -->
-            <div class="col-auto q-mr-sm drag-handle cursor-grab">
-              <q-icon name="drag_indicator" color="grey-6" size="sm" />
-            </div>
-
-            <!-- Operation Name -->
-            <div class="col-3">
-              <div class="text-weight-medium">
-                {{ getOperationDef(element.id)?.name || element.id }}
+    <!-- Operations List with Drag and Drop (Horizontal) -->
+    <div class="operations-scroll-wrapper">
+      <draggable
+        v-show="localOperations.length > 0"
+        v-model="localOperations"
+        :item-key="getItemKey"
+        @change="onDragEnd"
+        handle=".drag-handle"
+        class="operations-container-horizontal"
+      >
+        <template v-for="(element, index) in localOperations">
+          <q-card flat bordered class="operation-item-horizontal q-mr-sm">
+            <q-card-section class="q-pa-sm">
+              <!-- Header Row: Drag Handle + Name + Remove -->
+              <div class="row items-center justify-between q-mb-sm">
+                <div class="row items-center">
+                  <q-icon name="drag_indicator" color="grey-6" size="sm" class="drag-handle cursor-grab q-mr-xs" />
+                  <div class="text-weight-medium">
+                    {{ getOperationDef(element.id)?.name || element.id }}
+                  </div>
+                </div>
+                <q-btn
+                  flat
+                  dense
+                  round
+                  icon="close"
+                  color="negative"
+                  size="xs"
+                  @click="removeOperation(index)"
+                >
+                  <q-tooltip>Remove</q-tooltip>
+                </q-btn>
               </div>
-              <div class="text-caption text-grey-7">
-                {{ getOperationDef(element.id)?.category }}
-              </div>
-            </div>
 
-            <!-- Operation Parameters -->
-            <div class="col-7">
-              <div class="row q-gutter-sm">
+              <!-- Operation Parameters -->
+              <div class="column q-gutter-xs">
                 <template
                   v-for="(param, paramIndex) in getOperationDef(element.id)?.params"
                   :key="paramIndex"
@@ -63,14 +69,12 @@
                     type="number"
                     :label="param.name"
                     dense
-                    outlined
-                    style="max-width: 120px"
+                    borderless
+                    stack-label
+                    hide-bottom-space
+                    class="showLabelOnTop"
                     @update:model-value="onOperationChange"
-                  >
-                    <template v-if="param.description" v-slot:hint>
-                      {{ param.description }}
-                    </template>
-                  </q-input>
+                  />
 
                   <!-- String Parameter -->
                   <q-input
@@ -79,14 +83,12 @@
                     :label="param.name"
                     :placeholder="param.placeholder"
                     dense
-                    outlined
-                    style="max-width: 200px"
+                    borderless
+                    stack-label
+                    hide-bottom-space
+                    class="showLabelOnTop"
                     @update:model-value="onOperationChange"
-                  >
-                    <template v-if="param.description" v-slot:hint>
-                      {{ param.description }}
-                    </template>
-                  </q-input>
+                  />
 
                   <!-- Select Parameter (if options provided) -->
                   <q-select
@@ -95,40 +97,19 @@
                     :options="param.options"
                     :label="param.name"
                     dense
-                    outlined
-                    style="max-width: 150px"
+                    borderless
+                    stack-label
+                    hide-bottom-space
+                    class="showLabelOnTop"
                     @update:model-value="onOperationChange"
                   />
                 </template>
               </div>
-            </div>
-
-            <!-- Remove Button -->
-            <div class="col-1 text-right">
-              <q-btn
-                flat
-                dense
-                round
-                icon="delete"
-                color="negative"
-                size="sm"
-                @click="removeOperation(index)"
-              >
-                <q-tooltip>Remove operation</q-tooltip>
-              </q-btn>
-            </div>
-
-            <!-- Documentation -->
-            <div v-if="getOperationDef(element.id)?.documentation" class="col-12 q-mt-sm">
-              <q-icon name="info" size="xs" color="info" class="q-mr-xs" />
-              <span class="text-caption text-grey-7">
-                {{ getOperationDef(element.id)?.documentation }}
-              </span>
-            </div>
-          </q-card-section>
-        </q-card>
-      </template>
-    </draggable>
+            </q-card-section>
+          </q-card>
+        </template>
+      </draggable>
+    </div>
 
     <!-- Operation Selector Dialog -->
     <q-dialog v-model="showOperationSelector">
@@ -142,7 +123,10 @@
             v-model="searchQuery"
             label="Search operations"
             dense
-            outlined
+            borderless
+            stack-label
+            hide-bottom-space
+            class="showLabelOnTop"
             clearable
           >
             <template v-slot:prepend>
@@ -282,16 +266,51 @@ const onOperationChange = () => {
   border-radius: 4px;
 }
 
-.operations-container {
-  max-height: 500px;
-  overflow-y: auto;
+// Horizontal scroll wrapper
+.operations-scroll-wrapper {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 8px;
+
+  // Custom scrollbar styling
+  &::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+
+    &:hover {
+      background: #555;
+    }
+  }
 }
 
-.operation-item {
+// Horizontal operations container
+.operations-container-horizontal {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  min-height: 120px;
+  padding: 4px 0;
+}
+
+// Horizontal operation card
+.operation-item-horizontal {
+  min-width: 200px;
+  max-width: 280px;
+  flex-shrink: 0;
   transition: all 0.2s;
 
   &:hover {
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
   }
 }
 

@@ -47,7 +47,7 @@ class PromQueryModellerClass implements PromQueryModeller {
     if (labels.length === 0) return "";
 
     const labelStrings = labels.map((label) => {
-      const value = label.value.includes('"')
+      const value = label?.value?.includes('"')
         ? label.value.replace(/"/g, '\\"')
         : label.value;
       return `${label.label}${label.op}"${value}"`;
