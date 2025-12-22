@@ -77,7 +77,7 @@ export async function processPromQLData(
         dataObj[ts] = val;
       });
 
-      console.log(`Series: ${seriesName}, Values count: ${values.length}`);
+      // console.log(`Series: ${seriesName}, Values count: ${values.length}`);
 
       return {
         name: seriesName,

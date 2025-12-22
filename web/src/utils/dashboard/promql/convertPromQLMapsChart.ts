@@ -15,6 +15,7 @@
 
 import { PromQLChartConverter, ProcessedPromQLData, MapsConfig } from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
+import { getCountryName } from "../countryMappings";
 
 /**
  * Converter for maps charts (location-based visualization)
@@ -37,7 +38,7 @@ export class MapsConverter implements PromQLChartConverter {
     // Get label names for location name
     const nameLabel = config.name_label || "name" || "location" || "country" || "region";
 
-    const mapData: any[] = [];
+    const locationValueMap = new Map<string, number[]>();
     const errors: string[] = [];
 
     console.log("=== [MapsConverter] Starting conversion ===");
@@ -48,9 +49,9 @@ export class MapsConverter implements PromQLChartConverter {
       console.log(`Query ${qIndex} - series count:`, queryData.series?.length);
 
       queryData.series.forEach((seriesData, sIndex) => {
-        const locationName = seriesData.metric[nameLabel] || seriesData.name;
+        const rawLocationName = seriesData.metric[nameLabel] || seriesData.name;
 
-        if (!locationName) {
+        if (!rawLocationName) {
           errors.push(
             `Series "${seriesData.name}" missing location name. ` +
               `Expected label: "${nameLabel}"`
@@ -58,20 +59,31 @@ export class MapsConverter implements PromQLChartConverter {
           return;
         }
 
+        // Map country codes to full names (e.g., "US" -> "United States")
+        const locationName = getCountryName(rawLocationName);
+
         const value = applyAggregation(seriesData.values, aggregation);
 
-        console.log(`Query ${qIndex}, Series ${sIndex} - name: ${locationName}, value: ${value}`);
-
-        mapData.push({
-          name: locationName,
-          value: value,
-          itemStyle: {
-            color: this.getColorByValue(value, config),
-          },
-        });
-
-        extras.legends.push(locationName);
+        // Aggregate values by location
+        if (!locationValueMap.has(locationName)) {
+          locationValueMap.set(locationName, []);
+        }
+        locationValueMap.get(locationName)!.push(value);
       });
+    });
+
+    // Convert aggregated data to map data array
+    const mapData: any[] = [];
+    locationValueMap.forEach((values, locationName) => {
+      // Sum all values for the same location (since we already applied aggregation per series)
+      const aggregatedValue = values.reduce((sum, val) => sum + val, 0);
+
+      mapData.push({
+        name: locationName,
+        value: aggregatedValue,
+      });
+
+      extras.legends.push(locationName);
     });
 
     if (errors.length > 0) {
@@ -89,78 +101,76 @@ export class MapsConverter implements PromQLChartConverter {
     console.log("=== [MapsConverter] Conversion complete ===");
     console.log("Map data points:", mapData.length);
 
+    // Calculate min/max values from data (matching SQL implementation)
+    const numericValues = mapData
+      .map((item: any) => item.value)
+      .filter(
+        (value: any): value is number =>
+          typeof value === "number" && !Number.isNaN(value)
+      );
+
+    const minValue =
+      numericValues.length === 1 ? 0 : Math.min(...numericValues);
+    const maxValue = Math.max(...numericValues);
+
     // Return map chart configuration
     // Uses ECharts map type with location names
     return {
       series: [
         {
           type: "map",
-          map: config.map_type || "world", // Map type: world, USA, China, etc.
+          map: config.map_type?.type || "world", // Map type: world, USA, China, etc.
           roam: config.enable_roam !== false,
           data: mapData,
           emphasis: {
             label: {
               show: true,
             },
-            itemStyle: {
-              areaColor: config.emphasis_area_color || "#ffd700",
-            },
-          },
-          select: {
-            label: {
-              show: true,
-            },
-            itemStyle: {
-              areaColor: config.select_area_color || "#ff6b6b",
-            },
           },
         },
       ],
       tooltip: {
         trigger: "item",
+        showDelay: 0,
+        transitionDuration: 0.2,
+        backgroundColor: "rgba(255,255,255,0.8)",
         formatter: (params: any) => {
-          if (params.value !== undefined) {
-            return `${params.name}<br/>Value: ${params.value}`;
+          let formattedValue = params.value;
+          if (formattedValue === "-" || Number.isNaN(formattedValue)) {
+            formattedValue = "-";
           }
-          return params.name;
+          return `${params.name}: ${formattedValue}`;
         },
       },
+      toolbox: {
+        show: true,
+        left: "left",
+        top: "top",
+      },
+      xAxis: [],
+      yAxis: [],
       visualMap: {
-        min: config.min_value || 0,
-        max: config.max_value || this.calculateMaxValue(mapData),
+        left: "right",
+        min: minValue,
+        max: maxValue,
+        inRange: {
+          color: [
+            "#313695",
+            "#4575b4",
+            "#74add1",
+            "#abd9e9",
+            "#e0f3f8",
+            "#ffffbf",
+            "#fee090",
+            "#fdae61",
+            "#f46d43",
+            "#d73027",
+            "#a50026",
+          ],
+        },
         text: ["High", "Low"],
         calculable: true,
-        inRange: {
-          color: config.color_range || ["#e0f3f7", "#006edd"],
-        },
-        left: "left",
-        bottom: "bottom",
       },
     };
-  }
-
-  /**
-   * Get color based on value and configuration
-   */
-  private getColorByValue(value: number, config: any): string | undefined {
-    if (!config.color_thresholds) return undefined;
-
-    for (const threshold of config.color_thresholds) {
-      if (value <= threshold.value) {
-        return threshold.color;
-      }
-    }
-
-    return undefined;
-  }
-
-  /**
-   * Calculate maximum value from map data for visualMap
-   */
-  private calculateMaxValue(mapData: any[]): number {
-    if (mapData.length === 0) return 100;
-
-    const values = mapData.map((item) => item.value || 0);
-    return Math.max(...values);
   }
 }

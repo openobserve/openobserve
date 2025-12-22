@@ -138,10 +138,11 @@ export interface GeoMapConfig {
  */
 export interface MapsConfig {
   name_label?: string;
-  map_type?: string;
+  map_type?: {
+    type: string;
+  };
   enable_roam?: boolean;
-  min_value?: number;
-  max_value?: number;
-  color_range?: string[];
-  color_thresholds?: Array<{ value: number; color: string }>;
+  aggregation?: string;
+  emphasis_area_color?: string;
+  select_area_color?: string;
 }
