@@ -242,6 +242,46 @@ pub async fn save_enrichment_table_from_url(
         ));
     }
 
+    // SSRF protection: Block internal IPs and localhost
+    if let Ok(parsed_url) = url::Url::parse(&request_body.url) {
+        if let Some(host) = parsed_url.host_str() {
+            // Block localhost
+            if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+                return Ok(MetaHttpResponse::bad_request(
+                    "Cannot access localhost URLs",
+                ));
+            }
+
+            // Block private IP ranges and AWS metadata endpoint
+            if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+                match ip {
+                    std::net::IpAddr::V4(v4) => {
+                        let octets = v4.octets();
+                        // RFC1918 private ranges: 10.x.x.x, 172.16-31.x.x, 192.168.x.x
+                        // AWS metadata: 169.254.169.254
+                        if octets[0] == 10
+                            || (octets[0] == 172 && (16..=31).contains(&octets[1]))
+                            || (octets[0] == 192 && octets[1] == 168)
+                            || (octets[0] == 169 && octets[1] == 254)
+                        {
+                            return Ok(MetaHttpResponse::bad_request(
+                                "Cannot access private IP addresses",
+                            ));
+                        }
+                    }
+                    std::net::IpAddr::V6(v6) => {
+                        // Block IPv6 localhost and private ranges
+                        if v6.is_loopback() || v6.segments()[0] & 0xfe00 == 0xfc00 {
+                            return Ok(MetaHttpResponse::bad_request(
+                                "Cannot access private IP addresses",
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // ===== DUPLICATE JOB PREVENTION =====
     // Check if there's already a job in progress for this table.
     // This prevents:
@@ -315,7 +355,7 @@ pub async fn save_enrichment_table_from_url(
     // we still create the job and assume no Range support (safer fallback).
     let supports_range = {
         use crate::service::enrichment_table::url_processor::check_range_support_for_url;
-        match check_range_support_for_url(&request_body.url).await {
+        match check_range_support_for_url(&request_body.url, &org_id, &table_name).await {
             Ok(true) => {
                 log::info!(
                     "[ENRICHMENT::URL] URL {} supports Range requests - resume capability enabled",
