@@ -292,9 +292,22 @@ async fn process_single_url_job(org_id: &str, table_name: &str) -> Result<()> {
                 bytes
             );
 
-            // Update job with final statistics and mark as completed.
-            // These updates are persisted to database so the UI can show final results.
-            job.update_progress(bytes, records);
+            // Fetch the latest job state to preserve progress updates made during processing.
+            // The process_enrichment_table_url function updates progress after each batch,
+            // so we need the latest state before marking as completed.
+            let mut job = match get_url_job(org_id, table_name).await? {
+                Some(j) => j,
+                None => {
+                    log::warn!(
+                        "[ENRICHMENT::URL] Job {}/{} not found after successful processing",
+                        org_id,
+                        table_name
+                    );
+                    return Ok(());
+                }
+            };
+
+            // Mark as completed (progress already updated during processing)
             job.mark_completed();
             save_url_job(&job).await?;
 
@@ -321,6 +334,20 @@ async fn process_single_url_job(org_id: &str, table_name: &str) -> Result<()> {
                 table_name,
                 e
             );
+
+            // Fetch the latest job state to preserve progress updates (last_byte_position, etc.)
+            // made during processing before the failure occurred.
+            let mut job = match get_url_job(org_id, table_name).await? {
+                Some(j) => j,
+                None => {
+                    log::warn!(
+                        "[ENRICHMENT::URL] Job {}/{} not found after failure",
+                        org_id,
+                        table_name
+                    );
+                    return Err(e);
+                }
+            };
 
             let cfg = get_config();
             job.retry_count += 1;
