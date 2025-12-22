@@ -27,11 +27,17 @@ use config::{
         time::{BASE_TIME, now_micros},
     },
 };
-use infra::{cache::stats, db as infra_db};
+use infra::{cache::stats, db as infra_db, table::enrichment_table_urls};
 use rayon::prelude::*;
 use vrl::prelude::NotNan;
 #[cfg(feature = "enterprise")]
-use {crate::service::search::SEARCH_SERVER, o2_enterprise::enterprise::search::TaskStatus};
+use {
+    crate::service::search::SEARCH_SERVER,
+    o2_enterprise::enterprise::{
+        search::TaskStatus,
+        o2_enterprise::enterprise::super_cluster::queue::ENRICHMENT_TABLE_URL_JOB_KEY,
+    }
+};
 
 use crate::{
     common::infra::config::ENRICHMENT_TABLES,
@@ -529,6 +535,157 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         }
     }
     Ok(())
+}
+
+/// Convert EnrichmentTableStatus enum to i16 for database storage
+fn status_to_i16(status: &config::meta::enrichment_table::EnrichmentTableStatus) -> i16 {
+    match status {
+        config::meta::enrichment_table::EnrichmentTableStatus::Pending => 0,
+        config::meta::enrichment_table::EnrichmentTableStatus::Processing => 1,
+        config::meta::enrichment_table::EnrichmentTableStatus::Completed => 2,
+        config::meta::enrichment_table::EnrichmentTableStatus::Failed => 3,
+    }
+}
+
+/// Convert i16 from database to EnrichmentTableStatus enum
+fn i16_to_status(status: i16) -> config::meta::enrichment_table::EnrichmentTableStatus {
+    match status {
+        0 => config::meta::enrichment_table::EnrichmentTableStatus::Pending,
+        1 => config::meta::enrichment_table::EnrichmentTableStatus::Processing,
+        2 => config::meta::enrichment_table::EnrichmentTableStatus::Completed,
+        3 => config::meta::enrichment_table::EnrichmentTableStatus::Failed,
+        _ => config::meta::enrichment_table::EnrichmentTableStatus::Pending, // Default fallback
+    }
+}
+
+/// Save enrichment table URL job state
+pub async fn save_url_job(
+    job: &config::meta::enrichment_table::EnrichmentTableUrlJob,
+) -> Result<(), infra::errors::Error> {
+    let record = enrichment_table_urls::EnrichmentTableUrlRecord {
+        org: job.org_id.clone(),
+        name: job.table_name.clone(),
+        url: job.url.clone(),
+        status: status_to_i16(&job.status),
+        error_message: job.error_message.clone(),
+        created_at: job.created_at,
+        updated_at: job.updated_at,
+        total_bytes_fetched: job.total_bytes_fetched as i64,
+        total_records_processed: job.total_records_processed,
+        retry_count: job.retry_count as i32,
+        append_data: job.append_data,
+    };
+    enrichment_table_urls::put(record.clone()).await?;
+
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        let key = format!("{ENRICHMENT_TABLE_URL_JOB_KEY}/{}/{}", job.org_id, job.table_name);
+        match config::utils::json::to_vec(record) {
+            Err(e) => {
+                log::error!(
+                    "[Enrichment::Url] error serializing enrichment table {}/{} for super_cluster event: {e}",
+                    job.org_id, job.table_name
+                );
+            }
+            Ok(value_vec) => {
+                if let Err(e) =
+                    o2_enterprise::enterprise::super_cluster::queue::enrichment_url_put(
+                        &key,
+                        value_vec.into(),
+                    )
+                    .await
+                {
+                    log::error!(
+                        "[Enrichment::Url] error sending enrichment table {}/{} for super_cluster event: {e}",
+                        job.org_id, job.table_name
+                    );
+                }
+            }
+        };
+    }
+
+    Ok(())
+}
+
+/// Get enrichment table URL job state
+pub async fn get_url_job(
+    org_id: &str,
+    table_name: &str,
+) -> Result<Option<config::meta::enrichment_table::EnrichmentTableUrlJob>, infra::errors::Error> {
+    match enrichment_table_urls::get(org_id, table_name).await? {
+        Some(record) => {
+            let job = config::meta::enrichment_table::EnrichmentTableUrlJob {
+                org_id: record.org,
+                table_name: record.name,
+                url: record.url,
+                status: i16_to_status(record.status),
+                error_message: record.error_message,
+                created_at: record.created_at,
+                updated_at: record.updated_at,
+                total_bytes_fetched: record.total_bytes_fetched as u64,
+                total_records_processed: record.total_records_processed,
+                retry_count: record.retry_count as u32,
+                append_data: record.append_data,
+            };
+            Ok(Some(job))
+        }
+        None => Ok(None),
+    }
+}
+
+/// Delete enrichment table URL job state
+pub async fn delete_url_job(
+    org_id: &str,
+    table_name: &str,
+) -> Result<(), infra::errors::Error> {
+    enrichment_table_urls::delete(org_id, table_name).await?;
+
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        let key = format!("{ENRICHMENT_TABLE_URL_JOB_KEY}/{}/{}", org_id, table_name);
+        if let Err(e) =
+            o2_enterprise::enterprise::super_cluster::queue::enrichment_url_delete(&key).await
+        {
+            log::error!(
+                "[Enrichment::Url] error sending enrichment table {}/{} for super_cluster delete event: {e}",
+                org_id, table_name
+            );
+        }
+    }
+
+    Ok(())
+}
+
+/// List all enrichment table URL jobs for an organization
+pub async fn list_url_jobs(
+    org_id: &str,
+) -> Result<Vec<config::meta::enrichment_table::EnrichmentTableUrlJob>, infra::errors::Error> {
+    let records = enrichment_table_urls::list_by_org(org_id).await?;
+
+    let jobs = records
+        .into_iter()
+        .map(|record| config::meta::enrichment_table::EnrichmentTableUrlJob {
+            org_id: record.org,
+            table_name: record.name,
+            url: record.url,
+            status: i16_to_status(record.status),
+            error_message: record.error_message,
+            created_at: record.created_at,
+            updated_at: record.updated_at,
+            total_bytes_fetched: record.total_bytes_fetched as u64,
+            total_records_processed: record.total_records_processed,
+            retry_count: record.retry_count as u32,
+            append_data: record.append_data,
+        })
+        .collect();
+
+    Ok(jobs)
 }
 
 // write test for convert_to_vrl

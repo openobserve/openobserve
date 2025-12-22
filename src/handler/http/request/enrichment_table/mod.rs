@@ -16,9 +16,11 @@
 use std::io::Error;
 
 use actix_multipart::Multipart;
-use actix_web::{HttpRequest, HttpResponse, post, web};
+use actix_web::{HttpRequest, HttpResponse, get, post, web};
 use config::SIZE_IN_MB;
 use hashbrown::HashMap;
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
@@ -116,5 +118,303 @@ pub async fn save_enrichment_table(
         None => Ok(MetaHttpResponse::bad_request(
             "Bad Request, content-type must be multipart/form-data",
         )),
+    }
+}
+
+// ============================================================================
+// URL-based Enrichment Table Endpoints
+// ============================================================================
+//
+// These endpoints provide asynchronous enrichment table population from public URLs.
+// Unlike the file upload endpoint (save_enrichment_table), these endpoints:
+//
+// 1. Return immediately (202 Accepted) without blocking the HTTP thread
+// 2. Process data in the background using MPSC event-driven architecture
+// 3. Support files exceeding available RAM via streaming
+// 4. Provide status polling for UI progress updates
+// 5. Include retry logic for transient network failures
+//
+// This design was chosen over synchronous processing because:
+// - File downloads can take minutes to hours for large files
+// - Network issues require retry logic that's better handled asynchronously
+// - Users need real-time feedback without keeping HTTP connections open
+// - Background processing allows horizontal scaling across multiple ingesters
+
+/// Request body for creating an enrichment table from a public URL.
+///
+/// The URL must point to a publicly accessible CSV file. Authentication-required
+/// URLs (e.g., S3 presigned URLs with complex headers) are not currently supported.
+///
+/// The `append` behavior is controlled via query parameter, matching the file upload endpoint.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct EnrichmentTableUrlRequest {
+    /// Public URL to the CSV file.
+    ///
+    /// Requirements:
+    /// - Must start with http:// or https://
+    /// - Must be publicly accessible (no authentication)
+    /// - Should return CSV content-type (not enforced but recommended)
+    /// - File can be any size - streaming handles large files efficiently
+    pub url: String,
+}
+
+/// CreateEnrichmentTableFromUrl
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Functions",
+    operation_id = "CreateEnrichmentTableFromUrl",
+    summary = "Create enrichment table from URL",
+    description = "Creates a new enrichment table by fetching CSV data from a public URL. The process runs asynchronously in the background.",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("table_name" = String, Path, description = "Table name"),
+        ("append" = Option<bool>, Query, description = "Whether to append data to existing table (default: false)"),
+    ),
+    request_body(
+        content = EnrichmentTableUrlRequest,
+        description = "URL for the CSV file",
+        content_type = "application/json"
+    ),
+    responses(
+        (status = StatusCode::ACCEPTED, description = "Job created successfully", body = String),
+        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = String),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = String),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Enrichment Table", "operation": "create"}))
+    )
+)]
+#[post("/{org_id}/enrichment_tables/{table_name}/url")]
+pub async fn save_enrichment_table_from_url(
+    path: web::Path<(String, String)>,
+    body: web::Json<EnrichmentTableUrlRequest>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    use crate::service::db::enrichment_table::{get_url_job, save_url_job};
+    use crate::service::enrichment_table::url_processor::trigger_url_job_processing;
+    use config::meta::enrichment_table::{EnrichmentTableStatus, EnrichmentTableUrlJob};
+    use std::collections::HashMap;
+
+    let (org_id, table_name) = path.into_inner();
+    let request_body = body.into_inner();
+
+    // ===== PARSE QUERY PARAMETERS =====
+    // Extract append_data from query parameter to match file upload endpoint consistency.
+    // This keeps both endpoints (file upload and URL) using the same parameter pattern.
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let append_data = match query.get("append") {
+        Some(append_str) => append_str.parse::<bool>().unwrap_or(false),
+        None => false,
+    };
+
+    // ===== INPUT VALIDATION =====
+    // We validate all inputs before doing any database operations to fail fast
+    // and provide clear error messages to users.
+
+    if org_id.trim().is_empty() {
+        return Ok(MetaHttpResponse::bad_request("Organization cannot be empty"));
+    }
+    if table_name.trim().is_empty() {
+        return Ok(MetaHttpResponse::bad_request("Table name cannot be empty"));
+    }
+    if request_body.url.trim().is_empty() {
+        return Ok(MetaHttpResponse::bad_request("URL cannot be empty"));
+    }
+
+    // Validate URL scheme to prevent potential security issues.
+    // We only support http/https, not file://, ftp://, etc.
+    // This prevents:
+    // - Local file access via file:// URLs
+    // - SSRF attacks via internal network protocols
+    // - Confusion with non-HTTP transports
+    if !request_body.url.starts_with("http://") && !request_body.url.starts_with("https://") {
+        return Ok(MetaHttpResponse::bad_request(
+            "URL must start with http:// or https://",
+        ));
+    }
+
+    // ===== DUPLICATE JOB PREVENTION =====
+    // Check if there's already a job in progress for this table.
+    // This prevents:
+    // 1. Wasted resources from duplicate downloads
+    // 2. Race conditions where two jobs write to the same table
+    // 3. Confusing UI state where multiple jobs exist for same table
+    //
+    // We allow replacing completed/failed jobs to support retrying with
+    // different URLs or re-importing updated data.
+    match get_url_job(&org_id, &table_name).await {
+        Ok(Some(existing_job)) => {
+            // Only block if job is actively processing.
+            // This check is eventually consistent (job could complete between
+            // check and new job creation), but the race window is milliseconds
+            // and worst case is a harmless duplicate completion.
+            if existing_job.status == EnrichmentTableStatus::Processing {
+                return Ok(MetaHttpResponse::bad_request(format!(
+                    "Job already in progress for table {}/{}",
+                    org_id, table_name
+                )));
+            }
+            // If status is Completed or Failed, we allow creating a new job.
+            // This overwrites the old job state, which is intentional - users
+            // may want to re-import with updated data or a different URL.
+        }
+        Ok(None) => {
+            // No existing job found - this is the common case for first-time
+            // imports. Proceed with creating new job.
+        }
+        Err(e) => {
+            // Database error while checking for existing job.
+            // We fail the request rather than proceeding blindly, because:
+            // 1. There might actually be a job in progress that we can't see
+            // 2. Database issues indicate broader system problems
+            // 3. Better to fail safe than risk duplicate work or data corruption
+            log::error!(
+                "[ENRICHMENT::URL] Failed to check existing job for {}/{}: {}",
+                org_id,
+                table_name,
+                e
+            );
+            return Ok(MetaHttpResponse::internal_error(
+                "Failed to check job status",
+            ));
+        }
+    }
+
+    // ===== JOB CREATION =====
+    // Create a new job record with Pending status.
+    // This immediately makes the job visible to the status API, allowing
+    // the UI to start polling for updates even before processing begins.
+    let job = EnrichmentTableUrlJob::new(
+        org_id.clone(),
+        table_name.clone(),
+        request_body.url.clone(),
+        append_data,
+    );
+
+    // ===== PERSIST JOB TO DATABASE =====
+    // Save job to etcd before triggering processing.
+    // This ordering is critical:
+    // 1. If save succeeds but trigger fails → Job exists in DB but not processing.
+    //    User can retry or we can add recovery mechanism.
+    // 2. If trigger succeeds but save fails → Processing starts without job record.
+    //    Status API returns 404, UI shows no progress, chaos ensues.
+    //
+    // Therefore: save first, trigger second.
+    if let Err(e) = save_url_job(&job).await {
+        log::error!(
+            "[ENRICHMENT::URL] Failed to save job for {}/{}: {}",
+            org_id,
+            table_name,
+            e
+        );
+        return Ok(MetaHttpResponse::internal_error("Failed to create job"));
+    }
+
+    // ===== TRIGGER BACKGROUND PROCESSING =====
+    // Send MPSC event to background processor.
+    // This is a non-blocking operation that just queues an event.
+    // Actual processing begins when the background task receives the event.
+    //
+    // Why we can fail here:
+    // If this fails, the job exists in the database but will never process.
+    // That's acceptable because:
+    // 1. This only fails during process shutdown (channel closed)
+    // 2. We return 500, so user knows the request failed
+    // 3. User can retry, which will trigger processing of the existing job
+    if let Err(e) = trigger_url_job_processing(org_id.clone(), table_name.clone()) {
+        log::error!(
+            "[ENRICHMENT::URL] Failed to trigger job processing for {}/{}: {}",
+            org_id,
+            table_name,
+            e
+        );
+        return Ok(MetaHttpResponse::internal_error(
+            "Failed to trigger job processing",
+        ));
+    }
+
+    log::info!(
+        "[ENRICHMENT::URL] Created and triggered job for {}/{} from URL: {}",
+        org_id,
+        table_name,
+        request_body.url
+    );
+
+    // ===== SUCCESS RESPONSE =====
+    // Return 202 Accepted (not 200 OK or 201 Created) because:
+    // - The job is accepted but not yet processed
+    // - Processing happens asynchronously in the background
+    // - Final outcome (success/failure) is unknown at this point
+    // - Client should poll the status endpoint for progress
+    //
+    // Response includes identifiers so client can construct status URL:
+    // GET /api/{org_id}/enrichment_tables/{table_name}/url/status
+    Ok(MetaHttpResponse::json(serde_json::json!({
+        "message": "Enrichment table job created successfully",
+        "org_id": org_id,
+        "table_name": table_name,
+        "status": "pending"
+    })))
+}
+
+/// GetAllEnrichmentTableStatuses
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Functions",
+    operation_id = "GetAllEnrichmentTableStatuses",
+    summary = "Get all enrichment table statuses for an organization",
+    description = "Get the status of all enrichment tables (both file and URL-based) for an organization in a single request",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = StatusCode::OK, description = "Statuses retrieved", body = HashMap<String, config::meta::enrichment_table::EnrichmentTableUrlJob>),
+        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = String),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = String),
+    )
+)]
+#[get("/{org_id}/enrichment_tables/status")]
+pub async fn get_all_enrichment_table_statuses(
+    path: web::Path<String>,
+) -> Result<HttpResponse, Error> {
+    use crate::service::db::enrichment_table::list_url_jobs;
+
+    let org_id = path.into_inner();
+
+    // ===== INPUT VALIDATION =====
+    if org_id.trim().is_empty() {
+        return Ok(MetaHttpResponse::bad_request("Organization cannot be empty"));
+    }
+
+    // ===== FETCH ALL URL JOBS FOR THIS ORG =====
+    // This returns all URL-based enrichment table jobs in a single query.
+    // Much more efficient than N separate queries for N tables.
+    // Frontend can then map table names to their job status locally.
+    match list_url_jobs(&org_id).await {
+        Ok(jobs) => {
+            // Convert Vec<Job> to HashMap<table_name, Job> for easier frontend lookup
+            let job_map: HashMap<String, config::meta::enrichment_table::EnrichmentTableUrlJob> =
+                jobs.into_iter()
+                    .map(|job| (job.table_name.clone(), job))
+                    .collect();
+
+            Ok(MetaHttpResponse::json(job_map))
+        }
+        Err(e) => {
+            log::error!(
+                "[ENRICHMENT::URL] Failed to list URL jobs for org {}: {}",
+                org_id,
+                e
+            );
+            Ok(MetaHttpResponse::internal_error(
+                "Failed to retrieve enrichment table statuses",
+            ))
+        }
     }
 }

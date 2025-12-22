@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{meta::pipeline::Pipeline, utils::json};
-use infra::errors::{Error, Result};
+use infra::{
+    table::enrichment_table_urls,
+    errors::{Error, Result}
+};
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
@@ -35,6 +38,25 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             let pipeline_id = parse_key(&msg.key)?;
             infra::coordinator::pipelines::emit_delete_event(&pipeline_id).await?;
             infra::pipeline::delete(&pipeline_id).await?;
+        }
+        MessageType::EnrichmentUrlPut => {
+            let bytes = msg
+                .value
+                .ok_or(Error::Message("Message missing value".to_string()))?;
+            let enrichment_url_job: enrichment_table_urls::EnrichmentTableUrlRecord = json::from_slice(&bytes).inspect_err(|e| {
+                log::error!(
+                    "[SUPER_CLUSTER:PIPELINE] Failed to deserialize message value to pipeline: {e}"
+                );
+            })?;
+            enrichment_table_urls::put(enrichment_url_job).await?;
+        }
+        MessageType::EnrichmentUrlDelete => {
+            let key_columns: Vec<&str> = key.split('/').collect();
+            // format is /enrichment_table_url_job/org_id/table_name
+            if key_columns.len() != 4 || key_columns[2].is_empty() || key_columns[3].is_empty() {
+                return Err(Error::Message("Invalid key".to_string()));
+            }
+            enrichment_table_urls::delete(key_columns[2], key_columns[3]).await?;
         }
         _ => {
             log::error!(

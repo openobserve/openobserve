@@ -2171,6 +2171,30 @@ pub struct EnrichmentTable {
         help = "Background sync interval in seconds"
     )]
     pub merge_interval: u64,
+    #[env_config(
+        name = "ZO_ENRICHMENT_URL_FETCH_MAX_SIZE",
+        default = 1024,
+        help = "Maximum size of each chunk when fetching from URL (in MB)"
+    )]
+    pub url_fetch_max_size_mb: usize,
+    #[env_config(
+        name = "ZO_ENRICHMENT_URL_FETCH_TIMEOUT",
+        default = 300,
+        help = "Timeout for URL fetch operations (in seconds)"
+    )]
+    pub url_fetch_timeout_secs: u64,
+    #[env_config(
+        name = "ZO_ENRICHMENT_URL_MAX_RETRIES",
+        default = 3,
+        help = "Maximum retry attempts for failed URL fetches"
+    )]
+    pub url_max_retries: u32,
+    #[env_config(
+        name = "ZO_ENRICHMENT_URL_RETRY_DELAY",
+        default = 5,
+        help = "Delay between retry attempts (in seconds)"
+    )]
+    pub url_retry_delay_secs: u64,
 }
 
 pub fn init() -> Config {

@@ -46,7 +46,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               tabindex="0"
             />
 
+            <!-- Data Source Selection (only for new tables) -->
+            <div v-if="!isUpdating" class="col-12 q-py-md">
+              <div class="text-grey-8 text-bold tw-mb-2">Data Source</div>
+              <q-option-group
+                v-model="formData.source"
+                :options="sourceOptions"
+                color="primary"
+                inline
+              />
+            </div>
+
+            <!-- Upload File Option -->
             <q-file
+              v-if="!isUpdating && formData.source === 'file'"
               filled
               v-model="formData.file"
               :label="t('function.uploadCSVFile')"
@@ -62,9 +75,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon name="attachment" />
               </template>
             </q-file>
-            <div v-if="isUpdating">
+
+            <!-- File Upload for Update Mode (existing behavior) -->
+            <q-file
+              v-if="isUpdating"
+              filled
+              v-model="formData.file"
+              :label="t('function.uploadCSVFile')"
+              class="col-12 q-py-md showLabelOnTop lookup-table-file-uploader"
+              stack-label
+              outlined
+              accept=".csv"
+              dense
+              :rules="[(val: any) => !!val || 'CSV File is required!']"
+              hide-bottom-space
+            >
+              <template v-slot:prepend>
+                <q-icon name="attachment" />
+              </template>
+            </q-file>
+
+            <!-- From URL Option (only for new tables) -->
+            <div v-if="!isUpdating && formData.source === 'url'" class="col-12">
+              <q-input
+                v-model="formData.url"
+                label="CSV File URL"
+                color="input-border"
+                bg-color="input-bg"
+                class="q-py-md showLabelOnTop text-grey-8 text-bold"
+                stack-label
+                outlined
+                filled
+                dense
+                placeholder="https://example.com/data.csv"
+                :rules="[
+                  (val: any) => !!val || 'URL is required!',
+                  (val: any) => (val && (val.startsWith('http://') || val.startsWith('https://'))) || 'URL must start with http:// or https://'
+                ]"
+                tabindex="0"
+              >
+                <template v-slot:hint>
+                  <div class="tw-text-xs">
+                    Must be a publicly accessible CSV file
+                  </div>
+                </template>
+              </q-input>
+            </div>
+
+            <!-- Append Data Toggle -->
+            <div v-if="isUpdating || (!isUpdating && formData.source === 'url')" class="col-12">
               <q-toggle
-                class="col-12 q-py-md text-grey-8 text-bold"
+                class="q-py-md text-grey-8 text-bold"
                 v-model="formData.append"
                 :label="t('function.appendData')"
               />
@@ -112,7 +173,9 @@ import { useReo } from "@/services/reodotdev_analytics";
 const defaultValue: any = () => {
   return {
     name: "",
+    source: "file", // "file" or "url"
     file: "",
+    url: "",
     append: false,
   };
 };
@@ -145,6 +208,11 @@ export default defineComponent({
 
     let compilationErr = ref("");
 
+    const sourceOptions = [
+      { label: 'Upload File', value: 'file' },
+      { label: 'From URL', value: 'url' }
+    ];
+
     const editorUpdate = (e: any) => {
       formData.value.function = e.target.value;
     };
@@ -155,50 +223,98 @@ export default defineComponent({
         message: "Please wait...",
         timeout: 2000,
       });
-      let reqformData = new FormData();
-      reqformData.append("file", formData.value.file);
 
-      jsTransformService
-        .create_enrichment_table(
-          store.state.selectedOrganization.identifier,
-          formData.value.name,
-          reqformData,
-          formData.value.append
-        )
-        .then((res) => {
-          formData.value = { ...defaultValue() };
-          emit("update:list");
+      // Handle URL-based enrichment table creation
+      if (formData.value.source === 'url') {
+        jsTransformService
+          .create_enrichment_table_from_url(
+            store.state.selectedOrganization.identifier,
+            formData.value.name,
+            formData.value.url,
+            formData.value.append
+          )
+          .then((res) => {
+            formData.value = { ...defaultValue() };
+            emit("update:list");
 
-          dismiss();
-          q.notify({
-            type: "positive",
-            message: res.data.message,
-          });
-        })
-        .catch((err) => {
-          compilationErr.value = err.response?.data?.["message"] || err.message || "Unknown error";
-          if(err.response?.status != 403){
+            dismiss();
             q.notify({
-            type: "negative",
-            message:
-              JSON.stringify(err.response?.data?.["error"]) ||
-              "Enrichment Table creation failed",
+              type: "positive",
+              message: "Enrichment table job started. Processing in background...",
+            });
+          })
+          .catch((err) => {
+            compilationErr.value = err.response?.data?.["message"] || err.message || "Unknown error";
+            if(err.response?.status != 403){
+              q.notify({
+                type: "negative",
+                message:
+                  err.response?.data?.["message"] ||
+                  "Enrichment Table creation failed",
+              });
+            }
+            dismiss();
           });
-          }
-          dismiss();
-        });
 
-      segment.track("Button Click", {
-        button: "Save Enrichment Table",
-        user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
-        function_name: formData.value.name,
-        page: "Add/Update Enrichment Table",
-      });
-      track("Button Click", {
-        button: "Save Enrichment Table",
-        page: "Add Enrichment Table"
-      });
+        segment.track("Button Click", {
+          button: "Save Enrichment Table from URL",
+          user_org: store.state.selectedOrganization.identifier,
+          user_id: store.state.userInfo.email,
+          function_name: formData.value.name,
+          page: "Add/Update Enrichment Table",
+        });
+        track("Button Click", {
+          button: "Save Enrichment Table from URL",
+          page: "Add Enrichment Table"
+        });
+      }
+      // Handle file upload enrichment table creation (existing logic)
+      else {
+        let reqformData = new FormData();
+        reqformData.append("file", formData.value.file);
+
+        jsTransformService
+          .create_enrichment_table(
+            store.state.selectedOrganization.identifier,
+            formData.value.name,
+            reqformData,
+            formData.value.append
+          )
+          .then((res) => {
+            formData.value = { ...defaultValue() };
+            emit("update:list");
+
+            dismiss();
+            q.notify({
+              type: "positive",
+              message: res.data.message,
+            });
+          })
+          .catch((err) => {
+            compilationErr.value = err.response?.data?.["message"] || err.message || "Unknown error";
+            if(err.response?.status != 403){
+              q.notify({
+              type: "negative",
+              message:
+                JSON.stringify(err.response?.data?.["error"]) ||
+                "Enrichment Table creation failed",
+            });
+            }
+            dismiss();
+          });
+
+        segment.track("Button Click", {
+          button: "Save Enrichment Table",
+          user_org: store.state.selectedOrganization.identifier,
+          user_id: store.state.userInfo.email,
+          function_name: formData.value.name,
+          page: "Add/Update Enrichment Table",
+        });
+        track("Button Click", {
+          button: "Save Enrichment Table",
+          page: "Add Enrichment Table"
+        });
+      }
     };
 
     return {
@@ -215,6 +331,7 @@ export default defineComponent({
       editorUpdate,
       isFetchingStreams,
       onSubmit,
+      sourceOptions,
     };
   },
   created() {

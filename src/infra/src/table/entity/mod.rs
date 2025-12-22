@@ -13,6 +13,7 @@ pub mod dashboards;
 pub mod destinations;
 pub mod distinct_value_fields;
 pub mod enrichment_tables;
+pub mod enrichment_table_urls;
 pub mod folders;
 pub mod org_users;
 pub mod organizations;
