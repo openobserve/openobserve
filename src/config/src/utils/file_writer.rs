@@ -38,7 +38,7 @@ use crate::{
 pub static VORTEX_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
     tokio::runtime::Builder::new_multi_thread()
         .thread_name("vortex_runtime")
-        .worker_threads(config::get_config().limit.cpu_num)
+        .worker_threads(config::get_config().limit.vortex_thread_num)
         .thread_stack_size(16 * 1024 * 1024)
         .enable_all()
         .build()

@@ -1381,6 +1381,8 @@ pub struct Limit {
     pub file_merge_thread_num: usize,
     #[env_config(name = "ZO_MEM_DUMP_THREAD_NUM", default = 0)]
     pub mem_dump_thread_num: usize,
+    #[env_config(name = "ZO_VORTEX_THREAD_NUM", default = 0)]
+    pub vortex_thread_num: usize,
     #[env_config(name = "ZO_USAGE_REPORTING_THREAD_NUM", default = 0)]
     pub usage_reporting_thread_num: usize,
     #[env_config(name = "ZO_QUERY_THREAD_NUM", default = 0)]
@@ -2392,6 +2394,10 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // HACK for mem_dump_thread_num equal to CPU core
     if cfg.limit.mem_dump_thread_num == 0 {
         cfg.limit.mem_dump_thread_num = cpu_num;
+    }
+    // HACK for vortex_thread_num equal to CPU core
+    if cfg.limit.vortex_thread_num == 0 {
+        cfg.limit.vortex_thread_num = cpu_num;
     }
     // HACK for usage_reporting_thread_num equal to half of CPU core
     if cfg.limit.usage_reporting_thread_num == 0 {
