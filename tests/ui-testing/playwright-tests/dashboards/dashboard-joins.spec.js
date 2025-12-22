@@ -286,6 +286,10 @@ test.describe("dashboard joins testcases", () => {
 
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
+
+     // Wait for dashboard UI to be fully stable
+     await pm.dashboardCreate.waitForDashboardUIStable();
+
     await pm.dashboardCreate.createDashboard(randomDashboardName);
     await page
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
@@ -352,14 +356,13 @@ test.describe("dashboard joins testcases", () => {
       .click();
     await page.waitForTimeout(2000);
 
-    // Should have both INNER JOIN and LEFT JOIN
-    const queryText = await page
-      .locator('.q-table__container')
-      .textContent();
-
-    expect(queryText).toContain('INNER JOIN');
-    expect(queryText).toContain('LEFT JOIN');
-
+    await expect(
+      page
+        .getByRole("cell", {
+          name: 'SELECT histogram(e2e_automate._timestamp) as "x_axis_1", count(e2e_automate._timestamp) as "y_axis_1" FROM "e2e_automate" INNER JOIN "e2e_automate_logs" AS stream_0 ON e2e_automate.kubernetes_pod_name = stream_0.kubernetes_pod_name LEFT JOIN "e2e_automate" AS stream_1 ON stream_0.kubernetes_namespace_name = stream_1.kubernetes_namespace_name GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+        })
+        .nth(1)
+    ).toBeVisible();
     await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     await pm.dashboardPanelActions.savePanel();
@@ -394,7 +397,7 @@ test.describe("dashboard joins testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Add two joins
@@ -476,7 +479,7 @@ test.describe("dashboard joins testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Add initial join with INNER type
@@ -518,8 +521,20 @@ test.describe("dashboard joins testcases", () => {
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
 
-    // Verify LEFT JOIN in SQL
-    await joinsHelper.verifyJoinInSQL('LEFT JOIN "e2e_automate_logs"');
+      // Verify both joins appear in SQL
+      await page
+      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
+      .click();
+    await page.waitForTimeout(2000);
+
+    await expect(
+      page
+        .getByRole("cell", {
+          name: 'SELECT histogram(e2e_automate._timestamp) as "x_axis_1", count(e2e_automate._timestamp) as "y_axis_1" FROM "e2e_automate" LEFT JOIN "e2e_automate_logs" AS stream_0 ON e2e_automate.kubernetes_pod_name = stream_0.kubernetes_pod_name AND e2e_automate.kubernetes_container_name = stream_0.kubernetes_container_name GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+        })
+        .nth(1)
+    ).toBeVisible();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     await pm.dashboardPanelActions.savePanel();
     await pm.dashboardCreate.backToDashboardList();
@@ -553,7 +568,7 @@ test.describe("dashboard joins testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Test != operator
@@ -576,8 +591,20 @@ test.describe("dashboard joins testcases", () => {
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
 
-    // Verify != in SQL
-    await joinsHelper.verifyJoinInSQL("!=");
+      // Verify both joins appear in SQL
+      await page
+      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
+      .click();
+    await page.waitForTimeout(2000);
+
+    await expect(
+      page
+        .getByRole("cell", {
+          name: 'SELECT histogram(e2e_automate._timestamp) as "x_axis_1", count(e2e_automate._timestamp) as "y_axis_1" FROM "e2e_automate" INNER JOIN "e2e_automate_logs" AS stream_0 ON e2e_automate.kubernetes_pod_name != stream_0.kubernetes_pod_name GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+        })
+        .nth(1)
+    ).toBeVisible();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     await pm.dashboardPanelActions.savePanel();
     await pm.dashboardCreate.backToDashboardList();
@@ -611,7 +638,7 @@ test.describe("dashboard joins testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Create join with condition that won't match (using != with same values)
@@ -634,9 +661,20 @@ test.describe("dashboard joins testcases", () => {
     await pm.dashboardPanelActions.applyDashboardBtn();
     await page.waitForTimeout(3000);
 
-    // Verify chart still renders (may show no data message)
-    const chartContainer = page.locator('[data-test="dashboard-panel-chart"]');
-    await chartContainer.waitFor({ state: "visible", timeout: 10000 });
+     // Verify both joins appear in SQL
+     await page
+     .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
+     .click();
+   await page.waitForTimeout(2000);
+
+   await expect(
+     page
+       .getByRole("cell", {
+         name: 'SELECT histogram(e2e_automate._timestamp) as "x_axis_1", count(e2e_automate._timestamp) as "y_axis_1" FROM "e2e_automate" INNER JOIN "e2e_automate_logs" AS stream_0 ON e2e_automate.kubernetes_pod_name != stream_0.kubernetes_pod_name GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+       })
+       .nth(1)
+   ).toBeVisible();
+   await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     // Save panel
     await pm.dashboardPanelActions.savePanel();
@@ -680,7 +718,7 @@ test.describe("dashboard joins testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Add filter
@@ -714,17 +752,18 @@ test.describe("dashboard joins testcases", () => {
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
 
-    // Verify SQL contains both JOIN and WHERE
-    await page
+      // Verify both joins appear in SQL
+      await page
       .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
       .click();
     await page.waitForTimeout(2000);
 
-    const queryText = await page.locator('.q-table__container').textContent();
-    expect(queryText).toContain('INNER JOIN');
-    expect(queryText).toContain('WHERE');
-    expect(queryText).toContain('kubernetes_container_name');
-
+    await expect(
+      page
+        .getByRole("cell", {
+          name: 'SELECT histogram(e2e_automate._timestamp) as "x_axis_1", count(e2e_automate._timestamp) as "y_axis_1" FROM "e2e_automate" INNER JOIN "e2e_automate_logs" AS stream_0 ON e2e_automate.kubernetes_pod_name = stream_0.kubernetes_pod_name WHERE e2e_automate.kubernetes_container_name = \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+        })
+    ).toBeVisible();
     await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     await pm.dashboardPanelActions.savePanel();
@@ -760,7 +799,7 @@ test.describe("dashboard joins testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Add join
@@ -783,18 +822,20 @@ test.describe("dashboard joins testcases", () => {
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
 
-    // Verify SQL contains both JOIN and GROUP BY with breakdown
-    await page
-      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
-      .click();
-    await page.waitForTimeout(2000);
+     // Verify both joins appear in SQL
+     await page
+     .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
+     .click();
+   await page.waitForTimeout(2000);
 
-    const queryText = await page.locator('.q-table__container').textContent();
-    expect(queryText).toContain('INNER JOIN');
-    expect(queryText).toContain('GROUP BY');
-    expect(queryText).toContain('breakdown');
-
-    await page.locator('[data-test="query-inspector-close-btn"]').click();
+   await expect(
+     page
+       .getByRole("cell", {
+         name: 'SELECT histogram(e2e_automate._timestamp) as "x_axis_1", count(e2e_automate._timestamp) as "y_axis_1", e2e_automate.kubernetes_container_name as "breakdown_1" FROM "e2e_automate" INNER JOIN "e2e_automate_logs" AS stream_0 ON e2e_automate.kubernetes_pod_name = stream_0.kubernetes_pod_name GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC',
+       })
+       .nth(1)
+   ).toBeVisible();
+   await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     await pm.dashboardPanelActions.savePanel();
     await pm.dashboardCreate.backToDashboardList();
@@ -828,7 +869,7 @@ test.describe("dashboard joins testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Add first join
@@ -868,17 +909,20 @@ test.describe("dashboard joins testcases", () => {
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
 
-    // Verify stream aliases in SQL
-    await page
-      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
-      .click();
-    await page.waitForTimeout(2000);
+     // Verify both joins appear in SQL
+     await page
+     .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
+     .click();
+   await page.waitForTimeout(2000);
 
-    const queryText = await page.locator('.q-table__container').textContent();
-    expect(queryText).toContain('AS stream_0');
-    expect(queryText).toContain('AS stream_1');
-
-    await page.locator('[data-test="query-inspector-close-btn"]').click();
+   await expect(
+     page
+       .getByRole("cell", {
+         name: 'SELECT histogram(e2e_automate._timestamp) as "x_axis_1", count(e2e_automate._timestamp) as "y_axis_1" FROM "e2e_automate" INNER JOIN "e2e_automate_logs" AS stream_0 ON e2e_automate.kubernetes_pod_name = stream_0.kubernetes_pod_name LEFT JOIN "e2e_automate" AS stream_1 ON stream_0.kubernetes_namespace_name = stream_1.kubernetes_namespace_name GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+       })
+       .nth(1)
+   ).toBeVisible();
+   await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     await pm.dashboardPanelActions.savePanel();
     await pm.dashboardCreate.backToDashboardList();

@@ -29,7 +29,7 @@ export default class ChartTypeSelector {
       .click();
 
     // CRITICAL: Wait for stream list API call to complete after changing type
-    await this.page.waitForLoadState("networkidle");
+    // await this.page.waitForLoadState("networkidle");
     await this.page.waitForTimeout(1000);
   }
 
