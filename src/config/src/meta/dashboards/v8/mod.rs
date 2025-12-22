@@ -128,6 +128,31 @@ pub struct Query {
     pub joins: Option<Vec<Join>>,
 }
 
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(default)]
+pub struct PromQLLabelFilter {
+    pub label: String,
+    pub op: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(default)]
+pub struct PromQLOperation {
+    pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub params: Option<Vec<PromQLOperationParam>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, Hash)]
+#[serde(untagged)]
+pub enum PromQLOperationParam {
+    String(String),
+    #[schema(value_type = f64)]
+    Number(OrdF64),
+    Bool(bool),
+}
+
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct PanelFields {
     pub stream: String,
@@ -156,6 +181,10 @@ pub struct PanelFields {
     pub value: Option<AxisItem>,
     #[schema(value_type = Object)]
     pub filter: PanelFilter,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub promql_labels: Vec<PromQLLabelFilter>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub promql_operations: Vec<PromQLOperation>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
