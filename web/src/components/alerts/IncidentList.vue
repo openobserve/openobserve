@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="incident-list" class="tw-w-full tw-h-full tw-pb-[0.625rem]">
+  <div data-test="incident-list" class="tw-w-full tw-h-full tw-pl-[0.625rem] tw-pb-[0.625rem]">
     <!-- Incidents table -->
     <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
       <div class="card-container tw-h-[calc(100vh-127px)]">
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, onMounted } from "vue";
+import { defineComponent, ref, computed, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -189,7 +189,13 @@ export default defineComponent({
     O2AIContextAddBtn,
     NoData,
   },
-  setup() {
+  props: {
+    searchQuery: {
+      type: String,
+      default: "",
+    },
+  },
+  setup(props) {
     const { t } = useI18n();
     const store = useStore();
     const $q = useQuasar();
@@ -229,7 +235,7 @@ export default defineComponent({
         name: "index",
         label: "#",
         field: "index",
-        align: "left" as const,
+        align: "center" as const,
         style: "width: 67px;",
         sortable: false,
       },
@@ -285,14 +291,14 @@ export default defineComponent({
         const org = store.state.selectedOrganization.identifier;
         const limit = pagination.value.rowsPerPage;
         const offset = (pagination.value.page - 1) * limit;
+        const keyword = props.searchQuery?.trim() || undefined;
 
-        // TODO: Update API to support status and severity filters
-        // For now, we load all and filter client-side
         const response = await incidentsService.list(
           org,
           undefined,  // Status filter to be added when API supports it
           limit,
-          offset
+          offset,
+          keyword
         );
 
         incidents.value = response.data.incidents;
@@ -411,6 +417,13 @@ export default defineComponent({
     };
 
     onMounted(() => {
+      loadIncidents();
+    });
+
+    // Watch for search query changes and reload incidents
+    watch(() => props.searchQuery, () => {
+      // Reset to page 1 when search query changes
+      pagination.value.page = 1;
       loadIncidents();
     });
 

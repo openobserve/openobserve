@@ -21,24 +21,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="alert-list-page"
     class="q-pa-none flex flex-col"
   >
-    <div class="tw-w-full tw-px-[0.625rem] tw-mb-[0.625rem] q-pt-xs" v-if="!showAddAlertDialog && !showImportAlertDialog">
+    <div class="tw-w-full tw-h-[68px] tw-px-[0.625rem] tw-mb-[0.625rem] q-pt-xs" v-if="!showAddAlertDialog && !showImportAlertDialog">
       <div class="card-container">
         <div
           class="flex justify-between full-width tw-py-3 tw-px-4 items-center"
         >
-          <div class="q-table__title tw-font-[600]" data-test="alerts-list-title" >
-            {{ t("alerts.header") }}
+          <div class="tw-flex tw-items-center tw-gap-4">
+            <!-- Icon-only View Mode Tabs -->
+            <div class="view-mode-tabs">
+              <q-btn
+                flat
+                dense
+                :class="viewMode === 'alerts' ? 'active-tab' : 'inactive-tab'"
+                class="view-tab-btn"
+                @click="onViewModeChange('alerts')"
+                data-test="alerts-view-btn"
+              >
+                <q-icon name="notifications_active" size="18px" />
+                <q-tooltip>{{ t('alerts.header') }}</q-tooltip>
+              </q-btn>
+              <q-btn
+                flat
+                dense
+                :class="viewMode === 'incidents' ? 'active-tab' : 'inactive-tab'"
+                class="view-tab-btn"
+                @click="onViewModeChange('incidents')"
+                data-test="incidents-view-btn"
+              >
+                <q-icon name="crisis_alert" size="18px" />
+                <q-tooltip>{{ t('alerts.incidents.title') }}</q-tooltip>
+              </q-btn>
+            </div>
+
+            <!-- Page Title -->
+            <div class="page-title tw-font-[600] tw-text-[20px]" data-test="page-title">
+              {{ viewMode === 'alerts' ? t('alerts.header') : t('alerts.incidents.title') }}
+            </div>
           </div>
           <div class="flex q-ml-auto tw-ps-2 items-center">
-            <div class="app-tabs-container tw-h-[36px] q-mr-sm">
+            <!-- Tabs only visible in Alerts view -->
+            <div v-if="viewMode === 'alerts'" class="app-tabs-container tw-h-[36px] q-mr-sm">
               <app-tabs
               class="tabs-selection-container"
-              :tabs="tabs"
+              :tabs="alertTabs"
               v-model:active-tab="activeTab"
               @update:active-tab="filterAlertsByTab"
             />
             </div>
+            <!-- Search for Alerts view -->
             <q-input
+              v-if="viewMode === 'alerts'"
               v-model="dynamicQueryModel"
               dense
               borderless
@@ -50,14 +82,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-list-search-input"
               :clearable="searchAcrossFolders"
               @clear="clearSearchHistory"
-
               class="o2-search-input"
             >
               <template #prepend>
                 <q-icon class="o2-search-input-icon" name="search" />
               </template>
             </q-input>
-            <div class="tw-mb-2">
+            <!-- Search for Incidents view -->
+            <q-input
+              v-if="viewMode === 'incidents'"
+              v-model="incidentSearchQuery"
+              dense
+              borderless
+              placeholder="Search incidents..."
+              data-test="incident-search-input"
+              clearable
+              class="o2-search-input"
+            >
+              <template #prepend>
+                <q-icon class="o2-search-input-icon" name="search" />
+              </template>
+            </q-input>
+            <!-- All Folders toggle (only for alerts view) -->
+            <div v-if="viewMode === 'alerts'" class="tw-mb-2">
               <q-toggle
                 data-test="alert-list-search-across-folders-toggle"
                 v-model="searchAcrossFolders"
@@ -85,16 +132,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-insights-btn"
             icon="insights"
           />
+          <!-- Import button (only for alerts view) -->
           <q-btn
+            v-if="viewMode === 'alerts'"
             class="q-ml-sm o2-secondary-button tw-h-[36px]"
             no-caps
             flat
             :label="t(`dashboard.import`)"
             @click="importAlert"
             data-test="alert-import"
-
           />
+          <!-- Add Alert button (only for alerts view) -->
           <q-btn
+            v-if="viewMode === 'alerts'"
             data-test="alert-list-add-alert-btn"
             class="q-ml-sm o2-primary-button tw-h-[36px]"
             no-caps
@@ -112,7 +162,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="full-width alert-list-table"
       style="height: calc(100vh - 116px)"
     >
+      <!-- Incidents View (no folders) -->
+      <div v-if="viewMode === 'incidents'" class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
+        <IncidentList :searchQuery="incidentSearchQuery" />
+      </div>
+
+      <!-- Alerts View (with folders) -->
       <q-splitter
+        v-else
         v-model="splitterModel"
         unit="px"
         :limits="[200, 500]"
@@ -132,11 +189,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #after>
           <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
             <div class="tw-h-full card-container">
-              <!-- Incidents List (shown when incidents tab is active) -->
-              <IncidentList v-if="activeTab === 'incidents'" />
               <!-- Alert List Table -->
               <q-table
-                v-else
                 v-model:selected="selectedAlerts"
                 :selected-rows-label="getSelectedString"
                 selection="multiple"
@@ -204,12 +258,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <template v-if="col.name === 'name'">
                         <div class="tw-flex tw-items-center tw-gap-1">
                           <span>{{ computedName(props.row[col.field]) }}</span>
-                          <O2AIContextAddBtn
-                            @sendToAiChat="openSREChat(props.row)"
-                            :size="'6px'"
-                            :imageHeight="'16px'"
-                            :imageWidth="'16px'"
-                          />
                         </div>
                         <q-tooltip
                           v-if="props.row[col.field]?.length > 30"
@@ -1090,11 +1138,36 @@ export default defineComponent({
 
     const activeFolderToMove = ref("default");
 
+    // Initialize viewMode from URL query parameter
+    const viewMode = ref(
+      (router.currentRoute.value.query.view as string) === "incidents" ? "incidents" : "alerts"
+    );
+
     // Initialize activeTab from URL query parameter, default to "all"
     const activeTab = ref(
       (router.currentRoute.value.query.tab as string) || "all"
     );
 
+    // Incident search query
+    const incidentSearchQuery = ref("");
+
+    // Tabs for alerts view only (removed incidents tab)
+    const alertTabs = reactive([
+      {
+        label: t("alerts.all"),
+        value: "all",
+      },
+      {
+        label: t("alerts.scheduled"),
+        value: "scheduled",
+      },
+      {
+        label: t("alerts.realTime"),
+        value: "realTime",
+      },
+    ]);
+
+    // Keep old tabs for backward compatibility if needed
     const tabs = reactive([
       {
         label: t("alerts.all"),
@@ -1113,6 +1186,26 @@ export default defineComponent({
         value: "incidents",
       },
     ]);
+
+    const onViewModeChange = (newMode: string) => {
+      // Update viewMode immediately
+      viewMode.value = newMode;
+
+      // Update URL query parameter
+      router.push({
+        query: {
+          ...router.currentRoute.value.query,
+          view: newMode,
+          // Reset tab to 'all' when switching to alerts view
+          tab: newMode === "alerts" ? "all" : undefined,
+        },
+      });
+
+      // Reset active tab when switching to alerts view
+      if (newMode === "alerts") {
+        activeTab.value = "all";
+      }
+    };
 
     const columns = computed(() => {
       const baseColumns: any = [
@@ -2573,6 +2666,10 @@ export default defineComponent({
       computedName,
       computedOwner,
       tabs,
+      alertTabs,
+      viewMode,
+      onViewModeChange,
+      incidentSearchQuery,
       filterAlertsByTab,
       showHistoryDrawer,
       selectedHistoryAlertId,
@@ -2592,6 +2689,75 @@ export default defineComponent({
 </script>
 
 <style lang="scss">
+.view-mode-tabs {
+  display: flex;
+  gap: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  padding: 4px;
+
+  .view-tab-btn {
+    min-width: 32px;
+    min-height: 32px;
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+
+    &.active-tab {
+      background: var(--q-primary);
+      color: white;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+
+      .q-icon {
+        color: white;
+      }
+    }
+
+    &.inactive-tab {
+      color: rgba(0, 0, 0, 0.54);
+
+      &:hover {
+        background: rgba(0, 0, 0, 0.04);
+      }
+
+      .q-icon {
+        color: rgba(0, 0, 0, 0.54);
+      }
+    }
+  }
+}
+
+.page-title {
+  color: rgba(0, 0, 0, 0.87);
+  line-height: 1.2;
+}
+
+// Dark mode support
+.body--dark {
+  .view-mode-tabs {
+    border-color: rgba(255, 255, 255, 0.12);
+
+    .view-tab-btn {
+      &.inactive-tab {
+        color: rgba(255, 255, 255, 0.7);
+
+        &:hover {
+          background: rgba(255, 255, 255, 0.12);
+        }
+
+        .q-icon {
+          color: rgba(255, 255, 255, 0.7);
+        }
+      }
+    }
+  }
+
+  .page-title {
+    color: rgba(255, 255, 255, 0.87);
+  }
+}
+
 .bottom-btn {
   display: flex;
   width: 100%;
