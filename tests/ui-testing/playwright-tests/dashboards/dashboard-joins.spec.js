@@ -8,7 +8,7 @@ import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
 import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/dashboard-time";
 import { waitForDashboardPage } from "./utils/dashCreation.js";
-import DashboardJoinsHelper from "./utils/dashboardJoinsHelper.js";
+import DashboardJoinsHelper from "../../pages/dashboardPages/dashboardJoinsHelper.js";
 
 const randomDashboardName =
   "Dashboard_Joins_" + Math.random().toString(36).substr(2, 9);
