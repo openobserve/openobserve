@@ -1449,14 +1449,22 @@ export default defineComponent({
         originalStreamFields.value.map((field: any) => field.value)
       );
 
+
+
       // Recursively collect all column names used in conditions
       const invalidFields: string[] = [];
 
       const checkConditionFields = (condition: any) => {
         if (!condition) return;
 
-        // If it's a condition group (has items array)
-        if (condition.items && Array.isArray(condition.items)) {
+        // V2: If it's a condition group (has conditions array with filterType: "group")
+        if (condition.filterType === "group" && condition.conditions && Array.isArray(condition.conditions)) {
+          condition.conditions.forEach((item: any) => {
+            checkConditionFields(item);
+          });
+        }
+        // V1: If it's a condition group (has items array)
+        else if (condition.items && Array.isArray(condition.items)) {
           condition.items.forEach((item: any) => {
             checkConditionFields(item);
           });
@@ -2452,6 +2460,10 @@ export default defineComponent({
             message: message,
             timeout: 6000,
           });
+
+          // Navigate back to step 2 (Query) where fields can be corrected
+          this.wizardStep = 2;
+
           return false;
         }
 
