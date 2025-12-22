@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Step 1: Alert Setup -->
         <q-step
           :name="1"
-          title="Alert Setup"
+          title="Alert Setup *"
           caption=""
           icon="settings"
           :done="wizardStep > 1"
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Step 2: Query Configuration -->
         <q-step
           :name="2"
-          title="Conditions"
+          title="Conditions *"
           caption=""
           icon="search"
           :done="wizardStep > 2"
@@ -247,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Step 4: Alert Settings -->
         <q-step
           :name="4"
-          title="Alert Settings"
+          title="Alert Settings *"
           caption=""
           icon="tune"
           :done="wizardStep > 4"
