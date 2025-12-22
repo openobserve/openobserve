@@ -76,9 +76,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-file>
 
-            <!-- File Upload for Update Mode (existing behavior) -->
+            <!-- File Upload for Update Mode (only for file-based tables) -->
             <q-file
-              v-if="isUpdating"
+              v-if="isUpdating && formData.source === 'file'"
               filled
               v-model="formData.file"
               :label="t('function.uploadCSVFile')"
@@ -94,6 +94,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon name="attachment" />
               </template>
             </q-file>
+
+            <!-- URL Display for Update Mode (for URL-based tables) -->
+            <div v-if="isUpdating && formData.source === 'url'" class="col-12">
+              <q-input
+                v-model="formData.url"
+                :label="t('function.enrichmentTableURL')"
+                color="input-border"
+                bg-color="input-bg"
+                class="q-py-md showLabelOnTop text-grey-8 text-bold"
+                stack-label
+                outlined
+                filled
+                dense
+                readonly
+                disable
+                :hint="t('function.urlCannotBeModified')"
+              >
+                <template v-slot:prepend>
+                  <q-icon name="link" />
+                </template>
+              </q-input>
+
+              <div class="q-mt-md text-grey-7 text-caption">
+                Note: URL-based enrichment tables cannot be edited. To update the data, delete this table and create a new one with the updated URL.
+              </div>
+            </div>
 
             <!-- From URL Option (only for new tables) -->
             <div v-if="!isUpdating && formData.source === 'url'" class="col-12">
@@ -122,8 +148,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-input>
             </div>
 
-            <!-- Append Data Toggle -->
-            <div v-if="isUpdating || (!isUpdating && formData.source === 'url')" class="col-12">
+            <!-- Append Data Toggle (only for file-based tables or new URL tables) -->
+            <div v-if="(isUpdating && formData.source === 'file') || (!isUpdating && formData.source === 'url')" class="col-12">
               <q-toggle
                 class="q-py-md text-grey-8 text-bold"
                 v-model="formData.append"
@@ -140,13 +166,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               v-close-popup
               class="q-mr-md o2-secondary-button tw-h-[36px]"
-              :label="t('function.cancel')"
+              :label="isUpdating && formData.source === 'url' ? t('function.close') : t('function.cancel')"
               no-caps
               flat
               :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
               @click="$emit('cancel:hideform')"
             />
+            <!-- Hide save button for URL-based tables in edit mode -->
             <q-btn
+              v-if="!(isUpdating && formData.source === 'url')"
               class="o2-primary-button no-border tw-h-[36px]"
               :label="t('function.save')"
               type="submit"
@@ -341,6 +369,14 @@ export default defineComponent({
       this.disableColor = "grey-5";
       this.formData = this.modelValue;
       if (this.formData.append == undefined) this.formData.append = false;
+
+      // Detect if this is a URL-based enrichment table
+      if (this.formData.urlJob) {
+        this.formData.source = 'url';
+        this.formData.url = this.formData.urlJob.url || '';
+      } else {
+        this.formData.source = 'file';
+      }
     }
   },
 });
