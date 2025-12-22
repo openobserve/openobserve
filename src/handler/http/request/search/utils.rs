@@ -15,7 +15,10 @@
 
 use std::collections::HashSet;
 
-use config::{TIMESTAMP_COL_NAME, meta::stream::StreamType};
+use config::{
+    ALL_VALUES_COL_NAME, ID_COL_NAME, INDEX_FIELD_NAME_FOR_ALL, ORIGINAL_DATA_COL_NAME,
+    TIMESTAMP_COL_NAME, meta::stream::StreamType,
+};
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes};
 #[cfg(feature = "enterprise")]
@@ -142,7 +145,11 @@ pub async fn validate_query_fields(
 
 /// Checks if a field is a system field that should always be allowed
 fn is_system_field(field: &str) -> bool {
-    field == "_timestamp" || field == "_all" || field == TIMESTAMP_COL_NAME
+    field == TIMESTAMP_COL_NAME
+        || field == INDEX_FIELD_NAME_FOR_ALL
+        || field == ID_COL_NAME
+        || field == ORIGINAL_DATA_COL_NAME
+        || field == ALL_VALUES_COL_NAME
 }
 
 #[cfg(feature = "enterprise")]
@@ -220,14 +227,17 @@ mod tests {
 
     #[test]
     fn test_is_system_field() {
-        // Test system fields
-        assert!(is_system_field("_timestamp"));
-        assert!(is_system_field("_all"));
-        assert!(is_system_field(config::TIMESTAMP_COL_NAME));
+        // Test all system fields using constants
+        assert!(is_system_field(config::TIMESTAMP_COL_NAME)); // "_timestamp"
+        assert!(is_system_field(config::INDEX_FIELD_NAME_FOR_ALL)); // "_all"
+        assert!(is_system_field(config::ID_COL_NAME)); // "_o2_id"
+        assert!(is_system_field(config::ORIGINAL_DATA_COL_NAME)); // "_original"
+        assert!(is_system_field(config::ALL_VALUES_COL_NAME)); // "_all_values"
 
         // Test non-system fields
         assert!(!is_system_field("custom_field"));
         assert!(!is_system_field("user_id"));
+        assert!(!is_system_field("message")); // MESSAGE_COL_NAME is not a system field
         assert!(!is_system_field(""));
     }
 
