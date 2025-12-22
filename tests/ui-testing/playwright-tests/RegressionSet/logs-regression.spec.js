@@ -239,18 +239,19 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.clickRelative15MinButton();
 
     // Enter subquery
-    const subquery = 'SELECT * FROM (SELECT * FROM "e2e_automate" WHERE kubernetes_pod_name IS NOT NULL LIMIT 10)';
+    const subquery = 'SELECT kubernetes_pod_name FROM (SELECT * FROM "e2e_automate" WHERE kubernetes_pod_name IS NOT NULL LIMIT 10)';
     testLogger.info(`Entering subquery: ${subquery}`);
-    await pm.logsPage.clickQueryEditor();
-    await pm.logsPage.typeInQueryEditor(subquery);
+    await pm.logsPage.clearAndFillQueryEditor(subquery);
     await pm.logsPage.waitForTimeout(500);
 
     // Run query
     testLogger.info('Running query');
     await pm.logsPage.clickRefreshButton();
+    await pm.logsPage.waitForTimeout(3000);
 
     // Wait for results table to load
     await pm.logsPage.expectLogTableColumnSourceVisible();
+    await pm.logsPage.waitForTimeout(2000);
     testLogger.info('Query results loaded successfully');
 
     // Expand field to trigger values API
