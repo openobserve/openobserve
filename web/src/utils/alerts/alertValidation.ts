@@ -325,7 +325,6 @@ export function validateAlert(alert: Alert, context?: AlertValidationContext): V
 export interface ValidationContext {
   q: any;
   store: any;
-  scheduledAlertRef: any;
   validateSqlQueryPromise: any;
   sqlQueryErrorMsg: any;
   vrlFunctionError: any;
@@ -373,7 +372,7 @@ export const validateInputs = (
   context: ValidationContext,
   notify: boolean = true,
 ): boolean => {
-  const { q, scheduledAlertRef } = context;
+  const { q } = context;
 
   if (isNaN(Number(input.trigger_condition.silence))) {
     notify &&
@@ -434,26 +433,43 @@ export const validateInputs = (
     return false;
   }
 
+  // Validate cron expression if frequency type is cron
   if (input.trigger_condition.frequency_type === "cron") {
     try {
       cronParser.parseExpression(input.trigger_condition.cron!);
     } catch (err) {
       console.log(err);
-      scheduledAlertRef.value.cronJobError = "Invalid cron expression!";
-      return;
+      notify &&
+        q.notify({
+          type: "negative",
+          message: "Invalid cron expression!",
+          timeout: 1500,
+        });
+      return false;
     }
-  }
 
-  scheduledAlertRef.value?.validateFrequency(input.trigger_condition);
-
-  if (scheduledAlertRef.value.cronJobError) {
-    notify &&
-      q.notify({
-        type: "negative",
-        message: scheduledAlertRef.value.cronJobError,
-        timeout: 1500,
-      });
-    return false;
+    // Validate timezone is set for cron
+    if (!input.trigger_condition.timezone || input.trigger_condition.timezone.trim() === '') {
+      notify &&
+        q.notify({
+          type: "negative",
+          message: "Timezone is required for cron schedule",
+          timeout: 1500,
+        });
+      return false;
+    }
+  } else if (input.trigger_condition.frequency_type === "minutes") {
+    // Validate frequency for minutes type
+    const frequency = Number(input.trigger_condition.frequency);
+    if (isNaN(frequency) || frequency < 1) {
+      notify &&
+        q.notify({
+          type: "negative",
+          message: "Frequency should be greater than 0",
+          timeout: 1500,
+        });
+      return false;
+    }
   }
 
   return true;

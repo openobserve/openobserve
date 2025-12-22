@@ -457,42 +457,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :isEditing="beingUpdated"
       />
     </q-dialog>
-    <!-- Hidden ScheduledAlert for Editor Dialog Access
-    <scheduled-alert
-      v-if="false"
-      ref="scheduledAlertRef"
-      :columns="filteredColumns"
-      :streamFieldsMap="streamFieldsMap"
-      :generatedSqlQuery="generatedSqlQuery"
-      :conditions="formData.query_condition?.conditions || {}"
-      :expandState="expandState"
-      :alertData="formData"
-      :sqlQueryErrorMsg="sqlQueryErrorMsg"
-      :vrlFunctionError="vrlFunctionError"
-      :showTimezoneWarning="showTimezoneWarning"
-      :selectedStream="formData.stream_name"
-      :selected-stream-type="formData.stream_type"
-      :destinations="formData.destinations"
-      :formattedDestinations="getFormattedDestinations"
-      v-model:trigger="formData.trigger_condition"
-      v-model:sql="formData.query_condition.sql"
-      v-model:promql="formData.query_condition.promql"
-      v-model:query_type="formData.query_condition.type"
-      v-model:aggregation="formData.query_condition.aggregation"
-      v-model:silence="formData.trigger_condition.silence"
-      v-model:promql_condition="formData.query_condition.promql_condition"
-      v-model:multi_time_range="formData.query_condition.multi_time_range"
-      v-model:vrl_function="formData.query_condition.vrl_function"
-      @input:update="onInputUpdate"
-      @update:expandState="updateExpandState"
-      @update:formData="formData = $event"
-      @refresh:destinations="refreshDestinations"
-      @update:destinations="updateDestinations"
-      @update:group="updateGroup"
-      @remove:group="removeConditionGroup"
-      @update:silence="updateSilence"
-      @update:multi-time-range="updateMultiTimeRange"
-    /> -->
 
 </template>
 
@@ -649,8 +613,6 @@ export default defineComponent({
   },
   emits: ["update:list", "cancel:hideform", "refresh:destinations"],
   components: {
-    ScheduledAlert: defineAsyncComponent(() => import("./ScheduledAlert.vue")),
-    RealTimeAlert: defineAsyncComponent(() => import("./RealTimeAlert.vue")),
     JsonEditor,
     HorizontalStepper,
     AlertSetup,
@@ -684,7 +646,6 @@ export default defineComponent({
     const selectedDestinations = ref("slack");
     const originalStreamFields: any = ref([]);
     const isAggregationEnabled = ref(false);
-    const realTimeAlertRef: any = ref(null);
     const expandState = ref({
       alertSetup: true,
       queryMode: true,
@@ -737,7 +698,6 @@ export default defineComponent({
     const addAlertFormRef = ref(null);
 
     const router = useRouter();
-    const scheduledAlertRef: any = ref(null);
     const viewSqlEditorDialog = ref(false);
 
     const plotChart: any = ref(null);
@@ -883,143 +843,6 @@ export default defineComponent({
       // with proper field refs for highlighting
     });
 
-    // Track setTimeout IDs to clean them up properly
-    let multiWindowTimeout: number | null = null;
-
-    // Track which fields are currently registered for each alert type
-    const scheduledFieldIds = ['frequency', 'period', 'threshold', 'operator', 'silence', 'conditions', 'multiwindow', 'destinations'];
-    const realTimeFieldIds = ['silence', 'conditions', 'destinations'];
-
-    // Watch for scheduledAlertRef to become available and register its fields
-    watch(scheduledAlertRef, (newVal, oldVal) => {
-      // Clean up old registrations if switching away from scheduled alert
-      if (oldVal && !newVal) {
-        scheduledFieldIds.forEach(fieldId => {
-          focusManager.unregisterField(fieldId);
-        });
-        // Clear any pending multiwindow timeout
-        if (multiWindowTimeout) {
-          clearTimeout(multiWindowTimeout);
-          multiWindowTimeout = null;
-        }
-      }
-
-      if (newVal) {
-        // Initialize tab from formData
-        if (formData.value.query_condition.type) {
-          newVal.tab = formData.value.query_condition.type;
-        }
-
-        // Register ScheduledAlert fields once the component is mounted
-        nextTick(() => {
-          focusManager.registerField('frequency', {
-            ref: newVal.frequencyFieldRef,
-            onBeforeFocus: () => {
-              // Expand Query section if collapsed
-              expandState.value.queryMode = true;
-            }
-          });
-          focusManager.registerField('period', {
-            ref: newVal.periodFieldRef,
-            onBeforeFocus: () => {
-              // Expand Query section if collapsed
-              expandState.value.queryMode = true;
-            }
-          });
-          focusManager.registerField('threshold', {
-            ref: newVal.thresholdFieldRef,
-            onBeforeFocus: () => {
-              // Expand Thresholds section if collapsed
-              expandState.value.thresholds = true;
-            }
-          });
-          focusManager.registerField('operator', {
-            ref: newVal.operatorFieldRef,
-            onBeforeFocus: () => {
-              // Expand Thresholds section if collapsed
-              expandState.value.thresholds = true;
-            }
-          });
-          focusManager.registerField('silence', {
-            ref: newVal.silenceFieldRef,
-            onBeforeFocus: () => {
-              // Expand Thresholds section if collapsed
-              expandState.value.thresholds = true;
-            }
-          });
-          focusManager.registerField('conditions', {
-            ref: newVal.conditionsFieldRef,
-            onBeforeFocus: () => {
-              // Expand Query section if collapsed
-              expandState.value.queryMode = true;
-            }
-          });
-          // Register multiwindow field with additional delay to ensure ref is populated
-          // Clear any existing timeout first
-          if (multiWindowTimeout) {
-            clearTimeout(multiWindowTimeout);
-          }
-          multiWindowTimeout = window.setTimeout(() => {
-            // Check if component still exists before registering
-            if (scheduledAlertRef.value && newVal.multiWindowContainerRef) {
-              focusManager.registerField('multiwindow', {
-                ref: newVal.multiWindowContainerRef,
-                onBeforeFocus: () => {
-                  // Expand Multi Window section if collapsed
-                  expandState.value.multiWindowSelection = true;
-                }
-              });
-            }
-            multiWindowTimeout = null;
-          }, 100);
-          focusManager.registerField('destinations', {
-            ref: newVal.destinationSelectRef,
-            onBeforeFocus: () => {
-              // Expand Thresholds section if collapsed (destinations are in thresholds section)
-              expandState.value.thresholds = true;
-            }
-          });
-        });
-      }
-    }, { immediate: true });
-
-    // Watch for realTimeAlertRef to become available and register its fields
-    watch(realTimeAlertRef, (newVal, oldVal) => {
-      // Clean up old registrations if switching away from real-time alert
-      if (oldVal && !newVal) {
-        realTimeFieldIds.forEach(fieldId => {
-          focusManager.unregisterField(fieldId);
-        });
-      }
-
-      if (newVal) {
-        // Register RealTimeAlert fields once the component is mounted
-        nextTick(() => {
-          focusManager.registerField('silence', {
-            ref: newVal.silenceFieldRef,
-            onBeforeFocus: () => {
-              // Expand Alert Settings section if collapsed
-              expandState.value.thresholds = true;
-            }
-          });
-          focusManager.registerField('conditions', {
-            ref: newVal.conditionsFieldRef,
-            onBeforeFocus: () => {
-              // Expand Conditions section if collapsed
-              expandState.value.realTimeMode = true;
-            }
-          });
-          focusManager.registerField('destinations', {
-            ref: newVal.destinationSelectRef,
-            onBeforeFocus: () => {
-              // Expand Alert Settings section if collapsed
-              expandState.value.thresholds = true;
-            }
-          });
-        });
-      }
-    }, { immediate: true });
-
     // Watch for step4Ref (AlertSettings) to register wizard mode field refs
     watch(step4Ref, (newVal) => {
       if (newVal) {
@@ -1148,12 +971,6 @@ export default defineComponent({
       // Clean up alerts-specific context provider
       contextRegistry.unregister('alerts');
       contextRegistry.setActive('');
-
-      // Clear any pending multiwindow timeout
-      if (multiWindowTimeout) {
-        clearTimeout(multiWindowTimeout);
-        multiWindowTimeout = null;
-      }
 
       // Clean up focus manager
       focusManager.clear();
@@ -1303,20 +1120,6 @@ export default defineComponent({
     const openEditorDialog = () => {
       viewSqlEditorDialog.value = true;
     };
-
-    // Watch viewSqlEditorDialog and sync with ScheduledAlert
-    watch(viewSqlEditorDialog, (newValue) => {
-      if (scheduledAlertRef.value && scheduledAlertRef.value.viewSqlEditor) {
-        scheduledAlertRef.value.viewSqlEditor.value = newValue;
-      }
-    });
-
-    // Watch ScheduledAlert's viewSqlEditor and sync back
-    watch(() => scheduledAlertRef.value?.viewSqlEditor?.value, (newValue) => {
-      if (newValue !== undefined && newValue !== viewSqlEditorDialog.value) {
-        viewSqlEditorDialog.value = newValue;
-      }
-    });
 
     // Watch for SQL query changes and update preview
     watch(() => formData.value.query_condition?.sql, (newValue) => {
@@ -1553,7 +1356,6 @@ export default defineComponent({
       const validationContext: ValidationContext = {
         q,
         store,
-        scheduledAlertRef,
         validateSqlQueryPromise,
         sqlQueryErrorMsg,
         vrlFunctionError,
@@ -1567,7 +1369,6 @@ export default defineComponent({
       const validationContext: ValidationContext = {
         q,
         store,
-        scheduledAlertRef,
         validateSqlQueryPromise,
         sqlQueryErrorMsg,
         vrlFunctionError,
@@ -1631,11 +1432,6 @@ export default defineComponent({
     const updateTab = (tab: string) => {
       // Save to formData so it persists when navigating between steps
       formData.value.query_condition.type = tab;
-
-      // Also update the ref for immediate UI updates
-      if (scheduledAlertRef.value) {
-        scheduledAlertRef.value.tab = tab;
-      }
     }
 
     const clearMultiWindows = () => {
@@ -2151,7 +1947,6 @@ export default defineComponent({
       removeVariable,
       addVariable,
       selectedDestinations,
-      scheduledAlertRef,
       router,
       isAggregationEnabled,
       plotChart,
@@ -2201,7 +1996,6 @@ export default defineComponent({
       decodedVrlFunction,
       viewSqlEditorDialog,
       navigateToErrorField,
-      realTimeAlertRef,
       openJsonEditor,
       showJsonEditorDialog,
       saveAlertJson,
@@ -2246,7 +2040,6 @@ export default defineComponent({
       this.formData.is_real_time = this.formData.is_real_time.toString();
 
     // If from panel, load panel data BEFORE initializing child components
-    // This ensures the correct query type is set before ScheduledAlert initializes
     if (isFromPanel) {
       this.formData.query_condition.type = ""; // Temporarily set to empty
       await this.loadPanelDataIfPresent(); // Load panel data and set correct type
