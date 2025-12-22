@@ -47,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :depth="0"
               condition-input-width="tw-w-[130px]"
               :allow-custom-columns="true"
+              module="pipelines"
               @add-condition="(updatedGroup) => updateGroup(updatedGroup)"
               @add-group="(updatedGroup) => updateGroup(updatedGroup)"
               @remove-group="(groupId) => removeConditionGroup(groupId)"
