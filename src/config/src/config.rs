@@ -2179,7 +2179,7 @@ pub struct EnrichmentTable {
     pub url_fetch_max_size_mb: usize,
     #[env_config(
         name = "ZO_ENRICHMENT_URL_FETCH_TIMEOUT",
-        default = 300,
+        default = 7200,
         help = "Timeout for URL fetch operations (in seconds)"
     )]
     pub url_fetch_timeout_secs: u64,
