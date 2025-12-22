@@ -120,9 +120,7 @@ mod tests {
             compression: None,
         };
 
-        let result =
-            write_recordbatches_to_buf(std::slice::from_ref(&batch), config)
-                .await;
+        let result = write_recordbatches_to_buf(std::slice::from_ref(&batch), config).await;
 
         assert!(result.is_ok());
         assert!(!result.unwrap().is_empty());
@@ -147,9 +145,7 @@ mod tests {
             compression: None,
         };
 
-        let result =
-            write_recordbatches_to_buf(&[batch.clone(), batch], config)
-                .await;
+        let result = write_recordbatches_to_buf(&[batch.clone(), batch], config).await;
 
         assert!(result.is_ok());
         assert!(!result.unwrap().is_empty());
