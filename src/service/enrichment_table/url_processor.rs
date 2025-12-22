@@ -603,23 +603,23 @@ async fn check_range_support(
     org_id: &str,
     table_name: &str,
 ) -> Result<bool> {
-    // First, try HEAD request to check for Accept-Ranges header
+    // Use HEAD request to check for Accept-Ranges header (no body transfer)
     let head_response = client.head(url).send().await?;
 
     if let Some(accept_ranges) = head_response.headers().get("accept-ranges")
         && let Ok(value) = accept_ranges.to_str()
     {
         if value.eq_ignore_ascii_case("bytes") {
-            log::debug!(
-                "[ENRICHMENT::URL] {}/{} - Server advertises Range support via Accept-Ranges header",
+            log::info!(
+                "[ENRICHMENT::URL] {}/{} - Server advertises Range support via Accept-Ranges: bytes",
                 org_id,
                 table_name
             );
             return Ok(true);
         }
         if value.eq_ignore_ascii_case("none") {
-            log::debug!(
-                "[ENRICHMENT::URL] {}/{} - Server explicitly disables Range support",
+            log::info!(
+                "[ENRICHMENT::URL] {}/{} - Server explicitly disables Range support (Accept-Ranges: none)",
                 org_id,
                 table_name
             );
@@ -627,33 +627,16 @@ async fn check_range_support(
         }
     }
 
-    // Header missing or unclear - perform test range request
-    log::debug!(
-        "[ENRICHMENT::URL] {}/{} - Testing Range support with small request",
+    // SAFETY: If Accept-Ranges header is missing or unclear, assume ranges are NOT supported.
+    // We cannot safely test with a GET request because if the server doesn't support ranges,
+    // it will return the entire file (potentially gigabytes) which could cause memory exhaustion.
+    log::warn!(
+        "[ENRICHMENT::URL] {}/{} - No Accept-Ranges header found. Assuming Range requests are NOT supported for safety. File will be downloaded in one pass without resume capability.",
         org_id,
         table_name
     );
-    let test_response = client
-        .get(url)
-        .header("Range", "bytes=0-1023") // Request first 1KB
-        .send()
-        .await?;
 
-    // HTTP 206 Partial Content means ranges are supported
-    let supports_range = test_response.status() == reqwest::StatusCode::PARTIAL_CONTENT;
-    log::info!(
-        "[ENRICHMENT::URL] {}/{} - Range support test: {} (status: {})",
-        org_id,
-        table_name,
-        if supports_range {
-            "SUPPORTED"
-        } else {
-            "NOT SUPPORTED"
-        },
-        test_response.status()
-    );
-
-    Ok(supports_range)
+    Ok(false)
 }
 
 /// Fetches only the CSV headers from a URL using a small Range request.
@@ -1081,7 +1064,7 @@ impl UrlCsvProcessor {
                         "byte limit"
                     };
 
-                    log::debug!(
+                    log::info!(
                         "[ENRICHMENT::URL] {}/{} - Completed batch {} with {} records, {} MB (total processed: {} MB) - triggered by {}",
                         org_id,
                         table_name,

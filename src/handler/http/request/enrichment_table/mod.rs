@@ -437,9 +437,6 @@ pub async fn save_enrichment_table_from_url(
     // - Processing happens asynchronously in the background
     // - Final outcome (success/failure) is unknown at this point
     // - Client should poll the status endpoint for progress
-    //
-    // Response includes identifiers so client can construct status URL:
-    // GET /api/{org_id}/enrichment_tables/{table_name}/url/status
     Ok(MetaHttpResponse::json(serde_json::json!({
         "message": "Enrichment table job created successfully",
         "org_id": org_id,

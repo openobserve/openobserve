@@ -72,9 +72,8 @@ impl From<Model> for EnrichmentTableUrlRecord {
 /// * `Result<(), errors::Error>` - Success or error
 pub async fn put(record: EnrichmentTableUrlRecord) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = get_lock().await;
 
     // Try to find existing record
     let existing = Entity::find()
@@ -152,10 +151,10 @@ pub async fn get(
 /// # Returns
 /// * `Result<(), errors::Error>` - Success or error
 pub async fn delete(org: &str, table_name: &str) -> Result<(), errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::delete_many()
         .filter(Column::Org.eq(org))
         .filter(Column::Name.eq(table_name))
