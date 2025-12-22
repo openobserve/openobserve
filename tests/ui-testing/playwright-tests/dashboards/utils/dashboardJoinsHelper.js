@@ -70,7 +70,7 @@ export default class DashboardJoinsHelper {
     await dropdownMenu.waitFor({ state: "visible", timeout: 5000 });
 
     // Wait for options to be filtered
-    await this.page.waitForTimeout(500);
+    await this.page.waitForTimeout(1000);
 
     // First, ensure expansion items are expanded
     const expansionItems = dropdownMenu.locator('.q-expansion-item');
@@ -89,8 +89,21 @@ export default class DashboardJoinsHelper {
     // Wait a bit more for expansion animation to complete
     await this.page.waitForTimeout(500);
 
-    // Now find and click the field item
-    await dropdownMenu.getByText(fieldName, { exact: true }).click();
+    // Now find and click the field item using data-test attribute scoped to the dropdown menu
+    // Get all matching options and click the first visible one
+    const allOptions = dropdownMenu.locator(
+      `[data-test="stream-field-select-option-${fieldName}"]`
+    );
+    const optionCount = await allOptions.count();
+
+    // Click the first visible option
+    for (let i = 0; i < optionCount; i++) {
+      const option = allOptions.nth(i);
+      if (await option.isVisible()) {
+        await option.click();
+        break;
+      }
+    }
   }
 
   /**
@@ -333,7 +346,9 @@ export default class DashboardJoinsHelper {
    * @returns {Promise<number>} Number of joins
    */
   async getJoinCount() {
-    const joinItems = this.page.locator('[data-test^="dashboard-join-item-"]');
+    // Count only join items, not their child elements (like remove buttons)
+    // Use a more specific selector that excludes -remove, -menu, etc.
+    const joinItems = this.page.locator('[data-test^="dashboard-join-item-"]:not([data-test*="-remove"]):not([data-test*="-menu"])');
     return await joinItems.count();
   }
 
