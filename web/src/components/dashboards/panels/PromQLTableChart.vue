@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="promql-table-chart" style="height: 100%; width: 100%">
+  <div class="promql-table-chart" style="height: 100%; width: 100%; display: flex; flex-direction: column; position: relative;">
     <q-table
-      :rows="tableRows"
+      :rows="filteredTableRows"
       :columns="tableColumns"
       :pagination="paginationConfig"
       :filter="filter"
@@ -26,9 +26,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       flat
       bordered
       dense
-      :style="{ height: '100%' }"
-      :virtual-scroll="tableRows.length > 100"
+      :style="{ flex: '1 1 auto', height: showLegendFooter ? 'calc(100% - 60px)' : '100%' }"
+      :virtual-scroll="filteredTableRows.length > 100"
       :rows-per-page-options="[10, 20, 50, 100, 0]"
+      :class="{ 'with-legend-footer': showLegendFooter }"
     >
       <!-- Header slot for custom styling -->
       <template v-slot:header="props">
@@ -107,6 +108,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-input>
     </div>
+
+    <!-- Legend Dropdown Footer (Grafana-style) -->
+    <div
+      v-if="showLegendFooter"
+      class="legend-footer q-pa-sm"
+    >
+      <div class="row items-center q-gutter-md" style="width: 100%; padding: 0 12px;">
+        <div class="text-body2" style="min-width: 60px;">
+          Legend:
+        </div>
+        <q-select
+          v-model="selectedLegend"
+          :options="legendOptions"
+          outlined
+          dense
+          emit-value
+          map-options
+          style="min-width: 300px; max-width: 500px;"
+          placeholder="Select series to filter"
+        >
+          <template v-slot:prepend>
+            <q-icon name="filter_list" size="sm" />
+          </template>
+        </q-select>
+        <q-space />
+        <div class="text-body2 text-grey-7">
+          Showing {{ filteredTableRows.length }} of {{ tableRows.length }} rows
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -161,6 +192,67 @@ export default defineComponent({
       return rows;
     });
 
+    // Legend filtering logic
+    const selectedLegend = ref<string>("");
+
+    // Extract unique legend names from rows
+    const legendOptions = computed(() => {
+      const rows = props.data?.rows || [];
+      const uniqueLegends = new Set<string>();
+
+      rows.forEach((row: any) => {
+        if (row.__legend__) {
+          uniqueLegends.add(row.__legend__);
+        }
+      });
+
+      const legends = Array.from(uniqueLegends);
+
+      // Config option: table_mode can be "single" (default) or "all"
+      const tableMode = props.config?.promql_table_mode || "single";
+
+      const options = [];
+
+      if (tableMode === "all") {
+        // In "all" mode, add "All series" option
+        options.push({ label: "All series", value: "__all__" });
+      }
+
+      // Add individual legend options
+      legends.forEach((legend) => {
+        options.push({
+          label: legend,
+          value: legend,
+        });
+      });
+
+      console.log("Legend Options:", options);
+      console.log("Table Mode:", tableMode);
+      console.log("Unique legends count:", legends.length);
+
+      return options;
+    });
+
+    // Determine if legend footer should be shown
+    const showLegendFooter = computed(() => {
+      return legendOptions.value.length > 1;
+    });
+
+    // Filter rows based on selected legend
+    const filteredTableRows = computed(() => {
+      if (!selectedLegend.value || selectedLegend.value === "__all__") {
+        return tableRows.value;
+      }
+
+      const filtered = tableRows.value.filter(
+        (row: any) => row.__legend__ === selectedLegend.value
+      );
+      console.log(
+        `Filtered to legend "${selectedLegend.value}": ${filtered.length} rows`
+      );
+      return filtered;
+    });
+
     const paginationConfig = computed(() => {
       const pageSize = props.config.page_size || 10;
       const enabled = props.config.pagination !== false;
@@ -168,18 +260,33 @@ export default defineComponent({
       return {
         page: 1,
         rowsPerPage: enabled ? pageSize : 0, // 0 = show all rows
-        rowsNumber: tableRows.value.length,
+        rowsNumber: filteredTableRows.value.length,
       };
     });
 
-    // Watch for data changes
+    // Watch for data changes and set default legend
     watch(
       () => props.data,
       (newData) => {
         console.log("=== [PromQL Table Chart] Data updated ===");
         console.log("New data:", newData);
+
+        // Set default legend selection
+        if (legendOptions.value.length > 0) {
+          const tableMode = props.config?.promql_table_mode || "single";
+
+          if (tableMode === "all") {
+            // In "all" mode, default to "All series"
+            selectedLegend.value = "__all__";
+          } else {
+            // In "single" mode (default), select first series
+            selectedLegend.value = legendOptions.value[0]?.value || "";
+          }
+
+          console.log("Default legend selected:", selectedLegend.value);
+        }
       },
-      { deep: true }
+      { deep: true, immediate: true }
     );
 
     return {
@@ -187,7 +294,11 @@ export default defineComponent({
       loading,
       tableColumns,
       tableRows,
+      filteredTableRows,
       paginationConfig,
+      selectedLegend,
+      legendOptions,
+      showLegendFooter,
     };
   },
 });
@@ -258,6 +369,28 @@ export default defineComponent({
     .table-filter {
       background-color: rgba(30, 30, 30, 0.95);
     }
+
+    .legend-footer {
+      background-color: #1a1a1a !important;
+      border-top-color: rgba(255, 255, 255, 0.12) !important;
+      box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.5);
+    }
   }
+}
+
+// Legend footer styling
+.legend-footer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  z-index: 10;
+  border-top: 2px solid #e0e0e0;
+  background-color: #ffffff;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease-in-out;
 }
 </style>

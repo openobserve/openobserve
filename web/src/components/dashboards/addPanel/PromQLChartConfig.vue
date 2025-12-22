@@ -251,6 +251,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-select>
 
+      <!-- PromQL Table Mode -->
+      <q-select
+        v-model="promqlTableMode"
+        :options="promqlTableModeOptions"
+        borderless
+        dense
+        class="q-py-md showLabelOnTop"
+        stack-label
+        emit-value
+        map-options
+        data-test="dashboard-config-promql-table-mode"
+      >
+        <template v-slot:label>
+          <div class="row items-center all-pointer-events">
+            {{ t("dashboard.promqlTableMode") }}
+            <q-icon class="q-ml-xs" size="20px" name="info" />
+            <q-tooltip class="bg-grey-8" max-width="350px">
+              <b>PromQL Table Mode - </b>
+              Controls how series data is displayed in the legend dropdown.
+              <br /><br />
+              <b>Single Series (default):</b> Shows only the first series by default. User must select other series from dropdown.
+              <br /><br />
+              <b>All Series:</b> Shows all series data by default with "All series" option in dropdown.
+              <br /><br />
+              <b>Note:</b> The legend dropdown only appears when multiple series are present.
+            </q-tooltip>
+          </div>
+        </template>
+      </q-select>
+
       <!-- Column Filters -->
       <div class="q-mb-sm text-subtitle2 q-mt-md">Column Filters</div>
 
@@ -583,6 +613,23 @@ export default defineComponent({
       },
     });
 
+    // PromQL Table Mode configuration
+    const promqlTableMode = computed({
+      get: () => dashboardPanelData.data.config?.promql_table_mode || "single",
+      set: (value: string) => {
+        if (!dashboardPanelData.data.config) {
+          dashboardPanelData.data.config = {};
+        }
+        dashboardPanelData.data.config.promql_table_mode = value;
+      },
+    });
+
+    // Options for PromQL table mode
+    const promqlTableModeOptions = [
+      { label: "Single Series (show first series by default)", value: "single" },
+      { label: "All Series (show all series by default)", value: "all" },
+    ];
+
     // Get available column options from stream fields
     const availableColumnOptions = computed(() => {
       // Get fields from groupedFields based on current query's stream
@@ -776,6 +823,8 @@ export default defineComponent({
       mapsMapType,
       mapsEnableRoam,
       tableAggregations,
+      promqlTableMode,
+      promqlTableModeOptions,
       getTableAggregationsDisplay,
       visibleColumnsFilteredOptions,
       hiddenColumnsFilteredOptions,

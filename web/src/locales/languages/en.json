@@ -1101,6 +1101,7 @@
     "mapsMapType": "Map Type",
     "mapsEnableRoam": "Enable Zoom/Pan",
     "tableAggregations": "Table Aggregations",
+    "promqlTableMode": "PromQL Table Mode",
     "visibleColumns": "Visible Columns",
     "hiddenColumns": "Hidden Columns",
     "stickyFirstColumn": "Sticky First Column",

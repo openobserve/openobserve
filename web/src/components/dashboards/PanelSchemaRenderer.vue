@@ -41,6 +41,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : { options: { backgroundColor: 'transparent' } }
           "
         />
+        <PromQLTableChart
+          v-else-if="panelSchema.type == 'table' && panelSchema.queryType === 'promql'"
+          :data="tableRendererData"
+          :config="panelSchema.config"
+        />
         <TableRenderer
           v-else-if="panelSchema.type == 'table'"
           :data="tableRendererData"
@@ -48,7 +53,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @row-click="onChartClick"
           ref="tableRendererRef"
           :wrap-cells="panelSchema.config?.wrap_table_cells"
-          :query-type="panelSchema.queryType"
         />
         <div
           v-else-if="panelSchema.type == 'html'"
@@ -349,6 +353,10 @@ const TableRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/TableRenderer.vue");
 });
 
+const PromQLTableChart = defineAsyncComponent(() => {
+  return import("@/components/dashboards/panels/PromQLTableChart.vue");
+});
+
 const GeoMapRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/GeoMapRenderer.vue");
 });
@@ -382,6 +390,7 @@ export default defineComponent({
     ChartRenderer,
     AlertContextMenu,
     TableRenderer,
+    PromQLTableChart,
     GeoMapRenderer,
     MapsRenderer,
     HTMLRenderer,
