@@ -775,8 +775,8 @@ export default defineComponent({
       const captions: Record<number, string> = {
         1: 'Set the stage for your alert',
         2: 'What should trigger the alert',
-        3: 'Set your alert rules and choose how you\'d like to be notified.',
-        4: 'Compare current results with data from another time period',
+        3: 'Compare current results with data from another time period',
+        4: 'Set your alert rules and choose how you\'d like to be notified.',
         5: 'Avoid sending the same alert multiple times by grouping similar alerts together.',
         6: 'Context variables, description, and row template',
       };

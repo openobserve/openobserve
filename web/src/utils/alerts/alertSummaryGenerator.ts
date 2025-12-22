@@ -182,34 +182,6 @@ function getOperatorSymbol(operator: string, t: (key: string) => string): string
 }
 
 /**
- * Get frequency text (e.g., "every 5 minutes", "every hour")
- */
-function getFrequencyText(triggerCondition: any): string {
-  if (!triggerCondition) return 'periodically';
-
-  const { frequency, frequency_type, cron } = triggerCondition;
-
-  if (frequency_type === 'cron' && cron) {
-    return 'on a custom schedule';
-  }
-
-  if (!frequency || !frequency_type) {
-    return 'periodically';
-  }
-
-  const num = parseInt(frequency);
-  if (isNaN(num)) return 'periodically';
-
-  // Handle singular vs plural
-  if (num === 1) {
-    const singularType = frequency_type.replace(/s$/, ''); // Remove trailing 's'
-    return `every ${singularType}`;
-  }
-
-  return `every ${num} ${frequency_type}`;
-}
-
-/**
  * Get period text (e.g., "the last 30 minutes", "the last 1 hour")
  */
 function getPeriodText(period: number, t: (key: string) => string): string {

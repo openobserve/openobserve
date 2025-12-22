@@ -25,11 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import { generateAlertSummary } from '@/utils/alerts/alertSummaryGenerator';
 
-const store = useStore();
 const { t } = useI18n();
 
 const props = defineProps({

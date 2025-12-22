@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw-w-fit tw-flex tw-justify-center tw-border tw-border-gray-200">
           <q-btn
             data-test="multi-time-range-alerts-add-btn"
-            label="Add Comparision Window"
+            label="Add Comparison Window"
             size="sm"
             class="text-semibold add-variable q-pa-sm multi-window-text no-border"
             style="font-size: 14px;"
