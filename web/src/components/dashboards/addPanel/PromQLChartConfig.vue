@@ -260,12 +260,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('dashboard.visibleColumns')"
         multiple
         use-input
-        :use-chips="false"
         input-debounce="0"
         new-value-mode="add-unique"
         @filter="filterVisibleColumns"
         @new-value="createColumnValue"
-        hide-selected
         borderless
         dense
         class="q-py-sm showLabelOnTop"
@@ -310,12 +308,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('dashboard.hiddenColumns')"
         multiple
         use-input
-        :use-chips="false"
         input-debounce="0"
         new-value-mode="add-unique"
         @filter="filterHiddenColumns"
         @new-value="createColumnValue"
-        hide-selected
         borderless
         dense
         class="q-py-sm showLabelOnTop"
@@ -382,12 +378,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('dashboard.stickyColumns')"
         multiple
         use-input
-        :use-chips="false"
         input-debounce="0"
         new-value-mode="add-unique"
         @filter="filterStickyColumns"
         @new-value="createColumnValue"
-        hide-selected
         borderless
         dense
         class="q-py-sm showLabelOnTop"
@@ -616,7 +610,7 @@ export default defineComponent({
       const fieldNames = streamFields.schema.map((field: any) => field.name).filter(Boolean);
 
       // Return unique field names
-      return [...new Set(fieldNames)] as string[];
+      return Array.from(new Set(fieldNames)) as string[];
     });
 
     // Filtered options for each multiselect (for search/autocomplete)
