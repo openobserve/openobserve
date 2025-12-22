@@ -26,63 +26,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
   >
     <q-table
+      :class="['my-sticky-virtscroll-table']"
       :rows="filteredTableRows"
       :columns="tableColumns"
       v-model:pagination="pagination"
-      :filter="filter"
-      :loading="loading"
       row-key="id"
-      flat
-      bordered
       dense
       virtual-scroll
       :rows-per-page-options="[0]"
       :virtual-scroll-sticky-size-start="48"
-      :style="{ flex: '1 1 auto', height: '100%' }"
+      hide-no-data
     >
-      <!-- Header slot for custom styling -->
-      <template v-slot:header="props">
-        <q-tr :props="props">
-          <q-th
-            v-for="col in props.cols"
-            :key="col.name"
-            :props="props"
-            :style="{
-              backgroundColor: config.header_bg_color || '#f5f5f5',
-              fontWeight: 'bold',
-            }"
-          >
-            {{ col.label }}
-          </q-th>
-        </q-tr>
-      </template>
-
-      <!-- Body slot for custom formatting -->
-      <template v-slot:body="props">
-        <q-tr :props="props" :class="{ 'cursor-pointer': true }">
-          <q-td
-            v-for="col in props.cols"
-            :key="col.name"
-            :props="props"
-            :style="{ textAlign: col.align || 'left' }"
-          >
-            {{
-              col.format
-                ? col.format(props.row[col.field])
-                : props.row[col.field]
-            }}
-          </q-td>
-        </q-tr>
-      </template>
-
-      <!-- No data slot -->
-      <template v-slot:no-data>
-        <div class="text-center q-pa-md text-grey-6">
-          <q-icon name="info" size="48px" color="grey-5" class="q-mb-md" />
-          <div class="text-h6">No data available</div>
-          <div class="text-caption">Your PromQL query returned no results</div>
-        </div>
-      </template>
 
       <!-- Bottom slot: add legend dropdown alongside pagination -->
       <template v-slot:bottom v-if="showLegendFooter">
@@ -115,10 +69,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
-import {
-  getUnitValue,
-  formatUnitValue,
-} from "@/utils/dashboard/convertDataIntoUnitValue";
 
 export default defineComponent({
   name: "PromQLTableChart",
@@ -274,50 +224,52 @@ export default defineComponent({
 <style scoped lang="scss">
 .promql-table-chart {
   position: relative;
+}
 
-  :deep(.q-table) {
-    height: 100%;
+.my-sticky-virtscroll-table {
+  /* height or max-height is important */
+  height: calc(100% - 1px);
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: auto;
 
-    .q-table__top,
-    .q-table__bottom,
-    thead tr:first-child th {
-      background-color: #fff;
-    }
-
-    thead tr th {
-      will-change: auto !important;
-      position: sticky;
-      z-index: 1;
-    }
-
-    thead tr:first-child th {
-      top: 0;
-    }
-
-    .q-virtual-scroll {
-      will-change: auto !important;
-    }
+  :deep(.q-table__top),
+  :deep(.q-table__bottom),
+  :deep(thead tr:first-child th) {
+    /* bg color is important for th; just specify one */
+    background-color: #fff;
   }
 
-  .table-filter {
-    background-color: rgba(255, 255, 255, 0.95);
-    border-radius: 4px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  :deep(thead tr th) {
+    will-change: auto !important;
+    position: sticky;
+    z-index: 1;
+  }
+
+  /* this will be the loading indicator */
+  :deep(thead tr:last-child th) {
+    /* height of all previous header rows */
+    top: 48px;
+  }
+
+  :deep(thead tr:first-child th) {
+    top: 0;
+  }
+
+  :deep(.q-virtual-scroll) {
+    will-change: auto !important;
   }
 }
 
-// Dark mode support
-.body--dark .promql-table-chart {
-  :deep(.q-table) {
-    .q-table__top,
-    .q-table__bottom,
-    thead tr:first-child th {
-      background-color: var(--q-dark-page) !important;
-    }
-  }
-
-  .table-filter {
-    background-color: rgba(30, 30, 30, 0.95);
+.my-sticky-virtscroll-table.q-dark {
+  :deep(.q-table__top),
+  :deep(.q-table__bottom),
+  :deep(thead tr:first-child th) {
+    /* bg color is important for th; just specify one */
+    background-color: $dark-page !important;
   }
 }
 </style>
