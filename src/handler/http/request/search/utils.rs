@@ -30,6 +30,7 @@ use {
         },
         service::users::get_user,
     },
+    actix_web::HttpResponse,
     config::meta::user::User,
     o2_openfga::meta::mapping::OFGA_MODELS,
 };
