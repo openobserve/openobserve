@@ -70,7 +70,7 @@
                   <!-- Value Selection -->
                   <q-select
                     v-model="label.value"
-                    :options="labelValuesMap.get(label.label) || []"
+                    :options="getLabelValueOptions(label.label)"
                     label="Value"
                     dense
                     borderless
@@ -81,6 +81,10 @@
                     fill-input
                     hide-selected
                     input-debounce="0"
+                    emit-value
+                    map-options
+                    option-value="value"
+                    option-label="label"
                     @filter="(val, update) => filterLabelValues(val, update, label.label)"
                     @update:model-value="onLabelChange"
                     :disable="!label.label"
@@ -91,6 +95,16 @@
                       <q-item>
                         <q-item-section class="text-grey">
                           {{ !label.label ? 'Select a label first' : 'No values found' }}
+                        </q-item-section>
+                      </q-item>
+                    </template>
+                    <template v-slot:option="scope">
+                      <q-item v-bind="scope.itemProps">
+                        <q-item-section>
+                          <q-item-label>{{ scope.opt.label }}</q-item-label>
+                          <q-item-label v-if="scope.opt.isVariable" caption class="text-grey-7">
+                            Variable
+                          </q-item-label>
                         </q-item-section>
                       </q-item>
                     </template>
@@ -139,6 +153,7 @@ import metricsService from "@/services/metrics";
 const props = defineProps<{
   labels: QueryBuilderLabelFilter[];
   metric?: string;
+  dashboardData?: any; // Dashboard data containing variables
 }>();
 
 const emit = defineEmits<{
@@ -278,6 +293,38 @@ const onLabelChange = () => {
   emit("update:labels", localLabels.value);
 };
 
+// Get label value options including variables
+const getLabelValueOptions = (labelKey: string) => {
+  if (!labelKey) return [];
+
+  const options: any[] = [];
+
+  // Add dashboard variables at the top
+  // Note: dashboardData is already currentDashboardData.data from AddPanel.vue
+  if (props.dashboardData?.variables?.list) {
+    const variables = props.dashboardData.variables.list;
+    variables.forEach((variable: any) => {
+      options.push({
+        label: `$${variable.name}`,
+        value: `$${variable.name}`,
+        isVariable: true,
+      });
+    });
+  }
+
+  // Add actual label values
+  const actualValues = labelValuesMap.value.get(labelKey) || [];
+  actualValues.forEach((value: string) => {
+    options.push({
+      label: value,
+      value: value,
+      isVariable: false,
+    });
+  });
+
+  return options;
+};
+
 // Filter label values with autocomplete
 const filterLabelValues = (
   val: string,
@@ -289,15 +336,17 @@ const filterLabelValues = (
     return;
   }
 
-  const allValues = labelValuesMap.value.get(labelKey) || [];
+  const allOptions = getLabelValueOptions(labelKey);
 
   update(() => {
     if (val === "") {
-      return allValues;
+      return allOptions;
     }
-    // Filter values based on input
+    // Filter options based on input
     const needle = val.toLowerCase();
-    return allValues.filter((v) => v.toLowerCase().includes(needle));
+    return allOptions.filter((opt: any) =>
+      opt.label.toLowerCase().includes(needle)
+    );
   });
 };
 

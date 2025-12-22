@@ -676,6 +676,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <LabelFilterEditor
       :labels="promqlBuilderQuery.labels"
       :metric="promqlBuilderQuery.metric"
+      :dashboardData="dashboardData"
       @update:labels="updatePromQLBuilderLabels"
     />
     <q-separator />
