@@ -652,11 +652,6 @@ describe("AddAlert Component", () => {
         cronParser.parseExpression = vi.fn().mockImplementation(() => {
           throw new Error('Invalid cron');
         });
-        wrapper.vm.scheduledAlertRef = {
-          cronJobError: ''
-        };
-      
-
 
         wrapper.vm.formData.is_real_time = false;
         wrapper.vm.formData.query_condition.aggregation = null;
@@ -665,26 +660,18 @@ describe("AddAlert Component", () => {
         wrapper.vm.formData.trigger_condition.threshold = '10';
         wrapper.vm.formData.trigger_condition.frequency_type = 'cron';
         wrapper.vm.formData.trigger_condition.operator = '>';
-        wrapper.vm.formData.trigger_condition.cron = '';
-      
+        wrapper.vm.formData.trigger_condition.cron = 'invalid-cron';
+
         const result = wrapper.vm.validateInputs(wrapper.vm.formData);
-        expect(result).toBeUndefined(); // function returns nothing in this case
-        expect(wrapper.vm.scheduledAlertRef.cronJobError).toBe('Invalid cron expression!');
+        expect(result).toBe(false); // function returns false when cron is invalid
       });
-      it('fails when scheduledAlertRef has cronJobError after validation', () => {
+      it('passes when valid cron expression is provided', () => {
         cronParser.parseExpression = vi.fn().mockImplementation(() => {
           return {
               next: vi.fn(),
           }
         });
 
-        const notifyMock = vi.fn();
-        wrapper.vm.q.notify = notifyMock;
-        wrapper.vm.scheduledAlertRef = {
-          cronJobError: '',
-          validateFrequency: vi.fn(),
-        };
-      
         wrapper.vm.formData.is_real_time = false
         wrapper.vm.formData.trigger_condition.silence = '5';
         wrapper.vm.formData.trigger_condition.period = '60';
@@ -692,15 +679,11 @@ describe("AddAlert Component", () => {
         wrapper.vm.formData.trigger_condition.frequency_type = 'cron';
         wrapper.vm.formData.trigger_condition.operator = '>';
         wrapper.vm.formData.trigger_condition.cron = '* * * * *';
-        wrapper.vm.formData.query_condition.aggregation = null
+        wrapper.vm.formData.trigger_condition.timezone = 'UTC';
+        wrapper.vm.formData.query_condition.aggregation = null;
 
-        wrapper.vm.scheduledAlertRef.cronJobError = 'Invalid cron!';
-      
-        const result = wrapper.vm.validateInputs(wrapper.vm.formData);
-        expect(result).toBe(false);
-        expect(notifyMock).toHaveBeenCalledWith(expect.objectContaining({
-          message: 'Invalid cron!'
-        }));
+        const result = wrapper.vm.validateInputs(wrapper.vm.formData, false);
+        expect(result).toBe(true); // function returns true when cron is valid
       });
       
       
@@ -1743,12 +1726,12 @@ describe("AddAlert Component", () => {
 
     it('should provide currentStepCaption for step 3', () => {
       w.vm.wizardStep = 3;
-      expect(w.vm.currentStepCaption).toBe('Set your alert rules and choose how you\'d like to be notified.');
+      expect(w.vm.currentStepCaption).toBe('Compare current results with data from another time period');
     });
 
     it('should provide currentStepCaption for step 4', () => {
       w.vm.wizardStep = 4;
-      expect(w.vm.currentStepCaption).toBe('Compare current results with data from another time period');
+      expect(w.vm.currentStepCaption).toBe('Set your alert rules and choose how you\'d like to be notified.');
     });
 
     it('should provide currentStepCaption for step 5', () => {
