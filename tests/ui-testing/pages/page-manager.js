@@ -10,7 +10,7 @@ import DashboardVariables from "./dashboardPages/dashboard-variables";
 import ChartTypeSelector from "./dashboardPages/dashboard-chart";
 import DashboardDrilldownPage from "./dashboardPages/dashboard-drilldown";
 import DashboardFilter from "./dashboardPages/dashboard-filter";
-import DashboardJoinsHelper from "../playwright-tests/dashboards/utils/dashboardJoinsHelper.js";
+import DashboardJoinsHelper from "./dashboardPages/dashboardJoinsHelper.js";
 import DashboardImport from "./dashboardPages/dashboard-import.js";
 import DashboardShareExportPage from "./dashboardPages/dashboard-share-export";
 import DashboardTimeRefresh from "./dashboardPages/dashboard-refresh";
