@@ -15,7 +15,8 @@
 
 import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
-import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
+import { getUnitValue, formatUnitValue, formatDate } from "../convertDataIntoUnitValue";
+import { toZonedTime } from "date-fns-tz";
 
 /**
  * Converter for table charts
@@ -40,7 +41,7 @@ export class TableConverter implements PromQLChartConverter {
     console.log("Built Columns:", columns);
 
     // Build rows from series data
-    const rows = this.buildRows(processedData, panelSchema);
+    const rows = this.buildRows(processedData, panelSchema, store);
     console.log("Built Rows:", rows);
     console.log("Rows count:", rows.length);
 
@@ -189,7 +190,7 @@ export class TableConverter implements PromQLChartConverter {
    * Build table rows from processed data
    * Supports multi-aggregation: calculates all selected aggregations for each series
    */
-  private buildRows(processedData: ProcessedPromQLData[], panelSchema: any): any[] {
+  private buildRows(processedData: ProcessedPromQLData[], panelSchema: any, store: any): any[] {
     const config = panelSchema.config || {};
     const tableMode = config.promql_table_mode || "single";
     const rows: any[] = [];
@@ -204,12 +205,14 @@ export class TableConverter implements PromQLChartConverter {
 
     // In "single" (Timestamp) mode, create rows with timestamp + value for ALL series
     if (tableMode === "single") {
+      const timezone = store.state.timezone;
+
       processedData.forEach((queryData, qIndex) => {
         queryData.series.forEach((seriesData, sIndex) => {
           // Create a row for each data point
           seriesData.values.forEach(([timestamp, value]) => {
             rows.push({
-              timestamp: new Date(timestamp * 1000).toLocaleString(),
+              timestamp: formatDate(toZonedTime(timestamp * 1000, timezone)),
               value: parseFloat(value),
               __legend__: seriesData.name, // Store legend for filtering
             });
