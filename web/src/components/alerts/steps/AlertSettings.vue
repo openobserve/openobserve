@@ -1173,16 +1173,11 @@ export default defineComponent({
 
     // Validation method - just call the inline validations that already exist
     const validate = async () => {
-      console.log('[AlertSettings] Starting validation, isRealTime:', props.isRealTime);
-      console.log('[AlertSettings] localDestinations.value:', localDestinations.value);
-      console.log('[AlertSettings] silence:', props.formData.trigger_condition.silence);
-
       // Validate cron/frequency first
       validateFrequency();
 
       // Check if there are any cron validation errors
       if (cronJobError.value) {
-        console.log('[AlertSettings] Cron error:', cronJobError.value);
         return { valid: false, message: cronJobError.value };
       }
 
@@ -1195,17 +1190,14 @@ export default defineComponent({
           props.formData.trigger_condition.silence === null ||
           props.formData.trigger_condition.silence === ''
         ) {
-          console.log('[AlertSettings] Silence notification validation failed');
           return { valid: false, message: `${t('alerts.silenceNotification')} should be greater than or equal to 0` };
         }
 
         // Check destinations (required for both real-time and scheduled)
         if (!localDestinations.value || localDestinations.value.length === 0) {
-          console.log('[AlertSettings] Destinations validation failed - no destinations selected');
           return { valid: false, message: null }; // null means show inline error only
         }
 
-        console.log('[AlertSettings] Real-time validation passed');
         return { valid: true };
       }
 
@@ -1273,7 +1265,6 @@ export default defineComponent({
 
       // Check destinations (required for both real-time and scheduled)
       if (!localDestinations.value || localDestinations.value.length === 0) {
-        console.log('[AlertSettings] Destinations validation failed - no destinations selected');
         return { valid: false, message: null }; // null means show inline error only
       }
 
