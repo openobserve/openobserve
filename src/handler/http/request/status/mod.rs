@@ -113,6 +113,7 @@ struct ConfigResponse<'a> {
     restricted_routes_on_empty_data: bool,
     sso_enabled: bool,
     native_login_enabled: bool,
+    service_account_enabled: bool,
     rbac_enabled: bool,
     super_cluster_enabled: bool,
     query_on_stream_selection: bool,
@@ -264,6 +265,11 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let native_login_enabled = true;
 
     #[cfg(feature = "enterprise")]
+    let service_account_enabled = dex_cfg.service_account_enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let service_account_enabled = true;
+
+    #[cfg(feature = "enterprise")]
     let rbac_enabled = openfga_cfg.enabled;
     #[cfg(not(feature = "enterprise"))]
     let rbac_enabled = false;
@@ -381,6 +387,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         restricted_routes_on_empty_data: cfg.common.restricted_routes_on_empty_data,
         sso_enabled,
         native_login_enabled,
+        service_account_enabled,
         rbac_enabled,
         super_cluster_enabled,
         query_on_stream_selection: cfg.common.query_on_stream_selection,
