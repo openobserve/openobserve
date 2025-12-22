@@ -1,5 +1,5 @@
 <template>
-  <div class="label-filter-editor">
+  <div class="label-filter-editor tw-py-[0.25rem]">
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">{{ t("panel.labelFilters") }}</div>
       <span class="layout-separator">:</span>
@@ -317,14 +317,10 @@ const getOperatorHint = (op: string): string => {
 </script>
 
 <style scoped lang="scss">
-.label-filter-editor {
-  margin-bottom: 8px;
-}
-
 .layout-name {
   font-size: 14px;
   white-space: nowrap;
-  min-width: 130px;
+  min-width: 86px;
   display: flex;
   align-items: center;
 }

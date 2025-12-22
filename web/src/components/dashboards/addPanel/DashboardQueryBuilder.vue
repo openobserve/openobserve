@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-if="
       !promqlMode &&
+      !promqlBuilderMode &&
       dashboardPanelData.data.type != 'geomap' &&
       dashboardPanelData.data.type != 'maps' &&
       dashboardPanelData.data.type != 'sankey'
@@ -669,6 +670,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :dashboardData="dashboardData"
     ></DashboardFiltersOption>
   </div>
+
+  <!-- PromQL Builder Mode -->
+  <div v-if="promqlBuilderMode">
+    <LabelFilterEditor
+      :labels="promqlBuilderQuery.labels"
+      :metric="promqlBuilderQuery.metric"
+      @update:labels="updatePromQLBuilderLabels"
+    />
+    <q-separator />
+    <OperationsList
+      :operations="promqlBuilderQuery.operations"
+      @update:operations="updatePromQLBuilderOperations"
+    />
+  </div>
+
   <DashboardGeoMapsQueryBuilder :dashboardData="dashboardData" />
   <DashboardMapsQueryBuilder :dashboardData="dashboardData" />
   <DashboardSankeyChartBuilder :dashboardData="dashboardData" />
@@ -701,6 +717,10 @@ import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFuncti
 import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import { useStore } from "vuex";
 import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
+import LabelFilterEditor from "@/components/promql/components/LabelFilterEditor.vue";
+import OperationsList from "@/components/promql/components/OperationsList.vue";
+import { promQueryModeller } from "@/components/promql/operations/queryModeller";
+import type { PromVisualQuery } from "@/components/promql/types";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
@@ -713,6 +733,8 @@ export default defineComponent({
     DashboardFiltersOption,
     DashboardJoinsOption,
     DynamicFunctionPopUp,
+    LabelFilterEditor,
+    OperationsList,
   },
   props: ["dashboardData"],
   setup(props) {
@@ -1222,6 +1244,72 @@ export default defineComponent({
 
     const operators = ["=", "<>", ">=", "<=", ">", "<"];
 
+    // PromQL Builder Mode
+    const promqlBuilderMode = computed(
+      () => dashboardPanelData.data.queryType == "promql-builder"
+    );
+
+    const promqlBuilderQuery = reactive<PromVisualQuery>({
+      metric: "",
+      labels: [],
+      operations: [],
+    });
+
+    // Watch for metric changes from FieldList (stream selection)
+    watch(
+      () =>
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.stream,
+      (newStream) => {
+        if (promqlBuilderMode.value && newStream) {
+          promqlBuilderQuery.metric = newStream;
+        }
+      },
+      { immediate: true }
+    );
+
+    // Initialize from existing query if available
+    watch(
+      () => promqlBuilderMode.value,
+      (isBuilderMode) => {
+        if (isBuilderMode) {
+          const currentQuery =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ];
+          // Initialize metric from stream
+          if (currentQuery?.fields?.stream) {
+            promqlBuilderQuery.metric = currentQuery.fields.stream;
+          }
+        }
+      },
+      { immediate: true }
+    );
+
+    const updatePromQLBuilderLabels = (labels: any[]) => {
+      promqlBuilderQuery.labels = labels;
+      generatePromQLQuery();
+    };
+
+    const updatePromQLBuilderOperations = (operations: any[]) => {
+      promqlBuilderQuery.operations = operations;
+      generatePromQLQuery();
+    };
+
+    const generatePromQLQuery = () => {
+      if (!promqlBuilderMode.value) return;
+
+      try {
+        const query = promQueryModeller.renderQuery(promqlBuilderQuery);
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].query = query;
+      } catch (error) {
+        console.error("Error generating PromQL query:", error);
+      }
+    };
+
     return {
       showXAxis,
       t,
@@ -1250,6 +1338,10 @@ export default defineComponent({
       yAxisHint,
       zAxisHint,
       promqlMode,
+      promqlBuilderMode,
+      promqlBuilderQuery,
+      updatePromQLBuilderLabels,
+      updatePromQLBuilderOperations,
       xLabel,
       yLabel,
       zLabel,

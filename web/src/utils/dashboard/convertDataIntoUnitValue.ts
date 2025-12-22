@@ -1154,7 +1154,7 @@ export const validateSQLPanelFields = (
   isFieldsValidationRequired: boolean = true,
   pageKey?: string,
 ) => {
-  const isPromQLMode = panelData?.queryType === "promql";
+  const isPromQLMode = panelData?.queryType === "promql" || panelData?.queryType === "promql-builder";
   if (
     !isPromQLMode &&
     !panelData?.queries?.[0]?.customQuery &&
@@ -1213,7 +1213,7 @@ const validateContentNotEmpty = (
  */
 const validatePanelContentByType = (panel: any, errors: string[]) => {
   // Check for promQL query type
-  if (panel?.queryType === "promql") {
+  if (panel?.queryType === "promql" || panel?.queryType === "promql-builder") {
     validateQueriesNotEmpty(panel?.queries, errors);
   }
 
@@ -1306,7 +1306,7 @@ const validateJoinFields = (joins: any, errors: string[]) => {
  */
 const validatePanelFields = (panel: any, errors: string[] = []) => {
   // Check if panel has promQL query type
-  const isPromQLMode = panel?.queryType === "promql";
+  const isPromQLMode = panel?.queryType === "promql" || panel?.queryType === "promql-builder";
   const currentQueryIndex = 0; // Default to first query
 
   // Validate panel content based on type
@@ -1427,7 +1427,7 @@ export const validatePanel = (
   const currentQueryIndex = panelData?.layout?.currentQueryIndex || 0;
 
   // Check if panel has promQL query type
-  const isPromQLMode = panelData?.data?.queryType === "promql";
+  const isPromQLMode = panelData?.data?.queryType === "promql" || panelData?.data?.queryType === "promql-builder";
 
   // Validate panel content based on type
   validatePanelContentByType(panelData?.data, errors);
