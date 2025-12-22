@@ -124,11 +124,6 @@ pub async fn validate_query_fields(
             continue;
         }
 
-        // Skip aggregation functions
-        if field == "count" {
-            continue;
-        }
-
         // Check 1: Field must exist in schema
         if schema.field_with_name(&field).is_err() {
             return Err(Error::ErrorCode(ErrorCodes::SearchFieldNotFound(format!(
