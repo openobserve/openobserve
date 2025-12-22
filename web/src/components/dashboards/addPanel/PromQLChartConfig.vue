@@ -274,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <b>PromQL Table Mode - </b>
               Controls how time-series data is displayed in the table.
               <br /><br />
-              <b>Timestamp:</b> Shows timestamp and value columns for selected series with legend dropdown.
+              <b>Time Series:</b> Shows timestamp and value columns for selected series with legend dropdown.
               <br /><br />
               <b>Aggregate:</b> Shows aggregated values across all series without timestamps (no legend dropdown).
               <br /><br />
@@ -629,7 +629,7 @@ export default defineComponent({
 
     // Options for PromQL table mode
     const promqlTableModeOptions = [
-      { label: "Timestamp", value: "single" },
+      { label: "Time Series", value: "single" },
       { label: "Aggregate", value: "all" },
     ];
 
