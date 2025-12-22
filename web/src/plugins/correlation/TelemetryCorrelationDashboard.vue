@@ -63,11 +63,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="(value, key) in pendingDimensions"
             :key="key"
             class="tw-flex tw-items-center tw-gap-2"
-            :class="{ 'tw-opacity-60': unstableDimensionKeys.has(key) }"
           >
             <span
               class="tw-text-xs tw-font-semibold"
-              :class="unstableDimensionKeys.has(key) ? 'tw-text-gray-500' : ''"
+              :class="unstableDimensionKeys.has(key) ? 'tw-opacity-60' : 'tw-opacity-100'"
             >
               {{ key }}:
             </span>
@@ -451,11 +450,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="(value, key) in pendingDimensions"
           :key="key"
           class="tw-flex tw-items-center tw-gap-2"
-          :class="{ 'tw-opacity-60': unstableDimensionKeys.has(key) }"
         >
           <span
             class="tw-text-xs tw-font-semibold"
-            :class="unstableDimensionKeys.has(key) ? 'tw-text-gray-500' : ''"
+            :class="unstableDimensionKeys.has(key) ? 'tw-opacity-60' : 'tw-opacity-100'"
           >
             {{ key }}:
           </span>
