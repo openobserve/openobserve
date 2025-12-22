@@ -15,7 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="promql-table-chart" style="height: 100%; width: 100%; display: flex; flex-direction: column; position: relative;">
+  <div
+    class="promql-table-chart"
+    style="
+      height: 100%;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    "
+  >
     <q-table
       :rows="filteredTableRows"
       :columns="tableColumns"
@@ -26,7 +35,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       flat
       bordered
       dense
-      :style="{ flex: '1 1 auto', height: showLegendFooter ? 'calc(100% - 60px)' : '100%' }"
+      :style="{
+        flex: '1 1 auto',
+        height: showLegendFooter ? 'calc(100% - 60px)' : '100%',
+      }"
       :virtual-scroll="filteredTableRows.length > 100"
       :rows-per-page-options="[10, 20, 50, 100, 0]"
       :class="{ 'with-legend-footer': showLegendFooter }"
@@ -71,53 +83,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-center q-pa-md text-grey-6">
           <q-icon name="info" size="48px" color="grey-5" class="q-mb-md" />
           <div class="text-h6">No data available</div>
-          <div class="text-caption">
-            Your PromQL query returned no results
-          </div>
+          <div class="text-caption">Your PromQL query returned no results</div>
         </div>
-      </template>
-
-      <!-- Loading slot -->
-      <template v-slot:loading>
-        <q-inner-loading showing color="primary" />
       </template>
     </q-table>
 
-    <!-- Search/Filter bar (optional) -->
-    <div
-      v-if="config.filterable !== false && tableRows.length > 0"
-      class="table-filter q-pa-sm"
-      style="
-        position: absolute;
-        top: 8px;
-        right: 8px;
-        z-index: 10;
-        width: 250px;
-      "
-    >
-      <q-input
-        v-model="filter"
-        outlined
-        dense
-        debounce="300"
-        placeholder="Search..."
-        clearable
-      >
-        <template v-slot:prepend>
-          <q-icon name="search" />
-        </template>
-      </q-input>
-    </div>
-
     <!-- Legend Dropdown Footer (Grafana-style) -->
-    <div
-      v-if="showLegendFooter"
-      class="legend-footer q-pa-sm"
-    >
-      <div class="row items-center q-gutter-md" style="width: 100%; padding: 0 12px;">
-        <div class="text-body2" style="min-width: 60px;">
-          Legend:
-        </div>
+    <div v-if="showLegendFooter" class="legend-footer q-pa-sm">
+      <div
+        class="row items-center q-gutter-md"
+        style="width: 100%; padding: 0 12px"
+      >
+        <div class="text-body2" style="min-width: 60px">Legend:</div>
         <q-select
           v-model="selectedLegend"
           :options="legendOptions"
@@ -125,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
           emit-value
           map-options
-          style="min-width: 300px; max-width: 500px;"
+          style="min-width: 300px; max-width: 500px"
           placeholder="Select series to filter"
         >
           <template v-slot:prepend>
@@ -245,10 +222,10 @@ export default defineComponent({
       }
 
       const filtered = tableRows.value.filter(
-        (row: any) => row.__legend__ === selectedLegend.value
+        (row: any) => row.__legend__ === selectedLegend.value,
       );
       console.log(
-        `Filtered to legend "${selectedLegend.value}": ${filtered.length} rows`
+        `Filtered to legend "${selectedLegend.value}": ${filtered.length} rows`,
       );
       return filtered;
     });
@@ -286,7 +263,7 @@ export default defineComponent({
           console.log("Default legend selected:", selectedLegend.value);
         }
       },
-      { deep: true, immediate: true }
+      { deep: true, immediate: true },
     );
 
     return {
@@ -311,34 +288,24 @@ export default defineComponent({
   :deep(.q-table) {
     height: 100%;
 
-    .q-table__container {
-      height: 100%;
-      max-height: 100%;
-    }
-
-    .q-table__middle {
-      max-height: calc(100% - 50px);
+    .q-table__top,
+    .q-table__bottom,
+    thead tr:first-child th {
+      background-color: #fff;
     }
 
     thead tr th {
+      will-change: auto !important;
       position: sticky;
+      z-index: 1;
+    }
+
+    thead tr:first-child th {
       top: 0;
-      z-index: 2;
-      background-color: #f5f5f5;
-      font-weight: bold;
     }
 
-    tbody tr {
-      transition: background-color 0.2s;
-
-      &:hover {
-        background-color: rgba(0, 0, 0, 0.05);
-      }
-    }
-
-    // Ensure alternating row colors
-    tbody tr:nth-child(even) {
-      background-color: rgba(0, 0, 0, 0.02);
+    .q-virtual-scroll {
+      will-change: auto !important;
     }
   }
 
@@ -350,31 +317,23 @@ export default defineComponent({
 }
 
 // Dark mode support
-.body--dark {
-  .promql-table-chart {
-    :deep(.q-table) {
-      thead tr th {
-        background-color: #1e1e1e;
-      }
-
-      tbody tr:nth-child(even) {
-        background-color: rgba(255, 255, 255, 0.02);
-      }
-
-      tbody tr:hover {
-        background-color: rgba(255, 255, 255, 0.05);
-      }
+.body--dark .promql-table-chart {
+  :deep(.q-table) {
+    .q-table__top,
+    .q-table__bottom,
+    thead tr:first-child th {
+      background-color: var(--q-dark-page) !important;
     }
+  }
 
-    .table-filter {
-      background-color: rgba(30, 30, 30, 0.95);
-    }
+  .table-filter {
+    background-color: rgba(30, 30, 30, 0.95);
+  }
 
-    .legend-footer {
-      background-color: #1a1a1a !important;
-      border-top-color: rgba(255, 255, 255, 0.12) !important;
-      box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.5);
-    }
+  .legend-footer {
+    background-color: var(--q-dark-page) !important;
+    border-top-color: rgba(255, 255, 255, 0.12) !important;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.5);
   }
 }
 
