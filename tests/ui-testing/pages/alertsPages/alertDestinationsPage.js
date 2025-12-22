@@ -343,6 +343,36 @@ export class AlertDestinationsPage {
     }
 
     /**
+     * Verify successful import message is visible
+     * Uses text content since the UI doesn't have data-test attributes for this message
+     */
+    async verifySuccessfulImportMessage() {
+        // Look for the success message text anywhere on the page (toast or dialog)
+        const successMessage = this.page.getByText('Successfully imported');
+        await expect(successMessage).toBeVisible({ timeout: 10000 });
+    }
+
+    /**
+     * Verify destination count message is visible (e.g., "Destination - 1:")
+     * The message appears in the error/output section of the ImportDestination component
+     */
+    async verifyDestinationCountMessage() {
+        // Wait for the import to process and show errors/output
+        await this.page.waitForTimeout(2000);
+
+        // Look for destination error items using data-test attribute pattern
+        // The errors appear with data-test="destination-import-error-{index}-{errorIndex}"
+        const errorItem = this.page.locator('[data-test^="destination-import-error-"]').first();
+
+        // Or look for the destination count message text anywhere on the page
+        const countMessage = this.page.getByText(/Destination - \d+:/);
+
+        // Wait for either the error item or the count message to be visible
+        await expect(errorItem.or(countMessage)).toBeVisible({ timeout: 10000 });
+        testLogger.debug('Destination count/error message verified');
+    }
+
+    /**
      * Import destination from file
      * @param {string} filePath - Path to the destination JSON file
      * @param {string} templateName - Name of the template to use
