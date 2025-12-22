@@ -135,33 +135,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- Add Comparison Window Button -->
-      <div class="tw-w-full tw-flex tw-justify-center q-mt-sm">
-        <div class="tw-w-fit tw-flex tw-justify-center tw-border tw-border-gray-200">
+      <!-- Action Buttons Section -->
+      <div class="tw-w-full tw-flex tw-justify-center tw-items-center tw-gap-3 q-mt-sm">
+        <q-btn
+          data-test="multi-time-range-alerts-add-btn"
+          label="Add Comparison Window"
+          size="md"
+          class="o2-secondary-button"
+          style="font-size: 14px;"
+          no-caps
+          :disable="isComparisonDisabled"
+          @click="addTimeShift"
+        >
+          <q-tooltip
+            v-if="isComparisonDisabled"
+            anchor="top middle"
+            self="bottom middle"
+            :offset="[0, 8]"
+          >
+            {{ comparisonDisabledTooltip }}
+          </q-tooltip>
+        </q-btn>
+
+        <!-- Go to View Editor Button with Info Icon - shows when comparison windows are added -->
+        <div v-if="localMultiTimeRange.length > 0" class="tw-flex tw-items-center tw-gap-2">
           <q-btn
-            data-test="multi-time-range-alerts-add-btn"
-            label="Add Comparison Window"
-            size="sm"
-            class="text-semibold add-variable q-pa-sm multi-window-text no-border"
+            data-test="go-to-view-editor-btn"
+            label="Go to Conditions"
+            size="md"
+            class="o2-secondary-button"
             style="font-size: 14px;"
             no-caps
-            :disable="isComparisonDisabled"
-            @click="addTimeShift"
+            @click="goToSqlEditor"
           >
-            <q-icon
-              :class="store.state.theme === 'dark' ? 'tw-text-white tw-font-bold q-ml-sm' : 'tw-text-black tw-font-bold q-ml-sm'"
-              name="add"
-              size="20px"
-            />
-            <q-tooltip
-              v-if="isComparisonDisabled"
+          <q-tooltip
               anchor="top middle"
               self="bottom middle"
+              max-width="300px"
               :offset="[0, 8]"
             >
-              {{ comparisonDisabledTooltip }}
+              Click on "Go to Conditions" to verify the events for selected comparison windows
             </q-tooltip>
-          </q-btn>
+        </q-btn>
         </div>
       </div>
     </div>
@@ -211,7 +226,7 @@ export default defineComponent({
       default: "custom",
     },
   },
-  emits: ["update:multiTimeRange"],
+  emits: ["update:multiTimeRange", "goToSqlEditor"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
@@ -303,6 +318,10 @@ export default defineComponent({
       }
     };
 
+    const goToSqlEditor = () => {
+      emit("goToSqlEditor");
+    };
+
     return {
       t,
       store,
@@ -315,6 +334,7 @@ export default defineComponent({
       convertMinutesToDisplayValue,
       isComparisonDisabled,
       comparisonDisabledTooltip,
+      goToSqlEditor,
     };
   },
 });

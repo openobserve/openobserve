@@ -222,6 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :cron="formData.trigger_condition.cron"
                   :selectedTab="formData.query_condition.type || 'custom'"
                   @update:multiTimeRange="(val) => formData.query_condition.multi_time_range = val"
+                  @goToSqlEditor="handleGoToSqlEditor"
                 />
               </div>
 
@@ -1434,6 +1435,13 @@ export default defineComponent({
       formData.value.query_condition.type = tab;
     }
 
+    const handleGoToSqlEditor = () => {
+      // Switch to SQL mode
+      formData.value.query_condition.type = 'sql';
+      // Navigate to step 2 (Query Config)
+      wizardStep.value = 2;
+    }
+
     const clearMultiWindows = () => {
       formData.value.query_condition.multi_time_range = [];
     }
@@ -2022,6 +2030,7 @@ export default defineComponent({
       lastValidStep,
       clearMultiWindows,
       validateStep,
+      handleGoToSqlEditor,
     };
   },
 
