@@ -251,6 +251,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-select>
 
+      <!-- Table Mode Section -->
+      <div class="q-mb-sm text-subtitle2 q-mt-md">Table Mode</div>
+
       <!-- PromQL Table Mode -->
       <q-select
         v-model="promqlTableMode"

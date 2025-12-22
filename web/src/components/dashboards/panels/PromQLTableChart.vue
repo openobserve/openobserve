@@ -28,20 +28,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-table
       :rows="filteredTableRows"
       :columns="tableColumns"
-      :pagination="paginationConfig"
+      v-model:pagination="pagination"
       :filter="filter"
       :loading="loading"
       row-key="id"
       flat
       bordered
       dense
-      :style="{
-        flex: '1 1 auto',
-        height: showLegendFooter ? 'calc(100% - 60px)' : '100%',
-      }"
-      :virtual-scroll="filteredTableRows.length > 100"
-      :rows-per-page-options="[10, 20, 50, 100, 0]"
-      :class="{ 'with-legend-footer': showLegendFooter }"
+      virtual-scroll
+      :rows-per-page-options="[0]"
+      :virtual-scroll-sticky-size-start="48"
+      :style="{ flex: '1 1 auto', height: '100%' }"
     >
       <!-- Header slot for custom styling -->
       <template v-slot:header="props">
@@ -86,10 +83,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-caption">Your PromQL query returned no results</div>
         </div>
       </template>
-    </q-table>
 
-    <!-- Legend Dropdown Footer (Grafana-style) -->
-    <div v-if="showLegendFooter" class="legend-footer q-pa-sm">
+      <!-- Bottom slot: add legend dropdown alongside pagination -->
+      <div v-if="showLegendFooter" class="legend-footer q-pa-sm">
       <div
         class="row items-center q-gutter-md"
         style="width: 100%; padding: 0 12px"
@@ -110,11 +106,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-select>
         <q-space />
-        <div class="text-body2 text-grey-7">
-          Showing {{ filteredTableRows.length }} of {{ tableRows.length }} rows
+          <div class="q-pr-md text-body2">
+            1-{{ filteredTableRows.length }} of {{ filteredTableRows.length }}
+          </div>
         </div>
       </div>
-    </div>
+    </q-table>
   </div>
 </template>
 
@@ -232,15 +229,8 @@ export default defineComponent({
       return filtered;
     });
 
-    const paginationConfig = computed(() => {
-      const pageSize = props.config.page_size || 10;
-      const enabled = props.config.pagination !== false;
-
-      return {
-        page: 1,
-        rowsPerPage: enabled ? pageSize : 0, // 0 = show all rows
-        rowsNumber: filteredTableRows.value.length,
-      };
+    const pagination = ref({
+      rowsPerPage: 0, // 0 = show all rows (like SQL table)
     });
 
     // Watch for data changes and set default legend
@@ -274,7 +264,7 @@ export default defineComponent({
       tableColumns,
       tableRows,
       filteredTableRows,
-      paginationConfig,
+      pagination,
       selectedLegend,
       legendOptions,
       showLegendFooter,
@@ -331,27 +321,5 @@ export default defineComponent({
   .table-filter {
     background-color: rgba(30, 30, 30, 0.95);
   }
-
-  .legend-footer {
-    background-color: var(--q-dark-page) !important;
-    border-top-color: rgba(255, 255, 255, 0.12) !important;
-    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.5);
-  }
-}
-
-// Legend footer styling
-.legend-footer {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 60px;
-  z-index: 10;
-  border-top: 2px solid #e0e0e0;
-  background-color: #ffffff;
-  display: flex;
-  align-items: center;
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
-  transition: all 0.2s ease-in-out;
 }
 </style>
