@@ -659,7 +659,7 @@ export default defineComponent({
       // Determine query type based on panel configuration
       // Only care about SQL vs PromQL distinction
       let queryType = "sql"; // Default to SQL
-      if (panelSchema.value.queryType === "promql" || panelSchema.value.queryType === "promql-builder") {
+      if (panelSchema.value.queryType === "promql") {
         queryType = "promql";
       }
 
@@ -1150,7 +1150,7 @@ export default defineComponent({
         return "";
       }
       // Check if the queryType is 'promql'
-      else if (panelSchema.value?.queryType == "promql" || panelSchema.value?.queryType == "promql-builder") {
+      else if (panelSchema.value?.queryType == "promql") {
         // Check if the 'data' array has elements and every item has a non-empty 'result' array
         return data.value?.length &&
           data.value.some((item: any) => item?.result?.length)
@@ -2066,7 +2066,7 @@ export default defineComponent({
           let csvContent;
 
           // Check if this is a PromQL query type panel
-          if (panelSchema.value.queryType === "promql" || panelSchema.value.queryType === "promql-builder") {
+          if (panelSchema.value.queryType === "promql") {
             // Handle PromQL data format
             const flattenedData: any[] = [];
 

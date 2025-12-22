@@ -855,8 +855,8 @@ export const usePanelDataLoader = (
         code: "",
       };
 
-      // Check if the query type is "promql" or "promql-builder"
-      if (panelSchema.value.queryType == "promql" || panelSchema.value.queryType == "promql-builder") {
+      // Check if the query type is "promql"
+      if (panelSchema.value.queryType == "promql") {
         // copy of current abortController
         // which is used to check whether the current query has been aborted
         const abortControllerRef = abortController;
@@ -1825,7 +1825,7 @@ export const usePanelDataLoader = (
     }
 
     // continue if there are any adhoc queries
-    if (queryType === "promql" || queryType === "promql-builder") {
+    if (queryType === "promql") {
       adHocVariables.forEach((variable: any) => {
         metadata.push({
           type: "dynamicVariable",

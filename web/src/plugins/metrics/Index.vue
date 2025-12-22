@@ -680,7 +680,7 @@ export default defineComponent({
       // set default chart type as line
       dashboardPanelData.data.type = "line";
       // set the default query type as promql for metrics
-      dashboardPanelData.data.queryType = "promql-builder";
+      dashboardPanelData.data.queryType = "promql";
       dashboardPanelData.data.queries[0].customQuery = false;
 
       // set the show query bar by default for metrics page

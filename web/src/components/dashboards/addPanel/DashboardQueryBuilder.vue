@@ -1244,9 +1244,10 @@ export default defineComponent({
 
     const operators = ["=", "<>", ">=", "<=", ">", "<"];
 
-    // PromQL Builder Mode
+    // PromQL Builder Mode (queryType = "promql" with customQuery = false)
     const promqlBuilderMode = computed(
-      () => dashboardPanelData.data.queryType == "promql-builder"
+      () => dashboardPanelData.data.queryType == "promql" &&
+           !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.customQuery
     );
 
     const promqlBuilderQuery = reactive<PromVisualQuery>({

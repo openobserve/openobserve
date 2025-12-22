@@ -1154,7 +1154,7 @@ export const validateSQLPanelFields = (
   isFieldsValidationRequired: boolean = true,
   pageKey?: string,
 ) => {
-  const isPromQLMode = panelData?.queryType === "promql" || panelData?.queryType === "promql-builder";
+  const isPromQLMode = panelData?.queryType === "promql";
   if (
     !isPromQLMode &&
     !panelData?.queries?.[0]?.customQuery &&
@@ -1213,7 +1213,7 @@ const validateContentNotEmpty = (
  */
 const validatePanelContentByType = (panel: any, errors: string[]) => {
   // Check for promQL query type
-  if (panel?.queryType === "promql" || panel?.queryType === "promql-builder") {
+  if (panel?.queryType === "promql") {
     validateQueriesNotEmpty(panel?.queries, errors);
   }
 

@@ -164,45 +164,6 @@ const computedLabel = (label: QueryBuilderLabelFilter): string => {
   return `${label.label} ${label.op} ${label.value}`;
 };
 
-// Watch for metric changes to fetch available labels
-watch(
-  () => props.metric,
-  async (newMetric) => {
-    if (newMetric) {
-      await fetchAvailableLabels(newMetric);
-    } else {
-      availableLabels.value = [];
-      labelValuesMap.value.clear();
-    }
-  },
-  { immediate: true }
-);
-
-// Watch for prop changes
-watch(
-  () => props.labels,
-  (newLabels) => {
-    localLabels.value = [...newLabels];
-  }
-);
-
-// Watch for changes in labels to clear value when label key changes
-watch(
-  () => localLabels.value,
-  (newLabels, oldLabels) => {
-    if (oldLabels) {
-      newLabels.forEach((newLabel, index) => {
-        const oldLabel = oldLabels[index];
-        // If label key changed, clear the value since label changed
-        if (oldLabel && newLabel.label !== oldLabel.label) {
-          newLabel.value = "";
-        }
-      });
-    }
-  },
-  { deep: true }
-);
-
 // Fetch available labels and their values for the selected metric
 const fetchAvailableLabels = async (metric: string) => {
   if (!metric) return;
@@ -258,6 +219,46 @@ const fetchAvailableLabels = async (metric: string) => {
     loadingLabels.value = false;
   }
 };
+
+// Watch for metric changes to fetch available labels
+watch(
+  () => props.metric,
+  async (newMetric) => {
+    if (newMetric) {
+      await fetchAvailableLabels(newMetric);
+    } else {
+      availableLabels.value = [];
+      labelValuesMap.value.clear();
+    }
+  },
+  { immediate: true }
+);
+
+// Watch for prop changes
+watch(
+  () => props.labels,
+  (newLabels) => {
+    localLabels.value = [...newLabels];
+  }
+);
+
+// Watch for changes in labels to clear value when label key changes
+watch(
+  () => localLabels.value,
+  (newLabels, oldLabels) => {
+    if (oldLabels) {
+      newLabels.forEach((newLabel, index) => {
+        const oldLabel = oldLabels[index];
+        // If label key changed, clear the value since label changed
+        if (oldLabel && newLabel.label !== oldLabel.label) {
+          newLabel.value = "";
+        }
+      });
+    }
+  },
+  { deep: true }
+);
+
 
 const addLabel = () => {
   localLabels.value.push({
