@@ -21,6 +21,7 @@ use config::{
     meta::{sql::resolve_stream_names, stream::StreamType},
 };
 use hashbrown::HashMap;
+use infra::errors::{Error, ErrorCodes};
 #[cfg(feature = "enterprise")]
 use {
     crate::{
@@ -100,7 +101,7 @@ pub async fn validate_query_fields(
     stream_name: &str,
     stream_type: StreamType,
     sql: &str,
-) -> Result<(), infra::errors::Error> {
+) -> Result<(), Error> {
     // Step 1: Parse SQL to get columns (lightweight parsing)
     let search_query = proto::cluster_rpc::SearchQuery {
         sql: sql.to_string(),
@@ -116,11 +117,7 @@ pub async fn validate_query_fields(
     // Step 2: Get schema and UDS fields (from cache)
     let schema = infra::schema::get(org_id, stream_name, stream_type)
         .await
-        .map_err(|_| {
-            infra::errors::Error::ErrorCode(infra::errors::ErrorCodes::SearchStreamNotFound(
-                stream_name.to_string(),
-            ))
-        })?;
+        .map_err(|_| Error::ErrorCode(ErrorCodes::SearchStreamNotFound(stream_name.to_string())))?;
 
     let settings = infra::schema::get_settings(org_id, stream_name, stream_type).await;
     let uds_fields = infra::schema::get_stream_setting_defined_schema_fields(&settings);
@@ -142,22 +139,18 @@ pub async fn validate_query_fields(
 
         // Check 1: Field must exist in schema
         if schema.field_with_name(&field).is_err() {
-            return Err(infra::errors::Error::ErrorCode(
-                infra::errors::ErrorCodes::SearchFieldNotFound(format!(
-                    "{}. Field not found in stream schema.",
-                    field
-                )),
-            ));
+            return Err(Error::ErrorCode(ErrorCodes::SearchFieldNotFound(format!(
+                "{}. Field not found in stream schema.",
+                field
+            ))));
         }
 
         // Check 2: If UDS is defined, field must be in UDS
         if !uds_fields.is_empty() && !uds_fields.contains(&field) {
-            return Err(infra::errors::Error::ErrorCode(
-                infra::errors::ErrorCodes::SearchFieldNotFound(format!(
-                    "{}. Field exists but not in User-Defined Schema (UDS). Available UDS fields: {:?}",
-                    field, uds_fields
-                )),
-            ));
+            return Err(Error::ErrorCode(ErrorCodes::SearchFieldNotFound(format!(
+                "{}. Field exists but not in User-Defined Schema (UDS). Available UDS fields: {:?}",
+                field, uds_fields
+            ))));
         }
     }
 
