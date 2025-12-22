@@ -391,7 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex items-center" style="border-left: none">
                   <div style="width: 89px; margin-left: 0 !important">
                     <q-input
-                      v-model="formData.trigger_condition.threshold"
+                      v-model.number="formData.trigger_condition.threshold"
                       type="number"
                       dense
                       borderless
@@ -444,7 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div ref="periodFieldRef" class="flex items-center q-mr-sm" style="width: fit-content">
               <div style="width: 87px; margin-left: 0 !important" class="period-input-container">
                 <q-input
-                  v-model="formData.trigger_condition.period"
+                  v-model.number="formData.trigger_condition.period"
                   type="number"
                   dense
                   borderless
@@ -549,7 +549,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-if="formData.trigger_condition.frequency_type === 'minutes'" class="tw-flex tw-items-center">
                 <div style="width: 87px; margin-left: 0 !important">
                   <q-input
-                    v-model="formData.trigger_condition.frequency"
+                    v-model.number="formData.trigger_condition.frequency"
                     type="number"
                     dense
                     borderless
@@ -1131,9 +1131,12 @@ export default defineComponent({
       const periodValue = Number(props.formData.trigger_condition.period);
 
       if (periodValue && periodValue > 0) {
-        // Always sync frequency, regardless of current mode
-        // This ensures frequency is up-to-date when user switches to minutes mode
-        props.formData.trigger_condition.frequency = periodValue;
+        // Only sync frequency if period is above minimum refresh interval
+        // This prevents frequency from going below the minimum allowed value
+        const minFrequency = Math.ceil(store.state?.zoConfig?.min_auto_refresh_interval / 60) || 10;
+        if (periodValue >= minFrequency) {
+          props.formData.trigger_condition.frequency = periodValue;
+        }
 
         // Always sync cron expression, regardless of current mode
         // This ensures cron is up-to-date when user switches to cron mode

@@ -573,7 +573,7 @@ const defaultValue: any = () => {
     trigger_condition: {
       period: 10,
       operator: ">=",
-      frequency: 1,
+      frequency: 10,
       cron: "",
       threshold: 3,
       silence: 10,
@@ -2048,7 +2048,7 @@ export default defineComponent({
     // Set default frequency to min_auto_refresh_interval
     if (this.store.state?.zoConfig?.min_auto_refresh_interval)
       this.formData.trigger_condition.frequency = Math.ceil(
-        this.store.state?.zoConfig?.min_auto_refresh_interval / 60 || 1,
+        this.store.state?.zoConfig?.min_auto_refresh_interval / 60 || 10,
       );
 
     this.beingUpdated = this.isUpdated;

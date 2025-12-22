@@ -196,7 +196,7 @@ export default defineComponent({
     },
     frequency: {
       type: Number,
-      default: 1,
+      default: 10,
     },
     frequencyType: {
       type: String,
