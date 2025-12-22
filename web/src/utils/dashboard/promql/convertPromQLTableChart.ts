@@ -148,17 +148,7 @@ export class TableConverter implements PromQLChartConverter {
       } as any);
     });
 
-    // Always add timestamp column if time-series data
-    const hasTimeSeriesData = processedData.some((qd) => qd.timestamps.length > 1);
-    if (hasTimeSeriesData) {
-      columns.unshift({
-        name: "timestamp",
-        field: "timestamp",
-        label: "Timestamp",
-        align: "left",
-        sortable: true,
-      });
-    }
+    // Timestamp column removed as per user request
 
     console.log("Built columns:", columns.map(c => c.name));
     return columns;
@@ -197,11 +187,6 @@ export class TableConverter implements PromQLChartConverter {
           const columnName = aggregations.length === 1 ? "value" : `value_${agg}`;
           row[columnName] = applyAggregation(seriesData.values, agg);
         });
-
-        // Add timestamp if it's a single value
-        if (queryData.timestamps.length === 1) {
-          row.timestamp = queryData.timestamps[0][1];
-        }
 
         rows.push(row);
       });
