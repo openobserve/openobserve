@@ -330,11 +330,10 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.clickRelative15MinButton();
 
-    // Enter CTE query (no clear, just type)
+    // Enter CTE query
     const cteQuery = 'WITH filtered_logs AS (SELECT * FROM "e2e_automate" WHERE kubernetes_pod_name IS NOT NULL LIMIT 10) SELECT * FROM filtered_logs';
     testLogger.info(`Entering CTE query: ${cteQuery}`);
-    await pm.logsPage.clickQueryEditor();
-    await pm.logsPage.typeInQueryEditor(cteQuery);
+    await pm.logsPage.clearAndFillQueryEditor(cteQuery);
     await pm.logsPage.waitForTimeout(500);
 
     // Run query
@@ -421,11 +420,10 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.clickRelative15MinButton();
 
-    // Enter aggregation query (no clear, just type)
+    // Enter aggregation query
     const aggQuery = 'SELECT kubernetes_pod_name, count(*) as total FROM "e2e_automate" WHERE kubernetes_pod_name IS NOT NULL GROUP BY kubernetes_pod_name LIMIT 10';
     testLogger.info(`Entering aggregation query: ${aggQuery}`);
-    await pm.logsPage.clickQueryEditor();
-    await pm.logsPage.typeInQueryEditor(aggQuery);
+    await pm.logsPage.clearAndFillQueryEditor(aggQuery);
     await pm.logsPage.waitForTimeout(500);
 
     // Run query
