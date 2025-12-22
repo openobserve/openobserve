@@ -1,0 +1,79 @@
+[
+  {
+    "__name__": "cpu_usage",
+    "__type__": "gauge",
+    "namespace": "default",
+    "pod_name": "pod-0",
+    "container": "container-0",
+    "environment": "ci",
+    "host_name": "ci-runner-01",
+    "_timestamp": 1763707168000000,
+    "value": 75.5
+  },
+  {
+    "__name__": "cpu_usage",
+    "__type__": "gauge",
+    "namespace": "default",
+    "pod_name": "pod-1",
+    "container": "container-1",
+    "environment": "ci",
+    "host_name": "ci-runner-01",
+    "_timestamp": 1763707228000000,
+    "value": 82.3
+  },
+  {
+    "__name__": "memory_usage",
+    "__type__": "gauge",
+    "namespace": "default",
+    "pod_name": "pod-0",
+    "container": "container-0",
+    "environment": "ci",
+    "host_name": "ci-runner-01",
+    "_timestamp": 1763707168000000,
+    "value": 150.2
+  },
+  {
+    "__name__": "memory_usage",
+    "__type__": "gauge",
+    "namespace": "default",
+    "pod_name": "pod-1",
+    "container": "container-1",
+    "environment": "ci",
+    "host_name": "ci-runner-01",
+    "_timestamp": 1763707228000000,
+    "value": 180.7
+  },
+  {
+    "__name__": "request_count",
+    "__type__": "counter",
+    "method": "GET",
+    "status": "200",
+    "endpoint": "/api/v1",
+    "environment": "ci",
+    "service_name": "api",
+    "_timestamp": 1763707168000000,
+    "value": 100
+  },
+  {
+    "__name__": "request_count",
+    "__type__": "counter",
+    "method": "POST",
+    "status": "200",
+    "endpoint": "/api/v1",
+    "environment": "ci",
+    "service_name": "api",
+    "_timestamp": 1763707228000000,
+    "value": 150
+  },
+  {
+    "__name__": "cadvisor_version_info",
+    "__type__": "gauge",
+    "cadvisorRevision": "test-revision",
+    "cadvisorVersion": "v0.47.0",
+    "dockerVersion": "20.10.0",
+    "kernelVersion": "5.10.0",
+    "environment": "ci",
+    "_timestamp": 1763707168000000,
+    "value": 1
+  }
+]
