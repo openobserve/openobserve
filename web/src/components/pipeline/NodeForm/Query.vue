@@ -366,7 +366,7 @@ const getDefaultPromqlCondition = () => {
 const saveQueryData = async () => {
   // Validate inputs
   if (!scheduledPipelineRef.value.validateInputs()) {
-    return; // Don't close dialog on validation failure
+    return false; // Don't close dialog on validation failure
   }
 
   // Validate SQL query
@@ -374,7 +374,7 @@ const saveQueryData = async () => {
     await validateSqlQuery();
     await validateSqlQueryPromise.value;
   } catch (e) {
-    return; // Don't close dialog on SQL validation failure
+    return false; // Don't close dialog on SQL validation failure
   }
 
   //this is not needed as we are using validateInputs in scheduledPipeline.vue
