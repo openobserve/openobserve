@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-icon>
             </span>
           </div>
-          <div class="datetime-picker-wrapper">
+          <div class="datetime-picker-wrapper tw-mt-2">
             <CustomDateTimePicker
               v-model="picker.offSet"
               :picker="picker"
