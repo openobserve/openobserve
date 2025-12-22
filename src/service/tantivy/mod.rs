@@ -132,9 +132,19 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         .union(&index_fields)
         .cloned()
         .collect::<HashSet<_>>();
+
+    // Determine if we should create an empty index
+    // This is true when stream settings have FTS/index fields configured,
+    // even if the actual parquet data doesn't contain those fields
+    let should_create_empty_index = !full_text_search_fields.is_empty() || !index_fields.is_empty();
+
     // no fields need to create index, return
     if tantivy_fields.is_empty() {
-        return Ok(None);
+        if !should_create_empty_index {
+            return Ok(None);
+        }
+        // Continue to create an empty index structure as a marker
+        log::debug!("Creating empty tantivy index (no matching fields in parquet data)");
     }
 
     // add fields to tantivy schema
@@ -301,10 +311,14 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
     }
     let total_num_rows = task.await??;
     // no docs need to create index, return
-    if total_num_rows == 0 {
+    if total_num_rows == 0 && !should_create_empty_index {
         return Ok(None);
     }
-    log::debug!("write documents to tantivy index success");
+    log::debug!(
+        "write documents to tantivy index success (rows: {}, empty_index: {})",
+        total_num_rows,
+        total_num_rows == 0
+    );
 
     let index = tokio::task::spawn_blocking(move || {
         index_writer.finalize().map_err(|e| {
