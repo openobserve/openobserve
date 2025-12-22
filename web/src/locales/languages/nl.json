@@ -1001,7 +1001,11 @@
     "colorBySeriesTitle": "Kleur per serie",
     "colorBySeriesTooltip": "Pas kleuren toe op series voor een beter visueel onderscheid in diagrammen. Pas kleuren aan voor elke serie om de datavisualisatie te verbeteren.",
     "editColorBySeries": " Kleur per serie bewerken",
-    "applyColorBySeries": " Kleur per serie aanbrengen"
+    "applyColorBySeries": " Kleur per serie aanbrengen",
+    "showAllLegends": "Alle legendes weergeven",
+    "legendsOfCharts": "Legenden van hitlijsten",
+    "totalLegends": "Totaal: {count}",
+    "noLegendsAvailable": "Geen legendes beschikbaar"
   },
   "panel": {
     "header": "Paneel",
@@ -1068,7 +1072,15 @@
     "mapvalue": "Waarde",
     "customChartTypeSelector": "Aangepaste grafiektypekiezer",
     "customChartTypeSelectorHint": "Selecteer een diagramtype uit de eCharts bibliotheek om aan de slag te gaan met een eenvoudige codestructuur",
-    "selectChartType": "Diagramtype selecteren"
+    "selectChartType": "Diagramtype selecteren",
+    "joins": "Sluit zich aan",
+    "addJoin": "Join toevoegen",
+    "removeJoin": "Join verwijderen",
+    "leftJoin": "Links aansluiten",
+    "innerJoin": "Innerlijke verbinding",
+    "rightJoin": "Right Join",
+    "addClause": "Clausule toevoegen",
+    "removeClause": "Clausule verwijderen"
   },
   "home": {
     "streams": "Streams",
@@ -1937,7 +1949,8 @@
     "period": "Periode",
     "cron": "Cron",
     "type": "Typ",
-    "run_pipeline": "Pipeline uitvoeren"
+    "run_pipeline": "Pipeline uitvoeren",
+    "showLegends": "Legendes weergeven"
   },
   "alert_list": {
     "alert_details": "Details van de waarschuwing"

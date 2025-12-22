@@ -107,6 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @error="errorDetail = $event"
           @click="onChartClick"
           @contextmenu="onChartContextMenu"
+          @domcontextmenu="onChartDomContextMenu"
         />
       </div>
       <div
@@ -158,10 +159,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <div
-        v-if="allowAnnotationsAdd && isCursorOverPanel"
-        style="position: absolute; top: 0px; right: 0px; z-index: 9"
+        v-if="isCursorOverPanel"
+        class="flex items-center q-gutter-x-xs"
+        style="position: absolute; top: 0px; right: 0px; z-index: 9; padding-right: 2px; padding-top: 2px;"
         @click.stop
       >
+        <q-btn
+          v-if="
+            ![
+              'table',
+              'html',
+              'markdown',
+              'custom_chart',
+              'geomap',
+              'maps',
+              'heatmap',
+              'metric',
+              'gauge',
+            ].includes(panelSchema.type)
+          "
+          color="primary"
+          icon="format_list_bulleted"
+          round
+          outline
+          size="sm"
+          @click="$emit('show-legends')"
+          class="el-border"
+        >
+          <q-tooltip anchor="top middle" self="bottom right">
+            Show Legends
+          </q-tooltip>
+        </q-btn>
         <q-btn
           v-if="
             [
@@ -175,6 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'h-stacked',
             ].includes(panelSchema.type) &&
             checkIfPanelIsTimeSeries === true &&
+            allowAnnotationsAdd &&
             !viewOnly
           "
           color="primary"
@@ -464,6 +493,7 @@ export default defineComponent({
     "is-partial-data-update",
     "series-data-update",
     "contextmenu",
+    "show-legends",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -571,13 +601,16 @@ export default defineComponent({
     const contextMenuData = ref<any>(null);
 
     const onChartContextMenu = (event: any) => {
-      // Only show context menu if alert creation is allowed
+      // Emit contextmenu event for general usage (drilldowns, annotations, etc.)
       emit("contextmenu", {
         ...event,
         panelTitle: panelSchema.value.title,
         panelId: panelSchema.value.id,
       });
+    };
 
+    const onChartDomContextMenu = (event: any) => {
+      // Handle DOM contextmenu event specifically for alert creation
       if (!allowAlertCreation.value) {
         return;
       }
@@ -2217,7 +2250,9 @@ export default defineComponent({
       contextMenuVisible,
       contextMenuPosition,
       contextMenuValue,
+      contextMenuData,
       onChartContextMenu,
+      onChartDomContextMenu,
       hideContextMenu,
       handleCreateAlert,
     };

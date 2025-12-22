@@ -1001,7 +1001,11 @@
     "colorBySeriesTitle": "Couleur par série",
     "colorBySeriesTooltip": "Appliquez des couleurs aux séries pour une meilleure distinction visuelle dans les graphiques. Personnalisez les couleurs de chaque série afin d'améliorer la visualisation des données.",
     "editColorBySeries": " Modifier la couleur par série",
-    "applyColorBySeries": " Appliquer la couleur par série"
+    "applyColorBySeries": " Appliquer la couleur par série",
+    "showAllLegends": "Afficher toutes les légendes",
+    "legendsOfCharts": "Les légendes des cartes",
+    "totalLegends": "Total : {count}",
+    "noLegendsAvailable": "Aucune légende disponible"
   },
   "panel": {
     "header": "Panneau",
@@ -1068,7 +1072,15 @@
     "mapvalue": "Valeur",
     "customChartTypeSelector": "Sélecteur de type de graphique personnalisé",
     "customChartTypeSelectorHint": "Sélectionnez un type de graphique dans la bibliothèque eCharts pour commencer avec une structure de code de base",
-    "selectChartType": "Sélectionnez le type de graphique"
+    "selectChartType": "Sélectionnez le type de graphique",
+    "joins": "Rejoint",
+    "addJoin": "Ajouter Rejoindre",
+    "removeJoin": "Supprimer Rejoindre",
+    "leftJoin": "Rejoindre à gauche",
+    "innerJoin": "Jointure intérieure",
+    "rightJoin": "Adhérez à droite",
+    "addClause": "Ajouter une clause",
+    "removeClause": "Supprimer la clause"
   },
   "home": {
     "streams": "Ruisseaux",
@@ -1937,7 +1949,8 @@
     "period": "Période",
     "cron": "Cron",
     "type": "Tapez",
-    "run_pipeline": "Exécuter un pipeline"
+    "run_pipeline": "Exécuter un pipeline",
+    "showLegends": "Afficher les légendes"
   },
   "alert_list": {
     "alert_details": "Détails de l'alerte"

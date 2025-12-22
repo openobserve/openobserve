@@ -45,8 +45,8 @@ test.describe("dashboard UI testcases", () => {
 
     await pm.chartTypeSelector.selectStreamType("logs");
     await pm.chartTypeSelector.selectStream("kubernetes");
-    
-    await pm.chartTypeSelector.removeField("_timestamp", "x");
+
+    await pm.chartTypeSelector.removeField("x_axis_1", "x");
 
     await pm.chartTypeSelector.searchAndAddField(
       "dns_records",
@@ -72,7 +72,7 @@ test.describe("dashboard UI testcases", () => {
 
 
 
-    await page.locator('[data-test="dashboard-x-item-dns_records"]').click();
+    await page.locator('[data-test="dashboard-x-item-x_axis_1"]').click();
     await page.getByRole('checkbox', { name: 'Render Data as JSON / Array' }).click();
 
     // Set date-time and timezone for table chart

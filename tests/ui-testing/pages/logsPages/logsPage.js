@@ -146,6 +146,31 @@ export class LogsPage {
         this.queryEditorFullScreenBtn = '[data-test="logs-query-editor-full_screen-btn"]';
         this.queryEditorContainer = '.query-editor-container';
         this.expandOnFocusClass = '.expand-on-focus';
+
+        // ===== REGRESSION TEST LOCATORS =====
+        // Query history
+        this.queryHistoryButton = '[data-test="logs-search-bar-query-history-btn"]';
+        this.historyPanel = '.history-panel, [data-test*="history"]';
+
+        // Table and pagination CSS selectors
+        this.tableBottom = '.q-table__bottom';
+        this.tableBodyRow = 'tbody tr';
+        this.tableBodyRowWithIndex = 'tbody tr[data-index]';
+        this.tableHeaderCell = 'thead th';
+        this.tableHeaders = 'thead th';
+
+        // Dynamic field selectors (functions for field-specific locators)
+        this.fieldExpandButton = (fieldName) => `[data-test="log-search-expand-${fieldName}-field-btn"]`;
+        this.fieldListItem = (fieldName) => `[data-test="logs-field-list-item-${fieldName}"]`;
+        this.subfieldAddButton = (fieldName) => `[data-test*="logs-search-subfield-add-${fieldName}"]`;
+        this.allFieldExpandButtons = '[data-test*="log-search-expand-"][data-test$="-field-btn"]';
+        this.fieldIndexListButton = (fieldName) => `[data-test="log-search-index-list-${fieldName}-field-btn"]`;
+
+        // Additional regression test selectors
+        this.streamsSearchInputField = '[data-test="streams-search-stream-input"] input';
+        // Note: Narrowed from [class*="error"] to avoid false positives like "error-free"
+        this.errorIndicators = '.q-notification--negative, .q-notification__message--error, .text-negative, [class^="error-"], [class$="-error"]';
+        this.timestampInDetail = '[data-test*="timestamp"], .timestamp';
     }
 
 
@@ -480,7 +505,7 @@ export class LogsPage {
                     }
 
                     // Try by text
-                    const streamByText = this.page.getByText(stream, { exact: true }).first();
+                    const streamByText = this.page.locator("div.q-item").getByText(stream, { exact: true }).first();
                     const textVisible = await streamByText.isVisible({ timeout: 500 }).catch(() => false);
 
                     if (textVisible) {

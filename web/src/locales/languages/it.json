@@ -1001,7 +1001,11 @@
     "colorBySeriesTitle": "Colore per serie",
     "colorBySeriesTooltip": "Applica colori alle serie per una migliore distinzione visiva nei grafici. Personalizza i colori per ogni serie per migliorare la visualizzazione dei dati.",
     "editColorBySeries": " Modifica colore per serie",
-    "applyColorBySeries": " Applica colore per serie"
+    "applyColorBySeries": " Applica colore per serie",
+    "showAllLegends": "Mostra tutte le leggende",
+    "legendsOfCharts": "Leggende dei grafici",
+    "totalLegends": "Totale: {count}",
+    "noLegendsAvailable": "Nessuna legenda disponibile"
   },
   "panel": {
     "header": "Pannello",
@@ -1068,7 +1072,15 @@
     "mapvalue": "Valore",
     "customChartTypeSelector": "Selettore del tipo di grafico personalizzato",
     "customChartTypeSelectorHint": "Seleziona un tipo di grafico dalla libreria eCharts per iniziare con una struttura di codice di base",
-    "selectChartType": "Seleziona il tipo di grafico"
+    "selectChartType": "Seleziona il tipo di grafico",
+    "joins": "Si unisce",
+    "addJoin": "Aggiungi Unisciti",
+    "removeJoin": "Rimuovi Join",
+    "leftJoin": "Unisciti a sinistra",
+    "innerJoin": "Inner Join",
+    "rightJoin": "Unisciti a destra",
+    "addClause": "Aggiungi clausola",
+    "removeClause": "Rimuovi clausola"
   },
   "home": {
     "streams": "Stream",
@@ -1937,7 +1949,8 @@
     "period": "Periodo",
     "cron": "Cron",
     "type": "Tipo",
-    "run_pipeline": "Esegui pipeline"
+    "run_pipeline": "Esegui pipeline",
+    "showLegends": "Mostra leggende"
   },
   "alert_list": {
     "alert_details": "Dettagli dell'avviso"

@@ -1017,7 +1017,11 @@
     "colorBySeriesTitle": "シリーズ別カラー",
     "colorBySeriesTooltip": "系列に色を適用すると、グラフが見やすくなります。各系列の色をカスタマイズして、データの視覚化を強化します。",
     "editColorBySeries": " シリーズ別に色を編集",
-    "applyColorBySeries": " シリーズごとに色を適用"
+    "applyColorBySeries": " シリーズごとに色を適用",
+    "showAllLegends": "すべてのレジェンドを表示",
+    "legendsOfCharts": "レジェンド・オブ・チャート",
+    "totalLegends": "合計:{カウント}",
+    "noLegendsAvailable": "レジェンドはありません"
   },
   "panel": {
     "header": "パネル",
@@ -1084,7 +1088,15 @@
     "panelDuplicationFailed": "パネルを複製できませんでした",
     "customChartTypeSelector": "カスタムチャートタイプセレクター",
     "customChartTypeSelectorHint": "基本的なコード構造を始めるには、eCharts ライブラリからグラフの種類を選択します。",
-    "selectChartType": "チャートタイプを選択"
+    "selectChartType": "チャートタイプを選択",
+    "joins": "参加します",
+    "addJoin": "追加ジョイン",
+    "removeJoin": "[結合を削除]",
+    "leftJoin": "レフト・ジョイン",
+    "innerJoin": "インナー・ジョイン",
+    "rightJoin": "右結合",
+    "addClause": "条項を追加",
+    "removeClause": "条項を削除"
   },
   "home": {
     "streams": "ストリーム",
@@ -1930,7 +1942,8 @@
     "period": "ピリオド",
     "cron": "クロン",
     "type": "タイプ",
-    "run_pipeline": "パイプラインを実行"
+    "run_pipeline": "パイプラインを実行",
+    "showLegends": "レジェンドを表示"
   },
   "alert_list": {
     "alert_details": "アラートの詳細"

@@ -1001,7 +1001,11 @@
     "colorBySeriesTitle": "Colorir por série",
     "colorBySeriesTooltip": "Aplique cores às séries para obter uma melhor distinção visual nos gráficos. Personalize as cores de cada série para aprimorar a visualização dos dados.",
     "editColorBySeries": " Editar cor por série",
-    "applyColorBySeries": " Aplique cores por série"
+    "applyColorBySeries": " Aplique cores por série",
+    "showAllLegends": "Mostrar todas as lendas",
+    "legendsOfCharts": "Lendas de gráficos",
+    "totalLegends": "Total: {count}",
+    "noLegendsAvailable": "Nenhuma legenda disponível"
   },
   "panel": {
     "header": "Painel",
@@ -1068,7 +1072,15 @@
     "mapvalue": "Valor",
     "customChartTypeSelector": "Seletor de tipo de gráfico personalizado",
     "customChartTypeSelectorHint": "Selecione um tipo de gráfico na biblioteca eCharts para começar com uma estrutura de código básica",
-    "selectChartType": "Selecione o tipo de gráfico"
+    "selectChartType": "Selecione o tipo de gráfico",
+    "joins": "Junta-se",
+    "addJoin": "Adicionar junção",
+    "removeJoin": "Remover junção",
+    "leftJoin": "Junção à esquerda",
+    "innerJoin": "Junção interna",
+    "rightJoin": "Junção correta",
+    "addClause": "Adicionar cláusula",
+    "removeClause": "Remover cláusula"
   },
   "home": {
     "streams": "Transmissões",
@@ -1937,7 +1949,8 @@
     "period": "Período",
     "cron": "Cron",
     "type": "Tipo",
-    "run_pipeline": "Executar Pipeline"
+    "run_pipeline": "Executar Pipeline",
+    "showLegends": "Mostrar lendas"
   },
   "alert_list": {
     "alert_details": "Detalhes do alerta"
