@@ -1029,7 +1029,8 @@
     "visibleColumns": "可见列",
     "hiddenColumns": "隐藏的专栏",
     "stickyFirstColumn": "置顶第一列",
-    "stickyColumns": "置顶专栏"
+    "stickyColumns": "置顶专栏",
+    "promqlTableMode": "PromQL 表格模式"
   },
   "panel": {
     "header": "面板",

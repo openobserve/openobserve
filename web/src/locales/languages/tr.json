@@ -1029,7 +1029,8 @@
     "visibleColumns": "Görünür Sütunlar",
     "hiddenColumns": "Gizli Sütunlar",
     "stickyFirstColumn": "Yapışkan İlk Sütun",
-    "stickyColumns": "Yapışkan Sütunlar"
+    "stickyColumns": "Yapışkan Sütunlar",
+    "promqlTableMode": "PromQL Tablo Modu"
   },
   "panel": {
     "header": "Panel",

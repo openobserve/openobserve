@@ -1029,7 +1029,8 @@
     "visibleColumns": "Columnas visibles",
     "hiddenColumns": "Columnas ocultas",
     "stickyFirstColumn": "Primera columna adhesiva",
-    "stickyColumns": "Columnas adhesivas"
+    "stickyColumns": "Columnas adhesivas",
+    "promqlTableMode": "Modo de tabla PromQL"
   },
   "panel": {
     "header": "Panel",

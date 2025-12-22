@@ -1029,7 +1029,8 @@
     "visibleColumns": "Zichtbare kolommen",
     "hiddenColumns": "Verborgen kolommen",
     "stickyFirstColumn": "Sticky eerste kolom",
-    "stickyColumns": "Kleverige kolommen"
+    "stickyColumns": "Kleverige kolommen",
+    "promqlTableMode": "ProMQL-tabelmodus"
   },
   "panel": {
     "header": "Paneel",

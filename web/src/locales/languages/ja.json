@@ -1045,7 +1045,8 @@
     "visibleColumns": "表示カラム",
     "hiddenColumns": "非表示列",
     "stickyFirstColumn": "スティッキー・ファースト・カラム",
-    "stickyColumns": "スティッキーカラム"
+    "stickyColumns": "スティッキーカラム",
+    "promqlTableMode": "プロムQL テーブルモード"
   },
   "panel": {
     "header": "パネル",

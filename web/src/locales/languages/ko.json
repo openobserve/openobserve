@@ -1029,7 +1029,8 @@
     "visibleColumns": "보이는 컬럼",
     "hiddenColumns": "히든 컬럼",
     "stickyFirstColumn": "스티키 퍼스트 컬럼",
-    "stickyColumns": "스티키 컬럼"
+    "stickyColumns": "스티키 컬럼",
+    "promqlTableMode": "ProMQL 테이블 모드"
   },
   "panel": {
     "header": "패널",
