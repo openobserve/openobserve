@@ -560,7 +560,11 @@ fn parse_csv_chunk(
 /// - `Ok(true)`: Server supports Range requests
 /// - `Ok(false)`: Server doesn't support Range requests
 /// - `Err`: Network error or server error
-pub async fn check_range_support_for_url(url: &str, org_id: &str, table_name: &str) -> Result<bool> {
+pub async fn check_range_support_for_url(
+    url: &str,
+    org_id: &str,
+    table_name: &str,
+) -> Result<bool> {
     let cfg = get_config();
     let timeout = std::time::Duration::from_secs(cfg.enrichment_table.url_fetch_timeout_secs);
 
@@ -590,7 +594,12 @@ pub async fn check_range_support_for_url(url: &str, org_id: &str, table_name: &s
 /// - `Ok(true)`: Server supports Range requests (returns 206)
 /// - `Ok(false)`: Server doesn't support Range requests (returns 200 or lacks capability)
 /// - `Err`: Network error or server error
-async fn check_range_support(client: &Client, url: &str, org_id: &str, table_name: &str) -> Result<bool> {
+async fn check_range_support(
+    client: &Client,
+    url: &str,
+    org_id: &str,
+    table_name: &str,
+) -> Result<bool> {
     // First, try HEAD request to check for Accept-Ranges header
     let head_response = client.head(url).send().await?;
 
@@ -662,7 +671,12 @@ async fn check_range_support(client: &Client, url: &str, org_id: &str, table_nam
 ///
 /// - `Ok(headers)`: Vector of column names in order
 /// - `Err`: Network error, parse error, or file doesn't start with valid CSV
-async fn fetch_headers_only(client: &Client, url: &str, org_id: &str, table_name: &str) -> Result<Vec<String>> {
+async fn fetch_headers_only(
+    client: &Client,
+    url: &str,
+    org_id: &str,
+    table_name: &str,
+) -> Result<Vec<String>> {
     let cfg = get_config();
     let header_size = cfg.enrichment_table.url_header_fetch_size_bytes;
 
@@ -983,7 +997,12 @@ impl UrlCsvProcessor {
             }
             // Normal full download
         } else {
-            return Err(anyhow!("{}/{} - URL returned status: {}", org_id, table_name, status));
+            return Err(anyhow!(
+                "{}/{} - URL returned status: {}",
+                org_id,
+                table_name,
+                status
+            ));
         }
 
         // Get streaming handle to response body. bytes_stream() provides
