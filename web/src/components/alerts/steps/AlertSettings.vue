@@ -372,8 +372,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Without Aggregation -->
             <template v-else>
-              <div ref="thresholdFieldRef" class="flex justify-start items-center">
-                <div>
+              <div ref="thresholdFieldRef" class="flex justify-start items-start">
+                <div class="tw-flex tw-flex-col">
                   <q-select
                     v-model="formData.trigger_condition.operator"
                     :options="triggerOperators"
@@ -387,36 +387,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="width: 88px"
                     @update:model-value="emitTriggerUpdate"
                   />
+                  <div
+                    v-if="!formData.trigger_condition.operator"
+                    class="text-red-8 q-pt-xs"
+                    style="font-size: 11px; line-height: 12px"
+                  >
+                    Field is required!
+                  </div>
                 </div>
-                <div class="flex items-center" style="border-left: none">
-                  <div style="width: 89px; margin-left: 0 !important">
-                    <q-input
-                      v-model.number="formData.trigger_condition.threshold"
-                      type="number"
-                      dense
-                      borderless
-                      min="1"
-                      style="background: none"
-                      debounce="300"
-                      @update:model-value="emitTriggerUpdate"
-                    />
+                <div class="flex items-start tw-flex-col" style="border-left: none">
+                  <div class="tw-flex tw-items-center">
+                    <div style="width: 89px; margin-left: 0 !important">
+                      <q-input
+                        v-model.number="formData.trigger_condition.threshold"
+                        type="number"
+                        dense
+                        borderless
+                        min="1"
+                        style="background: none"
+                        debounce="300"
+                        @update:model-value="emitTriggerUpdate"
+                      />
+                    </div>
+                    <div
+                      style="min-width: 90px; margin-left: 0 !important; height: 36px; font-weight: normal"
+                      :style="store.state.theme === 'dark' ? 'border: 1px solid #2c2c2c;' : ''"
+                      :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'"
+                      class="flex justify-center items-center"
+                    >
+                      {{ t("alerts.events") }}
+                    </div>
                   </div>
                   <div
-                    style="min-width: 90px; margin-left: 0 !important; height: 36px; font-weight: normal"
-                    :style="store.state.theme === 'dark' ? 'border: 1px solid #2c2c2c;' : ''"
-                    :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'"
-                    class="flex justify-center items-center"
+                    v-if="!Number(formData.trigger_condition.threshold)"
+                    class="text-red-8 q-pt-xs"
+                    style="font-size: 11px; line-height: 12px"
                   >
-                    {{ t("alerts.events") }}
+                    Field is required!
                   </div>
                 </div>
-              </div>
-              <div
-                v-if="!formData.trigger_condition.operator || !Number(formData.trigger_condition.threshold)"
-                class="text-red-8 q-pt-xs"
-                style="font-size: 11px; line-height: 12px"
-              >
-                Field is required!
               </div>
             </template>
           </div>
