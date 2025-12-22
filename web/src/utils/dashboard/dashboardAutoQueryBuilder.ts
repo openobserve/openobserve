@@ -211,7 +211,6 @@ function buildFieldExpression(field: any, defaultStream: any): string {
  *   - groupByFields: Array of fields for GROUP BY clause (optional)
  *   - havingField: Field with having conditions (optional)
  *   - havingFields: Array of fields with having conditions (optional, for multiple HAVING clauses)
- *   - requiredFields: Field names that are required (optional)
  *   - queryData: Query data containing stream, joins, filters, and config
  *   - buildWhereClause: Function to build WHERE clause from filter conditions
  * @returns SQL query string
@@ -221,7 +220,6 @@ function buildChartQuery(config: {
   groupByFields?: any[];
   havingField?: any;
   havingFields?: any[];
-  requiredFields?: string[];
   queryData: any;
   dashboardPanelData: any;
 }): string {
@@ -231,18 +229,6 @@ function buildChartQuery(config: {
   // Only use stream alias when joins exist
   const streamAlias = queryData?.joins?.length > 0 ? stream : "";
 
-  // Validate required fields
-  if (config.requiredFields) {
-    for (const fieldName of config.requiredFields) {
-      const field = config.selectFields.find(
-        (f: any) => f && f.name === fieldName,
-      );
-      if (!field?.field?.column) {
-        console.warn(`${fieldName} field is required but not provided`);
-        return "";
-      }
-    }
-  }
 
   // Build SELECT clause
   const selectExpressions: string[] = [];
@@ -835,7 +821,6 @@ export const mapChart = (dashboardPanelData: any) => {
     ],
     groupByFields: [name],
     havingField: value_for_maps,
-    requiredFields: ["name", "value_for_maps"],
     queryData,
     dashboardPanelData,
   });
