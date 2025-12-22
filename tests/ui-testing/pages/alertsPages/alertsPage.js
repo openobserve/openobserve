@@ -320,23 +320,24 @@ export class AlertsPage {
             testLogger.info('Set silence notification to 0 minutes');
         }
 
-        // Select destination
-        // In the new UI, destinations are in a multi-select dropdown
-        const destinationDropdown = this.page.locator(this.stepAlertConditions).locator('.q-select').first();
+        // Select destination - find the destination row by its label and then the q-select
+        const destinationRow = this.page.locator(this.alertSettingsRow).filter({ hasText: /Destination/ });
+        const destinationDropdown = destinationRow.locator('.q-select').first();
+        await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
         await destinationDropdown.click();
         await this.page.waitForTimeout(1000);
 
         // Find and select the destination
-        try {
-            await this.page.getByText(destinationName, { exact: true }).first().click();
-        } catch (e) {
-            // If exact match fails, try scrolling
+        const destinationOption = this.page.getByText(destinationName, { exact: true }).first();
+        if (await destinationOption.isVisible({ timeout: 3000 })) {
+            await destinationOption.click();
+        } else {
             await this.commonActions.scrollAndFindOption(destinationName, 'destination');
         }
         await this.page.waitForTimeout(500);
 
         // Click outside to close dropdown
-        await this.page.locator(this.stepAlertConditions).click({ position: { x: 10, y: 10 } });
+        await this.page.keyboard.press('Escape');
         testLogger.info('Selected destination', { destinationName });
 
         // ==================== STEP 6: ADVANCED (Skip) ====================
