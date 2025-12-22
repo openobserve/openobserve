@@ -6,7 +6,7 @@
       <div class="axis-container scroll row">
         <!-- Label Filter Items -->
         <div
-          v-for="(label, index) in localLabels"
+          v-for="(label, index) in props.labels"
           :key="index"
           class="label-filter-item"
         >
@@ -39,7 +39,6 @@
                     fill-input
                     hide-selected
                     input-debounce="0"
-                    @update:model-value="onLabelChange"
                     :loading="loadingLabels"
                     clearable
                     data-test="promql-label-select"
@@ -63,7 +62,6 @@
                     stack-label
                     hide-bottom-space
                     class="showLabelOnTop q-mb-sm"
-                    @update:model-value="onLabelChange"
                     data-test="promql-operator-select"
                   />
 
@@ -86,7 +84,6 @@
                     option-value="value"
                     option-label="label"
                     @filter="(val, update) => filterLabelValues(val, update, label.label)"
-                    @update:model-value="onLabelChange"
                     :disable="!label.label"
                     clearable
                     data-test="promql-value-select"
@@ -162,7 +159,6 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const store = useStore();
-const localLabels = ref<QueryBuilderLabelFilter[]>([...props.labels]);
 const availableLabels = ref<string[]>([]);
 const labelValuesMap = ref<Map<string, string[]>>(new Map()); // Maps label key to its values
 const loadingLabels = ref(false);
@@ -249,48 +245,16 @@ watch(
   { immediate: true }
 );
 
-// Watch for prop changes
-watch(
-  () => props.labels,
-  (newLabels) => {
-    localLabels.value = [...newLabels];
-  }
-);
-
-// Watch for changes in labels to clear value when label key changes
-watch(
-  () => localLabels.value,
-  (newLabels, oldLabels) => {
-    if (oldLabels) {
-      newLabels.forEach((newLabel, index) => {
-        const oldLabel = oldLabels[index];
-        // If label key changed, clear the value since label changed
-        if (oldLabel && newLabel.label !== oldLabel.label) {
-          newLabel.value = "";
-        }
-      });
-    }
-  },
-  { deep: true }
-);
-
-
 const addLabel = () => {
-  localLabels.value.push({
+  props.labels.push({
     label: "",
     op: "=",
     value: "",
   });
-  onLabelChange();
 };
 
 const removeLabel = (index: number) => {
-  localLabels.value.splice(index, 1);
-  onLabelChange();
-};
-
-const onLabelChange = () => {
-  emit("update:labels", localLabels.value);
+  props.labels.splice(index, 1);
 };
 
 // Get label value options including variables

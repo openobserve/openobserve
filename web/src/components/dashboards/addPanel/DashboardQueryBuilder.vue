@@ -674,15 +674,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- PromQL Builder Mode -->
   <div v-if="promqlBuilderMode">
     <LabelFilterEditor
-      :labels="promqlBuilderQuery.labels"
+      v-model:labels="promqlBuilderQuery.labels"
       :metric="promqlBuilderQuery.metric"
       :dashboardData="dashboardData"
-      @update:labels="updatePromQLBuilderLabels"
     />
     <q-separator />
     <OperationsList
-      :operations="promqlBuilderQuery.operations"
-      @update:operations="updatePromQLBuilderOperations"
+      v-model:operations="promqlBuilderQuery.operations"
     />
   </div>
 
@@ -1312,38 +1310,33 @@ export default defineComponent({
       }
     );
 
-    const updatePromQLBuilderLabels = (labels: any[]) => {
-      promqlBuilderQuery.labels = labels;
-      // Save to schema
-      const currentQuery = dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ];
-      currentQuery.fields.promql_labels = labels;
-      generatePromQLQuery();
-    };
+    // Deep watcher to rebuild PromQL query when any field changes
+    // Triggers on: metric, labels, operations changes (including drag reorder)
+    watch(
+      promqlBuilderQuery,
+      () => {
+        // Only rebuild if in promql-builder mode (queryType = "promql" && customQuery = false)
+        if (!promqlBuilderMode.value) return;
 
-    const updatePromQLBuilderOperations = (operations: any[]) => {
-      promqlBuilderQuery.operations = operations;
-      // Save to schema
-      const currentQuery = dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ];
-      currentQuery.fields.promql_operations = operations;
-      generatePromQLQuery();
-    };
+        const currentQuery =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ];
 
-    const generatePromQLQuery = () => {
-      if (!promqlBuilderMode.value) return;
+        // Save labels and operations to schema
+        currentQuery.fields.promql_labels = promqlBuilderQuery.labels;
+        currentQuery.fields.promql_operations = promqlBuilderQuery.operations;
 
-      try {
-        const query = promQueryModeller.renderQuery(promqlBuilderQuery);
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].query = query;
-      } catch (error) {
-        console.error("Error generating PromQL query:", error);
-      }
-    };
+        // Rebuild the PromQL query
+        try {
+          const query = promQueryModeller.renderQuery(promqlBuilderQuery);
+          currentQuery.query = query;
+        } catch (error) {
+          console.error("Error generating PromQL query:", error);
+        }
+      },
+      { deep: true }
+    );
 
     return {
       showXAxis,
@@ -1375,8 +1368,6 @@ export default defineComponent({
       promqlMode,
       promqlBuilderMode,
       promqlBuilderQuery,
-      updatePromQLBuilderLabels,
-      updatePromQLBuilderOperations,
       xLabel,
       yLabel,
       zLabel,
