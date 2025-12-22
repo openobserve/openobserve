@@ -2173,8 +2173,8 @@ pub struct EnrichmentTable {
     pub merge_interval: u64,
     #[env_config(
         name = "ZO_ENRICHMENT_URL_FETCH_MAX_SIZE",
-        default = 1024,
-        help = "Maximum size of each chunk when fetching from URL (in MB)"
+        default = 500,
+        help = "Maximum size of each batch when fetching from URL (in MB). Batches are saved to reduce database checkpoint frequency."
     )]
     pub url_fetch_max_size_mb: usize,
     #[env_config(
@@ -2183,6 +2183,12 @@ pub struct EnrichmentTable {
         help = "Timeout for URL fetch operations (in seconds)"
     )]
     pub url_fetch_timeout_secs: u64,
+    #[env_config(
+        name = "ZO_ENRICHMENT_URL_HEADER_FETCH_SIZE",
+        default = 8192,
+        help = "Size of initial fetch for CSV headers when resuming (in bytes). Should be large enough to contain the header row."
+    )]
+    pub url_header_fetch_size_bytes: usize,
     #[env_config(
         name = "ZO_ENRICHMENT_URL_MAX_RETRIES",
         default = 3,

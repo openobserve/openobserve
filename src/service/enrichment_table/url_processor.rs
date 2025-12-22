@@ -608,25 +608,32 @@ async fn check_range_support(client: &Client, url: &str) -> Result<bool> {
 ///
 /// This is used when resuming a download - we need the headers to know the
 /// column order, but we already have the data rows. This function fetches
-/// just enough bytes (8KB) to capture the header row.
+/// just enough bytes to capture the header row.
 ///
-/// # Why 8KB
+/// # Why configurable size
 ///
 /// - Most CSV headers are < 1KB
-/// - 8KB provides buffer for files with many columns or long column names
+/// - Default 8KB provides buffer for files with many columns or long column names
 /// - Tiny overhead compared to GB files
 /// - Conservative enough to work with most reasonable CSV files
+/// - Configurable via ZO_ENRICHMENT_URL_HEADER_FETCH_SIZE env variable
 ///
 /// # Returns
 ///
 /// - `Ok(headers)`: Vector of column names in order
 /// - `Err`: Network error, parse error, or file doesn't start with valid CSV
 async fn fetch_headers_only(client: &Client, url: &str) -> Result<Vec<String>> {
-    log::debug!("[ENRICHMENT::URL] Fetching headers only via Range request");
+    let cfg = get_config();
+    let header_size = cfg.enrichment_table.url_header_fetch_size_bytes;
+
+    log::debug!(
+        "[ENRICHMENT::URL] Fetching headers only via Range request (0-{} bytes)",
+        header_size - 1
+    );
 
     let response = client
         .get(url)
-        .header("Range", "bytes=0-8191") // First 8KB should contain headers
+        .header("Range", format!("bytes=0-{}", header_size - 1))
         .send()
         .await?;
 
@@ -634,10 +641,12 @@ async fn fetch_headers_only(client: &Client, url: &str) -> Result<Vec<String>> {
     let bytes = response.bytes().await?;
 
     // Find first newline to extract header row
-    let header_end = bytes
-        .iter()
-        .position(|&b| b == b'\n')
-        .ok_or_else(|| anyhow!("No newline found in first 8KB - invalid CSV"))?;
+    let header_end = bytes.iter().position(|&b| b == b'\n').ok_or_else(|| {
+        anyhow!(
+            "No newline found in first {} bytes - invalid CSV or headers too large",
+            header_size
+        )
+    })?;
 
     let header_line = &bytes[..header_end];
 
@@ -822,7 +831,8 @@ impl UrlCsvProcessor {
     ///
     /// # Parameters
     ///
-    /// - `batch_size_records`: Number of records per batch (recommended: 10,000)
+    /// - `batch_size_records`: Max records per batch (0 = unlimited, focus on byte limit)
+    /// - `batch_size_bytes`: Max bytes per batch (triggers batch save when approaching this limit)
     /// - `resume_from_byte`: Optional byte position to resume from (uses Range request if
     ///   supported)
     /// - `resume_headers`: Optional CSV headers when resuming (to maintain column order)
@@ -840,9 +850,17 @@ impl UrlCsvProcessor {
     /// - Expects HTTP 206 Partial Content response
     /// - Uses provided `resume_headers` instead of parsing from first chunk
     /// - If server returns 200 OK instead of 206, returns error (indicates resume not supported)
+    ///
+    /// # Batch Processing Strategy
+    ///
+    /// With batch_size_records=0 and batch_size_bytes=500MB:
+    /// - Accumulates records until batch size approaches 500MB
+    /// - Reduces database checkpoint frequency (fewer writes)
+    /// - Balances memory usage vs. checkpoint overhead
     pub async fn fetch_and_process_batches<F, Fut>(
         &self,
         batch_size_records: usize,
+        batch_size_bytes: u64,
         resume_from_byte: Option<u64>,
         resume_headers: Option<Vec<String>>,
         mut on_batch: F,
@@ -957,14 +975,29 @@ impl UrlCsvProcessor {
                 current_batch_records.push(record);
                 total_bytes_in_batch += record_size;
 
-                // Check if we've reached batch size - process immediately
-                if current_batch_records.len() >= batch_size_records {
+                // Check if we should process this batch:
+                // 1. If batch_size_records > 0, check if we've reached that limit
+                // 2. Always check if we've reached the byte size limit (with 95% threshold)
+                let should_process_batch = (batch_size_records > 0
+                    && current_batch_records.len() >= batch_size_records)
+                    || (total_bytes_in_batch >= (batch_size_bytes * 95 / 100)); // 95% threshold
+
+                if should_process_batch {
+                    let reason = if batch_size_records > 0
+                        && current_batch_records.len() >= batch_size_records
+                    {
+                        "record limit"
+                    } else {
+                        "byte limit"
+                    };
+
                     log::debug!(
-                        "[ENRICHMENT::URL] Completed batch {} with {} records, {} bytes (total processed: {} bytes)",
+                        "[ENRICHMENT::URL] Completed batch {} with {} records, {} MB (total processed: {} MB) - triggered by {}",
                         batch_count + 1,
                         current_batch_records.len(),
-                        total_bytes_in_batch,
-                        total_bytes_processed
+                        total_bytes_in_batch / 1024 / 1024,
+                        total_bytes_processed / 1024 / 1024,
+                        reason
                     );
 
                     // Process batch immediately via callback
@@ -1129,14 +1162,18 @@ async fn process_enrichment_table_url(
         None
     };
 
-    // Fetch batches with default batch size of 10,000 records
-    let batch_size = 10_000; // Can make this configurable later if needed
+    // Batch size: 0 means unlimited records, focus on byte limit instead
+    // This reduces database checkpoint frequency while ensuring batches don't get too large
+    let cfg = get_config();
+    let batch_size_records = 0; // Unlimited records per batch
+    let batch_size_bytes = (cfg.enrichment_table.url_fetch_max_size_mb * 1024 * 1024) as u64; // Convert MB to bytes
 
     log::info!(
-        "[ENRICHMENT::URL] {}/{} - Fetching CSV in batches of {} records",
+        "[ENRICHMENT::URL] {}/{} - Fetching CSV in batches of {} MB ({} bytes)",
         org_id,
         table_name,
-        batch_size
+        cfg.enrichment_table.url_fetch_max_size_mb,
+        batch_size_bytes
     );
 
     let started_at = chrono::Utc::now().timestamp_micros();
@@ -1161,7 +1198,8 @@ async fn process_enrichment_table_url(
     // Process each batch as it arrives using a callback
     let total_batches = processor
         .fetch_and_process_batches(
-            batch_size,
+            batch_size_records,
+            batch_size_bytes,
             resume_from_byte,
             resume_headers,
             |records, batch_bytes, batch_idx, bytes_processed_so_far| {
