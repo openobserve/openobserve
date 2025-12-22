@@ -17,20 +17,17 @@
           <MetricSelector
             v-model:metric="visualQuery.metric"
             :datasource="datasourceOptions"
-            @update:metric="onMetricChange"
           />
 
           <!-- Label Filters -->
           <LabelFilterEditor
             v-model:labels="visualQuery.labels"
             :metric="visualQuery.metric"
-            @update:labels="onLabelsChange"
           />
 
           <!-- Operations List -->
           <OperationsList
             v-model:operations="visualQuery.operations"
-            @update:operations="onOperationsChange"
           />
         </div>
       </q-card-section>
@@ -118,28 +115,7 @@ const generatedQuery = computed(() => {
   return promQueryModeller.renderQuery(visualQuery.value);
 });
 
-// Watch for changes and update query
-watch(
-  visualQuery,
-  () => {
-    // Query automatically updates via computed property
-  },
-  { deep: true }
-);
-
 // Methods
-const onMetricChange = (newMetric: string) => {
-  visualQuery.value.metric = newMetric;
-};
-
-const onLabelsChange = (newLabels: any) => {
-  visualQuery.value.labels = newLabels;
-};
-
-const onOperationsChange = (newOperations: any) => {
-  visualQuery.value.operations = newOperations;
-};
-
 const copyQuery = () => {
   if (generatedQuery.value) {
     navigator.clipboard.writeText(generatedQuery.value);

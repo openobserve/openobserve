@@ -6,14 +6,14 @@
       <div class="axis-container scroll row">
         <!-- Operations with Drag and Drop -->
         <draggable
-          v-if="localOperations.length"
-          v-model="localOperations"
+          v-if="props.operations.length"
+          :modelValue="props.operations"
+          @update:modelValue="handleDragUpdate"
           :item-key="getItemKey"
-          @change="onDragEnd"
           handle=".drag-handle"
           class="operations-container"
         >
-          <template v-for="(element, index) in localOperations">
+          <template v-for="(element, index) in props.operations">
             <div class="operation-item">
               <q-btn-group>
                 <q-btn
@@ -65,7 +65,6 @@
                           stack-label
                           hide-bottom-space
                           class="showLabelOnTop q-mb-sm"
-                          @update:model-value="onOperationChange"
                           :data-test="`promql-operation-param-${paramIndex}`"
                         />
 
@@ -80,7 +79,6 @@
                           stack-label
                           hide-bottom-space
                           class="showLabelOnTop q-mb-sm"
-                          @update:model-value="onOperationChange"
                           :data-test="`promql-operation-param-${paramIndex}`"
                         />
 
@@ -95,7 +93,6 @@
                           stack-label
                           hide-bottom-space
                           class="showLabelOnTop q-mb-sm"
-                          @update:model-value="onOperationChange"
                           :data-test="`promql-operation-param-${paramIndex}`"
                         />
                       </template>
@@ -208,7 +205,6 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
-const localOperations = ref<QueryBuilderOperation[]>([...props.operations]);
 const showOperationSelector = ref(false);
 const searchQuery = ref("");
 
@@ -228,22 +224,6 @@ const computedLabel = (operation: QueryBuilderOperation): string => {
 
   return opDef.name;
 };
-
-onMounted(() => {
-  console.log("OperationsList mounted");
-  console.log("Categories:", categories.value);
-  console.log("All operations:", promQueryModeller.getAllOperations());
-  console.log("Initial operations:", localOperations.value);
-});
-
-// Watch for prop changes
-watch(
-  () => props.operations,
-  (newOps) => {
-    localOperations.value = [...newOps];
-  },
-  { deep: true }
-);
 
 const getItemKey = (item: QueryBuilderOperation, index: number) => {
   return `${item.id}-${index}`;
@@ -268,30 +248,25 @@ const getFilteredOperationsForCategory = (
   );
 };
 
+const handleDragUpdate = (newVal: QueryBuilderOperation[]) => {
+  // Clear and repopulate the array to maintain reactivity
+  props.operations.splice(0, props.operations.length, ...newVal);
+  // Emit the update to trigger parent watcher
+  emit("update:operations", props.operations);
+};
+
 const addOperation = (opDef: QueryBuilderOperationDef) => {
-  console.log("Adding operation:", opDef.name, opDef);
   const newOp: QueryBuilderOperation = {
     id: opDef.id,
     params: [...opDef.defaultParams],
   };
-  localOperations.value.push(newOp);
-  console.log("Local operations after add:", localOperations.value);
+  props.operations.push(newOp);
   showOperationSelector.value = false;
   searchQuery.value = "";
-  onOperationChange();
 };
 
 const removeOperation = (index: number) => {
-  localOperations.value.splice(index, 1);
-  onOperationChange();
-};
-
-const onDragEnd = () => {
-  onOperationChange();
-};
-
-const onOperationChange = () => {
-  emit("update:operations", localOperations.value);
+  props.operations.splice(index, 1);
 };
 </script>
 
