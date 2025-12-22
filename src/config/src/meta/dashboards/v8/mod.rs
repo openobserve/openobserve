@@ -147,6 +147,7 @@ pub struct PromQLOperation {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, Hash)]
 #[serde(untagged)]
 pub enum PromQLOperationParam {
+    Array(Vec<String>),
     String(String),
     #[schema(value_type = f64)]
     Number(OrdF64),

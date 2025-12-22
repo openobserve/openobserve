@@ -84,7 +84,7 @@ class PromQueryModellerClass implements PromQueryModeller {
 
     // Handle aggregations (sum, avg, etc.)
     if (def.category === PromVisualQueryOperationCategory.Aggregations) {
-      const byLabels = params[params.length - 1] as string;
+      const byLabelsParam = params[params.length - 1];
       const otherParams = params.slice(0, -1);
 
       // Build parameter string for functions like topk(k, ...) or quantile(q, ...)
@@ -93,12 +93,19 @@ class PromQueryModellerClass implements PromQueryModeller {
         funcParams = otherParams.join(", ");
       }
 
-      // Use INFIX form: sum by (label) (...) like Grafana
-      if (byLabels && byLabels.trim()) {
-        const labels = byLabels
+      // Handle byLabels as either array or string
+      let labels: string[] = [];
+      if (Array.isArray(byLabelsParam)) {
+        labels = byLabelsParam.filter((l) => l && l.trim());
+      } else if (typeof byLabelsParam === "string" && byLabelsParam.trim()) {
+        labels = byLabelsParam
           .split(",")
           .map((l) => l.trim())
           .filter((l) => l);
+      }
+
+      // Use INFIX form: sum by (label) (...) like Grafana
+      if (labels.length > 0) {
         const byClause = ` by (${labels.join(", ")})`;
 
         if (funcParams) {

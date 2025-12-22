@@ -676,11 +676,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <LabelFilterEditor
       v-model:labels="promqlBuilderQuery.labels"
       :metric="promqlBuilderQuery.metric"
-      :dashboardData="dashboardData"
+      :dashboardData="dashboardPanelData"
     />
     <q-separator />
     <OperationsList
       v-model:operations="promqlBuilderQuery.operations"
+      :dashboardData="dashboardPanelData"
     />
   </div>
 
@@ -774,6 +775,7 @@ export default defineComponent({
       isAddBreakdownNotAllowed,
       cleanupDraggingFields,
       selectedStreamFieldsBasedOnUserDefinedSchema,
+      fetchPromQLLabels
     } = useDashboardPanelData(dashboardPanelDataPageKey);
 
     // Initialize treatAsNonTimestamp for existing fields (only for table charts)

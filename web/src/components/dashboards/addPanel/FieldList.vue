@@ -616,6 +616,7 @@ export default defineComponent({
       addValue,
       cleanupDraggingFields,
       updateGroupedFields,
+      fetchPromQLLabels
     } = useDashboardPanelData(dashboardPanelDataPageKey);
     const { getStreams, getStream } = useStreams();
     const { showErrorNotification } = useNotifications();
@@ -783,6 +784,12 @@ export default defineComponent({
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].fields.stream?.toString() + "{}";
+
+              fetchPromQLLabels(
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.stream?.toString(),
+              );
             }
           } catch (error: any) {
             showErrorNotification(
