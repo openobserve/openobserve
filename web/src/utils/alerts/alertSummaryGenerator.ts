@@ -119,8 +119,17 @@ export function generateAlertSummary(formData: any, destinations: any[], t?: (ke
     } else {
       // Scheduled alert summary
       if (formData.trigger_condition?.period) {
-        const period = getPeriodText(formData.trigger_condition.period, translate);
-        parts.push(`✓ ${translate('alerts.summary.monitors')}: ${clickable(period, 'period')} ${translate('alerts.summary.ofData')}`);
+        let period: string;
+        let fieldId: string;
+        // Check if multi-time range comparison is enabled
+        if (formData.query_condition?.multi_time_range && formData.query_condition.multi_time_range.length > 0) {
+          period = getMultiTimeRangeText(formData.query_condition.multi_time_range, formData.trigger_condition.period);
+          fieldId = 'multiwindow'; // Focus on Compare with Past section
+        } else {
+          period = getPeriodText(formData.trigger_condition.period, translate);
+          fieldId = 'period'; // Focus on period field
+        }
+        parts.push(`✓ ${translate('alerts.summary.monitors')}: ${clickable(period, fieldId)} ${translate('alerts.summary.ofData')}`);
       }
 
       // Trigger condition

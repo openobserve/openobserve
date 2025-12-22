@@ -214,6 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw-flex-[0_0_60%] tw-flex tw-flex-col" style="height: 100%; overflow: hidden;">
               <div class="tw-flex-1" style="overflow: auto;">
                 <CompareWithPast
+                  ref="step3Ref"
                   :multiTimeRange="formData.query_condition.multi_time_range"
                   :period="formData.trigger_condition.period"
                   :frequency="formData.trigger_condition.frequency"
@@ -767,6 +768,7 @@ export default defineComponent({
     const wizardStepper = ref(null);
     const step1Ref = ref(null);
     const step2Ref = ref(null);
+    const step3Ref = ref(null);
     const step4Ref = ref(null);
     const lastValidStep = ref(1); // Track the last successfully validated step
 
@@ -1094,6 +1096,22 @@ export default defineComponent({
               }
             });
           }
+        });
+      }
+    }, { immediate: true });
+
+    // Watch for step3Ref (CompareWithPast) to register multiwindow field
+    watch(step3Ref, (newVal) => {
+      if (newVal && newVal.multiWindowContainerRef) {
+        nextTick(() => {
+          focusManager.registerField('multiwindow', {
+            ref: newVal.multiWindowContainerRef,
+            onBeforeFocus: () => {
+              if (wizardStep.value !== 3) {
+                wizardStep.value = 3;
+              }
+            }
+          });
         });
       }
     }, { immediate: true });
@@ -2205,6 +2223,7 @@ export default defineComponent({
       goToPreviousStep,
       isLastStep,
       step2Ref,
+      step3Ref,
       step4Ref,
       lastValidStep,
       clearMultiWindows,
