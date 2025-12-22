@@ -1,11 +1,12 @@
 <template>
-  <div class="operations-list">
+  <div class="tw-py-[0.25rem]">
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">{{ t("panel.operations") }}</div>
       <span class="layout-separator">:</span>
       <div class="axis-container scroll row">
         <!-- Operations with Drag and Drop -->
         <draggable
+          v-if="localOperations.length"
           v-model="localOperations"
           :item-key="getItemKey"
           @change="onDragEnd"
@@ -121,7 +122,7 @@
           size="sm"
           color="primary"
           @click="showOperationSelector = true"
-          class="add-operation-btn"
+          class="add-operation-btn tw-ml-[0.25rem]"
           data-test="promql-add-operation"
         >
           <q-tooltip>Add operation</q-tooltip>
@@ -295,14 +296,10 @@ const onOperationChange = () => {
 </script>
 
 <style scoped lang="scss">
-.operations-list {
-  margin-bottom: 8px;
-}
-
 .layout-name {
   font-size: 14px;
   white-space: nowrap;
-  min-width: 130px;
+  min-width: 86px;
   display: flex;
   align-items: center;
 }
@@ -332,10 +329,6 @@ const onOperationChange = () => {
 .operation-item {
   display: flex;
   align-items: center;
-}
-
-.add-operation-btn {
-  margin-left: 4px;
 }
 
 .drag-handle {
