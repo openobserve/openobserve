@@ -269,13 +269,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-icon class="q-ml-xs" size="20px" name="info" />
             <q-tooltip class="bg-grey-8" max-width="350px">
               <b>PromQL Table Mode - </b>
-              Controls how series data is displayed in the legend dropdown.
+              Controls how time-series data is displayed in the table.
               <br /><br />
-              <b>Single Series (default):</b> Shows only the first series by default. User must select other series from dropdown.
+              <b>Timestamp:</b> Shows timestamp and value columns for selected series with legend dropdown.
               <br /><br />
-              <b>All Series:</b> Shows all series data by default with "All series" option in dropdown.
+              <b>Aggregate:</b> Shows aggregated values across all series without timestamps (no legend dropdown).
               <br /><br />
-              <b>Note:</b> The legend dropdown only appears when multiple series are present.
+              <b>Note:</b> The legend dropdown only appears in Timestamp mode when multiple series are present.
             </q-tooltip>
           </div>
         </template>
@@ -626,8 +626,8 @@ export default defineComponent({
 
     // Options for PromQL table mode
     const promqlTableModeOptions = [
-      { label: "Single Series (show first series by default)", value: "single" },
-      { label: "All Series (show all series by default)", value: "all" },
+      { label: "Timestamp", value: "single" },
+      { label: "Aggregate", value: "all" },
     ];
 
     // Get available column options from stream fields

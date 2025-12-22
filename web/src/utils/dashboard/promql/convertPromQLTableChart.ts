@@ -66,6 +66,7 @@ export class TableConverter implements PromQLChartConverter {
    */
   private buildColumns(processedData: ProcessedPromQLData[], panelSchema: any): any[] {
     const config = panelSchema.config || {};
+    const tableMode = config.promql_table_mode || "single";
 
     // Get selected aggregations (default: ['last'])
     const aggregations = config.table_aggregations || [config.aggregation || 'last'];
@@ -73,8 +74,38 @@ export class TableConverter implements PromQLChartConverter {
     console.log("=== [buildColumns] Starting ===");
     console.log("processedData length:", processedData.length);
     console.log("Aggregations:", aggregations);
+    console.log("Table Mode:", tableMode);
 
-    // Collect all unique label keys across all series
+    // In "single" (Timestamp) mode, show timestamp + value columns
+    if (tableMode === "single") {
+      return [
+        {
+          name: "timestamp",
+          field: "timestamp",
+          label: "Timestamp",
+          align: "left",
+          sortable: true,
+        },
+        {
+          name: "value",
+          field: "value",
+          label: "Value",
+          align: "right",
+          sortable: true,
+          format: (val: any) => {
+            const unitValue = getUnitValue(
+              val,
+              config?.unit,
+              config?.unit_custom,
+              config?.decimals
+            );
+            return formatUnitValue(unitValue);
+          },
+        },
+      ];
+    }
+
+    // In "all" (Aggregate) mode, collect all unique label keys across all series
     const labelKeys = new Set<string>();
 
     processedData.forEach((queryData, qIndex) => {
@@ -160,6 +191,7 @@ export class TableConverter implements PromQLChartConverter {
    */
   private buildRows(processedData: ProcessedPromQLData[], panelSchema: any): any[] {
     const config = panelSchema.config || {};
+    const tableMode = config.promql_table_mode || "single";
     const rows: any[] = [];
 
     // Get selected aggregations (default: ['last'])
@@ -168,7 +200,33 @@ export class TableConverter implements PromQLChartConverter {
     console.log("=== [buildRows] Starting ===");
     console.log("Aggregations:", aggregations);
     console.log("processedData length:", processedData.length);
+    console.log("Table Mode:", tableMode);
 
+    // In "single" (Timestamp) mode, create rows with timestamp + value for ALL series
+    if (tableMode === "single") {
+      processedData.forEach((queryData, qIndex) => {
+        queryData.series.forEach((seriesData, sIndex) => {
+          // Create a row for each data point
+          seriesData.values.forEach(([timestamp, value]) => {
+            rows.push({
+              timestamp: new Date(timestamp * 1000).toLocaleString(),
+              value: parseFloat(value),
+              __legend__: seriesData.name, // Store legend for filtering
+            });
+          });
+        });
+      });
+
+      // Apply row limit if specified
+      if (config.row_limit) {
+        return rows.slice(0, config.row_limit);
+      }
+
+      console.log("Built rows count (timestamp mode):", rows.length);
+      return rows;
+    }
+
+    // In "all" (Aggregate) mode, create rows with metric labels and aggregated values
     processedData.forEach((queryData, qIndex) => {
       // console.log(`Query ${qIndex} - timestamps length:`, queryData.timestamps?.length);
       // console.log(`Query ${qIndex} - series length:`, queryData.series?.length);
@@ -199,7 +257,7 @@ export class TableConverter implements PromQLChartConverter {
       return rows.slice(0, config.row_limit);
     }
 
-    console.log("Built rows count:", rows.length);
+    console.log("Built rows count (aggregate mode):", rows.length);
     return rows;
   }
 }

@@ -212,7 +212,9 @@ export default defineComponent({
 
     // Determine if legend footer should be shown
     const showLegendFooter = computed(() => {
-      return legendOptions.value.length > 1;
+      const tableMode = props.config?.promql_table_mode || "single";
+      // Only show legend footer in "single" (timestamp) mode when there are multiple series
+      return tableMode === "single" && legendOptions.value.length > 1;
     });
 
     // Filter rows based on selected legend
