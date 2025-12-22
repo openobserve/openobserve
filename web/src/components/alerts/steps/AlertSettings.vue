@@ -330,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="width: 250px"
                       @update:model-value="emitAggregationUpdate"
                       hide-bottom-space
-                      :error="formData.query_condition.aggregation.having.column.length === 0"
+                      :error="!formData.query_condition.aggregation.having.column || formData.query_condition.aggregation.having.column.length === 0"
                       error-message="Field is required!"
                     />
                   </div>
