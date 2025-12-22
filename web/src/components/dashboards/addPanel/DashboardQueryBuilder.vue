@@ -1284,18 +1284,51 @@ export default defineComponent({
           if (currentQuery?.fields?.stream) {
             promqlBuilderQuery.metric = currentQuery.fields.stream;
           }
+          // Load saved builder state from schema
+          promqlBuilderQuery.labels = currentQuery?.fields?.promql_labels || [];
+          promqlBuilderQuery.operations = currentQuery?.fields?.promql_operations || [];
         }
       },
       { immediate: true }
     );
 
+    // Watch for query index changes to load the correct builder state
+    watch(
+      () => dashboardPanelData.layout.currentQueryIndex,
+      () => {
+        if (promqlBuilderMode.value) {
+          const currentQuery =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ];
+          // Load metric
+          if (currentQuery?.fields?.stream) {
+            promqlBuilderQuery.metric = currentQuery.fields.stream;
+          }
+          // Load saved builder state
+          promqlBuilderQuery.labels = currentQuery?.fields?.promql_labels || [];
+          promqlBuilderQuery.operations = currentQuery?.fields?.promql_operations || [];
+        }
+      }
+    );
+
     const updatePromQLBuilderLabels = (labels: any[]) => {
       promqlBuilderQuery.labels = labels;
+      // Save to schema
+      const currentQuery = dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ];
+      currentQuery.fields.promql_labels = labels;
       generatePromQLQuery();
     };
 
     const updatePromQLBuilderOperations = (operations: any[]) => {
       promqlBuilderQuery.operations = operations;
+      // Save to schema
+      const currentQuery = dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ];
+      currentQuery.fields.promql_operations = operations;
       generatePromQLQuery();
     };
 

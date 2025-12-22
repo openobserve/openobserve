@@ -145,6 +145,8 @@ const getDefaultDashboardPanelData: any = (store: any) => ({
           y: [],
           z: [],
           breakdown: [],
+          promql_labels: [],
+          promql_operations: [],
           filter: {
             filterType: "group",
             logicalOperator: "AND",
@@ -272,6 +274,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         y: [],
         z: [],
         breakdown: [],
+        promql_labels: [],
+        promql_operations: [],
         filter: {
           filterType: "group",
           logicalOperator: "AND",
