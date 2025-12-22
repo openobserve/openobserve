@@ -84,12 +84,12 @@ pub async fn check_stream_permissions(
 // ============================================================================
 
 /// Extracts a boolean query parameter
-/// Accepts "true" or "1" as true, anything else as false
+/// Accepts "true" (case-insensitive) as true, anything else as false
 /// Returns false if parameter is not present
 pub fn get_bool_from_request(query: &HashMap<String, String>, param_name: &str) -> bool {
     query
         .get(param_name)
-        .map(|v| v.to_lowercase() == "true" || v == "1")
+        .and_then(|v| v.to_lowercase().parse::<bool>().ok())
         .unwrap_or(false)
 }
 
@@ -267,12 +267,16 @@ mod tests {
         params.insert("validate".to_string(), "True".to_string());
         assert!(get_bool_from_request(&params, "validate"));
 
-        // Test "1"
-        params.insert("validate".to_string(), "1".to_string());
-        assert!(get_bool_from_request(&params, "validate"));
-
         // Test "false"
         params.insert("validate".to_string(), "false".to_string());
+        assert!(!get_bool_from_request(&params, "validate"));
+
+        // Test "False" (case insensitive)
+        params.insert("validate".to_string(), "False".to_string());
+        assert!(!get_bool_from_request(&params, "validate"));
+
+        // Test invalid value (treated as false)
+        params.insert("validate".to_string(), "1".to_string());
         assert!(!get_bool_from_request(&params, "validate"));
 
         // Test missing parameter
