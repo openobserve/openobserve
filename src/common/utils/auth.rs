@@ -506,7 +506,10 @@ impl FromRequest for AuthExtractor {
                     // this will take form org:dashboard or org:folders
 
                     // handle ratelimit:org
-                    if method.eq("GET") && (path_columns[1].starts_with("ratelimit") || path_columns[1].starts_with("enrichment_tables")) {
+                    if method.eq("GET")
+                        && (path_columns[1].starts_with("ratelimit")
+                            || path_columns[1].starts_with("enrichment_tables"))
+                    {
                         method = "LIST".to_string();
                     }
 

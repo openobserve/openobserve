@@ -15,8 +15,8 @@
 
 use config::{meta::pipeline::Pipeline, utils::json};
 use infra::{
+    errors::{Error, Result},
     table::enrichment_table_urls,
-    errors::{Error, Result}
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
 

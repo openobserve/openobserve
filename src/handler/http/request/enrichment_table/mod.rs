@@ -193,10 +193,14 @@ pub async fn save_enrichment_table_from_url(
     body: web::Json<EnrichmentTableUrlRequest>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    use crate::service::db::enrichment_table::{get_url_job, save_url_job};
-    use crate::service::enrichment_table::url_processor::trigger_url_job_processing;
-    use config::meta::enrichment_table::{EnrichmentTableStatus, EnrichmentTableUrlJob};
     use std::collections::HashMap;
+
+    use config::meta::enrichment_table::{EnrichmentTableStatus, EnrichmentTableUrlJob};
+
+    use crate::service::{
+        db::enrichment_table::{get_url_job, save_url_job},
+        enrichment_table::url_processor::trigger_url_job_processing,
+    };
 
     let (org_id, table_name) = path.into_inner();
     let request_body = body.into_inner();
@@ -215,7 +219,9 @@ pub async fn save_enrichment_table_from_url(
     // and provide clear error messages to users.
 
     if org_id.trim().is_empty() {
-        return Ok(MetaHttpResponse::bad_request("Organization cannot be empty"));
+        return Ok(MetaHttpResponse::bad_request(
+            "Organization cannot be empty",
+        ));
     }
     if table_name.trim().is_empty() {
         return Ok(MetaHttpResponse::bad_request("Table name cannot be empty"));
@@ -339,10 +345,10 @@ pub async fn save_enrichment_table_from_url(
     // ===== PERSIST JOB TO DATABASE =====
     // Save job to database before triggering processing.
     // This ordering is critical:
-    // 1. If save succeeds but trigger fails → Job exists in DB but not processing.
-    //    User can retry or we can add recovery mechanism.
-    // 2. If trigger succeeds but save fails → Processing starts without job record.
-    //    Status API returns 404, UI shows no progress, chaos ensues.
+    // 1. If save succeeds but trigger fails → Job exists in DB but not processing. User can retry
+    //    or we can add recovery mechanism.
+    // 2. If trigger succeeds but save fails → Processing starts without job record. Status API
+    //    returns 404, UI shows no progress, chaos ensues.
     //
     // Therefore: save first, trigger second.
     if let Err(e) = save_url_job(&job).await {
@@ -431,7 +437,9 @@ pub async fn get_all_enrichment_table_statuses(
 
     // ===== INPUT VALIDATION =====
     if org_id.trim().is_empty() {
-        return Ok(MetaHttpResponse::bad_request("Organization cannot be empty"));
+        return Ok(MetaHttpResponse::bad_request(
+            "Organization cannot be empty",
+        ));
     }
 
     // ===== FETCH ALL URL JOBS FOR THIS ORG =====

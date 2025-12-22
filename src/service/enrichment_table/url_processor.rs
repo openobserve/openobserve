@@ -278,7 +278,8 @@ async fn process_single_url_job(org_id: &str, table_name: &str) -> Result<()> {
     // - Streaming CSV data in configurable chunks (with optional Range request)
     // - Batch-by-batch parsing and storage
     // - Progress tracking (bytes and records)
-    let result = process_enrichment_table_url(org_id, table_name, &job.url, job.append_data, &job).await;
+    let result =
+        process_enrichment_table_url(org_id, table_name, &job.url, job.append_data, &job).await;
 
     match result {
         // ===== SUCCESS PATH =====
@@ -568,7 +569,9 @@ async fn check_range_support(client: &Client, url: &str) -> Result<bool> {
     if let Some(accept_ranges) = head_response.headers().get("accept-ranges") {
         if let Ok(value) = accept_ranges.to_str() {
             if value.eq_ignore_ascii_case("bytes") {
-                log::debug!("[ENRICHMENT::URL] Server advertises Range support via Accept-Ranges header");
+                log::debug!(
+                    "[ENRICHMENT::URL] Server advertises Range support via Accept-Ranges header"
+                );
                 return Ok(true);
             }
             if value.eq_ignore_ascii_case("none") {
@@ -590,7 +593,11 @@ async fn check_range_support(client: &Client, url: &str) -> Result<bool> {
     let supports_range = test_response.status() == reqwest::StatusCode::PARTIAL_CONTENT;
     log::info!(
         "[ENRICHMENT::URL] Range support test: {} (status: {})",
-        if supports_range { "SUPPORTED" } else { "NOT SUPPORTED" },
+        if supports_range {
+            "SUPPORTED"
+        } else {
+            "NOT SUPPORTED"
+        },
         test_response.status()
     );
 
@@ -816,7 +823,8 @@ impl UrlCsvProcessor {
     /// # Parameters
     ///
     /// - `batch_size_records`: Number of records per batch (recommended: 10,000)
-    /// - `resume_from_byte`: Optional byte position to resume from (uses Range request if supported)
+    /// - `resume_from_byte`: Optional byte position to resume from (uses Range request if
+    ///   supported)
     /// - `resume_headers`: Optional CSV headers when resuming (to maintain column order)
     /// - `on_batch`: Async callback called for each completed batch
     ///   - Parameters: (records, batch_bytes, batch_idx, total_bytes_fetched_so_far)
@@ -961,7 +969,8 @@ impl UrlCsvProcessor {
 
                     // Process batch immediately via callback
                     // Pass total_bytes_processed so caller can track resume position
-                    // This excludes incomplete lines still in buffer, ensuring we can resume from a valid CSV row
+                    // This excludes incomplete lines still in buffer, ensuring we can resume from a
+                    // valid CSV row
                     on_batch(
                         std::mem::take(&mut current_batch_records),
                         total_bytes_in_batch,
@@ -1011,8 +1020,15 @@ impl UrlCsvProcessor {
             );
 
             // Process final batch via callback
-            // This is the last batch, so total_bytes_processed represents the complete download position
-            on_batch(current_batch_records, total_bytes_in_batch, batch_count, total_bytes_processed).await?;
+            // This is the last batch, so total_bytes_processed represents the complete download
+            // position
+            on_batch(
+                current_batch_records,
+                total_bytes_in_batch,
+                batch_count,
+                total_bytes_processed,
+            )
+            .await?;
             batch_count += 1;
         }
 
@@ -1046,7 +1062,8 @@ async fn process_enrichment_table_url(
     // Determine if we should attempt resume
     let should_resume = job.supports_range && job.last_byte_position > 0;
 
-    // Fetch headers if resuming (we need them for CSV parsing since they won't be in the resumed data)
+    // Fetch headers if resuming (we need them for CSV parsing since they won't be in the resumed
+    // data)
     let resume_headers = if should_resume {
         log::info!(
             "[ENRICHMENT::URL] {}/{} - Attempting resume from byte {}",

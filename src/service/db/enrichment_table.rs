@@ -34,9 +34,9 @@ use vrl::prelude::NotNan;
 use {
     crate::service::search::SEARCH_SERVER,
     o2_enterprise::enterprise::{
-        search::TaskStatus,
         o2_enterprise::enterprise::super_cluster::queue::ENRICHMENT_TABLE_URL_JOB_KEY,
-    }
+        search::TaskStatus,
+    },
 };
 
 use crate::{
@@ -584,25 +584,29 @@ pub async fn save_url_job(
         .super_cluster
         .enabled
     {
-        let key = format!("{ENRICHMENT_TABLE_URL_JOB_KEY}/{}/{}", job.org_id, job.table_name);
-        match config::utils::json::to_vec(record) {
+        let key = format!(
+            "{ENRICHMENT_TABLE_URL_JOB_KEY}/{}/{}",
+            job.org_id, job.table_name
+        );
+        match config::utils::json::to_vec(&record) {
             Err(e) => {
                 log::error!(
                     "[Enrichment::Url] error serializing enrichment table {}/{} for super_cluster event: {e}",
-                    job.org_id, job.table_name
+                    job.org_id,
+                    job.table_name
                 );
             }
             Ok(value_vec) => {
-                if let Err(e) =
-                    o2_enterprise::enterprise::super_cluster::queue::enrichment_url_put(
-                        &key,
-                        value_vec.into(),
-                    )
-                    .await
+                if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::enrichment_url_put(
+                    &key,
+                    value_vec.into(),
+                )
+                .await
                 {
                     log::error!(
                         "[Enrichment::Url] error sending enrichment table {}/{} for super_cluster event: {e}",
-                        job.org_id, job.table_name
+                        job.org_id,
+                        job.table_name
                     );
                 }
             }
@@ -641,10 +645,7 @@ pub async fn get_url_job(
 }
 
 /// Delete enrichment table URL job state
-pub async fn delete_url_job(
-    org_id: &str,
-    table_name: &str,
-) -> Result<(), infra::errors::Error> {
+pub async fn delete_url_job(org_id: &str, table_name: &str) -> Result<(), infra::errors::Error> {
     enrichment_table_urls::delete(org_id, table_name).await?;
 
     #[cfg(feature = "enterprise")]
@@ -658,7 +659,8 @@ pub async fn delete_url_job(
         {
             log::error!(
                 "[Enrichment::Url] error sending enrichment table {}/{} for super_cluster delete event: {e}",
-                org_id, table_name
+                org_id,
+                table_name
             );
         }
     }
@@ -674,21 +676,23 @@ pub async fn list_url_jobs(
 
     let jobs = records
         .into_iter()
-        .map(|record| config::meta::enrichment_table::EnrichmentTableUrlJob {
-            org_id: record.org,
-            table_name: record.name,
-            url: record.url,
-            status: i16_to_status(record.status),
-            error_message: record.error_message,
-            created_at: record.created_at,
-            updated_at: record.updated_at,
-            total_bytes_fetched: record.total_bytes_fetched as u64,
-            total_records_processed: record.total_records_processed,
-            retry_count: record.retry_count as u32,
-            append_data: record.append_data,
-            last_byte_position: record.last_byte_position as u64,
-            supports_range: record.supports_range,
-        })
+        .map(
+            |record| config::meta::enrichment_table::EnrichmentTableUrlJob {
+                org_id: record.org,
+                table_name: record.name,
+                url: record.url,
+                status: i16_to_status(record.status),
+                error_message: record.error_message,
+                created_at: record.created_at,
+                updated_at: record.updated_at,
+                total_bytes_fetched: record.total_bytes_fetched as u64,
+                total_records_processed: record.total_records_processed,
+                retry_count: record.retry_count as u32,
+                append_data: record.append_data,
+                last_byte_position: record.last_byte_position as u64,
+                supports_range: record.supports_range,
+            },
+        )
         .collect();
 
     Ok(jobs)

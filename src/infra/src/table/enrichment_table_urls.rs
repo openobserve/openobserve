@@ -13,15 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use sea_orm::{
-    ColumnTrait, EntityTrait, QueryFilter, Set,
-    entity::prelude::*,
-};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, entity::prelude::*};
 use serde::{Deserialize, Serialize};
 
 use super::get_lock;
 // Re-export the entity for convenience
-pub use crate::table::entity::enrichment_table_urls::{ActiveModel, Column, Entity, Model, Relation};
+pub use crate::table::entity::enrichment_table_urls::{
+    ActiveModel, Column, Entity, Model, Relation,
+};
 use crate::{
     db::{ORM_CLIENT, connect_to_orm},
     errors,
@@ -130,7 +129,10 @@ pub async fn put(record: EnrichmentTableUrlRecord) -> Result<(), errors::Error> 
 ///
 /// # Returns
 /// * `Result<Option<EnrichmentTableUrlRecord>, errors::Error>` - The record or None if not found
-pub async fn get(org: &str, table_name: &str) -> Result<Option<EnrichmentTableUrlRecord>, errors::Error> {
+pub async fn get(
+    org: &str,
+    table_name: &str,
+) -> Result<Option<EnrichmentTableUrlRecord>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let record = Entity::find()
         .filter(Column::Org.eq(org))
