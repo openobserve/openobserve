@@ -39,9 +39,7 @@ impl MigrationTrait for Migration {
             .await?;
 
         // Create composite index for efficient org-level concurrency checking
-        manager
-            .create_index(create_index_org_user_stmt())
-            .await?;
+        manager.create_index(create_index_org_user_stmt()).await?;
 
         Ok(())
     }
