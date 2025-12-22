@@ -141,11 +141,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
-import { useStore } from "vuex";
+import { ref, watch, computed, inject } from "vue";
 import { useI18n } from "vue-i18n";
 import { QueryBuilderLabelFilter } from "@/components/promql/types";
-import metricsService from "@/services/metrics";
+import useDashboardPanelData from "@/composables/useDashboardPanel";
 
 const props = defineProps<{
   labels: QueryBuilderLabelFilter[];
@@ -158,10 +157,15 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
-const store = useStore();
-const availableLabels = ref<string[]>([]);
-const labelValuesMap = ref<Map<string, string[]>>(new Map()); // Maps label key to its values
-const loadingLabels = ref(false);
+
+// Get fetchPromQLLabels from composable
+const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+const { fetchPromQLLabels } = useDashboardPanelData(dashboardPanelDataPageKey);
+
+// Use shared meta from dashboard data for label options
+const availableLabels = computed(() => props.dashboardData?.meta?.promql?.availableLabels || []);
+const labelValuesMap = computed(() => props.dashboardData?.meta?.promql?.labelValuesMap || new Map());
+const loadingLabels = computed(() => props.dashboardData?.meta?.promql?.loadingLabels || false);
 
 const operatorOptions = ["=", "!=", "=~", "!~"];
 
@@ -175,71 +179,15 @@ const computedLabel = (label: QueryBuilderLabelFilter): string => {
   return `${label.label} ${label.op} ${label.value}`;
 };
 
-// Fetch available labels and their values for the selected metric
-const fetchAvailableLabels = async (metric: string) => {
-  if (!metric) return;
-
-  loadingLabels.value = true;
-  try {
-    const endTime = Math.floor(Date.now() * 1000); // microseconds
-    const startTime = endTime - (24 * 60 * 60 * 1000000); // 24 hours ago in microseconds
-
-    const response = await metricsService.get_promql_series({
-      org_identifier: store.state.selectedOrganization.identifier,
-      labels: `{__name__="${metric}"}`,
-      start_time: startTime,
-      end_time: endTime,
-    });
-
-    if (response.data && response.data.data && response.data.data.length > 0) {
-      // Extract all unique label keys and their values from the series
-      const labelSet = new Set<string>();
-      const valuesMap = new Map<string, Set<string>>();
-
-      response.data.data.forEach((series: any) => {
-        Object.keys(series).forEach((key) => {
-          if (key !== "__name__") {
-            labelSet.add(key);
-
-            // Collect all values for this label key
-            if (!valuesMap.has(key)) {
-              valuesMap.set(key, new Set<string>());
-            }
-            valuesMap.get(key)!.add(series[key]);
-          }
-        });
-      });
-
-      availableLabels.value = Array.from(labelSet).sort();
-
-      // Convert Sets to sorted arrays and store in the map
-      const newLabelValuesMap = new Map<string, string[]>();
-      valuesMap.forEach((valueSet, labelKey) => {
-        newLabelValuesMap.set(labelKey, Array.from(valueSet).sort());
-      });
-      labelValuesMap.value = newLabelValuesMap;
-    } else {
-      availableLabels.value = [];
-      labelValuesMap.value = new Map();
-    }
-  } catch (error) {
-    console.error("Error fetching labels:", error);
-    availableLabels.value = [];
-    labelValuesMap.value = new Map();
-  } finally {
-    loadingLabels.value = false;
-  }
-};
-
 // Watch for metric changes to fetch available labels
 watch(
   () => props.metric,
   async (newMetric) => {
     if (newMetric) {
-      await fetchAvailableLabels(newMetric);
-    } else {
-      availableLabels.value = [];
-      labelValuesMap.value.clear();
+      await fetchPromQLLabels(newMetric);
+    } else if (props.dashboardData?.meta?.promql) {
+      props.dashboardData.meta.promql.availableLabels = [];
+      props.dashboardData.meta.promql.labelValuesMap = new Map();
     }
   },
   { immediate: true }

@@ -51,13 +51,15 @@
 
                       <!-- Operation Parameters -->
                       <template
-                        v-for="(param, paramIndex) in getOperationDef(element.id)?.params"
+                        v-for="(param, paramIndex) in getOperationDef(
+                          element.id,
+                        )?.params"
                         :key="paramIndex"
                       >
                         <!-- Number Parameter -->
                         <q-input
                           v-if="param.type === 'number'"
-                          v-model.number="element.params[paramIndex]"
+                          v-model.number="element.params[paramIndex] as number"
                           type="number"
                           :label="param.name"
                           dense
@@ -71,7 +73,7 @@
                         <!-- String Parameter -->
                         <q-input
                           v-else-if="param.type === 'string'"
-                          v-model="element.params[paramIndex]"
+                          v-model="element.params[paramIndex] as string"
                           :label="param.name"
                           :placeholder="param.placeholder"
                           dense
@@ -82,19 +84,37 @@
                           :data-test="`promql-operation-param-${paramIndex}`"
                         />
 
-                        <!-- Select Parameter (if options provided) -->
+                        <!-- Multi-Select Parameter for labels -->
                         <q-select
-                          v-else-if="param.options"
-                          v-model="element.params[paramIndex]"
-                          :options="param.options"
+                          v-else-if="param.type === 'select'"
+                          v-model="element.params[paramIndex] as string[]"
+                          :options="availableLabels"
                           :label="param.name"
                           dense
                           borderless
                           stack-label
                           hide-bottom-space
+                          multiple
                           class="showLabelOnTop q-mb-sm"
                           :data-test="`promql-operation-param-${paramIndex}`"
-                        />
+                          :hint="
+                            availableLabels.length
+                              ? 'Select one or more labels'
+                              : 'No labels available'
+                          "
+                        >
+                          <template v-slot:no-option>
+                            <q-item>
+                              <q-item-section class="text-grey">
+                                {{
+                                  availableLabels.length
+                                    ? "No matching labels"
+                                    : "Select a metric first to load labels"
+                                }}
+                              </q-item-section>
+                            </q-item>
+                          </template>
+                        </q-select>
                       </template>
                     </div>
                   </q-menu>
@@ -198,6 +218,7 @@ import { promQueryModeller } from "@/components/promql/operations/queryModeller"
 
 const props = defineProps<{
   operations: QueryBuilderOperation[];
+  dashboardData?: any; // Dashboard data containing shared meta
 }>();
 
 const emit = defineEmits<{
@@ -208,6 +229,9 @@ const { t } = useI18n();
 const showOperationSelector = ref(false);
 const searchQuery = ref("");
 
+// Access shared label options from meta
+const availableLabels = computed(() => props.dashboardData?.meta?.promql?.availableLabels || []);
+
 const categories = computed(() => promQueryModeller.getCategories());
 
 const computedLabel = (operation: QueryBuilderOperation): string => {
@@ -215,11 +239,21 @@ const computedLabel = (operation: QueryBuilderOperation): string => {
   if (!opDef) return operation.id;
 
   // Show operation name with parameters if any
-  if (operation.params && operation.params.length > 0 && operation.params.some(p => p !== "" && p !== null && p !== undefined)) {
-    const paramsStr = operation.params
-      .filter(p => p !== "" && p !== null && p !== undefined)
-      .join(", ");
-    return `${opDef.name}(${paramsStr})`;
+  if (operation.params && operation.params.length > 0) {
+    const displayParams = operation.params
+      .map((p) => {
+        // Handle array parameters (e.g., selected labels)
+        if (Array.isArray(p)) {
+          return p.length > 0 ? p.join(", ") : "";
+        }
+        // Handle primitive parameters
+        return p !== "" && p !== null && p !== undefined ? String(p) : "";
+      })
+      .filter((p) => p !== "");
+
+    if (displayParams.length > 0) {
+      return `${opDef.name}(${displayParams.join(", ")})`;
+    }
   }
 
   return opDef.name;
@@ -268,6 +302,10 @@ const addOperation = (opDef: QueryBuilderOperationDef) => {
 const removeOperation = (index: number) => {
   props.operations.splice(index, 1);
 };
+
+defineExpose({
+  availableLabels,
+});
 </script>
 
 <style scoped lang="scss">
