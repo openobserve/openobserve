@@ -89,14 +89,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <!-- Apply Button -->
           <q-btn
+            flat
             dense
             no-caps
-            color="primary"
+            text-color="light-text"
             :label="t('common.apply')"
             :disable="!hasPendingChanges"
             @click="applyDimensionChanges"
-            class="tw-ml-2"
-            size="sm"
+            class="o2-secondary-button tw-ml-2"
             data-test="apply-dimension-filters"
           />
         </div>
@@ -448,7 +448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('correlation.filters') }}:
         </span>
         <div
-          v-for="(value, key) in activeDimensions"
+          v-for="(value, key) in pendingDimensions"
           :key="key"
           class="tw-flex tw-items-center tw-gap-2"
           :class="{ 'tw-opacity-60': unstableDimensionKeys.has(key) }"
@@ -460,13 +460,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ key }}:
           </span>
           <q-select
-            v-model="activeDimensions[key]"
+            v-model="pendingDimensions[key]"
             :options="getDimensionOptions(key, value)"
             dense
             outlined
             emit-value
             map-options
-            @update:model-value="onDimensionChange"
+            @update:model-value="onPendingDimensionChange"
             class="dimension-dropdown"
             borderless
             style="min-width: 120px"
@@ -475,6 +475,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             Unstable dimension - changes on pod restart. Default: All values.
           </q-tooltip>
         </div>
+        <!-- Apply Button -->
+        <q-btn
+          flat
+          dense
+          no-caps
+          text-color="light-text"
+          :label="t('common.apply')"
+          :disable="!hasPendingChanges"
+          @click="applyDimensionChanges"
+          class="o2-secondary-button tw-ml-2"
+          data-test="apply-dimension-filters-embedded"
+          style="line-height: 2.2rem !important;"
+        />
       </div>
     </div>
 
