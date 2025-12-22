@@ -320,14 +320,23 @@ export class AlertsPage {
             testLogger.info('Set silence notification to 0 minutes');
         }
 
-        // Select destination - find the destination row by its label and then the q-select
-        const destinationRow = this.page.locator(this.alertSettingsRow).filter({ hasText: /Destination/ });
-        const destinationDropdown = destinationRow.locator('.q-select').first();
+        // Select destination for REAL-TIME alerts
+        // Real-time alerts use a different layout than scheduled alerts - they don't have .alert-settings-row
+        // Find the destination section by looking for the "Destination" text label, then find the q-select within the same container
+        const destinationSection = this.page.locator('div.flex.items-start').filter({
+            has: this.page.locator('span:has-text("Destination")')
+        }).first();
+
+        // Wait for the destination section to be visible
+        await destinationSection.waitFor({ state: 'visible', timeout: 10000 });
+
+        // Find the q-select dropdown within the destination section
+        const destinationDropdown = destinationSection.locator('.q-select').first();
         await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
         await destinationDropdown.click();
         await this.page.waitForTimeout(1000);
 
-        // Find and select the destination
+        // Find and select the destination from the dropdown options
         const destinationOption = this.page.getByText(destinationName, { exact: true }).first();
         if (await destinationOption.isVisible({ timeout: 3000 })) {
             await destinationOption.click();
