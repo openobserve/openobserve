@@ -45,8 +45,9 @@ use crate::{
     },
     service::{
         alerts::{
+            ConditionListExt,
             alert::{self, AlertError},
-            build_sql, ConditionListExt,
+            build_sql,
         },
         db::scheduler,
     },
