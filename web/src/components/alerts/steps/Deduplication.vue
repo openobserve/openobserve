@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="step-deduplication" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-    <div class="step-content card-container tw-px-3 tw-py-4">
+    <div class="step-content card-container tw:px-3 tw:py-4">
       <!-- Fingerprint Fields -->
-      <div class="tw-mb-4">
-        <div class="tw-font-semibold tw-pb-2 tw-flex tw-items-center">
+      <div class="tw:mb-4">
+        <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
           {{ t("alerts.deduplication.fingerprintFields") }}
           <q-icon
             name="info"
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tooltip>
           </q-icon>
         </div>
-        <div class="tw-text-sm tw-text-gray-600 dark:tw-text-gray-400 tw-mb-2">
+        <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
           {{ t("alerts.deduplication.fingerprintFieldsHint") }}
         </div>
         <q-select
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: 300px;"
         >
           <template v-slot:hint>
-            <div class="tw-text-xs">
+            <div class="tw:text-xs">
               💡 Leave empty to auto-detect based on query (SQL: GROUP BY columns, PromQL: labels, Custom: condition
               fields)
             </div>
@@ -63,8 +63,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Time Window -->
-      <div class="tw-mb-4">
-        <div class="tw-font-semibold tw-pb-2 tw-flex tw-items-center">
+      <div class="tw:mb-4">
+        <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
           {{ t("alerts.deduplication.timeWindow") }}
           <q-icon
             name="info"
@@ -77,10 +77,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tooltip>
           </q-icon>
         </div>
-        <div class="tw-text-sm tw-text-gray-600 dark:tw-text-gray-400 tw-mb-2">
+        <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
           {{ t("alerts.deduplication.timeWindowHint") }}
         </div>
-        <div class="tw-flex tw-items-center">
+        <div class="tw:flex tw:items-center">
           <div style="width: 210px; margin-left: 0 !important">
             <q-input
               v-model.number="localDeduplication.time_window_minutes"

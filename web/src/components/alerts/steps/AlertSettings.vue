@@ -16,13 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="step-alert-conditions" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-    <div class="step-content card-container tw-px-3 tw-py-4">
+    <div class="step-content card-container tw:px-3 tw:py-4">
       <q-form ref="alertSettingsForm" @submit.prevent>
       <!-- For Real-Time Alerts -->
       <template v-if="isRealTime === 'true'">
         <!-- Silence Notification (Cooldown) -->
-        <div class="flex justify-start items-start tw-pb-3 tw-mb-4">
-          <div class="tw-font-semibold flex items-center" style="width: 190px; height: 36px">
+        <div class="flex justify-start items-start tw:pb-3 tw:mb-4">
+          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
             {{ t("alerts.silenceNotification") + " *" }}
             <q-icon
               name="info"
@@ -84,12 +84,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Destinations -->
-        <div class="flex items-start tw-pb-4 tw-mb-4">
-          <div style="width: 190px; height: 36px" class="flex items-center tw-font-semibold">
+        <div class="flex items-start tw:pb-4 tw:mb-4">
+          <div style="width: 190px; height: 36px" class="flex items-center tw:font-semibold">
             <span>{{ t("alerts.destination") }} *</span>
           </div>
-          <div class="tw-flex tw-flex-col">
-            <div class="tw-flex tw-items-center">
+          <div class="tw:flex tw:flex-col">
+            <div class="tw:flex tw:items-center">
               <q-select
                 v-model="localDestinations"
                 :options="filteredDestinations"
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- For Scheduled Alerts -->
       <template v-else>
         <!-- Aggregation Toggle (only for custom queries, not SQL or PromQL) -->
-        <div v-if="queryType === 'custom'" class="flex justify-start items-center tw-font-semibold alert-settings-row">
+        <div v-if="queryType === 'custom'" class="flex justify-start items-center tw:font-semibold alert-settings-row">
           <div class="flex items-center" style="width: 190px; height: 36px">
             {{ t("common.aggregation") }}
             <q-icon
@@ -194,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="localIsAggregationEnabled"
             size="md"
             color="primary"
-            class="text-bold q-pl-0 o2-toggle-button-sm tw-h-[36px] tw-ml-1"
+            class="text-bold q-pl-0 o2-toggle-button-sm tw:h-[36px] tw:ml-1"
             @update:model-value="toggleAggregation"
           />
         </div>
@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="localIsAggregationEnabled && formData.query_condition.aggregation"
           class="flex items-start no-wrap q-mr-sm alert-settings-row"
         >
-          <div class="flex items-center tw-font-semibold" style="width: 190px; height: 36px">
+          <div class="flex items-center tw:font-semibold" style="width: 190px; height: 36px">
             {{ t("alerts.groupBy") }}
             <q-icon
               name="info"
@@ -279,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Threshold -->
         <div class="flex justify-start items-start q-mb-xs no-wrap alert-settings-row">
-          <div class="tw-font-semibold flex items-center" style="width: 190px; height: 36px">
+          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
             {{ t("alerts.threshold") + " *" }}
             <q-icon
               name="info"
@@ -298,8 +298,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div style="width: calc(100% - 190px)">
             <!-- With Aggregation -->
             <template v-if="localIsAggregationEnabled && formData.query_condition.aggregation">
-              <div ref="thresholdFieldRef" class="flex tw-flex-col justify-start items-start tw-gap-2">
-                <div class="tw-flex tw-items-center">
+              <div ref="thresholdFieldRef" class="flex tw:flex-col justify-start items-start tw:gap-2">
+                <div class="tw:flex tw:items-center">
                   <div class="q-mr-xs">
                     <q-select
                       v-model="formData.query_condition.aggregation.function"
@@ -336,7 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
                 <div class="flex items-center q-mt-xs">
-                  <div class="monaco-editor-test q-mr-xs tw-pb-1">
+                  <div class="monaco-editor-test q-mr-xs tw:pb-1">
                     <q-select
                       v-model="formData.query_condition.aggregation.having.operator"
                       :options="triggerOperators"
@@ -351,7 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:model-value="emitAggregationUpdate"
                     />
                   </div>
-                  <div class="flex items-center tw-pb-1">
+                  <div class="flex items-center tw:pb-1">
                     <div style="width: 250px; margin-left: 0 !important">
                       <q-input
                         v-model="formData.query_condition.aggregation.having.value"
@@ -373,7 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Without Aggregation -->
             <template v-else>
               <div ref="thresholdFieldRef" class="flex justify-start items-start">
-                <div class="tw-flex tw-flex-col">
+                <div class="tw:flex tw:flex-col">
                   <q-select
                     v-model="formData.trigger_condition.operator"
                     :options="triggerOperators"
@@ -395,8 +395,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     Field is required!
                   </div>
                 </div>
-                <div class="flex items-start tw-flex-col" style="border-left: none">
-                  <div class="tw-flex tw-items-center">
+                <div class="flex items-start tw:flex-col" style="border-left: none">
+                  <div class="tw:flex tw:items-center">
                     <div style="width: 89px; margin-left: 0 !important">
                       <q-input
                         v-model.number="formData.trigger_condition.threshold"
@@ -433,7 +433,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Period -->
         <div class="flex items-start q-mr-sm alert-settings-row">
-          <div class="tw-font-semibold flex items-center" style="width: 190px; height: 36px">
+          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
             {{ t("alerts.period") + " *" }}
             <q-icon
               name="info"
@@ -484,7 +484,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Frequency (with inline interval/cron toggle) -->
         <div class="flex items-start q-mr-sm alert-settings-row">
-          <div class="tw-font-semibold flex items-center" style="width: 190px; height: 36px">
+          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
             {{ t("alerts.frequency") + " *" }}
             <q-icon
               name="info"
@@ -509,23 +509,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon
                 name="warning"
                 size="18px"
-                class="cursor-pointer tw-ml-2"
-                :class="store.state.theme === 'dark' ? 'tw-text-orange-500' : 'tw-text-orange-500'"
+                class="cursor-pointer tw:ml-2"
+                :class="store.state.theme === 'dark' ? 'tw:text-orange-500' : 'tw:text-orange-500'"
               >
                 <q-tooltip
                   anchor="center right"
                   self="center left"
                   max-width="auto"
-                  class="tw-text-[14px]"
+                  class="tw:text-[14px]"
                 >
                   Warning: The displayed timezone is approximate. Verify and select the correct timezone manually.
                 </q-tooltip>
               </q-icon>
             </template>
           </div>
-          <div class="tw-flex tw-flex-col" style="min-height: 78px">
+          <div class="tw:flex tw:flex-col" style="min-height: 78px">
             <!-- Interval/Cron Mode Buttons -->
-            <div class="tw-flex frequency-toggle-group tw-mb-3">
+            <div class="tw:flex frequency-toggle-group tw:mb-3">
               <q-btn
                 :label="t('alerts.interval')"
                 :outline="formData.trigger_condition.frequency_type === 'cron'"
@@ -533,7 +533,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :color="formData.trigger_condition.frequency_type === 'minutes' ? 'primary' : 'grey-7'"
                 no-caps
                 size="sm"
-                class="tw-px-4 frequency-toggle-btn frequency-toggle-left"
+                class="tw:px-4 frequency-toggle-btn frequency-toggle-left"
                 :class="formData.trigger_condition.frequency_type === 'minutes' ? 'active' : 'inactive'"
                 style="min-width: 90px"
                 @click="handleFrequencyTypeChange('minutes')"
@@ -545,7 +545,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :color="formData.trigger_condition.frequency_type === 'cron' ? 'primary' : 'grey-7'"
                 no-caps
                 size="sm"
-                class="tw-px-4 frequency-toggle-btn frequency-toggle-right"
+                class="tw:px-4 frequency-toggle-btn frequency-toggle-right"
                 :class="formData.trigger_condition.frequency_type === 'cron' ? 'active' : 'inactive'"
                 style="min-width: 130px"
                 @click="handleFrequencyTypeChange('cron')"
@@ -553,9 +553,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Input Fields Container (fixed height to prevent shifting) -->
-            <div class="tw-flex tw-items-start" style="min-height: 36px">
+            <div class="tw:flex tw:items-start" style="min-height: 36px">
               <!-- Interval Mode -->
-              <div v-if="formData.trigger_condition.frequency_type === 'minutes'" class="tw-flex tw-items-center">
+              <div v-if="formData.trigger_condition.frequency_type === 'minutes'" class="tw:flex tw:items-center">
                 <div style="width: 87px; margin-left: 0 !important">
                   <q-input
                     v-model.number="formData.trigger_condition.frequency"
@@ -579,7 +579,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Cron Mode -->
-              <div v-else class="tw-flex tw-items-center tw-gap-2">
+              <div v-else class="tw:flex tw:items-center tw:gap-2">
                 <q-input
                   v-model="formData.trigger_condition.cron"
                   dense
@@ -622,7 +622,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 (formData.trigger_condition.frequency_type === 'cron' && (!formData.trigger_condition.cron || !formData.trigger_condition.timezone)) ||
                 cronJobError
               "
-              class="text-red-8 tw-mt-1"
+              class="text-red-8 tw:mt-1"
               style="font-size: 11px; line-height: 12px"
             >
               {{ cronJobError || "Field is required!" }}
@@ -632,7 +632,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
         <div class="flex items-start q-mr-sm alert-settings-row">
-          <div class="tw-font-semibold flex items-center" style="width: 190px; height: 36px">
+          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
             {{ t("alerts.silenceNotification") + " *" }}
             <q-icon
               name="info"
@@ -696,7 +696,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Destinations -->
         <div class="flex items-start q-mr-sm alert-settings-row">
-          <div class="tw-font-semibold flex items-center" style="width: 190px; height: 36px">
+          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
             {{ t("alerts.destination") + " *" }}
             <q-icon
               name="info"

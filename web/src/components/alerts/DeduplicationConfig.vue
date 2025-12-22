@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:model-value="emitUpdate"
               >
                 <template v-slot:hint>
-                  <div class="tw-text-xs">
+                  <div class="tw:text-xs">
                     💡 Leave empty to auto-detect based on query (SQL: GROUP BY columns, PromQL: labels, Custom: condition fields)
                   </div>
                 </template>

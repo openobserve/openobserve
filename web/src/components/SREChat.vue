@@ -185,7 +185,7 @@
               </div>
             </div>
           </div>
-          <div v-if="isLoading" id="loading-indicator" class="tw-flex tw-items-center tw-gap-2 tw-p-4">
+          <div v-if="isLoading" id="loading-indicator" class="tw:flex tw:items-center tw:gap-2 tw:p-4">
             <q-spinner-dots color="primary" size="2em" />
             <span style="font-size: 14px; opacity: 0.7;">{{ currentObservingMessage }}</span>
           </div>
