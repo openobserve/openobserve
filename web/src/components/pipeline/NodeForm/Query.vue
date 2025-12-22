@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator />
 
     <div class="stream-routing-container q-px-md">
-      <q-form ref="queryFormRef" @submit="saveQueryData">
+      <q-form ref="queryFormRef">
         <div class="full-width">
           <scheduled-pipeline
             ref="scheduledPipelineRef"
@@ -52,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model:isAggregationEnabled="isAggregationEnabled"
             v-model:streamType="streamRoute.stream_type"
             @validate-sql="validateSqlQuery"
+            @submit:form="saveQueryData"
             @cancel:form="openCancelDialog"
             @delete:node="openDeleteDialog"
             @update:fullscreen="updateFullscreenMode"
@@ -258,8 +259,8 @@ const getDefaultStreamRoute: any = () => {
 
 onMounted(() => {
   if (pipelineObj.isEditNode) {
-    streamRoute.value = pipelineObj.currentSelectedNodeData
-      ?.data as StreamRoute;
+    // Deep copy to avoid modifying the original node data
+    streamRoute.value = JSON.parse(JSON.stringify(pipelineObj.currentSelectedNodeData?.data)) as StreamRoute;
   }
 
   originalStreamRouting.value = JSON.parse(JSON.stringify(streamRoute.value));
@@ -269,8 +270,8 @@ onMounted(() => {
 
 onActivated(() => {
   if (pipelineObj.isEditNode) {
-    streamRoute.value = pipelineObj.currentSelectedNodeData
-      ?.data as StreamRoute;
+    // Deep copy to avoid modifying the original node data
+    streamRoute.value = JSON.parse(JSON.stringify(pipelineObj.currentSelectedNodeData?.data)) as StreamRoute;
   }
 
   originalStreamRouting.value = JSON.parse(JSON.stringify(streamRoute.value));
@@ -346,7 +347,11 @@ const openCancelDialog = () => {
   dialog.value.show = true;
   dialog.value.title = "Discard Changes";
   dialog.value.message = "Are you sure you want to cancel routing changes?";
-  dialog.value.okCallback = closeDialog;
+  dialog.value.okCallback = () => {
+    // Restore original data when canceling
+    streamRoute.value = JSON.parse(JSON.stringify(originalStreamRouting.value));
+    closeDialog();
+  };
 };
 
 const getDefaultPromqlCondition = () => {
@@ -359,15 +364,17 @@ const getDefaultPromqlCondition = () => {
 
 // TODO OK : Add check for duplicate routing name
 const saveQueryData = async () => {
+  // Validate inputs
   if (!scheduledPipelineRef.value.validateInputs()) {
-    return false;
+    return; // Don't close dialog on validation failure
   }
 
+  // Validate SQL query
   try {
     await validateSqlQuery();
     await validateSqlQueryPromise.value;
   } catch (e) {
-    return false;
+    return; // Don't close dialog on SQL validation failure
   }
 
   //this is not needed as we are using validateInputs in scheduledPipeline.vue
@@ -425,6 +432,8 @@ const saveQueryData = async () => {
     }
     queryPayload.query_condition.promql_condition = getDefaultPromqlCondition();
   }
+
+  // All validations passed - add node and close dialog
   addNode(queryPayload);
   emit("cancel:hideform");
 };
@@ -508,6 +517,7 @@ const validateSqlQuery = async () => {
         org_identifier: store.state.selectedOrganization.identifier,
         query,
         page_type: "logs",
+        validate: true,
       })
       .then((res: any) => {
         isValidSqlQuery.value = true;
@@ -526,10 +536,10 @@ const validateSqlQuery = async () => {
             message: `${message}`,
             timeout: 3000,
           });
-          resolve("");
+          reject(message);
         } else {
           isValidSqlQuery.value = true;
-          reject("");
+          resolve("");
         }
       });
   });
