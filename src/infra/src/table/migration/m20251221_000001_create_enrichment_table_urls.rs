@@ -130,8 +130,8 @@ mod tests {
                 "total_records_processed" bigint NOT NULL,
                 "retry_count" integer NOT NULL,
                 "append_data" bool NOT NULL,
-                "last_byte_position" bigint DEFAULT 0 NOT NULL,
-                "supports_range" bool DEFAULT false NOT NULL
+                "last_byte_position" bigint NOT NULL DEFAULT 0,
+                "supports_range" bool NOT NULL DEFAULT FALSE
             )"#
         );
 
@@ -158,8 +158,8 @@ mod tests {
                 `total_records_processed` bigint NOT NULL,
                 `retry_count` int NOT NULL,
                 `append_data` bool NOT NULL,
-                `last_byte_position` bigint DEFAULT 0 NOT NULL,
-                `supports_range` bool DEFAULT false NOT NULL
+                `last_byte_position` bigint NOT NULL DEFAULT 0,
+                `supports_range` bool NOT NULL DEFAULT FALSE
             )"#
         );
 
@@ -186,8 +186,8 @@ mod tests {
                 "total_records_processed" bigint NOT NULL,
                 "retry_count" integer NOT NULL,
                 "append_data" boolean NOT NULL,
-                "last_byte_position" bigint DEFAULT 0 NOT NULL,
-                "supports_range" boolean DEFAULT false NOT NULL
+                "last_byte_position" bigint NOT NULL DEFAULT 0,
+                "supports_range" boolean NOT NULL DEFAULT FALSE
             )"#
         );
 
