@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="multi-window-text tw-w-full tw-text-center lg:tw-w-auto lg:tw-text-left">
           Current window
         </div>
+
         <div class="tw-flex lg:tw-flex-col tw-items-start tw-gap-2">
           <div class="multi-window-text tw-w-full tw-text-center lg:tw-w-auto lg:tw-text-left">
             Cycle
@@ -47,6 +48,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw-flex tw-justify-between tw-items-start tw-gap-4">
             <div class="tw-w-full lg:tw-w-[300px] running-text">
               Running for {{ convertMinutesToDisplayValue(period) }} in the interval of every {{ convertMinutesToDisplayValue(frequency) }}
+            </div>
+            <div>
+              <span class="tw-inline-block">
+                <q-btn
+                  icon="delete_outline"
+                  class="iconHoverBtn q-ml-xs q-mr-sm"
+                  :class="store.state.theme === 'dark' ? 'icon-dark' : ''"
+                  padding="xs"
+                  unelevated
+                  size="16px"
+                  round
+                  flat
+                  disable
+                  style="min-width: auto; opacity: 0.3; pointer-events: none;"
+                />
+                <q-tooltip
+                  anchor="top middle"
+                  self="bottom middle"
+                  :offset="[0, 8]"
+                >
+                  Current window cannot be deleted
+                </q-tooltip>
+              </span>
             </div>
           </div>
         </div>
@@ -69,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Time Frame -->
-        <div class="tw-flex lg:tw-flex-col tw-gap-2 lg:tw-gap-0 tw-items-start tw-justify-between tw-h-20">
+        <div class="tw-flex tw-flex-col tw-gap-2 tw-items-center">
           <div class="tw-flex tw-items-center">
             <span class="tw-mr-1"><q-icon name="schedule" size="16px" /></span>
             Time Frame
@@ -86,13 +110,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-icon>
             </span>
           </div>
-          <CustomDateTimePicker
-            v-model="picker.offSet"
-            :picker="picker"
-            :isFirstEntry="false"
-            @update:model-value="updateDateTimePicker"
-            :changeStyle="true"
-          />
+          <div class="datetime-picker-wrapper">
+            <CustomDateTimePicker
+              v-model="picker.offSet"
+              :picker="picker"
+              :isFirstEntry="false"
+              @update:model-value="updateDateTimePicker"
+              :changeStyle="true"
+            />
+          </div>
         </div>
 
         <!-- Cycle Info -->
@@ -434,5 +460,18 @@ export default defineComponent({
   &.icon-dark {
     filter: none !important;
   }
+}
+
+.datetime-picker-wrapper {
+    border: 1px solid;
+    border-radius: 4px;
+}
+
+.dark-mode-multi-window .datetime-picker-wrapper {
+    border-color: #4a4a4a !important;
+}
+
+.light-mode-multi-window .datetime-picker-wrapper {
+    border-color: #d0d0d0 !important;
 }
 </style>
