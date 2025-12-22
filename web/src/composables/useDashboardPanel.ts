@@ -267,12 +267,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 
   const addQuery = () => {
-    const queryType =
-      dashboardPanelData.data.queryType === "sql" ? "sql" : "promql";
     const newQuery: any = {
       query: "",
       vrlFunctionQuery: "",
-      customQuery: queryType === "promql",
+      customQuery: dashboardPanelData.data.queryType,
       fields: {
         stream:
           dashboardPanelData.data.queries[
@@ -335,8 +333,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       .join(" ");
   };
 
-  const promqlMode = computed(
-    () => dashboardPanelData.data.queryType == "promql",
+  const promqlMode = computed(() =>
+    ["promql", "promql-builder"].includes(dashboardPanelData.data.queryType),
   );
 
   const selectedStreamFieldsBasedOnUserDefinedSchema = computed(() => {
