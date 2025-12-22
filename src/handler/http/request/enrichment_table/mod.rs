@@ -243,39 +243,39 @@ pub async fn save_enrichment_table_from_url(
     }
 
     // SSRF protection: Block internal IPs and localhost
-    if let Ok(parsed_url) = url::Url::parse(&request_body.url) {
-        if let Some(host) = parsed_url.host_str() {
-            // Block localhost
-            if host == "localhost" || host == "127.0.0.1" || host == "::1" {
-                return Ok(MetaHttpResponse::bad_request(
-                    "Cannot access localhost URLs",
-                ));
-            }
+    if let Ok(parsed_url) = url::Url::parse(&request_body.url)
+        && let Some(host) = parsed_url.host_str()
+    {
+        // Block localhost
+        if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+            return Ok(MetaHttpResponse::bad_request(
+                "Cannot access localhost URLs",
+            ));
+        }
 
-            // Block private IP ranges and AWS metadata endpoint
-            if let Ok(ip) = host.parse::<std::net::IpAddr>() {
-                match ip {
-                    std::net::IpAddr::V4(v4) => {
-                        let octets = v4.octets();
-                        // RFC1918 private ranges: 10.x.x.x, 172.16-31.x.x, 192.168.x.x
-                        // AWS metadata: 169.254.169.254
-                        if octets[0] == 10
-                            || (octets[0] == 172 && (16..=31).contains(&octets[1]))
-                            || (octets[0] == 192 && octets[1] == 168)
-                            || (octets[0] == 169 && octets[1] == 254)
-                        {
-                            return Ok(MetaHttpResponse::bad_request(
-                                "Cannot access private IP addresses",
-                            ));
-                        }
+        // Block private IP ranges and AWS metadata endpoint
+        if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+            match ip {
+                std::net::IpAddr::V4(v4) => {
+                    let octets = v4.octets();
+                    // RFC1918 private ranges: 10.x.x.x, 172.16-31.x.x, 192.168.x.x
+                    // AWS metadata: 169.254.169.254
+                    if octets[0] == 10
+                        || (octets[0] == 172 && (16..=31).contains(&octets[1]))
+                        || (octets[0] == 192 && octets[1] == 168)
+                        || (octets[0] == 169 && octets[1] == 254)
+                    {
+                        return Ok(MetaHttpResponse::bad_request(
+                            "Cannot access private IP addresses",
+                        ));
                     }
-                    std::net::IpAddr::V6(v6) => {
-                        // Block IPv6 localhost and private ranges
-                        if v6.is_loopback() || v6.segments()[0] & 0xfe00 == 0xfc00 {
-                            return Ok(MetaHttpResponse::bad_request(
-                                "Cannot access private IP addresses",
-                            ));
-                        }
+                }
+                std::net::IpAddr::V6(v6) => {
+                    // Block IPv6 localhost and private ranges
+                    if v6.is_loopback() || v6.segments()[0] & 0xfe00 == 0xfc00 {
+                        return Ok(MetaHttpResponse::bad_request(
+                            "Cannot access private IP addresses",
+                        ));
                     }
                 }
             }

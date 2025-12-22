@@ -427,6 +427,13 @@ async fn process_single_url_job(org_id: &str, table_name: &str) -> Result<()> {
 // CSV Parsing Helper
 // ============================================================================
 
+/// Result type for CSV chunk parsing: (records, headers, leftover bytes)
+type CsvChunkResult = (
+    Vec<json::Map<String, json::Value>>,
+    Option<Vec<String>>,
+    Vec<u8>,
+);
+
 /// Parses CSV data from a buffer, handling incomplete lines across chunk boundaries.
 ///
 /// This is the core parsing logic that makes streaming large CSVs possible. HTTP chunks
@@ -466,11 +473,7 @@ async fn process_single_url_job(org_id: &str, table_name: &str) -> Result<()> {
 fn parse_csv_chunk(
     buffer: &[u8],
     existing_headers: Option<&Vec<String>>,
-) -> Result<(
-    Vec<json::Map<String, json::Value>>,
-    Option<Vec<String>>,
-    Vec<u8>,
-)> {
+) -> Result<CsvChunkResult> {
     // Find the last newline to split complete vs incomplete lines.
     // We search from the end (rposition) for efficiency on large buffers.
     let last_newline_pos = buffer.iter().rposition(|&b| b == b'\n');
@@ -603,24 +606,24 @@ async fn check_range_support(
     // First, try HEAD request to check for Accept-Ranges header
     let head_response = client.head(url).send().await?;
 
-    if let Some(accept_ranges) = head_response.headers().get("accept-ranges") {
-        if let Ok(value) = accept_ranges.to_str() {
-            if value.eq_ignore_ascii_case("bytes") {
-                log::debug!(
-                    "[ENRICHMENT::URL] {}/{} - Server advertises Range support via Accept-Ranges header",
-                    org_id,
-                    table_name
-                );
-                return Ok(true);
-            }
-            if value.eq_ignore_ascii_case("none") {
-                log::debug!(
-                    "[ENRICHMENT::URL] {}/{} - Server explicitly disables Range support",
-                    org_id,
-                    table_name
-                );
-                return Ok(false);
-            }
+    if let Some(accept_ranges) = head_response.headers().get("accept-ranges")
+        && let Ok(value) = accept_ranges.to_str()
+    {
+        if value.eq_ignore_ascii_case("bytes") {
+            log::debug!(
+                "[ENRICHMENT::URL] {}/{} - Server advertises Range support via Accept-Ranges header",
+                org_id,
+                table_name
+            );
+            return Ok(true);
+        }
+        if value.eq_ignore_ascii_case("none") {
+            log::debug!(
+                "[ENRICHMENT::URL] {}/{} - Server explicitly disables Range support",
+                org_id,
+                table_name
+            );
+            return Ok(false);
         }
     }
 
@@ -922,6 +925,7 @@ impl UrlCsvProcessor {
     /// - Accumulates records until batch size approaches 500MB
     /// - Reduces database checkpoint frequency (fewer writes)
     /// - Balances memory usage vs. checkpoint overhead
+    #[allow(clippy::too_many_arguments)]
     pub async fn fetch_and_process_batches<F, Fut>(
         &self,
         org_id: &str,
@@ -1515,15 +1519,15 @@ async fn process_enrichment_table_url(
     }
 
     // Notify update
-    if !schema.fields().is_empty() {
-        if let Err(e) = db::enrichment_table::notify_update(org_id, &stream_name).await {
-            log::error!(
-                "[ENRICHMENT::URL] {}/{} - Error notifying enrichment table update: {}",
-                org_id,
-                table_name,
-                e
-            );
-        }
+    if !schema.fields().is_empty()
+        && let Err(e) = db::enrichment_table::notify_update(org_id, &stream_name).await
+    {
+        log::error!(
+            "[ENRICHMENT::URL] {}/{} - Error notifying enrichment table update: {}",
+            org_id,
+            table_name,
+            e
+        );
     }
 
     log::info!(
