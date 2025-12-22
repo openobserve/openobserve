@@ -15,35 +15,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="preview-alert-container card-container" :class="{'preview-alert-container-light': store.state.theme !== 'dark'}" ref="chartPanelRef" style="height: 100%; position: relative">
-    <div class="text-bold"
-    style="width: 100%; padding: 16px 10px; "
-    :style="{ backgroundColor: store.state.theme === 'dark' ? '#2A2A2A' : '#fcfcfc',
-      borderBottom: store.state.theme === 'dark' ? '' : '1px solid #e6e6e6',
-      borderRadius: '0.375rem',
-    }"
-    >
-      Preview
-    </div>
-    <div data-test="alert-preview-chart" class="preview-alert-chart card-container tw-h-[calc(100vh-250px)]">
+  <div class="preview-alert-container" :class="{'preview-alert-container-light': store.state.theme !== 'dark'}" ref="chartPanelRef" style="height: 100%; position: relative; display: flex; flex-direction: column;">
+    <div data-test="alert-preview-chart" class="preview-alert-chart" style="flex: 1; min-height: 0; padding: 1rem;">
       <p class="sql-preview" v-if="selectedTab === 'sql'">
         Preview is not available in SQL mode
       </p>
       <PanelSchemaRenderer
         v-else-if="chartData"
-        :height="6"
-        :width="6"
+        :height="5"
+        :width="5"
         :panelSchema="chartData"
         :selectedTimeObj="dashboardPanelData.meta.dateTime"
         :variablesData="{}"
         searchType="UI"
+        :is_ui_histogram="isUsingBackendSql"
+        style="height: 180px; width: 100%; overflow-x: hidden;"
       />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch, onMounted } from "vue";
 import PanelSchemaRenderer from "../dashboards/PanelSchemaRenderer.vue";
 import { reactive } from "vue";
 import { onBeforeMount } from "vue";
@@ -152,6 +145,10 @@ const props = defineProps({
     type: String,
     default: "",
   },
+  isUsingBackendSql: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 onBeforeMount(() => {
@@ -202,7 +199,7 @@ const refreshData = () => {
   if (props.isAggregationEnabled) {
     yAxis.push({
       aggregationFunction: props.formData.query_condition.aggregation.function,
-      alias: "zo_sql_val",
+      alias: "zo_sql_num",
       color: null,
       column: store.state.zoConfig.timestamp_column || "_timestamp",
       label: t("alerts.numOfEvents"),
@@ -210,7 +207,7 @@ const refreshData = () => {
   } else {
     yAxis.push({
       aggregationFunction: "count",
-      alias: "zo_sql_val",
+      alias: "zo_sql_num",
       color: null,
       column: store.state.zoConfig.timestamp_column || "_timestamp",
       label: t("alerts.numOfEvents"),
@@ -247,6 +244,34 @@ const refreshData = () => {
 
   chartData.value = cloneDeep(dashboardPanelData.data);
 };
+
+// Watch for changes to props and refresh chart data automatically
+watch(
+  () => [
+    props.query,
+    props.formData.stream_name,
+    props.formData.stream_type,
+    props.formData.trigger_condition?.period,
+    props.isAggregationEnabled,
+    props.selectedTab,
+    props.formData.query_condition?.aggregation,
+    props.isUsingBackendSql,
+  ],
+  () => {
+    // Only refresh if we have a valid query and it's not in SQL mode
+    if (props.query && props.selectedTab !== 'sql') {
+      refreshData();
+    }
+  },
+  { deep: true }
+);
+
+// Refresh data on mount if we already have a query
+onMounted(() => {
+  if (props.query && props.selectedTab !== 'sql') {
+    refreshData();
+  }
+});
 
 defineExpose({ refreshData });
 </script>

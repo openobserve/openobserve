@@ -536,6 +536,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(alerts::enable_alert)
         .service(alerts::enable_alert_bulk)
         .service(alerts::trigger_alert)
+        .service(alerts::generate_sql)
         .service(alerts::move_alerts)
         .service(alerts::history::get_alert_history)
         .service(alerts::dedup_stats::get_dedup_summary)
