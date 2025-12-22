@@ -44,7 +44,7 @@ pub async fn add(
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Entity::insert(dbg!(record)).exec(client).await?;
+    Entity::insert(record).exec(client).await?;
 
     Ok(())
 }
@@ -109,22 +109,22 @@ pub async fn count_all_levels(
     // Build the SQL query using window functions for efficient counting
     // This counts all three levels in a single query to avoid multiple round-trips
     let sql = match backend {
-        sea_orm::DatabaseBackend::Postgres => {
+        sea_orm::DatabaseBackend::Postgres | sea_orm::DatabaseBackend::Sqlite => {
             // PostgreSQL uses $1, $2, $3 for parameter placeholders
             "SELECT
-                COUNT(*) OVER () as global_count,
-                SUM(CASE WHEN org_id = $1 THEN 1 ELSE 0 END) OVER () as org_count,
-                SUM(CASE WHEN user_id = $2 THEN 1 ELSE 0 END) OVER () as user_count
+                COUNT(*) as global_count,
+                SUM(CASE WHEN org_id = $1 THEN 1 ELSE 0 END) as org_count,
+                SUM(CASE WHEN org_id = $2 AND user_id = $3 THEN 1 ELSE 0 END) as user_count
             FROM search_queue
-            WHERE work_group = $3
+            WHERE work_group = $4
             LIMIT 1"
         }
-        sea_orm::DatabaseBackend::MySql | sea_orm::DatabaseBackend::Sqlite => {
+        sea_orm::DatabaseBackend::MySql => {
             // MySQL and SQLite use ? for parameter placeholders
             "SELECT
-                COUNT(*) OVER () as global_count,
-                SUM(CASE WHEN org_id = ? THEN 1 ELSE 0 END) OVER () as org_count,
-                SUM(CASE WHEN user_id = ? THEN 1 ELSE 0 END) OVER () as user_count
+                COUNT(*) as global_count,
+                SUM(CASE WHEN org_id = ? THEN 1 ELSE 0 END) as org_count,
+                SUM(CASE WHEN org_id = ? AND user_id = ? THEN 1 ELSE 0 END) as user_count
             FROM search_queue
             WHERE work_group = ?
             LIMIT 1"
@@ -143,6 +143,7 @@ pub async fn count_all_levels(
         backend,
         sql,
         vec![
+            org_id.unwrap_or("").into(),
             org_id.unwrap_or("").into(),
             user_id.unwrap_or("").into(),
             work_group.into(),
