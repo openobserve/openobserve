@@ -21,8 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- For Real-Time Alerts -->
       <template v-if="isRealTime === 'true'">
         <!-- Silence Notification (Cooldown) -->
-        <div class="flex justify-start items-center tw-pb-3 tw-mb-4">
-          <div class="tw-font-semibold flex items-center" style="width: 190px">
+        <div class="flex justify-start items-start tw-pb-3 tw-mb-4">
+          <div class="tw-font-semibold flex items-center" style="width: 190px; height: 36px">
             {{ t("alerts.silenceNotification") + " *" }}
             <q-icon
               name="info"
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Destinations -->
         <div class="flex items-start tw-pb-4 tw-mb-4">
-          <div style="width: 190px" class="flex items-center tw-font-semibold">
+          <div style="width: 190px; height: 36px" class="flex items-center tw-font-semibold">
             <span>{{ t("alerts.destination") }} *</span>
           </div>
           <div class="tw-flex tw-flex-col">
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-else>
         <!-- Aggregation Toggle (only for custom queries, not SQL or PromQL) -->
         <div v-if="queryType === 'custom'" class="flex justify-start items-center tw-font-semibold alert-settings-row">
-          <div class="flex items-center" style="width: 190px">
+          <div class="flex items-center" style="width: 190px; height: 36px">
             {{ t("common.aggregation") }}
             <q-icon
               name="info"
@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="localIsAggregationEnabled && formData.query_condition.aggregation"
           class="flex items-start no-wrap q-mr-sm alert-settings-row"
         >
-          <div class="flex items-center tw-font-semibold" style="width: 190px">
+          <div class="flex items-center tw-font-semibold" style="width: 190px; height: 36px">
             {{ t("alerts.groupBy") }}
             <q-icon
               name="info"
@@ -279,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Threshold -->
         <div class="flex justify-start items-start q-mb-xs no-wrap alert-settings-row">
-          <div class="tw-font-semibold flex items-center" style="width: 190px">
+          <div class="tw-font-semibold flex items-center" style="width: 190px; height: 36px">
             {{ t("alerts.threshold") + " *" }}
             <q-icon
               name="info"
@@ -424,7 +424,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Period -->
         <div class="flex items-start q-mr-sm alert-settings-row">
-          <div class="tw-font-semibold flex items-center" style="width: 190px">
+          <div class="tw-font-semibold flex items-center" style="width: 190px; height: 36px">
             {{ t("alerts.period") + " *" }}
             <q-icon
               name="info"
@@ -475,7 +475,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Frequency (with inline interval/cron toggle) -->
         <div class="flex items-start q-mr-sm alert-settings-row">
-          <div class="tw-font-semibold flex items-center" style="width: 190px">
+          <div class="tw-font-semibold flex items-center" style="width: 190px; height: 36px">
             {{ t("alerts.frequency") + " *" }}
             <q-icon
               name="info"
@@ -623,7 +623,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
         <div class="flex items-start q-mr-sm alert-settings-row">
-          <div class="tw-font-semibold flex items-center" style="width: 190px">
+          <div class="tw-font-semibold flex items-center" style="width: 190px; height: 36px">
             {{ t("alerts.silenceNotification") + " *" }}
             <q-icon
               name="info"
@@ -687,7 +687,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Destinations -->
         <div class="flex items-start q-mr-sm alert-settings-row">
-          <div class="tw-font-semibold flex items-center" style="width: 190px">
+          <div class="tw-font-semibold flex items-center" style="width: 190px; height: 36px">
             {{ t("alerts.destination") + " *" }}
             <q-icon
               name="info"
