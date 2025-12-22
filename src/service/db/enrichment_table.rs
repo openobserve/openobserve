@@ -34,7 +34,7 @@ use vrl::prelude::NotNan;
 use {
     crate::service::search::SEARCH_SERVER,
     o2_enterprise::enterprise::{
-        o2_enterprise::enterprise::super_cluster::queue::ENRICHMENT_TABLE_URL_JOB_KEY,
+        super_cluster::queue::ENRICHMENT_TABLE_URL_JOB_KEY,
         search::TaskStatus,
     },
 };

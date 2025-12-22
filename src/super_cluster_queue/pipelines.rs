@@ -51,7 +51,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             enrichment_table_urls::put(enrichment_url_job).await?;
         }
         MessageType::EnrichmentUrlDelete => {
-            let key_columns: Vec<&str> = key.split('/').collect();
+            let key_columns: Vec<&str> = msg.key.split('/').collect();
             // format is /enrichment_table_url_job/org_id/table_name
             if key_columns.len() != 4 || key_columns[2].is_empty() || key_columns[3].is_empty() {
                 return Err(Error::Message("Invalid key".to_string()));
