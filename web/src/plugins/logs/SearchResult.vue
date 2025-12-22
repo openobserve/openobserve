@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div v-else class="col-7 text-left q-pl-lg warning flex items-center">
-          {{ noOfRecordsTitle }}
+          {{ searchObj.meta.logsVisualizeToggle === 'patterns' ? patternSummaryText : noOfRecordsTitle }}
           <span v-if="searchObj.loadingCounter" class="q-ml-md">
             <q-spinner-hourglass
               color="primary"
@@ -275,11 +275,7 @@ color="warning" size="xs"></q-icon> Error while
           :expandedRows="expandedLogs"
           :highlight-timestamp="searchObj.data?.searchAround?.indexTimestamp"
           :selected-stream-fts-keys="selectedStreamFullTextSearchKeys"
-          :highlight-query="
-            searchObj.meta.sqlMode
-              ? searchObj.data.query.toLowerCase().split('where')[1]
-              : searchObj.data.query.toLowerCase()
-          "
+          :highlight-query="searchObj.data.highlightQuery"
           :default-columns="!searchObj.data.stream.selectedFields.length"
           class="col-12 tw-mt-[0.375rem]"
           :class="[
@@ -299,6 +295,7 @@ color="warning" size="xs"></q-icon> Error while
           @expand-row="expandLog"
           @send-to-ai-chat="sendToAiChat"
           @view-trace="redirectToTraces"
+          @show-correlation="openCorrelationFromLog"
         />
       </template>
 
@@ -314,12 +311,6 @@ color="warning" size="xs"></q-icon> Error while
             : 'table-container--with-histogram',
         ]"
       >
-        <!-- Statistics Bar -->
-        <PatternStatistics
-          v-if="patternsState?.patterns?.statistics"
-          :statistics="patternsState?.patterns?.statistics"
-        />
-
         <!-- Patterns List -->
         <PatternList
           :patterns="patternsState?.patterns?.patterns || []"
@@ -353,14 +344,13 @@ color="warning" size="xs"></q-icon> Error while
             ]
           "
           :stream-type="searchObj.data.stream.streamType"
+          :correlation-props="correlationDashboardProps"
+          :correlation-loading="correlationLoading"
+          :correlation-error="correlationError"
           class="detail-table-dialog"
           :currentIndex="searchObj.meta.resultGrid.navigation.currentRowIndex"
           :totalLength="parseInt(searchObj.data.queryResults.hits.length)"
-          :highlight-query="
-            searchObj.meta.sqlMode
-              ? searchObj.data.query.toLowerCase().split('where')[1]
-              : searchObj.data.query.toLowerCase()
-          "
+          :highlight-query="searchObj.data.highlightQuery"
           @showNextDetail="navigateRowDetail"
           @showPrevDetail="navigateRowDetail"
           @add:searchterm="addSearchTerm"
@@ -376,6 +366,7 @@ color="warning" size="xs"></q-icon> Error while
           "
           @sendToAiChat="sendToAiChat"
           @closeTable="closeTable"
+          @load-correlation="openCorrelationFromLog"
         />
       </q-dialog>
 
@@ -406,6 +397,24 @@ color="warning" size="xs"></q-icon> Error while
         @close="closeVolumeAnalysisDashboard"
       />
     </div>
+
+    <!-- Correlation Dashboard (for inline expanded logs, opens as separate dialog) -->
+    <TelemetryCorrelationDashboard
+      v-if="shouldShowInlineDialog"
+      mode="dialog"
+      :service-name="correlationDashboardProps.serviceName"
+      :matched-dimensions="correlationDashboardProps.matchedDimensions"
+      :additional-dimensions="correlationDashboardProps.additionalDimensions"
+      :metric-streams="correlationDashboardProps.metricStreams"
+      :log-streams="correlationDashboardProps.logStreams"
+      :trace-streams="correlationDashboardProps.traceStreams"
+      :source-stream="correlationDashboardProps.sourceStream"
+      :source-type="correlationDashboardProps.sourceType"
+      :available-dimensions="correlationDashboardProps.availableDimensions"
+      :fts-fields="correlationDashboardProps.ftsFields"
+      :time-range="correlationDashboardProps.timeRange"
+      @close="showCorrelation = false"
+    />
   </div>
 </template>
 
@@ -440,6 +449,9 @@ import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { searchState } from "@/composables/useLogs/searchState";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
+import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
+import type { TelemetryContext } from "@/utils/telemetryCorrelation";
+import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 
 export default defineComponent({
   name: "SearchResult",
@@ -452,9 +464,7 @@ export default defineComponent({
     TenstackTable: defineAsyncComponent(() => import("./TenstackTable.vue")),
     EqualIcon,
     NotEqualIcon,
-    PatternStatistics: defineAsyncComponent(
-      () => import("./patterns/PatternStatistics.vue"),
-    ),
+    TelemetryCorrelationDashboard,
     PatternList: defineAsyncComponent(
       () => import("./patterns/PatternList.vue"),
     ),
@@ -482,6 +492,22 @@ export default defineComponent({
     },
   },
   methods: {
+    formatPatternSummary(stats: any, totalEvents: number, histogramMs: number) {
+      const patternsFound = stats?.total_patterns_found || 0;
+      const logsAnalyzed = (stats?.total_logs_analyzed || 0).toLocaleString();
+      const totalEventsStr = totalEvents ? totalEvents.toLocaleString() : logsAnalyzed;
+
+      // Combine histogram time + pattern extraction time
+      const patternMs = stats?.extraction_time_ms || 0;
+      const totalTimeMs = histogramMs + patternMs;
+
+      return this.$t("search.pattern_summary", {
+        totalEvents: totalEventsStr,
+        patternsFound: patternsFound,
+        logsAnalyzed: logsAnalyzed,
+        totalTime: totalTimeMs
+      });
+    },
     handleColumnSizesUpdate(newColSizes: any) {
       const prevColSizes =
         this.searchObj.data.resultGrid?.colSizes[
@@ -670,6 +696,7 @@ export default defineComponent({
     const $q = useQuasar();
     const searchListContainer = ref(null);
     const noOfRecordsTitle = ref("");
+    const patternSummaryText = ref("");
     const scrollPosition = ref(0);
     const rowsPerPageOptions = [10, 25, 50, 100];
     const disableMoreErrorDetails = ref(false);
@@ -700,6 +727,26 @@ export default defineComponent({
     const originalTimeRangeBeforeSelection = ref<{ startTime: number; endTime: number } | null>(null);
 
     const searchTableRef: any = ref(null);
+
+    // Correlation dashboard state
+    const showCorrelation = ref(false);
+    const correlationContext = ref<TelemetryContext | null>(null);
+    const correlationDashboardProps = ref<any>(null);
+    const correlationLoading = ref(false);
+    const correlationError = ref<string | null>(null);
+    const { findRelatedTelemetry } = useServiceCorrelation();
+
+    // Debug: computed to check why dialog isn't showing
+    const shouldShowInlineDialog = computed(() => {
+      const result = showCorrelation.value && correlationDashboardProps.value && !searchObj.meta.showDetailTab;
+      console.log("[SearchResult] shouldShowInlineDialog:", {
+        showCorrelation: showCorrelation.value,
+        hasProps: !!correlationDashboardProps.value,
+        showDetailTab: searchObj.meta.showDetailTab,
+        result
+      });
+      return result;
+    });
 
     const patternsColumns = [
       {
@@ -826,6 +873,156 @@ export default defineComponent({
     const openLogDetails = (props: any, index: number) => {
       searchObj.meta.showDetailTab = true;
       searchObj.meta.resultGrid.navigation.currentRowIndex = index;
+
+      // Prepare correlation context (but don't open panel automatically)
+      const logData = searchObj.data.queryResults?.hits?.[index];
+      if (logData) {
+        correlationContext.value = {
+          timestamp: logData._timestamp || Date.now() * 1000,
+          fields: logData,
+        };
+      }
+    };
+
+    const openCorrelationPanel = () => {
+      showCorrelation.value = true;
+    };
+
+    const openCorrelationFromLog = async (logData: any) => {
+      console.log("[SearchResult] openCorrelationFromLog called with logData:", logData);
+      console.log("[SearchResult] Current stream:", searchObj.data.stream.selectedStream[0]);
+
+      try {
+        correlationLoading.value = true;
+        correlationError.value = null; // Clear any previous error
+
+        // Set the correlation context from the log data
+        const context: TelemetryContext = {
+          timestamp: logData._timestamp || Date.now() * 1000,
+          fields: logData,
+        };
+        correlationContext.value = context;
+
+        console.log("[SearchResult] Calling findRelatedTelemetry...");
+
+        // Fetch correlation data
+        const result = await findRelatedTelemetry(
+          context,
+          "logs",
+          5, // 5 minute time window
+          searchObj.data.stream.selectedStream[0]
+        );
+
+        console.log("[SearchResult] findRelatedTelemetry result:", result);
+
+        if (!result) {
+          console.warn("[SearchResult] No correlation result returned");
+          correlationError.value = "No matching service found for correlation";
+          $q.notify({
+            type: "warning",
+            message: "No matching service found for correlation",
+            timeout: 3000,
+          });
+          return;
+        }
+
+        if (!result.correlationData) {
+          console.warn("[SearchResult] No correlation data in result");
+          correlationError.value = "Unable to retrieve correlation data";
+          $q.notify({
+            type: "warning",
+            message: "Unable to retrieve correlation data",
+            timeout: 3000,
+          });
+          return;
+        }
+
+        console.log("[SearchResult] Correlation data:", {
+          serviceName: result.correlationData.service_name,
+          metricsCount: result.correlationData.related_streams.metrics.length,
+          tracesCount: result.correlationData.related_streams.traces.length,
+          logsCount: result.correlationData.related_streams.logs.length,
+        });
+
+        // Check if there are any metric streams
+        if (result.correlationData.related_streams.metrics.length === 0) {
+          console.warn("[SearchResult] No metric streams found for correlation");
+          correlationError.value = `No metric streams found for service "${result.correlationData.service_name}"`;
+          $q.notify({
+            type: "info",
+            message: `No metric streams found for service "${result.correlationData.service_name}"`,
+            timeout: 3000,
+          });
+          return;
+        }
+
+        // Prepare props for the dashboard
+        // Calculate time range: ±5 minutes from log timestamp
+        // context.timestamp is in microseconds - pass microseconds directly (like TracesAnalysisDashboard)
+        const timeWindowMicros = 5 * 60 * 1000000; // 5 minutes in microseconds
+        const startTimeMicros = context.timestamp - timeWindowMicros;
+        let endTimeMicros = context.timestamp + timeWindowMicros;
+
+        // Cap end time to current UTC time (never allow future timestamps)
+        const currentTimeMicros = Date.now() * 1000; // Current time in microseconds
+        if (endTimeMicros > currentTimeMicros) {
+          endTimeMicros = currentTimeMicros;
+        }
+
+        // Check if there are any metrics to show
+        if (!result.correlationData.related_streams.metrics || result.correlationData.related_streams.metrics.length === 0) {
+          correlationError.value = "No correlated metrics found for this service";
+          $q.notify({
+            type: "info",
+            message: "No correlated metrics found for this service",
+            timeout: 3000,
+          });
+          return;
+        }
+
+        // Extract FTS fields from stream settings
+        const ftsFields = searchObj.data.stream.selectedStreamFields
+          ?.filter((field: any) => field.ftsKey === true)
+          .map((field: any) => field.name) || [];
+
+        correlationDashboardProps.value = {
+          serviceName: result.correlationData.service_name,
+          matchedDimensions: result.correlationData.matched_dimensions,
+          additionalDimensions: result.correlationData.additional_dimensions || {},
+          metricStreams: result.correlationData.related_streams.metrics,
+          logStreams: result.correlationData.related_streams.logs || [],
+          traceStreams: result.correlationData.related_streams.traces || [],
+          sourceStream: searchObj.data.stream.selectedStream[0],
+          sourceType: "logs",
+          availableDimensions: context.fields, // Actual field names from the log record
+          ftsFields: ftsFields, // Full text search fields for trace_id extraction from log body
+          timeRange: {
+            startTime: startTimeMicros,
+            endTime: endTimeMicros,
+          },
+        };
+
+        // For inline expanded logs, open the correlation dashboard as a dialog
+        // For DetailTable drawer, the data is passed via props (tabs are already visible)
+        console.log("[SearchResult] showDetailTab:", searchObj.meta.showDetailTab);
+        if (!searchObj.meta.showDetailTab) {
+          console.log("[SearchResult] Opening correlation dialog for inline expansion");
+          showCorrelation.value = true;
+        } else {
+          console.log("[SearchResult] DetailTable drawer is open, passing props to drawer tabs");
+        }
+      } catch (err: any) {
+        console.error("[SearchResult] Error in openCorrelationFromLog:", err);
+        correlationError.value = `Correlation error: ${err.message || err}`;
+        $q.notify({
+          type: "negative",
+          message: `Correlation error: ${err.message || err}`,
+          timeout: 3000,
+        });
+        correlationDashboardProps.value = null;
+      } finally {
+        correlationLoading.value = false;
+      }
     };
 
     const openPatternDetails = (pattern: any, index: number) => {
@@ -865,14 +1062,16 @@ export default defineComponent({
     const extractConstantsFromPattern = (template: string): string[] => {
       // Extract longest non-variable strings from pattern template
       // Pattern template has format like: "INFO action <*> at 14:47.1755283"
-      // We want continuous strings between <*> that are longer than 10 chars
+      // Variables can be: <*>, <:IDENTIFIERS>, <:TIMESTAMP>, <:UNIX_TIMESTAMP>, etc.
+      // We want continuous strings between these variables that are longer than 10 chars
       const constants: string[] = [];
-      const parts = template.split("<*>");
+
+      // Split by all variable markers using regex
+      // Matches: <*>, <:WORD>, etc.
+      const parts = template.split(/<[*:][^>]*>/);
 
       for (const part of parts) {
         const trimmed = part.trim();
-        // For now, use the string as-is without sanitization
-        // const sanitized = sanitizeForMatchAll(trimmed);
         // Only include strings longer than 10 characters
         if (trimmed.length > 10) {
           constants.push(trimmed);
@@ -901,10 +1100,15 @@ export default defineComponent({
       // Build multiple match_all() clauses, one for each constant
       // Each match_all takes a single string
       const matchAllClauses = constants.map((constant) => {
-        // Escape backslashes first, then single quotes in the constant
+        // Escape special characters for match_all query
+        // Order matters: backslash must be escaped first
         const escapedConstant = constant
-          .replace(/\\/g, "\\\\")
-          .replace(/'/g, "\\'");
+          .replace(/\\/g, "\\\\")  // Escape backslashes
+          .replace(/'/g, "\\'")     // Escape single quotes
+          .replace(/"/g, '\\"')     // Escape double quotes
+          .replace(/\n/g, "\\n")    // Escape newlines
+          .replace(/\r/g, "\\r")    // Escape carriage returns
+          .replace(/\t/g, "\\t");   // Escape tabs
         return `match_all('${escapedConstant}')`;
       });
 
@@ -922,6 +1126,9 @@ export default defineComponent({
 
       // Set the filter to be added to the query
       searchObj.data.stream.addToFilter = filterExpression;
+
+      // Switch to logs view to show the filtered results
+      searchObj.meta.logsVisualizeToggle = "logs";
     };
 
     const getRowIndex = (next: boolean, prev: boolean, oldIndex: number) => {
@@ -939,6 +1146,11 @@ export default defineComponent({
         Number(searchObj.meta.resultGrid.navigation.currentRowIndex),
       );
       searchObj.meta.resultGrid.navigation.currentRowIndex = newIndex;
+
+      // Clear correlation data when navigating to a different log
+      // User will need to click a correlation tab again for the new log
+      correlationDashboardProps.value = null;
+      correlationLoading.value = false;
     };
 
     const addSearchTerm = (
@@ -1180,6 +1392,7 @@ export default defineComponent({
       extractFTSFields,
       useLocalWrapContent,
       noOfRecordsTitle,
+      patternSummaryText,
       scrollPosition,
       rowsPerPageOptions,
       pageNumberInput,
@@ -1215,6 +1428,14 @@ export default defineComponent({
       extractConstantsFromPattern,
       openVolumeAnalysisDashboard,
       closeVolumeAnalysisDashboard,
+      showCorrelation,
+      correlationContext,
+      correlationDashboardProps,
+      correlationLoading,
+      correlationError,
+      shouldShowInlineDialog,
+      openCorrelationPanel,
+      openCorrelationFromLog,
     };
   },
   computed: {
@@ -1226,6 +1447,9 @@ export default defineComponent({
     },
     updateTitle() {
       return this.searchObj.data.histogram.chartParams.title;
+    },
+    updatePatternSummary() {
+      return this.patternsState?.patterns?.statistics;
     },
     reDrawChartData() {
       return this.searchObj.data.histogram;
@@ -1249,6 +1473,20 @@ export default defineComponent({
     updateTitle() {
       this.noOfRecordsTitle = this.searchObj.data.histogram.chartParams.title;
     },
+    updatePatternSummary() {
+      if (this.patternsState?.patterns?.statistics) {
+        // Reuse the same summary logic from PatternStatistics component
+        const stats = this.patternsState.patterns.statistics;
+        const totalEvents = this.searchObj.data.queryResults?.total || stats.total_logs_analyzed || 0;
+        const histogramMs = this.searchObj.data.queryResults?.took || 0;
+        
+        this.patternSummaryText = this.formatPatternSummary(
+          stats,
+          totalEvents,
+          histogramMs
+        );
+      }
+    },
     reDrawChartData: {
       deep: true,
       handler: function () {
@@ -1261,4 +1499,35 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 @import "@/styles/logs/search-result.scss";
+
+/* Correlation Panel Styles */
+.correlation-panel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 3000;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.correlation-panel-container {
+  width: 450px;
+  max-width: 90vw;
+  height: 100vh;
+  background: var(--q-background, #ffffff);
+  box-shadow: -2px 0 12px rgba(0, 0, 0, 0.15);
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
 </style>

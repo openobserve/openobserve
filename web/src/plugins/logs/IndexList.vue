@@ -82,9 +82,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="logs-search-no-field-found-text"
         class="text-center col-10 q-mx-none"
       >
-        <q-icon name="info" color="primary"
-size="xs" /> No field found in
-        selected stream.
+        <q-icon name="info" color="primary" size="xs" />
+        {{ t("search.noFieldFoundInStream") }}
       </h3>
     </div>
     <div v-else class="index-table q-mt-xs">
@@ -208,28 +207,37 @@ export default defineComponent({
       //we will also us the quasar's updateInputValue method to clear the input value
       this.$nextTick(() => {
         const indexListSelectField = this.$refs.streamSelect;
-        if (indexListSelectField && indexListSelectField.updateInputValue) {
+        if (indexListSelectField && indexListSelectField.inputValue && indexListSelectField.updateInputValue) {
           indexListSelectField.updateInputValue("");
         }
       });
       this.onStreamChange("");
+      this.resetPagination();
     },
     handleSingleStreamSelect(opt: any) {
       if (this.searchObj.data.stream.selectedStream.indexOf(opt.value) == -1) {
         this.searchObj.data.stream.selectedFields = [];
       }
       this.searchObj.data.stream.selectedStream = [opt.value];
-      // Clear the filter input when single stream is selected
+      // Clear the filter input and close the menu when single stream is selected
       //we will first check if qselect is there or not and then call the method
       //we will use the quasar next tick to ensure that the dom is updated before we call the method
       //we will also us the quasar's updateInputValue method to clear the input value
       this.$nextTick(() => {
         const indexListSelectField = this.$refs.streamSelect;
-        if (indexListSelectField && indexListSelectField.updateInputValue) {
-          indexListSelectField.updateInputValue("");
+        if (indexListSelectField) {
+          // Clear the search input
+          if (indexListSelectField.updateInputValue) {
+            indexListSelectField.updateInputValue("");
+          }
+          // // Close the dropdown menu
+          // if (indexListSelectField.hidePopup) {
+          //   indexListSelectField.hidePopup();
+          // }
         }
       });
       this.onStreamChange("");
+      this.resetPagination();
     },
   },
   setup(props, { emit }) {
@@ -1076,7 +1084,7 @@ export default defineComponent({
 
     const placeHolderText = computed(() => {
       return searchObj.data.stream?.selectedStream?.length === 0
-        ? "Select Stream"
+        ? t("search.selectStream")
         : "";
     });
 
@@ -1447,6 +1455,7 @@ export default defineComponent({
       streamList,
       hasUserDefinedSchemas,
       setPage,
+      resetPagination,
     };
   },
 });

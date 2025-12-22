@@ -136,7 +136,7 @@ test.describe("HTML chart dashboard", () => {
 
     await pm.chartTypeSelector.selectChartType("html");
 
-    await pm.dashboardTimeRefresh.setRelative("15", "m");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
 
     await page
       .locator('[data-test="dashboard-html-editor"]')

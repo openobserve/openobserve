@@ -114,7 +114,10 @@ class SchemaLoadPage {
         
         // Wait for the search to complete
         await searchResponsePromise;
-        await this.page.waitForLoadState('networkidle', { timeout: 30000 });
+        // Use non-blocking wait for networkidle as the page may have long-polling connections
+        await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {
+            testLogger.debug('Network idle timeout after search - continuing with verification');
+        });
         
         // Check if results are present - if no results, that's still success for schema verification
         try {
@@ -211,43 +214,39 @@ class SchemaLoadPage {
             // Step 1: Navigate to streams page first to verify stream exists
             await this.navigateToStreams();
             await this.searchStreamInStreamsPage(streamName);
-            
-            // Wait for stream to be visible in streams page
-            const streamExists = await this.page.locator(`text="${streamName}"`).isVisible();
-            if (!streamExists) {
-                testLogger.error('Stream not found in streams page', { streamName });
+
+            // Wait for stream to be visible in streams page with proper timeout
+            try {
+                const streamLocator = this.page.locator(`text="${streamName}"`).first();
+                await streamLocator.scrollIntoViewIfNeeded({ timeout: 20000 });
+                testLogger.debug('Stream verified in streams page', { streamName });
+            } catch (error) {
+                testLogger.error('Stream not found in streams page', { streamName, error: error.message });
                 throw new Error(`Stream ${streamName} not found in streams page after ingestion`);
             }
-            testLogger.debug('Stream verified in streams page', { streamName });
 
             // Step 2: Navigate to logs and verify stream is available in log search
             await this.navigateToLogs();
-            await this.page.waitForTimeout(1000); // Wait after navigating back to logs
-            
-            // Try a more direct approach - just check if we can see any streams at all
+            await this.page.waitForTimeout(2000); // Wait after navigating back to logs
+
+            // Open the stream dropdown and search for the stream
             await this.page.waitForSelector(this.schemaLoadLocators.logSearchIndexSelectStream, { state: 'visible' });
             await this.page.locator(this.schemaLoadLocators.logSearchIndexSelectStream).click();
             await this.page.waitForLoadState('domcontentloaded');
-            
-            // Look for our stream in the dropdown by partial text match
-            const streamVisible = await this.page.getByText(streamName, { exact: false }).first().isVisible();
-            if (!streamVisible) {
-                testLogger.debug('Stream not visible in dropdown, trying refresh');
-                await this.page.reload();
-                await this.page.waitForLoadState('domcontentloaded');
-                await this.page.waitForSelector(this.schemaLoadLocators.logSearchIndexSelectStream, { state: 'visible' });
-                await this.page.locator(this.schemaLoadLocators.logSearchIndexSelectStream).click();
-            }
-            
-            // Click on the stream name directly
-            await this.page.waitForTimeout(1000);
+
+            // Type the stream name to filter the dropdown
+            await this.page.locator(this.schemaLoadLocators.logSearchIndexSelectStream).fill(streamName);
+            await this.page.waitForTimeout(2000); // Wait for filtering to complete
             await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-            // Wait for the stream to be visible in the dropdown
+            // Find the stream in the filtered results and click it
             const streamLocator = this.page.getByText(streamName, { exact: false }).first();
-            await streamLocator.waitFor({ state: 'visible', timeout: 15000 });
+            await streamLocator.scrollIntoViewIfNeeded({ timeout: 20000 });
             await streamLocator.click();
-            await this.page.waitForLoadState('networkidle', { timeout: 30000 });
+            // Use a non-blocking wait for networkidle as the page may have long-polling connections
+            await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {
+                testLogger.debug('Network idle timeout after stream click - continuing with verification');
+            });
             
             // Step 3: Basic verification - refresh and verify search functionality works
             await this.refreshLogs();

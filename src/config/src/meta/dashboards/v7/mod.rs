@@ -68,6 +68,7 @@ impl From<Dashboard> for super::Dashboard {
             v5: None,
             v6: None,
             v7: Some(value),
+            v8: None,
             version,
             hash,
             updated_at,
@@ -174,6 +175,8 @@ pub struct AxisItem {
     pub having_conditions: Option<Vec<HavingConditions>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub treat_as_non_timestamp: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub show_field_as_json: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]

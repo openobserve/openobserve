@@ -29,7 +29,7 @@ use crate::{
         meta::{
             http::HttpResponse as MetaHttpResponse,
             ingestion::{
-                GCPIngestionRequest, HecResponse, HecStatus, IngestionRequest,
+                GCPIngestionRequest, HecResponse, HecStatus, IngestUser, IngestionRequest,
                 KinesisFHIngestionResponse, KinesisFHRequest,
             },
         },
@@ -94,7 +94,14 @@ pub async fn bulk(
         0
     };
 
-    let mut resp = match logs::bulk::ingest(**thread_id, &org_id, body, user_email).await {
+    let mut resp = match logs::bulk::ingest(
+        **thread_id,
+        &org_id,
+        body,
+        IngestUser::from_user_email(user_email.clone()),
+    )
+    .await
+    {
         Ok(v) => MetaHttpResponse::json(v),
         Err(e) => {
             // we do not want to log trial period expired errors
@@ -180,8 +187,8 @@ pub async fn multi(
         **thread_id,
         &org_id,
         &stream_name,
-        IngestionRequest::Multi(&body),
-        user_email,
+        IngestionRequest::Multi(body),
+        IngestUser::from_user_email(user_email.clone()),
         None,
         false,
     )
@@ -275,8 +282,8 @@ pub async fn json(
         **thread_id,
         &org_id,
         &stream_name,
-        IngestionRequest::JSON(&body),
-        user_email,
+        IngestionRequest::JSON(body),
+        IngestUser::from_user_email(user_email.clone()),
         None,
         false,
     )
@@ -368,8 +375,8 @@ pub async fn handle_kinesis_request(
             **thread_id,
             &org_id,
             &stream_name,
-            IngestionRequest::KinesisFH(&post_data.into_inner()),
-            user_email,
+            IngestionRequest::KinesisFH(post_data.into_inner()),
+            IngestUser::from_user_email(user_email.clone()),
             None,
             false,
         )
@@ -432,8 +439,8 @@ pub async fn handle_gcp_request(
             **thread_id,
             &org_id,
             &stream_name,
-            IngestionRequest::GCP(&post_data.into_inner()),
-            user_email,
+            IngestionRequest::GCP(post_data.into_inner()),
+            IngestUser::from_user_email(user_email.clone()),
             None,
             false,
         )

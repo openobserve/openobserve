@@ -358,6 +358,7 @@ pub async fn check_cache(
                     }),
                     req.query.start_time,
                     req.query.end_time,
+                    histogram_interval,
                     &mut deltas,
                 );
 
@@ -388,9 +389,13 @@ pub async fn check_cache(
                 }
             }
         };
-        multi_resp.deltas = c_resp.deltas.clone();
         multi_resp.has_cached_data = c_resp.has_cached_data;
-        multi_resp.cached_response.push(c_resp);
+        if !c_resp.deltas.is_empty() {
+            multi_resp.deltas = c_resp.deltas.clone();
+        };
+        if c_resp.has_cached_data {
+            multi_resp.cached_response.push(c_resp);
+        }
         multi_resp.took = start.elapsed().as_millis() as usize;
         multi_resp.cache_query_response = true;
         multi_resp.limit = sql.limit as i64;
@@ -482,11 +487,13 @@ pub async fn get_cached_results(
     let last_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap());
     let data_start_time = std::cmp::min(first_ts, last_ts);
     let data_end_time = std::cmp::max(first_ts, last_ts);
+    // convert histogram interval to microseconds
+    let histogram_interval = cached_response.histogram_interval.unwrap_or_default() * 1_000_000;
     // check if need to filter the data
     if data_start_time < cache_req.q_start_time || data_end_time > cache_req.q_end_time {
         cached_response.hits.retain(|hit| {
             let hit_ts = get_ts_value(&cache_req.ts_column, hit);
-            hit_ts < hits_allowed_end_time && hit_ts >= hits_allowed_start_time
+            hit_ts + histogram_interval < hits_allowed_end_time && hit_ts >= hits_allowed_start_time
         });
         // if the data is empty after filtering, return None
         if cached_response.hits.is_empty() {
@@ -494,7 +501,8 @@ pub async fn get_cached_results(
         }
         // reset the start and end time
         let first_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.first().unwrap());
-        let last_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap());
+        let last_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap())
+            + histogram_interval;
         matching_meta.start_time = std::cmp::min(first_ts, last_ts);
         matching_meta.end_time = std::cmp::max(first_ts, last_ts);
     }
@@ -523,6 +531,7 @@ pub fn calculate_deltas(
     result_meta: &ResultCacheMeta,
     query_start_time: i64,
     query_end_time: i64,
+    histogram_interval: i64,
     deltas: &mut Vec<QueryDelta>,
 ) {
     if query_start_time == result_meta.start_time && query_end_time == result_meta.end_time {
@@ -535,8 +544,13 @@ pub fn calculate_deltas(
         // for delta start time we need to add 1 microsecond to the end time
         // because we will include the start_time, if we don't add 1 microsecond
         // the start_time will be include in the next search, we will get duplicate data
+        let delta_start_time = if histogram_interval > 0 {
+            result_meta.end_time
+        } else {
+            result_meta.end_time + 1
+        };
         deltas.push(QueryDelta {
-            delta_start_time: result_meta.end_time + 1,
+            delta_start_time,
             delta_end_time: query_end_time,
         });
     }
@@ -913,9 +927,7 @@ fn calculate_deltas_multi(
             .last()
             .is_some_and(|last_meta| !last_meta.cached_response.hits.is_empty())
     {
-        // Adding histogram interval to the current end time to ensure the next query
-        // fetches the data after the last cache result timestamp, thereby avoiding duplicates
-        let mut expected_delta_start_time = current_end_time + histogram_interval.abs();
+        let mut expected_delta_start_time = current_end_time;
         if expected_delta_start_time > end_time {
             expected_delta_start_time = current_end_time;
         }
@@ -924,9 +936,6 @@ fn calculate_deltas_multi(
             delta_end_time: end_time,
         });
     }
-
-    // remove all deltas that are within the cache duration
-    // deltas.retain(|d| d.delta_start_time >= new_start_time);
 
     deltas.sort(); // Sort the deltas to bring duplicates together
     deltas.dedup(); // Remove consecutive duplicates
@@ -989,6 +998,7 @@ mod tests {
                 converted_histogram_query: None,
                 is_histogram_eligible: None,
                 query_index: None,
+                peak_memory_usage: Some(1024000.0),
             },
             deltas: vec![],
             has_cached_data: true,
@@ -1113,6 +1123,7 @@ mod tests {
                     converted_histogram_query: None,
                     is_histogram_eligible: None,
                     query_index: None,
+                    peak_memory_usage: Some(1024000.0),
                 },
                 deltas: vec![],
                 has_cached_data: true,
@@ -1151,6 +1162,7 @@ mod tests {
                     converted_histogram_query: None,
                     is_histogram_eligible: None,
                     query_index: None,
+                    peak_memory_usage: Some(1024000.0),
                 },
                 deltas: vec![],
                 has_cached_data: true,

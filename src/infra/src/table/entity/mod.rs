@@ -4,6 +4,8 @@ pub mod prelude;
 
 pub mod action_scripts;
 pub mod alert_dedup_state;
+pub mod alert_incident_alerts;
+pub mod alert_incidents;
 pub mod alerts;
 pub mod cipher_keys;
 pub mod compactor_manual_jobs;
@@ -24,7 +26,9 @@ pub mod search_job_partitions;
 pub mod search_job_results;
 pub mod search_jobs;
 pub mod search_queue;
+pub mod sessions;
 pub mod system_prompts;
+pub mod system_settings;
 pub mod templates;
 pub mod timed_annotation_panels;
 pub mod timed_annotations;

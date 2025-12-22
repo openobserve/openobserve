@@ -229,8 +229,8 @@ describe('License.vue', () => {
       expect(wrapper.text()).toContain('test-installation-123');
     });
 
-    it('should display license active status as badge', () => {
-      expect(wrapper.text()).toContain('Yes');
+    it('should display license status as badge', () => {
+      expect(wrapper.text()).toContain('Active');
     });
 
     it('should display company name', () => {

@@ -42,6 +42,13 @@ body {
   box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
 }
 
+// Alert field highlight animation
+.alert-field-highlight {
+  border: 2px solid var(--q-primary) !important;
+  border-radius: 4px;
+  transition: border 0.3s ease;
+}
+
 .q-page {
   border-radius: 0.375rem;
 }
@@ -1523,6 +1530,12 @@ body {
 
   // Smooth fade-in animation
   animation: tooltipFadeIn 0.2s ease-out;
+
+  // Override max-width for pipeline view tooltips
+  &:has(.pipeline-view-tooltip) {
+    max-width: min(520px, 85vw) !important;
+    padding: 12px !important;
+  }
 }
 
 @keyframes tooltipFadeIn {

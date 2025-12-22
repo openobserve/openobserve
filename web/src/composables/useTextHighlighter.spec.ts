@@ -240,7 +240,7 @@ describe("useTextHighlighter", () => {
       expect(result).toContain("hello");
       expect(result).toContain("world");
       // Brackets should be styled with gray color
-      expect(result).toContain("#9ca3af");
+      expect(result).toContain("log-object-brace");
     });
   });
 
@@ -313,6 +313,97 @@ describe("useTextHighlighter", () => {
         colors,
       );
       expect(result).toBe("#D97706");
+    });
+
+    it("should detect valid HTTP status codes", () => {
+      // Note: status_code maps to colors.numberValue in getColorForType
+      const colors = { numberValue: "#f57c00", stringValue: "#047857" };
+
+      // Valid 1xx codes
+      expect(textHighlighter.getSingleSemanticColor("100", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("101", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("103", colors)).toBe("#f57c00");
+
+      // Valid 2xx codes
+      expect(textHighlighter.getSingleSemanticColor("200", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("201", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("204", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("226", colors)).toBe("#f57c00");
+
+      // Valid 3xx codes
+      expect(textHighlighter.getSingleSemanticColor("301", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("302", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("304", colors)).toBe("#f57c00");
+
+      // Valid 4xx codes
+      expect(textHighlighter.getSingleSemanticColor("400", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("401", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("404", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("429", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("451", colors)).toBe("#f57c00");
+
+      // Valid 5xx codes
+      expect(textHighlighter.getSingleSemanticColor("500", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("502", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("503", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("511", colors)).toBe("#f57c00");
+    });
+
+    it("should NOT detect invalid 3-digit numbers as status codes", () => {
+      // Note: status_code maps to colors.numberValue in getColorForType
+      const colors = { numberValue: "#f57c00", stringValue: "#047857" };
+
+      expect(textHighlighter.getSingleSemanticColor("147", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("189", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("256", colors)).not.toBe("#f57c00");
+
+      // Invalid 1xx codes (only 100-103 are valid)
+      expect(textHighlighter.getSingleSemanticColor("104", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("199", colors)).not.toBe("#f57c00");
+
+      // Invalid 2xx codes
+      expect(textHighlighter.getSingleSemanticColor("209", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("227", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("299", colors)).not.toBe("#f57c00");
+
+      // Invalid 3xx codes
+      expect(textHighlighter.getSingleSemanticColor("309", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("399", colors)).not.toBe("#f57c00");
+
+      // Invalid 4xx codes
+      expect(textHighlighter.getSingleSemanticColor("432", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("450", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("452", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("499", colors)).not.toBe("#f57c00");
+
+      // Invalid 5xx codes
+      expect(textHighlighter.getSingleSemanticColor("512", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("599", colors)).not.toBe("#f57c00");
+
+      // Completely out of range
+      expect(textHighlighter.getSingleSemanticColor("600", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("999", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("000", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("099", colors)).not.toBe("#f57c00");
+    });
+
+    it("should correctly detect status codes in context (address example)", () => {
+      const colors = { status_code: "#f57c00", stringValue: "#047857" };
+      const mockColors = {
+        stringValue: "#047857",
+        status_code: "#f57c00",
+      };
+
+      // Test the actual bug case: "147 test address" should not highlight 147 as status code
+      const result = textHighlighter.processTextWithHighlights(
+        "147 test address",
+        "",
+        mockColors,
+      );
+
+      // Should NOT contain status_code styling for 147
+      // 147 is not a valid HTTP status code
+      expect(result).not.toContain("log-status_code");
     });
   });
 
@@ -406,7 +497,7 @@ describe("useTextHighlighter", () => {
         "match_all('error')",
         mockColors,
       );
-      expect(result).toContain("background-color: rgb(255, 213, 0)");
+      expect(result).toContain("log-highlighted");
       expect(result).toContain("error");
     });
 
@@ -416,7 +507,7 @@ describe("useTextHighlighter", () => {
         "",
         mockColors,
       );
-      expect(result).toContain("color: #047857");
+      expect(result).toContain("log-string");
       // New behavior: text is tokenized into separate spans
       expect(result).toContain("normal");
       expect(result).toContain("text");
@@ -428,7 +519,7 @@ describe("useTextHighlighter", () => {
         "",
         mockColors,
       );
-      expect(result).toContain("color: #D97706");
+      expect(result).toContain("log-ip");
       expect(result).toContain("192.168.1.1");
     });
 
@@ -438,7 +529,7 @@ describe("useTextHighlighter", () => {
         "match_all('IP')",
         mockColors,
       );
-      expect(result).toContain("background-color: rgb(255, 213, 0)");
+      expect(result).toContain("log-highlighted");
       expect(result).toContain("IP");
     });
 

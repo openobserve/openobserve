@@ -21,7 +21,9 @@ use infra::errors::Result;
 use serde::Deserialize;
 
 use crate::{
-    common::meta::ingestion::{HecResponse, HecStatus, IngestionRequest},
+    common::meta::ingestion::{
+        HecResponse, HecStatus, IngestUser, IngestionRequest, IngestionValueType,
+    },
     service::ingestion::check_ingestion_allowed,
 };
 
@@ -101,9 +103,17 @@ pub async fn ingest(
     }
 
     for (stream, entries) in streams {
-        let in_req = IngestionRequest::Hec(&entries);
-        if let Err(e) =
-            super::ingest::ingest(thread_id, org_id, &stream, in_req, user_email, None, false).await
+        let in_req = IngestionRequest::JsonValues(IngestionValueType::Hec, entries);
+        if let Err(e) = super::ingest::ingest(
+            thread_id,
+            org_id,
+            &stream,
+            in_req,
+            IngestUser::from_user_email(user_email.to_string()),
+            None,
+            false,
+        )
+        .await
         {
             return Ok(HecStatus::Custom(e.to_string(), 400).into());
         }

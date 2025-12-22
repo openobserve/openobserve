@@ -43,6 +43,8 @@ use crate::service::{
 mod storage;
 mod wal;
 
+type Context = (SessionContext, Arc<Schema>, ScanStats, bool);
+
 struct StorageProvider {
     trace_id: String,
     need_wal: bool,
@@ -58,7 +60,7 @@ impl TableProvider for StorageProvider {
         matchers: Matchers,
         label_selector: HashSet<String>,
         filters: &mut [(String, Vec<String>)],
-    ) -> datafusion::error::Result<Vec<(SessionContext, Arc<Schema>, ScanStats)>> {
+    ) -> datafusion::error::Result<Vec<Context>> {
         let mut ctxs = Vec::new();
         // register storage table
         let trace_id = self.trace_id.to_owned() + "-storage-" + stream_name;
@@ -391,8 +393,8 @@ async fn get_max_file_list(
         let stream_file_list = crate::service::file_list::query(
             trace_id,
             org_id,
-            &stream_name,
             StreamType::Metrics,
+            &stream_name,
             PartitionTimeLevel::default(),
             start,
             end,

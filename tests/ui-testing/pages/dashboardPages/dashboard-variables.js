@@ -2,6 +2,7 @@
 //methods: addDashboardVariable, selectValueFromVariableDropDown
 //addDashboardVariable params: name, streamtype, streamName, field, customValueSearch, filterConfig, showMultipleValues
 import { expect } from "@playwright/test";
+import { waitForValuesStreamComplete } from "../../playwright-tests/utils/streaming-helpers.js";
 
 export default class DashboardVariables {
   constructor(page) {
@@ -56,21 +57,20 @@ export default class DashboardVariables {
     await this.page
       .getByRole("option", { name: streamName, exact: true })
       .click();
-
     // Select Field
-    const fieldSelect = this.page.locator('[data-test="dashboard-variable-field-select"]');
+    const fieldSelect = await this.page.locator('[data-test="dashboard-variable-field-select"]');
     await fieldSelect.click();
-    await fieldSelect.fill(field);
+    await this.page.keyboard.type(field, {delay:100});
 
     // Wait for dropdown to have options available
     await this.page.waitForFunction(
-      () => {
-        const options = document.querySelectorAll('[role="option"]');
-        return options.length > 0;
-      },
-      { timeout: 10000, polling: 100 }
-    );
-
+        () => {
+            const options = document.querySelectorAll('[role="option"]');
+            return options.length > 0;
+          },
+          { timeout: 10000, polling: 100 }
+        );
+        
     // Try to select the field from dropdown - use multiple strategies
     let fieldSelected = false;
 
@@ -104,7 +104,26 @@ export default class DashboardVariables {
           await this.page.keyboard.press('Enter');
           fieldSelected = true;
         } catch (e3) {
-          fieldSelected = false;
+          // Strategy 4: Use JavaScript to directly click matching option (for deploy environment)
+          try {
+            const clicked = await this.page.evaluate((fieldName) => {
+              const options = document.querySelectorAll('[role="option"]');
+              for (const option of options) {
+                if (option.textContent.trim() === fieldName) {
+                  option.click();
+                  return true;
+                }
+              }
+              return false;
+            }, field);
+
+            if (clicked) {
+              await this.page.waitForTimeout(500);
+              fieldSelected = true;
+            }
+          } catch (e4) {
+            fieldSelected = false;
+          }
         }
       }
     }
@@ -205,8 +224,24 @@ export default class DashboardVariables {
   async selectValueFromVariableDropDown(label, value) {
     const input = this.page.getByLabel(label, { exact: true });
     await input.waitFor({ state: "visible", timeout: 10000 });
+
+    // Wait for _values_stream API call when clicking on the dropdown
+    // Start listening before the action to ensure we capture the stream
+    const valuesStreamPromise = waitForValuesStreamComplete(this.page);
+
     await input.click();
+
+    // Wait for the values stream to complete (waits for 'data: [[DONE]]' marker)
+    await valuesStreamPromise;
+
+    // Wait for _values_stream API call when filling/searching
+    // Start listening before filling to capture the search stream
+    // const searchStreamPromise = waitForValuesStreamComplete(this.page);
+
     await input.fill(value);
+
+    // // Wait for search stream to complete (waits for 'data: [[DONE]]' marker)
+    // await searchStreamPromise;
 
     const option = this.page.getByRole("option", { name: value });
     await option.waitFor({ state: "visible", timeout: 10000 });

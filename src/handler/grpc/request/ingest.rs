@@ -25,7 +25,10 @@ use proto::cluster_rpc::{
 };
 use tonic::{Request, Response, Status};
 
-use crate::service::ingestion::create_log_ingestion_req;
+use crate::{
+    common::meta::ingestion::{IngestUser, SystemJobType},
+    service::ingestion::create_log_ingestion_req,
+};
 
 #[derive(Default)]
 pub struct Ingester;
@@ -52,18 +55,20 @@ impl Ingest for Ingester {
             })
             .unwrap_or(false);
 
+        let internal_user = IngestUser::SystemJob(SystemJobType::InternalGrpc);
+
         let resp = match stream_type {
             StreamType::Logs => {
                 let log_ingestion_type = req.ingestion_type.unwrap_or_default();
                 let data = bytes::Bytes::from(in_data.data);
-                match create_log_ingestion_req(log_ingestion_type, &data) {
+                match create_log_ingestion_req(log_ingestion_type, data) {
                     Err(e) => Err(e),
                     Ok(ingestion_req) => crate::service::logs::ingest::ingest(
                         0,
                         &org_id,
                         &stream_name,
                         ingestion_req,
-                        "",
+                        internal_user.clone(),
                         None,
                         is_derived,
                     )
@@ -83,7 +88,7 @@ impl Ingest for Ingester {
                     )))
                 } else {
                     let data = bytes::Bytes::from(in_data.data);
-                    crate::service::metrics::json::ingest(&org_id, data, "")
+                    crate::service::metrics::json::ingest(&org_id, data, internal_user)
                         .await
                         .map(|_| ()) // we don't care about success response
                         .map_err(|e| Error::IngestionError(format!("error in ingesting metrics {e}")))
@@ -102,7 +107,7 @@ impl Ingest for Ingester {
                 } else {
                     let data = bytes::Bytes::from(in_data.data);
                     // internal ingestion does not require email id
-                    crate::service::traces::ingest_json(&org_id, data, OtlpRequestType::Grpc, &stream_name, "")
+                    crate::service::traces::ingest_json(&org_id, data, OtlpRequestType::Grpc, &stream_name, internal_user)
                         .await
                         .map(|_| ()) // we don't care about success response
                         .map_err(|e| Error::IngestionError(format!("error in ingesting traces {e}")))
@@ -159,14 +164,14 @@ impl Ingest for Ingester {
                 // Service graph edges - use same pattern as Logs
                 let log_ingestion_type = req.ingestion_type.unwrap_or_default();
                 let data = bytes::Bytes::from(in_data.data);
-                match create_log_ingestion_req(log_ingestion_type, &data) {
+                match create_log_ingestion_req(log_ingestion_type, data) {
                     Err(e) => Err(e),
                     Ok(ingestion_req) => crate::service::logs::ingest::ingest(
                         0,
                         &org_id,
                         &stream_name,
                         ingestion_req,
-                        "",
+                        internal_user,
                         None,
                         is_derived,
                     )

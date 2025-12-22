@@ -30,31 +30,36 @@
         backgroundColor: computedStyleMap
     }"
     >
-        <div class="tw-w-fit condition-tabs el-border">
-          <AppTabs
-            data-test="scheduled-alert-tabs"
-            :tabs="tabOptions"
-            class="tw-h-[20px] custom-tabs-selection-container"
-            v-model:active-tab="label"
-            @update:active-tab="toggleLabel"
-          />
+      <!-- V2: Group-level toggle only for nested groups (depth > 0) -->
+      <!-- Root group (depth 0) doesn't need toggle - its logicalOperator is dummy -->
+      <div v-if="depth > 0" class="tw-w-fit condition-tabs el-border">
+        <AppTabs
+          data-test="scheduled-alert-tabs"
+          :tabs="tabOptions"
+          class="tw-h-[20px] custom-tabs-selection-container"
+          v-model:active-tab="label"
+          @update:active-tab="toggleLabel"
+        />
       </div>
+      <!-- Spacer for root group to maintain consistent spacing -->
+      <div v-else class="tw-h-[14px]"></div>
 
       <!-- Group content -->
 
       <div v-if="isOpen" class="tw-overflow-x-auto group-container" :class="store.state.theme === 'dark' ? 'dark-mode-group' : 'light-mode-group'">
-        <!-- Items in group -->
-        <div class="tw-ml-2 tw-whitespace-nowrap " v-for="(item, index) in props.group.items" :key="index">
+        <!-- Items in group (V2 uses 'conditions' array) -->
+        <div class="tw-ml-2 tw-whitespace-nowrap " v-for="(item, index) in props.group.conditions" :key="index">
           <FilterGroup
             v-if="isGroup(item)"
             :group="item"
             :depth="depth + 1"
+            :is-first-group="index === 0 && depth === 0"
             @add-condition="emit('add-condition', $event)"
             @add-group="emit('add-group', $event)"
             @remove-group="emit('remove-group', $event)"
             :stream-fields="props.streamFields"
             :condition-input-width="props.conditionInputWidth"
-            :disable-first-condition="props.disableFirstCondition"
+            :allow-custom-columns="props.allowCustomColumns"
             @input:update="(name, field) => inputUpdate(name, field)"
           />
           <div
@@ -67,11 +72,13 @@
                 :stream-fields="props.streamFields"
                 @input:update="(name, field) => inputUpdate(name, field)"
                 :index="index"
-                :label="group.label"
+                :label="group.logicalOperator?.toLowerCase() || 'and'"
                 :depth="depth"
                 :input-width="props.conditionInputWidth"
+                :is-first-in-group="index === 0"
+                :allow-custom-columns="props.allowCustomColumns"
             />
-            <div class="tw-mb-1" v-if="!(props.disableFirstCondition && index === 0 && depth === 0)">
+            <div class="tw-mb-3">
                 <q-btn data-test="alert-conditions-delete-condition-btn" icon="close" size="10px" flat border-less @click="removeCondition(item.id)" />
             </div>
                 </div>
@@ -154,6 +161,7 @@
     import { getUUID } from '@/utils/zincutils';
     import AppTabs from '../common/AppTabs.vue';
     import ConfirmDialog from '@/components/ConfirmDialog.vue';
+    import { buildConditionsString } from '@/utils/alerts/conditionsFormatter';
     const props = defineProps({
     group: {
         type: Object,
@@ -177,9 +185,29 @@
         default: '',
         required: false,
     },
-    disableFirstCondition: {
+    isFirstGroup: {
         type: Boolean,
-        default: true,
+        default: false,
+        required: false,
+    },
+    allowCustomColumns: {
+        type: Boolean,
+        default: false,
+        required: false,
+    },
+    showSqlPreview: {
+        type: Boolean,
+        default: false,
+        required: false,
+    },
+    streamFieldsMap: {
+        type: Object,
+        default: () => ({}),
+        required: false,
+    },
+    sqlQuery: {
+        type: String,
+        default: '',
         required: false,
     },
     });
@@ -198,7 +226,8 @@
 
   const store = useStore();
 
-  const label = ref(props.group.label);
+  // V2: Use logicalOperator (AND/OR) instead of label (and/or)
+  const label = ref(props.group.logicalOperator?.toLowerCase() || 'and');
 
   const confirmDialog = ref({
     show: false,
@@ -211,72 +240,87 @@
   // Watch for prop changes to keep groups in sync with parent
   watch(() => props.group, (newGroup) => {
     groups.value = newGroup;
-    label.value = newGroup.label;
+    // V2: Use logicalOperator instead of label
+    label.value = newGroup.logicalOperator?.toLowerCase() || 'and';
   }, { deep: true });
 
   const tabOptions = computed(() => [
     {
       label: "OR",
       value: "or",
-      disabled: hasOnlyOneCondition.value,
-      tooltipLabel: hasOnlyOneCondition.value ? "Add at least one more condition to enable AND/OR toggle" : undefined,
     },
     {
       label: "AND",
       value: "and",
-      disabled: hasOnlyOneCondition.value,
-      tooltipLabel: hasOnlyOneCondition.value ? "Add at least one more condition to enable AND/OR toggle" : undefined,
     },
   ]);
 
   function isGroup(item: any) {
-    return item && item.items && Array.isArray(item.items);
+    // V2: Check for filterType === "group" with conditions array
+    if (item && item.filterType === "group" && item.conditions && Array.isArray(item.conditions)) {
+      return true;
+    }
+    // V1 compatibility: Check for items array (legacy)
+    if (item && item.items && Array.isArray(item.items) && item.groupId) {
+      return true;
+    }
+    return false;
   }
   
   const addCondition = (groupId: string) => {
-    groups.value.items.push({
+    // V2: Create condition with filterType and logicalOperator
+    const newCondition = {
+      filterType: 'condition',
       column: '',
       operator: '=',
       value: '',
-      ignore_case: true,
+      values: [],
+      logicalOperator: groups.value.logicalOperator || 'AND',
       id: getUUID(),
-    });
+    };
+    groups.value.conditions.push(newCondition);
     emit('add-condition', groups.value);
   };
   
   const addGroup = (groupId: string) => {
-
-    groups.value.items.push({
+    // V2: Create group with filterType, logicalOperator, and conditions array
+    const newGroup = {
+      filterType: 'group',
+      logicalOperator: 'OR',
       groupId: getUUID(),
-      label: 'or',
-      items: [
+      conditions: [
         {
+          filterType: 'condition',
           column: '',
           operator: '=',
           value: '',
-          ignore_case: true,
+          values: [],
+          logicalOperator: 'OR',
           id: getUUID(),
         }
       ]
-    });
+    };
+    groups.value.conditions.push(newGroup);
     emit('add-group', groups.value);
   };
   
   // Toggle AND/OR
   const toggleLabel = (newLabel?: string) => {
+    // V2: Use logicalOperator instead of label
     // If newLabel is provided, use it; otherwise toggle
     if (newLabel) {
-      groups.value.label = newLabel;
+      groups.value.logicalOperator = newLabel.toUpperCase();
     } else {
-      groups.value.label = groups.value.label === 'and' ? 'or' : 'and';
+      groups.value.logicalOperator = groups.value.logicalOperator === 'AND' ? 'OR' : 'AND';
     }
     emit('add-group', groups.value); // optional, sync with parent
     emit('input:update', 'conditions', groups.value);
   };
 
   const removeCondition = (id: string) => {
+    // V2: Use conditions array instead of items
     // First, check what will happen after removing this condition
-    const itemsAfterRemoval = groups.value.items.filter((item: any) => item.id !== id);
+    const itemsAfterRemoval = groups.value.conditions.filter((item: any) => item.id !== id);
     const hasConditionsAfterRemoval = itemsAfterRemoval.some((item: any) => !isGroup(item));
 
     // Count sub-groups that will be deleted
@@ -303,14 +347,15 @@
   };
 
   const performRemoveCondition = (id: string) => {
-    groups.value.items = groups.value.items.filter((item: any) => item.id !== id);
+    // V2: Use conditions array instead of items
+    groups.value.conditions = groups.value.conditions.filter((item: any) => item.id !== id);
 
     // Check if there are any conditions left (not sub-groups)
-    const hasConditions = groups.value.items.some((item: any) => !isGroup(item));
+    const hasConditions = groups.value.conditions.some((item: any) => !isGroup(item));
 
     if (!hasConditions) {
       // No conditions left, clear all items (including sub-groups) and remove this entire group
-      groups.value.items = [];
+      groups.value.conditions = [];
       emit('remove-group', props.group.groupId);
     } else {
       emit('add-group', groups.value); // update as usual
@@ -322,12 +367,13 @@
   };
 
   const reorderItems = () => {
+    // V2: Use conditions array instead of items
     // Separate conditions and groups
-    const conditions = groups.value.items.filter((item: any) => !isGroup(item));
-    const subGroups = groups.value.items.filter((item: any) => isGroup(item));
+    const conditions = groups.value.conditions.filter((item: any) => !isGroup(item));
+    const subGroups = groups.value.conditions.filter((item: any) => isGroup(item));
 
     // Reorder: conditions first, then groups
-    groups.value.items = [...conditions, ...subGroups];
+    groups.value.conditions = [...conditions, ...subGroups];
 
     // Emit update
     emit('add-group', groups.value);
@@ -390,51 +436,35 @@ const computedOpacity = computed(() => {
   return props.depth + 10;
 });
 
-// Build preview string recursively
-const buildPreviewString = (group: any): string => {
-  if (!group || !group.items || group.items.length === 0) {
-    return '';
+// Computed preview string
+// Supports three modes:
+// 1. Display mode (default): lowercase operators, simple formatting, wrapped in parentheses - for pipelines
+// 2. SQL Query mode (when sqlQuery prop provided): shows full SQL query - for alerts
+// 3. WHERE clause mode (when showSqlPreview=true but no sqlQuery): shows just WHERE clause
+const previewString = computed(() => {
+  // Mode 1: Full SQL Query (for alerts with aggregation, etc.)
+  if (props.sqlQuery && props.sqlQuery.trim().length > 0) {
+    return props.sqlQuery;
   }
 
-  const parts: string[] = [];
+  // Mode 2: SQL WHERE clause only (fallback for alerts)
+  if (props.showSqlPreview) {
+    return buildConditionsString(groups.value, {
+      sqlMode: true,              // SQL format (uppercase AND/OR, LIKE operators)
+      addWherePrefix: true,        // Add "WHERE" prefix
+      formatValues: true,          // Type-aware formatting (Int64 no quotes, String with quotes)
+      streamFieldsMap: props.streamFieldsMap,
+    });
+  }
 
-  group.items.forEach((item: any) => {
-    if (isGroup(item)) {
-      // Nested group - recursively build its preview
-      const nestedPreview = buildPreviewString(item);
-      if (nestedPreview) {
-        parts.push(`(${nestedPreview})`);
-      }
-    } else {
-      // Condition - show full condition: column operator value
-      const column = item.column || 'field';
-      const operator = item.operator || '=';
-      const value = item.value !== undefined && item.value !== null && item.value !== ''
-        ? `'${item.value}'`
-        : "''";
-      parts.push(`${column} ${operator} ${value}`);
-    }
+  // Mode 3: Display format (for pipelines)
+  const preview = buildConditionsString(groups.value, {
+    sqlMode: false,            // Display format (lowercase operators)
+    addWherePrefix: false,
+    formatValues: false,       // Simple display format without type-aware formatting
   });
-
-  // Join with the group's label (AND/OR)
-  const operator = (group.label || 'or').toUpperCase();
-  return parts.join(` ${operator} `);
-};
-
-// Computed preview string
-const previewString = computed(() => {
-  const preview = buildPreviewString(groups.value);
   // Wrap the entire root expression in parentheses
   return preview ? `(${preview})` : '';
-});
-
-// Check if group has only one condition and no sub-groups (to disable AND/OR toggle)
-const hasOnlyOneCondition = computed(() => {
-  const conditions = groups.value.items.filter((item: any) => !isGroup(item));
-  const subGroups = groups.value.items.filter((item: any) => isGroup(item));
-
-  // Disable only if there's exactly 1 condition AND no sub-groups
-  return conditions.length === 1 && subGroups.length === 0;
 });
 
 // Expose functions for testing
@@ -451,7 +481,6 @@ defineExpose({
   hslToCSS,
   computedStyleMap,
   computedOpacity,
-  hasOnlyOneCondition,
   groups,
   label,
   isOpen,

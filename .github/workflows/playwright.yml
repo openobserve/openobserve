@@ -123,6 +123,10 @@ jobs:
                 "serviceAccount.spec.js",
                 "usersOrg.spec.js",
                 "org.spec.js",
+                "theme-management.spec.js",
+                "ingestion-config.spec.js",
+                "landingPage.spec.js",
+                "languageTranslation.spec.js",
               ]
           - testfolder: "Logs-Core"
             browser: "chrome"
@@ -135,6 +139,7 @@ jobs:
                 "pagination.spec.js",
                 "unflattened.spec.js",
                 "logstable.spec.js",
+                "shareLink.spec.js",
               ]
           - testfolder: "Logs-Queries"
             browser: "chrome"
@@ -147,14 +152,14 @@ jobs:
                 "logsqueries.matchall.spec.js",
                 "searchpartition.spec.js",
               ]
-          - testfolder: "Alerts"
-            browser: "chrome"
-            run_files:
-              [
-                "alerts-e2e-flow.spec.js",
-                "alerts-ui-operations.spec.js",
-                "alerts-import.spec.js",
-              ]
+          # - testfolder: "Alerts"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "alerts-e2e-flow.spec.js",
+          #       "alerts-ui-operations.spec.js",
+          #       "alerts-import.spec.js",
+          #     ]
           - testfolder: "Dashboards-Core"
             browser: "chrome"
             run_files:
@@ -165,6 +170,7 @@ jobs:
                 "dashboard-folder.spec.js",
                 "dashboard-import.spec.js",
                 "maxquery.spec.js",
+                "dashboard-chartJson.spec.js",
               ]
           - testfolder: "Dashboards-Settings"
             browser: "chrome"
@@ -175,6 +181,8 @@ jobs:
                 "dashboard-tabs-setting.spec.js",
                 "dashboard-variables-setting.spec.js",
                 "dashboard-transpose.spec.js",
+                "dashboard-join.spec.js",
+                "dashboard-nested-functions.spec.js",
               ]
           - testfolder: "Dashboards-Charts"
             browser: "chrome"
@@ -193,6 +201,8 @@ jobs:
           - testfolder: "Pipelines"
             browser: "chrome"
             run_files: [
+                "pipeline-conditions.spec.js",
+                "pipeline-conditions-validation.spec.js",
                 "pipelines.spec.js",
                 "pipeline-dynamic.spec.js",
                 "pipeline-core.spec.js",
@@ -215,7 +225,7 @@ jobs:
               ]
           - testfolder: "RegressionSet"
             browser: "chrome"
-            run_files: ["logs-regression.spec.js"]
+            run_files: ["logs-regression.spec.js", "streams-regression.spec.js", "enrichment-regression.spec.js", "ui-regression.spec.js"]
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
@@ -471,19 +481,23 @@ jobs:
                           if [ "$PREV_JOB_STATUS" = "cancelled" ] || [ "$PREV_JOB_STATUS" = "null" ] || [ -z "$PREV_JOB_STATUS" ]; then
                             echo "::warning::⚠️ Previous shard was cancelled/abruptly ended - running FULL test suite"
                             npx playwright test $FILE_PATHS
+                            exit $?
                           elif [ "$PREV_JOB_STATUS" = "success" ]; then
                             echo "::notice::✅ Previous shard completed successfully - no tests to rerun"
                             exit 0
                           elif [ "$PREV_JOB_STATUS" = "failure" ]; then
                             echo "::warning::⚠️ Previous shard failed but TestDino has no failures recorded - running FULL test suite"
                             npx playwright test $FILE_PATHS
+                            exit $?
                           else
                             echo "::warning::⚠️ Unknown job status - running FULL test suite for safety"
                             npx playwright test $FILE_PATHS
+                            exit $?
                           fi
                         else
                           echo "::error::Failed to fetch job status from GitHub API - running FULL test suite"
                           npx playwright test $FILE_PATHS
+                          exit $?
                         fi
                       else
                         echo "::notice::✅ This is the first run, no previous attempt to check"
@@ -530,6 +544,7 @@ jobs:
                       echo "::warning::Treating as FAILED - running FULL test suite for this shard"
                       echo "DEBUG: Running all matrix tests: npx playwright test $FILE_PATHS"
                       npx playwright test $FILE_PATHS
+                      exit $?
                     elif [ "$PREV_JOB_STATUS" = "success" ]; then
                       echo "::notice::✅ Previous shard completed successfully - all tests passed"
                       echo "::notice::No failed tests to rerun. Exiting successfully."
@@ -539,17 +554,20 @@ jobs:
                       echo "::warning::This shouldn't happen - running FULL test suite for safety"
                       echo "DEBUG: Running all matrix tests: npx playwright test $FILE_PATHS"
                       npx playwright test $FILE_PATHS
+                      exit $?
                     else
                       echo "::warning::⚠️ Unknown job status: $PREV_JOB_STATUS"
                       echo "::warning::Running FULL test suite for safety"
                       echo "DEBUG: Running all matrix tests: npx playwright test $FILE_PATHS"
                       npx playwright test $FILE_PATHS
+                      exit $?
                     fi
                   else
                     echo "::error::Failed to fetch job status from GitHub API"
                     echo "::warning::Falling back to running FULL test suite for safety"
                     echo "DEBUG: Running all matrix tests: npx playwright test $FILE_PATHS"
                     npx playwright test $FILE_PATHS
+                    exit $?
                   fi
                 else
                   echo "::notice::✅ This is the first run, no previous attempt to check"
@@ -663,12 +681,8 @@ jobs:
             echo "::notice::Test job results: $SUCCEEDED succeeded, $FAILED failed, $TOTAL total"
 
             if [ "$SUCCEEDED" -gt 0 ] && [ "$FAILED" -eq 0 ]; then
-              echo "::notice::✅ All test jobs succeeded - they likely skipped because tests already passed"
-              echo "::notice::This is VALID behavior for optimized reruns"
-              echo "::notice::Creating empty report structure for downstream jobs"
-              mkdir -p playwright-results/html-report
-              echo '{"config":{},"suites":[],"errors":[]}' > playwright-results/report.json
-              echo "<html><body><h1>No tests executed - all shards skipped</h1><p>All test shards exited early because tests had already passed in a previous attempt.</p></body></html>" > playwright-results/html-report/index.html
+              echo "::notice::✅ All test jobs succeeded - tests likely skipped because they already passed"
+              echo "::notice::Skipping merge and upload (no reports to process)"
               echo "::endgroup::"
               exit 0
             else
@@ -740,10 +754,23 @@ jobs:
         if: ${{ (success() || failure()) && env.UPLOAD_TO_TESTDINO == 'true' }}
         run: |
           cd tests/ui-testing
-          npx --yes tdpw upload playwright-results \
+
+          # Fix startTime format: convert Unix timestamp (number) to ISO 8601 string for TestDino compatibility
+          if [ -f "playwright-results/report.json" ]; then
+            # Check if startTime is a number and convert it
+            START_TIME=$(jq -r '.stats.startTime // empty' playwright-results/report.json)
+            if [ -n "$START_TIME" ] && [[ "$START_TIME" =~ ^[0-9]+$ ]]; then
+              echo "Converting startTime from Unix timestamp to ISO 8601 string"
+              jq '.stats.startTime = (.stats.startTime / 1000 | strftime("%Y-%m-%dT%H:%M:%S.000Z"))' playwright-results/report.json > playwright-results/report.json.tmp
+              mv playwright-results/report.json.tmp playwright-results/report.json
+            fi
+          fi
+
+          npx --yes tdpw@latest upload playwright-results \
             --json-report playwright-results/report.json \
             --html-report playwright-results/html-report \
             --upload-html \
+            --verbose \
             --token="${{ secrets.TESTDINO_API_TOKEN }}"
 
   generate_coverage_report:

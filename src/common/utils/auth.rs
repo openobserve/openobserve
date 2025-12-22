@@ -307,10 +307,19 @@ impl FromRequest for AuthExtractor {
                     path_columns[0].to_string()
                 }
             } else if url_len == 2 || (url_len > 2 && path_columns[1].eq("settings")) {
-                // for settings, the post/delete require PUT permissions, GET needs LIST permissions
-                // also the special settings exception is for 3-part urls for logo /text
-                // which are of path /org/settings/logo , which need permission of operating
-                // on permission in general
+                // for settings (including settings/v2), the post/delete require PUT permissions,
+                // GET needs LIST permissions. This handles:
+                // - /org/settings (v1 settings API)
+                // - /org/settings/logo, /org/settings/text (logo/text endpoints)
+                // - /org/settings/v2/... (v2 multi-level settings API)
+                //
+                // Settings v2 API paths:
+                // - GET /{org_id}/settings/v2/{key} - get setting
+                // - GET /{org_id}/settings/v2 - list settings
+                // - POST /{org_id}/settings/v2/org - set org setting
+                // - POST /{org_id}/settings/v2/user/{user_id} - set user setting
+                // - DELETE /{org_id}/settings/v2/org/{key} - delete org setting
+                // - DELETE /{org_id}/settings/v2/user/{user_id}/{key} - delete user setting
                 if path_columns[1].eq("settings") {
                     if method.eq("POST") || method.eq("DELETE") {
                         method = "PUT".to_string();
@@ -726,6 +735,9 @@ impl FromRequest for AuthExtractor {
                 || path.contains("/bulk/enable")
                 // for license the function itself with do a perm check
                 || (url_len == 1 && path.contains("license"))
+                // service_streams APIs are org-level, not stream-specific
+                || path.contains("/service_streams/_analytics")
+                || path.contains("/service_streams/_correlate")
                 {
                     return Ok(AuthExtractor {
                         auth: auth_str.to_owned(),

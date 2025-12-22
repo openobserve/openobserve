@@ -80,7 +80,7 @@ pub mod search_stream;
 pub(crate) mod utils;
 
 async fn can_use_distinct_stream(
-    org: &str,
+    org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
     fields: &[String],
@@ -91,7 +91,7 @@ async fn can_use_distinct_stream(
         return false;
     }
 
-    let stream_settings = infra::schema::get_settings(org, stream_name, stream_type)
+    let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type)
         .await
         .unwrap_or_default();
 
@@ -120,7 +120,7 @@ async fn can_use_distinct_stream(
     #[allow(deprecated)]
     let query_fields: Vec<String> = match crate::service::search::sql::Sql::new(
         &(query.clone().into()),
-        org,
+        org_id,
         stream_type,
         None,
     )
@@ -174,6 +174,7 @@ async fn can_use_distinct_stream(
         ("org_id" = String, Path, description = "Organization name"),
         ("is_ui_histogram" = bool, Query, description = "Whether to return histogram data for UI"),
         ("is_multi_stream_search" = bool, Query, description = "Indicate is search is for multi stream"),
+        ("validate" = bool, Query, description = "Validate query fields against stream schema and User-Defined Schema (UDS). When enabled, returns error if queried fields are not in schema or not allowed by UDS"),
     ),
     request_body(content = inline(Request), description = "Search query", content_type = "application/json", example = json!({
         "query": {
@@ -262,6 +263,7 @@ pub async fn search(
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let is_ui_histogram = get_is_ui_histogram_from_request(&query);
     let is_multi_stream_search = get_is_multi_stream_search_from_request(&query);
+    let validate_query = utils::get_bool_from_request(&query.0, "validate");
 
     let dashboard_info = get_dashboard_info_from_request(&query);
 
@@ -356,6 +358,15 @@ pub async fn search(
                     "Query duration is modified due to query range restriction of {max_query_range} hours"
                 );
             }
+        }
+
+        // Validate query fields if requested
+        if validate_query
+            && let Err(e) =
+                utils::validate_query_fields(&org_id, &stream_name, stream_type, &req.query.sql)
+                    .await
+        {
+            return Ok(map_error_to_http_response(&e, Some(trace_id)));
         }
 
         // Check permissions on stream
@@ -1332,6 +1343,11 @@ async fn values_v1(
         resp.scan_records = std::cmp::max(resp.scan_records, ret.scan_records);
         resp.cached_ratio = std::cmp::max(resp.cached_ratio, ret.cached_ratio);
         resp.result_cache_ratio = std::cmp::max(resp.result_cache_ratio, ret.result_cache_ratio);
+        resp.peak_memory_usage = Some(
+            resp.peak_memory_usage
+                .unwrap_or(0.0)
+                .max(ret.peak_memory_usage.unwrap_or(0.0)),
+        );
         work_group_set.push(ret.work_group);
     }
     resp.total = fields.len();
@@ -1360,6 +1376,7 @@ async fn values_v1(
         trace_id: Some(trace_id),
         took_wait_in_queue: Some(resp.took_detail.wait_in_queue),
         work_group: get_work_group(work_group_set),
+        peak_memory_usage: resp.peak_memory_usage,
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -1713,6 +1730,7 @@ pub async fn search_history(
         trace_id: Some(trace_id),
         took_wait_in_queue,
         work_group: search_res.work_group.clone(),
+        peak_memory_usage: search_res.peak_memory_usage,
         ..Default::default()
     };
     let num_fn = search_query_req.query.query_fn.is_some() as u16;

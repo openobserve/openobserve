@@ -45,12 +45,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="stats-grid">
               <div class="stat-card stat-card-commit" :class="store.state.theme === 'dark' ? 'stat-card-commit-dark' : 'stat-card-commit-light'">
                 <q-icon name="code" size="32px" class="stat-icon" />
-                <div class="stat-label">Commit</div>
+                <div class="stat-label">{{ t("about.commit_lbl") }}</div>
                 <div class="stat-value tw-font-mono">{{ store.state.zoConfig.commit_hash }}</div>
               </div>
               <div class="stat-card stat-card-built" :class="store.state.theme === 'dark' ? 'stat-card-built-dark' : 'stat-card-built-light'">
                 <q-icon name="event" size="32px" class="stat-icon" />
-                <div class="stat-label">Built</div>
+                <div class="stat-label">{{ t("about.build_lbl") }}</div>
                 <div class="stat-value">{{ formatDate(store.state.zoConfig.build_date) }}</div>
               </div>
             </div>
@@ -66,10 +66,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
                   <q-icon name="code" size="24px" />
                 </div>
-                <h3 class="feature-title">Open Source Libraries</h3>
+                <h3 class="feature-title">{{ t("about.os_libraries") }}</h3>
               </div>
               <p class="feature-text">
-                Built on the shoulders of giants. OpenObserve depends on many amazing open source libraries.
+                {{ t("about.os_libraries_msg") }}
               </p>
             </div>
             <div class="tw-flex tw-flex-wrap tw-gap-2">
@@ -110,29 +110,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
                   <q-icon name="shield" size="24px" />
                 </div>
-                <h3 class="feature-title">License Information</h3>
+                <h3 class="feature-title">{{ t("about.license_info") }}</h3>
               </div>
               <p v-if="store.state.zoConfig.build_type == 'opensource'" class="feature-text">
-                You are using the <strong>open source version</strong> under the
-                <a
+                {{ t("about.license_info_os_msg") }} <a
                   href="https://github.com/openobserve/openobserve/blob/main/LICENSE"
                   target="_blank"
                   class="inline-link"
                 >GNU Affero General Public License (AGPL)</a>.
               </p>
               <p v-if="store.state.zoConfig.build_type == 'enterprise' && config.isCloud == 'false'" class="feature-text">
-                You are using the <strong>Enterprise version</strong> governed by the
-                <a
-                  href="https://openobserve.ai/enterprise-license/"
-                  target="_blank"
-                  class="inline-link"
-                >enterprise license agreement</a>.
+                {{ t("about.license_info_msg") }}
               </p>
             </div>
             <div class="tw-mt-4 tw-p-3 tw-rounded tw-bg-opacity-10" :class="store.state.theme === 'dark' ? 'tw-bg-blue-400' : 'tw-bg-blue-500'">
               <p class="tw-text-sm tw-mb-0">
                 <q-icon name="info" size="16px" class="tw-mr-1" />
-                By using OpenObserve, you agree to comply with the applicable license terms.
+                {{ t("about.license_info_note") }}
               </p>
             </div>
           </div>
@@ -147,10 +141,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
                   <q-icon name="groups" size="24px" />
                 </div>
-                <h3 class="feature-title">Community</h3>
+                <h3 class="feature-title">{{ t("about.community_lbl") }}</h3>
               </div>
               <p class="feature-text">
-                Join our vibrant community of developers and users building the future of observability.
+                {{ t("about.community_msg") }}
               </p>
             </div>
             <div class="tw-flex tw-flex-wrap tw-gap-2">
@@ -174,25 +168,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
                   <q-icon name="workspace_premium" size="24px" />
                 </div>
-                <h3 class="feature-title">Enterprise License Details</h3>
+                <h3 class="feature-title">{{ t("about.ent_lincese_detail_lbl") }}</h3>
               </div>
+              <q-btn
+                no-caps
+                :label="t('about.manage_license')"
+                @click="navigateToLicense"
+                size="sm"
+                class="o2-primary-button"
+              />
             </div>
 
             <div v-if="loadingLicense" class="tw-text-center tw-py-8">
               <q-spinner size="40px" color="primary" />
-              <div class="tw-mt-3 tw-text-sm tw-opacity-70">Loading license information...</div>
+              <div class="tw-mt-3 tw-text-sm tw-opacity-70">{{ t("about.loading_license_info") }}</div>
             </div>
 
             <div v-else-if="!licenseData || !licenseData.license" class="tw-py-4">
               <div class="tw-flex tw-items-start tw-gap-3 tw-p-4 tw-rounded tw-bg-opacity-10" :class="store.state.theme === 'dark' ? 'tw-bg-yellow-400' : 'tw-bg-yellow-500'">
                 <q-icon name="warning" size="24px" class="tw-text-yellow-500" />
                 <div>
-                  <div class="tw-font-semibold tw-mb-1">No License Installed</div>
+                  <div class="tw-font-semibold tw-mb-1">{{ t("about.no_license_installed_lbl") }}</div>
                   <p class="tw-text-sm tw-mb-2 tw-opacity-80">
-                    No enterprise license is currently installed. Contact your administrator or request a new license.
+                    {{ t("about.no_license_installed_msg") }}
                   </p>
                   <div v-if="licenseData && licenseData.installation_id" class="tw-text-xs tw-opacity-70 tw-mb-2">
-                    Installation ID: <code class="tw-px-2 tw-py-1 tw-rounded tw-bg-black tw-bg-opacity-10">{{ licenseData.installation_id }}</code>
+                    {{ t("about.installation_id_lbl") }}: <code class="tw-px-2 tw-py-1 tw-rounded tw-bg-black tw-bg-opacity-10">{{ licenseData.installation_id }}</code>
                   </div>
                 </div>
               </div>
@@ -204,29 +205,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-markup-table flat bordered dense class="compact-table">
                     <tbody>
                       <tr>
-                        <td class="tw-font-semibold">License ID</td>
+                        <td class="tw-font-semibold">{{ t("about.lincese_id_lbl") }}</td>
                         <td>{{ licenseData.license.license_id }}</td>
                       </tr>
                       <tr>
-                        <td class="tw-font-semibold">Status</td>
+                        <td class="tw-font-semibold">{{ t("about.status_lbl") }}</td>
                         <td>
-                          <q-badge :color="licenseData.license.active ? 'green' : 'red'">
-                            {{ licenseData.license.active ? 'Active' : 'Inactive' }}
+                          <q-badge :color="licenseData?.expired ? 'red' : 'green'">
+                            {{ licenseData?.expired ? t("about.expired_lbl") : t("about.active_lbl") }}
                           </q-badge>
                         </td>
                       </tr>
                       <tr>
-                        <td class="tw-font-semibold">Created At</td>
+                        <td class="tw-font-semibold">{{ t("about.create_at_lbl") }}</td>
                         <td>{{ formatLicenseDate(licenseData.license.created_at) }}</td>
                       </tr>
                       <tr>
-                        <td class="tw-font-semibold">Expires At</td>
+                        <td class="tw-font-semibold">{{ t("about.expires_at_lbl") }}</td>
                         <td>
                           <div class="tw-flex tw-items-center tw-justify-start tw-gap-4">
                             <span>{{ formatLicenseDate(licenseData.license.expires_at) }}</span>
-                            <q-badge v-if="licenseData?.expired" color="red">
-                              Expired
-                            </q-badge>
                           </div>
                         </td>
                       </tr>
@@ -238,23 +236,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-markup-table flat bordered dense class="compact-table">
                     <thead>
                       <tr>
-                        <th colspan="2" class="tw-text-center tw-font-semibold">Usage Limits</th>
+                        <th colspan="2" class="tw-text-center tw-font-semibold">{{ t("about.usage_limits") }}</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr>
-                        <td class="tw-font-semibold">Ingestion Type</td>
+                        <td class="tw-font-semibold">{{ t("about.ingestion_type") }}</td>
                         <td>{{ !licenseData?.expired && licenseData.license.limits?.Ingestion?.typ ? licenseData.license.limits.Ingestion.typ : 'PerDayCount' }}</td>
                       </tr>
                       <tr>
-                        <td class="tw-font-semibold">Ingestion Limit</td>
+                        <td class="tw-font-semibold">{{ t("about.ingestion_limit") }}</td>
                         <td>{{ !licenseData?.expired && licenseData.license.limits?.Ingestion?.value ? `${licenseData.license.limits.Ingestion.value} GB / day` : '100 GB / day' }}</td>
                       </tr>
                       <tr v-if="licenseData.ingestion_used !== undefined">
-                        <td class="tw-font-semibold">Today's Usage</td>
+                        <td class="tw-font-semibold">{{ t("about.today_usage") }}</td>
                         <td>
                           <span :class="licenseData.ingestion_used > 90 ? 'tw-text-red-500 tw-font-bold' : licenseData.ingestion_used > 70 ? 'tw-text-orange-500' : ''">
-                            {{ licenseData.ingestion_used }}%
+                            {{ licenseData.ingestion_used.toFixed(2) }}%
                           </span>
                         </td>
                       </tr>
@@ -283,6 +281,7 @@ import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import licenseServer from "@/services/license_server";
 import FeatureComparisonTable from "@/components/about/FeatureComparisonTable.vue";
+import { useQuasar } from "quasar";
 
 export default defineComponent({
   name: "PageAbout",
@@ -294,6 +293,7 @@ export default defineComponent({
     const router = useRouter();
     const pageData = ref("Page Data");
     const { t } = useI18n();
+    const $q = useQuasar();
     const licenseData = ref<any>(null);
     const loadingLicense = ref(false);
 
@@ -332,10 +332,53 @@ export default defineComponent({
 
     onMounted(() => {
       //  We don't need to make license data call for cloud
-      if(config.isCloud == 'false'){
+      if(config.isCloud == 'false' && config.isEnterprise == 'true'){
         loadLicenseData();
       }
     });
+
+    const navigateToLicense = () => {
+      // Get meta org identifier
+      const metaOrgIdentifier = store.state.zoConfig.meta_org;
+
+      // Find the meta org from the organizations list
+      const metaOrg = store.state.organizations?.find(
+        (org: any) => org.identifier === metaOrgIdentifier
+      );
+
+      if (metaOrg) {
+        // Create the org option object so that it will be used to switch to meta org
+        const metaOrgOption = {
+          label: metaOrg.name,
+          id: metaOrg.id,
+          identifier: metaOrg.identifier,
+          user_email: store.state.userInfo.email,
+          ingest_threshold: metaOrg.ingest_threshold,
+          search_threshold: metaOrg.search_threshold,
+        };
+
+        // Set the selected organization using dispatch
+        store.dispatch("setSelectedOrganization", metaOrgOption);
+
+        // Navigate to license page with the meta org identifier
+        router.push({
+          name: 'license',
+          query: { org_identifier: metaOrgIdentifier }
+        });
+      } else {
+        // Show error notification when user doesn't have access to meta org
+          $q.notify({
+            message: "You are not authorized to manage the license.",
+            color: 'negative',
+            timeout: 5000,
+          })
+        // router.push({
+        //   name: 'license',
+        //   query: { org_identifier: metaOrgIdentifier }
+        // });
+      }
+    };
+
 
     return {
       t,
@@ -347,6 +390,7 @@ export default defineComponent({
       licenseData,
       loadingLicense,
       formatLicenseDate,
+      navigateToLicense,
     };
   },
 });

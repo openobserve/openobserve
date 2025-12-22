@@ -1063,6 +1063,13 @@ export const convertTimeFromNsToMs = (time: number) => {
   return date.getTime();
 };
 
+export const convertTimeFromNsToUs = (time: number) => {
+  const nanoseconds = time;
+  const microseconds = Math.floor(nanoseconds / 1000);
+  const date = new Date(microseconds);
+  return date.getTime();
+};
+
 export const arraysMatch = (arr1: Array<any>, arr2: Array<any>) => {
   // Check if arrays have the same length
   if (arr1.length !== arr2.length) return false;
@@ -1223,6 +1230,17 @@ export const getCronIntervalInMinutes = (cronExpression: string): number => {
   } catch (err) {
     throw new Error("Invalid cron expression");
   }
+};
+
+export const convertMinutesToCron = (minutes: number): string => {
+  if (!minutes || minutes <= 0) {
+    return "";
+  }
+
+  // OpenObserve uses 6-field cron format: [Second] [Minute] [Hour] [Day of Month] [Month] [Day of Week]
+  // Convert minutes to minute-based cron expression only
+  // Format: 0 */[minutes] * * * * (every N minutes, starting at second 0)
+  return `0 */${minutes} * * * *`;
 };
 
 export const localTimeToMicroseconds = () => {

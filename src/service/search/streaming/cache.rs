@@ -45,8 +45,9 @@ pub async fn write_results_to_cache(
         return Ok(());
     }
 
+    let start = std::time::Instant::now();
     log::info!(
-        "[HTTP2_STREAM]: Writing results to file for trace_id: {}, file_path: {}, accumulated_results len: {}",
+        "[HTTP2_STREAM trace_id {}] Writing results to file: {}, accumulated_results len: {}",
         c_resp.trace_id,
         c_resp.file_path,
         accumulated_results.len()
@@ -104,9 +105,10 @@ pub async fn write_results_to_cache(
         )
         .await;
         log::info!(
-            "[HTTP2_STREAM]: Results written to file for trace_id: {}, file_path: {}",
+            "[HTTP2_STREAM trace_id {}] Results written to file: {}, async cache task created, took: {} ms",
             c_resp.trace_id,
             c_resp.file_path,
+            start.elapsed().as_millis()
         );
     }
 
@@ -451,6 +453,7 @@ async fn send_cached_responses(
         took_wait_in_queue: Some(cached.cached_response.took_detail.wait_in_queue),
         work_group: None, // TODO: add work group
         result_cache_ratio: Some(cached.cached_response.result_cache_ratio),
+        peak_memory_usage: cached.cached_response.peak_memory_usage,
         ..Default::default()
     };
     report_request_usage_stats(

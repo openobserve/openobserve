@@ -36,8 +36,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     hide-no-data
   >
     <template v-slot:body-cell="props">
-      <q-td :props="props" :style="getStyle(props)">
-        {{ props.value == 'undefined' || props.value === null ? '' : props.value }}
+      <q-td :props="props" :style="getStyle(props)" class="copy-cell-td">
+        <div
+          class="flex items-center no-wrap copy-cell-content"
+        >
+          <!-- Use JsonFieldRenderer if column is marked as JSON -->
+          <JsonFieldRenderer
+            v-if="props.col.showFieldAsJson"
+            :value="props.value"
+          />
+          <!-- Otherwise show normal value -->
+          <template v-else>
+            <span class="q-mr-xs">
+              {{
+                props.value == "undefined" || props.value === null
+                  ? ""
+                  : props.value
+              }}
+            </span>
+          </template>
+          <q-btn
+            :icon="isCellCopied(props.rowIndex, props.col.name) ? 'check' : 'content_copy'"
+            dense
+            size="xs"
+            no-caps
+            class="copy-btn"
+            @click.stop="copyCellContent(props.value, props.rowIndex, props.col.name)"
+          >
+          </q-btn>
+        </div>
       </q-td>
     </template>
   </q-table>
@@ -45,14 +72,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import useNotifications from "@/composables/useNotifications";
-import { exportFile } from "quasar";
+import { exportFile, copyToClipboard, useQuasar } from "quasar";
 import { defineComponent, ref } from "vue";
 import { findFirstValidMappedValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { useStore } from "vuex";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
+import JsonFieldRenderer from "./JsonFieldRenderer.vue";
 
 export default defineComponent({
   name: "TableRenderer",
+  components: {
+    JsonFieldRenderer,
+  },
   props: {
     data: {
       required: true,
@@ -74,6 +105,8 @@ export default defineComponent({
   setup(props: any) {
     const tableRef: any = ref(null);
     const store = useStore();
+    const $q = useQuasar();
+    const copiedCells = ref(new Map<string, boolean>());
 
     const { showErrorNotification, showPositiveNotification } =
       useNotifications();
@@ -218,6 +251,40 @@ export default defineComponent({
       return luminance < 0.5;
     };
 
+    const isCellCopied = (rowIndex: number, colName: string) => {
+      return copiedCells.value.has(`${rowIndex}_${colName}`);
+    };
+
+    const copyCellContent = (value: any, rowIndex: number, colName: string) => {
+      if (value === null || value === undefined) return;
+      
+      const textToCopy = String(value);
+      copyToClipboard(textToCopy)
+        .then(() => {
+          // Set copied state
+          const key = `${rowIndex}_${colName}`;
+          copiedCells.value.set(key, true);
+          
+          // Reset after 3 seconds
+          setTimeout(() => {
+            copiedCells.value.delete(key);
+          }, 3000);
+
+          $q.notify({
+            type: "positive",
+            message: "Copied to clipboard",
+            timeout: 1000,
+          });
+        })
+        .catch(() => {
+          $q.notify({
+            type: "negative",
+            message: "Failed to copy",
+            timeout: 1000,
+          });
+        });
+    };
+
     return {
       pagination: ref({
         rowsPerPage: 0,
@@ -227,6 +294,8 @@ export default defineComponent({
       tableRef,
       getStyle,
       store,
+      copyCellContent,
+      isCellCopied,
     };
   },
 });
@@ -290,6 +359,17 @@ export default defineComponent({
     word-break: break-word;
     overflow-wrap: break-word;
     white-space: normal !important;
+  }
+}
+
+.copy-cell-td {
+  .copy-btn {
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+  }
+
+  &:hover .copy-btn {
+    opacity: 1;
   }
 }
 </style>

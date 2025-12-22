@@ -340,6 +340,62 @@ pub async fn refresh_nodes_list() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+pub async fn node_reload(modules: Vec<String>) -> Result<(), anyhow::Error> {
+    let modules_str = modules.join(",");
+    let url = format!("/node/reload?module={}", modules_str);
+    let response = request(&url, None, reqwest::Method::GET).await?;
+    let Some(body) = response else {
+        return Err(anyhow::anyhow!("node reload failed"));
+    };
+
+    let response: serde_json::Value = serde_json::from_str(&body)?;
+    let status = response
+        .get("status")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown");
+    let results = response.get("results").and_then(|v| v.as_object());
+    let summary = response.get("summary").and_then(|v| v.as_object());
+
+    println!("Cache reload status: {}", status);
+    println!();
+
+    if let Some(results) = results {
+        let mut table = prettytable::Table::new();
+        table.add_row(prettytable::Row::new(vec![
+            prettytable::Cell::new("MODULE"),
+            prettytable::Cell::new("STATUS"),
+        ]));
+
+        for (module, status) in results.iter() {
+            table.add_row(prettytable::Row::new(vec![
+                prettytable::Cell::new(module),
+                prettytable::Cell::new(status.as_str().unwrap_or("unknown")),
+            ]));
+        }
+
+        table.printstd();
+    }
+
+    if let Some(summary) = summary {
+        println!();
+        println!("Summary:");
+        println!(
+            "  Total: {}",
+            summary.get("total").and_then(|v| v.as_u64()).unwrap_or(0)
+        );
+        println!(
+            "  Success: {}",
+            summary.get("success").and_then(|v| v.as_u64()).unwrap_or(0)
+        );
+        println!(
+            "  Failed: {}",
+            summary.get("failed").and_then(|v| v.as_u64()).unwrap_or(0)
+        );
+    }
+
+    Ok(())
+}
+
 async fn request(
     url: &str,
     body: Option<Vec<u8>>,

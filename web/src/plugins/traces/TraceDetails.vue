@@ -209,17 +209,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :size="`sm`"
               />
             </div>
-            <q-btn
+            <share-button
               data-test="trace-details-share-link-btn"
-              class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border !tw-h-[2.25rem] hover:tw-bg-[var(--o2-hover-accent)]"
-              size="xs"
-              icon="share"
-              @click="shareLink"
-            >
-              <q-tooltip>
-                {{ t('search.shareLink') }}
-              </q-tooltip>
-            </q-btn>
+              :url="traceDetailsShareURL"
+              button-class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border !tw-h-[2.25rem] hover:tw-bg-[var(--o2-hover-accent)]"
+              button-size="xs"
+            />
             <q-btn
               data-test="trace-details-close-btn"
               class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border !tw-h-[2.25rem] hover:tw-bg-[var(--o2-hover-accent)]"
@@ -373,6 +368,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :span="spanMap[selectedSpanId as string]"
                   :baseTracePosition="baseTracePosition"
                   :search-query="searchQuery"
+                  :stream-name="currentTraceStreamName"
+                  :service-streams-enabled="serviceStreamsEnabled"
                   @view-logs="redirectToLogs"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
@@ -417,6 +414,7 @@ import {
 } from "vue";
 import { cloneDeep } from "lodash-es";
 import SpanRenderer from "./SpanRenderer.vue";
+import ShareButton from "@/components/common/ShareButton.vue";
 import useTraces from "@/composables/useTraces";
 import { computed } from "vue";
 import TraceDetailsSidebar from "./TraceDetailsSidebar.vue";
@@ -427,6 +425,7 @@ import {
   formatTimeWithSuffix,
   getImageURL,
   convertTimeFromNsToMs,
+  convertTimeFromNsToUs,
 } from "@/utils/zincutils";
 import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
 import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
@@ -454,6 +453,7 @@ export default defineComponent({
   },
   components: {
     SpanRenderer,
+    ShareButton,
     TraceDetailsSidebar,
     TraceTree,
     TraceHeader,
@@ -464,11 +464,11 @@ export default defineComponent({
     ),
   },
 
-  emits: ["shareLink", "searchQueryUpdated"],
+  emits: ["searchQueryUpdated"],
   setup(props, { emit }) {
     const traceTree: any = ref([]);
     const spanMap: any = ref({});
-    const { searchObj, copyTracesUrl } = useTraces();
+    const { searchObj, getUrlQueryParams } = useTraces();
     const baseTracePosition: any = ref({});
     const collapseMapping: any = ref({});
     const traceRootSpan: any = ref(null);
@@ -553,6 +553,18 @@ export default defineComponent({
     const selectedStreamsString = computed(() =>
       searchObj.data.traceDetails.selectedLogStreams.join(", "),
     );
+
+    // Current trace stream name for correlation
+    const currentTraceStreamName = computed(() => {
+      return (router.currentRoute.value.query.stream as string) ||
+        searchObj.data.stream.selectedStream.value ||
+        '';
+    });
+
+    // Check if service streams feature is enabled
+    const serviceStreamsEnabled = computed(() => {
+      return store.state.zoConfig.service_streams_enabled !== false;
+    });
 
     const showTraceDetails = ref(false);
     const currentIndex = ref(0);
@@ -892,8 +904,9 @@ export default defineComponent({
     const calculateTracePosition = () => {
       const tics = [];
       baseTracePosition.value["durationMs"] = timeRange.value.end;
-      baseTracePosition.value["startTimeMs"] =
-        traceTree.value[0].startTimeMs + timeRange.value.start;
+      baseTracePosition.value["durationUs"] = timeRange.value.end * 1000;
+      baseTracePosition.value["startTimeUs"] =
+        traceTree.value[0].startTimeUs + (timeRange.value.start * 1000);
       const quarterMs = (timeRange.value.end - timeRange.value.start) / 4;
       let time = timeRange.value.start;
       for (let i = 0; i <= 4; i++) {
@@ -926,8 +939,22 @@ export default defineComponent({
 
       const formattedSpanMap: any = {};
 
-      spanList.value.forEach((spanData: any) => {
-        formattedSpanMap[spanData.span_id] = getFormattedSpan(spanData);
+      spanList.value.forEach((spanData: any, idx: number) => {
+        // Validate span data before processing
+        const validation = validateSpan(spanData);
+        if (!validation.valid) {
+          console.warn(
+            `Span has missing required fields: ${validation.missing.join(", ")}. Span data:`,
+            spanData,
+          );
+        }
+
+        const formattedSpan = getFormattedSpan(spanData);
+        const spanId =
+          spanData.span_id ||
+          formattedSpan.spanId ||
+          `span_${idx}_${Date.now()}`;
+        formattedSpanMap[spanId] = formattedSpan;
       });
 
       for (let i = 0; i < spanList.value.length; i++) {
@@ -958,6 +985,7 @@ export default defineComponent({
           parentSpan.spans.push(span);
         }
       }
+      
 
       // Purposely converting to microseconds to avoid floating point precision issues
       // In updateChart method, we are using start and end time to set the time range of trace
@@ -1082,24 +1110,52 @@ export default defineComponent({
       );
     };
 
+    // Validate required span fields
+    const validateSpan = (span: any): { valid: boolean; missing: string[] } => {
+      const requiredFields = [
+        "start_time",
+        "end_time",
+        "duration",
+        "operation_name",
+        "service_name",
+        "trace_id",
+        "span_id",
+      ];
+
+      const missing: string[] = [];
+
+      requiredFields.forEach((field) => {
+        if (span[field] === undefined || span[field] === null) {
+          missing.push(field);
+        }
+      });
+
+      return {
+        valid: missing.length === 0,
+        missing,
+      };
+    };
+
     // Convert span object to required format
     // Converting ns to ms
     const getFormattedSpan = (span: any) => {
       return {
         [store.state.zoConfig.timestamp_column]:
           span[store.state.zoConfig.timestamp_column],
+        startTimeUs: Math.floor(span.start_time / 1000),
         startTimeMs: convertTimeFromNsToMs(span.start_time),
         endTimeMs: convertTimeFromNsToMs(span.end_time),
-        durationMs: Number((span.duration / 1000).toFixed(4)), // This key is standard, we use for calculating width of span block. This should always be in ms
-        durationUs: Number(span.duration.toFixed(4)), // This key is used for displaying duration in span block. We convert this us to ms, s in span block
-        idleMs: convertTime(span.idle_ns),
-        busyMs: convertTime(span.busy_ns),
-        spanId: span.span_id,
-        operationName: span.operation_name,
-        serviceName: span.service_name,
-        spanStatus: span.span_status,
-        spanKind: getSpanKind(span.span_kind.toString()),
-        parentId: span.reference_parent_span_id,
+        endTimeUs: Math.floor(span.end_time / 1000),
+        durationMs: span?.duration ? Number((span?.duration / 1000).toFixed(4)) : 0, // This key is standard, we use for calculating width of span block. This should always be in ms
+        durationUs: span?.duration ? Number(span?.duration?.toFixed(4)) : 0, // This key is used for displaying duration in span block. We convert this us to ms, s in span block
+        idleMs: span.idle_ns ? convertTime(span.idle_ns) : 0,
+        busyMs: span.busy_ns ? convertTime(span.busy_ns) : 0,
+        spanId: span.span_id || `generated_${Date.now()}_${Math.random()}`,
+        operationName: span.operation_name || "Unknown Operation",
+        serviceName: span.service_name || "Unknown Service",
+        spanStatus: span.span_status || "UNSET",
+        spanKind: getSpanKind(span.span_kind),
+        parentId: span.reference_parent_span_id || "",
         spans: [],
         index: 0,
         style: {
@@ -1110,7 +1166,7 @@ export default defineComponent({
     };
 
     const convertTime = (time: number) => {
-      return Number((time / 1000000).toFixed(2));
+      return Number((time / 1000).toFixed(2));
     };
 
     const convertTimeFromNsToUs = (time: number) => {
@@ -1126,15 +1182,24 @@ export default defineComponent({
       return date.getTime();
     };
 
-    const getSpanKind = (spanKind: string) => {
+    const getSpanKind = (spanKind: string | null | undefined): string => {
+      // Handle missing or invalid span_kind
+      if (spanKind === null || spanKind === undefined || spanKind === "") {
+        return "Unspecified";
+      }
+
+      const kindStr = String(spanKind);
+
       const spanKindMapping: { [key: string]: string } = {
+        "0": "Unspecified",
         "1": "Client",
         "2": "Server",
         "3": "Producer",
         "4": "Consumer",
         "5": "Internal",
       };
-      return spanKindMapping[spanKind];
+
+      return spanKindMapping[kindStr] || "Unknown";
     };
 
     const closeSidebar = () => {
@@ -1153,8 +1218,8 @@ export default defineComponent({
       const data: any = [];
       for (let i = spanPositionList.value.length - 1; i > -1; i--) {
         const absoluteStartTime =
-          spanPositionList.value[i].startTimeMs -
-          convertTimeFromNsToMs(traceTree.value[0].lowestStartTime * 1000);
+          spanPositionList.value[i].startTimeUs -
+          convertTimeFromNsToUs(traceTree.value[0].lowestStartTime * 1000);
 
         const x1 = Number(
           (absoluteStartTime + spanPositionList.value[i].durationMs).toFixed(4),
@@ -1246,12 +1311,34 @@ export default defineComponent({
       copyToClipboard(spanList.value[0]["trace_id"]);
     };
 
-    const shareLink = () => {
-      copyTracesUrl({
-        from: router.currentRoute.value.query.from as string,
-        to: router.currentRoute.value.query.to as string,
-      });
-    };
+    /**
+     * Computed property for trace details share URL
+     * Uses custom time range from router query params
+     */
+    const traceDetailsShareURL = computed(() => {
+      const queryParams = getUrlQueryParams(true);
+
+      // Override with custom time range from route
+      const customFrom = router.currentRoute.value.query.from as string;
+      const customTo = router.currentRoute.value.query.to as string;
+
+      if (customFrom) queryParams.from = customFrom;
+      if (customTo) queryParams.to = customTo;
+
+      const searchParams = new URLSearchParams();
+      for (const [key, value] of Object.entries(queryParams)) {
+        searchParams.append(key, String(value));
+      }
+      const queryString = searchParams.toString();
+
+      let shareURL = window.location.origin + window.location.pathname;
+
+      if (queryString != "") {
+        shareURL += "?" + queryString;
+      }
+
+      return shareURL;
+    });
 
     const redirectToLogs = () => {
       if (!searchObj.data.traceDetails.selectedTrace) {
@@ -1362,7 +1449,7 @@ export default defineComponent({
       toggleTimeline,
       copyToClipboard,
       copyTraceId,
-      shareLink,
+      traceDetailsShareURL,
       outlinedInfo,
       redirectToLogs,
       filteredStreamOptions,
@@ -1390,6 +1477,15 @@ export default defineComponent({
       updateHeight,
       getSpanKind,
       adjustOpacity,
+      buildTracesTree,
+      getFormattedSpan,
+      buildTraceChart,
+      validateSpan,
+      calculateTracePosition,
+      buildServiceTree,
+      // Correlation props
+      currentTraceStreamName,
+      serviceStreamsEnabled,
     };
   },
 });

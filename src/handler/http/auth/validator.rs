@@ -25,7 +25,7 @@ use actix_web::{
 };
 use config::{
     get_config,
-    meta::user::{DBUser, UserRole},
+    meta::user::{DBUser, User, UserRole, UserType},
     utils::base64,
 };
 #[cfg(feature = "enterprise")]
@@ -143,7 +143,6 @@ pub async fn validator(
 ///
 /// ### Args:
 /// - token: The token to validate
-///  
 pub async fn validate_token(token: &str, org_id: &str) -> Result<(), Error> {
     match users::get_user_by_token(org_id, token).await {
         Some(_user) => Ok(()),
@@ -163,7 +162,7 @@ pub async fn validate_credentials(
         path_columns.pop();
     }
 
-    let user = if path_columns.last().unwrap_or(&"").eq(&"organizations") {
+    let mut user = if path_columns.last().unwrap_or(&"").eq(&"organizations") {
         let db_user = db::user::get_db_user(user_id).await;
         match db_user {
             Ok(user) => {
@@ -171,7 +170,13 @@ pub async fn validate_credentials(
                 if all_users.is_empty() {
                     None
                 } else {
-                    all_users.first().cloned()
+                    // For organizations endpoint, specifically look for user in _meta org
+                    // since permission check at line 966 expects the user to be in _meta
+                    all_users
+                        .iter()
+                        .find(|u| u.org == config::META_ORG_ID)
+                        .cloned()
+                        .or_else(|| all_users.first().cloned())
                 }
             }
             Err(e) => {
@@ -199,15 +204,42 @@ pub async fn validate_credentials(
     };
 
     if user.is_none() {
-        return Ok(TokenValidationResponse {
-            is_valid: false,
-            user_email: "".to_string(),
-            is_internal_user: false,
-            user_role: None,
-            user_name: "".to_string(),
-            family_name: "".to_string(),
-            given_name: "".to_string(),
-        });
+        // for license, we do not provide org in path, but
+        // want to be able to access it in all orgs, as long as user has
+        // logged in. So here we check if the user id is part of atleast one
+        // org, and if so, allow the call. If the user is not part of the current org
+        // rest of api calls will get blocked anyways, but without this,
+        // native users get stuck in logout loop if they go to any page calling license
+        // api call
+        if path == "license"
+            && let Ok(v) = db::user::get_user_record(user_id).await
+        {
+            // we set the record manually with minimal permission,
+            // so the password check later can be done correctly
+            user = Some(User {
+                email: v.email,
+                first_name: v.first_name,
+                last_name: v.last_name,
+                password: v.password,
+                salt: v.salt,
+                token: "".into(),
+                rum_token: None,
+                role: UserRole::User,
+                org: "".into(),
+                is_external: v.user_type == UserType::External,
+                password_ext: v.password_ext,
+            });
+        } else {
+            return Ok(TokenValidationResponse {
+                is_valid: false,
+                user_email: "".to_string(),
+                is_internal_user: false,
+                user_role: None,
+                user_name: "".to_string(),
+                family_name: "".to_string(),
+                given_name: "".to_string(),
+            });
+        }
     }
     let user = user.unwrap();
 
@@ -308,8 +340,8 @@ pub async fn validate_credentials_ext(
     path: &str,
     auth_token: AuthTokensExt,
 ) -> Result<TokenValidationResponse, Error> {
-    let config = get_config();
-    let password_ext_salt = config.auth.ext_auth_salt.as_str();
+    let cfg = get_config();
+    let password_ext_salt = cfg.auth.ext_auth_salt.as_str();
     let mut path_columns = path.split('/').collect::<Vec<&str>>();
     if let Some(v) = path_columns.last()
         && v.is_empty()
@@ -325,7 +357,13 @@ pub async fn validate_credentials_ext(
                 if all_users.is_empty() {
                     None
                 } else {
-                    all_users.first().cloned()
+                    // For organizations endpoint, specifically look for user in _meta org
+                    // since permission check at line 966 expects the user to be in _meta
+                    all_users
+                        .iter()
+                        .find(|u| u.org == config::META_ORG_ID)
+                        .cloned()
+                        .or_else(|| all_users.first().cloned())
                 }
             }
             Err(_) => None,
@@ -392,7 +430,7 @@ pub async fn validate_credentials_ext(
 /// - The user is a root user
 /// - This is a ingestion POST endpoint
 async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Result<(), Error> {
-    let config = get_config();
+    let cfg = get_config();
     let mut path_columns = path.split('/').collect::<Vec<&str>>();
     if let Some(v) = path_columns.first()
         && v.is_empty()
@@ -421,7 +459,7 @@ async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Res
         .await
         .is_none()
     {
-        if !config.common.create_org_through_ingestion {
+        if !cfg.common.create_org_through_ingestion {
             Err(ErrorNotFound("Organization not found"))
         } else if is_root_user(user_id)
             && method.eq(&Method::POST)
@@ -513,8 +551,8 @@ pub async fn validate_user(
     let db_user = db::user::get_user_record(user_id)
         .await
         .map(|user| DBUser::from(&user));
-    let config = get_config();
-    validate_user_from_db(db_user, user_password, None, 0, &config.auth.ext_auth_salt).await
+    let cfg = get_config();
+    validate_user_from_db(db_user, user_password, None, 0, &cfg.auth.ext_auth_salt).await
 }
 
 pub async fn validate_user_for_query_params(
@@ -524,13 +562,13 @@ pub async fn validate_user_for_query_params(
     exp_in: i64,
 ) -> Result<TokenValidationResponse, Error> {
     let db_user = db::user::get_db_user(user_id).await;
-    let config = get_config();
+    let cfg = get_config();
     validate_user_from_db(
         db_user,
         user_password,
         req_time,
         exp_in,
-        &config.auth.ext_auth_salt,
+        &cfg.auth.ext_auth_salt,
     )
     .await
 }
@@ -823,29 +861,16 @@ pub async fn oo_validator(
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let path_prefix = "/api/";
     let path = extract_relative_path(req.request().path(), path_prefix);
-    let path_columns = path.split('/').collect::<Vec<&str>>();
-    let is_short_url = is_short_url_path(&path_columns);
+    let _path_columns = path.split('/').collect::<Vec<&str>>();
 
     let auth_info = match auth_result {
         Ok(info) => info,
-        Err(e) => {
-            return if is_short_url {
-                Err(handle_auth_failure_for_redirect(req, &e))
-            } else {
-                Err((e, req))
-            };
-        }
+        Err(e) => return Err((e, req)),
     };
 
     match oo_validator_internal(req, auth_info, path_prefix).await {
         Ok(service_req) => Ok(service_req),
-        Err((err, err_req)) => {
-            if is_short_url {
-                Err(handle_auth_failure_for_redirect(err_req, &err))
-            } else {
-                Err((err, err_req))
-            }
-        }
+        Err((err, err_req)) => Err((err, err_req)),
     }
 }
 
@@ -1040,7 +1065,7 @@ fn extract_relative_path(full_path: &str, path_prefix: &str) -> String {
 }
 
 /// Helper function to check if the path corresponds to a short URL
-fn is_short_url_path(path_columns: &[&str]) -> bool {
+fn _is_short_url_path(path_columns: &[&str]) -> bool {
     path_columns
         .get(1)
         .is_some_and(|&segment| segment.to_lowercase() == "short")
@@ -1051,8 +1076,11 @@ fn is_short_url_path(path_columns: &[&str]) -> bool {
 /// This function is responsible for logging the authentication failure and returning a redirect
 /// response. It takes in the request and the error message, and returns a tuple containing the
 /// redirect response and the service request.
-fn handle_auth_failure_for_redirect(req: ServiceRequest, error: &Error) -> (Error, ServiceRequest) {
-    let full_url = extract_full_url(&req);
+fn _handle_auth_failure_for_redirect(
+    req: ServiceRequest,
+    error: &Error,
+) -> (Error, ServiceRequest) {
+    let full_url = _extract_full_url(&req);
     let redirect_http = RedirectResponseBuilder::default()
         .with_query_param("short_url", &full_url)
         .build();
@@ -1066,7 +1094,7 @@ fn handle_auth_failure_for_redirect(req: ServiceRequest, error: &Error) -> (Erro
 }
 
 /// Extracts the full URL from the request.
-fn extract_full_url(req: &ServiceRequest) -> String {
+fn _extract_full_url(req: &ServiceRequest) -> String {
     let connection_info = req.connection_info();
     let scheme = connection_info.scheme();
     let host = connection_info.host();
@@ -1294,19 +1322,19 @@ mod tests {
     async fn test_is_short_url_path() {
         // Test short URL path
         let short_url_path = ["api", "short", "abc123"];
-        assert!(is_short_url_path(&short_url_path));
+        assert!(_is_short_url_path(&short_url_path));
 
         // Test non-short URL path
         let normal_path = ["api", "v1", "logs"];
-        assert!(!is_short_url_path(&normal_path));
+        assert!(!_is_short_url_path(&normal_path));
 
         // Test path with insufficient segments
         let short_path = ["api"];
-        assert!(!is_short_url_path(&short_path));
+        assert!(!_is_short_url_path(&short_path));
 
         // Test case insensitive
         let mixed_case_path = ["api", "SHORT", "abc123"];
-        assert!(is_short_url_path(&mixed_case_path));
+        assert!(_is_short_url_path(&mixed_case_path));
     }
 
     #[test]
@@ -1361,7 +1389,7 @@ mod tests {
 
         // This test would need more setup to work properly
         // For now, just test that the function exists and compiles
-        let _ = extract_full_url(&service_req);
+        let _ = _extract_full_url(&service_req);
     }
 
     #[test]
@@ -1372,7 +1400,7 @@ mod tests {
         let error = ErrorUnauthorized("Test error");
 
         // Test that the function handles errors properly
-        let (redirect_error, _) = handle_auth_failure_for_redirect(req, &error);
+        let (redirect_error, _) = _handle_auth_failure_for_redirect(req, &error);
         // The error should be a redirect response, not necessarily contain "redirect" in the string
         assert!(!redirect_error.to_string().is_empty());
     }

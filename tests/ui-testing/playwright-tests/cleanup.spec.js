@@ -15,35 +15,166 @@ test.describe("Pre-Test Cleanup", () => {
 
     const pm = new PageManager(page);
 
-    // Run complete cascade cleanup
-    // This will delete:
-    // 1. All destinations starting with 'auto_playwright'
-    // 2. All alerts blocking those destinations
-    // 3. All folders containing those alerts
-    // 4. All templates linked to those destinations
-    // 5. All remaining folders starting with 'auto_'
-    await pm.apiCleanup.completeCascadeCleanup('auto_playwright');
+    // Run complete cascade cleanup for alert destinations, templates, and folders
+    await pm.apiCleanup.completeCascadeCleanup(
+      // Destination prefixes to clean up
+      [
+        'auto_',
+        'newdest_',
+        'sanitydest-',
+        'rbac_basic_dest_',
+        'rbac_editor_create_dest_',
+        'rbac_403_test_dest_',
+        'rbac_sql_dest_',
+        'rbac_user_delete_dest_',
+        'rbac_user_update_dest_',
+        'rbac_viewer_delete_dest_',
+        'rbac_viewer_update_dest_'
+      ],
+      // Template prefixes to clean up
+      [
+        'auto_email_template_',
+        'auto_webhook_template_',
+        'auto_playwright_template_',
+        'auto_url_webhook_template_',
+        'sanitytemp-',
+        'newtemp_',
+        'email_tmpl_',
+        'rbac_403_test_tmpl_',
+        'rbac_basic_tmpl_',
+        'rbac_del_tmpl_',
+        'rbac_editor_create_tmpl_',
+        'rbac_editor_update_tmpl_',
+        'rbac_sql_tmpl_',
+        'rbac_user_delete_tmpl_',
+        'rbac_viewer_delete_tmpl_',
+        'rbac_viewer_update_tmpl_'
+      ],
+      // Folder prefixes to clean up
+      ['auto_']
+    );
 
     // Clean up all reports owned by automation user
     await pm.apiCleanup.cleanupReports();
 
     // Clean up all dashboards owned by automation user
+    // This includes: Joins_Test_* (dashboard joins parallel tests), and other test dashboards
     await pm.apiCleanup.cleanupDashboards();
 
     // Clean up all pipelines for e2e_automate streams
-    await pm.apiCleanup.cleanupPipelines();
+    await pm.apiCleanup.cleanupPipelines(
+      // Stream names to match
+      [
+        'e2e_automate',
+        'e2e_automate1',
+        'e2e_automate2',
+        'e2e_automate3',
+        'e2e_conditions_validation_precedence_src',
+        'e2e_conditions_validation_nested_and_src',
+        'e2e_conditions_validation_nested_or_src',
+        'e2e_conditions_validation_numeric_src',
+        'e2e_conditions_validation_contains_src',
+        'e2e_conditions_validation_deep_src',
+        'e2e_conditions_basic',
+        'e2e_conditions_groups',
+        'e2e_conditions_validation',
+        'e2e_conditions_precedence',
+        'e2e_conditions_multiple',
+        'e2e_conditions_delete',
+        'e2e_conditions_operators'
+      ],
+      // Source stream patterns to match
+      [
+        /^e2e_precedence_src_\d+$/,
+        /^e2e_multiple_or_src_\d+$/,
+        /^e2e_nested_or_src_\d+$/,
+        /^e2e_numeric_src_\d+$/,
+        /^e2e_multiple_and_src_\d+$/,
+        /^e2e_deep_src_\d+$/,
+        /^e2e_not_operator_src_\d+$/,
+        /^e2e_impossible_src_\d+$/,
+        /^e2e_universal_src_\d+$/,
+        /^e2e_4level_src_\d+$/,
+        /^simple_src_\d+$/,
+        /^manual_debug_src_/,
+        /^manual_verify_src_/
+      ],
+      // Pipeline name patterns to match
+      [
+        /^validation-precedence-\d+$/,
+        /^validation-multiple-or-\d+$/,
+        /^validation-nested-or-\d+$/,
+        /^validation-numeric-\d+$/,
+        /^validation-multiple-and-\d+$/,
+        /^validation-deep-nested-\d+$/,
+        /^validation-not-operator-\d+$/,
+        /^validation-impossible-\d+$/,
+        /^validation-universal-\d+$/,
+        /^validation-4level-\d+$/,
+        /^simple-test-\d+$/,
+        /^or-root-test-\d+$/,
+        /^manual-debug-pipeline-/,
+        /^manual-verify-pipeline-/,
+        /^scheurl\d+$/,       // scheurl556, scheurl149, scheurl56, etc.
+        /^schefile\d+$/,      // schefile399, schefile971, schefile123, etc.
+        /^realurl\d+$/        // realurl822, etc.
+      ]
+    );
 
-    // Clean up all pipeline destinations matching pattern "destination" + 2-3 digits
-    await pm.apiCleanup.cleanupPipelineDestinations();
+    // Clean up pipeline destinations matching test patterns
+    await pm.apiCleanup.cleanupPipelineDestinations([
+      /^destination\d{2,3}$/  // destination12, destination123, etc.
+    ]);
 
-    // Clean up all functions matching pattern "Pipeline" + 3 digits
-    await pm.apiCleanup.cleanupFunctions();
+    // Clean up functions matching test patterns
+    await pm.apiCleanup.cleanupFunctions([
+      /^Pipeline\d{1,3}$/,           // Pipeline1, Pipeline12, Pipeline123
+      /^first\d{1,3}$/,              // first0, first1, first99
+      /^second\d{1,3}$/,             // second0, second1, second99
+      /^sanitytest_/,                // sanitytest_a3f2, etc.
+      /^e2eautomatefunctions_/       // e2eautomatefunctions_x9y2, etc.
+    ]);
 
-    // Clean up all enrichment tables matching pattern "protocols_" + UUID + "_csv"
-    await pm.apiCleanup.cleanupEnrichmentTables();
+    // Clean up enrichment tables matching test patterns
+    await pm.apiCleanup.cleanupEnrichmentTables([
+      /^protocols_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/  // protocols_<uuid>_csv
+    ]);
 
-    // Clean up all streams starting with "sanitylogstream_"
-    await pm.apiCleanup.cleanupStreams();
+    // Clean up streams matching test patterns
+    await pm.apiCleanup.cleanupStreams(
+      [
+        /^sanitylogstream_/,           // sanitylogstream_61hj, etc.
+        /^test\d+$/,                   // test1, test2, test3, etc.
+        /^stress_test/,                // stress_test*, stress_test_<runId>_w0, stress_test1, etc.
+        /^sdr_/,                       // sdr_* (SDR test streams)
+        /^e2e_join_/,                  // e2e_join_* (UNION test streams)
+        /^e2e_conditions_/,            // e2e_conditions_* (Pipeline conditions UI test streams)
+        /^e2e_streamcreation_/,        // e2e_streamcreation_* (Stream creation UI test streams)
+        /^e2e_MyUpperStream/i,         // e2e_MyUpperStream* (Stream name casing test streams)
+        /^e2e_mylowerstream/i,         // e2e_mylowerstream* (Stream name casing test streams)
+        /^[a-z]{8,9}$/,                // Random 8-9 char lowercase strings
+        /^e2e_cond_prec_(src|dest)_\d+$/,     // Test 1: Operator precedence test streams
+        /^e2e_multiple_or_(src|dest)_\d+$/,   // Test 2: Multiple OR test streams
+        /^e2e_nested_or_(src|dest)_\d+$/,     // Test 3: Nested OR test streams
+        /^e2e_numeric_(src|dest)_\d+$/,       // Test 4: Numeric comparison test streams
+        /^e2e_multiple_and_(src|dest)_\d+$/,  // Test 5: Multiple AND test streams
+        /^e2e_deep_(src|dest)_\d+$/,          // Test 6: Deeply nested test streams
+        /^e2e_not_operator_(src|dest)_\d+$/,  // Test 7: NOT operator test streams
+        /^e2e_impossible_(src|dest)_\d+$/,    // Test 8: Impossible condition test streams
+        /^e2e_universal_(src|dest)_\d+$/,     // Test 9: Universal condition test streams
+        /^e2e_4level_(src|dest)_\d+$/,        // Test 10: 4-level nested test streams
+        /^stream\d{13}$/,                     // stream1765164273471, etc. (timestamp-based test streams)
+        /^e2e_stream_(a|b)_\d+$/,             // Regression test streams (e2e_stream_a_*, e2e_stream_b_*)
+        /^join_[a-z0-9]+_(requests|users|sessions)$/,  // Dashboard joins test streams (join_<testId>_requests, etc.)
+        /^func_test_[a-z0-9]+$/,                       // Dashboard functions test streams (func_test_<testId>)
+        /^join_manual_test$/,                          // Manual join test stream
+        /^test_app_users$/,                            // Test app users stream
+        /^test_sessions$/,                             // Test sessions stream
+        /^test_web_requests$/                          // Test web requests stream
+      ],
+      // Protected streams to never delete
+      ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate']
+    );
 
     // Clean up all service accounts matching pattern "email*@gmail.com"
     await pm.apiCleanup.cleanupServiceAccounts();
@@ -57,6 +188,19 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up custom logo from _meta organization
     await pm.apiCleanup.cleanupLogo();
 
+    // Clean up all search jobs
+    await pm.apiCleanup.cleanupSearchJobs();
+
+    // Clean up saved views matching test patterns
+    await pm.apiCleanup.cleanupSavedViews();
+
+    // Note: Stream deletion waiting is no longer needed here because:
+    // 1. Pipeline conditions tests now use worker-specific stream names (e.g., e2e_conditions_basic_<runId>_w0)
+    // 2. Schemaload/stress tests now use unique stream names (e.g., stress_test_<runId>_w0)
+    // This avoids conflicts both within a test run (parallelIndex) and across test runs (testRunId)
+    // The cleanup patterns above will clean up old test streams via regex matching
+
     testLogger.info('Pre-test cleanup completed successfully');
   });
 });
+

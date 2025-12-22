@@ -45,7 +45,7 @@ use tokio::{
 use crate::{
     common::infra::config::QUERY_FUNCTIONS,
     service::{
-        alerts::ConditionExt,
+        alerts::{ConditionExt, ConditionGroupExt},
         ingestion::{apply_vrl_fn, compile_vrl_function},
         self_reporting::publish_error,
     },
@@ -570,7 +570,7 @@ async fn process_node(
                                     if cfg.common.skip_formatting_stream_name {
                                         stream_name.into()
                                     } else {
-                                        format_stream_name(&stream_name).into()
+                                        format_stream_name(stream_name).into()
                                     }
                             }
                             resolve_res => {
@@ -651,12 +651,21 @@ async fn process_node(
                     };
                     flattened = true;
                 }
+
+                // Evaluate based on condition version
+                let passes = match condition_params {
+                    config::meta::pipeline::components::ConditionParams::V1 { conditions } => {
+                        // v1: Use tree-based ConditionList evaluation
+                        conditions.evaluate(record.as_object().unwrap()).await
+                    }
+                    config::meta::pipeline::components::ConditionParams::V2 { conditions } => {
+                        // v2: Use linear ConditionGroup evaluation
+                        conditions.evaluate(record.as_object().unwrap()).await
+                    }
+                };
+
                 // only send to children when passing all condition evaluations
-                if condition_params
-                    .conditions
-                    .evaluate(record.as_object().unwrap())
-                    .await
-                {
+                if passes {
                     send_to_children(
                         &mut child_senders,
                         PipelineItem {
@@ -828,12 +837,9 @@ async fn process_node(
             log::debug!(
                 "[Pipeline]: Destination node {node_idx} starts processing, remote_stream : {remote_stream:?}"
             );
-            let min_ts = (Utc::now()
-                - chrono::Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
-            .timestamp_micros();
-            let max_ts = (Utc::now()
-                + chrono::Duration::try_hours(cfg.limit.ingest_allowed_in_future).unwrap())
-            .timestamp_micros();
+            let now = config::utils::time::now_micros();
+            let min_ts = now - cfg.limit.ingest_allowed_upto_micro;
+            let max_ts = now + cfg.limit.ingest_allowed_in_future_micro;
             while let Some(pipeline_item) = receiver.recv().await {
                 let PipelineItem {
                     mut record,

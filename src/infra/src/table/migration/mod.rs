@@ -72,6 +72,12 @@ mod m20250930_000001_create_pipeline_last_errors_table;
 mod m20251024_000001_add_alert_deduplication;
 mod m20251105_000001_update_enrichment_table_created_at_mysql;
 mod m20251118_000001_add_alert_row_template_type;
+mod m20251118_000002_create_sessions_table;
+mod m20251118_000003_delete_meta_sessions;
+mod m20251126_100001_create_service_streams_table;
+mod m20251126_100002_create_service_streams_dimensions_table;
+mod m20251204_000001_create_alert_incidents_table;
+mod m20251207_000001_create_system_settings_table;
 
 pub struct Migrator;
 
@@ -133,6 +139,12 @@ impl MigratorTrait for Migrator {
             Box::new(m20251024_000001_add_alert_deduplication::Migration),
             Box::new(m20251105_000001_update_enrichment_table_created_at_mysql::Migration),
             Box::new(m20251118_000001_add_alert_row_template_type::Migration),
+            Box::new(m20251118_000002_create_sessions_table::Migration),
+            Box::new(m20251118_000003_delete_meta_sessions::Migration),
+            Box::new(m20251126_100001_create_service_streams_table::Migration),
+            Box::new(m20251126_100002_create_service_streams_dimensions_table::Migration),
+            Box::new(m20251204_000001_create_alert_incidents_table::Migration),
+            Box::new(m20251207_000001_create_system_settings_table::Migration),
         ]
     }
 }

@@ -53,7 +53,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 13;
+pub const DB_SCHEMA_VERSION: u64 = 17;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1086,12 +1086,6 @@ pub struct Common {
     )]
     pub inverted_index_old_format: bool,
     #[env_config(
-        name = "ZO_INVERTED_INDEX_CAMEL_CASE_TOKENIZER_DISABLED",
-        default = false,
-        help = "Disable camel case tokenizer for inverted index."
-    )]
-    pub inverted_index_camel_case_tokenizer_disabled: bool,
-    #[env_config(
         name = "ZO_INVERTED_INDEX_COUNT_OPTIMIZER_ENABLED",
         default = true,
         help = "Toggle inverted index count optimizer."
@@ -1207,14 +1201,6 @@ pub struct Common {
         help = "Report alert/report triggers to the originating organization in addition to _meta org"
     )]
     pub usage_report_to_own_org: bool,
-    #[env_config(name = "ZO_FILE_LIST_DUMP_ENABLED", default = false)]
-    pub file_list_dump_enabled: bool,
-    #[env_config(name = "ZO_FILE_LIST_DUMP_DUAL_WRITE", default = true)]
-    pub file_list_dump_dual_write: bool,
-    #[env_config(name = "ZO_FILE_LIST_DUMP_MIN_HOUR", default = 2)]
-    pub file_list_dump_min_hour: usize,
-    #[env_config(name = "ZO_FILE_LIST_DUMP_DEBUG_CHECK", default = true)]
-    pub file_list_dump_debug_check: bool,
     #[env_config(
         name = "ZO_USE_STREAM_SETTINGS_FOR_PARTITIONS_ENABLED",
         default = false,
@@ -1377,8 +1363,10 @@ pub struct Limit {
     pub query_recommendation_top_k: usize,
     #[env_config(name = "ZO_INGEST_ALLOWED_UPTO", default = 5)] // in hours - in past
     pub ingest_allowed_upto: i64,
+    pub ingest_allowed_upto_micro: i64,
     #[env_config(name = "ZO_INGEST_ALLOWED_IN_FUTURE", default = 24)] // in hours - in future
     pub ingest_allowed_in_future: i64,
+    pub ingest_allowed_in_future_micro: i64,
     #[env_config(name = "ZO_INGEST_FLATTEN_LEVEL", default = 3)] // default flatten level
     pub ingest_flatten_level: u32,
     #[env_config(name = "ZO_LOGS_FILE_RETENTION", default = "hourly")]
@@ -1415,7 +1403,7 @@ pub struct Limit {
     pub job_runtime_blocking_worker_num: usize, // equals to 512 if 0
     #[env_config(name = "ZO_JOB_RUNTIME_SHUTDOWN_TIMEOUT", default = 10)] // seconds
     pub job_runtime_shutdown_timeout: u64,
-    #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 60)] // seconds
+    #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // seconds
     pub calculate_stats_interval: u64,
     #[env_config(name = "ZO_CALCULATE_STATS_STEP_LIMIT_SECS", default = 600)] // seconds
     pub calculate_stats_step_limit_secs: i64,
@@ -1521,18 +1509,6 @@ pub struct Limit {
         help = "timeout of transaction lock"
     )] // seconds
     pub meta_transaction_lock_timeout: usize,
-    #[env_config(
-        name = "ZO_FILE_LIST_ID_BATCH_SIZE",
-        default = 5000,
-        help = "batch size of file list query"
-    )]
-    pub file_list_id_batch_size: usize,
-    #[env_config(
-        name = "ZO_FILE_LIST_MULTI_THREAD",
-        default = false,
-        help = "use multi thread for file list query"
-    )]
-    pub file_list_multi_thread: bool,
     #[env_config(name = "ZO_DISTINCT_VALUES_INTERVAL", default = 10)] // seconds
     pub distinct_values_interval: u64,
     #[env_config(name = "ZO_DISTINCT_VALUES_HOURLY", default = false)]
@@ -1671,10 +1647,21 @@ pub struct Compact {
     #[env_config(name = "ZO_COMPACT_BLOCKED_ORGS", default = "")] // use comma to split
     pub blocked_orgs: String,
     #[env_config(name = "ZO_COMPACT_FILE_LIST_DELETED_MODE", default = "deleted")]
-    // "history" "deleted" "none"
-    pub file_list_deleted_mode: String,
-    #[env_config(name = "ZO_COMPACT_FILE_LIST_DELETED_BATCH_SIZE", default = 1000)]
+    pub file_list_deleted_mode: String, // "history" "deleted" "none"
+    #[env_config(
+        name = "ZO_COMPACT_FILE_LIST_DELETED_BATCH_SIZE",
+        default = 1000,
+        help = "batch size of file list deleted query"
+    )]
     pub file_list_deleted_batch_size: usize,
+    #[env_config(
+        name = "ZO_COMPACT_FILE_LIST_MULTI_THREAD",
+        default = false,
+        help = "use multi thread for file list query"
+    )]
+    pub file_list_multi_thread: bool,
+    #[env_config(name = "ZO_COMPACT_FILE_LIST_DUMP_ENABLED", default = false)]
+    pub file_list_dump_enabled: bool,
     #[env_config(
         name = "ZO_COMPACT_BATCH_SIZE",
         default = 0,
@@ -2375,10 +2362,6 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.limit.sql_db_connections_max =
         max(REQUIRED_DB_CONNECTIONS, cfg.limit.sql_db_connections_max);
 
-    if cfg.limit.file_list_id_batch_size == 0 {
-        cfg.limit.file_list_id_batch_size = 5000;
-    }
-
     if cfg.limit.consistent_hash_vnodes < 1 {
         cfg.limit.consistent_hash_vnodes = 1000;
     }
@@ -2401,6 +2384,11 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.limit.calculate_stats_step_limit_secs > 86400 {
         cfg.limit.calculate_stats_step_limit_secs = 86400;
     }
+
+    // format ingest allowed upto and in future to micro
+    cfg.limit.ingest_allowed_upto_micro = cfg.limit.ingest_allowed_upto * 3600 * 1_000_000;
+    cfg.limit.ingest_allowed_in_future_micro =
+        cfg.limit.ingest_allowed_in_future * 3600 * 1_000_000;
 
     Ok(())
 }
@@ -2563,11 +2551,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     {
         cfg.common.feature_broadcast_join_left_side_max_size = 10; // 10 MB
     }
-
-    // debug check is useful only when dual write is enabled. Otherwise it will raise error
-    // incorrectly each time
-    cfg.common.file_list_dump_debug_check =
-        cfg.common.file_list_dump_dual_write && cfg.common.file_list_dump_debug_check;
 
     if cfg.common.default_hec_stream.is_empty() {
         cfg.common.default_hec_stream = "_hec".to_string();
@@ -2919,6 +2902,10 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.compact.old_data_min_files < 1 {
         cfg.compact.old_data_min_files = 10;
+    }
+
+    if cfg.compact.file_list_deleted_batch_size == 0 {
+        cfg.compact.file_list_deleted_batch_size = 1000;
     }
 
     if cfg.compact.batch_size < 1 {

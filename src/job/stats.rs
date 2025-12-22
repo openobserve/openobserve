@@ -19,8 +19,8 @@ use tokio::time;
 use crate::service::{compact::stats::update_stats_from_file_list, db};
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    tokio::task::spawn(async move { update_node_memory_usage().await });
-    tokio::task::spawn(async move { update_node_disk_usage().await });
+    tokio::task::spawn(update_node_memory_usage());
+    tokio::task::spawn(update_node_disk_usage());
 
     if file_list_update_stats().is_none() {
         log::debug!("[STATS] job not started as not a compactor");
@@ -48,12 +48,9 @@ fn file_list_update_stats() -> Option<tokio::task::JoinHandle<()>> {
                 Err(e) => {
                     log::error!("[STATS] run update stream stats from file list error: {e}");
                 }
-                Ok(Some((offset, max_pk))) => {
-                    log::debug!(
-                        "[STATS] run update stream stats success, offset: {offset}, max_pk: {max_pk}"
-                    );
+                Ok(_) => {
+                    log::debug!("[STATS] run update stream stats success");
                 }
-                Ok(None) => {}
             }
         }
     ))

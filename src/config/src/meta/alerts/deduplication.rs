@@ -44,6 +44,11 @@ pub struct SemanticFieldGroup {
     /// Human-readable display name (e.g., "Host", "K8s Cluster")
     pub display: String,
 
+    /// Category/group this semantic field belongs to (e.g., "Common", "Kubernetes", "AWS", "GCP",
+    /// "Azure") Used for UI organization and preset templates
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+
     /// List of field names that are equivalent (e.g., ["host", "hostname", "node"])
     ///
     /// Note: Field names can overlap with other groups. First-defined group wins.
@@ -52,6 +57,20 @@ pub struct SemanticFieldGroup {
     /// Whether to normalize values (lowercase + trim)
     #[serde(default)]
     pub normalize: bool,
+
+    /// Whether this dimension is stable (low cardinality) and should be used for correlation key
+    ///
+    /// Stable dimensions (true): service, environment, k8s-cluster, k8s-namespace, k8s-deployment
+    /// Transient dimensions (false): k8s-pod, host, ip-address, container-id, trace-id
+    ///
+    /// Stable dimensions are used to compute correlation_key which prevents DB explosion.
+    /// Transient dimensions are stored but not used for service record identity.
+    #[serde(default = "default_is_stable")]
+    pub is_stable: bool,
+}
+
+fn default_is_stable() -> bool {
+    false // Conservative default: assume dimensions are transient unless marked stable
 }
 
 impl SemanticFieldGroup {
@@ -66,83 +85,69 @@ impl SemanticFieldGroup {
         Self {
             id: id.into(),
             display: display.into(),
+            group: None,
             fields,
             normalize,
+            is_stable: false, // Default to transient
         }
     }
-    /// Get default semantic groups for common use cases
-    pub fn default_presets() -> Vec<Self> {
-        vec![
-            Self::new(
-                "host",
-                "Host",
-                &["host", "hostname", "node", "node_name"],
-                true,
-            ),
-            Self::new(
-                "ip-address",
-                "IP Address",
-                &[
-                    "ip",
-                    "ipaddr",
-                    "ip_address",
-                    "ip_addr",
-                    "client_ip",
-                    "source_ip",
-                    "host_ip",
-                ],
-                true,
-            ),
-            Self::new(
-                "service",
-                "Service",
-                &[
-                    "service",
-                    "service_name",
-                    "svc",
-                    "app",
-                    "application",
-                    "app_name",
-                ],
-                true,
-            ),
-            // Kubernetes groups
-            Self::new(
-                "k8s-cluster",
-                "K8s Cluster",
-                &["k8s_cluster", "cluster", "cluster_name", "cluster_id"],
-                false,
-            ),
-            Self::new(
-                "k8s-namespace",
-                "K8s Namespace",
-                &["k8s_namespace", "namespace", "k8s_ns", "ns"],
-                false,
-            ),
-            Self::new(
-                "k8s-pod",
-                "K8s Pod",
-                &["k8s_pod", "pod", "pod_name", "pod_id"],
-                false,
-            ),
-            Self::new(
-                "k8s-node",
-                "K8s Node",
-                &["k8s_node", "node", "node_name", "kubernetes_node"],
-                false,
-            ),
-            Self::new(
-                "k8s-container",
-                "K8s Container",
-                &[
-                    "container",
-                    "container_name",
-                    "container_id",
-                    "k8s_container",
-                ],
-                false,
-            ),
-        ]
+
+    pub fn new_stable(
+        id: impl Into<String>,
+        display: impl Into<String>,
+        fields: &[&str],
+        normalize: bool,
+        is_stable: bool,
+    ) -> Self {
+        let fields = fields.iter().map(|v| v.to_string()).collect_vec();
+
+        Self {
+            id: id.into(),
+            display: display.into(),
+            group: None,
+            fields,
+            normalize,
+            is_stable,
+        }
+    }
+
+    pub fn with_group(
+        id: impl Into<String>,
+        display: impl Into<String>,
+        group: impl Into<String>,
+        fields: &[&str],
+        normalize: bool,
+    ) -> Self {
+        let fields = fields.iter().map(|v| v.to_string()).collect_vec();
+
+        Self {
+            id: id.into(),
+            display: display.into(),
+            group: Some(group.into()),
+            fields,
+            normalize,
+            is_stable: false, // Default to transient
+        }
+    }
+
+    pub fn with_group_stable(
+        id: impl Into<String>,
+        display: impl Into<String>,
+        group: impl Into<String>,
+        fields: &[&str],
+        normalize: bool,
+        is_stable: bool,
+    ) -> Self {
+        let fields = fields.iter().map(|v| v.to_string()).collect_vec();
+
+        Self {
+            id: id.into(),
+            display: display.into(),
+            group: Some(group.into()),
+            fields,
+            normalize,
+            is_stable,
+        }
     }
 
     /// Validate semantic field group ID format
@@ -156,6 +161,31 @@ impl SemanticFieldGroup {
             && !id.starts_with('-')
             && !id.ends_with('-')
             && !id.contains("--")
+    }
+
+    /// Get default semantic groups for common use cases
+    ///
+    /// ⚠️ **NOTE**: This is a minimal OSS fallback. The canonical source of defaults
+    /// for enterprise builds is in:
+    /// `o2-enterprise/o2_enterprise/src/enterprise/alerts/default_semantic_groups.json`
+    ///
+    /// Enterprise code should call
+    /// `o2_enterprise::enterprise::alerts::semantic_config::SemanticFieldGroup::load_defaults_from_file()`
+    /// instead.
+    #[allow(dead_code)]
+    pub fn default_presets() -> Vec<Self> {
+        vec![]
+    }
+
+    /// Load default semantic groups
+    ///
+    /// For OSS builds, this returns the minimal preset.
+    /// For enterprise builds with full JSON, call
+    /// `o2_enterprise::enterprise::alerts::semantic_config::SemanticFieldGroup::load_defaults_from_file()`
+    /// instead.
+    pub fn load_defaults_from_file() -> Vec<Self> {
+        // OSS fallback: return minimal preset
+        Self::default_presets()
     }
 }
 
@@ -217,6 +247,22 @@ pub struct GlobalDeduplicationConfig {
     /// Can be overridden per-alert.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time_window_minutes: Option<i64>,
+
+    /// FQN (Fully Qualified Name) priority dimensions for service correlation
+    ///
+    /// Defines which semantic dimensions are used to derive the service-fqn,
+    /// in priority order. The first dimension with a value wins.
+    ///
+    /// Default priority (if empty):
+    /// 1. k8s-deployment, k8s-statefulset, k8s-daemonset, k8s-job (K8s workloads)
+    /// 2. aws-ecs-task, faas-name, gcp-cloud-run, azure-cloud-role (Cloud workloads)
+    /// 3. process-name (Bare metal)
+    /// 4. service (Fallback)
+    ///
+    /// Example custom priority: ["k8s-deployment", "aws-ecs-task", "service"]
+    /// This would skip statefulset/daemonset and use deployment directly.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fqn_priority_dimensions: Vec<String>,
 }
 
 /// Per-alert deduplication configuration (from main branch)
@@ -414,11 +460,27 @@ impl GlobalDeduplicationConfig {
     pub fn default_with_presets() -> Self {
         Self {
             enabled: false,
-            semantic_field_groups: SemanticFieldGroup::default_presets(),
+            semantic_field_groups: SemanticFieldGroup::load_defaults_from_file(),
             alert_dedup_enabled: false,
             alert_fingerprint_groups: vec![],
             time_window_minutes: None,
+            fqn_priority_dimensions: Self::default_fqn_priority(),
         }
+    }
+
+    /// Get default FQN priority dimensions
+    ///
+    /// For OSS builds, returns empty (must be configured).
+    /// For enterprise builds, ServiceStreamsConfig provides the full default list.
+    ///
+    /// Default priority order for deriving service-fqn (first match wins):
+    /// 1. K8s workload: deployment, statefulset, daemonset, job
+    /// 2. Cloud workload: ECS task family, Lambda function, Cloud Run service
+    /// 3. Bare metal: process name
+    /// 4. Fallback: service dimension
+    pub fn default_fqn_priority() -> Vec<String> {
+        // OSS builds return empty - enterprise provides defaults via ServiceStreamsConfig
+        vec![]
     }
 
     /// Map a field name to its semantic group ID
@@ -522,7 +584,6 @@ mod tests {
     fn test_semantic_field_group_id_validation() {
         assert!(SemanticFieldGroup::validate_id("host"));
         assert!(SemanticFieldGroup::validate_id("k8s-cluster"));
-        assert!(SemanticFieldGroup::validate_id("ip-address"));
         assert!(SemanticFieldGroup::validate_id("service-123"));
 
         assert!(!SemanticFieldGroup::validate_id(""));
@@ -562,6 +623,7 @@ mod tests {
             ],
             alert_fingerprint_groups: vec![],
             time_window_minutes: Some(10),
+            fqn_priority_dimensions: vec![],
         };
 
         assert!(config.validate().is_ok());
@@ -633,6 +695,7 @@ mod tests {
             ],
             alert_fingerprint_groups: vec![],
             time_window_minutes: Some(10),
+            fqn_priority_dimensions: vec![],
         };
 
         // Should succeed - overlaps are allowed, just logged as warnings
@@ -650,6 +713,7 @@ mod tests {
             ],
             alert_fingerprint_groups: vec![],
             time_window_minutes: Some(10),
+            fqn_priority_dimensions: vec![],
         };
 
         let json = serde_json::to_string_pretty(&config).unwrap();
@@ -715,19 +779,9 @@ mod tests {
 
     #[test]
     fn test_default_presets() {
+        // OSS builds return empty defaults - semantic groups are loaded from
+        // enterprise JSON or configured via API
         let presets = SemanticFieldGroup::default_presets();
-        assert!(!presets.is_empty());
-
-        // Check that we have common groups
-        assert!(presets.iter().any(|g| g.id == "host"));
-        assert!(presets.iter().any(|g| g.id == "service"));
-        assert!(presets.iter().any(|g| g.id == "k8s-cluster"));
-
-        // Validate all preset IDs
-        for preset in &presets {
-            assert!(SemanticFieldGroup::validate_id(&preset.id));
-            assert!(!preset.display.is_empty());
-            assert!(!preset.fields.is_empty());
-        }
+        assert!(presets.is_empty());
     }
 }

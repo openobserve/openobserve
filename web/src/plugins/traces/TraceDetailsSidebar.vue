@@ -152,6 +152,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="text-transform: capitalize"
       data-test="trace-details-sidebar-tabs-attributes"
     />
+    <!-- Correlation Tabs (only visible when service streams enabled) -->
+    <q-tab
+      v-if="serviceStreamsEnabled"
+      name="correlated-logs"
+      :label="t('correlation.correlatedLogs')"
+      style="text-transform: capitalize"
+      data-test="trace-details-sidebar-tabs-correlated-logs"
+    />
+    <q-tab
+      v-if="serviceStreamsEnabled"
+      name="correlated-metrics"
+      :label="t('correlation.correlatedMetrics')"
+      style="text-transform: capitalize"
+      data-test="trace-details-sidebar-tabs-correlated-metrics"
+    />
   </q-tabs>
   <q-separator style="width: 100%" />
   <q-tab-panels
@@ -462,6 +477,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         No links present for this span
       </div>
     </q-tab-panel>
+
+    <!-- Correlated Logs Tab Panel -->
+    <q-tab-panel name="correlated-logs" class="q-pa-none full-height">
+      <TelemetryCorrelationDashboard
+        v-if="correlationProps"
+        mode="embedded-tabs"
+        external-active-tab="logs"
+        :service-name="correlationProps.serviceName"
+        :matched-dimensions="correlationProps.matchedDimensions"
+        :additional-dimensions="correlationProps.additionalDimensions"
+        :metric-streams="correlationProps.metricStreams"
+        :log-streams="correlationProps.logStreams"
+        :trace-streams="correlationProps.traceStreams"
+        :source-stream="correlationProps.sourceStream"
+        :source-type="correlationProps.sourceType"
+        :available-dimensions="correlationProps.availableDimensions"
+        :fts-fields="correlationProps.ftsFields"
+        :time-range="correlationProps.timeRange"
+        @close="activeTab = 'tags'"
+      />
+      <!-- Loading/Empty state when no data -->
+      <div v-else class="tw-flex tw-items-center tw-justify-center tw-h-full tw-py-20">
+        <div class="tw-text-center">
+          <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw-mb-4" />
+          <div v-else-if="correlationError" class="tw-text-base tw-text-red-500">{{ correlationError }}</div>
+          <div v-else class="tw-text-base tw-text-gray-500">{{ t('correlation.clickToLoadLogs') }}</div>
+        </div>
+      </div>
+    </q-tab-panel>
+
+    <!-- Correlated Metrics Tab Panel -->
+    <q-tab-panel name="correlated-metrics" class="q-pa-none full-height">
+      <TelemetryCorrelationDashboard
+        v-if="correlationProps"
+        mode="embedded-tabs"
+        external-active-tab="metrics"
+        :service-name="correlationProps.serviceName"
+        :matched-dimensions="correlationProps.matchedDimensions"
+        :additional-dimensions="correlationProps.additionalDimensions"
+        :metric-streams="correlationProps.metricStreams"
+        :log-streams="correlationProps.logStreams"
+        :trace-streams="correlationProps.traceStreams"
+        :source-stream="correlationProps.sourceStream"
+        :source-type="correlationProps.sourceType"
+        :available-dimensions="correlationProps.availableDimensions"
+        :fts-fields="correlationProps.ftsFields"
+        :time-range="correlationProps.timeRange"
+        @close="activeTab = 'tags'"
+      />
+      <!-- Loading/Empty state when no data -->
+      <div v-else class="tw-flex tw-items-center tw-justify-center tw-h-full tw-py-20">
+        <div class="tw-text-center">
+          <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw-mb-4" />
+          <div v-else-if="correlationError" class="tw-text-base tw-text-red-500">{{ correlationError }}</div>
+          <div v-else class="tw-text-base tw-text-gray-500">{{ t('correlation.clickToLoadMetrics') }}</div>
+        </div>
+      </div>
+    </q-tab-panel>
   </q-tab-panels>
 </template>
 
@@ -472,11 +545,14 @@ import { defineComponent, onBeforeMount, ref, watch, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { computed } from "vue";
-import { formatTimeWithSuffix, convertTimeFromNsToMs } from "@/utils/zincutils";
+import { formatTimeWithSuffix, convertTimeFromNsToUs } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useRouter } from "vue-router";
 import { onMounted } from "vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
+import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
+import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -493,11 +569,20 @@ export default defineComponent({
       type: String,
       default: "",
     },
+    streamName: {
+      type: String,
+      default: "",
+    },
+    serviceStreamsEnabled: {
+      type: Boolean,
+      default: false,
+    },
   },
   components: {
     LogsHighLighting,
+    TelemetryCorrelationDashboard,
   },
-  emits: ["close", "view-logs", "select-span", "open-trace"],
+  emits: ["close", "view-logs", "select-span", "open-trace", "show-correlation"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const activeTab = ref("tags");
@@ -865,9 +950,8 @@ export default defineComponent({
 
     const getStartTime = computed(() => {
       return (
-        convertTimeFromNsToMs(props.span.start_time) -
-        (props.baseTracePosition?.startTimeMs || 0) +
-        "ms"
+        formatTimeWithSuffix(convertTimeFromNsToUs(props.span.start_time) -
+        (props.baseTracePosition?.startTimeUs || 0))
       );
     });
 
@@ -888,8 +972,8 @@ export default defineComponent({
           trace_id: link.context.traceId,
           span_id: link.context.spanId,
           from:
-            convertTimeFromNsToMs(props.span.start_time) * 1000 - 3600000000,
-          to: convertTimeFromNsToMs(props.span.end_time) * 1000 + 3600000000,
+          convertTimeFromNsToUs(props.span.start_time) - 3600000000,
+          to: convertTimeFromNsToUs(props.span.end_time) + 3600000000,
           org_identifier: store.state.selectedOrganization.identifier,
         };
 
@@ -934,6 +1018,203 @@ export default defineComponent({
       }
     });
 
+    // Correlation state
+    const correlationLoading = ref(false);
+    const correlationError = ref<string | null>(null);
+    const correlationProps = ref<any>(null);
+    const { findRelatedTelemetry } = useServiceCorrelation();
+
+    /**
+     * Extract dimensions from span attributes for correlation
+     * Maps trace span attributes to semantic dimension names
+     */
+    const extractSpanDimensions = (span: any): Record<string, string> => {
+      const dimensions: Record<string, string> = {};
+
+      // Direct service name
+      if (span.service_name) {
+        dimensions['service-name'] = span.service_name;
+      }
+
+      // Common trace attributes that map to dimensions
+      const attributeMappings: Record<string, string> = {
+        // Kubernetes attributes
+        'k8s_namespace_name': 'k8s-namespace',
+        'k8s.namespace.name': 'k8s-namespace',
+        'k8s_deployment_name': 'k8s-deployment',
+        'k8s.deployment.name': 'k8s-deployment',
+        'k8s_pod_name': 'k8s-pod',
+        'k8s.pod.name': 'k8s-pod',
+        'k8s_container_name': 'k8s-container',
+        'k8s.container.name': 'k8s-container',
+        'k8s_statefulset_name': 'k8s-statefulset',
+        'k8s.statefulset.name': 'k8s-statefulset',
+        'k8s_daemonset_name': 'k8s-daemonset',
+        'k8s.daemonset.name': 'k8s-daemonset',
+        'k8s_replicaset_name': 'k8s-replicaset',
+        'k8s.replicaset.name': 'k8s-replicaset',
+        'k8s_job_name': 'k8s-job',
+        'k8s.job.name': 'k8s-job',
+        'k8s_cronjob_name': 'k8s-cronjob',
+        'k8s.cronjob.name': 'k8s-cronjob',
+        'k8s_node_name': 'k8s-node',
+        'k8s.node.name': 'k8s-node',
+        'k8s_cluster_name': 'k8s-cluster',
+        'k8s.cluster.name': 'k8s-cluster',
+        // Host attributes
+        'host_name': 'host-name',
+        'host.name': 'host-name',
+        // Cloud attributes
+        'cloud_region': 'cloud-region',
+        'cloud.region': 'cloud-region',
+        'cloud_availability_zone': 'cloud-availability-zone',
+        'cloud.availability_zone': 'cloud-availability-zone',
+        // Container attributes
+        'container_name': 'container-name',
+        'container.name': 'container-name',
+        'container_id': 'container-id',
+        'container.id': 'container-id',
+      };
+
+      // Check all span attributes
+      for (const [attrName, dimName] of Object.entries(attributeMappings)) {
+        if (span[attrName] && !dimensions[dimName]) {
+          dimensions[dimName] = String(span[attrName]);
+        }
+      }
+
+      return dimensions;
+    };
+
+    /**
+     * Load correlation data for this span (called when user clicks on correlation tabs)
+     */
+    const loadCorrelation = async () => {
+      // Skip if already loaded or loading
+      if (correlationProps.value || correlationLoading.value) {
+        return;
+      }
+
+      if (!props.span || !props.streamName) {
+        console.warn("[TraceDetailsSidebar] Cannot load correlation: missing span or stream name");
+        correlationError.value = "Missing span or stream name";
+        return;
+      }
+
+      correlationLoading.value = true;
+      correlationError.value = null;
+
+      try {
+        // Build telemetry context from span
+        const context: TelemetryContext = {
+          timestamp: convertTimeFromNsToUs(props.span.start_time) * 1000, // Convert to nanoseconds
+          fields: { ...props.span },
+          streamName: props.streamName,
+        };
+
+        // Extract dimensions from span attributes
+        const spanDimensions = extractSpanDimensions(props.span);
+        // Merge span dimensions into context fields for semantic extraction
+        Object.assign(context.fields, spanDimensions);
+
+        console.log("[TraceDetailsSidebar] Correlation context:", {
+          streamName: props.streamName,
+          serviceName: props.span.service_name,
+          dimensions: spanDimensions,
+        });
+
+        // Find related telemetry
+        const result = await findRelatedTelemetry(
+          context,
+          "traces",
+          5, // 5 minute time window
+          props.streamName
+        );
+
+        if (result && result.correlationData) {
+          const correlationData = result.correlationData;
+
+          // Calculate time range (span start/end with buffer)
+          const spanStartUs = convertTimeFromNsToUs(props.span.start_time);
+          const spanEndUs = convertTimeFromNsToUs(props.span.end_time);
+          const bufferUs = 5 * 60 * 1000000; // 5 minutes buffer
+
+          // Build availableDimensions from raw span attributes (actual field names)
+          // This is critical for log queries to use the correct field names (e.g., k8s_pod_name)
+          // Filter to only include string values that are correlation-relevant
+          const rawSpanDimensions: Record<string, string> = {};
+          for (const [key, value] of Object.entries(props.span)) {
+            if (typeof value !== 'string' || !value) continue;
+            if (key.startsWith('_')) continue; // Skip internal fields
+
+            // Include known correlation-relevant dimensions
+            const isRelevant =
+              key.startsWith('k8s_') ||
+              key.startsWith('k8s.') ||
+              key.startsWith('host') ||
+              key.startsWith('container') ||
+              key.startsWith('pod') ||
+              key.startsWith('namespace') ||
+              key.startsWith('deployment') ||
+              key.startsWith('service') ||
+              key.startsWith('node') ||
+              key.startsWith('os_') ||
+              key === 'version' ||
+              key === 'region' ||
+              key === 'cluster' ||
+              key === 'environment' ||
+              key === 'env';
+
+            if (isRelevant) {
+              rawSpanDimensions[key] = value;
+            }
+          }
+
+          console.log("[TraceDetailsSidebar] Raw span dimensions for log queries:", rawSpanDimensions);
+
+          correlationProps.value = {
+            serviceName: correlationData.service_name,
+            matchedDimensions: correlationData.matched_dimensions,
+            additionalDimensions: correlationData.additional_dimensions || {},
+            metricStreams: correlationData.related_streams.metrics,
+            logStreams: correlationData.related_streams.logs,
+            traceStreams: correlationData.related_streams.traces,
+            sourceStream: props.streamName,
+            sourceType: "traces",
+            // Use raw span attributes as availableDimensions for log query filters
+            availableDimensions: rawSpanDimensions,
+            ftsFields: [],
+            timeRange: {
+              startTime: spanStartUs - bufferUs,
+              endTime: spanEndUs + bufferUs,
+            },
+          };
+
+          console.log("[TraceDetailsSidebar] Correlation successful:", correlationProps.value);
+        } else {
+          correlationError.value = "No related services found for this trace span";
+        }
+      } catch (err: any) {
+        console.error("[TraceDetailsSidebar] Correlation failed:", err);
+        correlationError.value = err.message || "Failed to load correlation data";
+      } finally {
+        correlationLoading.value = false;
+      }
+    };
+
+    // Clear correlation when span changes
+    watch(() => props.span, () => {
+      correlationProps.value = null;
+      correlationError.value = null;
+    }, { deep: true });
+
+    // Load correlation data when user clicks on correlation tabs
+    watch(activeTab, (newTab) => {
+      if (newTab === "correlated-logs" || newTab === "correlated-metrics") {
+        loadCorrelation();
+      }
+    });
+
     return {
       t,
       activeTab,
@@ -962,7 +1243,11 @@ export default defineComponent({
       getProcessRows,
       highlightedAttributes,
       highlightTextMatch,
-      highlightedJSON
+      highlightedJSON,
+      // Correlation
+      correlationLoading,
+      correlationError,
+      correlationProps,
     };
   },
 });

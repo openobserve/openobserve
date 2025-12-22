@@ -18,6 +18,7 @@ use std::str::FromStr;
 pub mod distributed_plan;
 pub mod exec;
 pub mod optimizer;
+pub mod peak_memory_pool;
 pub mod plan;
 pub mod planner;
 pub mod storage;

@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <q-splitter
-      class="logs-horizontal-splitter !tw-pl-[0.625rem] !tw-h-[calc(100%-131px)]"
+      class="logs-horizontal-splitter !tw-pl-[0.625rem] !tw-h-[calc(100%-80px)]"
       v-model="splitterModel"
       unit="px"
       vertical

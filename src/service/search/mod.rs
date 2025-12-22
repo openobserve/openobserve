@@ -115,6 +115,7 @@ pub(crate) mod streaming;
 #[cfg(feature = "enterprise")]
 pub(crate) mod super_cluster;
 pub(crate) mod utils;
+pub(crate) mod work_group;
 
 /// The result of search in cluster
 /// data, scan_stats, wait_in_queue, is_partial, partial_err
@@ -328,6 +329,7 @@ pub async fn search(
                     took_wait_in_queue: Some(res.took_detail.wait_in_queue),
                     work_group: _work_group,
                     result_cache_ratio: Some(res.result_cache_ratio),
+                    peak_memory_usage: res.peak_memory_usage,
                     ..Default::default()
                 };
                 let num_fn = if req_query.query_fn.is_empty() { 0 } else { 1 };
@@ -720,7 +722,7 @@ pub async fn search_partition(
                 &sql.org_id,
                 stream_type,
                 &stream_name,
-                sql.time_range,
+                sql.time_range.unwrap_or_default(),
             )
             .await?;
             max_query_range = max(
@@ -813,12 +815,11 @@ pub async fn search_partition(
         return Ok(response);
     };
 
-    log::info!("[trace_id {trace_id}] search_partition: getting nodes");
     let nodes = infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
         .await
         .unwrap_or_default();
     if nodes.is_empty() {
-        log::error!("no querier node online");
+        log::error!("[trace_id {trace_id}] search_partition: no querier node online");
         return Err(Error::Message("no querier node online".to_string()));
     }
     let cpu_cores = nodes.iter().map(|n| n.cpu_num).sum::<u64>() as usize;
@@ -1045,8 +1046,13 @@ pub async fn search_partition(
                     query.end_time,
                 )
             } else {
-                match discover_cache_for_query(&cache_file_path, query.start_time, query.end_time)
-                    .await
+                match discover_cache_for_query(
+                    &cache_file_path,
+                    query.start_time,
+                    query.end_time,
+                    cache_interval,
+                )
+                .await
                 {
                     Ok(result) => result,
                     Err(e) => {
@@ -1253,6 +1259,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
                 idx_took: scan_stats.idx_took,
                 file_list_took: scan_stats.file_list_took,
                 aggs_cache_ratio: scan_stats.aggs_cache_ratio,
+                peak_memory_usage: scan_stats.peak_memory_usage / 1024 / 1024, // change to MB
             });
         let query_status = if result.is_queue {
             "waiting"

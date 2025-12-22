@@ -469,20 +469,21 @@ class APICleanup {
     }
 
     /**
-     * Clean up all enrichment tables matching pattern "protocols_" followed by UUID and "_csv"
-     * Deletes tables like protocols_f916681d_b71b_4edd_a4c1_00a8bf34b86d_csv
+     * Clean up enrichment tables matching specified patterns
+     * @param {Array<RegExp>} patterns - Array of regex patterns to match table names
      */
-    async cleanupEnrichmentTables() {
-        testLogger.info('Starting enrichment tables cleanup');
+    async cleanupEnrichmentTables(patterns = []) {
+        testLogger.info('Starting enrichment tables cleanup', { patterns: patterns.map(p => p.source) });
 
         try {
             // Fetch all enrichment tables
             const tables = await this.fetchEnrichmentTables();
             testLogger.info('Fetched enrichment tables', { total: tables.length });
 
-            // Filter tables matching pattern: "protocols_" + UUID pattern + "_csv"
-            const pattern = /^protocols_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/;
-            const matchingTables = tables.filter(t => pattern.test(t.name));
+            // Filter tables matching patterns
+            const matchingTables = tables.filter(t =>
+                patterns.some(pattern => pattern.test(t.name))
+            );
             testLogger.info('Found enrichment tables matching cleanup pattern', { count: matchingTables.length });
 
             if (matchingTables.length === 0) {
@@ -518,27 +519,18 @@ class APICleanup {
     }
 
     /**
-     * Clean up all functions matching pattern "Pipeline" followed by exactly 3 digits
-     * Deletes functions like Pipeline936, Pipeline657, etc.
-     * Does NOT delete Pipeline1234, test123, alpha123, etc.
+     * Clean up functions matching specified patterns
+     * @param {Array<RegExp>} patterns - Array of regex patterns to match function names
      */
-    async cleanupFunctions() {
-        testLogger.info('Starting functions cleanup');
+    async cleanupFunctions(patterns = []) {
+        testLogger.info('Starting functions cleanup', { patterns: patterns.map(p => p.source) });
 
         try {
             // Fetch all functions
             const functions = await this.fetchFunctions();
             testLogger.info('Fetched functions', { total: functions.length });
 
-            // Filter functions matching patterns:
-            // 1. "Pipeline" followed by 2 or 3 digits
-            // 2. "first" followed by 2 or 3 digits
-            // 3. "second" followed by 2 or 3 digits
-            const patterns = [
-                /^Pipeline\d{2,3}$/,
-                /^first\d{2,3}$/,
-                /^second\d{2,3}$/
-            ];
+            // Filter functions matching patterns
             const matchingFunctions = functions.filter(f =>
                 patterns.some(pattern => pattern.test(f.name))
             );
@@ -577,22 +569,45 @@ class APICleanup {
     }
 
     /**
-     * Clean up all pipelines for specific streams
-     * Deletes pipelines where source.stream_name matches any of the target streams
-     * @param {Array<string>} streamNames - Array of stream names to match (default: ['e2e_automate', 'e2e_automate1', 'e2e_automate2', 'e2e_automate3'])
+     * Clean up all pipelines for specific streams and matching patterns
+     * Deletes pipelines where source.stream_name matches any of the target streams or patterns
+     * @param {Array<string>} streamNames - Array of stream names to match
+     * @param {Array<RegExp>} sourceStreamPatterns - Array of regex patterns to match source stream names
+     * @param {Array<RegExp>} pipelineNamePatterns - Array of regex patterns to match pipeline names
      */
-    async cleanupPipelines(streamNames = ['e2e_automate', 'e2e_automate1', 'e2e_automate2', 'e2e_automate3']) {
-        testLogger.info('Starting pipeline cleanup', { streams: streamNames });
+    async cleanupPipelines(streamNames = [], sourceStreamPatterns = [], pipelineNamePatterns = []) {
+        testLogger.info('Starting pipeline cleanup', {
+            streams: streamNames,
+            sourceStreamPatterns: sourceStreamPatterns.map(p => p.toString()),
+            pipelineNamePatterns: pipelineNamePatterns.map(p => p.toString())
+        });
 
         try {
             // Fetch all pipelines
             const pipelines = await this.fetchPipelines();
             testLogger.info('Fetched pipelines', { total: pipelines.length });
 
-            // Filter pipelines by source stream name
-            const matchingPipelines = pipelines.filter(p =>
-                p.source && streamNames.includes(p.source.stream_name)
-            );
+            // Filter pipelines by source stream name OR by pattern matching
+            const matchingPipelines = pipelines.filter(p => {
+                if (!p.source) return false;
+
+                // Exact match for stream names
+                if (streamNames.length > 0 && streamNames.includes(p.source.stream_name)) return true;
+
+                // Pattern match for source stream names
+                if (sourceStreamPatterns.length > 0 && p.source.stream_name &&
+                    sourceStreamPatterns.some(pattern => pattern.test(p.source.stream_name))) {
+                    return true;
+                }
+
+                // Pattern match for pipeline names
+                if (pipelineNamePatterns.length > 0 && p.name &&
+                    pipelineNamePatterns.some(pattern => pattern.test(p.name))) {
+                    return true;
+                }
+
+                return false;
+            });
             testLogger.info('Found pipelines matching target streams', { count: matchingPipelines.length });
 
             if (matchingPipelines.length === 0) {
@@ -802,76 +817,191 @@ class APICleanup {
     }
 
     /**
-     * Clean up all streams starting with "sanitylogstream_"
-     * Deletes streams like sanitylogstream_61hj, sanitylogstream_abc123, etc.
+     * Check if a stream is still being deleted or exists
+     * Two-phase check:
+     * 1. GET stream settings - checks if schema exists
+     * 2. If schema gone, PUT settings to check if deletion marker is still active
+     * @param {string} streamName - The stream name to check
+     * @returns {Promise<boolean>} True if stream still exists or is being deleted
      */
-    /**
-     * Check if a stream name should be cleaned up
-     * Cleans up streams matching these patterns:
-     * 1. Starts with "sanitylogstream_"
-     * 2. Matches test patterns: test1, test2, test3, etc.
-     * 3. stress_test followed by numbers
-     * 4. Random 8-9 character lowercase strings (from pipeline dynamic tests)
-     *    - BUT excludes known production/important streams
-     */
-    shouldCleanupStream(streamName) {
-        // Pattern 1: sanitylogstream_*
-        if (streamName.startsWith('sanitylogstream_')) {
-            return true;
-        }
+    async isStreamStillDeleting(streamName) {
+        try {
+            // Phase 1: Check if stream schema exists via GET
+            const getResponse = await fetch(
+                `${this.baseUrl}/api/${this.org}/streams/${streamName}/settings?type=logs`,
+                {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': this.authHeader,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
 
-        // Pattern 2: test1, test2, test3, etc.
-        if (/^test\d+$/.test(streamName)) {
-            return true;
-        }
+            // If we get 200, stream still exists
+            if (getResponse.ok) {
+                testLogger.debug('Stream schema still exists', { streamName });
+                return true;
+            }
 
-        // Pattern 3: stress_test*
-        if (streamName.startsWith('stress_test')) {
-            return true;
-        }
+            // Check GET response for "is being deleted" error
+            const getResult = await getResponse.json().catch(() => ({}));
+            if (getResult.message && getResult.message.includes('is being deleted')) {
+                testLogger.debug('Stream is being deleted (GET check)', { streamName });
+                return true;
+            }
 
-        // Pattern 4: sdr_* (SDR test streams)
-        if (streamName.startsWith('sdr_')) {
-            return true;
-        }
+            // Phase 2: Schema is gone (404), but deletion marker might still be active
+            // Try PUT settings - this triggers is_deleting_stream check without creating data
+            const putResponse = await fetch(
+                `${this.baseUrl}/api/${this.org}/streams/${streamName}/settings?type=logs`,
+                {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': this.authHeader,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})  // Empty settings - won't create anything
+                }
+            );
 
-        // Pattern 4: Random 8-9 char lowercase strings
-        // First check if it matches the basic pattern
-        if (!/^[a-z]{8,9}$/.test(streamName)) {
+            const putResult = await putResponse.json().catch(() => ({}));
+
+            // Check if deletion marker is still active
+            if (putResult.message && putResult.message.includes('is being deleted')) {
+                testLogger.debug('Stream deletion marker still active (PUT check)', { streamName });
+                return true;
+            }
+
+            // Both schema gone and no deletion marker - deletion complete
+            testLogger.debug('Stream deletion fully complete', { streamName, getStatus: getResponse.status, putStatus: putResponse.status });
             return false;
+        } catch (error) {
+            // Network error - assume deletion might still be in progress
+            testLogger.warn('Error checking stream deletion status', { streamName, error: error.message });
+            return true;
         }
-
-        // Whitelist of known important streams to never delete
-        const protectedStreams = [
-            'default', 'sensitive', 'important', 'critical',
-            'production', 'staging', 'automation'
-        ];
-
-        // Don't delete if it's in the protected list
-        if (protectedStreams.includes(streamName)) {
-            return false;
-        }
-
-        // Don't delete if it contains common meaningful patterns
-        const meaningfulPatterns = ['prod', 'test', 'auto', 'log', 'metric', 'trace'];
-        if (meaningfulPatterns.some(pattern => streamName.includes(pattern))) {
-            return false;
-        }
-
-        // If it's 8-9 random lowercase chars and not protected, delete it
-        return true;
     }
 
-    async cleanupStreams() {
-        testLogger.info('Starting streams cleanup');
+    /**
+     * Wait for a stream deletion to fully complete
+     * @param {string} streamName - The stream name to wait for
+     * @param {number} maxWaitMs - Maximum time to wait in milliseconds (default: 120000 = 2 minutes)
+     * @param {number} pollIntervalMs - Polling interval in milliseconds (default: 3000 = 3 seconds)
+     * @returns {Promise<boolean>} True if deletion completed, false if timed out
+     */
+    async waitForStreamDeletion(streamName, maxWaitMs = 120000, pollIntervalMs = 3000) {
+        const startTime = Date.now();
+        let attempts = 0;
+
+        while (Date.now() - startTime < maxWaitMs) {
+            attempts++;
+            const stillDeleting = await this.isStreamStillDeleting(streamName);
+
+            if (!stillDeleting) {
+                testLogger.debug('Stream deletion confirmed complete', {
+                    streamName,
+                    attempts,
+                    elapsedMs: Date.now() - startTime
+                });
+                return true;
+            }
+
+            testLogger.debug('Stream still being deleted, waiting...', {
+                streamName,
+                attempts,
+                elapsedMs: Date.now() - startTime
+            });
+
+            await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+        }
+
+        testLogger.warn('Timeout waiting for stream deletion', {
+            streamName,
+            maxWaitMs,
+            attempts
+        });
+        return false;
+    }
+
+    /**
+     * Wait for specific stream names to be ready (not in "being deleted" state)
+     * Use this to ensure streams are available before tests, even if they weren't found in the stream list
+     * @param {Array<string>} streamNames - Array of stream names to check
+     * @param {number} maxWaitMs - Maximum time to wait per stream in ms (default: 120000)
+     * @returns {Promise<{ready: number, blocked: string[]}>} Count of ready streams and list of blocked stream names
+     */
+    async waitForStreamsReady(streamNames = [], maxWaitMs = 120000) {
+        testLogger.info('Waiting for streams to be ready (not being deleted)...', {
+            streamCount: streamNames.length,
+            maxWaitMs
+        });
+
+        let readyCount = 0;
+        const blockedStreams = [];
+
+        // Process in parallel batches
+        const batchSize = 5;
+        for (let i = 0; i < streamNames.length; i += batchSize) {
+            const batch = streamNames.slice(i, i + batchSize);
+            const results = await Promise.all(
+                batch.map(async (streamName) => {
+                    const ready = await this.waitForStreamDeletion(streamName, maxWaitMs);
+                    return { streamName, ready };
+                })
+            );
+
+            results.forEach(({ streamName, ready }) => {
+                if (ready) {
+                    readyCount++;
+                } else {
+                    blockedStreams.push(streamName);
+                    testLogger.error('Stream still blocked (being deleted)', { streamName });
+                }
+            });
+        }
+
+        testLogger.info('Streams ready check complete', {
+            total: streamNames.length,
+            ready: readyCount,
+            blocked: blockedStreams.length,
+            blockedNames: blockedStreams
+        });
+
+        if (blockedStreams.length > 0) {
+            throw new Error(`${blockedStreams.length} stream(s) still being deleted: ${blockedStreams.join(', ')}`);
+        }
+
+        return { ready: readyCount, blocked: blockedStreams };
+    }
+
+    /**
+     * Clean up streams matching specified patterns
+     * @param {Array<RegExp>} patterns - Array of regex patterns to match stream names
+     * @param {Array<string>} protectedStreams - Array of stream names to never delete (optional)
+     * @param {Object} options - Optional configuration
+     * @param {boolean} options.waitForDeletion - Whether to wait for deletions to complete (default: true)
+     * @param {number} options.maxWaitPerStreamMs - Max wait time per stream in ms (default: 120000)
+     */
+    async cleanupStreams(patterns = [], protectedStreams = [], options = {}) {
+        const { waitForDeletion = true, maxWaitPerStreamMs = 120000 } = options;
+
+        testLogger.info('Starting streams cleanup', {
+            patterns: patterns.map(p => p.source),
+            protectedStreams,
+            waitForDeletion
+        });
 
         try {
             // Fetch all log streams
             const streams = await this.fetchStreams();
             testLogger.info('Fetched streams', { total: streams.length });
 
-            // Filter streams matching cleanup patterns
-            const matchingStreams = streams.filter(s => this.shouldCleanupStream(s.name));
+            // Filter streams matching patterns but excluding protected streams
+            const matchingStreams = streams.filter(s =>
+                patterns.some(pattern => pattern.test(s.name)) &&
+                !protectedStreams.includes(s.name)
+            );
             testLogger.info('Found streams matching cleanup patterns', { count: matchingStreams.length });
 
             if (matchingStreams.length === 0) {
@@ -879,23 +1009,70 @@ class APICleanup {
                 return;
             }
 
-            // Delete each stream
+            // Phase 1: Initiate deletion for all streams
             let deletedCount = 0;
             let failedCount = 0;
+            const streamsToWaitFor = [];
 
             for (const stream of matchingStreams) {
                 const result = await this.deleteStream(stream.name);
 
                 if (result.code === 200) {
                     deletedCount++;
-                    testLogger.debug('Deleted stream', { name: stream.name });
+                    streamsToWaitFor.push(stream.name);
+                    testLogger.debug('Initiated stream deletion', { name: stream.name });
                 } else {
                     failedCount++;
-                    testLogger.warn('Failed to delete stream', { name: stream.name, result });
+                    testLogger.warn('Failed to initiate stream deletion', { name: stream.name, result });
                 }
             }
 
-            testLogger.info('Streams cleanup completed', {
+            testLogger.info('Stream deletion initiated', {
+                total: matchingStreams.length,
+                initiated: deletedCount,
+                failed: failedCount
+            });
+
+            // Phase 2: Wait for all deletions to complete (if enabled)
+            if (waitForDeletion && streamsToWaitFor.length > 0) {
+                testLogger.info('Waiting for stream deletions to complete...', {
+                    streamCount: streamsToWaitFor.length,
+                    maxWaitPerStreamMs
+                });
+
+                let completedCount = 0;
+                let timedOutCount = 0;
+
+                // Wait for streams in parallel batches to speed up the process
+                const batchSize = 5;
+                for (let i = 0; i < streamsToWaitFor.length; i += batchSize) {
+                    const batch = streamsToWaitFor.slice(i, i + batchSize);
+                    const results = await Promise.all(
+                        batch.map(streamName => this.waitForStreamDeletion(streamName, maxWaitPerStreamMs))
+                    );
+
+                    results.forEach((completed, index) => {
+                        if (completed) {
+                            completedCount++;
+                        } else {
+                            timedOutCount++;
+                            testLogger.error('Stream deletion timed out', { streamName: batch[index] });
+                        }
+                    });
+                }
+
+                testLogger.info('Stream deletion verification complete', {
+                    total: streamsToWaitFor.length,
+                    completed: completedCount,
+                    timedOut: timedOutCount
+                });
+
+                if (timedOutCount > 0) {
+                    throw new Error(`${timedOutCount} stream(s) failed to complete deletion within timeout`);
+                }
+            }
+
+            testLogger.info('Streams cleanup completed successfully', {
                 total: matchingStreams.length,
                 deleted: deletedCount,
                 failed: failedCount
@@ -903,6 +1080,7 @@ class APICleanup {
 
         } catch (error) {
             testLogger.error('Streams cleanup failed', { error: error.message });
+            throw error; // Re-throw to fail the cleanup test
         }
     }
 
@@ -957,20 +1135,21 @@ class APICleanup {
     }
 
     /**
-     * Clean up all pipeline destinations matching test patterns
-     * Deletes destinations starting with "destination" followed by 2-3 digits
+     * Clean up pipeline destinations matching specified patterns
+     * @param {Array<RegExp>} patterns - Array of regex patterns to match destination names
      */
-    async cleanupPipelineDestinations() {
-        testLogger.info('Starting pipeline destinations cleanup');
+    async cleanupPipelineDestinations(patterns = []) {
+        testLogger.info('Starting pipeline destinations cleanup', { patterns: patterns.map(p => p.source) });
 
         try {
             // Fetch all pipeline destinations
             const destinations = await this.fetchPipelineDestinations();
             testLogger.info('Fetched pipeline destinations', { total: destinations.length });
 
-            // Filter destinations matching pattern: "destination" followed by 2-3 digits
-            const pattern = /^destination\d{2,3}$/;
-            const matchingDestinations = destinations.filter(d => pattern.test(d.name));
+            // Filter destinations matching patterns
+            const matchingDestinations = destinations.filter(d =>
+                patterns.some(pattern => pattern.test(d.name))
+            );
             testLogger.info('Found pipeline destinations matching cleanup pattern', { count: matchingDestinations.length });
 
             if (matchingDestinations.length === 0) {
@@ -1275,9 +1454,26 @@ class APICleanup {
 
             testLogger.info('Loaded test pattern names', { count: testPatternNames.size });
 
-            // Filter patterns that match test data names
-            const matchingPatterns = patterns.filter(pattern => testPatternNames.has(pattern.name));
-            testLogger.info('Found patterns matching test data', { count: matchingPatterns.length });
+            // Additional test prefixes that should always be cleaned up
+            const testPrefixes = [
+                'duplicate_test_',      // regexPatternManagement.spec.js
+                'log_filename_',        // multipleSDRPatterns.spec.js
+                'time_hh_mm_ss_',       // multipleSDRPatterns.spec.js
+                'ifsc_code_',           // multipleSDRPatterns.spec.js
+                'date_dd_mm_yyyy_',     // multipleSDRPatterns.spec.js
+                'email_format_',        // SDR tests
+                'us_phone_',            // SDR tests
+                'credit_card_',         // SDR tests
+                'ssn_'                  // SDR tests
+            ];
+
+            // Filter patterns that match test data names (using prefix matching to catch patterns with unique suffixes)
+            const basePatternNames = Array.from(testPatternNames);
+            const matchingPatterns = patterns.filter(pattern =>
+                basePatternNames.some(baseName => pattern.name.startsWith(baseName)) ||
+                testPrefixes.some(prefix => pattern.name.startsWith(prefix))
+            );
+            testLogger.info('Found patterns matching test data (prefix match)', { count: matchingPatterns.length });
 
             if (matchingPatterns.length === 0) {
                 testLogger.info('No regex patterns to clean up');
@@ -1367,20 +1563,229 @@ class APICleanup {
     }
 
     /**
-     * Complete cascade cleanup: Alert -> Folder -> Destination -> Template
-     * Only deletes resources linked to destinations matching the prefix
-     * @param {string} prefix - Prefix to match destination names (e.g., 'auto_playwright')
+     * Fetch all search jobs
+     * @returns {Promise<Array>} Array of search job objects
      */
-    async completeCascadeCleanup(prefix = 'auto_playwright') {
-        testLogger.info('Starting complete cascade cleanup', { prefix });
+    async fetchSearchJobs() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/search_jobs?type=logs`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to fetch search jobs', { status: response.status });
+                return [];
+            }
+
+            const searchJobs = await response.json();
+            return searchJobs || [];
+        } catch (error) {
+            testLogger.error('Failed to fetch search jobs', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Delete a single search job
+     * @param {string} jobId - The search job ID
+     * @returns {Promise<Object>} Deletion result
+     */
+    async deleteSearchJob(jobId) {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/search_jobs/${jobId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to delete search job', { jobId, status: response.status });
+                return { code: response.status, message: 'Failed to delete search job' };
+            }
+
+            const result = await response.json();
+            return { code: 200, ...result };
+        } catch (error) {
+            testLogger.error('Failed to delete search job', { jobId, error: error.message });
+            return { code: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Clean up all search jobs
+     * Deletes all search jobs for the organization
+     */
+    async cleanupSearchJobs() {
+        testLogger.info('Starting search jobs cleanup');
 
         try {
-            // Step 1: Fetch all destinations and filter by prefix (including newdest_ and sanitydest-)
+            // Fetch all search jobs
+            const searchJobs = await this.fetchSearchJobs();
+            testLogger.info('Fetched search jobs', { total: searchJobs.length });
+
+            if (searchJobs.length === 0) {
+                testLogger.info('No search jobs to clean up');
+                return;
+            }
+
+            // Delete each search job
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const job of searchJobs) {
+                const result = await this.deleteSearchJob(job.id);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.debug('Deleted search job', { jobId: job.id, userId: job.user_id });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete search job', { jobId: job.id, userId: job.user_id, result });
+                }
+            }
+
+            testLogger.info('Search jobs cleanup completed', {
+                total: searchJobs.length,
+                deleted: deletedCount,
+                failed: failedCount
+            });
+
+        } catch (error) {
+            testLogger.error('Search jobs cleanup failed', { error: error.message });
+        }
+    }
+
+    /**
+     * Fetch all saved views
+     * @returns {Promise<Array>} Array of saved view objects
+     */
+    async fetchSavedViews() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/savedviews`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to fetch saved views', { status: response.status });
+                return [];
+            }
+
+            const data = await response.json();
+            return data.views || [];
+        } catch (error) {
+            testLogger.error('Failed to fetch saved views', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Delete a single saved view
+     * @param {string} viewId - The saved view ID
+     * @returns {Promise<Object>} Deletion result
+     */
+    async deleteSavedView(viewId) {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/savedviews/${viewId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to delete saved view', { viewId, status: response.status });
+                return { code: response.status, message: 'Failed to delete saved view' };
+            }
+
+            const result = await response.json();
+            return { code: 200, ...result };
+        } catch (error) {
+            testLogger.error('Failed to delete saved view', { viewId, error: error.message });
+            return { code: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Clean up all saved views matching test patterns
+     * Deletes saved views starting with "streamslog" or "multistream_view_"
+     */
+    async cleanupSavedViews() {
+        testLogger.info('Starting saved views cleanup');
+
+        try {
+            // Fetch all saved views
+            const savedViews = await this.fetchSavedViews();
+            testLogger.info('Fetched saved views', { total: savedViews.length });
+
+            // Filter saved views matching patterns: starts with "streamslog" or "multistream_view_"
+            const matchingSavedViews = savedViews.filter(view =>
+                view.view_name.startsWith('streamslog') ||
+                view.view_name.startsWith('multistream_view_')
+            );
+            testLogger.info('Found saved views matching cleanup patterns', { count: matchingSavedViews.length });
+
+            if (matchingSavedViews.length === 0) {
+                testLogger.info('No saved views to clean up');
+                return;
+            }
+
+            // Delete each saved view
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const view of matchingSavedViews) {
+                const result = await this.deleteSavedView(view.view_id);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.debug('Deleted saved view', { viewId: view.view_id, viewName: view.view_name });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete saved view', { viewId: view.view_id, viewName: view.view_name, result });
+                }
+            }
+
+            testLogger.info('Saved views cleanup completed', {
+                total: matchingSavedViews.length,
+                deleted: deletedCount,
+                failed: failedCount
+            });
+
+        } catch (error) {
+            testLogger.error('Saved views cleanup failed', { error: error.message });
+        }
+    }
+
+    /**
+     * Complete cascade cleanup: Alert -> Folder -> Destination -> Template
+     * Deletes all resources linked to destinations matching specified patterns
+     * @param {Array<string>} destinationPrefixes - Array of destination name prefixes to match (e.g., ['auto_', 'newdest_'])
+     * @param {Array<string>} templatePrefixes - Array of template name prefixes to match (e.g., ['auto_email_template_', 'auto_webhook_template_'])
+     * @param {Array<string>} folderPrefixes - Array of folder name prefixes to match (e.g., ['auto_'])
+     */
+    async completeCascadeCleanup(destinationPrefixes = [], templatePrefixes = [], folderPrefixes = []) {
+        testLogger.info('Starting complete cascade cleanup', {
+            destinationPrefixes,
+            templatePrefixes,
+            folderPrefixes
+        });
+
+        try {
+            // Step 1: Fetch all destinations and filter by prefixes
             const { destinations, templateToDestinations } = await this.fetchDestinationsWithTemplateMapping();
             const matchingDestinations = destinations.filter(d =>
-                d.name.startsWith(prefix) ||
-                d.name.startsWith('newdest_') ||
-                d.name.startsWith('sanitydest-')
+                destinationPrefixes.some(prefix => d.name.startsWith(prefix))
             );
 
             testLogger.info('Found destinations to process', { total: matchingDestinations.length });
@@ -1570,93 +1975,97 @@ class APICleanup {
                 }
             }
 
-            // Step 9b: Delete all auto_email_template_*, auto_webhook_template_*, sanitytemp-*, and newtemp_* templates
-            testLogger.info('Cleaning up auto_email, auto_webhook, sanitytemp, and newtemp templates');
+            // Step 9b: Delete templates matching specified prefixes
+            if (templatePrefixes.length > 0) {
+                testLogger.info('Cleaning up templates', { prefixes: templatePrefixes });
 
-            const allTemplatesResponse = await fetch(`${this.baseUrl}/api/${this.org}/alerts/templates?page_num=1&page_size=100000&sort_by=name&desc=false`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': this.authHeader,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (allTemplatesResponse.ok) {
-                const allTemplates = await allTemplatesResponse.json();
-                const autoTemplates = allTemplates.filter(t =>
-                    t.name.startsWith('auto_email_template_') ||
-                    t.name.startsWith('auto_webhook_template_') ||
-                    t.name.startsWith('sanitytemp-') ||
-                    t.name.startsWith('newtemp_')
-                );
-
-                testLogger.info('Found templates to delete', { count: autoTemplates.length });
-
-                for (const template of autoTemplates) {
-                    const templateDeleteResult = await fetch(`${this.baseUrl}/api/${this.org}/alerts/templates/${template.name}`, {
-                        method: 'DELETE',
-                        headers: {
-                            'Authorization': this.authHeader,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-                    const templateResult = await templateDeleteResult.json();
-                    if (templateResult.code === 200) {
-                        testLogger.info('Deleted auto template', { name: template.name });
-                    } else {
-                        testLogger.warn('Failed to delete auto template', {
-                            name: template.name,
-                            result: templateResult
-                        });
+                const allTemplatesResponse = await fetch(`${this.baseUrl}/api/${this.org}/alerts/templates?page_num=1&page_size=100000&sort_by=name&desc=false`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': this.authHeader,
+                        'Content-Type': 'application/json'
                     }
-                }
-            }
+                });
 
-            // Step 10: Delete all remaining folders starting with 'auto_'
-            testLogger.info('Cleaning up remaining folders starting with auto_');
+                if (allTemplatesResponse.ok) {
+                    const allTemplates = await allTemplatesResponse.json();
+                    const matchingTemplates = allTemplates.filter(t =>
+                        templatePrefixes.some(prefix => t.name.startsWith(prefix))
+                    );
 
-            // Fetch fresh list of all folders
-            const allFolders = await this.fetchAlertFolders();
-            const autoFolders = allFolders.filter(f => f.name.startsWith('auto_'));
-            testLogger.info('Found folders to clean up', { total: autoFolders.length });
+                    testLogger.info('Found templates to delete', { count: matchingTemplates.length });
 
-            for (const folder of autoFolders) {
-                // First, delete all alerts in the folder
-                const alerts = await this.fetchAlertsInFolder(folder.folderId);
-
-                if (alerts.length > 0) {
-                    testLogger.info('Deleting alerts in folder before folder deletion', {
-                        folderId: folder.folderId,
-                        folderName: folder.name,
-                        alertCount: alerts.length
-                    });
-
-                    for (const alert of alerts) {
-                        const alertDeleteResult = await this.deleteAlert(alert.alert_id, folder.folderId);
-                        if (alertDeleteResult.code === 200) {
-                            testLogger.debug('Deleted alert', { alertId: alert.alert_id, name: alert.name });
+                    for (const template of matchingTemplates) {
+                        const templateDeleteResult = await fetch(`${this.baseUrl}/api/${this.org}/alerts/templates/${template.name}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Authorization': this.authHeader,
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        const templateResult = await templateDeleteResult.json();
+                        if (templateResult.code === 200) {
+                            testLogger.info('Deleted template', { name: template.name });
                         } else {
-                            testLogger.warn('Failed to delete alert', {
-                                alertId: alert.alert_id,
-                                name: alert.name,
-                                result: alertDeleteResult
+                            testLogger.warn('Failed to delete template', {
+                                name: template.name,
+                                result: templateResult
                             });
                         }
                     }
                 }
+            }
 
-                // Then delete the folder
-                const folderDeleteResult = await this.deleteFolder(folder.folderId);
+            // Step 10: Delete remaining folders matching specified prefixes
+            let matchingFolders = [];
+            if (folderPrefixes.length > 0) {
+                testLogger.info('Cleaning up folders', { prefixes: folderPrefixes });
 
-                // Handle both JSON and plain text responses
-                if (folderDeleteResult.code === 200 || folderDeleteResult.message?.includes('Folder deleted')) {
-                    testLogger.info('Deleted folder', { folderId: folder.folderId, name: folder.name });
-                } else {
-                    testLogger.warn('Failed to delete folder', {
-                        folderId: folder.folderId,
-                        name: folder.name,
-                        result: folderDeleteResult
-                    });
+                // Fetch fresh list of all folders
+                const allFolders = await this.fetchAlertFolders();
+                matchingFolders = allFolders.filter(f =>
+                    folderPrefixes.some(prefix => f.name.startsWith(prefix))
+                );
+                testLogger.info('Found folders to clean up', { total: matchingFolders.length });
+
+                for (const folder of matchingFolders) {
+                    // First, delete all alerts in the folder
+                    const alerts = await this.fetchAlertsInFolder(folder.folderId);
+
+                    if (alerts.length > 0) {
+                        testLogger.info('Deleting alerts in folder before folder deletion', {
+                            folderId: folder.folderId,
+                            folderName: folder.name,
+                            alertCount: alerts.length
+                        });
+
+                        for (const alert of alerts) {
+                            const alertDeleteResult = await this.deleteAlert(alert.alert_id, folder.folderId);
+                            if (alertDeleteResult.code === 200) {
+                                testLogger.debug('Deleted alert', { alertId: alert.alert_id, name: alert.name });
+                            } else {
+                                testLogger.warn('Failed to delete alert', {
+                                    alertId: alert.alert_id,
+                                    name: alert.name,
+                                    result: alertDeleteResult
+                                });
+                            }
+                        }
+                    }
+
+                    // Then delete the folder
+                    const folderDeleteResult = await this.deleteFolder(folder.folderId);
+
+                    // Handle both JSON and plain text responses
+                    if (folderDeleteResult.code === 200 || folderDeleteResult.message?.includes('Folder deleted')) {
+                        testLogger.info('Deleted folder', { folderId: folder.folderId, name: folder.name });
+                    } else {
+                        testLogger.warn('Failed to delete folder', {
+                            folderId: folder.folderId,
+                            name: folder.name,
+                            result: folderDeleteResult
+                        });
+                    }
                 }
             }
 
@@ -1664,11 +2073,540 @@ class APICleanup {
                 totalDestinations: matchingDestinations.length,
                 deletedDestinations: deletedDestinations.length,
                 linkedTemplates: linkedTemplates.size,
-                foldersDeleted: autoFolders.length
+                foldersDeleted: folderPrefixes.length > 0 ? matchingFolders.length : 0
             });
 
         } catch (error) {
             testLogger.error('Complete cascade cleanup failed', { error: error.message });
+        }
+    }
+
+    /**
+     * ==========================================
+     * PIPELINE-SPECIFIC API METHODS
+     * ==========================================
+     */
+
+    /**
+     * Clean conditions for API (removes UI-only fields)
+     * This removes fields like 'id' and 'groupId' that are only used in UI
+     * @param {object} conditions - Condition configuration object with UI fields
+     * @returns {object} Cleaned conditions for API
+     */
+    cleanConditionsForAPI(conditions) {
+        if (conditions.filterType === "condition") {
+            // Remove UI-only fields: id, groupId
+            // KEEP values field as it's required by the backend
+            const { id, groupId, ...cleaned } = conditions;
+            return cleaned;
+        } else if (conditions.filterType === "group") {
+            // Recursively clean nested conditions
+            const { id, groupId, ...cleaned } = conditions;
+            cleaned.conditions = conditions.conditions.map(c => this.cleanConditionsForAPI(c));
+            return cleaned;
+        }
+        return conditions;
+    }
+
+    /**
+     * Create a stream via API
+     * @param {string} streamName - Name of the stream to create
+     * @param {string} streamType - Type of stream (logs, metrics, traces)
+     * @returns {Promise<object>} API response
+     */
+    async createStream(streamName, streamType = 'logs') {
+        const payload = {
+            fields: [],
+            settings: {
+                partition_keys: [],
+                index_fields: [],
+                full_text_search_keys: [],
+                bloom_filter_fields: [],
+                defined_schema_fields: [],
+                data_retention: 14
+            }
+        };
+
+        testLogger.info('Creating stream via API', { streamName, streamType });
+
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/streams/${streamName}?type=${streamType}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+
+            if (response.status === 200 && data.code === 200) {
+                testLogger.info('Stream created successfully', { streamName });
+            } else {
+                testLogger.warn('Stream creation returned non-200 or already exists', { streamName, status: response.status, data });
+            }
+
+            return { status: response.status, data };
+        } catch (error) {
+            testLogger.error('Failed to create stream', { streamName, error: error.message });
+            return { status: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Create a pipeline via API
+     * @param {string} pipelineName - Name of the pipeline
+     * @param {string} sourceStream - Source stream name
+     * @param {string} destStream - Destination stream name
+     * @param {object} conditions - Condition configuration object
+     * @returns {Promise<object>} API response
+     */
+    async createPipeline(pipelineName, sourceStream, destStream, conditions) {
+        // Clean conditions to remove UI-only fields
+        const cleanedConditions = this.cleanConditionsForAPI(conditions);
+        testLogger.info('Cleaned conditions', { cleaned: JSON.stringify(cleanedConditions, null, 2) });
+
+        // Generate unique node IDs
+        const inputNodeId = `input-${Date.now()}`;
+        const conditionNodeId = `condition-${Date.now()}`;
+        const outputNodeId = `output-${Date.now()}`;
+
+        const pipelinePayload = {
+            pipeline_id: "",
+            version: 0,
+            enabled: true,
+            org: this.org,
+            name: pipelineName,
+            description: `Validation test pipeline for ${pipelineName}`,
+            source: {
+                source_type: "realtime"
+            },
+            paused_at: null,
+            nodes: [
+                {
+                    id: inputNodeId,
+                    position: { x: 100, y: 100 },
+                    data: {
+                        node_type: "stream",
+                        stream_type: "logs",
+                        stream_name: sourceStream,
+                        org_id: this.org
+                    },
+                    io_type: "input"
+                },
+                {
+                    id: conditionNodeId,
+                    position: { x: 300, y: 200 },
+                    data: {
+                        node_type: "condition",
+                        version: 2,
+                        conditions: cleanedConditions
+                    },
+                    io_type: "default"
+                },
+                {
+                    id: outputNodeId,
+                    position: { x: 500, y: 300 },
+                    data: {
+                        node_type: "stream",
+                        stream_type: "logs",
+                        stream_name: destStream,
+                        org_id: this.org
+                    },
+                    io_type: "output"
+                }
+            ],
+            edges: [
+                {
+                    id: `e-${inputNodeId}-${conditionNodeId}`,
+                    source: inputNodeId,
+                    target: conditionNodeId,
+                    markerEnd: {
+                        type: "arrowclosed",
+                        width: 20,
+                        height: 20
+                    },
+                    type: "custom",
+                    style: {
+                        strokeWidth: 2
+                    },
+                    animated: true,
+                    updatable: true
+                },
+                {
+                    id: `e-${conditionNodeId}-${outputNodeId}`,
+                    source: conditionNodeId,
+                    target: outputNodeId,
+                    markerEnd: {
+                        type: "arrowclosed",
+                        width: 20,
+                        height: 20
+                    },
+                    type: "custom",
+                    style: {
+                        strokeWidth: 2
+                    },
+                    animated: true,
+                    updatable: true
+                }
+            ],
+            type: "realtime",
+            stream_name: sourceStream,
+            stream_type: "logs"
+        };
+
+        testLogger.info('Creating pipeline via API', { pipelineName, sourceStream, destStream });
+        testLogger.info('Pipeline payload', { payload: JSON.stringify(pipelinePayload, null, 2) });
+
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/pipelines`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(pipelinePayload)
+            });
+
+            const contentType = response.headers.get('content-type');
+            let data;
+
+            if (contentType && contentType.includes('application/json')) {
+                data = await response.json();
+            } else {
+                const text = await response.text();
+                data = { error: text };
+            }
+
+            testLogger.info('Pipeline creation response', { pipelineName, status: response.status, data });
+
+            if (response.status !== 200) {
+                throw new Error(`Pipeline creation failed: ${JSON.stringify(data)}`);
+            }
+
+            return { status: response.status, data };
+        } catch (error) {
+            testLogger.error('Failed to create pipeline', { pipelineName, error: error.message });
+            throw error;
+        }
+    }
+
+    /**
+     * Ingest data to a stream
+     * Sends records individually to ensure uniqueness
+     * @param {string} streamName - Stream name
+     * @param {array} data - Array of log objects
+     * @returns {Promise<object>} Result with success/fail counts
+     */
+    async ingestData(streamName, data) {
+        testLogger.info('Ingesting data', { streamName, recordCount: data.length });
+
+        let successCount = 0;
+        let failCount = 0;
+
+        // Send records one by one to ensure each is treated as unique
+        for (let i = 0; i < data.length; i++) {
+            const record = data[i];
+
+            try {
+                const response = await fetch(`${process.env.INGESTION_URL}/api/${this.org}/${streamName}/_json`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': this.authHeader,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify([record])  // Send as single-element array
+                });
+
+                const responseData = await response.json();
+
+                if (response.status === 200 && responseData.code === 200) {
+                    successCount++;
+                    testLogger.debug(`Ingested record ${i+1}/${data.length}`, { name: record.name, test_id: record.test_id || 'no_id', unique_id: record.unique_id });
+                } else {
+                    failCount++;
+                    testLogger.error(`Failed to ingest record ${i+1}/${data.length}`, { response: responseData, test_id: record.test_id || record.name });
+                }
+
+                // Small delay between records
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+            } catch (error) {
+                failCount++;
+                testLogger.error(`Error ingesting record ${i+1}/${data.length}`, { error: error.message });
+            }
+        }
+
+        testLogger.info('Ingestion complete', { streamName, total: data.length, success: successCount, failed: failCount });
+
+        if (failCount > 0) {
+            throw new Error(`Failed to ingest ${failCount} out of ${data.length} records`);
+        }
+
+        return { total: data.length, success: successCount, failed: failCount };
+    }
+
+    /**
+     * Query stream via API
+     * @param {string} streamName - Stream to query
+     * @param {number} expectedMinCount - Minimum expected record count (optional)
+     * @returns {Promise<array>} Query results
+     */
+    async queryStream(streamName, expectedMinCount = null) {
+        testLogger.info('Querying stream via API', { streamName });
+
+        // Query for last 10 minutes
+        const endTime = Date.now() * 1000; // microseconds
+        const startTime = endTime - (10 * 60 * 1000 * 1000);
+
+        const query = {
+            query: {
+                sql: `SELECT * FROM "${streamName}"`,
+                start_time: startTime,
+                end_time: endTime,
+                from: 0,
+                size: 1000
+            }
+        };
+
+        try {
+            const response = await fetch(`${process.env.INGESTION_URL}/api/${this.org}/_search?type=logs`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(query)
+            });
+
+            const data = await response.json();
+            const results = data.hits || [];
+
+            testLogger.info('Query results', { streamName, recordCount: results.length });
+
+            if (expectedMinCount !== null && expectedMinCount !== 0) {
+                if (results.length < expectedMinCount) {
+                    throw new Error(`Expected at least ${expectedMinCount} records, got ${results.length}`);
+                }
+            }
+
+            return results;
+        } catch (error) {
+            testLogger.error('Failed to query stream', { streamName, error: error.message });
+            throw error;
+        }
+    }
+
+    /**
+     * ==========================================
+     * SDR (Sensitive Data Redaction) CLEANUP METHODS
+     * ==========================================
+     */
+
+    /**
+     * Fetch all regex patterns via API
+     * @returns {Promise<Array>} Array of pattern objects with id, name, pattern, description
+     */
+    async fetchRegexPatterns() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/re_patterns`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                if (response.status === 404) {
+                    testLogger.info('Regex patterns endpoint not available (OSS edition)');
+                    return [];
+                }
+                testLogger.error('Failed to fetch regex patterns', { status: response.status });
+                return [];
+            }
+
+            const data = await response.json();
+            return data.patterns || [];
+        } catch (error) {
+            testLogger.error('Failed to fetch regex patterns', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Delete a single regex pattern by ID
+     * @param {string} patternId - The pattern ID
+     * @param {string} patternName - The pattern name (for logging)
+     * @returns {Promise<Object>} Deletion result
+     */
+    async deleteRegexPatternById(patternId, patternName = '') {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/re_patterns/${patternId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to delete regex pattern', { patternId, patternName, status: response.status });
+                return { code: response.status, message: 'Failed to delete regex pattern' };
+            }
+
+            const result = await response.json();
+            return { code: 200, ...result };
+        } catch (error) {
+            testLogger.error('Failed to delete regex pattern', { patternId, patternName, error: error.message });
+            return { code: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Delete regex patterns matching specified prefixes
+     * @param {Array<string>} prefixes - Array of pattern name prefixes to match (e.g., ['url_format_hash', 'strong_password_hash'])
+     * @returns {Promise<{deleted: number, failed: number}>} Deletion result counts
+     */
+    async deleteRegexPatternsByPrefix(prefixes = []) {
+        testLogger.info('Deleting regex patterns by prefix', { prefixes });
+
+        try {
+            const patterns = await this.fetchRegexPatterns();
+            testLogger.info('Fetched regex patterns', { total: patterns.length });
+
+            // Filter patterns matching prefixes
+            const matchingPatterns = patterns.filter(p =>
+                prefixes.some(prefix => p.name.startsWith(prefix) || p.name === prefix)
+            );
+
+            testLogger.info('Found patterns matching prefixes', { count: matchingPatterns.length });
+
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const pattern of matchingPatterns) {
+                const result = await this.deleteRegexPatternById(pattern.id, pattern.name);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.info('Deleted regex pattern', { name: pattern.name, id: pattern.id });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete regex pattern', { name: pattern.name, id: pattern.id, result });
+                }
+            }
+
+            testLogger.info('Regex patterns deletion completed', {
+                total: matchingPatterns.length,
+                deleted: deletedCount,
+                failed: failedCount
+            });
+
+            return { deleted: deletedCount, failed: failedCount };
+        } catch (error) {
+            testLogger.error('Regex patterns deletion failed', { error: error.message });
+            return { deleted: 0, failed: 0 };
+        }
+    }
+
+    /**
+     * Complete SDR test cleanup - deletes streams first (which removes pattern associations), then patterns
+     * This should be called in beforeAll hook of SDR tests
+     * @param {Array<string>} streamNames - Exact stream names to delete (e.g., ['sdr_combined_hash_test'])
+     * @param {Array<string>} patternPrefixes - Pattern name prefixes to delete (e.g., ['url_format_hash', 'strong_password_hash'])
+     * @param {Object} options - Optional configuration
+     * @param {boolean} options.waitForDeletion - Whether to wait for stream deletions to complete (default: true)
+     */
+    async cleanupSDRTestData(streamNames = [], patternPrefixes = [], options = {}) {
+        const { waitForDeletion = true } = options;
+
+        testLogger.info('=== Starting SDR Test Cleanup via API ===', {
+            streams: streamNames,
+            patternPrefixes
+        });
+
+        try {
+            // Step 1: Delete streams first (this automatically unlinks any pattern associations)
+            if (streamNames.length > 0) {
+                testLogger.info('Step 1: Deleting SDR test streams');
+
+                for (const streamName of streamNames) {
+                    testLogger.info(`Attempting to delete stream: ${streamName}`);
+                    const result = await this.deleteStream(streamName);
+
+                    if (result.code === 200) {
+                        testLogger.info(`✓ Stream deletion initiated: ${streamName}`);
+                    } else if (result.code === 404) {
+                        testLogger.info(`✓ Stream does not exist (OK): ${streamName}`);
+                    } else {
+                        testLogger.warn(`Failed to delete stream: ${streamName}`, { result });
+                    }
+                }
+
+                // Wait for stream deletions to complete if enabled
+                if (waitForDeletion) {
+                    testLogger.info('Waiting for stream deletions to complete...');
+                    for (const streamName of streamNames) {
+                        const completed = await this.waitForStreamDeletion(streamName, 60000, 2000);
+                        if (completed) {
+                            testLogger.info(`✓ Stream deletion complete: ${streamName}`);
+                        } else {
+                            testLogger.warn(`Stream deletion may still be in progress: ${streamName}`);
+                        }
+                    }
+                }
+            }
+
+            // Step 2: Delete patterns by prefix (they should now be unlinked from streams)
+            if (patternPrefixes.length > 0) {
+                testLogger.info('Step 2: Deleting SDR test patterns');
+                const patternResult = await this.deleteRegexPatternsByPrefix(patternPrefixes);
+                testLogger.info('Pattern deletion result', patternResult);
+            }
+
+            // Wait additional time to ensure backend fully processes deletions
+            // This prevents "stream is being deleted" errors when tests immediately try to recreate streams
+            testLogger.info('Waiting additional time for backend to finalize deletions...');
+            await new Promise(resolve => setTimeout(resolve, 5000));
+
+            testLogger.info('=== SDR Test Cleanup Complete ===');
+
+        } catch (error) {
+            testLogger.error('SDR Test Cleanup failed', { error: error.message });
+            // Don't throw - allow test to continue even if cleanup fails
+        }
+    }
+
+    /**
+     * Verify stream exists via API
+     * @param {string} streamName - Name of the stream to verify
+     * @returns {Promise<boolean>} True if stream exists
+     */
+    async verifyStreamExists(streamName) {
+        try {
+            const response = await fetch(`${process.env.INGESTION_URL}/api/${this.org}/streams`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const data = await response.json();
+
+            if (response.status === 200 && data.list) {
+                const streamExists = data.list.some(s => s.name === streamName);
+                testLogger.info('Stream existence check', { streamName, exists: streamExists });
+                return streamExists;
+            }
+
+            testLogger.warn('Failed to check stream existence', { streamName, status: response.status });
+            return false;
+        } catch (error) {
+            testLogger.error('Error checking stream existence', { streamName, error: error.message });
+            return false;
         }
     }
 }

@@ -15,7 +15,7 @@
 
 use std::{
     collections::HashMap,
-    io::{BufReader, Lines},
+    io::{BufReader, Cursor, Lines},
 };
 
 use actix_web::web;
@@ -24,6 +24,68 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use super::stream::SchemaRecords;
+
+/// System job types for backend ingestion processes
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SystemJobType {
+    LogPatterns,
+    SelfMetricsPromql,
+    ServiceGraph,
+    SelfReporting,
+    InternalGrpc,
+}
+
+impl SystemJobType {
+    /// Format as email local part (before @system.local)
+    pub fn as_email_local(&self) -> &'static str {
+        match self {
+            SystemJobType::LogPatterns => "log_patterns",
+            SystemJobType::SelfMetricsPromql => "self_metrics_promql",
+            SystemJobType::ServiceGraph => "service_graph",
+            SystemJobType::SelfReporting => "self_reporting",
+            SystemJobType::InternalGrpc => "internal_grpc",
+        }
+    }
+}
+
+/// User identifier for ingestion operations
+///
+/// This enum ensures proper tracking of who initiated an ingestion:
+/// - Real user emails for API requests
+/// - System job identifiers for automated backend processes
+///
+/// This prevents empty emails in usage reporting and makes it explicit
+/// whether ingestion was user-initiated or system-initiated.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IngestUser {
+    /// Real user email from authenticated API request
+    User(String),
+    /// System job identifier for automated backend processes
+    SystemJob(SystemJobType),
+}
+
+impl IngestUser {
+    /// Convert to email string for storage and reporting
+    ///
+    /// - User emails are returned as-is
+    /// - System jobs are formatted as `{job_name}@system.local`
+    pub fn to_email(&self) -> String {
+        match self {
+            IngestUser::User(email) => email.clone(),
+            IngestUser::SystemJob(job) => format!("{}@system.local", job.as_email_local()),
+        }
+    }
+
+    /// Create from a user email string
+    pub fn from_user_email(email: impl Into<String>) -> Self {
+        // we use unknown@system.local if email is passed as empty string
+        let email = match email.into() {
+            email if email.is_empty() => "unknown@system.local".to_string(),
+            email => email,
+        };
+        IngestUser::User(email)
+    }
+}
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct RecordStatus {
@@ -43,6 +105,8 @@ pub struct StreamStatus {
     pub name: String,
     #[serde(flatten)]
     pub status: RecordStatus,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub items: Vec<HashMap<String, BulkResponseItem>>,
 }
 
 impl StreamStatus {
@@ -50,6 +114,7 @@ impl StreamStatus {
         StreamStatus {
             name: name.to_string(),
             status: RecordStatus::default(),
+            items: vec![],
         }
     }
 }
@@ -319,22 +384,27 @@ pub struct GCPIngestionResponse {
     pub timestamp: String,
 }
 
-pub enum IngestionRequest<'a> {
-    JSON(&'a web::Bytes),
-    Multi(&'a web::Bytes),
-    Hec(&'a Vec<json::Value>),
-    Loki(&'a Vec<json::Value>),
-    GCP(&'a GCPIngestionRequest),
-    KinesisFH(&'a KinesisFHRequest),
-    RUM(&'a web::Bytes),
-    Usage(&'a web::Bytes),
+pub enum IngestionRequest {
+    JSON(web::Bytes),
+    Multi(web::Bytes),
+    JsonValues(IngestionValueType, Vec<json::Value>),
+    GCP(GCPIngestionRequest),
+    KinesisFH(KinesisFHRequest),
+    RUM(web::Bytes),
+    Usage(web::Bytes),
 }
 
-pub enum IngestionData<'a> {
-    JSON(&'a Vec<json::Value>),
-    Multi(&'a [u8]),
-    GCP(&'a GCPIngestionRequest),
-    KinesisFH(&'a KinesisFHRequest),
+pub enum IngestionValueType {
+    Bulk,
+    Hec,
+    Loki,
+}
+
+pub enum IngestionData {
+    JSON(Vec<json::Value>),
+    Multi(bytes::Bytes),
+    GCP(GCPIngestionRequest),
+    KinesisFH(KinesisFHRequest),
 }
 
 #[derive(Debug)]
@@ -357,9 +427,9 @@ impl From<std::io::Error> for IngestionError {
     }
 }
 
-pub enum IngestionDataIter<'a> {
-    JSONIter(std::slice::Iter<'a, json::Value>),
-    MultiIter(Lines<BufReader<&'a [u8]>>),
+pub enum IngestionDataIter {
+    JSONIter(std::vec::IntoIter<json::Value>),
+    MultiIter(Lines<BufReader<Cursor<bytes::Bytes>>>),
     GCP(
         std::vec::IntoIter<json::Value>,
         Option<GCPIngestionResponse>,

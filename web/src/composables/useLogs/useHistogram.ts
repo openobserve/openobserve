@@ -119,7 +119,7 @@ export const useHistogram = () => {
 
       if (searchObj.meta.logsVisualizeToggle === "logs") {
         title +=
-          "(" +
+          " (" +
           scanSizeLabel +
           ": " +
           formatSizeFromMB(searchObj.data.queryResults.scan_size) +

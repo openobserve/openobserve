@@ -279,7 +279,8 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
             .service(status::node_metrics)
             .service(status::consistent_hash)
             .service(status::refresh_nodes_list)
-            .service(status::refresh_user_sessions);
+            .service(status::refresh_user_sessions)
+            .service(status::cache_reload);
 
         svc.service(node_scope);
     }
@@ -405,6 +406,13 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(organization::settings::delete_logo)
         .service(organization::settings::set_logo_text)
         .service(organization::settings::delete_logo_text)
+        // System settings v2 (multi-level)
+        .service(organization::system_settings::get_setting)
+        .service(organization::system_settings::list_settings)
+        .service(organization::system_settings::set_org_setting)
+        .service(organization::system_settings::set_user_setting)
+        .service(organization::system_settings::delete_org_setting)
+        .service(organization::system_settings::delete_user_setting)
         .service(organization::org::org_summary)
         .service(organization::org::get_user_passcode)
         .service(organization::org::update_user_passcode)
@@ -511,6 +519,14 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(folders::deprecated::get_folder)
         .service(folders::deprecated::get_folder_by_name)
         .service(folders::deprecated::delete_folder)
+        // Incidents routes must be registered before alerts::get_alert
+        // to avoid /incidents being matched as {alert_id}
+        .service(alerts::incidents::list_incidents)
+        .service(alerts::incidents::get_incident_stats)
+        .service(alerts::incidents::trigger_incident_rca)
+        .service(alerts::incidents::get_incident)
+        .service(alerts::incidents::update_incident_status)
+        // Agent chat routes (enterprise only, but always exposed in API)
         .service(alerts::create_alert)
         .service(alerts::get_alert)
         .service(alerts::export_alert)
@@ -520,6 +536,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(alerts::enable_alert)
         .service(alerts::enable_alert_bulk)
         .service(alerts::trigger_alert)
+        .service(alerts::generate_sql)
         .service(alerts::move_alerts)
         .service(alerts::history::get_alert_history)
         .service(alerts::dedup_stats::get_dedup_summary)
@@ -586,7 +603,13 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(service_accounts::update)
         .service(service_accounts::get_api_token)
         .service(mcp::handle_mcp_post)
-        .service(mcp::handle_mcp_get);
+        .service(mcp::handle_mcp_get)
+        .service(alerts::deduplication::get_config)
+        .service(alerts::deduplication::set_config)
+        .service(alerts::deduplication::delete_config)
+        .service(alerts::deduplication::get_semantic_groups)
+        .service(alerts::deduplication::preview_semantic_groups_diff)
+        .service(alerts::deduplication::save_semantic_groups);
 
     #[cfg(feature = "enterprise")]
     let service = service
@@ -634,13 +657,15 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(license::get_license_info)
         .service(license::store_license)
         .service(traces::get_current_topology)
-        .service(patterns::extract_patterns);
+        .service(patterns::extract_patterns)
+        .service(agent::chat::agent_chat)
+        .service(agent::chat::agent_chat_stream);
 
     #[cfg(feature = "enterprise")]
     let service = service
-        .service(alerts::deduplication::get_config)
-        .service(alerts::deduplication::set_config)
-        .service(alerts::deduplication::delete_config);
+        .service(service_streams::get_dimension_analytics)
+        .service(service_streams::correlate_streams)
+        .service(service_streams::get_services_grouped);
 
     #[cfg(feature = "cloud")]
     let service = service

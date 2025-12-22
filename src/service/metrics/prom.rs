@@ -68,7 +68,7 @@ use crate::{
 pub async fn remote_write(
     org_id: &str,
     body: web::Bytes,
-    user_email: &str,
+    user: crate::common::meta::ingestion::IngestUser,
 ) -> std::result::Result<(), anyhow::Error> {
     // check system resource
     check_ingestion_allowed(org_id, StreamType::Metrics, None).await?;
@@ -114,7 +114,7 @@ pub async fn remote_write(
 
     // parse metadata
     for item in request.metadata {
-        let metric_name = format_stream_name(&item.metric_family_name.clone());
+        let metric_name = format_stream_name(item.metric_family_name.to_string());
         let schema = infra::schema::get(org_id, &metric_name, StreamType::Metrics)
             .await
             .unwrap_or(Schema::empty());
@@ -573,10 +573,11 @@ pub async fn remote_write(
                         .map_or(0, |exec_pl| exec_pl.num_of_func())
                 });
         req_stats.response_time = start.elapsed().as_secs_f64();
-        req_stats.user_email = if user_email.is_empty() {
+        let email_str = user.to_email();
+        req_stats.user_email = if email_str.is_empty() {
             None
         } else {
-            Some(user_email.to_string())
+            Some(email_str)
         };
         report_request_usage_stats(
             req_stats,

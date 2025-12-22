@@ -891,6 +891,61 @@ async fn merge_files(
     let account = storage::get_account(&new_file_key).unwrap_or_default();
     storage::put(&account, &new_file_key, buf.clone()).await?;
 
+    // Enterprise: Extract service metadata during data processing
+    // This runs BEFORE indexing checks to ensure all stream types are discovered
+    #[cfg(feature = "enterprise")]
+    {
+        use config::cluster::LOCAL_NODE;
+        let service_streams_config =
+            &o2_enterprise::enterprise::common::config::get_config().service_streams;
+
+        // Only process in ingester mode (if mode is "compactor", this will be handled during merge)
+        // Skip self-reporting streams from _meta organization to avoid processing internal metrics
+        if LOCAL_NODE.is_ingester()
+            && service_streams_config.enabled
+            && service_streams_config.is_ingester_mode()
+            && org_id != config::META_ORG_ID
+            && (stream_type == StreamType::Logs
+                || stream_type == StreamType::Metrics
+                || stream_type == StreamType::Traces)
+        {
+            // Check if we should process this file (per-stream-type sampling)
+            let should_process =
+                o2_enterprise::enterprise::service_streams::sampler::should_process_file(
+                    &org_id,
+                    stream_type,
+                    &stream_name,
+                    &new_file_key,
+                );
+
+            if should_process {
+                let buf_clone = buf.clone();
+                let org_id_clone = org_id.clone();
+                let stream_name_clone = stream_name.clone();
+
+                // Queue services for batched processing (non-blocking)
+                tokio::spawn(async move {
+                    if let Err(e) = queue_services_from_parquet(
+                        &org_id_clone,
+                        stream_type,
+                        &stream_name_clone,
+                        &buf_clone,
+                    )
+                    .await
+                    {
+                        log::error!(
+                            "[ServiceStreams] Failed to queue services for {}/{}/{}: {}",
+                            org_id_clone,
+                            stream_type,
+                            stream_name_clone,
+                            e
+                        );
+                    }
+                });
+            }
+        }
+    }
+
     // skip index generation if not enabled or not supported by stream type
     if !cfg.common.inverted_index_enabled || !stream_type.support_index() {
         return Ok((account, new_file_key, new_file_meta, retain_file_list));
@@ -960,6 +1015,8 @@ async fn extract_patterns_from_parquet(
 
     // ParquetRecordBatchStream is a Stream, use .next().await
     use futures::StreamExt;
+
+    use crate::common::meta::ingestion::{IngestUser, SystemJobType};
     while let Some(batch_result) = reader.next().await {
         let batch = batch_result?;
 
@@ -1050,9 +1107,14 @@ async fn extract_patterns_from_parquet(
 
     // Ingest patterns immediately
     let ingest_start = std::time::Instant::now();
-    crate::service::logs::patterns::ingest_patterns(org_id, stream_name, patterns)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to ingest patterns: {}", e))?;
+    crate::service::logs::patterns::ingest_patterns(
+        org_id,
+        stream_name,
+        patterns,
+        IngestUser::SystemJob(SystemJobType::LogPatterns),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("Failed to ingest patterns: {}", e))?;
     let ingest_duration = ingest_start.elapsed();
 
     let total_duration = start.elapsed();
@@ -1076,6 +1138,201 @@ async fn extract_patterns_from_parquet(
     metrics::PATTERN_EXTRACTION_TIME
         .with_label_values(&[org_id, "total"])
         .observe(total_duration.as_secs_f64());
+
+    Ok(())
+}
+
+#[cfg(feature = "enterprise")]
+async fn queue_services_from_parquet(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    parquet_data: &[u8],
+) -> Result<(), anyhow::Error> {
+    use std::collections::HashMap;
+
+    use tokio::sync::mpsc;
+
+    let start = std::time::Instant::now();
+
+    // Get semantic field groups and FQN priority upfront (before spawning tasks)
+    let semantic_groups =
+        crate::service::db::system_settings::get_semantic_field_groups(org_id).await;
+    let fqn_priority =
+        crate::service::db::system_settings::get_fqn_priority_dimensions(org_id).await;
+
+    // Get config values for channel capacity
+    let ss_config = &o2_enterprise::enterprise::common::config::get_config().service_streams;
+    let channel_capacity = ss_config.channel_capacity;
+
+    // Create bounded channel for backpressure - drops records if consumer can't keep up
+    // ARROW-NATIVE: Channel now sends RecordBatch directly (no HashMap conversion!)
+    let (tx, mut rx) = mpsc::channel::<arrow::record_batch::RecordBatch>(channel_capacity);
+
+    // Clone data needed for producer task
+    let parquet_bytes = Bytes::copy_from_slice(parquet_data);
+
+    // Spawn producer task to read parquet and send Arrow batches through channel
+    // ARROW-NATIVE: No HashMap conversion! Sends RecordBatch directly.
+    let producer_handle = tokio::spawn(async move {
+        let mut records_sent = 0u64;
+        let mut records_dropped = 0u64;
+        let mut batches_sent = 0u64;
+
+        let reader_result = get_recordbatch_reader_from_bytes(&parquet_bytes).await;
+        let (_schema, mut reader) = match reader_result {
+            Ok(r) => r,
+            Err(e) => {
+                log::error!("[ServiceStreams] Failed to read parquet: {}", e);
+                return (records_sent, records_dropped);
+            }
+        };
+
+        use futures::StreamExt;
+        while let Some(batch_result) = reader.next().await {
+            let batch = match batch_result {
+                Ok(b) => b,
+                Err(e) => {
+                    log::error!("[ServiceStreams] Error reading batch: {}", e);
+                    continue;
+                }
+            };
+
+            let num_rows = batch.num_rows();
+            if num_rows == 0 {
+                continue;
+            }
+
+            // Send Arrow batch directly (no conversion!)
+            match tx.try_send(batch) {
+                Ok(()) => {
+                    batches_sent += 1;
+                    records_sent += num_rows as u64;
+                }
+                Err(mpsc::error::TrySendError::Full(dropped_batch)) => {
+                    let dropped = dropped_batch.num_rows() as u64;
+                    records_dropped += dropped;
+                    log::debug!("[ServiceStreams] Channel full, dropped {} records", dropped);
+                }
+                Err(mpsc::error::TrySendError::Closed(_)) => {
+                    // Consumer closed, stop producing
+                    log::debug!(
+                        "[ServiceStreams] Consumer closed, stopping producer (sent {} batches, {} records)",
+                        batches_sent,
+                        records_sent
+                    );
+                    return (records_sent, records_dropped);
+                }
+            }
+        }
+
+        log::debug!(
+            "[ServiceStreams] Producer finished: sent {} batches ({} records), dropped {} records",
+            batches_sent,
+            records_sent,
+            records_dropped
+        );
+
+        (records_sent, records_dropped)
+    });
+
+    // Consumer: Process batches as they arrive
+    let processor = o2_enterprise::enterprise::service_streams::processor::StreamProcessor::new(
+        org_id.to_string(),
+        semantic_groups,
+        fqn_priority,
+    );
+
+    let mut all_services: HashMap<
+        String,
+        o2_enterprise::enterprise::service_streams::meta::ServiceMetadata,
+    > = HashMap::new();
+    let mut total_records_processed = 0u64;
+
+    // Process Arrow batches from channel
+    // ARROW-NATIVE: Process RecordBatch directly (no HashMap conversion!)
+    while let Some(batch) = rx.recv().await {
+        let batch_len = batch.num_rows();
+
+        // Process Arrow batch using Arrow-native method
+        let services = processor
+            .process_arrow_batch(&batch, stream_type, stream_name)
+            .await;
+
+        // Merge discovered services
+        for (key, service) in services {
+            all_services
+                .entry(key)
+                .and_modify(|existing| existing.merge(&service))
+                .or_insert(service);
+        }
+
+        total_records_processed += batch_len as u64;
+    }
+
+    // Wait for producer to finish and get stats
+    let (records_sent, records_dropped) = producer_handle.await.unwrap_or((0, 0));
+
+    if records_dropped > 0 {
+        log::warn!(
+            "[ServiceStreams] Dropped {} records due to backpressure for {}/{}",
+            records_dropped,
+            org_id,
+            stream_name
+        );
+        metrics::SERVICE_STREAMS_RECORDS_DROPPED
+            .with_label_values(&[org_id, &stream_type.to_string()])
+            .inc_by(records_dropped);
+    }
+
+    // Log blocked dimensions
+    let blocked = processor.get_blocked_dimensions().await;
+    if !blocked.is_empty() {
+        log::warn!(
+            "[ServiceStreams] Blocked high-cardinality dimensions for {}/{}: {:?}",
+            org_id,
+            stream_name,
+            blocked
+        );
+        for (dimension, _count) in &blocked {
+            metrics::SERVICE_STREAMS_HIGH_CARDINALITY_BLOCKED
+                .with_label_values(&[org_id, dimension])
+                .inc();
+        }
+    }
+
+    if all_services.is_empty() {
+        return Ok(());
+    }
+
+    // Record metrics
+    let service_count = all_services.len() as u64;
+    metrics::SERVICE_STREAMS_SERVICES_DISCOVERED
+        .with_label_values(&[org_id, &stream_type.to_string()])
+        .inc_by(service_count);
+
+    let duration = start.elapsed();
+    metrics::SERVICE_STREAMS_PROCESSING_TIME
+        .with_label_values(&[org_id])
+        .observe(duration.as_secs_f64());
+
+    log::debug!(
+        "[ServiceStreams] Processed {} records, discovered {} services in {:?} for {}/{} (sent: {}, dropped: {})",
+        total_records_processed,
+        service_count,
+        duration,
+        org_id,
+        stream_name,
+        records_sent,
+        records_dropped
+    );
+
+    // Queue services for batched processing
+    o2_enterprise::enterprise::service_streams::batch_processor::queue_services(
+        org_id.to_string(),
+        all_services,
+    )
+    .await;
 
     Ok(())
 }
