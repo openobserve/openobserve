@@ -126,27 +126,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-input>
 
       <q-input
-        v-model="geoNameLabel"
-        :label="t('dashboard.geoNameLabel')"
-        placeholder="name"
-        borderless
-        dense
-        class="q-py-sm showLabelOnTop"
-        stack-label
-        data-test="dashboard-config-geo-name-label"
-      >
-        <template v-slot:label>
-          <div class="row items-center all-pointer-events">
-            {{ t("dashboard.geoNameLabel") }}
-            <q-icon class="q-ml-xs" size="20px" name="info" />
-            <q-tooltip class="bg-grey-8" max-width="250px">
-              Name of the metric label to use for location names. Default: "name"
-            </q-tooltip>
-          </div>
-        </template>
-      </q-input>
-
-      <q-input
         v-model.number="geoSymbolSize"
         :label="t('dashboard.geoSymbolSize')"
         type="number"

@@ -17,8 +17,16 @@ import { PromQLChartConverter, ProcessedPromQLData, GeoMapConfig } from "./share
 import { applyAggregation } from "./shared/dataProcessor";
 
 /**
- * Converter for geographic map charts
+ * Normalize value for symbol size calculation
+ */
+function normalizeValue(value: any, minValue: any, maxValue: any) {
+  return (value - minValue) / (maxValue - minValue);
+}
+
+/**
+ * Converter for geographic map charts (geomap)
  * Requires metrics with latitude and longitude labels
+ * Uses Leaflet for map rendering (matching SQL implementation)
  */
 export class GeoConverter implements PromQLChartConverter {
   supportedTypes = ["geomap"];
@@ -37,39 +45,46 @@ export class GeoConverter implements PromQLChartConverter {
     const latLabel = config.lat_label || "latitude" || "lat";
     const lonLabel = config.lon_label || "longitude" || "lon";
     const weightLabel = config.weight_label || "weight" || "value";
-    const nameLabel = config.name_label || "name";
 
     const geoData: any[] = [];
     const errors: string[] = [];
 
-    processedData.forEach((queryData) => {
-      queryData.series.forEach((seriesData) => {
+    console.log("=== [GeoConverter] Starting conversion ===");
+    console.log("Lat label:", latLabel);
+    console.log("Lon label:", lonLabel);
+    console.log("Weight label:", weightLabel);
+    console.log("Aggregation:", aggregation);
+
+    processedData.forEach((queryData, qIndex) => {
+      console.log(`Query ${qIndex} - series count:`, queryData.series?.length);
+
+      queryData.series.forEach((seriesData, sIndex) => {
         const lat = seriesData.metric[latLabel];
         const lon = seriesData.metric[lonLabel];
-        const name = seriesData.metric[nameLabel] || seriesData.name;
 
         if (!lat || !lon) {
           errors.push(
             `Series "${seriesData.name}" missing geo coordinates. ` +
-              `Expected labels: "${latLabel}", "${lonLabel}", "${weightLabel}"`
+              `Expected labels: "${latLabel}", "${lonLabel}"`
           );
           return;
         }
 
-        // Use weight from metric label or aggregate from values
-        const weight = seriesData.metric[weightLabel]
-          ? parseFloat(seriesData.metric[weightLabel])
-          : applyAggregation(seriesData.values, aggregation);
+        // Weight is optional - use from metric label, aggregate from values, or use fixed value
+        let weight;
+        if (seriesData.metric[weightLabel]) {
+          weight = parseFloat(seriesData.metric[weightLabel]);
+        } else if (seriesData.values && seriesData.values.length > 0) {
+          weight = applyAggregation(seriesData.values, aggregation);
+        } else {
+          weight = config.weight_fixed || 1; // Default weight if not provided
+        }
 
-        geoData.push({
-          name,
-          value: [parseFloat(lon), parseFloat(lat), weight],
-          itemStyle: {
-            color: this.getColorByValue(weight, config),
-          },
-        });
-
-        extras.legends.push(name);
+        geoData.push([
+          parseFloat(lon),
+          parseFloat(lat),
+          weight,
+        ]);
       });
     });
 
@@ -80,73 +95,124 @@ export class GeoConverter implements PromQLChartConverter {
     if (geoData.length === 0) {
       return {
         error: true,
-        message: `No valid geo data found. Ensure metrics have "${latLabel}", "${lonLabel}", and "${weightLabel}" labels.`,
+        message: `No valid geo data found. Ensure metrics have "${latLabel}" and "${lonLabel}" labels.`,
         series: [],
       };
     }
 
+    console.log("=== [GeoConverter] Conversion complete ===");
+    console.log("Geo data points:", geoData.length);
+
+    // Calculate min/max values for visualMap and symbolSize
+    const values = geoData.map((item: any) => item[2]);
+    const minValue = Math.min(...values);
+    const maxValue = Math.max(...values);
+
+    // Return geomap configuration matching SQL implementation
     return {
+      lmap: {
+        center: [
+          config.map_view?.lng || 0,
+          config.map_view?.lat || 0,
+        ],
+        zoom: config.map_view?.zoom || 2,
+        roam: true,
+        resizeEnable: true,
+        renderOnMoving: true,
+        echartsLayerInteractive: true,
+        largeMode: false,
+      },
+      tooltip: {
+        trigger: "item",
+        showDelay: 0,
+        transitionDuration: 0.2,
+        textStyle: {
+          fontSize: 10,
+        },
+        padding: 6,
+        backgroundColor: "rgba(255,255,255,0.8)",
+        formatter: function (params: any) {
+          return `Layer 1: ${params.value[2]}`;
+        },
+      },
+      visualMap: {
+        left: "right",
+        min: minValue,
+        max: maxValue,
+        inRange: {
+          color: [
+            "#313695",
+            "#4575b4",
+            "#74add1",
+            "#abd9e9",
+            "#e0f3f8",
+            "#ffffbf",
+            "#fee090",
+            "#fdae61",
+            "#f46d43",
+            "#d73027",
+            "#a50026",
+          ],
+        },
+        text: ["High", "Low"],
+        calculable: true,
+      },
+      toolbox: {
+        show: true,
+        left: "left",
+        top: "top",
+      },
+      legend: {
+        show: true,
+        type: "scroll",
+        orient: "vertical",
+        left: "left",
+        top: "bottom",
+        padding: [10, 20, 10, 10],
+        tooltip: {
+          show: true,
+          padding: 10,
+          textStyle: {
+            fontSize: 12,
+          },
+          backgroundColor: "rgba(255,255,255,0.8)",
+        },
+        textStyle: {
+          width: 100,
+          overflow: "truncate",
+        },
+      },
       series: [
         {
-          type: "scatter",
-          coordinateSystem: "geo",
+          name: "Layer 1",
+          type: config.layer_type || "scatter",
+          coordinateSystem: "lmap",
           data: geoData,
-          symbolSize: config.symbol_size || 10,
+          symbolSize: function (val: any) {
+            const normalizedSize = normalizeValue(val[2], minValue, maxValue);
+            const minSymbolSize = config.map_symbol_style?.size_by_value?.min ?? 1;
+            const maxSymbolSize = config.map_symbol_style?.size_by_value?.max ?? 100;
+            const mapSymbolStyleSelected = config.map_symbol_style?.size ?? "by Value";
+
+            if (mapSymbolStyleSelected === "by Value") {
+              return minSymbolSize + normalizedSize * (maxSymbolSize - minSymbolSize);
+            } else if (mapSymbolStyleSelected === "fixed") {
+              return config.map_symbol_style?.size_fixed ?? 2;
+            }
+          },
+          itemStyle: {
+            color: "#b02a02",
+          },
+          encode: {
+            value: 2,
+          },
           emphasis: {
             label: {
               show: true,
-              formatter: "{b}",
-              position: "top",
             },
           },
         },
       ],
-      geo: {
-        map: config.map_type || "world",
-        roam: config.enable_roam !== false,
-        itemStyle: {
-          areaColor: config.area_color || "#e0e0e0",
-          borderColor: config.border_color || "#404040",
-        },
-        emphasis: {
-          itemStyle: {
-            areaColor: config.emphasis_area_color || "#c0c0c0",
-          },
-        },
-      },
-      tooltip: {
-        trigger: "item",
-        formatter: (params: any) => {
-          const [lon, lat, value] = params.value;
-          return `${params.name}<br/>Lat: ${lat}<br/>Lon: ${lon}<br/>Value: ${value}`;
-        },
-      },
-      visualMap: {
-        min: config.min_value || 0,
-        max: config.max_value || 100,
-        calculable: true,
-        inRange: {
-          color: config.color_range || ["#50a3ba", "#eac736", "#d94e5d"],
-        },
-        text: ["High", "Low"],
-        left: "left",
-        bottom: "bottom",
-      },
     };
-  }
-
-  /**
-   * Get color based on value and configuration
-   */
-  private getColorByValue(value: number, config: any): string | undefined {
-    if (!config.color_thresholds) return undefined;
-
-    for (const threshold of config.color_thresholds) {
-      if (value <= threshold.value) {
-        return threshold.color;
-      }
-    }
-
-    return undefined;
   }
 }
