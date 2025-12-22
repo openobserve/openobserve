@@ -85,32 +85,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- Bottom slot: add legend dropdown alongside pagination -->
-      <div v-if="showLegendFooter" class="legend-footer q-pa-sm">
-      <div
-        class="row items-center q-gutter-md"
-        style="width: 100%; padding: 0 12px"
-      >
-        <div class="text-body2" style="min-width: 60px">Legend:</div>
-        <q-select
-          v-model="selectedLegend"
-          :options="legendOptions"
-          outlined
-          dense
-          emit-value
-          map-options
-          style="min-width: 300px; max-width: 500px"
-          placeholder="Select series to filter"
-        >
-          <template v-slot:prepend>
-            <q-icon name="filter_list" size="sm" />
-          </template>
-        </q-select>
-        <q-space />
+      <template v-slot:bottom v-if="showLegendFooter">
+        <div class="row items-center full-width">
+          <div class="row items-center q-gutter-sm q-pl-md">
+            <q-select
+              v-model="selectedLegend"
+              :options="legendOptions"
+              outlined
+              dense
+              emit-value
+              map-options
+              style="min-width: 300px; max-width: 500px"
+              placeholder="Select series to filter"
+            >
+              <template v-slot:prepend>
+                <q-icon name="filter_list" size="xs" />
+              </template>
+            </q-select>
+          </div>
+          <q-space />
           <div class="q-pr-md text-body2">
             1-{{ filteredTableRows.length }} of {{ filteredTableRows.length }}
           </div>
         </div>
-      </div>
+      </template>
     </q-table>
   </div>
 </template>
