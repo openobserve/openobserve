@@ -173,6 +173,7 @@ jobs:
                 "dashboard-import.spec.js",
                 "maxquery.spec.js",
                 "dashboard-chartJson.spec.js",
+                "dashboard-joins.spec.js"
               ]
           - testfolder: "Dashboards-Settings"
             browser: "chrome"
