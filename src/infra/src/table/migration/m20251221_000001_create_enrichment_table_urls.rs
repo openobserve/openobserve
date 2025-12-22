@@ -71,6 +71,8 @@ fn create_enrichment_table_urls_statement() -> TableCreateStatement {
         .col(ColumnDef::new(EnrichmentTableUrls::TotalRecordsProcessed).big_integer().not_null())
         .col(ColumnDef::new(EnrichmentTableUrls::RetryCount).integer().not_null())
         .col(ColumnDef::new(EnrichmentTableUrls::AppendData).boolean().not_null())
+        .col(ColumnDef::new(EnrichmentTableUrls::LastBytePosition).big_integer().not_null().default(0))
+        .col(ColumnDef::new(EnrichmentTableUrls::SupportsRange).boolean().not_null().default(false))
         .to_owned()
 }
 
@@ -101,6 +103,8 @@ enum EnrichmentTableUrls {
     TotalRecordsProcessed,
     RetryCount,
     AppendData,
+    LastBytePosition,
+    SupportsRange,
 }
 
 #[cfg(test)]
@@ -125,7 +129,9 @@ mod tests {
                 "total_bytes_fetched" bigint NOT NULL,
                 "total_records_processed" bigint NOT NULL,
                 "retry_count" integer NOT NULL,
-                "append_data" bool NOT NULL
+                "append_data" bool NOT NULL,
+                "last_byte_position" bigint DEFAULT 0 NOT NULL,
+                "supports_range" bool DEFAULT false NOT NULL
             )"#
         );
 
@@ -151,7 +157,9 @@ mod tests {
                 `total_bytes_fetched` bigint NOT NULL,
                 `total_records_processed` bigint NOT NULL,
                 `retry_count` int NOT NULL,
-                `append_data` bool NOT NULL
+                `append_data` bool NOT NULL,
+                `last_byte_position` bigint DEFAULT 0 NOT NULL,
+                `supports_range` bool DEFAULT false NOT NULL
             )"#
         );
 
@@ -177,7 +185,9 @@ mod tests {
                 "total_bytes_fetched" bigint NOT NULL,
                 "total_records_processed" bigint NOT NULL,
                 "retry_count" integer NOT NULL,
-                "append_data" boolean NOT NULL
+                "append_data" boolean NOT NULL,
+                "last_byte_position" bigint DEFAULT 0 NOT NULL,
+                "supports_range" boolean DEFAULT false NOT NULL
             )"#
         );
 

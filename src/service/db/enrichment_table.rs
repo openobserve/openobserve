@@ -574,6 +574,8 @@ pub async fn save_url_job(
         total_records_processed: job.total_records_processed,
         retry_count: job.retry_count as i32,
         append_data: job.append_data,
+        last_byte_position: job.last_byte_position as i64,
+        supports_range: job.supports_range,
     };
     enrichment_table_urls::put(record.clone()).await?;
 
@@ -629,6 +631,8 @@ pub async fn get_url_job(
                 total_records_processed: record.total_records_processed,
                 retry_count: record.retry_count as u32,
                 append_data: record.append_data,
+                last_byte_position: record.last_byte_position as u64,
+                supports_range: record.supports_range,
             };
             Ok(Some(job))
         }
@@ -682,6 +686,8 @@ pub async fn list_url_jobs(
             total_records_processed: record.total_records_processed,
             retry_count: record.retry_count as u32,
             append_data: record.append_data,
+            last_byte_position: record.last_byte_position as u64,
+            supports_range: record.supports_range,
         })
         .collect();
 

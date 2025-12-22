@@ -18,6 +18,8 @@ pub struct Model {
     pub total_records_processed: i64,
     pub retry_count: i32,
     pub append_data: bool,
+    pub last_byte_position: i64,
+    pub supports_range: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

@@ -38,6 +38,8 @@ pub struct EnrichmentTableUrlJob {
     pub total_records_processed: i64,
     pub retry_count: u32,
     pub append_data: bool,
+    pub last_byte_position: u64,
+    pub supports_range: bool,
 }
 
 impl EnrichmentTableUrlJob {
@@ -55,6 +57,8 @@ impl EnrichmentTableUrlJob {
             total_records_processed: 0,
             retry_count: 0,
             append_data,
+            last_byte_position: 0,
+            supports_range: false,
         }
     }
 

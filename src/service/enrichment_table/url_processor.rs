@@ -265,18 +265,20 @@ async fn process_single_url_job(org_id: &str, table_name: &str) -> Result<()> {
     save_url_job(&job).await?;
 
     log::info!(
-        "[ENRICHMENT::URL] Processing job for {}/{} from {}",
+        "[ENRICHMENT::URL] Processing job for {}/{} from {} (resume capable: {}, last byte: {})",
         org_id,
         table_name,
-        job.url
+        job.url,
+        job.supports_range,
+        job.last_byte_position
     );
 
     // Delegate to the main CSV processing function which handles:
-    // - URL validation via HEAD request
-    // - Streaming CSV data in configurable chunks
+    // - URL validation via HEAD request (or header fetch if resuming)
+    // - Streaming CSV data in configurable chunks (with optional Range request)
     // - Batch-by-batch parsing and storage
     // - Progress tracking (bytes and records)
-    let result = process_enrichment_table_url(org_id, table_name, &job.url, job.append_data).await;
+    let result = process_enrichment_table_url(org_id, table_name, &job.url, job.append_data, &job).await;
 
     match result {
         // ===== SUCCESS PATH =====
@@ -516,6 +518,143 @@ fn parse_csv_chunk(
 }
 
 // ============================================================================
+// Range Request Support for Resumable Downloads
+// ============================================================================
+
+/// Public wrapper to check if a URL supports HTTP Range requests.
+///
+/// This is called from the API handler when a new URL job is created.
+/// It creates a temporary HTTP client and delegates to the internal check function.
+///
+/// # Returns
+///
+/// - `Ok(true)`: Server supports Range requests
+/// - `Ok(false)`: Server doesn't support Range requests
+/// - `Err`: Network error or server error
+pub async fn check_range_support_for_url(url: &str) -> Result<bool> {
+    let cfg = get_config();
+    let timeout = std::time::Duration::from_secs(cfg.enrichment_table.url_fetch_timeout_secs);
+
+    let client = Client::builder()
+        .timeout(timeout)
+        .build()
+        .expect("Failed to create HTTP client");
+
+    check_range_support(&client, url).await
+}
+
+/// Checks if the server supports HTTP Range requests.
+///
+/// This function performs a small test range request to determine if the server
+/// supports partial content downloads (HTTP 206 responses). This is essential
+/// for implementing resumable downloads.
+///
+/// # Detection Strategy
+///
+/// 1. Check for `Accept-Ranges: bytes` header in HEAD response
+/// 2. If header present and value is "bytes", ranges are supported
+/// 3. If header says "none", ranges are explicitly not supported
+/// 4. If header missing, perform test range request to confirm
+///
+/// # Returns
+///
+/// - `Ok(true)`: Server supports Range requests (returns 206)
+/// - `Ok(false)`: Server doesn't support Range requests (returns 200 or lacks capability)
+/// - `Err`: Network error or server error
+async fn check_range_support(client: &Client, url: &str) -> Result<bool> {
+    // First, try HEAD request to check for Accept-Ranges header
+    let head_response = client.head(url).send().await?;
+
+    if let Some(accept_ranges) = head_response.headers().get("accept-ranges") {
+        if let Ok(value) = accept_ranges.to_str() {
+            if value.eq_ignore_ascii_case("bytes") {
+                log::debug!("[ENRICHMENT::URL] Server advertises Range support via Accept-Ranges header");
+                return Ok(true);
+            }
+            if value.eq_ignore_ascii_case("none") {
+                log::debug!("[ENRICHMENT::URL] Server explicitly disables Range support");
+                return Ok(false);
+            }
+        }
+    }
+
+    // Header missing or unclear - perform test range request
+    log::debug!("[ENRICHMENT::URL] Testing Range support with small request");
+    let test_response = client
+        .get(url)
+        .header("Range", "bytes=0-1023") // Request first 1KB
+        .send()
+        .await?;
+
+    // HTTP 206 Partial Content means ranges are supported
+    let supports_range = test_response.status() == reqwest::StatusCode::PARTIAL_CONTENT;
+    log::info!(
+        "[ENRICHMENT::URL] Range support test: {} (status: {})",
+        if supports_range { "SUPPORTED" } else { "NOT SUPPORTED" },
+        test_response.status()
+    );
+
+    Ok(supports_range)
+}
+
+/// Fetches only the CSV headers from a URL using a small Range request.
+///
+/// This is used when resuming a download - we need the headers to know the
+/// column order, but we already have the data rows. This function fetches
+/// just enough bytes (8KB) to capture the header row.
+///
+/// # Why 8KB
+///
+/// - Most CSV headers are < 1KB
+/// - 8KB provides buffer for files with many columns or long column names
+/// - Tiny overhead compared to GB files
+/// - Conservative enough to work with most reasonable CSV files
+///
+/// # Returns
+///
+/// - `Ok(headers)`: Vector of column names in order
+/// - `Err`: Network error, parse error, or file doesn't start with valid CSV
+async fn fetch_headers_only(client: &Client, url: &str) -> Result<Vec<String>> {
+    log::debug!("[ENRICHMENT::URL] Fetching headers only via Range request");
+
+    let response = client
+        .get(url)
+        .header("Range", "bytes=0-8191") // First 8KB should contain headers
+        .send()
+        .await?;
+
+    // Read the small chunk into memory
+    let bytes = response.bytes().await?;
+
+    // Find first newline to extract header row
+    let header_end = bytes
+        .iter()
+        .position(|&b| b == b'\n')
+        .ok_or_else(|| anyhow!("No newline found in first 8KB - invalid CSV"))?;
+
+    let header_line = &bytes[..header_end];
+
+    // Parse header row as CSV
+    let mut reader = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .from_reader(header_line);
+
+    let headers = reader
+        .headers()?
+        .iter()
+        .map(|s| s.to_string())
+        .collect::<Vec<String>>();
+
+    log::info!(
+        "[ENRICHMENT::URL] Fetched {} headers: {:?}",
+        headers.len(),
+        headers
+    );
+
+    Ok(headers)
+}
+
+// ============================================================================
 // CSV Processor
 // ============================================================================
 
@@ -677,18 +816,31 @@ impl UrlCsvProcessor {
     /// # Parameters
     ///
     /// - `batch_size_records`: Number of records per batch (recommended: 10,000)
+    /// - `resume_from_byte`: Optional byte position to resume from (uses Range request if supported)
+    /// - `resume_headers`: Optional CSV headers when resuming (to maintain column order)
     /// - `on_batch`: Async callback called for each completed batch
+    ///   - Parameters: (records, batch_bytes, batch_idx, total_bytes_fetched_so_far)
     ///
     /// # Returns
     ///
     /// Total number of batches processed
+    ///
+    /// # Resume Behavior
+    ///
+    /// When `resume_from_byte` is provided:
+    /// - Uses HTTP Range request: `Range: bytes={resume_from_byte}-`
+    /// - Expects HTTP 206 Partial Content response
+    /// - Uses provided `resume_headers` instead of parsing from first chunk
+    /// - If server returns 200 OK instead of 206, returns error (indicates resume not supported)
     pub async fn fetch_and_process_batches<F, Fut>(
         &self,
         batch_size_records: usize,
+        resume_from_byte: Option<u64>,
+        resume_headers: Option<Vec<String>>,
         mut on_batch: F,
     ) -> Result<usize>
     where
-        F: FnMut(Vec<json::Map<String, json::Value>>, u64, usize) -> Fut,
+        F: FnMut(Vec<json::Map<String, json::Value>>, u64, usize, u64) -> Fut,
         Fut: std::future::Future<Output = Result<()>>,
     {
         // Track total batches processed
@@ -697,8 +849,8 @@ impl UrlCsvProcessor {
         // Buffer for accumulating HTTP chunks until we have complete CSV lines
         let mut buffer = Vec::new();
 
-        // CSV column headers, extracted from first chunk and reused for all records
-        let mut headers: Option<Vec<String>> = None;
+        // CSV column headers - use provided headers if resuming, otherwise extract from first chunk
+        let mut headers: Option<Vec<String>> = resume_headers.clone();
 
         // Current batch being accumulated (will be processed when full)
         let mut current_batch_records = Vec::new();
@@ -706,44 +858,75 @@ impl UrlCsvProcessor {
         // Size tracking for current batch (for progress reporting)
         let mut total_bytes_in_batch = 0u64;
 
-        log::info!(
-            "[ENRICHMENT::URL] Starting to fetch CSV from {} with chunk_size={} MB",
-            self.url,
-            self.chunk_size / 1024 / 1024
-        );
+        // Build HTTP GET request with optional Range header for resume
+        let mut request = self.client.get(&self.url);
 
-        // Initiate HTTP GET request. Unlike the HEAD request in validate_url(),
-        // this actually downloads the file body.
-        let response = self.client.get(&self.url).send().await?;
-        if !response.status().is_success() {
-            return Err(anyhow!("URL returned status: {}", response.status()));
+        if let Some(start_byte) = resume_from_byte {
+            log::info!(
+                "[ENRICHMENT::URL] Attempting to resume download from byte {} using Range request",
+                start_byte
+            );
+            request = request.header("Range", format!("bytes={}-", start_byte));
+        } else {
+            log::info!(
+                "[ENRICHMENT::URL] Starting fresh download from {} with chunk_size={} MB",
+                self.url,
+                self.chunk_size / 1024 / 1024
+            );
+        }
+
+        // Initiate HTTP request
+        let response = request.send().await?;
+
+        // Handle both full (200) and partial (206) responses
+        let status = response.status();
+        if status == reqwest::StatusCode::PARTIAL_CONTENT {
+            log::info!("[ENRICHMENT::URL] Server returned 206 Partial Content - resume successful");
+        } else if status == reqwest::StatusCode::OK {
+            if resume_from_byte.is_some() {
+                // Server ignored Range request and returned full content
+                // This is technically valid HTTP behavior - server can ignore Range requests
+                log::warn!(
+                    "[ENRICHMENT::URL] Server returned 200 OK despite Range request - resume not supported. Starting from beginning."
+                );
+                // Clear resume headers since we're getting the full file with headers
+                headers = None;
+            }
+            // Normal full download
+        } else {
+            return Err(anyhow!("URL returned status: {}", status));
         }
 
         // Get streaming handle to response body. bytes_stream() provides
         // chunked access without buffering the entire response.
         let mut stream = response.bytes_stream();
 
-        // Track total bytes for logging/monitoring. This helps operators
-        // understand typical file sizes and detect outliers.
-        let mut total_bytes_fetched = 0u64;
+        // Track total bytes successfully processed (excluding incomplete lines in buffer).
+        // This is critical for resume functionality - we can only resume from complete CSV rows.
+        let mut total_bytes_processed = 0u64;
 
         while let Some(chunk_result) = stream.next().await {
             let chunk = chunk_result?;
             let chunk_len = chunk.len() as u64;
-            total_bytes_fetched += chunk_len;
 
             log::debug!(
-                "[ENRICHMENT::URL] url: {} Received HTTP chunk: {} bytes (total fetched: {} bytes)",
+                "[ENRICHMENT::URL] url: {} Received HTTP chunk: {} bytes",
                 self.url,
-                chunk_len,
-                total_bytes_fetched
+                chunk_len
             );
 
             // Append chunk to buffer
             buffer.extend_from_slice(&chunk);
 
+            // Calculate how many bytes we're about to parse (before leftover is calculated)
+            let bytes_before_parse = buffer.len() as u64;
+
             // Parse complete lines from buffer
             let (records, parsed_headers, leftover) = parse_csv_chunk(&buffer, headers.as_ref())?;
+
+            // Calculate how many bytes were successfully parsed (excluding leftover)
+            let bytes_parsed = bytes_before_parse - leftover.len() as u64;
+            total_bytes_processed += bytes_parsed;
 
             // If we got headers for the first time, store them
             if headers.is_none() && parsed_headers.is_some() {
@@ -769,17 +952,21 @@ impl UrlCsvProcessor {
                 // Check if we've reached batch size - process immediately
                 if current_batch_records.len() >= batch_size_records {
                     log::debug!(
-                        "[ENRICHMENT::URL] Completed batch {} with {} records, {} bytes",
+                        "[ENRICHMENT::URL] Completed batch {} with {} records, {} bytes (total processed: {} bytes)",
                         batch_count + 1,
                         current_batch_records.len(),
-                        total_bytes_in_batch
+                        total_bytes_in_batch,
+                        total_bytes_processed
                     );
 
                     // Process batch immediately via callback
+                    // Pass total_bytes_processed so caller can track resume position
+                    // This excludes incomplete lines still in buffer, ensuring we can resume from a valid CSV row
                     on_batch(
                         std::mem::take(&mut current_batch_records),
                         total_bytes_in_batch,
                         batch_count,
+                        total_bytes_processed,
                     )
                     .await?;
 
@@ -797,7 +984,11 @@ impl UrlCsvProcessor {
         }
 
         // Process any remaining data in buffer
+        // At this point, buffer contains the incomplete line(s) at the end of the file
         if !buffer.is_empty() {
+            let buffer_size = buffer.len() as u64;
+            total_bytes_processed += buffer_size; // Now we can count these bytes as processed
+
             let (records, ..) = parse_csv_chunk(&buffer, headers.as_ref())?;
             for record in records {
                 let record_size = serde_json::to_string(&record)
@@ -812,21 +1003,23 @@ impl UrlCsvProcessor {
         // Process final batch if it has any records
         if !current_batch_records.is_empty() {
             log::debug!(
-                "[ENRICHMENT::URL] Final batch {} with {} records, {} bytes",
+                "[ENRICHMENT::URL] Final batch {} with {} records, {} bytes (total processed: {} bytes)",
                 batch_count + 1,
                 current_batch_records.len(),
-                total_bytes_in_batch
+                total_bytes_in_batch,
+                total_bytes_processed
             );
 
             // Process final batch via callback
-            on_batch(current_batch_records, total_bytes_in_batch, batch_count).await?;
+            // This is the last batch, so total_bytes_processed represents the complete download position
+            on_batch(current_batch_records, total_bytes_in_batch, batch_count, total_bytes_processed).await?;
             batch_count += 1;
         }
 
         log::info!(
-            "[ENRICHMENT::URL] Completed fetching CSV: {} batches, {} total bytes",
+            "[ENRICHMENT::URL] Completed fetching CSV: {} batches, {} total bytes processed",
             batch_count,
-            total_bytes_fetched
+            total_bytes_processed
         );
 
         Ok(batch_count)
@@ -834,42 +1027,90 @@ impl UrlCsvProcessor {
 }
 
 /// Process enrichment table URL by fetching and saving in batches
+///
 /// Returns: (total_records, total_bytes)
+///
+/// This function handles both fresh downloads and resume scenarios:
+/// - If job.supports_range == true and job.last_byte_position > 0: Attempts resume
+/// - Otherwise: Performs fresh download from beginning
 async fn process_enrichment_table_url(
     org_id: &str,
     table_name: &str,
     url: &str,
     append_data: bool,
+    job: &EnrichmentTableUrlJob,
 ) -> Result<(i64, u64)> {
     // Create CSV processor
     let processor = UrlCsvProcessor::new(url.to_string());
 
-    // Validate URL first
-    log::info!(
-        "[ENRICHMENT::URL] {}/{} - Validating URL: {}",
-        org_id,
-        table_name,
-        url
-    );
+    // Determine if we should attempt resume
+    let should_resume = job.supports_range && job.last_byte_position > 0;
 
-    match processor.validate_url().await? {
-        Some(size) => {
-            log::info!(
-                "[ENRICHMENT::URL] {}/{} - URL validation successful, content-length: {} bytes ({} MB)",
-                org_id,
-                table_name,
-                size,
-                size / 1024 / 1024
-            );
+    // Fetch headers if resuming (we need them for CSV parsing since they won't be in the resumed data)
+    let resume_headers = if should_resume {
+        log::info!(
+            "[ENRICHMENT::URL] {}/{} - Attempting resume from byte {}",
+            org_id,
+            table_name,
+            job.last_byte_position
+        );
+
+        match fetch_headers_only(&processor.client, url).await {
+            Ok(headers) => {
+                log::info!(
+                    "[ENRICHMENT::URL] {}/{} - Fetched headers for resume: {:?}",
+                    org_id,
+                    table_name,
+                    headers
+                );
+                Some(headers)
+            }
+            Err(e) => {
+                log::warn!(
+                    "[ENRICHMENT::URL] {}/{} - Failed to fetch headers for resume: {}. Will try fresh download.",
+                    org_id,
+                    table_name,
+                    e
+                );
+                None
+            }
         }
-        None => {
-            log::warn!(
-                "[ENRICHMENT::URL] {}/{} - URL validation successful, but no content-length header",
-                org_id,
-                table_name
-            );
+    } else {
+        // Not resuming - either first attempt or server doesn't support ranges
+        log::info!(
+            "[ENRICHMENT::URL] {}/{} - Validating URL: {}",
+            org_id,
+            table_name,
+            url
+        );
+
+        match processor.validate_url().await? {
+            Some(size) => {
+                log::info!(
+                    "[ENRICHMENT::URL] {}/{} - URL validation successful, content-length: {} bytes ({} MB)",
+                    org_id,
+                    table_name,
+                    size,
+                    size / 1024 / 1024
+                );
+            }
+            None => {
+                log::warn!(
+                    "[ENRICHMENT::URL] {}/{} - URL validation successful, but no content-length header",
+                    org_id,
+                    table_name
+                );
+            }
         }
-    }
+        None
+    };
+
+    // Determine byte position to resume from
+    let resume_from_byte = if should_resume && resume_headers.is_some() {
+        Some(job.last_byte_position)
+    } else {
+        None
+    };
 
     // Fetch batches with default batch size of 10,000 records
     let batch_size = 10_000; // Can make this configurable later if needed
@@ -888,17 +1129,30 @@ async fn process_enrichment_table_url(
     let total_bytes = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
     let has_schema = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
 
+    // Determine if we're resuming (important for append behavior)
+    let is_resuming = resume_from_byte.is_some();
+
     // Clone Arc references for the callback
     let total_records_clone = total_records.clone();
     let total_bytes_clone = total_bytes.clone();
     let has_schema_clone = has_schema.clone();
 
+    // Clone job data for callback (need to save progress after each batch)
+    let org_id_for_save = org_id.to_string();
+    let table_name_for_save = table_name.to_string();
+
     // Process each batch as it arrives using a callback
     let total_batches = processor
-        .fetch_and_process_batches(batch_size, |records, batch_bytes, batch_idx| {
+        .fetch_and_process_batches(
+            batch_size,
+            resume_from_byte,
+            resume_headers,
+            |records, batch_bytes, batch_idx, bytes_processed_so_far| {
             // Clone variables needed in async block
             let org_id = org_id.to_string();
             let table_name = table_name.to_string();
+            let org_id_for_save = org_id_for_save.clone();
+            let table_name_for_save = table_name_for_save.clone();
             let total_records = total_records_clone.clone();
             let total_bytes = total_bytes_clone.clone();
             let has_schema = has_schema_clone.clone();
@@ -916,9 +1170,17 @@ async fn process_enrichment_table_url(
                     batch_bytes
                 );
 
-                // For first batch, don't append (create/replace)
-                // For subsequent batches, always append
-                let should_append = if is_first_batch { append_data } else { true };
+                // Determine append behavior:
+                // - If resuming: Always append (data already exists from previous attempt)
+                // - If first batch and not resuming: Use user's append_data preference
+                // - If subsequent batch: Always append
+                let should_append = if is_resuming {
+                    true // Always append when resuming to preserve existing data
+                } else if is_first_batch {
+                    append_data // Use user preference for first batch of fresh download
+                } else {
+                    true // Always append for subsequent batches
+                };
 
                 // Save batch using batch-optimized logic
                 match save_enrichment_batch(
@@ -958,6 +1220,34 @@ async fn process_enrichment_table_url(
                             table_name,
                             batch_idx + 1
                         );
+
+                        // Save progress checkpoint after successful batch save
+                        // This allows resume from this position if the job fails later
+                        // Calculate absolute byte position (add resume offset if resuming)
+                        let absolute_byte_position = resume_from_byte.unwrap_or(0) + bytes_processed_so_far;
+
+                        if let Ok(Some(mut current_job)) = db::enrichment_table::get_url_job(&org_id_for_save, &table_name_for_save).await {
+                            current_job.last_byte_position = absolute_byte_position;
+                            current_job.total_bytes_fetched = absolute_byte_position;
+                            current_job.total_records_processed += record_count as i64;
+
+                            if let Err(e) = db::enrichment_table::save_url_job(&current_job).await {
+                                // Log error but don't fail the batch - progress tracking is best-effort
+                                log::warn!(
+                                    "[ENRICHMENT::URL] {}/{} - Failed to save progress checkpoint: {}",
+                                    org_id,
+                                    table_name,
+                                    e
+                                );
+                            } else {
+                                log::debug!(
+                                    "[ENRICHMENT::URL] {}/{} - Saved progress checkpoint at byte {}",
+                                    org_id,
+                                    table_name,
+                                    absolute_byte_position
+                                );
+                            }
+                        }
 
                         Ok(())
                     }

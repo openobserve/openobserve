@@ -287,15 +287,57 @@ pub async fn save_enrichment_table_from_url(
     // Create a new job record with Pending status.
     // This immediately makes the job visible to the status API, allowing
     // the UI to start polling for updates even before processing begins.
-    let job = EnrichmentTableUrlJob::new(
+    let mut job = EnrichmentTableUrlJob::new(
         org_id.clone(),
         table_name.clone(),
         request_body.url.clone(),
         append_data,
     );
 
+    // ===== CHECK RANGE REQUEST SUPPORT =====
+    // Check if the URL supports HTTP Range requests for resumable downloads.
+    // This check is done once at job creation and cached in the database.
+    // The processor will use this flag to decide whether to use Range requests on retry.
+    //
+    // Why check now instead of during processing:
+    // 1. Fail fast - detect unsupported URLs before accepting the job
+    // 2. Cache the capability - avoid redundant checks on every retry
+    // 3. Simplify retry logic - processor just reads the flag from DB
+    //
+    // Why we don't fail if check fails:
+    // Range support is optional. If the check fails (network error, timeout),
+    // we still create the job and assume no Range support (safer fallback).
+    let supports_range = {
+        use crate::service::enrichment_table::url_processor::check_range_support_for_url;
+        match check_range_support_for_url(&request_body.url).await {
+            Ok(true) => {
+                log::info!(
+                    "[ENRICHMENT::URL] URL {} supports Range requests - resume capability enabled",
+                    request_body.url
+                );
+                true
+            }
+            Ok(false) => {
+                log::info!(
+                    "[ENRICHMENT::URL] URL {} does not support Range requests - will use delete-and-retry on failure",
+                    request_body.url
+                );
+                false
+            }
+            Err(e) => {
+                log::warn!(
+                    "[ENRICHMENT::URL] Failed to check Range support for {}: {}. Assuming no support.",
+                    request_body.url,
+                    e
+                );
+                false
+            }
+        }
+    };
+    job.supports_range = supports_range;
+
     // ===== PERSIST JOB TO DATABASE =====
-    // Save job to etcd before triggering processing.
+    // Save job to database before triggering processing.
     // This ordering is critical:
     // 1. If save succeeds but trigger fails → Job exists in DB but not processing.
     //    User can retry or we can add recovery mechanism.

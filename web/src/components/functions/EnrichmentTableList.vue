@@ -90,9 +90,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="18px"
                       >
                         <q-tooltip>
-                          Status: Completed<br/>
-                          Records: {{ props.row.urlJob.total_records_processed.toLocaleString() }}<br/>
-                          Size: {{ formatSizeFromMB((props.row.urlJob.total_bytes_fetched / (1024 * 1024)).toString()) }}
+                          <div style="max-width: 300px;">
+                            <strong>Status: Completed</strong><br/>
+                            Records: {{ props.row.urlJob.total_records_processed.toLocaleString() }}<br/>
+                            Size: {{ formatSizeFromMB((props.row.urlJob.total_bytes_fetched / (1024 * 1024)).toString()) }}<br/>
+                            <template v-if="props.row.urlJob.supports_range">
+                              Resume: Supported<br/>
+                            </template>
+                          </div>
                         </q-tooltip>
                       </q-icon>
                       <q-icon
@@ -103,10 +108,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="rotate-animation"
                       >
                         <q-tooltip>
-                          Status: Processing<br/>
-                          Progress: {{ props.row.urlJob.total_records_processed.toLocaleString() }} records<br/>
-                          Downloaded: {{ formatSizeFromMB((props.row.urlJob.total_bytes_fetched / (1024 * 1024)).toString()) }}<br/>
-                          Retry: {{ props.row.urlJob.retry_count }} of 3
+                          <div style="max-width: 300px;">
+                            <strong>Status: Processing</strong><br/>
+                            Progress: {{ props.row.urlJob.total_records_processed.toLocaleString() }} records<br/>
+                            Downloaded: {{ formatSizeFromMB((props.row.urlJob.total_bytes_fetched / (1024 * 1024)).toString()) }}<br/>
+                            <template v-if="props.row.urlJob.last_byte_position > 0">
+                              Position: {{ formatSizeFromMB((props.row.urlJob.last_byte_position / (1024 * 1024)).toString()) }}<br/>
+                            </template>
+                            Retry: {{ props.row.urlJob.retry_count }} of 3<br/>
+                            <template v-if="props.row.urlJob.supports_range">
+                              Resume: Enabled<br/>
+                            </template>
+                            <br/>
+                            <em style="font-size: 0.85em;">Note: Progress is not real-time. Refresh the page to see latest updates.</em>
+                          </div>
                         </q-tooltip>
                       </q-icon>
                       <q-icon
@@ -118,10 +133,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click="showFailedJobDetails(props.row)"
                       >
                         <q-tooltip>
-                          Status: Failed<br/>
-                          Error: Failed after {{ props.row.urlJob.retry_count }} retries<br/>
-                          {{ props.row.urlJob.error_message || 'Unknown error' }}<br/><br/>
-                          Click for full details
+                          <div style="max-width: 350px;">
+                            <strong>Status: Failed</strong><br/>
+                            Error: Failed after {{ props.row.urlJob.retry_count }} retries<br/>
+                            {{ props.row.urlJob.error_message || 'Unknown error' }}<br/>
+                            <template v-if="props.row.urlJob.last_byte_position > 0">
+                              Progress before failure: {{ formatSizeFromMB((props.row.urlJob.last_byte_position / (1024 * 1024)).toString()) }}<br/>
+                            </template>
+                            <template v-if="props.row.urlJob.supports_range && props.row.urlJob.last_byte_position > 0">
+                              <br/>
+                              <em style="color: #4CAF50;">Resume enabled: Retry will continue from {{ formatSizeFromMB((props.row.urlJob.last_byte_position / (1024 * 1024)).toString()) }}</em><br/>
+                            </template>
+                            <br/>
+                            Click for full details
+                          </div>
                         </q-tooltip>
                       </q-icon>
                     </template>

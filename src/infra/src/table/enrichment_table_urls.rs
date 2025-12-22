@@ -40,6 +40,8 @@ pub struct EnrichmentTableUrlRecord {
     pub total_records_processed: i64,
     pub retry_count: i32,
     pub append_data: bool,
+    pub last_byte_position: i64,
+    pub supports_range: bool,
 }
 
 impl From<Model> for EnrichmentTableUrlRecord {
@@ -56,6 +58,8 @@ impl From<Model> for EnrichmentTableUrlRecord {
             total_records_processed: model.total_records_processed,
             retry_count: model.retry_count,
             append_data: model.append_data,
+            last_byte_position: model.last_byte_position,
+            supports_range: model.supports_range,
         }
     }
 }
@@ -91,6 +95,8 @@ pub async fn put(record: EnrichmentTableUrlRecord) -> Result<(), errors::Error> 
         active.total_records_processed = Set(record.total_records_processed);
         active.retry_count = Set(record.retry_count);
         active.append_data = Set(record.append_data);
+        active.last_byte_position = Set(record.last_byte_position);
+        active.supports_range = Set(record.supports_range);
         active.update(client).await?;
     } else {
         // Insert new record
@@ -106,6 +112,8 @@ pub async fn put(record: EnrichmentTableUrlRecord) -> Result<(), errors::Error> 
             total_records_processed: Set(record.total_records_processed),
             retry_count: Set(record.retry_count),
             append_data: Set(record.append_data),
+            last_byte_position: Set(record.last_byte_position),
+            supports_range: Set(record.supports_range),
             ..Default::default()
         };
         Entity::insert(active).exec(client).await?;
