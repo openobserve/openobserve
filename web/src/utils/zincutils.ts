@@ -1232,6 +1232,17 @@ export const getCronIntervalInMinutes = (cronExpression: string): number => {
   }
 };
 
+export const convertMinutesToCron = (minutes: number): string => {
+  if (!minutes || minutes <= 0) {
+    return "";
+  }
+
+  // OpenObserve uses 6-field cron format: [Second] [Minute] [Hour] [Day of Month] [Month] [Day of Week]
+  // Convert minutes to minute-based cron expression only
+  // Format: 0 */[minutes] * * * * (every N minutes, starting at second 0)
+  return `0 */${minutes} * * * *`;
+};
+
 export const localTimeToMicroseconds = () => {
   // Create a Date object representing the current local time
   var date = new Date();
