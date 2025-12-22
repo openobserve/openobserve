@@ -1115,4 +1115,3 @@ describe('ScheduledAlert.vue', () => {
     });
   });
 });
-
