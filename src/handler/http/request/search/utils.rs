@@ -111,7 +111,7 @@ pub async fn validate_query_fields(
         ..Default::default()
     };
 
-    let sql_obj = Sql::new_with_options(&search_query, org_id, stream_type, None, false).await?;
+    let sql = Sql::new_with_options(&search_query, org_id, stream_type, None, false).await?;
 
     // Step 2: Get schema and UDS fields (from cache)
     let schema = infra::schema::get(org_id, stream_name, stream_type)
@@ -126,7 +126,7 @@ pub async fn validate_query_fields(
     let uds_fields = infra::schema::get_stream_setting_defined_schema_fields(&settings);
 
     // Step 3: Get fields used in query
-    let used_fields: HashSet<String> = sql_obj.columns.values().flatten().cloned().collect();
+    let used_fields: HashSet<String> = sql.columns.values().flatten().cloned().collect();
 
     // Step 4: Validate each field
     for field in used_fields {
