@@ -209,8 +209,6 @@ impl Partition {
                     merge_record_batches("INGESTER:PERSIST", 0, self.schema.clone(), batches)
                         .context(MergeRecordBatchSnafu)?;
 
-                // Determine file format and compression
-                let file_format = cfg.common.file_format;
                 let compression = if cfg.common.feature_ingester_none_compression {
                     Some("none")
                 } else {
@@ -226,7 +224,7 @@ impl Partition {
                     compression,
                 };
 
-                let buf_file = write_recordbatches_to_buf(file_format, &[batch], write_config)
+                let buf_file = write_recordbatches_to_buf(&[batch], write_config)
                     .await
                     .map_err(|e| {
                         let err: Box<dyn std::error::Error + Send + Sync> = e.into();
@@ -238,7 +236,7 @@ impl Partition {
                     file_meta.min_ts,
                     file_meta.max_ts,
                     file_meta.original_size,
-                    file_format.extension(),
+                    ".parquet",
                 );
                 let mut path = path.clone();
                 path.push(hour.to_string());
@@ -260,7 +258,7 @@ impl Partition {
 
                 // set file metadata cache
                 let mut file_key = path.clone();
-                file_key.set_extension(file_format.extension());
+                file_key.set_extension("parquet");
                 let file_key = file_key
                     .strip_prefix(base_path.clone())
                     .unwrap()

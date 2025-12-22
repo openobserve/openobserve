@@ -19,21 +19,8 @@ use arrow::record_batch::RecordBatch;
 use arrow_schema::Schema;
 use once_cell::sync::Lazy;
 use tokio::runtime::Runtime;
-use vortex::{
-    VortexSessionDefault,
-    array::{ArrayRef, arrow::FromArrowArray},
-    dtype::{DType, arrow::FromArrowType},
-    file::VortexWriteOptions,
-    session::VortexSession,
-};
-use vortex_file::WriteStrategyBuilder;
-use vortex_io::session::RuntimeSessionExt;
 
-use crate::{
-    config::{self, FileFormat},
-    meta::stream::FileMeta,
-    utils::{parquet::new_parquet_writer, vortex::Utf8Compressor},
-};
+use crate::{config, meta::stream::FileMeta, utils::parquet::new_parquet_writer};
 
 pub static VORTEX_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
     tokio::runtime::Builder::new_multi_thread()
@@ -54,16 +41,12 @@ pub struct WriteConfig<'a> {
     pub compression: Option<&'a str>,
 }
 
-/// Write record batches to a buffer using the specified file format
+/// Write record batches to a buffer in Parquet format
 pub async fn write_recordbatches_to_buf(
-    format: FileFormat,
     batches: &[RecordBatch],
     config: WriteConfig<'_>,
 ) -> Result<Vec<u8>, anyhow::Error> {
-    match format {
-        FileFormat::Parquet => write_recordbatches_to_parquet(batches, config).await,
-        FileFormat::Vortex => write_recordbatches_to_vortex(batches, config).await,
-    }
+    write_recordbatches_to_parquet(batches, config).await
 }
 
 /// Write record batches to a Parquet buffer
@@ -90,45 +73,6 @@ async fn write_recordbatches_to_parquet(
     Ok(buf)
 }
 
-/// Write record batches to a Vortex buffer
-async fn write_recordbatches_to_vortex(
-    batches: &[RecordBatch],
-    config: WriteConfig<'_>,
-) -> Result<Vec<u8>, anyhow::Error> {
-    // Clone data needed for the operation
-    let batches = batches.to_vec();
-    let schema = config.schema.clone();
-
-    // Spawn blocking task on VORTEX_RUNTIME that runs async code
-    let result = VORTEX_RUNTIME
-        .spawn_blocking(move || {
-            VORTEX_RUNTIME.block_on(async move {
-                let mut buf = Vec::new();
-                let session = VortexSession::default().with_tokio();
-                let dtype = DType::from_arrow(schema.as_ref());
-                let write_options = VortexWriteOptions::new(session.clone()).with_strategy(
-                    WriteStrategyBuilder::new()
-                        .with_compressor(Utf8Compressor::default())
-                        .build(),
-                );
-                let mut writer = write_options.writer(&mut buf, dtype);
-
-                for batch in &batches {
-                    let array: ArrayRef = ArrayRef::from_arrow(batch.clone(), false);
-                    writer.push(array).await?;
-                }
-
-                writer.finish().await?;
-
-                Ok::<Vec<u8>, anyhow::Error>(buf)
-            })
-        })
-        .await
-        .map_err(|e| anyhow::anyhow!("Vortex runtime task failed: {}", e))??;
-
-    Ok(result)
-}
-
 #[cfg(test)]
 mod tests {
     use arrow::{
@@ -138,7 +82,6 @@ mod tests {
     };
 
     use super::*;
-    use crate::config::FileFormat;
 
     fn create_test_batch() -> (Arc<Schema>, RecordBatch) {
         let schema = Arc::new(Schema::new(vec![
@@ -178,7 +121,7 @@ mod tests {
         };
 
         let result =
-            write_recordbatches_to_buf(FileFormat::Parquet, std::slice::from_ref(&batch), config)
+            write_recordbatches_to_buf(std::slice::from_ref(&batch), config)
                 .await;
 
         assert!(result.is_ok());
@@ -186,7 +129,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_write_vortex() {
+    async fn test_write_multiple_batches() {
         let (schema, batch) = create_test_batch();
         let metadata = FileMeta {
             min_ts: 1000,
@@ -205,7 +148,7 @@ mod tests {
         };
 
         let result =
-            write_recordbatches_to_buf(FileFormat::Vortex, std::slice::from_ref(&batch), config)
+            write_recordbatches_to_buf(&[batch.clone(), batch], config)
                 .await;
 
         assert!(result.is_ok());
