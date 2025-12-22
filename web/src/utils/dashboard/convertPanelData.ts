@@ -61,7 +61,7 @@ export const convertPanelData = async (
       if (
         // panelSchema?.fields?.stream_type == "metrics" &&
         // panelSchema?.customQuery &&
-        panelSchema?.queryType == "promql" || panelSchema?.queryType == "promql-builder" 
+        panelSchema?.queryType == "promql"
       ) {
         // chartpanelref will be used to get width and height of the chart element from DOM
         return {
@@ -125,7 +125,7 @@ export const convertPanelData = async (
     }
     case "custom_chart": {
       const hasData =
-        panelSchema?.queryType === "promql" || panelSchema?.queryType == "promql-builder"
+        panelSchema?.queryType === "promql"
           ? data.length > 0 && data[0].result.length > 0
           : data.length > 0 && data[0].length > 0;
 

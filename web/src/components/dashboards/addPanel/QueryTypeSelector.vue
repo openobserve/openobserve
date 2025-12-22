@@ -145,11 +145,13 @@ export default defineComponent({
 
       ignoreSelectedButtonTypeUpdate.value = true;
       if (dashboardPanelData.data.type == "custom_chart") {
-        // For custom_chart, check the actual query type instead of assuming custom-sql
-        if (dashboardPanelData.data.queryType == "promql") {
-          selectedButtonType.value = "promql";
-        } else if (dashboardPanelData.data.queryType == "promql-builder") {
+        // For custom_chart, check the actual query type and customQuery flag
+        if (dashboardPanelData.data.queryType == "promql" &&
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.customQuery == false) {
           selectedButtonType.value = "promql-builder";
+        } else if (dashboardPanelData.data.queryType == "promql" &&
+                   dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.customQuery == true) {
+          selectedButtonType.value = "promql";
         } else {
           selectedButtonType.value = "custom-sql";
         }
@@ -173,7 +175,7 @@ export default defineComponent({
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery == false &&
-        dashboardPanelData.data.queryType == "promql-builder"
+        dashboardPanelData.data.queryType == "promql"
       ) {
         selectedButtonType.value = "promql-builder";
       } else if (
@@ -306,7 +308,7 @@ export default defineComponent({
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].customQuery = false;
-          dashboardPanelData.data.queryType = "promql-builder";
+          dashboardPanelData.data.queryType = "promql";
 
           // For custom charts, preserve the existing query
           // Only clear the query for non-custom charts when switching to promql-builder
