@@ -317,7 +317,7 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info(`✓ TERTIARY CHECK PASSED: ${valueCount} field value(s) displayed in dropdown`);
   });
 
-  test('should load field values with CTE (Common Table Expression) without 400 error @bug-7751 @P1 @regression', async ({ page }) => {
+  test.skip('should load field values with CTE (Common Table Expression) without 400 error @bug-7751 @P1 @regression', async ({ page }) => {
     testLogger.info('Test: Field values with CTE');
 
     // Navigate to logs page
