@@ -97,10 +97,6 @@ pub async fn validate_query_fields(
     // Step 1: Parse SQL to get columns (lightweight parsing)
     let search_query = proto::cluster_rpc::SearchQuery {
         sql: sql.to_string(),
-        from: 0,
-        size: 0,
-        start_time: 0,
-        end_time: 0,
         ..Default::default()
     };
 
