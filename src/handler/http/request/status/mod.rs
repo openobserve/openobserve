@@ -647,12 +647,15 @@ pub async fn redirect(req: actix_web::HttpRequest) -> Result<HttpResponse, Error
     use config::meta::user::UserRole;
 
     use crate::common::meta::user::AuthTokens;
+    let cfg = get_config();
 
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let code = match query.get("code") {
         Some(code) => code,
         None => {
-            return Err(Error::other("no code in request"));
+            return Ok(HttpResponse::TemporaryRedirect()
+                .append_header((header::LOCATION, cfg.common.web_url.clone()))
+                .finish());
         }
     };
     let mut audit_message = AuditMessage {
@@ -680,7 +683,9 @@ pub async fn redirect(req: actix_web::HttpRequest) -> Result<HttpResponse, Error
                 // Bad Request
                 audit_message.response_meta.http_response_code = 400;
                 audit(audit_message).await;
-                return Err(Error::other("invalid state in request"));
+                return Ok(HttpResponse::TemporaryRedirect()
+                    .append_header((header::LOCATION, cfg.common.web_url.clone()))
+                    .finish());
             }
         },
 
@@ -688,7 +693,9 @@ pub async fn redirect(req: actix_web::HttpRequest) -> Result<HttpResponse, Error
             // Bad Request
             audit_message.response_meta.http_response_code = 400;
             audit(audit_message).await;
-            return Err(Error::other("no state in request"));
+            return Ok(HttpResponse::TemporaryRedirect()
+                .append_header((header::LOCATION, cfg.common.web_url.clone()))
+                .finish());
         }
     };
 
@@ -798,7 +805,6 @@ pub async fn redirect(req: actix_web::HttpRequest) -> Result<HttpResponse, Error
                 refresh_token: login_data.refresh_token,
             })
             .unwrap();
-            let cfg = get_config();
             let tokens = base64::encode(&tokens);
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
