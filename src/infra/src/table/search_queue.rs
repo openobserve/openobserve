@@ -15,7 +15,7 @@
 
 use config::utils::time::now_micros;
 use sea_orm::{
-    ColumnTrait, DbBackend, EntityTrait, FromQueryResult, PaginatorTrait, QueryFilter, Set,
+    ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, PaginatorTrait, QueryFilter, Set,
     Statement,
 };
 
@@ -44,7 +44,7 @@ pub async fn add(
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Entity::insert(record).exec(client).await?;
+    Entity::insert(dbg!(record)).exec(client).await?;
 
     Ok(())
 }
@@ -104,16 +104,32 @@ pub async fn count_all_levels(
     user_id: Option<&str>,
 ) -> Result<(usize, usize, usize), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let backend = client.get_database_backend();
 
     // Build the SQL query using window functions for efficient counting
     // This counts all three levels in a single query to avoid multiple round-trips
-    let sql = "SELECT
-            COUNT(*) OVER () as global_count,
-            SUM(CASE WHEN org_id = ? THEN 1 ELSE 0 END) OVER () as org_count,
-            SUM(CASE WHEN user_id = ? THEN 1 ELSE 0 END) OVER () as user_count
-        FROM search_queue
-        WHERE work_group = ?
-        LIMIT 1";
+    let sql = match backend {
+        sea_orm::DatabaseBackend::Postgres => {
+            // PostgreSQL uses $1, $2, $3 for parameter placeholders
+            "SELECT
+                COUNT(*) OVER () as global_count,
+                SUM(CASE WHEN org_id = $1 THEN 1 ELSE 0 END) OVER () as org_count,
+                SUM(CASE WHEN user_id = $2 THEN 1 ELSE 0 END) OVER () as user_count
+            FROM search_queue
+            WHERE work_group = $3
+            LIMIT 1"
+        }
+        sea_orm::DatabaseBackend::MySql | sea_orm::DatabaseBackend::Sqlite => {
+            // MySQL and SQLite use ? for parameter placeholders
+            "SELECT
+                COUNT(*) OVER () as global_count,
+                SUM(CASE WHEN org_id = ? THEN 1 ELSE 0 END) OVER () as org_count,
+                SUM(CASE WHEN user_id = ? THEN 1 ELSE 0 END) OVER () as user_count
+            FROM search_queue
+            WHERE work_group = ?
+            LIMIT 1"
+        }
+    };
 
     #[derive(Debug, FromQueryResult)]
     struct CountResult {
@@ -124,7 +140,7 @@ pub async fn count_all_levels(
 
     // Execute the query with parameters
     let result = CountResult::find_by_statement(Statement::from_sql_and_values(
-        DbBackend::Postgres, // This will be auto-converted based on actual DB backend
+        backend,
         sql,
         vec![
             org_id.unwrap_or("").into(),
