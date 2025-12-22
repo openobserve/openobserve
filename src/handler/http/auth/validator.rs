@@ -243,6 +243,36 @@ pub async fn validate_credentials(
     }
     let user = user.unwrap();
 
+    // Check token authentication first (before native login restrictions)
+    // This allows service accounts and all users to use API tokens regardless of native login settings
+    if user.role.eq(&UserRole::ServiceAccount) && user.token.eq(&user_password) {
+        return Ok(TokenValidationResponse {
+            is_valid: true,
+            user_email: user.email,
+            is_internal_user: !user.is_external,
+            user_role: Some(user.role),
+            user_name: user.first_name.to_owned(),
+            family_name: user.last_name,
+            given_name: user.first_name,
+        });
+    }
+
+    if (path_columns.len() == 1 || INGESTION_EP.iter().any(|s| path_columns.contains(s)))
+        && user.token.eq(&user_password)
+    {
+        return Ok(TokenValidationResponse {
+            is_valid: true,
+            user_email: user.email,
+            is_internal_user: !user.is_external,
+            user_role: Some(user.role),
+            user_name: user.first_name.to_owned(),
+            family_name: user.last_name,
+            given_name: user.first_name,
+        });
+    }
+
+    // Enforce native login restrictions only for password-based authentication
+    // (Token authentication has already been checked above)
     #[cfg(feature = "enterprise")]
     {
         if !get_dex_config().native_login_enabled && !user.is_external {
@@ -268,32 +298,6 @@ pub async fn validate_credentials(
                 given_name: "".to_string(),
             });
         }
-    }
-
-    if user.role.eq(&UserRole::ServiceAccount) && user.token.eq(&user_password) {
-        return Ok(TokenValidationResponse {
-            is_valid: true,
-            user_email: user.email,
-            is_internal_user: !user.is_external,
-            user_role: Some(user.role),
-            user_name: user.first_name.to_owned(),
-            family_name: user.last_name,
-            given_name: user.first_name,
-        });
-    }
-
-    if (path_columns.len() == 1 || INGESTION_EP.iter().any(|s| path_columns.contains(s)))
-        && user.token.eq(&user_password)
-    {
-        return Ok(TokenValidationResponse {
-            is_valid: true,
-            user_email: user.email,
-            is_internal_user: !user.is_external,
-            user_role: Some(user.role),
-            user_name: user.first_name.to_owned(),
-            family_name: user.last_name,
-            given_name: user.first_name,
-        });
     }
 
     let in_pass = get_hash(user_password, &user.salt);
