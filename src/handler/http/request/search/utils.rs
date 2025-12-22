@@ -15,11 +15,7 @@
 
 use std::collections::HashSet;
 
-use actix_web::HttpResponse;
-use config::{
-    TIMESTAMP_COL_NAME,
-    meta::{sql::resolve_stream_names, stream::StreamType},
-};
+use config::{TIMESTAMP_COL_NAME, meta::stream::StreamType};
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes};
 #[cfg(feature = "enterprise")]
@@ -35,11 +31,7 @@ use {
     o2_openfga::meta::mapping::OFGA_MODELS,
 };
 
-use crate::{
-    common::utils::stream::get_settings_max_query_range,
-    handler::http::request::search::error_utils::map_error_to_http_response,
-    service::search::sql::Sql,
-};
+use crate::service::search::sql::Sql;
 
 // Check permissions on stream
 #[cfg(feature = "enterprise")]
@@ -155,48 +147,6 @@ pub async fn validate_query_fields(
     }
 
     Ok(())
-}
-
-/// Validates and adjusts query time range based on max_query_range setting
-/// Returns (adjusted_start_time, adjusted_end_time, error_message)
-#[allow(dead_code)]
-pub async fn validate_and_adjust_query_range(
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
-    user_id: Option<&str>,
-    start_time: i64,
-    end_time: i64,
-) -> (i64, i64, Option<String>) {
-    if let Some(settings) = infra::schema::get_settings(org_id, stream_name, stream_type).await {
-        let max_query_range =
-            get_settings_max_query_range(settings.max_query_range, org_id, user_id).await;
-
-        if max_query_range > 0 && (end_time - start_time) > max_query_range * 3600 * 1_000_000 {
-            let adjusted_start = end_time - max_query_range * 3600 * 1_000_000;
-            let error_msg = format!(
-                "Query duration is modified due to query range restriction of {max_query_range} hours"
-            );
-            return (adjusted_start, end_time, Some(error_msg));
-        }
-    }
-
-    (start_time, end_time, None)
-}
-
-/// Resolves stream names from SQL with standardized error handling
-#[allow(dead_code)]
-pub fn resolve_stream_names_or_error(
-    sql: &str,
-    trace_id: &str,
-) -> Result<Vec<String>, HttpResponse> {
-    match resolve_stream_names(sql) {
-        Ok(v) => Ok(v.clone()),
-        Err(e) => Err(map_error_to_http_response(
-            &(e.into()),
-            Some(trace_id.to_string()),
-        )),
-    }
 }
 
 /// Checks if a field is a system field that should always be allowed
