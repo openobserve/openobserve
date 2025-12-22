@@ -15,74 +15,115 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-table
-    :class="[
-      'my-sticky-virtscroll-table',
-      { 'no-position-absolute': store.state.printMode },
-      { 'wrap-enabled': wrapCells },
-    ]"
-    virtual-scroll
-    v-model:pagination="pagination"
-    :rows-per-page-options="[0]"
-    :virtual-scroll-sticky-size-start="48"
-    dense
-    :wrap-cells="wrapCells"
-    :rows="data.rows || []"
-    :columns="data.columns"
-    row-key="id"
-    ref="tableRef"
-    data-test="dashboard-panel-table"
-    @row-click="(...args: any) => $emit('row-click', ...args)"
-    hide-no-data
+  <div
+    class="table-renderer-container"
+    :class="{ 'has-legend-footer': queryType === 'promql' && uniqueLegendCount > 1 }"
+    style="height: 100%; width: 100%; display: flex; flex-direction: column; position: relative;"
   >
-    <template v-slot:header-cell="props">
-      <q-th :props="props" :class="props.col.stickyClass">
-        {{ props.col.label }}
-      </q-th>
-    </template>
-    <template v-slot:body-cell="props">
-      <q-td
-        :props="props"
-        :style="getStyle(props)"
-        :class="['copy-cell-td', props.col.stickyClass]"
-      >
-        <div
-          class="flex items-center no-wrap copy-cell-content"
+    <q-table
+      :class="[
+        'my-sticky-virtscroll-table',
+        { 'no-position-absolute': store.state.printMode },
+        { 'wrap-enabled': wrapCells },
+        { 'with-legend-footer': queryType === 'promql' && uniqueLegendCount > 1 },
+      ]"
+      virtual-scroll
+      v-model:pagination="pagination"
+      :rows-per-page-options="[0]"
+      :virtual-scroll-sticky-size-start="48"
+      dense
+      :wrap-cells="wrapCells"
+      :rows="filteredRows"
+      :columns="data.columns"
+      row-key="id"
+      ref="tableRef"
+      data-test="dashboard-panel-table"
+      @row-click="(...args: any) => $emit('row-click', ...args)"
+      hide-no-data
+    >
+      <template v-slot:header-cell="props">
+        <q-th :props="props" :class="props.col.stickyClass">
+          {{ props.col.label }}
+        </q-th>
+      </template>
+      <template v-slot:body-cell="props">
+        <q-td
+          :props="props"
+          :style="getStyle(props)"
+          :class="['copy-cell-td', props.col.stickyClass]"
         >
-          <!-- Use JsonFieldRenderer if column is marked as JSON -->
-          <JsonFieldRenderer
-            v-if="props.col.showFieldAsJson"
-            :value="props.value"
-          />
-          <!-- Otherwise show normal value -->
-          <template v-else>
-            <span class="q-mr-xs">
-              {{
-                props.value == "undefined" || props.value === null
-                  ? ""
-                  : props.value
-              }}
-            </span>
-          </template>
-          <q-btn
-            :icon="isCellCopied(props.rowIndex, props.col.name) ? 'check' : 'content_copy'"
-            dense
-            size="xs"
-            no-caps
-            class="copy-btn"
-            @click.stop="copyCellContent(props.value, props.rowIndex, props.col.name)"
-          >
-          </q-btn>
+          <div class="flex items-center no-wrap copy-cell-content">
+            <!-- Use JsonFieldRenderer if column is marked as JSON -->
+            <JsonFieldRenderer
+              v-if="props.col.showFieldAsJson"
+              :value="props.value"
+            />
+            <!-- Otherwise show normal value -->
+            <template v-else>
+              <span class="q-mr-xs">
+                {{
+                  props.value == "undefined" || props.value === null
+                    ? ""
+                    : props.value
+                }}
+              </span>
+            </template>
+            <q-btn
+              :icon="
+                isCellCopied(props.rowIndex, props.col.name)
+                  ? 'check'
+                  : 'content_copy'
+              "
+              dense
+              size="xs"
+              no-caps
+              class="copy-btn"
+              @click.stop="
+                copyCellContent(props.value, props.rowIndex, props.col.name)
+              "
+            >
+            </q-btn>
+          </div>
+        </q-td>
+      </template>
+    </q-table>
+
+    <!-- Legend Dropdown Footer (Grafana-style) for PromQL tables only -->
+    <div
+      v-if="queryType === 'promql' && uniqueLegendCount > 1"
+      class="legend-footer q-pa-sm"
+    >
+      <div class="row items-center q-gutter-md" style="width: 100%; padding: 0 12px;">
+        <div class="text-body2" style="min-width: 60px;">
+          Legend:
         </div>
-      </q-td>
-    </template>
-  </q-table>
+        <q-select
+          v-model="selectedLegend"
+          :options="legendOptions"
+          outlined
+          dense
+          emit-value
+          map-options
+          style="min-width: 300px; max-width: 500px;"
+          placeholder="Select series to filter"
+        >
+          <template v-slot:prepend>
+            <q-icon name="filter_list" size="sm" />
+          </template>
+        </q-select>
+        <q-space />
+        <div class="text-body2 text-grey-7">
+          Showing {{ filteredRows.length }} of {{ (data.rows || []).length }} rows
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script lang="ts">
 import useNotifications from "@/composables/useNotifications";
 import { exportFile, copyToClipboard, useQuasar } from "quasar";
-import { defineComponent, ref, watch } from "vue";
+import { defineComponent, ref, watch, computed } from "vue";
 import { findFirstValidMappedValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { useStore } from "vuex";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
@@ -109,11 +150,17 @@ export default defineComponent({
       type: Object,
       default: () => [],
     },
+    queryType: {
+      required: false,
+      type: String,
+      default: "",
+    },
   },
   emits: ["row-click"],
   setup(props: any) {
     console.log("=== [TableRenderer] Component mounted ===");
     console.log("Props data:", props.data);
+    console.log("Props queryType:", props.queryType);
     console.log("Props data.rows:", props.data?.rows);
     console.log("Props data.columns:", props.data?.columns);
 
@@ -124,16 +171,86 @@ export default defineComponent({
 
     const { showErrorNotification, showPositiveNotification } =
       useNotifications();
-
+    // Legend filtering logic for PromQL tables
+    const selectedLegend = ref<string>("__all__");
     // Watch for data changes
-    watch(() => props.data, (newData) => {
-      console.log("=== [TableRenderer] Data changed ===");
-      console.log("New data:", newData);
-      console.log("Rows:", newData?.rows);
-      console.log("Columns:", newData?.columns);
-      console.log("Rows count:", newData?.rows?.length);
-      console.log("Columns count:", newData?.columns?.length);
-    }, { deep: true, immediate: true });
+    watch(
+      () => props.data,
+      (newData) => {
+        console.log("=== [TableRenderer] Data changed ===");
+        console.log("New data:", newData);
+        console.log("Rows:", newData?.rows);
+        console.log("Columns:", newData?.columns);
+        console.log("Rows count:", newData?.rows?.length);
+        console.log("Columns count:", newData?.columns?.length);
+        // Reset legend selection when data changes
+        selectedLegend.value = "__all__";
+      },
+      { deep: true, immediate: true },
+    );
+
+    // Extract unique legend names from rows (only for PromQL)
+    const legendOptions = computed(() => {
+      // Skip if not PromQL
+      if (props.queryType !== "promql") {
+        return [{ label: "All series", value: "__all__" }];
+      }
+
+      const rows = props.data?.rows || [];
+      const uniqueLegends = new Set<string>();
+
+      console.log(
+        "=== [TableRenderer legendOptions] Processing PromQL rows ===",
+      );
+      console.log("Total rows:", rows.length);
+
+      rows.forEach((row: any, index: number) => {
+        if (index < 3) {
+          console.log(`Row ${index}:`, row);
+          console.log(`Row ${index} __legend__:`, row.__legend__);
+        }
+        if (row.__legend__) {
+          uniqueLegends.add(row.__legend__);
+        }
+      });
+
+      const options = [
+        { label: "All series", value: "__all__" },
+        ...Array.from(uniqueLegends).map((legend) => ({
+          label: legend,
+          value: legend,
+        })),
+      ];
+
+      console.log("Unique legends found:", Array.from(uniqueLegends));
+      console.log("Legend Options:", options);
+      console.log("Unique legends count:", uniqueLegends.size);
+      return options;
+    });
+
+    // Count of unique legends (excluding "All series" option)
+    const uniqueLegendCount = computed(() => {
+      return legendOptions.value.length - 1; // Subtract 1 for "All series"
+    });
+
+    // Filter rows based on selected legend (only for PromQL)
+    const filteredRows = computed(() => {
+      const rows = props.data?.rows || [];
+
+      // Skip filtering if not PromQL or "All series" is selected
+      if (props.queryType !== "promql" || selectedLegend.value === "__all__") {
+        return rows;
+      }
+
+      const filtered = rows.filter(
+        (row: any) => row.__legend__ === selectedLegend.value,
+      );
+      console.log(
+        `Filtered to legend "${selectedLegend.value}": ${filtered.length} rows`,
+      );
+      return filtered;
+    });
+
     function wrapCsvValue(val: any, formatFn?: any, row?: any) {
       let formatted = formatFn !== void 0 ? formatFn(val, row) : val;
 
@@ -281,14 +398,14 @@ export default defineComponent({
 
     const copyCellContent = (value: any, rowIndex: number, colName: string) => {
       if (value === null || value === undefined) return;
-      
+
       const textToCopy = String(value);
       copyToClipboard(textToCopy)
         .then(() => {
           // Set copied state
           const key = `${rowIndex}_${colName}`;
           copiedCells.value.set(key, true);
-          
+
           // Reset after 3 seconds
           setTimeout(() => {
             copiedCells.value.delete(key);
@@ -320,6 +437,12 @@ export default defineComponent({
       store,
       copyCellContent,
       isCellCopied,
+      // Legend filtering (only for PromQL)
+      filteredRows,
+      legendOptions,
+      uniqueLegendCount,
+      selectedLegend,
+      queryType: computed(() => props.queryType),
     };
   },
 });
@@ -335,6 +458,11 @@ export default defineComponent({
   right: 0;
   bottom: 0;
   overflow: auto;
+
+  // When legend footer is present, adjust bottom position
+  &.with-legend-footer {
+    bottom: 60px; // Height of legend footer
+  }
 
   :deep(.q-table__top),
   :deep(.q-table__bottom),
@@ -425,6 +553,32 @@ export default defineComponent({
   :deep(tbody tr td.sticky-column) {
     background-color: $dark-page !important;
     box-shadow: 2px 0 5px -2px rgba(0, 0, 0, 0.5);
+  }
+}
+
+// Legend footer styling
+.legend-footer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  z-index: 10;
+  border-top: 2px solid #e0e0e0;
+  background-color: #ffffff;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease-in-out;
+}
+
+// Dark mode support for legend footer
+.table-renderer-container.q-dark,
+.body--dark .table-renderer-container {
+  .legend-footer {
+    background-color: $dark-page !important;
+    border-top-color: rgba(255, 255, 255, 0.12) !important;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.5);
   }
 }
 </style>

@@ -48,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @row-click="onChartClick"
           ref="tableRendererRef"
           :wrap-cells="panelSchema.config?.wrap_table_cells"
+          :query-type="panelSchema.queryType"
         />
         <div
           v-else-if="panelSchema.type == 'html'"

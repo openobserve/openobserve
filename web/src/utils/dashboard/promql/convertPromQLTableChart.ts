@@ -78,9 +78,9 @@ export class TableConverter implements PromQLChartConverter {
     const labelKeys = new Set<string>();
 
     processedData.forEach((queryData, qIndex) => {
-      console.log(`Query ${qIndex} - series count:`, queryData.series?.length);
+      // console.log(`Query ${qIndex} - series count:`, queryData.series?.length);
       queryData.series.forEach((seriesData, sIndex) => {
-        console.log(`Query ${qIndex}, Series ${sIndex} - metric:`, seriesData.metric);
+        // console.log(`Query ${qIndex}, Series ${sIndex} - metric:`, seriesData.metric);
         Object.keys(seriesData.metric).forEach((key) => {
           labelKeys.add(key);
         });
@@ -170,16 +170,18 @@ export class TableConverter implements PromQLChartConverter {
     console.log("processedData length:", processedData.length);
 
     processedData.forEach((queryData, qIndex) => {
-      console.log(`Query ${qIndex} - timestamps length:`, queryData.timestamps?.length);
-      console.log(`Query ${qIndex} - series length:`, queryData.series?.length);
+      // console.log(`Query ${qIndex} - timestamps length:`, queryData.timestamps?.length);
+      // console.log(`Query ${qIndex} - series length:`, queryData.series?.length);
 
       queryData.series.forEach((seriesData, sIndex) => {
-        console.log(`Query ${qIndex}, Series ${sIndex} - values length:`, seriesData.values?.length);
-        console.log(`Query ${qIndex}, Series ${sIndex} - metric:`, seriesData.metric);
+        // console.log(`Query ${qIndex}, Series ${sIndex} - values length:`, seriesData.values?.length);
+        // console.log(`Query ${qIndex}, Series ${sIndex} - metric:`, seriesData.metric);
 
         // Create row with metric labels
         const row: any = {
           ...seriesData.metric,
+          // Add legend name (series name) for filtering
+          __legend__: seriesData.name,
         };
 
         // Calculate each aggregation for the series
