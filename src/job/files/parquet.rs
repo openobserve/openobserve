@@ -1256,7 +1256,7 @@ async fn queue_services_from_parquet(
 
         // Process Arrow batch using Arrow-native method
         let services = processor
-            .process_arrow_batch(&batch, stream_type, &stream_name)
+            .process_arrow_batch(&batch, stream_type, stream_name)
             .await;
 
         // Merge discovered services
