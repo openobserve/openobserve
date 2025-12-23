@@ -3,6 +3,7 @@ import { LoginPage } from '../../pages/generalPages/loginPage';
 import { PipelinesEP } from "../../pages/pipelinesPages/pipelinesEP";
 import { IngestionPage } from '../../pages/generalPages/ingestionPage';
 import { PipelineDestinations } from '../../pages/pipelinesPages/pipelineDestinations';
+const testLogger = require('../utils/test-logger.js');
 
 test.describe.configure({ mode: 'parallel' });
 
@@ -12,7 +13,7 @@ test.use({
   }
 });
 
-test.describe("Pipeline Import", { tag: '@enterprise' }, () => {
+test.describe("Pipeline Import", { tag: ['@enterprise', '@pipelines', '@pipelinesImport'] }, () => {
     let loginPage, pipelinesEP, ingestionPage, pipelineDestinations;
 
     test.beforeEach(async ({ page }) => {

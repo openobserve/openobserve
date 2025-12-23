@@ -1,35 +1,25 @@
 import { test, expect } from '@playwright/test';
 import PageManager from '../../pages/page-manager.js';
+import { LoginPage } from '../../pages/generalPages/loginPage.js';
 import logsdata from '../../../test-data/logs_data.json';
 import { getHeaders, getIngestionUrl, sendRequest } from '../../utils/apiUtils.js';
 const testLogger = require('../utils/test-logger.js');
 
-test.describe('Pipeline Dynamic Stream Names', () => {
-
-
+test.describe('Pipeline Dynamic Stream Names', { tag: ['@all', '@pipelines', '@pipelinesDynamic'] }, () => {
 
   let page;
   let pageManager;
+  let loginPage;
 
   test.beforeAll(async ({ browser }) => {
     page = await browser.newPage();
     pageManager = new PageManager(page);
+    loginPage = new LoginPage(page);
 
-    // Login - happens only once before all tests
-    await page.goto(process.env["ZO_BASE_URL"]);
-    if (await page.getByText('Login as internal user').isVisible()) {
-      await page.getByText('Login as internal user').click();
-    }
-    await page.waitForTimeout(1000);
-    await page
-      .locator('[data-cy="login-user-id"]')
-      .fill(process.env["ZO_ROOT_USER_EMAIL"]);
-    await page
-      .locator('[data-cy="login-password"]')
-      .fill(process.env["ZO_ROOT_USER_PASSWORD"]);
-    await page.locator('[data-cy="login-sign-in"]').click();
-    // Wait for login to complete and page to be ready
-    await page.waitForTimeout(4000);
+    // Login using LoginPage - happens only once before all tests
+    await loginPage.gotoLoginPage();
+    await loginPage.loginAsInternalUser();
+    await loginPage.login();
   });
 
   test.beforeEach(async () => {

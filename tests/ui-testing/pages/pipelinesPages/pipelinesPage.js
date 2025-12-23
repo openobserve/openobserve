@@ -451,12 +451,33 @@ export class PipelinesPage {
         await this.pipelineDestinationsTab.click();
         await this.searchInput.click();
         await this.searchInput.fill(randomNodeName);
-        
+
         const deleteButton = this.page.locator(`[data-test="alert-destination-list-${randomNodeName}-delete-destination"]`);
         await deleteButton.click();
         await this.confirmButton.click();
-        
+
         await expect(this.deletedSuccessfullyText).toBeVisible();
+    }
+
+    /**
+     * Delete an output stream node by hovering and clicking the delete button
+     * Uses the first output stream node found
+     */
+    async deleteOutputStreamNode() {
+        await this.pipelineNodeOutputStreamNode.first().hover();
+        await this.page.waitForTimeout(500);
+        await this.pipelineNodeOutputDeleteBtn.first().click();
+        await this.confirmButton.click();
+    }
+
+    /**
+     * Verify that the output stream node has been deleted
+     * @returns {Promise<boolean>} True if node count is 0
+     */
+    async verifyOutputStreamNodeDeleted() {
+        await this.page.waitForTimeout(1000);
+        const nodeCount = await this.pipelineNodeOutputStreamNode.count();
+        return nodeCount === 0;
     }
 
     async createRemoteDestination(randomNodeName, AuthorizationToken) {
@@ -1074,5 +1095,189 @@ export class PipelinesPage {
             testLogger.error('Failed to create pipeline', { pipelineName, error: error.message });
             return { status: 500, error: error.message };
         }
+    }
+
+    /**
+     * Explore a stream and interact with log details, then navigate to pipeline
+     * @param {string} streamName - Name of the stream to explore
+     */
+    async exploreStreamAndInteractWithLogDetails(streamName) {
+        // Navigate to the streams menu
+        await this.streamsMenuItem.click();
+        await this.page.waitForTimeout(1000);
+
+        // Search for the stream
+        await this.searchStreamInput.click();
+        await this.searchStreamInput.fill(streamName);
+        await this.page.waitForTimeout(1000);
+
+        // Click on the 'Explore' button
+        await this.exploreButton.first().click();
+        await this.page.waitForTimeout(3000);
+
+        await this.page.waitForSelector('[data-test="logs-search-result-table-body"]');
+
+        // Expand the log table menu
+        await this.timestampColumnMenu.click();
+
+        // Navigate to the pipeline menu
+        await this.pipelineMenuLink.click();
+    }
+
+    /**
+     * Cancel pipeline creation and delete the pipeline by name
+     * @param {string} pipelineName - Name of the pipeline to delete
+     * @param {string} searchPrefix - Search prefix for finding the pipeline (default: 'automatepi')
+     */
+    async cancelAndDeletePipeline(pipelineName, searchPrefix = 'automatepi') {
+        // Click the cancel/back button
+        await this.page.locator('[data-test="add-pipeline-cancel-btn"]').click();
+        await this.confirmButton.click();
+        await this.page.waitForTimeout(2000);
+
+        // Search for the pipeline
+        await this.pipelineSearchInput.click();
+        await this.pipelineSearchInput.fill(searchPrefix);
+
+        // Delete the pipeline
+        await this.page.locator(`[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`).click();
+        await this.confirmButton.click();
+    }
+
+    /**
+     * Perform bulk ingestion to multiple streams
+     * @param {string[]} streamNames - Array of stream names to ingest data into
+     * @param {object} data - Data to ingest (JSON array)
+     */
+    async bulkIngestToStreams(streamNames, data) {
+        const orgId = process.env["ORGNAME"];
+        const basicAuthCredentials = Buffer.from(
+            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+        ).toString('base64');
+
+        const headers = {
+            "Authorization": `Basic ${basicAuthCredentials}`,
+            "Content-Type": "application/json",
+        };
+
+        for (const streamName of streamNames) {
+            const response = await this.page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
+                const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(logsdata)
+                });
+                return await fetchResponse.json();
+            }, {
+                url: process.env.INGESTION_URL,
+                headers: headers,
+                orgId: orgId,
+                streamName: streamName,
+                logsdata: data
+            });
+            testLogger.debug('Bulk ingestion response', { streamName, response });
+        }
+    }
+
+    /**
+     * Connect input node directly to output node (for simple source->destination pipelines)
+     */
+    async connectInputToOutput() {
+        await this.page.waitForSelector('[data-test="pipeline-node-input-output-handle"]', { state: 'visible' });
+        await this.page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible' });
+
+        // Ensure no dialogs are blocking
+        await this.page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {});
+
+        await this.pipelineNodeInputOutputHandle.hover({ force: true });
+        await this.page.mouse.down();
+        await this.pipelineNodeOutputInputHandle.hover({ force: true });
+        await this.page.mouse.up();
+        await this.page.waitForTimeout(1000);
+    }
+
+    /**
+     * Connect nodes via a middle node (function or condition)
+     * Creates edges: input -> middle -> output
+     */
+    async connectNodesViaMiddleNode() {
+        await this.page.waitForSelector('[data-test="pipeline-node-input-output-handle"]', { state: 'visible' });
+        await this.page.waitForSelector('[data-test="pipeline-node-default-input-handle"]', { state: 'visible' });
+        await this.page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible' });
+
+        // Ensure no dialogs are blocking
+        await this.page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {});
+
+        // Connect input to middle node
+        await this.pipelineNodeInputOutputHandle.hover({ force: true });
+        await this.page.mouse.down();
+        await this.pipelineNodeDefaultInputHandle.hover({ force: true });
+        await this.page.mouse.up();
+        await this.page.waitForTimeout(500);
+
+        // Connect middle node to output
+        await this.pipelineNodeDefaultOutputHandle.hover({ force: true });
+        await this.page.mouse.down();
+        await this.pipelineNodeOutputInputHandle.hover({ force: true });
+        await this.page.mouse.up();
+        await this.page.waitForTimeout(1000);
+    }
+
+    /**
+     * Fill destination stream name
+     * @param {string} streamName - Name for the destination stream
+     */
+    async fillDestinationStreamName(streamName) {
+        await this.streamNameInput.click();
+        await this.streamNameInput.fill(streamName);
+        await this.page.waitForTimeout(1000);
+    }
+
+    /**
+     * Delete a pipeline by name
+     * @param {string} pipelineName - Name of the pipeline to delete
+     */
+    async deletePipelineByName(pipelineName) {
+        await this.page.waitForTimeout(1000);
+        const deletePipelineButton = this.page.locator(
+            `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
+        );
+        await deletePipelineButton.waitFor({ state: "visible" });
+        await deletePipelineButton.click();
+        await this.confirmDeletePipeline();
+        await this.verifyPipelineDeleted();
+    }
+
+    /**
+     * Fill condition fields for FilterGroup UI
+     * @param {string} columnName - Column name to search for
+     * @param {string} columnOption - The option text to select
+     * @param {string} operator - Operator text (e.g., "Contains")
+     * @param {string} value - Value to filter by
+     */
+    async fillConditionFields(columnName, columnOption, operator, value) {
+        // Fill column select
+        await this.columnSelect.locator('input').click();
+        await this.columnSelect.locator('input').fill(columnName);
+        await this.page.waitForTimeout(500);
+        await this.page.getByRole("option", { name: columnOption }).click();
+
+        // Select operator
+        await this.operatorSelect.click();
+        await this.page.waitForTimeout(300);
+        await this.page.getByText(operator, { exact: true }).click();
+
+        // Fill value input
+        await this.valueInput.locator('input').click();
+        await this.valueInput.locator('input').fill(value);
+    }
+
+    /**
+     * Select a stream option by name
+     * @param {string} streamName - Exact name of the stream option to select
+     */
+    async selectStreamOption(streamName) {
+        await this.page.waitForTimeout(2000);
+        await this.page.getByRole("option", { name: streamName, exact: true }).first().click();
     }
 }
