@@ -295,7 +295,7 @@ color="warning" size="xs"></q-icon> Error while
           @expand-row="expandLog"
           @send-to-ai-chat="sendToAiChat"
           @view-trace="redirectToTraces"
-          @show-correlation="openCorrelationFromLog"
+          @show-correlation="openLogDetailsWithCorrelation"
         />
       </template>
 
@@ -347,6 +347,7 @@ color="warning" size="xs"></q-icon> Error while
           :correlation-props="correlationDashboardProps"
           :correlation-loading="correlationLoading"
           :correlation-error="correlationError"
+          :initial-tab="detailTableInitialTab"
           class="detail-table-dialog"
           :currentIndex="searchObj.meta.resultGrid.navigation.currentRowIndex"
           :totalLength="parseInt(searchObj.data.queryResults.hits.length)"
@@ -734,6 +735,7 @@ export default defineComponent({
     const correlationDashboardProps = ref<any>(null);
     const correlationLoading = ref(false);
     const correlationError = ref<string | null>(null);
+    const detailTableInitialTab = ref<string>("json");
     const { findRelatedTelemetry } = useServiceCorrelation();
 
     // Debug: computed to check why dialog isn't showing
@@ -873,6 +875,7 @@ export default defineComponent({
     const openLogDetails = (props: any, index: number) => {
       searchObj.meta.showDetailTab = true;
       searchObj.meta.resultGrid.navigation.currentRowIndex = index;
+      detailTableInitialTab.value = "json"; // Reset to default tab
 
       // Prepare correlation context (but don't open panel automatically)
       const logData = searchObj.data.queryResults?.hits?.[index];
@@ -882,6 +885,45 @@ export default defineComponent({
           fields: logData,
         };
       }
+    };
+
+    const openLogDetailsWithCorrelation = (row: any) => {
+      console.log("[SearchResult] openLogDetailsWithCorrelation called with row:", row);
+
+      // If sidebar is already open, we already know the index
+      if (searchObj.meta.showDetailTab) {
+        console.log("[SearchResult] Sidebar already open, using current index:", searchObj.meta.resultGrid.navigation.currentRowIndex);
+        // Just set the tab and load correlation data
+        detailTableInitialTab.value = "correlated-logs";
+        openCorrelationFromLog(row);
+        return;
+      }
+
+      // Find the index of this row in the hits array by comparing timestamp
+      const timestampColumn = store.state.zoConfig?.timestamp_column || "_timestamp";
+      const index = searchObj.data.queryResults?.hits?.findIndex(
+        (hit: any) => hit[timestampColumn] === row[timestampColumn]
+      );
+
+      if (index === -1 || index === undefined) {
+        console.error("[SearchResult] Could not find row index for correlation", {
+          rowTimestamp: row[timestampColumn],
+          hitsCount: searchObj.data.queryResults?.hits?.length,
+        });
+        return;
+      }
+
+      console.log("[SearchResult] Found row at index:", index);
+
+      // Set the initial tab to correlated-logs before opening the sidebar
+      detailTableInitialTab.value = "correlated-logs";
+
+      // Open the log details sidebar
+      searchObj.meta.showDetailTab = true;
+      searchObj.meta.resultGrid.navigation.currentRowIndex = index;
+
+      // Load correlation data
+      openCorrelationFromLog(row);
     };
 
     const openCorrelationPanel = () => {
@@ -1433,9 +1475,11 @@ export default defineComponent({
       correlationDashboardProps,
       correlationLoading,
       correlationError,
+      detailTableInitialTab,
       shouldShowInlineDialog,
       openCorrelationPanel,
       openCorrelationFromLog,
+      openLogDetailsWithCorrelation,
     };
   },
   computed: {
