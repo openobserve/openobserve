@@ -199,8 +199,9 @@ describe("TableRenderer", () => {
       wrapper = createWrapper({ wrapCells: true });
 
       expect(wrapper.find(".wrap-enabled").exists()).toBe(true);
-      // Inner copy-cell-content should exist and will receive wrap styles in the UI
-      expect(wrapper.find(".copy-cell-content").exists()).toBe(true);
+      // Verify the table component has the wrapCells prop set
+      const table = wrapper.findComponent({ name: "QTable" });
+      expect(table.props("wrapCells")).toBe(true);
     });
 
     it("should not apply wrap cells class when wrapCells is false", () => {
