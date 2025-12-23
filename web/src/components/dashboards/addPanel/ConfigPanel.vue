@@ -29,7 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         autogrow
         class="showLabelOnTop el-border"
         data-test="dashboard-config-description"
-       hide-bottom-space/>
+        hide-bottom-space
+      />
     </div>
   </div>
   <div v-else style="padding-bottom: 30px">
@@ -43,7 +44,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         autogrow
         class="showLabelOnTop el-border"
         data-test="dashboard-config-description"
-       hide-bottom-space/>
+        hide-bottom-space
+      />
     </div>
 
     <div class="space"></div>
@@ -61,7 +63,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       label-slot
       placeholder="e.g., 30s, 1m, 5m, 1h"
       data-test="dashboard-config-step-value"
-     hide-bottom-space>
+      hide-bottom-space
+    >
       <template v-slot:label>
         <div class="row items-center all-pointer-events">
           {{ t("dashboard.stepValue") }}
@@ -113,7 +116,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.config.trellis?.layout ?? 'None'
         }`"
         :disable="isBreakdownFieldEmpty || hasTimeShifts"
-       hide-bottom-space>
+        hide-bottom-space
+      >
         <template v-slot:label>
           <div class="row items-center all-pointer-events">
             {{ t("dashboard.trellisLayout") }}
@@ -212,7 +216,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-trellis-group-by-y-axis"
           class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
           size="lg"
-          :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-toggle-button-lg-dark'
+              : 'o2-toggle-button-lg-light'
+          "
         />
         <div>
           <q-icon
@@ -227,8 +235,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <br /><br />
               {{ t("dashboard.groupMultiYAxisTrellisTooltipDescription") }}
               <br /><br />
-              <b>{{ t("dashboard.groupMultiYAxisTrellisTooltipEnabled") }}</b> <br /><br />
-              <b>{{ t("dashboard.groupMultiYAxisTrellisTooltipDisabled") }}</b> <br /><br />
+              <b>{{ t("dashboard.groupMultiYAxisTrellisTooltipEnabled") }}</b>
+              <br /><br />
+              <b>{{ t("dashboard.groupMultiYAxisTrellisTooltipDisabled") }}</b>
+              <br /><br />
               <i>{{ t("dashboard.groupMultiYAxisTrellisTooltipExample") }}</i>
               <br />
               {{ t("dashboard.groupMultiYAxisTrellisTooltipEnabledResult") }}
@@ -247,7 +257,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dashboard-config-show-legend"
       class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
       size="lg"
-      :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
+      :class="
+        store.state.theme === 'dark'
+          ? 'o2-toggle-button-lg-dark'
+          : 'o2-toggle-button-lg-light'
+      "
     />
 
     <div class="space"></div>
@@ -259,7 +273,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dashboard-config-wrap-table-cells"
       class="tw-h-[36px] -tw-ml-2 o2-toggle-button-lg"
       size="lg"
-      :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
+      :class="
+        store.state.theme === 'dark'
+          ? 'o2-toggle-button-lg-dark'
+          : 'o2-toggle-button-lg-light'
+      "
     />
 
     <div class="space"></div>
@@ -271,7 +289,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dashboard-config-table_transpose"
       class="tw-h-[36px] -tw-ml-2 o2-toggle-button-lg"
       size="lg"
-      :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
+      :class="
+        store.state.theme === 'dark'
+          ? 'o2-toggle-button-lg-dark'
+          : 'o2-toggle-button-lg-light'
+      "
     />
 
     <div class="space"></div>
@@ -283,7 +305,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dashboard-config-table_dynamic_columns"
       class="tw-h-[36px] -tw-ml-2 o2-toggle-button-lg"
       size="lg"
-      :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
+      :class="
+        store.state.theme === 'dark'
+          ? 'o2-toggle-button-lg-dark'
+          : 'o2-toggle-button-lg-light'
+      "
     />
 
     <div class="space"></div>
@@ -303,7 +329,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.config.legends_position ?? 'Auto'
         }`"
         data-test="dashboard-config-legend-position"
-       hide-bottom-space>
+        hide-bottom-space
+      >
       </q-select>
 
       <div class="space"></div>
@@ -322,7 +349,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.config.legends_type ?? 'Auto'
         }`"
         data-test="dashboard-config-legends-scrollable"
-       hide-bottom-space>
+        hide-bottom-space
+      >
       </q-select>
 
       <div class="space"></div>
@@ -343,7 +371,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :type="'number'"
           placeholder="Auto"
           data-test="dashboard-config-legend-width"
-         hide-bottom-space></q-input>
+          hide-bottom-space
+        ></q-input>
 
         <!-- Legend Height Configuration (for auto/bottom position) -->
         <q-input
@@ -360,7 +389,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :type="'number'"
           placeholder="Auto"
           data-test="dashboard-config-legend-height"
-         hide-bottom-space></q-input>
+          hide-bottom-space
+        ></q-input>
         <!-- dashboardPanelData.data.config.legends_type != 'scroll' -->
         <!-- Unit container for Legend Width (right position) -->
         <div
@@ -455,7 +485,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.config.chart_align ?? 'Auto'
         }`"
         data-test="dashboard-config-chart-align"
-       hide-bottom-space>
+        hide-bottom-space
+      >
       </q-select>
 
       <div class="space"></div>
@@ -491,7 +522,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dense
         label-slot
         data-test="dashboard-config-custom-unit"
-       borderless hide-bottom-space/>
+        borderless
+        hide-bottom-space
+      />
       <div class="space"></div>
       <q-input
         type="number"
@@ -533,7 +566,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         stack-label
         emit-value
         data-test="dashboard-config-map-type"
-       hide-bottom-space>
+        hide-bottom-space
+      >
       </q-select>
 
       <div class="space"></div>
@@ -550,7 +584,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         emit-value
         :display-value="'OpenStreetMap'"
         data-test="dashboard-config-basemap"
-       hide-bottom-space>
+        hide-bottom-space
+      >
       </q-select>
 
       <div class="space"></div>
@@ -567,14 +602,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('dashboard.latitudeLabel')"
             color="input-border"
             bg-color="input-bg"
-            class="col-6 q-py-md showLabelOnTop"
+            class="col q-mr-sm q-py-md showLabelOnTop"
             stack-label
             borderless
             dense
             label-slot
             :type="'number'"
             data-test="dashboard-config-latitude"
-           hide-bottom-space>
+            hide-bottom-space
+          >
           </q-input>
           <q-input
             v-model.number="dashboardPanelData.data.config.map_view.lng"
@@ -585,14 +621,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('dashboard.longitudeLabel')"
             color="input-border"
             bg-color="input-bg"
-            class="col-6 q-py-md showLabelOnTop"
+            class="col q-mr-sm q-py-md showLabelOnTop"
             stack-label
             borderless
             dense
             label-slot
             :type="'number'"
             data-test="dashboard-config-longitude"
-           hide-bottom-space>
+            hide-bottom-space
+          >
           </q-input>
         </div>
         <q-input
@@ -609,7 +646,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           label-slot
           :type="'number'"
           data-test="dashboard-config-zoom"
-         hide-bottom-space>
+          hide-bottom-space
+        >
         </q-input>
 
         <!-- symbol size -->
@@ -624,7 +662,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           emit-value
           :display-value="`${dashboardPanelData.data.config.map_symbol_style.size}`"
           data-test="dashboard-config-symbol"
-         hide-bottom-space>
+          hide-bottom-space
+        >
         </q-select>
 
         <div class="space"></div>
@@ -657,7 +696,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :type="'number'"
             data-test="dashboard-config-map-symbol-min"
             :min="0"
-           hide-bottom-space>
+            hide-bottom-space
+          >
           </q-input>
 
           <q-input
@@ -687,7 +727,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :type="'number'"
             data-test="dashboard-config-map-symbol-max"
             :min="0"
-           hide-bottom-space>
+            hide-bottom-space
+          >
           </q-input>
         </div>
         <q-input
@@ -715,7 +756,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           label-slot
           :type="'number'"
           data-test="dashboard-config-map-symbol-fixed"
-         hide-bottom-space>
+          hide-bottom-space
+        >
         </q-input>
       </div>
 
@@ -780,7 +822,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="q-py-sm showLabelOnTop"
         stack-label
         borderless
-
         dense
         label-slot
         placeholder="0"
@@ -835,7 +876,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="q-py-sm showLabelOnTop"
         stack-label
         borderless
-
         dense
         label-slot
         placeholder="ALL"
@@ -898,7 +938,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
           size="lg"
-          :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-toggle-button-lg-dark'
+              : 'o2-toggle-button-lg-light'
+          "
         />
 
         <q-icon
@@ -978,8 +1022,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('dashboard.connectNullValues')"
         data-test="dashboard-config-connect-null-values"
         class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
-      size="lg"
-      :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
+        size="lg"
+        :class="
+          store.state.theme === 'dark'
+            ? 'o2-toggle-button-lg-dark'
+            : 'o2-toggle-button-lg-light'
+        "
       />
 
       <div class="space"></div>
@@ -1000,7 +1048,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         label-slot
         placeholder="-"
         data-test="dashboard-config-no-value-replacement"
-         borderless hide-bottom-space><template v-slot:label>
+        borderless
+        hide-bottom-space
+        ><template v-slot:label>
           <div class="row items-center all-pointer-events">
             {{ t("dashboard.noValueReplacement") }}
             <div>
@@ -1043,7 +1093,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ].config.layer_type
         }`"
         data-test="dashboard-config-layer-type"
-       hide-bottom-space>
+        hide-bottom-space
+      >
       </q-select>
 
       <div class="space"></div>
@@ -1075,7 +1126,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         label-slot
         :type="'number'"
         data-test="dashboard-config-weight"
-       hide-bottom-space>
+        hide-bottom-space
+      >
       </q-input>
 
       <q-input
@@ -1098,14 +1150,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="q-py-md showLabelOnTop"
         stack-label
         borderless
-
         dense
         label-slot
         :type="'number'"
         data-test="dashboard-config-gauge-min"
       >
         <template v-slot:label>
-          <div class="row items-center all-pointer-events">{{ t("dashboard.gaugeMinValue") }}</div>
+          <div class="row items-center all-pointer-events">
+            {{ t("dashboard.gaugeMinValue") }}
+          </div>
         </template>
       </q-input>
       <q-input
@@ -1128,7 +1181,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="q-py-md showLabelOnTop"
         stack-label
         borderless
-
         dense
         label-slot
         placeholder="100"
@@ -1136,7 +1188,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-config-gauge-max"
       >
         <template v-slot:label>
-          <div class="row items-center all-pointer-events">{{ t("dashboard.gaugeMaxValue") }}</div>
+          <div class="row items-center all-pointer-events">
+            {{ t("dashboard.gaugeMaxValue") }}
+          </div>
         </template>
       </q-input>
 
@@ -1188,8 +1242,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('dashboard.showBorder')"
         data-test="dashboard-config-axis-border"
         class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
-      size="lg"
-      :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
+        size="lg"
+        :class="
+          store.state.theme === 'dark'
+            ? 'o2-toggle-button-lg-dark'
+            : 'o2-toggle-button-lg-light'
+        "
       />
 
       <div class="space"></div>
@@ -1339,7 +1397,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-config-show-gridlines"
         class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
         size="lg"
-        :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
+        :class="
+          store.state.theme === 'dark'
+            ? 'o2-toggle-button-lg-dark'
+            : 'o2-toggle-button-lg-light'
+        "
       />
 
       <div class="space"></div>
@@ -1482,7 +1544,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="q-py-sm showLabelOnTop"
         stack-label
         borderless
-
         dense
         label-slot
         :placeholder="t('dashboard.lineThicknessDefault')"

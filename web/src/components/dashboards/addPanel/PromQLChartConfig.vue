@@ -60,20 +60,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- GeoMap Label Configuration -->
     <div v-if="chartType === 'geomap'" class="geomap-config">
-      <div class="q-mb-sm text-subtitle2">GeoMap Configuration</div>
-
       <q-input
         v-model="geoLatLabel"
         :label="t('dashboard.geoLatLabel')"
         placeholder="latitude or lat"
         borderless
         dense
-        class="q-py-sm showLabelOnTop"
+        class="tw-mb-3 showLabelOnTop"
         stack-label
         data-test="dashboard-config-geo-lat-label"
       >
         <template v-slot:label>
-          <div class="row items-center all-pointer-events">
+          <div class="row items-center all-pointer-events tw-mb-[-5px]">
             {{ t("dashboard.geoLatLabel") }}
             <q-icon class="q-ml-xs" size="20px" name="info" />
             <q-tooltip class="bg-grey-8" max-width="250px">
@@ -90,12 +88,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         placeholder="longitude or lon"
         borderless
         dense
-        class="q-py-sm showLabelOnTop"
+        class="tw-mb-3 showLabelOnTop"
         stack-label
         data-test="dashboard-config-geo-lon-label"
       >
         <template v-slot:label>
-          <div class="row items-center all-pointer-events">
+          <div class="row items-center all-pointer-events tw-mb-[-5px]">
             {{ t("dashboard.geoLonLabel") }}
             <q-icon class="q-ml-xs" size="20px" name="info" />
             <q-tooltip class="bg-grey-8" max-width="250px">
@@ -112,12 +110,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         placeholder="weight"
         borderless
         dense
-        class="q-py-sm showLabelOnTop"
+        class="tw-mb-3 showLabelOnTop"
         stack-label
         data-test="dashboard-config-geo-weight-label"
       >
         <template v-slot:label>
-          <div class="row items-center all-pointer-events">
+          <div class="row items-center all-pointer-events tw-mb-[-5px]">
             {{ t("dashboard.geoWeightLabel") }}
             <q-icon class="q-ml-xs" size="20px" name="info" />
             <q-tooltip class="bg-grey-8" max-width="250px">
@@ -135,12 +133,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         placeholder="10"
         borderless
         dense
-        class="q-py-sm showLabelOnTop"
+        class="tw-mb-3 showLabelOnTop"
         stack-label
         data-test="dashboard-config-geo-symbol-size"
       >
         <template v-slot:label>
-          <div class="row items-center all-pointer-events">
+          <div class="row items-center all-pointer-events tw-mb-[-5px]">
             {{ t("dashboard.geoSymbolSize") }}
           </div>
         </template>
@@ -156,8 +154,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Maps Label Configuration -->
     <div v-if="chartType === 'maps'" class="maps-config">
-      <div class="q-mb-sm text-subtitle2">Maps Configuration</div>
-
       <q-input
         v-model="mapsNameLabel"
         :label="t('dashboard.mapsNameLabel')"
@@ -169,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-config-maps-name-label"
       >
         <template v-slot:label>
-          <div class="row items-center all-pointer-events">
+          <div class="row items-center all-pointer-events tw-mb-[-5px]">
             {{ t("dashboard.mapsNameLabel") }}
             <q-icon class="q-ml-xs" size="20px" name="info" />
             <q-tooltip class="bg-grey-8" max-width="300px">
@@ -182,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-select
         v-model="mapsMapType"
-        :options="['world', 'USA', 'China']"
+        :options="['world']"
         :label="t('dashboard.mapsMapType')"
         borderless
         dense
@@ -191,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-config-maps-type"
       >
         <template v-slot:label>
-          <div class="row items-center all-pointer-events">
+          <div class="row items-center all-pointer-events tw-mb-[-5px]">
             {{ t("dashboard.mapsMapType") }}
             <q-icon class="q-ml-xs" size="20px" name="info" />
             <q-tooltip class="bg-grey-8" max-width="250px">
@@ -232,13 +228,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <b>PromQL Table Mode - </b>
               Controls how time-series data is displayed in the table.
               <br /><br />
-              <b>Time Series:</b> Shows timestamp and value columns for selected series with legend dropdown.
-              <br /><br />
-              <b>Time Series with Metadata:</b> Shows timestamp, value, and all metric labels (job, instance, etc.) for selected series with legend dropdown.
-              <br /><br />
-              <b>Aggregate:</b> Shows aggregated values across all series without timestamps (no legend dropdown).
-              <br /><br />
-              <b>Note:</b> The legend dropdown only appears in time series modes when multiple series are present.
+              <b>Time Series:</b> Shows timestamp and value columns for selected
+              series with legend dropdown. <br /><br />
+              <b>Time Series with Metadata:</b> Shows timestamp, value, and all
+              metric labels (job, instance, etc.) for selected series with
+              legend dropdown. <br /><br />
+              <b>Aggregate:</b> Shows aggregated values across all series
+              without timestamps (no legend dropdown). <br /><br />
+              <b>Note:</b> The legend dropdown only appears in time series modes
+              when multiple series are present.
             </q-tooltip>
           </div>
         </template>
@@ -251,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           multiple
           borderless
           dense
-          class="q-py-md showLabelOnTop"
+          class="showLabelOnTop"
           stack-label
           emit-value
           map-options
@@ -276,14 +274,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
-            <q-item v-bind="itemProps">
-              <q-item-section side>
+            <q-item v-bind="itemProps" dense style="padding: 0px 4px">
+              <q-item-section side class="q-pa-none">
                 <q-checkbox
                   :model-value="selected"
                   @update:model-value="toggleOption(opt)"
                 />
               </q-item-section>
-              <q-item-section>
+              <q-item-section class="q-pa-none">
                 <q-item-label>{{ opt.label }}</q-item-label>
               </q-item-section>
             </q-item>
@@ -292,7 +290,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- Column Filters -->
-      <template v-if="promqlTableMode === 'all' || promqlTableMode === 'single_with_metadata'">
+      <template
+        v-if="
+          promqlTableMode === 'all' ||
+          promqlTableMode === 'single_with_metadata'
+        "
+      >
         <div class="q-mb-sm text-subtitle2 q-mt-md">Column Filters</div>
 
         <q-select
@@ -307,13 +310,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @new-value="createColumnValue"
           borderless
           dense
-          class="q-py-sm showLabelOnTop"
+          class="showLabelOnTop"
           stack-label
           data-test="dashboard-config-visible-columns"
           :display-value="getVisibleColumnsDisplay"
         >
           <template v-slot:label>
-            <div class="row items-center all-pointer-events">
+            <div class="row items-center all-pointer-events tw-mb-[-5px]">
               {{ t("dashboard.visibleColumns") }}
               <q-icon class="q-ml-xs" size="18px" name="info">
                 <q-tooltip class="bg-grey-8" max-width="400px">
@@ -333,14 +336,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
-            <q-item v-bind="itemProps">
-              <q-item-section side>
+            <q-item
+              v-bind="itemProps"
+              dense
+              style="min-height: auto; padding: 0px 4px"
+            >
+              <q-item-section side class="q-pa-none">
                 <q-checkbox
                   :model-value="selected"
                   @update:model-value="toggleOption(opt)"
                 />
               </q-item-section>
-              <q-item-section>
+              <q-item-section class="q-pa-none">
                 <q-item-label>{{ opt }}</q-item-label>
               </q-item-section>
             </q-item>
@@ -359,13 +366,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @new-value="createColumnValue"
           borderless
           dense
-          class="q-py-sm showLabelOnTop"
+          class="showLabelOnTop"
           stack-label
           data-test="dashboard-config-hidden-columns"
           :display-value="getHiddenColumnsDisplay"
         >
           <template v-slot:label>
-            <div class="row items-center all-pointer-events">
+            <div class="row items-center all-pointer-events tw-mb-[-5px]">
               {{ t("dashboard.hiddenColumns") }}
               <q-icon class="q-ml-xs" size="18px" name="info">
                 <q-tooltip class="bg-grey-8" max-width="400px">
@@ -385,14 +392,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
-            <q-item v-bind="itemProps">
-              <q-item-section side>
+            <q-item
+              v-bind="itemProps"
+              dense
+              style="min-height: auto; padding: 0px 4px"
+            >
+              <q-item-section side class="q-pa-none">
                 <q-checkbox
                   :model-value="selected"
                   @update:model-value="toggleOption(opt)"
                 />
               </q-item-section>
-              <q-item-section>
+              <q-item-section class="q-pa-none">
                 <q-item-label>{{ opt }}</q-item-label>
               </q-item-section>
             </q-item>
@@ -401,16 +412,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- Sticky Columns -->
-      <template v-if="promqlTableMode === 'all' || promqlTableMode === 'single_with_metadata'">
+      <template
+        v-if="
+          promqlTableMode === 'all' ||
+          promqlTableMode === 'single_with_metadata'
+        "
+      >
         <div class="q-mb-sm text-subtitle2 q-mt-md">Sticky Columns</div>
 
         <q-toggle
           v-model="stickyFirstColumn"
-          class="q-py-sm"
           data-test="dashboard-config-sticky-first-column"
         >
           <template v-slot:default>
-            <div class="row items-center all-pointer-events">
+            <div class="row items-center all-pointer-events tw-mb-[-5px]">
               {{ t("dashboard.stickyFirstColumn") }}
               <q-icon class="q-ml-xs" size="20px" name="info" />
               <q-tooltip class="bg-grey-8" max-width="300px">
@@ -436,7 +451,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @new-value="createColumnValue"
           borderless
           dense
-          class="q-py-sm showLabelOnTop"
+          class="showLabelOnTop"
           stack-label
           data-test="dashboard-config-sticky-columns"
           :disable="stickyFirstColumn"
@@ -463,14 +478,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
-            <q-item v-bind="itemProps">
-              <q-item-section side>
+            <q-item
+              v-bind="itemProps"
+              dense
+              style="min-height: auto; padding: 0px 4px"
+            >
+              <q-item-section side class="q-pa-none">
                 <q-checkbox
                   :model-value="selected"
                   @update:model-value="toggleOption(opt)"
                 />
               </q-item-section>
-              <q-item-section>
+              <q-item-section class="q-pa-none">
                 <q-item-label>{{ opt }}</q-item-label>
               </q-item-section>
             </q-item>
@@ -512,12 +531,7 @@ export default defineComponent({
     ];
 
     // Chart types that support aggregation
-    const chartsWithAggregation = [
-      "pie",
-      "donut",
-      "geomap",
-      "maps",
-    ];
+    const chartsWithAggregation = ["pie", "donut", "geomap", "maps"];
 
     const showAggregationConfig = computed(() =>
       chartsWithAggregation.includes(props.chartType),
@@ -607,7 +621,10 @@ export default defineComponent({
     });
 
     const mapsMapType = computed({
-      get: () => dashboardPanelData.data.config?.map_type || "world",
+      get: () => {
+        const val = dashboardPanelData.data.config?.map_type;
+        return typeof val === "string" ? val : "world";
+      },
       set: (value: string) => {
         if (!dashboardPanelData.data.config) {
           dashboardPanelData.data.config = {};
@@ -651,7 +668,7 @@ export default defineComponent({
     // Options for PromQL table mode
     const promqlTableModeOptions = [
       { label: "Time Series", value: "single" },
-      { label: "Time Series with Metadata", value: "single_with_metadata" },
+      { label: "TimeSeries with Metadata", value: "single_with_metadata" },
       { label: "Aggregate", value: "all" },
     ];
 
@@ -913,8 +930,8 @@ export default defineComponent({
   .geomap-config,
   .maps-config,
   .table-config {
-    padding: 16px 0;
-    border-top: 1px solid rgba(0, 0, 0, 0.12);
+    padding: 0px 0;
+    // border: 1px solid rgba(0, 0, 0, 0.12);
   }
 
   // Fix icon cropping in labels
