@@ -407,35 +407,31 @@ pub async fn get_api_token(
         // Verify requester has permission to view tokens
         #[cfg(feature = "enterprise")]
         {
-            use o2_openfga::{
-                authorizer::authz::is_allowed, config::get_config as get_openfga_config,
-            };
+            use crate::common::utils::auth::check_permissions;
 
-            if get_openfga_config().enabled {
-                // Check if requester has permission to view this service account's tokens
-                // We check for "GET" permission on the service account resource
-                let has_permission = is_allowed(
-                    config::META_ORG_ID,
+            // Check if requester has permission to view this service account's tokens
+            // We check for "GET" permission on the service account resource
+            let has_permission = check_permissions(
+                Some(user_id.to_string()),
+                config::META_ORG_ID,
+                requester_email,
+                "service_accounts",
+                "GET",
+                "",
+            )
+            .await;
+
+            if !has_permission {
+                log::warn!(
+                    "Unauthorized multi-token access attempt | requester={} | target_sa={} | org={}",
                     requester_email,
-                    "GET",
-                    &format!("service_account:{}", user_id),
-                    "",
-                    "", // Role will be determined by OpenFGA
-                )
-                .await;
-
-                if !has_permission {
-                    log::warn!(
-                        "Unauthorized multi-token access attempt | requester={} | target_sa={} | org={}",
-                        requester_email,
-                        user_id,
-                        org
-                    );
-                    return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                        http::StatusCode::FORBIDDEN,
-                        "Insufficient permissions to view tokens",
-                    )));
-                }
+                    user_id,
+                    org
+                );
+                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                    http::StatusCode::FORBIDDEN,
+                    "Insufficient permissions to view tokens",
+                )));
             }
         }
 
