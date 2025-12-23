@@ -54,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :sql-query="generatedSqlQuery"
               :group="inputData.conditions"
               :depth="0"
+              module="alerts"
               @add-condition="updateGroup"
               @add-group="updateGroup"
               @remove-group="removeConditionGroup"

@@ -1008,12 +1008,15 @@ export default defineComponent({
 
     const updateStreamFields = async (stream_name: any) => {
       let streamCols: any = [];
+
+      // Fetch stream details including schema and settings
       const streams: any = await getStream(
         stream_name,
         formData.value.stream_type,
         true,
       );
 
+      // Map all schema fields to column objects with label, value, and type
       if (streams && Array.isArray(streams.schema)) {
         streamCols = streams.schema.map((column: any) => ({
           label: column.name,
@@ -1022,6 +1025,37 @@ export default defineComponent({
         }));
       }
 
+      // Check if User Defined Schema (UDS) fields are configured
+      // If defined_schema_fields exists and is not empty, we should filter to show only those fields
+      if (
+        streams?.settings?.defined_schema_fields &&
+        Array.isArray(streams.settings.defined_schema_fields) &&
+        streams.settings.defined_schema_fields.length > 0
+      ) {
+        const definedFields = streams.settings.defined_schema_fields;
+
+        // get timestamp and all fields 
+        // why we need this because we need to show timestamp and all fields in defined schema fields 
+        // we dont get them in defined_schema_fields so if they are present in schema then we should keep them as it is
+        const timestampColumn = store.state.zoConfig?.timestamp_column || '_timestamp';
+        const allFieldsName = store.state.zoConfig?.all_fields_name;
+
+        // Filter the columns to include:
+        // 1.(timestamp and all_fields) (_timestamp , _all) --> this will be varied depending upon the env variables
+        // 2. User-defined schema fields - only the fields user explicitly configured as UDS
+        streamCols = streamCols.filter((col: any) => {
+          // Always include timestamp column (e.g., '_timestamp')
+          // Always include all fields column (e.g., '_all')
+          if (col.value === timestampColumn || col.value === allFieldsName) {
+            return true;
+          }
+          // Include field only if it's in the defined_schema_fields list
+          return definedFields.includes(col.value);
+        });
+      }
+      // If defined_schema_fields is not present or empty, show all schema fields (default behavior)
+
+      // Store the filtered/unfiltered columns for use in the component
       originalStreamFields.value = [...streamCols];
       filteredColumns.value = [...streamCols];
 
@@ -1377,6 +1411,127 @@ export default defineComponent({
         getParser,
       };
       return validateSqlQueryUtil(formData.value, validationContext);
+    };
+
+    /**
+     * Validates that all condition fields are in the available filtered fields when UDS is configured
+     * This ensures users only create conditions using fields that are part of the defined schema
+     *
+     * Note: We skip validation for "sql" and "promql" query types as users write custom queries there
+     * We use the already filtered originalStreamFields instead of fetching stream again for efficiency
+     *
+     * @returns {{ isValid: boolean, invalidFields: string[] }} Validation result with invalid fields list
+     */
+    const validateConditionsAgainstUDS = () => {
+      // Skip validation if no stream is selected or no fields are available
+      if (
+        !formData.value.stream_name ||
+        !formData.value.stream_type ||
+        !originalStreamFields.value ||
+        originalStreamFields.value.length === 0
+      ) {
+        return { isValid: true, invalidFields: [] };
+      }
+
+      // For scheduled alerts: Skip validation if query type is "sql" or "promql" - users write custom queries there
+      // For real-time alerts: Always validate since they use the conditions UI
+      const isRealTime = formData.value.is_real_time === "true" || formData.value.is_real_time === true;
+      const isScheduled = !isRealTime;
+      const queryType = formData.value.query_condition?.type;
+
+      if (isScheduled && (queryType === "sql" || queryType === "promql")) {
+        return { isValid: true, invalidFields: [] };
+      }
+
+      // Use the already filtered fields from originalStreamFields
+      // These are already filtered by UDS in updateStreamFields function
+      const allowedFieldNames = new Set(
+        originalStreamFields.value.map((field: any) => field.value)
+      );
+
+
+
+      // Recursively collect all column names used in conditions
+      const invalidFields: string[] = [];
+
+      const checkConditionFields = (condition: any) => {
+        if (!condition) return;
+
+        // V2: If it's a condition group (has conditions array with filterType: "group")
+        if (condition.filterType === "group" && condition.conditions && Array.isArray(condition.conditions)) {
+          condition.conditions.forEach((item: any) => {
+            checkConditionFields(item);
+          });
+        }
+        // V1: If it's a condition group (has items array)
+        else if (condition.items && Array.isArray(condition.items)) {
+          condition.items.forEach((item: any) => {
+            checkConditionFields(item);
+          });
+        }
+        // If it's a single condition (has column property)
+        else if (condition.column) {
+          // Check if the column is in the allowed fields
+          // Skip empty columns
+          if (condition.column && condition.column !== "" && !allowedFieldNames.has(condition.column)) {
+            // Add to invalid fields if not already present
+            if (!invalidFields.includes(condition.column)) {
+              invalidFields.push(condition.column);
+            }
+          }
+        }
+      };
+
+      // Check conditions based on alert type
+      if (isRealTime) {
+        // Real-time alerts: Always check conditions since they use the conditions UI
+        if (formData.value.query_condition?.conditions) {
+          checkConditionFields(formData.value.query_condition.conditions);
+        }
+      } else {
+        // Scheduled alerts: Only check if query type is "custom"
+        if (
+          formData.value.query_condition?.conditions &&
+          queryType === "custom"
+        ) {
+          checkConditionFields(formData.value.query_condition.conditions);
+        }
+
+        // Also check aggregation having clause if present (for scheduled alerts with custom query type)
+        if (
+          isAggregationEnabled.value &&
+          queryType === "custom" &&
+          formData.value.query_condition?.aggregation?.having?.column
+        ) {
+          const havingColumn = formData.value.query_condition.aggregation.having.column;
+          if (havingColumn && havingColumn !== "" && !allowedFieldNames.has(havingColumn)) {
+            if (!invalidFields.includes(havingColumn)) {
+              invalidFields.push(havingColumn);
+            }
+          }
+        }
+
+        // Also check group_by fields if present (for scheduled alerts with custom query type)
+        if (
+          isAggregationEnabled.value &&
+          queryType === "custom" &&
+          formData.value.query_condition?.aggregation?.group_by &&
+          Array.isArray(formData.value.query_condition.aggregation.group_by)
+        ) {
+          formData.value.query_condition.aggregation.group_by.forEach((field: string) => {
+            if (field && field !== "" && !allowedFieldNames.has(field)) {
+              if (!invalidFields.includes(field)) {
+                invalidFields.push(field);
+              }
+            }
+          });
+        }
+      }
+
+      return {
+        isValid: invalidFields.length === 0,
+        invalidFields
+      };
     };
 
     const updateFunctionVisibility = () => {
@@ -1976,6 +2131,7 @@ export default defineComponent({
       showVrlFunction,
       validateSqlQuery,
       validateSqlQueryPromise,
+      validateConditionsAgainstUDS,
       isValidResourceName,
       sqlQueryErrorMsg,
       vrlFunctionError,
@@ -2279,6 +2435,37 @@ export default defineComponent({
 
         this.formData.tz_offset = convertedDateTime.offset;
       }
+              // Validate that conditions use only available fields (respects UDS filtering if configured)
+        // Only validates "custom" query type - skips "sql" and "promql" as users write custom queries
+        const udsValidation = this.validateConditionsAgainstUDS();
+        if (!udsValidation.isValid) {
+          const invalidCount = udsValidation.invalidFields.length;
+          let message = '';
+
+          if (invalidCount === 1) {
+            // Single field - show the field name
+            message = `Field "${udsValidation.invalidFields[0]}" is not available. Please use only the available fields in your conditions.`;
+          } else if (invalidCount <= 3) {
+            // 2-3 fields - show all field names
+            message = `Fields ${udsValidation.invalidFields.map((f: string) => `"${f}"`).join(', ')} are not available. Please use only the available fields in your conditions.`;
+          } else {
+            // More than 3 fields - show count and first few fields
+            const firstThree = udsValidation.invalidFields.slice(0, 3).map((f: string) => `"${f}"`).join(', ');
+            const remaining = invalidCount - 3;
+            message = `${invalidCount} fields are not available (${firstThree} and ${remaining} more). Please use only the available fields in your conditions.`;
+          }
+
+          this.q.notify({
+            type: "negative",
+            message: message,
+            timeout: 6000,
+          });
+
+          // Navigate back to step 2 (Query) where fields can be corrected
+          this.wizardStep = 2;
+
+          return false;
+        }
 
       const payload = this.getAlertPayload();
 

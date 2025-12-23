@@ -33,6 +33,7 @@ import {
   calculateBottomLegendHeight,
   calculateRightLegendWidth,
 } from "./legendConfiguration";
+import { convertPromQLChartData } from "./promql/convertPromQLChartData";
 
 let moment: any;
 let momentInitialized = false;
@@ -81,6 +82,7 @@ export const convertPromQLData = async (
   annotations: any,
   metadata: any = null,
 ) => {
+
   // console.time("convertPromQLData");
 
   // Set gridlines visibility based on config.show_gridlines (default: true)
@@ -100,6 +102,53 @@ export const convertPromQLData = async (
     // console.timeEnd("convertPromQLData");
     return { options: null };
   }
+
+  // ========== NEW MODULAR CHART SYSTEM ==========
+  // Delegate to new modular converter for newly supported chart types
+  const NEW_CHART_TYPES = [
+    "pie",
+    "donut",
+    "table",
+    "heatmap",
+    "h-bar",
+    "stacked",
+    "h-stacked",
+    "geomap",
+    "maps",
+  ];
+
+  if (NEW_CHART_TYPES.includes(panelSchema.type)) {
+
+    try {
+      const result = await convertPromQLChartData(searchQueryData, {
+        panelSchema,
+        store,
+        chartPanelRef,
+        hoveredSeriesState,
+        annotations,
+        metadata,
+      });
+
+      // Apply annotations if present (only for ECharts-based charts)
+      if (annotations && annotations.length > 0 && panelSchema.type !== "table") {
+        const annotationResults = await getAnnotationsData(
+          annotations,
+          store,
+          panelSchema,
+        );
+        if (annotationResults && result.options) {
+          result.options.annotations = annotationResults;
+        }
+      }
+      return result;
+    } catch (error) {
+      console.error(`Error converting ${panelSchema.type} chart:`, error);
+      console.error("Error stack:", error);
+      // Fall back to legacy system if new system fails
+      console.warn(`Falling back to legacy converter for ${panelSchema.type}`);
+    }
+  }
+  // ========== END NEW MODULAR CHART SYSTEM ==========
 
   // Initialize extras object
   let extras: any = {};

@@ -40,16 +40,25 @@ const mockDashboardPanelData = {
         ]
       }
     }],
-    type: "line"
+    type: "line",
+    queryType: "sql" // Default to SQL mode
   },
   layout: {
     currentQueryIndex: 0
+  },
+  meta: {
+    streamFields: {
+      groupedFields: []
+    }
   }
 };
 
+const mockPromqlMode = { value: false };
+
 vi.mock("@/composables/useDashboardPanel", () => ({
   default: vi.fn(() => ({
-    dashboardPanelData: mockDashboardPanelData
+    dashboardPanelData: mockDashboardPanelData,
+    promqlMode: mockPromqlMode
   }))
 }));
 
@@ -62,9 +71,11 @@ describe("OverrideConfig", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     store.state.theme = 'light';
     mockDashboardPanelData.data.config.override_config = [];
+    mockDashboardPanelData.data.queryType = 'sql';
+    mockPromqlMode.value = false;
     mockDashboardPanelData.data.queries[0].fields = {
       x: [
         { alias: "timestamp", label: "Timestamp" },
@@ -74,6 +85,11 @@ describe("OverrideConfig", () => {
         { alias: "count", label: "Count" },
         { alias: "duration", label: "Duration" }
       ]
+    };
+    mockDashboardPanelData.meta = {
+      streamFields: {
+        groupedFields: []
+      }
     };
   });
 

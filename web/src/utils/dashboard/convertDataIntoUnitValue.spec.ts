@@ -1222,7 +1222,6 @@ describe("Dashboard Data Conversion Utils", () => {
       };
       const errors = [];
       validatePanel(panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
-      expect(errors).toContain("Selected chart type is not supported for PromQL. Only line chart is supported.");
       expect(errors).toContain("X-Axis is not supported for PromQL. Remove anything added to the X-Axis.");
     });
 

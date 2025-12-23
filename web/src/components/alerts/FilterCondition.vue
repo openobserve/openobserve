@@ -55,7 +55,10 @@
             class="tw-mb-2"
             @filter="filterColumns"
             behavior="menu"
-            :rules="[(val: any) => !!val || 'Field is required!']"
+            :rules="[
+              (val: any) => !!val || 'Field is required!',
+              validateColumnField
+            ]"
             :class="inputWidth ? inputWidth : ''"
             @update:model-value="emits('input:update', 'conditions', condition)"
             :new-value-mode="props.allowCustomColumns ? 'add-unique' : undefined"
@@ -153,6 +156,12 @@
         default: false,
         required: false,
     },
+    module: {
+        type: String,
+        default: 'alerts',
+        required: false,
+        validator: (value: string) => ['alerts', 'pipelines'].includes(value),
+    },
     });
 
 import { ref, computed } from "vue";
@@ -235,6 +244,24 @@ const filterColumns = (val: string, update: Function) => {
       (column: any) => column.value.toLowerCase().indexOf(value) > -1
     );
   });
+};
+
+// Validation rule for column field - checks if field exists in dropdown (only for alerts)
+const validateColumnField = (val: any) => {
+  // Skip validation if field is empty (required validation handles this)
+  if (!val || val === '') return true;
+
+  // Skip validation for pipelines module (they can use custom fields)
+  if (props.module === 'pipelines') return true;
+
+  // For alerts module: check if the selected field exists in the available streamFields
+  const fieldExists = props.streamFields.some((field: any) => field.value === val);
+
+  if (!fieldExists) {
+    return 'Field doesn\'t exist.';
+  }
+
+  return true;
 };
   </script>
 
