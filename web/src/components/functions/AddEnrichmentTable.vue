@@ -96,33 +96,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-file>
 
             <!-- URL Display for Update Mode (for URL-based tables) -->
-            <div v-if="isUpdating && formData.source === 'url'" class="col-12">
-              <q-input
-                v-model="formData.url"
-                :label="t('function.enrichmentTableURL')"
-                color="input-border"
-                bg-color="input-bg"
-                class="q-py-md showLabelOnTop text-grey-8 text-bold"
-                stack-label
-                outlined
-                filled
-                dense
-                readonly
-                disable
-                :hint="t('function.urlCannotBeModified')"
-              >
-                <template v-slot:prepend>
-                  <q-icon name="link" />
-                </template>
-              </q-input>
-
-              <div class="q-mt-md text-grey-7 text-caption">
-                Note: URL-based enrichment tables cannot be edited. To update the data, delete this table and create a new one with the updated URL.
-              </div>
-            </div>
-
-            <!-- From URL Option (only for new tables) -->
-            <div v-if="!isUpdating && formData.source === 'url'" class="col-12">
+            <!-- From URL Option (for both new and edit mode) -->
+            <div v-if="formData.source === 'url'" class="col-12">
               <q-input
                 v-model="formData.url"
                 label="CSV File URL"
@@ -166,15 +141,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               v-close-popup
               class="q-mr-md o2-secondary-button tw-h-[36px]"
-              :label="isUpdating && formData.source === 'url' ? t('function.close') : t('function.cancel')"
+              :label="t('function.cancel')"
               no-caps
               flat
               :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
               @click="$emit('cancel:hideform')"
             />
-            <!-- Hide save button for URL-based tables in edit mode -->
             <q-btn
-              v-if="!(isUpdating && formData.source === 'url')"
               class="o2-primary-button no-border tw-h-[36px]"
               :label="t('function.save')"
               type="submit"

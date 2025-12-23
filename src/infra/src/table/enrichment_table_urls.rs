@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, entity::prelude::*};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set, entity::prelude::*};
 use serde::{Deserialize, Serialize};
 
 use super::get_lock;
@@ -183,23 +183,25 @@ pub async fn list_by_org(org: &str) -> Result<Vec<EnrichmentTableUrlRecord>, err
 
 /// Atomically claims stale jobs that are stuck in Processing status
 ///
-/// This function is used for stale job recovery in distributed deployments (PostgreSQL/MySQL).
-/// It uses database-level atomic operations to ensure only ONE ingester claims each stale job.
+/// This function is used for stale job recovery in both single-node (SQLite) and distributed
+/// deployments (PostgreSQL/MySQL). The implementation varies by database backend.
 ///
-/// # Important: SQLite is NOT supported
+/// # How it works
 ///
-/// This function returns an error if called with SQLite backend. SQLite is only used in
-/// single-node deployments where there's only one ingester, so distributed job claiming
-/// is not needed.
+/// ## SQLite (single-node)
+/// 1. Uses `get_lock()` for process-level synchronization
+/// 2. Finds up to `limit` stale jobs using Sea-ORM queries
+/// 3. Updates each job to Pending status sequentially
+/// 4. Returns the updated jobs
 ///
-/// # How it works (PostgreSQL/MySQL only)
+/// Since SQLite is single-node, only one ingester exists, so no distributed coordination needed.
 ///
-/// 1. Finds jobs in Processing status where updated_at < stale_threshold
-/// 2. Selects up to `limit` jobs (LIMIT N)
-/// 3. Atomically updates their status to Pending and updated_at to now
-/// 4. Returns the claimed jobs (or empty vec if no stale jobs exist)
+/// ## PostgreSQL/MySQL (distributed)
+/// 1. Uses database-level atomic UPDATE with subquery
+/// 2. Only ONE ingester successfully claims each job (database ensures atomicity)
+/// 3. Returns the claimed jobs via RETURNING (PostgreSQL) or separate SELECT (MySQL)
 ///
-/// The SELECT and UPDATE happen atomically, so only one ingester succeeds per job.
+/// Multiple ingesters can run this simultaneously - database ensures proper distribution.
 ///
 /// # Arguments
 /// * `stale_threshold_timestamp` - Jobs with updated_at older than this are considered stale (in
@@ -220,17 +222,35 @@ pub async fn claim_stale_jobs(
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let backend = client.get_database_backend();
-
-    // SQLite doesn't need distributed job claiming - only one ingester in single-node mode
-    if backend == sea_orm::DatabaseBackend::Sqlite {
-        return Err(errors::Error::Message(
-            "Stale job claiming is not supported for SQLite backend. SQLite is single-node only."
-                .to_string(),
-        ));
-    }
-
     let _lock = get_lock().await;
     let now = chrono::Utc::now().timestamp_micros();
+
+    // For SQLite (single-node), use simple Sea-ORM API since get_lock() provides sufficient protection
+    if backend == sea_orm::DatabaseBackend::Sqlite {
+        // Find stale jobs
+        let stale_jobs: Vec<Model> = Entity::find()
+            .filter(Column::Status.eq(processing_status))
+            .filter(Column::UpdatedAt.lt(stale_threshold_timestamp))
+            .limit(limit as u64)
+            .all(client)
+            .await?;
+
+        if stale_jobs.is_empty() {
+            return Ok(vec![]);
+        }
+
+        // Update them to Pending status
+        let mut updated_jobs: Vec<EnrichmentTableUrlRecord> = Vec::new();
+        for job in stale_jobs {
+            let mut active: ActiveModel = job.into();
+            active.status = Set(pending_status);
+            active.updated_at = Set(now);
+            let updated: Model = active.update(client).await?;
+            updated_jobs.push(updated.into());
+        }
+
+        return Ok(updated_jobs);
+    }
 
     // Use raw SQL for atomic claim operation
     let sql = match backend {
