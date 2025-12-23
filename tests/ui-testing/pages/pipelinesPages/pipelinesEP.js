@@ -27,6 +27,7 @@ export class PipelinesEP {
         this.pipelineExportPipelineButton = (name) => `[data-test="pipeline-list-${name}-export-pipeline"]`;
         this.pipelineDeleteButton = '[data-test="pipeline-list-re1-delete-pipeline"]';
         this.confirmButton = '[data-test="confirm-button"]';
+        this.fileInput = page.locator('input[type="file"]');
     }
 
     async gotoPipelinesPageEP() {
@@ -100,6 +101,10 @@ export class PipelinesEP {
         await this.page.locator(this.importCancelButton).click();
         await this.page.locator(this.pipelineListTitle).waitFor({ state: 'visible' });
         await expect(this.page.locator(this.pipelineListTitle)).toContainText('Pipelines');
+    }
+
+    async setFileInput(filePath) {
+        await this.fileInput.setInputFiles(filePath);
     }
 
     async importPipelineJson(url) {

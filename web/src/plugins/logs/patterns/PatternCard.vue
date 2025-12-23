@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Pattern Column -->
     <div class="tw-flex-1 tw-min-w-0 tw-px-2">
       <div
-        class="tw-truncate o2-monospace-font"
+        class="tw-truncate pattern-template-text"
         :class="store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8'"
         :data-test="`pattern-card-${index}-template`"
         :title="pattern.template"
@@ -126,4 +126,9 @@ const { t } = useI18n();
 
 <style scoped lang="scss">
 @import "@/styles/logs/search-result.scss";
+
+.pattern-template-text {
+  font-family: monospace;
+  font-size: 12px;
+}
 </style>
