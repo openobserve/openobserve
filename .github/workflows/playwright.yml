@@ -152,14 +152,14 @@ jobs:
                 "logsqueries.matchall.spec.js",
                 "searchpartition.spec.js",
               ]
-          # - testfolder: "Alerts"
-          #   browser: "chrome"
-          #   run_files:
-          #     [
-          #       "alerts-e2e-flow.spec.js",
-          #       "alerts-ui-operations.spec.js",
-          #       "alerts-import.spec.js",
-          #     ]
+          - testfolder: "Alerts"
+            browser: "chrome"
+            run_files:
+              [
+                "alerts-e2e-flow.spec.js",
+                "alerts-ui-operations.spec.js",
+                "alerts-import.spec.js",
+              ]
           - testfolder: "Dashboards-Core"
             browser: "chrome"
             run_files:
