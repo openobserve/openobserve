@@ -460,6 +460,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
             </q-tab>
+
+            <!-- New Telemetry Tabs -->
+            <q-tab
+              name="logs"
+              icon="description"
+              :label="t('common.logs')"
+            />
+            <q-tab
+              name="metrics"
+              icon="bar_chart"
+              :label="t('search.metrics')"
+            />
+            <q-tab
+              name="traces"
+              icon="timeline"
+              :label="t('menu.traces')"
+            />
           </q-tabs>
 
           <!-- Action buttons -->
@@ -598,6 +615,219 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-list>
           </div>
         </div>
+
+        <!-- Logs Tab Content -->
+        <div v-if="activeTab === 'logs'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
+          <!-- Refresh Button (shown when data is loaded) -->
+          <div v-if="hasCorrelatedData && !correlationLoading" class="tw-px-4 tw-py-2 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-between">
+            <span class="tw-text-xs tw-text-gray-500">Showing correlated logs from incident timeframe</span>
+            <q-btn
+              flat
+              dense
+              size="sm"
+              icon="refresh"
+              color="primary"
+              @click="refreshCorrelation"
+              :disable="correlationLoading"
+            >
+              <q-tooltip>Refresh correlated data</q-tooltip>
+            </q-btn>
+          </div>
+
+          <!-- Loading State -->
+          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-py-20">
+            <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
+            <div class="tw-text-base">Loading correlated logs...</div>
+          </div>
+
+          <!-- Error State -->
+          <div v-else-if="correlationError" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-p-4">
+            <q-icon name="error_outline" size="3rem" color="negative" class="tw-mb-4" />
+            <div class="tw-text-base tw-mb-2">Failed to load correlated logs</div>
+            <div class="tw-text-sm tw-text-gray-500 tw-mb-4">{{ correlationError }}</div>
+            <q-btn
+              color="primary"
+              outline
+              size="sm"
+              @click="refreshCorrelation"
+              icon="refresh"
+              label="Retry"
+            />
+          </div>
+
+          <!-- No Data State -->
+          <div v-else-if="!hasCorrelatedData || !hasAnyStreams" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-p-4">
+            <q-icon name="info_outline" size="3rem" color="grey-5" class="tw-mb-4" />
+            <div class="tw-text-base tw-mb-4">No correlated logs found</div>
+            <div v-if="incidentDetails" class="tw-text-sm tw-text-gray-500 tw-mb-4">
+              Try searching manually using these dimensions:
+            </div>
+            <div v-if="incidentDetails" class="info-box tw-rounded tw-p-3 tw-text-xs" :class="isDarkMode ? 'info-box-dark' : 'info-box-light'">
+              <div v-for="(value, key) in incidentDetails.stable_dimensions" :key="key" class="tw-flex tw-gap-2 tw-mb-1">
+                <span class="label-text">{{ key }}:</span>
+                <span class="tw-font-mono">{{ value }}</span>
+                <q-btn flat dense size="xs" icon="content_copy" @click="$q.notify({ message: 'Copied!', type: 'positive' })" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Success State - TelemetryCorrelationDashboard -->
+          <div v-else-if="hasCorrelatedData && correlationData" class="tw-flex-1 tw-overflow-hidden">
+            <TelemetryCorrelationDashboard
+              mode="embedded-tabs"
+              :externalActiveTab="'logs'"
+              :serviceName="correlationData.serviceName"
+              :matchedDimensions="correlationData.matchedDimensions"
+              :additionalDimensions="correlationData.additionalDimensions"
+              :logStreams="correlationData.logStreams"
+              :metricStreams="correlationData.metricStreams"
+              :traceStreams="correlationData.traceStreams"
+              :timeRange="telemetryTimeRange"
+            />
+          </div>
+        </div>
+
+        <!-- Metrics Tab Content -->
+        <div v-if="activeTab === 'metrics'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
+          <!-- Refresh Button (shown when data is loaded) -->
+          <div v-if="hasCorrelatedData && !correlationLoading" class="tw-px-4 tw-py-2 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-between">
+            <span class="tw-text-xs tw-text-gray-500">Showing correlated metrics from incident timeframe</span>
+            <q-btn
+              flat
+              dense
+              size="sm"
+              icon="refresh"
+              color="primary"
+              @click="refreshCorrelation"
+              :disable="correlationLoading"
+            >
+              <q-tooltip>Refresh correlated data</q-tooltip>
+            </q-btn>
+          </div>
+
+          <!-- Loading State -->
+          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-py-20">
+            <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
+            <div class="tw-text-base">Loading correlated metrics...</div>
+          </div>
+
+          <!-- Error State -->
+          <div v-else-if="correlationError" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-p-4">
+            <q-icon name="error_outline" size="3rem" color="negative" class="tw-mb-4" />
+            <div class="tw-text-base tw-mb-2">Failed to load correlated metrics</div>
+            <div class="tw-text-sm tw-text-gray-500 tw-mb-4">{{ correlationError }}</div>
+            <q-btn
+              color="primary"
+              outline
+              size="sm"
+              @click="refreshCorrelation"
+              icon="refresh"
+              label="Retry"
+            />
+          </div>
+
+          <!-- No Data State -->
+          <div v-else-if="!hasCorrelatedData || !hasAnyStreams" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-p-4">
+            <q-icon name="info_outline" size="3rem" color="grey-5" class="tw-mb-4" />
+            <div class="tw-text-base tw-mb-4">No correlated metrics found</div>
+            <div v-if="incidentDetails" class="tw-text-sm tw-text-gray-500 tw-mb-4">
+              Try searching manually using these dimensions:
+            </div>
+            <div v-if="incidentDetails" class="info-box tw-rounded tw-p-3 tw-text-xs" :class="isDarkMode ? 'info-box-dark' : 'info-box-light'">
+              <div v-for="(value, key) in incidentDetails.stable_dimensions" :key="key" class="tw-flex tw-gap-2 tw-mb-1">
+                <span class="label-text">{{ key }}:</span>
+                <span class="tw-font-mono">{{ value }}</span>
+                <q-btn flat dense size="xs" icon="content_copy" @click="$q.notify({ message: 'Copied!', type: 'positive' })" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Success State - TelemetryCorrelationDashboard -->
+          <div v-else-if="hasCorrelatedData && correlationData" class="tw-flex-1 tw-overflow-hidden">
+            <TelemetryCorrelationDashboard
+              mode="embedded-tabs"
+              :externalActiveTab="'metrics'"
+              :serviceName="correlationData.serviceName"
+              :matchedDimensions="correlationData.matchedDimensions"
+              :additionalDimensions="correlationData.additionalDimensions"
+              :logStreams="correlationData.logStreams"
+              :metricStreams="correlationData.metricStreams"
+              :traceStreams="correlationData.traceStreams"
+              :timeRange="telemetryTimeRange"
+            />
+          </div>
+        </div>
+
+        <!-- Traces Tab Content -->
+        <div v-if="activeTab === 'traces'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
+          <!-- Refresh Button (shown when data is loaded) -->
+          <div v-if="hasCorrelatedData && !correlationLoading" class="tw-px-4 tw-py-2 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-between">
+            <span class="tw-text-xs tw-text-gray-500">Showing correlated traces from incident timeframe</span>
+            <q-btn
+              flat
+              dense
+              size="sm"
+              icon="refresh"
+              color="primary"
+              @click="refreshCorrelation"
+              :disable="correlationLoading"
+            >
+              <q-tooltip>Refresh correlated data</q-tooltip>
+            </q-btn>
+          </div>
+
+          <!-- Loading State -->
+          <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-py-20">
+            <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
+            <div class="tw-text-base">Loading correlated traces...</div>
+          </div>
+
+          <!-- Error State -->
+          <div v-else-if="correlationError" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-p-4">
+            <q-icon name="error_outline" size="3rem" color="negative" class="tw-mb-4" />
+            <div class="tw-text-base tw-mb-2">Failed to load correlated traces</div>
+            <div class="tw-text-sm tw-text-gray-500 tw-mb-4">{{ correlationError }}</div>
+            <q-btn
+              color="primary"
+              outline
+              size="sm"
+              @click="refreshCorrelation"
+              icon="refresh"
+              label="Retry"
+            />
+          </div>
+
+          <!-- No Data State -->
+          <div v-else-if="!hasCorrelatedData || !hasAnyStreams" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-p-4">
+            <q-icon name="info_outline" size="3rem" color="grey-5" class="tw-mb-4" />
+            <div class="tw-text-base tw-mb-4">No correlated traces found</div>
+            <div v-if="incidentDetails" class="tw-text-sm tw-text-gray-500 tw-mb-4">
+              Try searching manually using these dimensions:
+            </div>
+            <div v-if="incidentDetails" class="info-box tw-rounded tw-p-3 tw-text-xs" :class="isDarkMode ? 'info-box-dark' : 'info-box-light'">
+              <div v-for="(value, key) in incidentDetails.stable_dimensions" :key="key" class="tw-flex tw-gap-2 tw-mb-1">
+                <span class="label-text">{{ key }}:</span>
+                <span class="tw-font-mono">{{ value }}</span>
+                <q-btn flat dense size="xs" icon="content_copy" @click="$q.notify({ message: 'Copied!', type: 'positive' })" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Success State - TelemetryCorrelationDashboard -->
+          <div v-else-if="hasCorrelatedData && correlationData" class="tw-flex-1 tw-overflow-hidden">
+            <TelemetryCorrelationDashboard
+              mode="embedded-tabs"
+              :externalActiveTab="'traces'"
+              :serviceName="correlationData.serviceName"
+              :matchedDimensions="correlationData.matchedDimensions"
+              :additionalDimensions="correlationData.additionalDimensions"
+              :logStreams="correlationData.logStreams"
+              :metricStreams="correlationData.metricStreams"
+              :traceStreams="correlationData.traceStreams"
+              :timeRange="telemetryTimeRange"
+            />
+          </div>
+        </div>
         </div>
       </div>
     </div>
@@ -616,13 +846,22 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { date } from "quasar";
-import incidentsService, { Incident, IncidentWithAlerts, IncidentAlert } from "@/services/incidents";
+import incidentsService, {
+  Incident,
+  IncidentWithAlerts,
+  IncidentAlert,
+  IncidentCorrelatedStreams,
+} from "@/services/incidents";
 import { getImageURL } from "@/utils/zincutils";
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 
 export default defineComponent({
   name: "IncidentDetailDrawer",
+  components: {
+    TelemetryCorrelationDashboard,
+  },
   props: {
     incident: {
       type: Object as PropType<Incident | null>,
@@ -659,6 +898,11 @@ export default defineComponent({
     const expandedSections = ref<Record<string, boolean>>({});
     const tocRenderKey = ref(0);
 
+    // Telemetry correlation state
+    const correlationData = ref<IncidentCorrelatedStreams | null>(null);
+    const correlationLoading = ref(false);
+    const correlationError = ref<string | null>(null);
+
     // Computed to check if analysis already exists
     const hasExistingRca = computed(() => {
       return !!incidentDetails.value?.topology_context?.suggested_root_cause;
@@ -667,6 +911,74 @@ export default defineComponent({
     // Check if dark mode is active
     const isDarkMode = computed(() => {
       return store.state.theme === "dark";
+    });
+
+    // Fetch correlated telemetry streams
+    const fetchCorrelatedStreams = async (force: boolean = false) => {
+      if (!incidentDetails.value) return;
+
+      // Skip if already loaded and not forcing refresh
+      if (!force && correlationData.value) return;
+
+      correlationLoading.value = true;
+      correlationError.value = null;
+
+      try {
+        const org = store.state.selectedOrganization.identifier;
+        correlationData.value = await incidentsService.getCorrelatedStreams(
+          org,
+          incidentDetails.value
+        );
+      } catch (error: any) {
+        console.error("Failed to load correlated streams:", error);
+        correlationError.value =
+          error?.response?.data?.message ||
+          error?.message ||
+          "Failed to load correlated telemetry";
+      } finally {
+        correlationLoading.value = false;
+      }
+    };
+
+    // Refresh correlation data
+    const refreshCorrelation = () => {
+      fetchCorrelatedStreams(true);
+    };
+
+    // Lazy load correlation when user clicks telemetry tab for the first time
+    watch(activeTab, (newTab) => {
+      if (
+        (newTab === "logs" || newTab === "metrics" || newTab === "traces") &&
+        !correlationData.value &&
+        !correlationLoading.value &&
+        !correlationError.value
+      ) {
+        fetchCorrelatedStreams();
+      }
+    });
+
+    // Computed properties for TelemetryCorrelationDashboard
+    const telemetryTimeRange = computed(() => {
+      if (!incidentDetails.value) {
+        return { startTime: 0, endTime: 0 };
+      }
+      return {
+        startTime: incidentDetails.value.first_alert_at,
+        endTime: incidentDetails.value.last_alert_at,
+      };
+    });
+
+    const hasCorrelatedData = computed(() => {
+      return !!correlationData.value;
+    });
+
+    const hasAnyStreams = computed(() => {
+      if (!correlationData.value) return false;
+      return (
+        correlationData.value.logStreams.length > 0 ||
+        correlationData.value.metricStreams.length > 0 ||
+        correlationData.value.traceStreams.length > 0
+      );
     });
 
     // Computed property for formatted RCA content
@@ -684,6 +996,11 @@ export default defineComponent({
 
     const loadDetails = async (incidentId: string) => {
       loading.value = true;
+
+      // Reset correlation state when loading new incident
+      correlationData.value = null;
+      correlationError.value = null;
+
       try {
         const org = store.state.selectedOrganization.identifier;
         const response = await incidentsService.get(org, incidentId);
@@ -702,17 +1019,23 @@ export default defineComponent({
     };
 
     watch(
-      () => router.currentRoute.value.query.incident_id,
-      (incidentIdFromUrl) => {
-        // Only use URL incident_id - don't rely on props
-        if (incidentIdFromUrl) {
-          loadDetails(incidentIdFromUrl as string);
+      () => props.incident,
+      (incident) => {
+        if (incident) {
+          loadDetails(incident.id);
+        } else {
+          // Clear correlation data when drawer closes
+          correlationData.value = null;
+          correlationError.value = null;
         }
       },
       { immediate: true }
     );
 
     const close = () => {
+      // Clear correlation data when closing
+      correlationData.value = null;
+      correlationError.value = null;
       emit("close");
     };
 
@@ -1305,6 +1628,13 @@ export default defineComponent({
       expandedSections,
       tocRenderKey,
       formattedRcaContent,
+      correlationData,
+      correlationLoading,
+      correlationError,
+      hasCorrelatedData,
+      hasAnyStreams,
+      telemetryTimeRange,
+      refreshCorrelation,
       close,
       acknowledgeIncident,
       resolveIncident,
