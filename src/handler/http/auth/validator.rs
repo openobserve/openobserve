@@ -244,7 +244,8 @@ pub async fn validate_credentials(
     let user = user.unwrap();
 
     // Check token authentication first (before native login restrictions)
-    // This allows service accounts and all users to use API tokens regardless of native login settings
+    // This allows service accounts and all users to use API tokens regardless of native login
+    // settings
     if user.role.eq(&UserRole::ServiceAccount) && user.token.eq(&user_password) {
         return Ok(TokenValidationResponse {
             is_valid: true,
