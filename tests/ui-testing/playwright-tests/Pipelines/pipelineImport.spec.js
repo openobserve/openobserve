@@ -3,7 +3,6 @@ import { LoginPage } from '../../pages/generalPages/loginPage';
 import { PipelinesEP } from "../../pages/pipelinesPages/pipelinesEP";
 import { IngestionPage } from '../../pages/generalPages/ingestionPage';
 import { PipelineDestinations } from '../../pages/pipelinesPages/pipelineDestinations';
-const testLogger = require('../utils/test-logger.js');
 
 test.describe.configure({ mode: 'parallel' });
 
