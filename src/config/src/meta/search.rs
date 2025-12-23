@@ -962,7 +962,7 @@ impl<'de> Deserialize<'de> for SearchEventType {
             }
         }
 
-        deserializer.deserialize_identifier(FieldVisitor)
+        deserializer.deserialize_any(FieldVisitor)
     }
 }
 

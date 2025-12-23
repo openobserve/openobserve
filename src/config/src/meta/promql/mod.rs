@@ -49,6 +49,27 @@ where
             }
         }
 
+        fn visit_none<E>(self) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Vec::new())
+        }
+
+        fn visit_unit<E>(self) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Vec::new())
+        }
+
+        fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            deserializer.deserialize_any(self)
+        }
+
         fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
         where
             A: SeqAccess<'de>,
@@ -61,7 +82,7 @@ where
         }
     }
 
-    deserializer.deserialize_any(StringOrVec)
+    deserializer.deserialize_option(StringOrVec)
 }
 
 pub mod grpc;
@@ -198,9 +219,17 @@ pub struct RequestRangeQuery {
     pub use_streaming: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub search_type: Option<SearchEventType>,
-    #[serde(default, deserialize_with = "deserialize_string_or_vec")]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        deserialize_with = "deserialize_string_or_vec"
+    )]
     pub regions: Vec<String>, // default query all regions, local: only query local region clusters
-    #[serde(default, deserialize_with = "deserialize_string_or_vec")]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        deserialize_with = "deserialize_string_or_vec"
+    )]
     pub clusters: Vec<String>, // default query all clusters, local: only query local cluster
 }
 
