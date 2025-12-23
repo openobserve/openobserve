@@ -398,35 +398,60 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     pendingUpdateGroupedFields = false;
 
     try {
-      const currentStream =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream;
-      if (!currentStream) return;
+      // For PromQL queries, collect streams from ALL queries
+      if (dashboardPanelData.data.queryType === "promql") {
+        const allStreams = new Set<string>();
 
-      // Collect streams (main + joins)
-      const joinsStreams = [
-        { stream: currentStream, streamAlias: undefined },
-        ...(dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].joins?.filter((stream: any) => stream?.stream) ?? []),
-      ];
+        // Iterate through all queries to collect unique streams
+        dashboardPanelData.data.queries?.forEach((query: any) => {
+          if (query?.fields?.stream) {
+            allStreams.add(query.fields.stream);
+          }
+        });
 
-      // Fetch stream fields
-      const groupedFields = await Promise.all(
-        joinsStreams.map(async (stream: any) => {
-          const streamData = await loadStreamFields(stream?.stream);
-          return {
-            ...streamData,
-            stream_alias: stream?.streamAlias,
-          };
-        }),
-      );
+        if (allStreams.size === 0) return;
 
-      // Filter out any invalid entries (streams with no name)
-      dashboardPanelData.meta.streamFields.groupedFields = groupedFields.filter(
-        (field: any) => field?.name,
-      );
+        // Fetch stream fields for all unique streams
+        const groupedFields = await Promise.all(
+          Array.from(allStreams).map(async (streamName) => {
+            const streamData = await loadStreamFields(streamName);
+            return streamData;
+          }),
+        );
+
+        // Filter out any invalid entries (streams with no name)
+        dashboardPanelData.meta.streamFields.groupedFields =
+          groupedFields.filter((field: any) => field?.name);
+      } else {
+        const currentStream =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream;
+        if (!currentStream) return;
+
+        // Collect streams (main + joins)
+        const joinsStreams = [
+          { stream: currentStream, streamAlias: undefined },
+          ...(dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].joins?.filter((stream: any) => stream?.stream) ?? []),
+        ];
+
+        // Fetch stream fields
+        const groupedFields = await Promise.all(
+          joinsStreams.map(async (stream: any) => {
+            const streamData = await loadStreamFields(stream?.stream);
+            return {
+              ...streamData,
+              stream_alias: stream?.streamAlias,
+            };
+          }),
+        );
+
+        // Filter out any invalid entries (streams with no name)
+        dashboardPanelData.meta.streamFields.groupedFields =
+          groupedFields.filter((field: any) => field?.name);
+      }
     } finally {
       isUpdatingGroupedFields = false;
       // If there was a pending update request, run it now
@@ -2999,7 +3024,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         });
 
         // Save to shared meta
-        dashboardPanelData.meta.promql.availableLabels = Array.from(labelSet).sort();
+        dashboardPanelData.meta.promql.availableLabels =
+          Array.from(labelSet).sort();
 
         // Convert Sets to sorted arrays and store in the map
         const newLabelValuesMap = new Map<string, string[]>();

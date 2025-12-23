@@ -655,40 +655,60 @@ export default defineComponent({
       { label: "Aggregate", value: "all" },
     ];
 
-    // Get available column options from stream fields
+    // Get available column options from stream fields across ALL queries
     const availableColumnOptions = computed(() => {
-      // Get fields from groupedFields based on current query's stream
-      // This is the same data source used for the Label config in ConfigPanel.vue
-      const currentQuery =
-        dashboardPanelData.data.queries?.[
-          dashboardPanelData.layout?.currentQueryIndex ?? 0
-        ];
-      const currentStream = currentQuery?.fields?.stream;
+      // For PromQL, we need to combine fields from ALL queries since it supports multi-query
+      const queries = dashboardPanelData.data.queries || [];
+      const allFieldNames = new Set<string>();
 
-      if (
-        !currentStream ||
-        !dashboardPanelData.meta?.streamFields?.groupedFields
-      ) {
+      console.log("[PromQL Config] Total queries:", queries.length);
+
+      if (!dashboardPanelData.meta?.streamFields?.groupedFields) {
+        console.log("[PromQL Config] No groupedFields available");
         return [];
       }
 
-      // Find the current stream in groupedFields
-      const streamFields =
-        dashboardPanelData.meta.streamFields.groupedFields.find(
-          (group: any) => group.name === currentStream,
-        );
+      console.log("[PromQL Config] Available streams in groupedFields:",
+        dashboardPanelData.meta.streamFields.groupedFields.map((g: any) => g.name));
 
-      if (!streamFields?.schema) {
-        return [];
-      }
+      // Iterate through ALL queries and collect unique field names
+      queries.forEach((query: any, index: number) => {
+        console.log(`[PromQL Config] Query ${index} full object:`, query);
+        const streamName = query?.fields?.stream;
+        console.log(`[PromQL Config] Query ${index} stream:`, streamName);
+        console.log(`[PromQL Config] Query ${index} fields object:`, query?.fields);
 
-      // Extract field names from schema
-      const fieldNames = streamFields.schema
-        .map((field: any) => field.name)
-        .filter(Boolean);
+        if (!streamName) {
+          console.log(`[PromQL Config] Query ${index} skipped - no stream name`);
+          return;
+        }
 
-      // Return unique field names
-      return Array.from(new Set(fieldNames)) as string[];
+        // Find the stream in groupedFields
+        const streamFields =
+          dashboardPanelData.meta.streamFields.groupedFields.find(
+            (group: any) => group.name === streamName,
+          );
+
+        console.log(`[PromQL Config] Query ${index} found streamFields:`, streamFields ? 'YES' : 'NO');
+
+        if (streamFields?.schema) {
+          // Extract field names from schema and add to set (automatically removes duplicates)
+          const fieldNames = streamFields.schema
+            .map((field: any) => field.name)
+            .filter(Boolean);
+
+          console.log(`[PromQL Config] Query ${index} fields count: ${fieldNames.length}`, fieldNames);
+          fieldNames.forEach((name: string) => allFieldNames.add(name));
+        } else {
+          console.log(`[PromQL Config] Query ${index} has no schema`);
+        }
+      });
+
+      const result = Array.from(allFieldNames).sort();
+      console.log("[PromQL Config] Combined unique fields:", result);
+
+      // Return unique field names as array
+      return result;
     });
 
     // Filtered options for each multiselect (for search/autocomplete)
