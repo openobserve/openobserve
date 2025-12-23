@@ -17,7 +17,7 @@
 //!
 //! Correlates fired alerts into unified incidents to reduce alert fatigue.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use config::{
     meta::alerts::{alert::Alert, deduplication::GlobalDeduplicationConfig},
@@ -445,7 +445,17 @@ pub async fn get_service_graph(
 
     // Get stable dimensions
     let stable_dimensions: HashMap<String, String> =
-        serde_json::from_value(incident.stable_dimensions).unwrap_or_default();
+        match serde_json::from_value(incident.stable_dimensions) {
+            Ok(map) => map,
+            Err(e) => {
+                log::warn!(
+                    "Failed to parse stable_dimensions JSON for incident {}: {}",
+                    incident_id,
+                    e
+                );
+                HashMap::new()
+            }
+        };
 
     // Get primary service from stable_dimensions
     let incident_service = stable_dimensions
@@ -500,7 +510,7 @@ pub async fn get_service_graph(
 
     let mut nodes = Vec::new();
     let mut edges = Vec::new();
-    let mut all_services: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut all_services: HashSet<String> = HashSet::new();
 
     // Add primary service
     all_services.insert(incident_service.clone());
