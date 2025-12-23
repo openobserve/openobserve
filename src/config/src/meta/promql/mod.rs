@@ -49,27 +49,6 @@ where
             }
         }
 
-        fn visit_none<E>(self) -> Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            Ok(Vec::new())
-        }
-
-        fn visit_unit<E>(self) -> Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            Ok(Vec::new())
-        }
-
-        fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-        where
-            D: Deserializer<'de>,
-        {
-            deserializer.deserialize_any(self)
-        }
-
         fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
         where
             A: SeqAccess<'de>,
@@ -82,7 +61,7 @@ where
         }
     }
 
-    deserializer.deserialize_option(StringOrVec)
+    deserializer.deserialize_any(StringOrVec)
 }
 
 pub mod grpc;
