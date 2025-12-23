@@ -2017,7 +2017,13 @@
     "confirmRefreshMsg": "¿Está seguro de que desea actualizar este token de cuenta de servicio?",
     "confirmRefreshHead": "Actualizar token de servicio",
     "downloadToken": "Descargar Token",
-    "token": "Símbolo"
+    "token": "Símbolo",
+    "viewAllTokens": "Ver todos los tokens",
+    "viewAndCopyTokens": "Ver y copiar fichas",
+    "copyAllTokens": "Copiar todos los tokens",
+    "downloadAllTokens": "Descargar todos los tokens",
+    "serviceAccountToken": "Token de cuenta de servicio",
+    "serviceAccountTokensAllOrgs": "Tokens de cuentas de servicio (todas las organizaciones)"
   },
   "pipeline_destinations": {
     "header": "Destinos de oleoductos",
