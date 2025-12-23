@@ -94,12 +94,13 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
     await pageManager.pipelinesPage.selectAndDragFunction();
     await pageManager.pipelinesPage.toggleCreateFunction();
     await pageManager.pipelinesPage.enterFunctionName(randomFunctionName);
-    await page.locator('[data-test="logs-vrl-function-editor"]').locator('.monaco-editor').click();
-    await page.keyboard.type(".a=41", { delay: 100 });
+    // Type function code in VRL editor using page object methods
+    await pageManager.pipelinesPage.clickVrlEditorMonaco();
+    await pageManager.pipelinesPage.typeVrlCode(".a=41", 100);
     await page.keyboard.press("Enter");
-    await page.keyboard.type(".", { delay: 100 });
-    await page.getByText("Note: The function will be").click();
-    await page.getByText(".a=41 .");
+    await pageManager.pipelinesPage.typeVrlCode(".", 100);
+    await pageManager.pipelinesPage.clickNoteText();
+    await pageManager.pipelinesPage.verifyVrlEditorHasText(".a=41 .");
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.saveNewFunction();
     await page.waitForTimeout(3000);

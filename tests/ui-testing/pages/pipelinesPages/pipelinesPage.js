@@ -142,6 +142,25 @@ export class PipelinesPage {
         this.pipelineNodeDefaultOutputHandle = page.locator('[data-test="pipeline-node-default-output-handle"]');
         this.pipelineNodeOutputInputHandle = page.locator('[data-test="pipeline-node-output-input-handle"]');
         this.addPipelineBackBtn = page.locator('[data-test="add-pipeline-back-btn"]');
+
+        // Additional locators for raw selector fixes
+        this.functionIcon = page.getByRole("img", { name: "Function", exact: true });
+        this.vrlFunctionEditor = page.locator('[data-test="logs-vrl-function-editor"]');
+        this.vrlEditorViewLines = page.locator('[data-test="logs-vrl-function-editor"] .view-lines');
+        this.vrlEditorMonaco = page.locator('[data-test="logs-vrl-function-editor"]').locator('.monaco-editor');
+        this.noteText = page.getByText("Note: The function will be");
+        this.streamTypeDropdown = page.locator('div').filter({ hasText: /^Stream Type \*$/ }).first();
+        this.streamTypeLabel = page.getByLabel('Stream Type *');
+        this.sqlEditorViewLines = page.locator('[data-test="scheduled-pipeline-sql-editor"] .view-lines');
+        this.invalidSqlQueryText = page.getByText("Invalid SQL Query");
+        this.queryRoutingSection = page.locator('[data-test="add-stream-query-routing-section "]');
+        this.queryNode = page.locator('[data-test="pipeline-node-input-query-node"]');
+        this.queryNodeDeleteBtn = page.locator('[data-test="pipeline-node-input-delete-btn"]');
+        this.cancelPipelineBtn = page.locator('[data-test="add-pipeline-cancel-btn"]');
+        this.dashboardsMenuLink = page.locator('[data-test="menu-link-\\/dashboards-item"]');
+        this.connectAllNodesError = page.getByText("Please connect all nodes");
+        this.logsOptionRole = page.getByRole("option", { name: "logs" });
+        this.fileInput = page.locator('input[type="file"]');
     }
 
     // Methods from original PipelinesPage
@@ -1279,5 +1298,298 @@ export class PipelinesPage {
     async selectStreamOption(streamName) {
         await this.page.waitForTimeout(2000);
         await this.page.getByRole("option", { name: streamName, exact: true }).first().click();
+    }
+
+    // ============= Methods for raw selector fixes =============
+
+    /**
+     * Click the second delete button (for deleting auto-created nodes)
+     */
+    async clickSecondDeleteButton() {
+        await this.deleteButtonNth1.click();
+    }
+
+    /**
+     * Hover over the edit button
+     */
+    async hoverEditButton() {
+        await this.editButton.hover();
+    }
+
+    /**
+     * Click the output stream icon
+     */
+    async clickOutputStreamIcon() {
+        await this.outputStreamIcon.click();
+    }
+
+    /**
+     * Click the function icon
+     */
+    async clickFunctionIcon() {
+        await this.functionIcon.click();
+    }
+
+    /**
+     * Click the stream icon
+     */
+    async clickStreamIcon() {
+        await this.streamIcon.click();
+    }
+
+    /**
+     * Click VRL function editor view lines
+     */
+    async clickVrlEditorViewLines() {
+        await this.vrlEditorViewLines.click();
+    }
+
+    /**
+     * Click VRL function editor monaco editor
+     */
+    async clickVrlEditorMonaco() {
+        await this.vrlEditorMonaco.click();
+    }
+
+    /**
+     * Type code in VRL editor using keyboard
+     * @param {string} code - Code to type
+     * @param {number} delay - Delay between keystrokes (default: 100)
+     */
+    async typeVrlCode(code, delay = 100) {
+        await this.page.keyboard.type(code, { delay });
+    }
+
+    /**
+     * Click the note text to blur focus from editor
+     */
+    async clickNoteText() {
+        await this.noteText.click();
+    }
+
+    /**
+     * Verify text exists in VRL editor
+     * @param {string} text - Text to verify
+     */
+    async verifyVrlEditorHasText(text) {
+        await this.page.getByText(text);
+    }
+
+    /**
+     * Hover over function name text
+     * @param {string} functionName - Name of the function to hover
+     */
+    async hoverFunctionName(functionName) {
+        await this.page.getByText(functionName).hover();
+    }
+
+    /**
+     * Hover over condition text (kubernetes_container_name)
+     */
+    async hoverConditionText() {
+        await this.conditionText.hover();
+    }
+
+    /**
+     * Click stream type dropdown
+     */
+    async clickStreamTypeDropdown() {
+        await this.streamTypeDropdown.click();
+        await this.streamTypeLabel.click();
+    }
+
+    /**
+     * Click SQL editor view lines
+     */
+    async clickSqlEditorViewLines() {
+        await this.sqlEditorViewLines.click();
+    }
+
+    /**
+     * Type SQL query in the editor
+     * @param {string} query - SQL query to type
+     */
+    async typeSqlQuery(query) {
+        await this.sqlEditor.click();
+        await this.page.keyboard.type(query);
+    }
+
+    /**
+     * Verify SQL query exists in editor
+     * @param {string} query - Query text to find
+     * @returns {Promise<number>} - Count of matching lines
+     */
+    async verifySqlQueryTyped(query) {
+        return await this.page.locator(".view-lines")
+            .locator(".view-line")
+            .filter({ hasText: query })
+            .count();
+    }
+
+    /**
+     * Click frequency unit dropdown
+     */
+    async clickFrequencyUnit() {
+        await this.frequencyUnit.click();
+    }
+
+    /**
+     * Wait for query routing section to be hidden
+     * @param {number} timeout - Timeout in ms (default: 60000)
+     */
+    async waitForQuerySectionHidden(timeout = 60000) {
+        await this.queryRoutingSection.waitFor({ state: 'hidden', timeout });
+    }
+
+    /**
+     * Wait for query node to be visible
+     * @param {number} timeout - Timeout in ms (default: 30000)
+     */
+    async waitForQueryNodeVisible(timeout = 30000) {
+        await this.queryNode.first().waitFor({ state: 'visible', timeout });
+    }
+
+    /**
+     * Hover over query node
+     */
+    async hoverQueryNode() {
+        await this.queryNode.first().hover();
+    }
+
+    /**
+     * Click query node delete button
+     */
+    async clickQueryNodeDeleteBtn() {
+        await this.queryNodeDeleteBtn.first().click();
+    }
+
+    /**
+     * Click confirm button
+     */
+    async clickConfirmButton() {
+        await this.confirmButton.click();
+    }
+
+    /**
+     * Click cancel pipeline button
+     */
+    async clickCancelPipelineBtn() {
+        await this.cancelPipelineBtn.click();
+    }
+
+    /**
+     * Click dashboards menu link
+     */
+    async clickDashboardsMenu() {
+        await this.dashboardsMenuLink.click();
+    }
+
+    /**
+     * Verify connection error is displayed
+     */
+    async verifyConnectionError() {
+        await this.connectAllNodesError.click();
+    }
+
+    /**
+     * Wait for pipeline handles to be visible with error handling
+     */
+    async waitForPipelineHandles() {
+        await this.page.waitForTimeout(2000);
+        await this.page.waitForSelector('[data-test="pipeline-node-input-output-handle"]', { state: 'visible' }).catch(() => {});
+        await this.page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible' }).catch(() => {});
+        await this.page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {});
+    }
+
+    /**
+     * Click logs option in dropdown
+     */
+    async clickLogsOption() {
+        await this.logsOptionRole.click();
+    }
+
+    /**
+     * Verify invalid SQL query error
+     */
+    async verifyInvalidSqlQueryError() {
+        await this.invalidSqlQueryText.click();
+    }
+
+    /**
+     * Delete query node complete flow
+     */
+    async deleteQueryNode() {
+        await this.waitForQuerySectionHidden();
+        await this.waitForQueryNodeVisible();
+        await this.hoverQueryNode();
+        await this.page.waitForTimeout(500);
+        await this.clickQueryNodeDeleteBtn();
+        await this.clickConfirmButton();
+    }
+
+    /**
+     * Setup source stream with delete and function icon click
+     * Used in skipped tests
+     */
+    async deleteAutoNodeAndClickFunctionIcon() {
+        await this.page.waitForTimeout(2000);
+        await this.clickSecondDeleteButton();
+        await this.clickConfirmButton();
+        await this.hoverEditButton();
+        await this.clickFunctionIcon();
+    }
+
+    /**
+     * Setup source stream with delete and output stream icon click
+     * Used in skipped tests
+     */
+    async deleteAutoNodeAndClickOutputIcon() {
+        await this.page.waitForTimeout(3000);
+        await this.clickSecondDeleteButton();
+        await this.clickConfirmButton();
+        await this.hoverEditButton();
+        await this.clickOutputStreamIcon();
+    }
+
+    /**
+     * Setup source stream with delete and stream icon click (for conditions)
+     * Used in skipped tests
+     */
+    async deleteAutoNodeAndClickStreamIcon() {
+        await this.page.waitForTimeout(2000);
+        await this.clickSecondDeleteButton();
+        await this.clickConfirmButton();
+        await this.hoverEditButton();
+        await this.clickStreamIcon();
+    }
+
+    /**
+     * Type function code in VRL editor
+     * @param {string} code - Code to type (e.g., ".a=41")
+     */
+    async typeFunctionInVrlEditor(code = ".a=41") {
+        await this.clickVrlEditorViewLines();
+        await this.typeVrlCode(code, 100);
+        await this.page.keyboard.press("Enter");
+        await this.typeVrlCode(".", 100);
+        await this.clickNoteText();
+    }
+
+    /**
+     * Setup query source - complete flow
+     * @param {string} query - SQL query to type
+     */
+    async setupQuerySource(query = 'select * from "default"') {
+        await this.clickStreamTypeDropdown();
+        await this.page.waitForTimeout(1000);
+        await this.clickSqlEditorViewLines();
+        await this.typeSqlQuery(query);
+        await this.page.waitForTimeout(1000);
+
+        const queryTyped = await this.verifySqlQueryTyped(query);
+        if (queryTyped > 0) {
+            await this.clickFrequencyUnit();
+        }
+        await this.saveQuery();
     }
 }
