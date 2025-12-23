@@ -68,16 +68,15 @@ class PromQueryModellerClass implements PromQueryModeller {
 
     const params = operation.params || def.defaultParams;
 
+    // Handle quantile_over_time first (special case with 2 params)
+    if (operation.id === PromOperationId.QuantileOverTime) {
+      const quantile = params[0] || 0.95;
+      const range = params[1] || "$__interval";
+      return `${operation.id}(${quantile}, ${innerExpr}[${range}])`;
+    }
+
     // Handle range functions (rate, increase, etc.)
-    if (
-      def.category === PromVisualQueryOperationCategory.RangeFunctions &&
-      !operation.id.includes("quantile")
-    ) {
-      if (operation.id === PromOperationId.QuantileOverTime) {
-        const quantile = params[0] || 0.95;
-        const range = params[1] || "$__interval";
-        return `${operation.id}(${quantile}, ${innerExpr}[${range}])`;
-      }
+    if (def.category === PromVisualQueryOperationCategory.RangeFunctions) {
       const range = params[0] || "$__interval";
       return `${operation.id}(${innerExpr}[${range}])`;
     }
