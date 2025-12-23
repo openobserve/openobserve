@@ -76,39 +76,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <!-- Display the token or masked text based on visibility -->
             <div v-else  class="tw-flex tw-items-center">
-              <span 
-                style="
-                display: inline-block;
-                width: 150px; /* Set a fixed width */
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-                text-align: center;
-              "
+              <!-- Show special indicator for meta service accounts with multiple tokens -->
+              <span
+                v-if="props.row.isMetaServiceAccount === true"
+                class="token-multi-org-text"
+                >
+                Multiple Organizations
+                </span>
+              <!-- Show regular token display for single token accounts or unknown state -->
+              <span
+                v-else
+                class="token-display-text"
                 >
                 {{ getDisplayToken(props.row) }}
                 </span>
 
-                <!-- Button to fetch or toggle token visibility -->
+                <!-- Show appropriate button based on whether we know it's a meta service account -->
+                <!-- If isMetaServiceAccount is true, show view all button -->
                 <q-btn
+                  v-if="props.row.isMetaServiceAccount === true"
+                  icon="visibility"
+                  :title="t('serviceAccounts.viewAllTokens')"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  class="cursor-pointer"
+                  @click="viewMetaServiceAccountTokens(props.row)"
+                />
+                <!-- Otherwise show regular toggle button -->
+                <q-btn
+                  v-else
                   :icon="props.row.isTokenVisible ? 'visibility_off' : 'visibility'"
                   :title="props.row.isTokenVisible ? t('serviceAccounts.hideToken') : t('serviceAccounts.showToken')"
                   unelevated
                   size="sm"
                   round
                   flat
-                  style="cursor: pointer !important; "
+                  class="cursor-pointer"
                   @click="getServiceToken(props.row)"
                 />
+                <!-- Copy button - smart behavior based on account type -->
                 <q-btn
-                  @click.stop="copyToClipboard(props.row.token)"
+                  @click.stop="handleCopyToken(props.row)"
                   size="sm"
                   dense
                   flat
-                  :title="t('serviceAccounts.copyToken')"
+                  :title="props.row.isMetaServiceAccount === true ? t('serviceAccounts.viewAndCopyTokens') : t('serviceAccounts.copyToken')"
                   icon="content_copy"
-                  :disable="!props.row.token"
-                  :class="{ 'disabled-opacity': !props.row.token }"
+                  :disable="props.row.isMetaServiceAccount !== true && !props.row.token"
+                  :class="{ 'disabled-opacity': props.row.isMetaServiceAccount !== true && !props.row.token }"
                   class="copy-btn-sql"
                 />
               </div>
@@ -266,54 +283,126 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card>
     </q-dialog>
 
-    <q-dialog v-model="isShowToken"  persistent>
-  <q-card style="width: 40vw; max-height: 90vh; overflow-y: auto;">
-    <q-card-section  class="text-h6 dialog-heading tw-flex tw-justify-between tw-items-center" >
-      <div>Service Account Token </div>
-          <q-btn data-test="sa-cancel-button" dense flat icon="cancel" size="md" @click="isShowToken = false" style="cursor: pointer" />
+    <q-dialog v-model="isShowToken" persistent>
+  <q-card :class="isMultiToken ? 'token-dialog-multi' : 'token-dialog-single'">
+    <q-card-section class="confirmBody token-dialog-header">
+      <div class="head">{{ isMultiToken ? t('serviceAccounts.serviceAccountTokensAllOrgs') : t('serviceAccounts.serviceAccountToken') }}</div>
+      <q-btn
+        data-test="sa-close-button"
+        dense
+        flat
+        round
+        icon="close"
+        size="sm"
+        class="token-dialog-close-btn"
+        @click="isShowToken = false"
+      />
     </q-card-section>
 
-    <q-card-section>
+    <q-card-section class="token-content-section">
+      <!-- Single Token Display -->
+      <div v-if="!isMultiToken" class="single-token-container">
+        <div class="single-token-display">
+          {{  serviceToken }}
+        </div>
+      </div>
 
-      <div class="tw-flex tw-items-center tw-gap-2" style="padding: 0rem 1rem;  border-radius: 8px;">
-  <!-- Token section taking 75% of the width -->
-  <div
-    class="text-h6 text-center tw-truncate el-border"
-    style="flex: 3;  padding: 0.5rem; border-radius: 6px; font-family: monospace; text-align: center; overflow: hidden;"
-  >
-    {{  serviceToken }}
-  </div>
-  <!-- Buttons section taking 25% of the width -->
-  <div class="tw-flex tw-justify-end tw-gap-1" style="flex: 1; max-width: 25%;">
-    <q-btn
-      @click.stop="copyToClipboard(serviceToken)"
-      size="lg"
-      dense
-      outline
-      :title="t('serviceAccounts.copyToken')"
-      icon="content_copy"
-      class="q-mr-xs"
-    />
-    <q-btn
-      @click.stop="downloadTokenAsFile(serviceToken)"
-      size="lg"
-      dense
-      outline
-      :title="t('serviceAccounts.downloadToken')"
-      icon="file_download"
-    />
-  </div>
-  
-</div>
-
-    <div class="q-pt-md flex items-center warning-text">
-      <q-icon name="info" class="q-mr-xs " size="16px" />
-      <span class="text-p">Make sure to copy / download the token. You will not be able to see it again.
-      </span>
-    </div>
-   
+      <!-- Multi Token Display (Table) -->
+      <div v-else class="multi-token-container">
+        <q-table
+          :rows="multiTokens"
+          :columns="multiTokenColumns"
+          row-key="org_id"
+          flat
+          :pagination="{ rowsPerPage: 0 }"
+          hide-pagination
+          class="multi-token-table"
+        >
+          <template #body-cell-token="props">
+            <q-td :props="props">
+              <div class="tw-flex tw-items-center tw-gap-2">
+                <span class="token-cell-text" :title="props.row.token">
+                  {{ props.row.token }}
+                </span>
+              </div>
+            </q-td>
+          </template>
+          <template #body-cell-actions="props">
+            <q-td :props="props">
+              <q-btn
+                @click.stop="copyToClipboard(props.row.token)"
+                size="sm"
+                dense
+                flat
+                round
+                :title="t('serviceAccounts.copyToken')"
+                icon="content_copy"
+              />
+              <q-btn
+                @click.stop="downloadTokenAsFile(props.row.token, `service_account_token_${props.row.org_id}.txt`)"
+                size="sm"
+                dense
+                flat
+                round
+                :title="t('serviceAccounts.downloadToken')"
+                icon="file_download"
+              />
+            </q-td>
+          </template>
+        </q-table>
+      </div>
     </q-card-section>
 
+    <q-card-actions class="token-dialog-actions">
+      <!-- Single Token Actions -->
+      <div v-if="!isMultiToken" class="token-dialog-single-actions">
+        <q-btn
+          @click.stop="copyToClipboard(serviceToken)"
+          unelevated
+          no-caps
+          class="o2-secondary-button"
+          :label="t('serviceAccounts.copyToken')"
+          icon="content_copy"
+        />
+        <q-btn
+          @click.stop="downloadTokenAsFile(serviceToken, 'service_account_token.txt')"
+          unelevated
+          no-caps
+          class="o2-secondary-button"
+          :label="t('serviceAccounts.downloadToken')"
+          icon="file_download"
+        />
+      </div>
+      <!-- Multi Token Actions -->
+      <div v-else class="token-dialog-multi-actions">
+        <q-btn
+          @click.stop="copyAllTokens()"
+          unelevated
+          no-caps
+          class="o2-secondary-button"
+          :label="t('serviceAccounts.copyAllTokens')"
+          icon="content_copy"
+        />
+        <q-btn
+          @click.stop="downloadAllTokens()"
+          unelevated
+          no-caps
+          class="o2-secondary-button"
+          :label="t('serviceAccounts.downloadAllTokens')"
+          icon="file_download"
+        />
+      </div>
+      <q-btn
+        data-test="sa-ok-button"
+        v-close-popup
+        unelevated
+        no-caps
+        class="o2-primary-button"
+        @click="isShowToken = false"
+      >
+        {{ t("user.ok") }}
+      </q-btn>
+    </q-card-actions>
   </q-card>
 </q-dialog>
   </q-page>
@@ -343,7 +432,7 @@ import { outlinedDelete,outlinedVisibility } from "@quasar/extras/material-icons
 import usePermissions from "@/composables/iam/usePermissions";
 import { computed, nextTick } from "vue";
 import { getRoles } from "@/services/iam";
-import service_accounts from "@/services/service_accounts";
+import service_accounts, { isMultiTokenResponse, type OrgTokenInfo } from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
 export default defineComponent({
   name: "ServiceAccountsList",
@@ -373,6 +462,38 @@ export default defineComponent({
     });
 
     const serviceToken  = ref("");
+    const isMultiToken = ref(false);
+    const multiTokens = ref<OrgTokenInfo[]>([]);
+    const multiTokenColumns = ref([
+      {
+        name: "org_name",
+        label: "Organization Name",
+        field: "org_name",
+        align: "left",
+        sortable: true,
+      },
+      {
+        name: "org_id",
+        label: "Organization ID",
+        field: "org_id",
+        align: "left",
+        sortable: true,
+      },
+      {
+        name: "token",
+        label: "Token",
+        field: "token",
+        align: "left",
+        sortable: false,
+      },
+      {
+        name: "actions",
+        label: "Actions",
+        field: "actions",
+        align: "center",
+        sortable: false,
+      },
+    ]);
 
     const serviceAccounts = ref([]);
 
@@ -478,8 +599,27 @@ export default defineComponent({
       }
       }
        service_accounts.get_service_token(store.state.selectedOrganization.identifier,row.email).then((res)=>{
-        if(fromColum) row.token = res.data.token;
-        else serviceToken.value = res.data.token;
+        const responseData = res.data;
+
+        // Check if response is multi-token format
+        if (isMultiTokenResponse(responseData)) {
+          // Multi-token response (from _meta org for meta service accounts)
+          isMultiToken.value = true;
+          multiTokens.value = responseData.tokens;
+          serviceToken.value = ''; // Clear single token
+          if(fromColum) {
+            // Mark this row as a meta service account
+            row.isMetaServiceAccount = true;
+            row.token = ''; // Clear any existing token value
+          }
+        } else {
+          // Single token response
+          isMultiToken.value = false;
+          multiTokens.value = [];
+          row.isMetaServiceAccount = false;
+          if(fromColum) row.token = responseData.token;
+          else serviceToken.value = responseData.token;
+        }
        }).catch((err)=>{
         if(err.response?.status != 403){
           $q.notify({
@@ -487,11 +627,87 @@ export default defineComponent({
           message: `Error fetching token: ${err.response?.data?.message || 'Unknown error'}`,
           });
         }
-        
+
        }).finally(()=>{
         row.isLoading = false;
        });
     }
+
+    const viewMetaServiceAccountTokens = async (row: any) => {
+      row.isLoading = true;
+      try {
+        const res = await service_accounts.get_service_token(
+          store.state.selectedOrganization.identifier,
+          row.email
+        );
+        const responseData = res.data;
+
+        if (isMultiTokenResponse(responseData)) {
+          isMultiToken.value = true;
+          multiTokens.value = responseData.tokens;
+          serviceToken.value = '';
+          isShowToken.value = true;
+        } else {
+          // Fallback to single token display
+          isMultiToken.value = false;
+          multiTokens.value = [];
+          serviceToken.value = responseData.token;
+          isShowToken.value = true;
+        }
+      } catch (err: any) {
+        if (err.response?.status != 403) {
+          $q.notify({
+            color: "negative",
+            message: `Error fetching tokens: ${err.response?.data?.message || 'Unknown error'}`,
+          });
+        }
+      } finally {
+        row.isLoading = false;
+      }
+    };
+
+    const handleCopyToken = async (row: any) => {
+      // If we know it's a meta service account, open the modal
+      if (row.isMetaServiceAccount === true) {
+        await viewMetaServiceAccountTokens(row);
+      } else if (row.token) {
+        // If token is already available, copy it
+        copyToClipboard(row.token);
+      } else {
+        // If we don't have the token yet, fetch it first
+        row.isLoading = true;
+        try {
+          const res = await service_accounts.get_service_token(
+            store.state.selectedOrganization.identifier,
+            row.email
+          );
+          const responseData = res.data;
+
+          if (isMultiTokenResponse(responseData)) {
+            // It's a meta service account - show modal
+            row.isMetaServiceAccount = true;
+            isMultiToken.value = true;
+            multiTokens.value = responseData.tokens;
+            serviceToken.value = '';
+            isShowToken.value = true;
+          } else {
+            // It's a regular service account - copy the token
+            row.isMetaServiceAccount = false;
+            row.token = responseData.token;
+            copyToClipboard(responseData.token);
+          }
+        } catch (err: any) {
+          if (err.response?.status != 403) {
+            $q.notify({
+              color: "negative",
+              message: `Error fetching token: ${err.response?.data?.message || 'Unknown error'}`,
+            });
+          }
+        } finally {
+          row.isLoading = false;
+        }
+      }
+    };
 
 
     const getServiceAccountsUsers = async () =>{
@@ -516,6 +732,7 @@ export default defineComponent({
                 first_name: data.first_name,
                 last_name: data.last_name,
                 isTokenVisible: false,
+                isMetaServiceAccount: undefined, // Will be determined when token is fetched
               };
             });
 
@@ -700,13 +917,46 @@ export default defineComponent({
       });
     }
 
-    const downloadTokenAsFile = (token:string) => {
+    const downloadTokenAsFile = (token:string, filename = "service_account_token.txt") => {
       const blob = new Blob([token], { type: "text/plain" });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
-      link.download = "service_account_token.txt";
+      link.download = filename;
       link.click();
       URL.revokeObjectURL(link.href); // Cleanup
+    };
+
+    const copyAllTokens = () => {
+      const allTokensText = multiTokens.value
+        .map((t) => `Organization: ${t.org_name} (${t.org_id})\nToken: ${t.token}`)
+        .join("\n\n");
+
+      navigator.clipboard.writeText(allTokensText).then(() => {
+        $q.notify({
+          type: "positive",
+          message: `All tokens copied successfully!`,
+          timeout: 5000,
+        });
+      }).catch(() => {
+        $q.notify({
+          type: "negative",
+          message: "Error while copying tokens.",
+          timeout: 5000,
+        });
+      });
+    };
+
+    const downloadAllTokens = () => {
+      const allTokensText = multiTokens.value
+        .map((t) => `Organization: ${t.org_name} (${t.org_id})\nToken: ${t.token}`)
+        .join("\n\n");
+
+      const blob = new Blob([allTokensText], { type: "text/plain" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "service_account_all_tokens.txt";
+      link.click();
+      URL.revokeObjectURL(link.href);
     };
 
     const confirmRefreshAction = (row: any) => {
@@ -805,6 +1055,13 @@ export default defineComponent({
       confirmRefresh,
       visibleRows,
       hasVisibleRows,
+      isMultiToken,
+      multiTokens,
+      multiTokenColumns,
+      copyAllTokens,
+      downloadAllTokens,
+      viewMetaServiceAccountTokens,
+      handleCopyToken,
     };
   },
 });
@@ -815,9 +1072,115 @@ export default defineComponent({
 .disabled-opacity {
   opacity: 0.1 !important;
 }
-.warning-text {
-  color: #ec960c;
+
+.cursor-pointer {
+  cursor: pointer !important;
 }
 
+// Token display in table column
+.token-multi-org-text {
+  display: inline-block;
+  width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+  color: #5960b2;
+  font-weight: 500;
+}
 
+.token-display-text {
+  display: inline-block;
+  width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+
+// Modal dialog sizing
+.token-dialog-single {
+  width: 40vw;
+  max-width: 600px;
+}
+
+.token-dialog-multi {
+  width: 60vw;
+  max-width: 900px;
+}
+
+.token-content-section {
+  padding: 0 1.375rem 1rem;
+  font-size: 0.875rem;
+}
+
+// Single token display
+.single-token-container {
+  padding: 1rem 0;
+}
+
+.single-token-display {
+  padding: 1rem 1.5rem;
+  border: 1px solid;
+  border-radius: 6px;
+  font-family: monospace;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.875rem;
+  word-break: break-all;
+}
+
+// Multi token display
+.multi-token-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.multi-token-table {
+  margin-bottom: 0;
+}
+
+.token-cell-text {
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 300px;
+  display: inline-block;
+}
+
+// Token dialog header with close button
+.token-dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 11px 1.375rem 0 !important;
+}
+
+.token-dialog-close-btn {
+  margin-left: auto;
+}
+
+// Token dialog actions footer
+.token-dialog-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.375rem 1.5rem;
+  gap: 0.75rem;
+}
+
+.token-dialog-single-actions,
+.token-dialog-multi-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.token-dialog-actions .o2-primary-button {
+  margin-left: auto;
+  min-width: 80px;
+}
 </style>

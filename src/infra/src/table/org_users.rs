@@ -48,6 +48,7 @@ pub struct OrgUserRecord {
     pub token: String,
     pub rum_token: Option<String>,
     pub created_at: i64,
+    pub is_meta_service_account: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -74,6 +75,7 @@ impl OrgUserRecord {
             token: token.to_string(),
             rum_token,
             created_at: chrono::Utc::now().timestamp_micros(),
+            is_meta_service_account: false,
         }
     }
 }
@@ -87,6 +89,7 @@ impl From<Model> for OrgUserRecord {
             token: model.token,
             rum_token: model.rum_token,
             created_at: model.created_at,
+            is_meta_service_account: model.is_meta_service_account.unwrap_or(false),
         }
     }
 }
@@ -101,6 +104,7 @@ pub struct UserOrgExpandedRecord {
     pub created_at: i64,
     pub org_name: String,
     pub org_type: OrganizationType,
+    pub is_meta_service_account: bool,
 }
 
 impl FromQueryResult for UserOrgExpandedRecord {
@@ -113,6 +117,8 @@ impl FromQueryResult for UserOrgExpandedRecord {
         let created_at = result.try_get(pre, "created_at")?;
         let org_name = result.try_get(pre, "org_name")?;
         let org_type: i16 = result.try_get(pre, "org_type")?;
+        let is_meta_service_account: Option<bool> =
+            result.try_get(pre, "is_meta_service_account").ok();
 
         Ok(Self {
             email,
@@ -123,6 +129,7 @@ impl FromQueryResult for UserOrgExpandedRecord {
             created_at,
             org_name,
             org_type: org_type.into(),
+            is_meta_service_account: is_meta_service_account.unwrap_or(false),
         })
     }
 }
@@ -141,6 +148,7 @@ pub struct OrgUserExpandedRecord {
     pub token: String,
     pub rum_token: Option<String>,
     pub created_at: i64,
+    pub is_meta_service_account: bool,
 }
 
 impl FromQueryResult for OrgUserExpandedRecord {
@@ -157,6 +165,8 @@ impl FromQueryResult for OrgUserExpandedRecord {
         let token = res.try_get(pre, "token")?;
         let rum_token = res.try_get(pre, "rum_token")?;
         let created_at = res.try_get(pre, "created_at")?;
+        let is_meta_service_account: Option<bool> =
+            res.try_get(pre, "is_meta_service_account").ok();
 
         Ok(Self {
             email,
@@ -171,6 +181,7 @@ impl FromQueryResult for OrgUserExpandedRecord {
             token,
             rum_token,
             created_at,
+            is_meta_service_account: is_meta_service_account.unwrap_or(false),
         })
     }
 }
@@ -200,6 +211,17 @@ pub async fn add(
     token: &str,
     rum_token: Option<String>,
 ) -> Result<(), errors::Error> {
+    add_with_flag(org_id, user_email, role, token, rum_token, false).await
+}
+
+pub async fn add_with_flag(
+    org_id: &str,
+    user_email: &str,
+    role: UserRole,
+    token: &str,
+    rum_token: Option<String>,
+    is_meta_service_account: bool,
+) -> Result<(), errors::Error> {
     let now = chrono::Utc::now().timestamp_micros();
     let role: i16 = role.into();
     let record = ActiveModel {
@@ -211,6 +233,7 @@ pub async fn add(
         created_at: Set(now),
         updated_at: Set(now),
         id: Set(ider::uuid()),
+        is_meta_service_account: Set(Some(is_meta_service_account)),
     };
 
     // make sure only one client is writing to the database(only for sqlite)
@@ -372,6 +395,7 @@ pub async fn get_expanded_user_org(
         .column(Column::Token)
         .column(Column::RumToken)
         .column(Column::CreatedAt)
+        .column(Column::IsMetaServiceAccount)
         .into_model::<OrgUserExpandedRecord>()
         .one(client)
         .await
@@ -407,6 +431,7 @@ pub async fn get_user_by_rum_token(
         .column(Column::Token)
         .column(Column::RumToken)
         .column(Column::CreatedAt)
+        .column(Column::IsMetaServiceAccount)
         .into_model::<OrgUserExpandedRecord>()
         .one(client)
         .await
@@ -448,6 +473,7 @@ pub async fn list_orgs_by_user(email: &str) -> Result<Vec<UserOrgExpandedRecord>
         .column(Column::CreatedAt)
         .column(organizations::Column::OrgName)
         .column(organizations::Column::OrgType)
+        .column(Column::IsMetaServiceAccount)
         .into_model::<UserOrgExpandedRecord>()
         .all(client)
         .await

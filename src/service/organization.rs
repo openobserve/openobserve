@@ -45,10 +45,11 @@ use {
 use super::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event};
 use crate::{
     common::{
+        infra::config::ORG_USERS,
         meta::organization::{
             AlertSummary, CUSTOM, DEFAULT_ORG, IngestionPasscode, IngestionTokensContainer,
-            OrgSummary, Organization, PipelineSummary, RumIngestionToken, StreamSummary,
-            TriggerStatus, TriggerStatusSearchResult,
+            MetaServiceAccountTokens, OrgSummary, OrgTokenInfo, Organization, PipelineSummary,
+            RumIngestionToken, StreamSummary, TriggerStatus, TriggerStatusSearchResult,
         },
         utils::auth::{delete_org_tuples, is_root_user, save_org_tuples},
     },
@@ -59,6 +60,38 @@ use crate::{
         users::add_admin_to_org,
     },
 };
+
+const MASKED_TOKEN: &str = "***MASKED***";
+
+/// Checks if a service account token should be masked based on org context
+/// Returns true if:
+/// - The service account has is_meta_service_account flag set to true
+/// - The requesting org is NOT _meta
+fn should_mask_token(org_id: Option<&str>, user_email: &str) -> bool {
+    // If accessing from _meta org, never mask
+    if org_id == Some(config::META_ORG_ID) {
+        return false;
+    }
+
+    // Check if this user has is_meta_service_account flag set in the requesting org
+    if let Some(org) = org_id {
+        let key = format!("{}/{}", org, user_email);
+        if let Some(user_record) = ORG_USERS.get(&key) {
+            return user_record.is_meta_service_account;
+        }
+    }
+
+    false
+}
+
+/// Masks a token if necessary based on org context
+fn mask_token_if_needed(token: String, org_id: Option<&str>, user_email: &str) -> String {
+    if should_mask_token(org_id, user_email) {
+        MASKED_TOKEN.to_string()
+    } else {
+        token
+    }
+}
 
 pub async fn get_summary(org_id: &str) -> OrgSummary {
     let streams = get_streams(org_id, None, false, None).await;
@@ -151,9 +184,63 @@ pub async fn get_passcode(
             "Not allowed for external service accounts",
         ));
     }
+    let passcode = mask_token_if_needed(user.token, org_id, &user.email);
     Ok(IngestionPasscode {
         user: user.email,
-        passcode: user.token,
+        passcode,
+    })
+}
+
+/// Get all tokens for a meta service account across all organizations
+/// Only accessible from _meta org
+pub async fn get_meta_service_account_tokens(
+    user_email: &str,
+) -> Result<MetaServiceAccountTokens, anyhow::Error> {
+    // Get user with all their organizations
+    let Some(db_user) = db::user::get_user_by_email(user_email).await else {
+        return Err(anyhow::Error::msg("User not found"));
+    };
+
+    // Check if user is a service account
+    if !db_user
+        .organizations
+        .iter()
+        .any(|org| org.role.eq(&UserRole::ServiceAccount))
+    {
+        return Err(anyhow::Error::msg("User is not a service account"));
+    }
+
+    // Check if this is a meta service account (has is_meta_service_account flag in any org)
+    let mut is_meta_svc = false;
+    for org in &db_user.organizations {
+        let key = format!("{}/{}", org.name, user_email);
+        if let Some(user_record) = ORG_USERS.get(&key)
+            && org.name != config::META_ORG_ID
+            && user_record.is_meta_service_account
+        {
+            is_meta_svc = true;
+            break;
+        }
+    }
+
+    if !is_meta_svc {
+        return Err(anyhow::Error::msg("User is not a meta service account"));
+    }
+
+    // Collect all tokens (unmasked)
+    let tokens: Vec<OrgTokenInfo> = db_user
+        .organizations
+        .into_iter()
+        .map(|org| OrgTokenInfo {
+            org_id: org.name,
+            org_name: org.org_name,
+            token: org.token,
+        })
+        .collect();
+
+    Ok(MetaServiceAccountTokens {
+        user: user_email.to_string(),
+        tokens,
     })
 }
 
@@ -238,13 +325,14 @@ async fn update_passcode_inner(
     // TODO : Fix for root users
     let ret = if is_rum_update {
         IngestionTokensContainer::RumToken(RumIngestionToken {
-            user: db_user.email,
+            user: db_user.email.clone(),
             rum_token: Some(rum_token),
         })
     } else {
+        let passcode = mask_token_if_needed(token, org_id, &db_user.email);
         IngestionTokensContainer::Passcode(IngestionPasscode {
             user: db_user.email,
-            passcode: token,
+            passcode,
         })
     };
     Ok(ret)
@@ -276,7 +364,13 @@ pub async fn list_org_users_by_user(
 pub async fn create_org(
     org: &mut Organization,
     user_email: &str,
-) -> Result<Organization, anyhow::Error> {
+) -> Result<
+    (
+        Organization,
+        Option<crate::common::meta::organization::ServiceAccountTokenInfo>,
+    ),
+    anyhow::Error,
+> {
     #[cfg(not(feature = "enterprise"))]
     let is_allowed = false;
     #[cfg(feature = "enterprise")]
@@ -337,7 +431,37 @@ pub async fn create_org(
                 stream_name: None,
             })
             .await;
-            Ok(org.clone())
+
+            // Check if creator is a service account and return token info
+            let service_account_info = if let Some(new_org_user) =
+                crate::service::users::get_user(Some(&org.identifier), user_email).await
+            {
+                // Check if they're a service account in _meta org
+                if let Some(meta_user) =
+                    crate::service::users::get_user(Some(config::META_ORG_ID), user_email).await
+                {
+                    if meta_user.role == UserRole::ServiceAccount {
+                        let token = mask_token_if_needed(
+                            new_org_user.token.clone(),
+                            Some(&org.identifier),
+                            &new_org_user.email,
+                        );
+                        Some(crate::common::meta::organization::ServiceAccountTokenInfo {
+                            email: new_org_user.email.clone(),
+                            token,
+                            role: format!("{}", new_org_user.role),
+                        })
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            Ok((org.clone(), service_account_info))
         }
         Err(e) => {
             log::error!("Error creating org: {e}");

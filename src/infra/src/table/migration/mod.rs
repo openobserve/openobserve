@@ -84,6 +84,7 @@ mod m20251207_000001_create_system_settings_table;
 mod m20251219_000001_add_org_id_to_search_queue;
 mod m20251221_000001_create_enrichment_table_urls;
 mod m20251226_000001_add_enrichment_table_urls_is_local_region;
+mod m20251222_000002_add_is_meta_service_account_to_org_users;
 
 pub struct Migrator;
 
@@ -157,6 +158,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20251219_000001_add_org_id_to_search_queue::Migration),
             Box::new(m20251221_000001_create_enrichment_table_urls::Migration),
             Box::new(m20251226_000001_add_enrichment_table_urls_is_local_region::Migration),
+            Box::new(m20251222_000002_add_is_meta_service_account_to_org_users::Migration),
         ]
     }
 }
