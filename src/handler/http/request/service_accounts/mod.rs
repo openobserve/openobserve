@@ -16,7 +16,7 @@
 use std::io::{Error, ErrorKind};
 
 use actix_web::{
-    HttpMessage, HttpRequest, HttpResponse, delete, get,
+    HttpRequest, HttpResponse, delete, get,
     http::{self},
     post, put, web,
 };
@@ -393,7 +393,8 @@ pub async fn delete_bulk(
 #[get("/{org_id}/service_accounts/{email_id}")]
 pub async fn get_api_token(
     path: web::Path<(String, String)>,
-    req: HttpRequest,
+    Headers(user_email): Headers<UserEmail>,
+    _req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org, user_id) = path.into_inner();
 
@@ -401,22 +402,7 @@ pub async fn get_api_token(
     // and return all tokens if so
     if org == config::META_ORG_ID {
         // Extract requester identity for authorization check
-        let requester_email = {
-            let extensions = req.extensions();
-            match extensions.get::<UserEmail>() {
-                Some(email) => email.user_id.clone(),
-                None => {
-                    log::error!(
-                        "Multi-token request without authentication | target_sa={}",
-                        user_id
-                    );
-                    return Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
-                        http::StatusCode::UNAUTHORIZED,
-                        "Authentication required",
-                    )));
-                }
-            }
-        }; // extensions is dropped here
+        let requester_email = &user_email.user_id;
 
         // Verify requester has permission to view tokens
         #[cfg(feature = "enterprise")]
@@ -430,7 +416,7 @@ pub async fn get_api_token(
                 // We check for "GET" permission on the service account resource
                 let has_permission = is_allowed(
                     config::META_ORG_ID,
-                    &requester_email,
+                    requester_email,
                     "GET",
                     &format!("service_account:{}", user_id),
                     "",
