@@ -144,12 +144,6 @@ pub(crate) async fn list(prefix: &str) -> Result<HashMap<String, Bytes>> {
 }
 
 #[inline]
-pub(crate) async fn list_keys(prefix: &str) -> Result<Vec<String>> {
-    let db = infra_db::get_db().await;
-    db.list_keys(prefix).await
-}
-
-#[inline]
 pub(crate) async fn list_values(prefix: &str) -> Result<Vec<Bytes>> {
     let db = infra_db::get_db().await;
     db.list_values(prefix).await
