@@ -371,10 +371,7 @@ async fn delete(
     path: web::Path<(String, String)>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, mut stream_name) = path.into_inner();
-    if !config::get_config().common.skip_formatting_stream_name {
-        stream_name = format_stream_name(stream_name);
-    }
+    let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let del_related_feature_resources = query
