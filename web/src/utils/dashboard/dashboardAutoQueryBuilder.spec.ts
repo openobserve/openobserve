@@ -1970,7 +1970,7 @@ describe("dashboardAutoQueryBuilder", () => {
       expect(result).toContain("LIMIT 100");
     });
 
-    it("should return empty string when name field is missing", () => {
+    it("should return partial query when name field is missing", () => {
       mockDashboardPanelData.data.queries[0].fields.name = {
         alias: "name_alias",
         column: null,
@@ -1978,10 +1978,12 @@ describe("dashboardAutoQueryBuilder", () => {
         args: [],
       };
       const result = mapChart(mockDashboardPanelData);
-      expect(result).toBe("");
+      expect(result).toContain("SELECT");
+      expect(result).toContain("count(id)");
+      expect(result).toContain("value_alias");
     });
 
-    it("should return empty string when value_for_maps field is missing", () => {
+    it("should return partial query when value_for_maps field is missing", () => {
       mockDashboardPanelData.data.queries[0].fields.value_for_maps = {
         alias: "value_alias",
         column: null,
@@ -1989,7 +1991,9 @@ describe("dashboardAutoQueryBuilder", () => {
         args: [],
       };
       const result = mapChart(mockDashboardPanelData);
-      expect(result).toBe("");
+      expect(result).toContain("SELECT");
+      expect(result).toContain("country");
+      expect(result).toContain("name_alias");
     });
   });
 

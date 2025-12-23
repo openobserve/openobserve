@@ -72,7 +72,10 @@ use crate::{
     operation_id = "SearchSQLMultiStream",
     summary = "Search across multiple streams",
     description = "Executes SQL queries that can span across multiple data streams within the organization. This enables cross-stream analytics, joins, and aggregations to analyze data relationships and patterns across different log streams, metrics, or traces. The query engine automatically handles data from different streams and returns unified results.",
-    params(("org_id" = String, Path, description = "Organization name")),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("validate" = bool, Query, description = "Validate query fields against stream schema and User-Defined Schema (UDS). When enabled, returns error if queried fields are not in schema or not allowed by UDS"),
+    ),
     request_body(
         content = inline(search::MultiStreamRequest),
         description = "Search query",
@@ -173,6 +176,7 @@ pub async fn search_multi(
     }
 
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    let validate_query = super::utils::get_bool_from_request(&query, "validate");
 
     let dashboard_info = get_dashboard_info_from_request(&query);
 
@@ -246,6 +250,19 @@ pub async fn search_multi(
                     multi_res.new_end_time = Some(req.query.end_time);
                 }
             }
+        }
+
+        // Validate query fields if requested
+        if validate_query
+            && let Err(e) = super::utils::validate_query_fields(
+                &org_id,
+                &stream_name,
+                stream_type,
+                &req.query.sql,
+            )
+            .await
+        {
+            return Ok(map_error_to_http_response(&e, Some(trace_id)));
         }
 
         // Check permissions on stream
