@@ -667,7 +667,7 @@ export default defineComponent({
 
     // Options for PromQL table mode
     const promqlTableModeOptions = [
-      { label: "Time Series", value: "single" },
+      { label: "TimeSeries", value: "single" },
       { label: "TimeSeries with Metadata", value: "single_with_metadata" },
       { label: "Aggregate", value: "all" },
     ];
@@ -685,18 +685,27 @@ export default defineComponent({
         return [];
       }
 
-      console.log("[PromQL Config] Available streams in groupedFields:",
-        dashboardPanelData.meta.streamFields.groupedFields.map((g: any) => g.name));
+      console.log(
+        "[PromQL Config] Available streams in groupedFields:",
+        dashboardPanelData.meta.streamFields.groupedFields.map(
+          (g: any) => g.name,
+        ),
+      );
 
       // Iterate through ALL queries and collect unique field names
       queries.forEach((query: any, index: number) => {
         console.log(`[PromQL Config] Query ${index} full object:`, query);
         const streamName = query?.fields?.stream;
         console.log(`[PromQL Config] Query ${index} stream:`, streamName);
-        console.log(`[PromQL Config] Query ${index} fields object:`, query?.fields);
+        console.log(
+          `[PromQL Config] Query ${index} fields object:`,
+          query?.fields,
+        );
 
         if (!streamName) {
-          console.log(`[PromQL Config] Query ${index} skipped - no stream name`);
+          console.log(
+            `[PromQL Config] Query ${index} skipped - no stream name`,
+          );
           return;
         }
 
@@ -706,7 +715,10 @@ export default defineComponent({
             (group: any) => group.name === streamName,
           );
 
-        console.log(`[PromQL Config] Query ${index} found streamFields:`, streamFields ? 'YES' : 'NO');
+        console.log(
+          `[PromQL Config] Query ${index} found streamFields:`,
+          streamFields ? "YES" : "NO",
+        );
 
         if (streamFields?.schema) {
           // Extract field names from schema and add to set (automatically removes duplicates)
@@ -714,7 +726,10 @@ export default defineComponent({
             .map((field: any) => field.name)
             .filter(Boolean);
 
-          console.log(`[PromQL Config] Query ${index} fields count: ${fieldNames.length}`, fieldNames);
+          console.log(
+            `[PromQL Config] Query ${index} fields count: ${fieldNames.length}`,
+            fieldNames,
+          );
           fieldNames.forEach((name: string) => allFieldNames.add(name));
         } else {
           console.log(`[PromQL Config] Query ${index} has no schema`);
