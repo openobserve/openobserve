@@ -14,6 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import serviceStreamsApi, {
+  type CorrelationRequest,
+  type CorrelationResponse,
+  type StreamInfo,
+} from "./service_streams";
 
 // Types matching backend API responses
 export interface Incident {
@@ -69,6 +74,16 @@ export interface IncidentStats {
   by_service: Record<string, number>;
   mttr_minutes?: number;
   alerts_per_incident_avg: number;
+}
+
+export interface IncidentCorrelatedStreams {
+  serviceName: string;
+  matchedDimensions: Record<string, string>;
+  additionalDimensions: Record<string, string>;
+  logStreams: StreamInfo[];
+  metricStreams: StreamInfo[];
+  traceStreams: StreamInfo[];
+  correlationData: CorrelationResponse;
 }
 
 const incidents = {
@@ -130,6 +145,63 @@ const incidents = {
   triggerRca: (org_identifier: string, incident_id: string) => {
     return http().post<{ rca_content: string }>(
       `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca`
+    );
+  },
+
+  /**
+   * Get correlated telemetry streams for an incident
+   *
+   * Uses the incident's stable_dimensions to find related logs, metrics, and traces
+   * via the service correlation API.
+   *
+   * @param org_identifier Organization ID
+   * @param incident The incident with stable_dimensions
+   * @returns Correlated streams grouped by type
+   */
+  getCorrelatedStreams: async (
+    org_identifier: string,
+    incident: Incident
+  ): Promise<IncidentCorrelatedStreams> => {
+    const dimensions = incident.stable_dimensions;
+
+    const request: CorrelationRequest = {
+      source_stream: dimensions.service || "default",
+      source_type: "logs",
+      available_dimensions: dimensions,
+    };
+
+    const response = await serviceStreamsApi.correlate(org_identifier, request);
+    const correlationData = response.data;
+
+    return {
+      serviceName: correlationData.service_name,
+      matchedDimensions: correlationData.matched_dimensions || {},
+      additionalDimensions: correlationData.additional_dimensions || {},
+      logStreams: correlationData.related_streams.logs || [],
+      metricStreams: correlationData.related_streams.metrics || [],
+      traceStreams: correlationData.related_streams.traces || [],
+      correlationData,
+    };
+  },
+
+  /**
+   * Extract trace_id from incident's first alert
+   *
+   * Attempts to find a trace_id dimension in the incident's stable_dimensions.
+   * This can be used as a fallback correlation method.
+   *
+   * @param incident The incident to extract trace_id from
+   * @returns trace_id if found, undefined otherwise
+   */
+  extractTraceId: (incident: Incident): string | undefined => {
+    const dimensions = incident.stable_dimensions;
+
+    // Check common trace_id field variations
+    return (
+      dimensions["trace_id"] ||
+      dimensions["traceId"] ||
+      dimensions["trace.id"] ||
+      dimensions["TraceId"]
     );
   },
 };
