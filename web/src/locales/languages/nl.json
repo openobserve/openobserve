@@ -1084,7 +1084,8 @@
     "metric": "Metrisch",
     "labelFilters": "Filters voor etiketten",
     "operations": "Operaties",
-    "promQLBuilder": "ProMQL Builder"
+    "promQLBuilder": "ProMQL Builder",
+    "options": "Opties"
   },
   "home": {
     "streams": "Streams",

@@ -1084,7 +1084,8 @@
     "metric": "Metrisch",
     "labelFilters": "Label-Filter",
     "operations": "Operationen",
-    "promQLBuilder": "PromQL Builder"
+    "promQLBuilder": "PromQL Builder",
+    "options": "Optionen"
   },
   "home": {
     "streams": "Streams",

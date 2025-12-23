@@ -1100,7 +1100,8 @@
     "metric": "メトリック",
     "labelFilters": "ラベルフィルター",
     "operations": "オペレーション",
-    "promQLBuilder": "プロムQLビルダー"
+    "promQLBuilder": "プロムQLビルダー",
+    "options": "[オプション]"
   },
   "home": {
     "streams": "ストリーム",
