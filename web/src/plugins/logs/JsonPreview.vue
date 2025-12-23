@@ -725,14 +725,15 @@ export default {
       }
     });
 
-    watch(()=>searchObj.data.stream.selectedStreamFields,
-    ()=>{
-       updateMultiStreamFields();
-    },
-    {
-      deep:true
-    }
-  );
+    watch(
+      () => searchObj.data.stream.selectedStreamFields,
+      () => {
+        updateMultiStreamFields();
+      },
+      {
+        deep: true,
+      },
+    );
 
     const filterStreamFn = (val: any = "") => {
       filteredTracesStreamOptions.value = tracesStreams.value.filter(
@@ -747,8 +748,11 @@ export default {
     };
 
     const openCorrelation = () => {
-      console.log("[JsonPreview] openCorrelation clicked, emitting show-correlation event");
-      emit("show-correlation");
+      console.log(
+        "[JsonPreview] openCorrelation clicked, emitting show-correlation event with value:",
+        props.value,
+      );
+      emit("show-correlation", props.value);
     };
 
     const handleTabChange = async () => {
