@@ -28,7 +28,7 @@
                   <!-- Label Selection -->
                   <q-select
                     v-model="label.label"
-                    :options="availableLabels"
+                    :options="getAvailableLabelsForFilter(index)"
                     label="Label"
                     dense
                     borderless
@@ -168,6 +168,14 @@ const labelValuesMap = computed(() => props.dashboardData?.meta?.promql?.labelVa
 const loadingLabels = computed(() => props.dashboardData?.meta?.promql?.loadingLabels || false);
 
 const operatorOptions = ["=", "!=", "=~", "!~"];
+
+// Get available labels excluding already selected ones for a specific filter
+const getAvailableLabelsForFilter = (currentIndex: number) => {
+  const selectedLabels = props.labels
+    .map((l, idx) => (idx !== currentIndex ? l.label : null))
+    .filter((l) => l && l.trim());
+  return availableLabels.value.filter((label) => !selectedLabels.includes(label));
+};
 
 const computedLabel = (label: QueryBuilderLabelFilter): string => {
   if (!label.label) {
