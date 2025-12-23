@@ -3033,11 +3033,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           newLabelValuesMap.set(labelKey, Array.from(valueSet).sort());
         });
         dashboardPanelData.meta.promql.labelValuesMap = newLabelValuesMap;
-
-        console.log(
-          "dashboardPanelData.meta.promql ----",
-          dashboardPanelData.meta.promql,
-        );
       } else {
         dashboardPanelData.meta.promql.availableLabels = [];
         dashboardPanelData.meta.promql.labelValuesMap = new Map();
