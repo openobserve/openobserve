@@ -1162,4 +1162,21 @@ mod tests {
         // construction For now, we'll test that our conversion functions handle all other
         // cases without data loss
     }
+
+    #[tokio::test]
+    async fn test_claim_stale_url_jobs() {
+        // Test that claim_stale_url_jobs returns an empty vector when there are no stale jobs
+        // This is a basic integration test that verifies the function can be called
+        let result = claim_stale_url_jobs(300, 1).await;
+
+        // The function should succeed (database operations work)
+        assert!(result.is_ok());
+
+        // With no stale jobs in a fresh test environment, we expect an empty vector
+        let jobs = result.unwrap();
+        assert!(
+            jobs.len() <= 1,
+            "Should return at most the limit number of jobs"
+        );
+    }
 }

@@ -126,3 +126,165 @@ impl EnrichmentTableUrlJob {
         self.updated_at = chrono::Utc::now().timestamp_micros();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_status_to_i16_conversion() {
+        assert_eq!(i16::from(EnrichmentTableStatus::Pending), 0);
+        assert_eq!(i16::from(EnrichmentTableStatus::Processing), 1);
+        assert_eq!(i16::from(EnrichmentTableStatus::Completed), 2);
+        assert_eq!(i16::from(EnrichmentTableStatus::Failed), 3);
+    }
+
+    #[test]
+    fn test_status_from_ref_to_i16_conversion() {
+        assert_eq!(i16::from(&EnrichmentTableStatus::Pending), 0);
+        assert_eq!(i16::from(&EnrichmentTableStatus::Processing), 1);
+        assert_eq!(i16::from(&EnrichmentTableStatus::Completed), 2);
+        assert_eq!(i16::from(&EnrichmentTableStatus::Failed), 3);
+    }
+
+    #[test]
+    fn test_i16_to_status_conversion() {
+        assert_eq!(
+            EnrichmentTableStatus::from(0),
+            EnrichmentTableStatus::Pending
+        );
+        assert_eq!(
+            EnrichmentTableStatus::from(1),
+            EnrichmentTableStatus::Processing
+        );
+        assert_eq!(
+            EnrichmentTableStatus::from(2),
+            EnrichmentTableStatus::Completed
+        );
+        assert_eq!(
+            EnrichmentTableStatus::from(3),
+            EnrichmentTableStatus::Failed
+        );
+    }
+
+    #[test]
+    fn test_i16_to_status_invalid_defaults_to_pending() {
+        // Test that invalid status codes default to Pending
+        assert_eq!(
+            EnrichmentTableStatus::from(99),
+            EnrichmentTableStatus::Pending
+        );
+        assert_eq!(
+            EnrichmentTableStatus::from(-1),
+            EnrichmentTableStatus::Pending
+        );
+    }
+
+    #[test]
+    fn test_enrichment_table_url_job_new() {
+        let job = EnrichmentTableUrlJob::new(
+            "test_org".to_string(),
+            "test_table".to_string(),
+            "https://example.com/data.csv".to_string(),
+            false,
+        );
+
+        assert_eq!(job.org_id, "test_org");
+        assert_eq!(job.table_name, "test_table");
+        assert_eq!(job.url, "https://example.com/data.csv");
+        assert_eq!(job.status, EnrichmentTableStatus::Pending);
+        assert_eq!(job.error_message, None);
+        assert_eq!(job.total_bytes_fetched, 0);
+        assert_eq!(job.total_records_processed, 0);
+        assert_eq!(job.retry_count, 0);
+        assert_eq!(job.append_data, false);
+        assert_eq!(job.last_byte_position, 0);
+        assert_eq!(job.supports_range, false);
+    }
+
+    #[test]
+    fn test_mark_processing() {
+        let mut job = EnrichmentTableUrlJob::new(
+            "org".to_string(),
+            "table".to_string(),
+            "url".to_string(),
+            false,
+        );
+        let before = job.updated_at;
+
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        job.mark_processing();
+
+        assert_eq!(job.status, EnrichmentTableStatus::Processing);
+        assert!(job.updated_at > before);
+    }
+
+    #[test]
+    fn test_mark_completed() {
+        let mut job = EnrichmentTableUrlJob::new(
+            "org".to_string(),
+            "table".to_string(),
+            "url".to_string(),
+            false,
+        );
+        job.error_message = Some("error".to_string());
+
+        job.mark_completed();
+
+        assert_eq!(job.status, EnrichmentTableStatus::Completed);
+        assert_eq!(job.error_message, None);
+    }
+
+    #[test]
+    fn test_mark_failed() {
+        let mut job = EnrichmentTableUrlJob::new(
+            "org".to_string(),
+            "table".to_string(),
+            "url".to_string(),
+            false,
+        );
+
+        job.mark_failed("Test error".to_string());
+
+        assert_eq!(job.status, EnrichmentTableStatus::Failed);
+        assert_eq!(job.error_message, Some("Test error".to_string()));
+    }
+
+    #[test]
+    fn test_increment_retry() {
+        let mut job = EnrichmentTableUrlJob::new(
+            "org".to_string(),
+            "table".to_string(),
+            "url".to_string(),
+            false,
+        );
+        job.status = EnrichmentTableStatus::Processing;
+
+        job.increment_retry("Retry error".to_string());
+
+        assert_eq!(job.retry_count, 1);
+        assert_eq!(job.status, EnrichmentTableStatus::Pending);
+        assert_eq!(job.error_message, Some("Retry error".to_string()));
+
+        job.increment_retry("Second retry".to_string());
+        assert_eq!(job.retry_count, 2);
+    }
+
+    #[test]
+    fn test_update_progress() {
+        let mut job = EnrichmentTableUrlJob::new(
+            "org".to_string(),
+            "table".to_string(),
+            "url".to_string(),
+            false,
+        );
+
+        job.update_progress(1024, 10);
+        assert_eq!(job.total_bytes_fetched, 1024);
+        assert_eq!(job.total_records_processed, 10);
+
+        job.update_progress(2048, 20);
+        assert_eq!(job.total_bytes_fetched, 3072);
+        assert_eq!(job.total_records_processed, 30);
+    }
+}
