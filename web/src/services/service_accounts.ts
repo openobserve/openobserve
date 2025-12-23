@@ -17,6 +17,32 @@
 import http from "./http";
 import config from "../aws-exports";
 
+// Type definitions for API responses
+export interface SingleTokenResponse {
+  token: string;
+  user: string;
+}
+
+export interface OrgTokenInfo {
+  org_id: string;
+  org_name: string;
+  token: string;
+}
+
+export interface MultiTokenResponse {
+  user: string;
+  tokens: OrgTokenInfo[];
+}
+
+export type ServiceAccountTokenResponse = SingleTokenResponse | MultiTokenResponse;
+
+// Type guard to check if response is multi-token
+export function isMultiTokenResponse(
+  response: ServiceAccountTokenResponse
+): response is MultiTokenResponse {
+  return 'tokens' in response && Array.isArray((response as MultiTokenResponse).tokens);
+}
+
 const service_accounts = {
   list: (
     org_identifier: string,

@@ -147,6 +147,7 @@ pub struct OrgUserExpandedRecord {
     pub token: String,
     pub rum_token: Option<String>,
     pub created_at: i64,
+    pub is_meta_service_account: bool,
 }
 
 impl FromQueryResult for OrgUserExpandedRecord {
@@ -163,6 +164,8 @@ impl FromQueryResult for OrgUserExpandedRecord {
         let token = res.try_get(pre, "token")?;
         let rum_token = res.try_get(pre, "rum_token")?;
         let created_at = res.try_get(pre, "created_at")?;
+        let is_meta_service_account: Option<bool> =
+            res.try_get(pre, "is_meta_service_account").ok();
 
         Ok(Self {
             email,
@@ -177,6 +180,7 @@ impl FromQueryResult for OrgUserExpandedRecord {
             token,
             rum_token,
             created_at,
+            is_meta_service_account: is_meta_service_account.unwrap_or(false),
         })
     }
 }

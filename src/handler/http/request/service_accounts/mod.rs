@@ -16,7 +16,7 @@
 use std::io::{Error, ErrorKind};
 
 use actix_web::{
-    HttpRequest, HttpResponse, delete, get,
+    HttpMessage, HttpRequest, HttpResponse, delete, get,
     http::{self},
     post, put, web,
 };

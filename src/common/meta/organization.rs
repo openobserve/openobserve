@@ -61,6 +61,21 @@ pub struct OrganizationCreationResponse {
 }
 
 #[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
+pub struct ServiceAccountTokenInfo {
+    pub email: String,
+    pub token: String,
+    pub role: String,
+}
+
+#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
+pub struct OrganizationCreationResponse {
+    #[serde(flatten)]
+    pub organization: Organization,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service_account: Option<ServiceAccountTokenInfo>,
+}
+
+#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
 pub struct OrgRenameBody {
     pub new_name: String,
 }
@@ -247,6 +262,19 @@ pub enum IngestionTokensContainer {
 pub struct IngestionPasscode {
     pub passcode: String,
     pub user: String,
+}
+
+#[derive(Serialize, ToSchema, Clone)]
+pub struct OrgTokenInfo {
+    pub org_id: String,
+    pub org_name: String,
+    pub token: String,
+}
+
+#[derive(Serialize, ToSchema, Clone)]
+pub struct MetaServiceAccountTokens {
+    pub user: String,
+    pub tokens: Vec<OrgTokenInfo>,
 }
 
 #[derive(Serialize, ToSchema)]
