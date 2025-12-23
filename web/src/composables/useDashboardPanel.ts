@@ -125,6 +125,21 @@ const getDefaultDashboardPanelData: any = (store: any) => ({
         colorBySeries: [],
       },
       background: null,
+      // PromQL aggregation config
+      aggregation: "last",
+      // GeoMap config
+      lat_label: "latitude",
+      lon_label: "longitude",
+      weight_label: "weight",
+      name_label: "name",
+      symbol_size: 10,
+      enable_roam: true,
+      // PromQL Table config
+      table_aggregations: ["last"],
+      promql_table_mode: "single",
+      visible_columns: [],
+      hidden_columns: [],
+      sticky_columns: [],
     },
     htmlContent: "",
     markdownContent: "",
