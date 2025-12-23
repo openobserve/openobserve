@@ -406,6 +406,26 @@ pub struct PanelConfig {
     trellis: Option<Trellis>,
     #[serde(skip_serializing_if = "Option::is_none")]
     show_gridlines: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    aggregation: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    lat_label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    lon_label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    weight_label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    name_label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    table_aggregations: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    promql_table_mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    visible_columns: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hidden_columns: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sticky_columns: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]

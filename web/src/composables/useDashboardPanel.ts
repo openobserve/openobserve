@@ -133,8 +133,6 @@ const getDefaultDashboardPanelData: any = (store: any) => ({
       lon_label: "longitude",
       weight_label: "weight",
       name_label: "name",
-      symbol_size: 10,
-      enable_roam: true,
       // PromQL Table config
       table_aggregations: ["last"],
       promql_table_mode: "single",
