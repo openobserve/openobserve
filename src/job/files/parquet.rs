@@ -230,17 +230,6 @@ async fn scan_wal_files(
         {
             log::error!("[INGESTER:JOB] Failed to scan files: {e}");
         }
-        if let Err(e) = scan_files_with_channel(
-            pattern.as_path(),
-            "vortex", // TODO: create a constant for vortex extension
-            Some(cfg.limit.file_push_limit),
-            tx,
-        )
-        .await
-            && !e.to_string().contains("No such file or directory")
-        {
-            log::error!("[INGESTER:JOB] Failed to scan files: {e}");
-        }
     });
     let mut files_num = 0;
     loop {

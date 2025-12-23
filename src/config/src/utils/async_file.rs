@@ -228,11 +228,7 @@ pub fn create_wal_dir_datetime_filter(
             && (!path.is_file()
                 || path
                     .extension()
-                    .and_then(|extension| {
-                        extension
-                            .to_str()
-                            .map(|s| s.to_lowercase() == "parquet" || s.to_lowercase() == "vortex")
-                    })
+                    .and_then(|extension| extension.to_str().map(|s| s.to_lowercase() == "parquet"))
                     .unwrap_or_default())
     }
 }
