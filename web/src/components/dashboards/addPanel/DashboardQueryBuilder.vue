@@ -683,6 +683,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:operations="promqlBuilderQuery.operations"
       :dashboardData="dashboardPanelData"
     />
+    <PromQLBuilderOptions :dashboardPanelData="dashboardPanelData" />
   </div>
 
   <DashboardGeoMapsQueryBuilder :dashboardData="dashboardData" />
@@ -719,6 +720,7 @@ import { useStore } from "vuex";
 import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
 import LabelFilterEditor from "@/components/promql/components/LabelFilterEditor.vue";
 import OperationsList from "@/components/promql/components/OperationsList.vue";
+import PromQLBuilderOptions from "@/components/promql/components/PromQLBuilderOptions.vue";
 import { promQueryModeller } from "@/components/promql/operations/queryModeller";
 import type { PromVisualQuery } from "@/components/promql/types";
 
@@ -735,6 +737,7 @@ export default defineComponent({
     DynamicFunctionPopUp,
     LabelFilterEditor,
     OperationsList,
+    PromQLBuilderOptions,
   },
   props: ["dashboardData"],
   setup(props) {
