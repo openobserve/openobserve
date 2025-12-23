@@ -62,11 +62,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(value, key) in pendingDimensions"
             :key="key"
-            class="tw-flex tw-items-center tw-gap-2"
+            class="tw:flex tw:items-center tw:gap-2"
           >
             <span
-              class="tw-text-xs tw-font-semibold"
-              :class="unstableDimensionKeys.has(key) ? 'tw-opacity-60' : 'tw-opacity-100'"
+              class="tw:text-xs tw:font-semibold"
+              :class="unstableDimensionKeys.has(key) ? 'tw:opacity-60' : 'tw:opacity-100'"
             >
               {{ key }}:
             </span>
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('common.apply')"
             :disable="!hasPendingChanges"
             @click="applyDimensionChanges"
-            class="o2-secondary-button tw-ml-2"
+            class="o2-secondary-button tw:ml-2"
             data-test="apply-dimension-filters"
           />
         </div>
@@ -449,11 +449,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="(value, key) in pendingDimensions"
           :key="key"
-          class="tw-flex tw-items-center tw-gap-2"
+          class="tw:flex tw:items-center tw:gap-2"
         >
           <span
-            class="tw-text-xs tw-font-semibold"
-            :class="unstableDimensionKeys.has(key) ? 'tw-opacity-60' : 'tw-opacity-100'"
+            class="tw:text-xs tw:font-semibold"
+            :class="unstableDimensionKeys.has(key) ? 'tw:opacity-60' : 'tw:opacity-100'"
           >
             {{ key }}:
           </span>
@@ -482,7 +482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('common.apply')"
           :disable="!hasPendingChanges"
           @click="applyDimensionChanges"
-          class="o2-secondary-button tw-ml-2"
+          class="o2-secondary-button tw:ml-2"
           data-test="apply-dimension-filters-embedded"
           style="line-height: 2.2rem !important;"
         />
