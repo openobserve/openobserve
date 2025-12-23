@@ -78,6 +78,7 @@ mod m20251126_100001_create_service_streams_table;
 mod m20251126_100002_create_service_streams_dimensions_table;
 mod m20251204_000001_create_alert_incidents_table;
 mod m20251207_000001_create_system_settings_table;
+mod m20251219_000001_add_org_id_to_search_queue;
 
 pub struct Migrator;
 
@@ -145,6 +146,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20251126_100002_create_service_streams_dimensions_table::Migration),
             Box::new(m20251204_000001_create_alert_incidents_table::Migration),
             Box::new(m20251207_000001_create_system_settings_table::Migration),
+            Box::new(m20251219_000001_add_org_id_to_search_queue::Migration),
         ]
     }
 }
