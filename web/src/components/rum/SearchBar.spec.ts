@@ -339,6 +339,14 @@ describe("SearchBar Component", () => {
       wrapper.vm.searchObj.meta.sqlMode = true;
       const queryValue = "SELECT * FROM test_stream";
 
+      // Ensure streamResults.list is initialized
+      if (!wrapper.vm.searchObj.data.streamResults) {
+        wrapper.vm.searchObj.data.streamResults = { list: [] };
+      }
+      if (!wrapper.vm.searchObj.data.streamResults.list) {
+        wrapper.vm.searchObj.data.streamResults.list = [];
+      }
+
       await wrapper.vm.updateQueryValue(queryValue);
 
       expect(mockParser.astify).toHaveBeenCalledWith(queryValue);
@@ -467,14 +475,17 @@ describe("SearchBar Component", () => {
         revokeObjectURL: vi.fn(),
       };
 
-      // Mock File constructor
-      globalThis.File = vi
-        .fn()
-        .mockImplementation((data, filename, options) => ({
-          data,
-          filename,
-          options,
-        }));
+      // Mock File constructor as a proper class that can be used with 'new' keyword
+      const MockFileConstructor = vi.fn(function(this: any, data: any, filename: string, options: any) {
+        this.data = data;
+        this.filename = filename;
+        this.options = options;
+        this.type = options?.type || '';
+        this.size = Array.isArray(data) ? data.join('').length : 0;
+        return this;
+      });
+
+      globalThis.File = MockFileConstructor as any;
 
       // Mock document methods only for download operations
       const mockLink = {

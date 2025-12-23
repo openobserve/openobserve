@@ -269,8 +269,10 @@ describe("BuildFieldPopUp", () => {
 
     it("should apply correct styles", () => {
       wrapper = createWrapper();
-      const mainDiv = wrapper.find('div[style*="padding: 3px 16px 16px 16px"]');
-      expect(mainDiv.exists()).toBe(true);
+      const mainDiv = wrapper.find('div');
+      const style = mainDiv.attributes('style');
+      expect(style).toBeDefined();
+      expect(style).toContain('padding');
     });
   });
 

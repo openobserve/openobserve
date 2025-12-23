@@ -308,8 +308,8 @@ describe('ScriptEditor.vue', () => {
   describe('Component Structure', () => {
     it('has correct main wrapper structure', () => {
       wrapper = createWrapper();
-      
-      const mainDiv = wrapper.find('.tw:w-full.tw:h-full');
+
+      const mainDiv = wrapper.find('[class*="tw:w-full"][class*="tw:h-full"]');
       expect(mainDiv.exists()).toBe(true);
     });
 

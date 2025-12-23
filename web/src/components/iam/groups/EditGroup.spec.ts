@@ -459,7 +459,7 @@ describe("EditGroup Component", () => {
   describe("Theme Support", () => {
     it("applies correct theme classes to sticky footer", () => {
       // Footer classes have been updated to use Tailwind CSS
-      const footer = wrapper.find('.flex.justify-end.tw:w-full');
+      const footer = wrapper.find('[class*="flex"][class*="justify-end"][class*="tw:w-full"]');
       expect(footer.exists()).toBe(true);
       // Test that theme classes are applied correctly
     });
@@ -481,7 +481,7 @@ describe("EditGroup Component", () => {
       });
 
       // Footer classes have been updated, theme classes are no longer applied to footer
-      const footer = wrapper.find('.flex.justify-end.tw:w-full');
+      const footer = wrapper.find('[class*="flex"][class*="justify-end"][class*="tw:w-full"]');
       expect(footer.exists()).toBe(true);
     });
   });

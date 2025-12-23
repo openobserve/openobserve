@@ -703,7 +703,7 @@ describe("zincutils", () => {
 
     describe("getCronIntervalDifferenceInSeconds", () => {
       it("should calculate interval for valid cron expression", () => {
-        const interval = getCronIntervalDifferenceInSeconds("0 */5 * * * *"); // Every 5 minutes
+        const interval = getCronIntervalDifferenceInSeconds("0 */5 * * * *"); // Every 5 minutes (6-field format: second minute hour day month weekday)
         expect(interval).toBe(300); // 5 minutes = 300 seconds
       });
 

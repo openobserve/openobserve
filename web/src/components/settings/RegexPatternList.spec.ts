@@ -37,35 +37,55 @@ vi.mock('@/aws-exports', () => ({
   }
 }));
 
+// Store original createElement to restore later
+const originalCreateElement = document.createElement.bind(document);
+
 // Mock URL.createObjectURL and URL.revokeObjectURL
 const mockCreateObjectURL = vi.fn(() => 'mock-blob-url');
 const mockRevokeObjectURL = vi.fn();
-Object.defineProperty(global.URL, 'createObjectURL', {
-  value: mockCreateObjectURL,
-  configurable: true
-});
-Object.defineProperty(global.URL, 'revokeObjectURL', {
-  value: mockRevokeObjectURL,
-  configurable: true
-});
 
-// Mock document.createElement
+// Mock document.createElement for anchor elements
 const mockClick = vi.fn();
-const mockLink = {
-  href: '',
-  download: '',
-  click: mockClick
-};
-Object.defineProperty(document, 'createElement', {
-  value: vi.fn(() => mockLink),
-  configurable: true
-});
+let mockLink: any;
 
-// Mock Blob
-global.Blob = vi.fn().mockImplementation((content, options) => ({
-  content,
-  options
-}));
+// Setup function to reset mocks before each test
+const setupMocks = () => {
+  mockCreateObjectURL.mockClear();
+  mockRevokeObjectURL.mockClear();
+  mockClick.mockClear();
+
+  // Ensure URL methods are properly assigned and return values
+  global.URL.createObjectURL = mockCreateObjectURL.mockReturnValue('mock-blob-url');
+  global.URL.revokeObjectURL = mockRevokeObjectURL;
+
+  // Create a new mock link for each test
+  mockLink = {
+    href: '',
+    download: '',
+    click: mockClick,
+    style: {},
+    setAttribute: vi.fn(),
+    getAttribute: vi.fn(),
+    removeAttribute: vi.fn(),
+  };
+
+  // Mock document.createElement to return our mock link for 'a' tags
+  document.createElement = vi.fn((tagName: string) => {
+    if (tagName === 'a') {
+      return mockLink as any;
+    }
+    return originalCreateElement(tagName);
+  }) as any;
+};
+
+// Mock Blob as a proper constructor
+global.Blob = vi.fn(function(this: any, content: any, options: any) {
+  this.content = content;
+  this.options = options;
+  this.type = options?.type || '';
+  this.size = Array.isArray(content) ? content.join('').length : 0;
+  return this;
+}) as any;
 
 // Mock i18n
 const mockT = vi.fn((key) => key);
@@ -124,6 +144,9 @@ describe('RegexPatternList.vue Component Logic', () => {
   beforeEach(() => {
     // Reset mocks
     vi.clearAllMocks();
+
+    // Setup DOM mocks
+    setupMocks();
     
     // Setup service mocks
     regexPatternsService.list.mockResolvedValue({
@@ -284,15 +307,20 @@ describe('RegexPatternList.vue Component Logic', () => {
         const link = document.createElement('a');
         link.href = url;
         link.download = `${row.name || 'regex_pattern'}.json`;
-        link.click();
+
+        // Ensure click is callable
+        if (typeof link.click === 'function') {
+          link.click();
+        }
+
         mockQuasar.notify({
           message: 'Regex pattern exported successfully',
           color: 'positive',
           icon: 'check',
         });
-      } catch (error) {
+      } catch (error: any) {
         mockQuasar.notify({
-          message: error.data?.message || 'Error exporting regex pattern',
+          message: error?.data?.message || error?.message || 'Error exporting regex pattern',
           color: 'negative',
           icon: 'error',
         });
@@ -509,10 +537,23 @@ describe('RegexPatternList.vue Component Logic', () => {
   // Test 15: exportRegexPattern function creates and downloads file
   it('should create and download file in exportRegexPattern', () => {
     const setup = createComponentSetup();
-    const testRow = mockRegexPatterns[0];
-    
+    const testRow = { ...mockRegexPatterns[0] };
+
+    // Reset mocks and ensure they work properly
+    mockCreateObjectURL.mockClear();
+    mockClick.mockClear();
+    mockRevokeObjectURL.mockClear();
+    mockQuasar.notify.mockClear();
+    (global.Blob as any).mockClear();
+
+    // Ensure mock returns a value
+    mockCreateObjectURL.mockReturnValue('mock-blob-url');
+
+    // Reset mockLink download property
+    mockLink.download = '';
+
     setup.exportRegexPattern(testRow);
-    
+
     expect(mockCreateObjectURL).toHaveBeenCalled();
     expect(mockLink.download).toBe('Test Pattern 1.json');
     expect(mockClick).toHaveBeenCalled();
@@ -522,10 +563,23 @@ describe('RegexPatternList.vue Component Logic', () => {
   // Test 16: exportRegexPattern function uses default filename when name is missing
   it('should use default filename when name is missing in exportRegexPattern', () => {
     const setup = createComponentSetup();
-    const testRow = { ...mockRegexPatterns[0], name: '' };
-    
+    const testRow = { ...mockRegexPatterns[0], name: '', pattern: 'test', description: 'desc' };
+
+    // Reset mocks and ensure they work properly
+    mockCreateObjectURL.mockClear();
+    mockClick.mockClear();
+    mockRevokeObjectURL.mockClear();
+    mockQuasar.notify.mockClear();
+    (global.Blob as any).mockClear();
+
+    // Ensure mock returns a value
+    mockCreateObjectURL.mockReturnValue('mock-blob-url');
+
+    // Reset mockLink download property
+    mockLink.download = '';
+
     setup.exportRegexPattern(testRow);
-    
+
     expect(mockLink.download).toBe('regex_pattern.json');
   });
 
@@ -650,17 +704,18 @@ describe('RegexPatternList.vue Component Logic', () => {
     mockCreateObjectURL.mockImplementation(() => {
       throw new Error('Blob error');
     });
-    
+
     const setup = createComponentSetup();
-    
+
     setup.exportRegexPattern(mockRegexPatterns[0]);
-    
+
+    // The error handler now includes the actual error message in the catch block
     expect(mockQuasar.notify).toHaveBeenCalledWith({
-      message: 'Error exporting regex pattern',
+      message: 'Blob error',
       color: 'negative',
       icon: 'error',
     });
-    
+
     // Reset mock
     mockCreateObjectURL.mockReturnValue('mock-blob-url');
   });
@@ -843,15 +898,28 @@ describe('RegexPatternList.vue Component Logic', () => {
   // Test 39: Component handles export notifications correctly
   it('should show success notification after export', () => {
     const setup = createComponentSetup();
-    const testRow = mockRegexPatterns[0];
-    
+    const testRow = { ...mockRegexPatterns[0] };
+
+    // Reset all mocks to ensure clean state
+    mockCreateObjectURL.mockClear();
+    mockClick.mockClear();
+    mockRevokeObjectURL.mockClear();
+    mockQuasar.notify.mockClear();
+    (global.Blob as any).mockClear();
+
+    // Ensure all mocks return proper values
+    mockCreateObjectURL.mockReturnValue('mock-blob-url');
+    mockLink.download = '';
+    mockLink.href = '';
+
     setup.exportRegexPattern(testRow);
-    
-    expect(mockQuasar.notify).toHaveBeenCalledWith({
-      message: 'Regex pattern exported successfully',
-      color: 'positive',
-      icon: 'check',
-    });
+
+    // Verify the notification was called with success message
+    expect(mockQuasar.notify).toHaveBeenCalled();
+    const notifyCall = mockQuasar.notify.mock.calls[0][0];
+    expect(notifyCall.message).toBe('Regex pattern exported successfully');
+    expect(notifyCall.color).toBe('positive');
+    expect(notifyCall.icon).toBe('check');
   });
 
   // Test 40: Component handles API error with response.data.message in deleteRegexPattern

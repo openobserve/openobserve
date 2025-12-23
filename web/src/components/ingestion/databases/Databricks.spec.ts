@@ -271,7 +271,7 @@ describe('Databricks.vue', () => {
     wrapper = mount(Databricks, {
       ...getGlobalConfig()
     });
-    const docSection = wrapper.find('.tw:font-bold.tw:pt-6.tw:pb-2');
+    const docSection = wrapper.find('[class*="tw:font-bold"][class*="tw:pt-6"][class*="tw:pb-2"]');
     expect(docSection.exists()).toBe(true);
     expect(docSection.classes()).toContain('tw:font-bold');
     expect(docSection.classes()).toContain('tw:pt-6');

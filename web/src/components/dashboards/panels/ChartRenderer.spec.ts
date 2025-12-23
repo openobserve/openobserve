@@ -32,11 +32,12 @@ vi.mock("echarts/core", () => ({
     clear: vi.fn(),
     showLoading: vi.fn(),
     hideLoading: vi.fn(),
-    getOption: vi.fn().mockReturnValue({ 
+    getOption: vi.fn().mockReturnValue({
       series: [{ data: [[1609459200000, 10], [1609462800000, 20]] }],
       legend: [{}]
     }),
     dispatchAction: vi.fn(),
+    convertFromPixel: vi.fn(),
   }),
   dispose: vi.fn(),
 }));
@@ -141,12 +142,12 @@ describe("ChartRenderer", () => {
       setHoveredSeriesName: vi.fn(),
     };
 
-    // Mock intersection observer
-    global.IntersectionObserver = vi.fn().mockImplementation((callback) => ({
-      observe: vi.fn(),
-      unobserve: vi.fn(),
-      disconnect: vi.fn(),
-    }));
+    // Mock intersection observer as a constructor that can be called with 'new'
+    global.IntersectionObserver = vi.fn(function(this: any, callback: any) {
+      this.observe = vi.fn();
+      this.unobserve = vi.fn();
+      this.disconnect = vi.fn();
+    }) as any;
 
     // Mock window event listeners
     global.addEventListener = vi.fn();

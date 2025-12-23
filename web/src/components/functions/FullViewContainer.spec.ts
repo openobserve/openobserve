@@ -170,7 +170,7 @@ describe('FullViewContainer.vue', () => {
 
     it('applies custom label class', () => {
       wrapper = createWrapper({ labelClass: 'tw:text-red-500' });
-      const label = wrapper.find('.tw:text-\\[14px\\]');
+      const label = wrapper.find('[class*="tw:text-[14px]"]');
       expect(label.classes()).toContain('tw:text-red-500');
     });
   });
@@ -178,13 +178,13 @@ describe('FullViewContainer.vue', () => {
   describe('Theme Handling', () => {
     it('applies correct text color for light theme', () => {
       wrapper = createWrapper({}, { theme: 'light' });
-      const label = wrapper.find('.tw:text-\\[14px\\]');
+      const label = wrapper.find('[class*="tw:text-[14px]"]');
       expect(label.classes()).toContain('tw:text-gray-500');
     });
 
     it('applies correct text color for dark theme', () => {
       wrapper = createWrapper({}, { theme: 'dark' });
-      const label = wrapper.find('.tw:text-\\[14px\\]');
+      const label = wrapper.find('[class*="tw:text-[14px]"]');
       expect(label.classes()).toContain('tw:text-gray-100');
     });
 
@@ -214,7 +214,7 @@ describe('FullViewContainer.vue', () => {
 
     it('emits update:isExpanded when label is clicked and showExpandIcon is true', async () => {
       wrapper = createWrapper({ isExpanded: false, showExpandIcon: true });
-      const label = wrapper.find('.tw:text-\\[14px\\]');
+      const label = wrapper.find('[class*="tw:text-[14px]"]');
 
       await label.trigger('click');
 
@@ -224,7 +224,7 @@ describe('FullViewContainer.vue', () => {
 
     it('does not emit update:isExpanded when label is clicked and showExpandIcon is false', async () => {
       wrapper = createWrapper({ isExpanded: false, showExpandIcon: false });
-      const label = wrapper.find('.tw:text-\\[14px\\]');
+      const label = wrapper.find('[class*="tw:text-[14px]"]');
 
       await label.trigger('click');
 
@@ -458,13 +458,13 @@ describe('FullViewContainer.vue', () => {
 
     it('applies correct flex layout classes', () => {
       wrapper = createWrapper();
-      const flexContainer = wrapper.find('.tw:flex.tw:justify-between');
+      const flexContainer = wrapper.find('[class*="tw:flex"][class*="tw:justify-between"]');
       expect(flexContainer.exists()).toBe(true);
     });
 
     it('applies correct label styling classes', () => {
       wrapper = createWrapper();
-      const label = wrapper.find('.tw:text-\\[14px\\]');
+      const label = wrapper.find('[class*="tw:text-[14px]"]');
       expect(label.classes()).toContain('tw:font-bold');
     });
 
@@ -473,12 +473,12 @@ describe('FullViewContainer.vue', () => {
       
       // Check main container
       expect(wrapper.find('div').exists()).toBe(true);
-      
+
       // Check flex container
-      expect(wrapper.find('.tw:flex.tw:justify-between').exists()).toBe(true);
-      
+      expect(wrapper.find('[class*="tw:flex"][class*="tw:justify-between"]').exists()).toBe(true);
+
       // Check left and right sections
-      expect(wrapper.findAll('.tw:flex.tw:items-center')).toHaveLength(1);
+      expect(wrapper.findAll('[class*="tw:flex"][class*="tw:items-center"]')).toHaveLength(1);
     });
   });
 
@@ -486,7 +486,7 @@ describe('FullViewContainer.vue', () => {
     it('provides clickable elements for keyboard navigation', () => {
       wrapper = createWrapper();
       const icon = wrapper.find('.q-icon-stub');
-      const label = wrapper.find('.tw:text-\\[14px\\]');
+      const label = wrapper.find('[class*="tw:text-[14px]"]');
       
       expect(icon.classes()).toContain('tw:cursor-pointer');
       // Label should be clickable when showExpandIcon is true

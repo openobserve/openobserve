@@ -189,6 +189,16 @@ vi.mock("@/utils/dashboard/checkConfigChangeApiCall", () => ({
   checkIfConfigChangeRequiredApiCallOrNot: vi.fn(() => shouldRequireApiCall),
 }));
 
+// Mock AbortController globally before any imports
+global.AbortController = class MockAbortController {
+  signal = {
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    aborted: false,
+  };
+  abort = vi.fn();
+} as any;
+
 // Mock Vue's onMounted and onUnmounted to avoid warnings
 vi.mock("vue", async () => {
   const actual = await vi.importActual("vue");
@@ -319,15 +329,15 @@ describe("usePanelDataLoader", () => {
     // Mock clearTimeout
     vi.spyOn(global, "clearTimeout").mockImplementation(() => {});
 
-    // Mock AbortController
-    global.AbortController = vi.fn().mockImplementation(() => ({
-      signal: {
+    // Reset AbortController mock for each test
+    global.AbortController = class MockAbortController {
+      signal = {
         addEventListener: vi.fn(),
         removeEventListener: vi.fn(),
         aborted: false,
-      },
-      abort: vi.fn(),
-    }));
+      };
+      abort = vi.fn();
+    } as any;
 
     // Mock window.addEventListener and removeEventListener 
     vi.spyOn(window, 'addEventListener').mockImplementation(() => {});
@@ -2798,15 +2808,15 @@ describe("usePanelDataLoader", () => {
         const selectedTimeObj = createMockSelectedTimeObj();
         const variablesData = createMockVariablesData();
 
-        // Mock AbortController to throw abort error
-        global.AbortController = vi.fn().mockImplementation(() => ({
-          signal: {
+        // Reset AbortController to ensure clean state
+        global.AbortController = class MockAbortController {
+          signal = {
             addEventListener: vi.fn(),
             removeEventListener: vi.fn(),
             aborted: false,
-          },
-          abort: vi.fn(),
-        }));
+          };
+          abort = vi.fn();
+        } as any;
 
         const loader = usePanelDataLoader(
           panelSchema,

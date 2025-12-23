@@ -122,14 +122,14 @@ describe("LoadingProgress", () => {
   it("should have correct CSS classes for dark theme", () => {
     store.state.theme = "dark";
     wrapper = createWrapper();
-    const element = wrapper.find('.tw:relative.tw:overflow-x-hidden');
+    const element = wrapper.find('[class*="tw:relative"][class*="tw:overflow-x-hidden"]');
     expect(element.classes()).toContain('tw:bg-gray-700');
   });
 
   it("should have correct CSS classes for light theme", () => {
     store.state.theme = "light";
     wrapper = createWrapper();
-    const element = wrapper.find('.tw:relative.tw:overflow-x-hidden');
+    const element = wrapper.find('[class*="tw:relative"][class*="tw:overflow-x-hidden"]');
     expect(element.classes()).toContain('tw:bg-gray-200');
   });
 

@@ -2187,6 +2187,8 @@ export default defineComponent({
       clearMultiWindows,
       validateStep,
       handleGoToSqlEditor,
+      importSqlParser,
+      parser,
     };
   },
 

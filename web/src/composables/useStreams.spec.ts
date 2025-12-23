@@ -552,18 +552,19 @@ describe("useStreams Composable", () => {
     it("should handle resetStreamType error gracefully", () => {
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-      // Mock Object.hasOwn to throw error
-      const originalHasOwn = Object.hasOwn;
+      // Mock store.dispatch to throw error to test error handling
+      const originalDispatch = mockStore.dispatch;
+      mockStore.dispatch = vi.fn().mockImplementation(() => {
+        throw new Error("Test error");
+      });
 
       try {
-        Object.hasOwn = vi.fn().mockImplementation(() => { throw new Error("Test error"); });
-
         streamsInstance.resetStreamType("logs");
 
         expect(consoleSpy).toHaveBeenCalledWith("Error while clearing local cache for stream type.", expect.any(Error));
       } finally {
         // Always restore in finally block
-        Object.hasOwn = originalHasOwn;
+        mockStore.dispatch = originalDispatch;
         consoleSpy.mockRestore();
       }
     });

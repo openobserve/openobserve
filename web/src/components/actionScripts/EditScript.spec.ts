@@ -543,7 +543,9 @@ describe("EditScript", () => {
 
   describe("Cron validation", () => {
     it("should validate cron expression", async () => {
-      wrapper.vm.frequency.cron = "0 0 * * *";
+      // Set a valid cron expression that runs every 5 minutes (well above min interval)
+      // Using 6-field format (second minute hour day month weekday) for cron-parser v5.x
+      wrapper.vm.frequency.cron = "0 */5 * * * *";
       wrapper.vm.validateFrequency(wrapper.vm.frequency.cron);
 
       expect(wrapper.vm.cronError).toBe("");

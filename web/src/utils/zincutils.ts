@@ -1142,7 +1142,7 @@ export function convertUnixToQuasarFormat(unixMicroseconds: any) {
 export function getCronIntervalDifferenceInSeconds(cronExpression: string) {
   // Parse the cron expression using cron-parser
   try {
-    const interval = cronParser.parseExpression(cronExpression);
+    const interval = cronParser.parse(cronExpression);
 
     // Get the first and second execution times
     const firstExecution = interval.next();
