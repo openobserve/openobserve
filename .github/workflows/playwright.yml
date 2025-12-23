@@ -106,9 +106,9 @@ jobs:
     needs: [build_binary]
     runs-on:
       labels: repo-openobserve-standard-8
-    container:
-      image: mcr.microsoft.com/playwright:v1.50.0-jammy
-      options: --user root 
+    # container:
+    #   image: mcr.microsoft.com/playwright:v1.50.0-jammy
+    #   options: --user root 
     strategy:
       matrix:
         include:
@@ -318,8 +318,7 @@ jobs:
           echo "ZO_SMTP_ENABLED=${ZO_SMTP_ENABLED}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci
-          # Browsers already installed in Docker container
-          # npx playwright install --with-deps chromium
+          npx playwright install --with-deps chromium
 
           # Check if this is a rerun
           IS_RERUN="${{ steps.check_rerun.outputs.is_rerun }}"
