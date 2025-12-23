@@ -55,6 +55,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ? panelData
               : { options: { backgroundColor: 'transparent' } }
           "
+          :value-mapping="panelSchema?.config?.mappings ?? []"
+          @row-click="onChartClick"
+          ref="tableRendererRef"
+          :wrap-cells="panelSchema.config?.wrap_table_cells"
         />
         <div
           v-else-if="panelSchema.type == 'html'"
