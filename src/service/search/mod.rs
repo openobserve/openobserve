@@ -44,6 +44,7 @@ use config::{
 use hashbrown::HashMap;
 use infra::{
     cache::stats,
+    cluster::get_cached_online_querier_nodes,
     errors::{Error, ErrorCodes},
     schema::unwrap_stream_settings,
 };
@@ -81,12 +82,9 @@ use {
 
 use super::self_reporting::report_request_usage_stats;
 use crate::{
-    common::{
-        infra::cluster as infra_cluster,
-        utils::{
-            functions::{get_all_transform_keys, init_vrl_runtime},
-            stream::get_settings_max_query_range,
-        },
+    common::utils::{
+        functions::{get_all_transform_keys, init_vrl_runtime},
+        stream::get_settings_max_query_range,
     },
     handler::grpc::request::search::Searcher,
     service::search::{
@@ -815,7 +813,7 @@ pub async fn search_partition(
         return Ok(response);
     };
 
-    let nodes = infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
+    let nodes = get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
         .await
         .unwrap_or_default();
     if nodes.is_empty() {

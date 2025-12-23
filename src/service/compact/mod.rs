@@ -24,6 +24,7 @@ use config::{
     },
 };
 use infra::{
+    cluster::get_node_from_consistent_hash,
     file_list as infra_file_list,
     schema::{get_settings, unwrap_partition_time_level},
 };
@@ -31,7 +32,7 @@ use infra::{
 use o2_enterprise::enterprise::common::downsampling::get_matching_downsampling_rules;
 use tokio::sync::mpsc;
 
-use crate::{common::infra::cluster::get_node_from_consistent_hash, service::db};
+use crate::service::db;
 
 pub mod deleted;
 pub mod dump;

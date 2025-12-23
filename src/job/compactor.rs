@@ -19,11 +19,11 @@ use config::{
     meta::{cluster::CompactionJobType, stream::ALL_STREAM_TYPES},
     metrics, spawn_pausable_job,
 };
+use infra::cluster::get_node_by_uuid;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 
-use crate::{common::infra::cluster::get_node_by_uuid, service::compact};
-
+use crate::service::compact;
 const ENRICHMENT_TABLE_MERGE_LOCK_KEY: &str = "/compact/enrichment_table";
 
 pub async fn run() -> Result<(), anyhow::Error> {

@@ -25,15 +25,12 @@ use config::{
     utils::time::{BASE_TIME, day_micros, get_ymdh_from_micros, hour_micros},
 };
 use infra::{
-    dist_lock, file_list as infra_file_list,
+    cluster::get_node_by_uuid, dist_lock, file_list as infra_file_list,
     table::compactor_manual_jobs::Status as CompactorManualJobStatus,
 };
 use itertools::Itertools;
 
-use crate::{
-    common::infra::cluster::get_node_by_uuid,
-    service::{db, file_list, file_list_dump::generate_dump_stream_name},
-};
+use crate::service::{db, file_list, file_list_dump::generate_dump_stream_name};
 
 /// This function will split the original time range based on the exclude range
 /// It expects a mutable reference to a Vec which will be populated with the split time ranges

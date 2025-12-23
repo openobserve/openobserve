@@ -29,8 +29,9 @@ use actix_web::{
     route, web,
 };
 use hashbrown::HashMap;
+use infra::cluster;
 
-use crate::common::{infra::cluster, utils::http::get_search_type_from_request};
+use crate::common::utils::http::get_search_type_from_request;
 
 struct URLDetails {
     is_error: bool,
