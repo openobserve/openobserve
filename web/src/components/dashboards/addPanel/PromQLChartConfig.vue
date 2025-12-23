@@ -126,30 +126,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-input>
 
-      <q-input
-        v-model.number="geoSymbolSize"
-        :label="t('dashboard.geoSymbolSize')"
-        type="number"
-        placeholder="10"
-        borderless
-        dense
-        class="tw-mb-3 showLabelOnTop"
-        stack-label
-        data-test="dashboard-config-geo-symbol-size"
-      >
-        <template v-slot:label>
-          <div class="row items-center all-pointer-events tw-mb-[-5px]">
-            {{ t("dashboard.geoSymbolSize") }}
-          </div>
-        </template>
-      </q-input>
-
-      <q-toggle
-        v-model="geoEnableRoam"
-        :label="t('dashboard.geoEnableRoam')"
-        class="q-py-sm"
-        data-test="dashboard-config-geo-enable-roam"
-      />
     </div>
 
     <!-- Maps Label Configuration -->
@@ -197,12 +173,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-select>
 
-      <q-toggle
-        v-model="mapsEnableRoam"
-        :label="t('dashboard.mapsEnableRoam')"
-        class="q-py-sm"
-        data-test="dashboard-config-maps-enable-roam"
-      />
     </div>
 
     <!-- Table Configuration -->
@@ -585,26 +555,6 @@ export default defineComponent({
       },
     });
 
-    const geoSymbolSize = computed({
-      get: () => dashboardPanelData.data.config?.symbol_size || 10,
-      set: (value: number) => {
-        if (!dashboardPanelData.data.config) {
-          dashboardPanelData.data.config = {};
-        }
-        dashboardPanelData.data.config.symbol_size = value;
-      },
-    });
-
-    const geoEnableRoam = computed({
-      get: () => dashboardPanelData.data.config?.enable_roam !== false,
-      set: (value: boolean) => {
-        if (!dashboardPanelData.data.config) {
-          dashboardPanelData.data.config = {};
-        }
-        dashboardPanelData.data.config.enable_roam = value;
-      },
-    });
-
     const geoWeightLabel = computed({
       get: () => dashboardPanelData.data.config?.weight_label || "weight",
       set: (value: string) => {
@@ -918,8 +868,6 @@ export default defineComponent({
       geoLonLabel,
       geoWeightLabel,
       geoNameLabel,
-      geoSymbolSize,
-      geoEnableRoam,
       mapsNameLabel,
       mapsMapType,
       mapsEnableRoam,
