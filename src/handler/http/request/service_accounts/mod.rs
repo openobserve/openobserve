@@ -16,7 +16,7 @@
 use std::io::{Error, ErrorKind};
 
 use actix_web::{
-    HttpRequest, HttpResponse, delete, get,
+    HttpMessage, HttpRequest, HttpResponse, delete, get,
     http::{self},
     post, put, web,
 };
@@ -371,7 +371,9 @@ pub async fn delete_bulk(
      tag = "ServiceAccounts",
     operation_id = "GetServiceAccountToken",
     summary = "Get service account API token",
-    description = "Retrieves the current API token for a specific service account. The API token is used for authenticating automated systems and applications when making API requests. Keep tokens secure and rotate them regularly for security best practices. If the token is compromised, use the update endpoint with rotateToken=true to generate a new one.",
+    description = "Retrieves the current API token for a specific service account. The API token is used for authenticating automated systems and applications when making API requests. Keep tokens secure and rotate them regularly for security best practices. If the token is compromised, use the update endpoint with rotateToken=true to generate a new one. \
+                   \
+                   When accessed from _meta org for a meta service account (one with is_meta_service_account=true in customer orgs), returns all tokens across all organizations. For regular orgs or non-meta service accounts, returns only the single org token.",
     security(
         ("Authorization"= [])
     ),
@@ -380,7 +382,7 @@ pub async fn delete_bulk(
         ("email_id" = String, Path, description = "Service Account email id"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(APIToken)),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -389,8 +391,100 @@ pub async fn delete_bulk(
     )
 )]
 #[get("/{org_id}/service_accounts/{email_id}")]
-pub async fn get_api_token(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+pub async fn get_api_token(
+    path: web::Path<(String, String)>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
     let (org, user_id) = path.into_inner();
+
+    // If accessing from _meta org, check if this is a meta service account
+    // and return all tokens if so
+    if org == config::META_ORG_ID {
+        // Extract requester identity for authorization check
+        let requester_email = {
+            let extensions = req.extensions();
+            match extensions.get::<UserEmail>() {
+                Some(email) => email.user_id.clone(),
+                None => {
+                    log::error!(
+                        "Multi-token request without authentication | target_sa={}",
+                        user_id
+                    );
+                    return Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
+                        http::StatusCode::UNAUTHORIZED,
+                        "Authentication required",
+                    )));
+                }
+            }
+        }; // extensions is dropped here
+
+        // Verify requester has permission to view tokens
+        #[cfg(feature = "enterprise")]
+        {
+            use o2_openfga::{
+                authorizer::authz::is_allowed, config::get_config as get_openfga_config,
+            };
+
+            if get_openfga_config().enabled {
+                // Check if requester has permission to view this service account's tokens
+                // We check for "GET" permission on the service account resource
+                let has_permission = is_allowed(
+                    config::META_ORG_ID,
+                    &requester_email,
+                    "GET",
+                    &format!("service_account:{}", user_id),
+                    "",
+                    "", // Role will be determined by OpenFGA
+                )
+                .await;
+
+                if !has_permission {
+                    log::warn!(
+                        "Unauthorized multi-token access attempt | requester={} | target_sa={} | org={}",
+                        requester_email,
+                        user_id,
+                        org
+                    );
+                    return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                        http::StatusCode::FORBIDDEN,
+                        "Insufficient permissions to view tokens",
+                    )));
+                }
+            }
+        }
+
+        // Audit log for multi-token retrieval
+        log::warn!(
+            "Multi-token retrieval | requester={} | target_sa={} | org={}",
+            requester_email,
+            user_id,
+            org
+        );
+
+        // Try to get all tokens for meta service account
+        match crate::service::organization::get_meta_service_account_tokens(&user_id).await {
+            Ok(tokens) => {
+                // Log number of tokens exposed
+                log::info!(
+                    "Multi-token response sent | requester={} | target_sa={} | num_tokens={}",
+                    requester_email,
+                    user_id,
+                    tokens.tokens.len()
+                );
+                return Ok(HttpResponse::Ok().json(tokens));
+            }
+            Err(e) => {
+                log::debug!(
+                    "Failed to retrieve meta service account tokens | target_sa={} | error={}",
+                    user_id,
+                    e
+                );
+                // Not a meta service account or error, fall through to regular behavior
+            }
+        }
+    }
+
+    // Regular behavior: return single token for the requested org
     let org_id = Some(org.as_str());
     match crate::service::organization::get_passcode(org_id, &user_id).await {
         Ok(passcode) => Ok(HttpResponse::Ok().json(APIToken {
