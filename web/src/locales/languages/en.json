@@ -1152,6 +1152,7 @@
     "search": "Search Panel",
     "name": "Name of Panel",
     "typeDesc": "Description",
+    "options": "Options",
     "createdashboard": "Create a New Panel",
     "nameHolder": "Enter Name of New Panel",
     "typeHolder": "Enter Type Description of New Panel",

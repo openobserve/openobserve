@@ -51,8 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-input
       v-if="promqlMode"
       v-model="dashboardPanelData.data.config.step_value"
-      :value="0"
-      :min="0"
+      type="text"
       color="input-border"
       bg-color="input-bg"
       class="q-py-sm showLabelOnTop"
@@ -60,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       borderless
       dense
       label-slot
-      placeholder="Default: 0"
+      placeholder="e.g., 30s, 1m, 5m, 1h"
       data-test="dashboard-config-step-value"
      hide-bottom-space>
       <template v-slot:label>
