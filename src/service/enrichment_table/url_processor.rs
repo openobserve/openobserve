@@ -1323,6 +1323,7 @@ async fn process_enrichment_table_url(
     let total_records = std::sync::Arc::new(std::sync::atomic::AtomicI64::new(0));
     let total_bytes = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
     let has_schema = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let last_batch_timestamp = std::sync::Arc::new(std::sync::atomic::AtomicI64::new(0));
 
     // Determine if we're resuming (important for append behavior)
     let is_resuming = resume_from_byte.is_some();
@@ -1331,6 +1332,7 @@ async fn process_enrichment_table_url(
     let total_records_clone = total_records.clone();
     let total_bytes_clone = total_bytes.clone();
     let has_schema_clone = has_schema.clone();
+    let last_batch_timestamp_clone = last_batch_timestamp.clone();
 
     // Clone job data for callback (need to save progress after each batch)
     let org_id_for_save = org_id.to_string();
@@ -1354,6 +1356,7 @@ async fn process_enrichment_table_url(
             let total_records = total_records_clone.clone();
             let total_bytes = total_bytes_clone.clone();
             let has_schema = has_schema_clone.clone();
+            let last_batch_timestamp = last_batch_timestamp_clone.clone();
 
             async move {
                 let is_first_batch = batch_idx == 0;
@@ -1390,7 +1393,7 @@ async fn process_enrichment_table_url(
                 )
                 .await
                 {
-                    Ok(batch_schema) => {
+                    Ok((batch_schema, batch_timestamp)) => {
                         if is_first_batch {
                             // If first batch returned empty schema, we can't proceed
                             if batch_schema.fields().is_empty() {
@@ -1407,6 +1410,9 @@ async fn process_enrichment_table_url(
                             }
                             has_schema.store(true, std::sync::atomic::Ordering::Relaxed);
                         }
+
+                        // Store the timestamp from this batch (will be used as end_time after all batches)
+                        last_batch_timestamp.store(batch_timestamp, std::sync::atomic::Ordering::Relaxed);
 
                         // Update totals
                         total_records.fetch_add(record_count as i64, std::sync::atomic::Ordering::Relaxed);
@@ -1494,7 +1500,8 @@ async fn process_enrichment_table_url(
     // Now that all batches are processed, update meta stats and notify
     // We need to get the schema from the stream_schema_map since we can't pass it from callback
     let stream_name = crate::service::format_stream_name(table_name.to_string());
-    let timestamp = chrono::Utc::now().timestamp_micros();
+    // Use the timestamp from the last batch instead of generating a new one
+    let timestamp = last_batch_timestamp.load(std::sync::atomic::Ordering::Relaxed);
 
     log::info!(
         "[ENRICHMENT::URL] {}/{} - All batches processed. Updating meta stats and notifying",
@@ -1590,14 +1597,14 @@ async fn process_enrichment_table_url(
 /// - Skips local storage (done once at the end)
 /// - Skips meta stats updates and notifications (done once at the end)
 ///
-/// Returns the schema for validation purposes.
+/// Returns a tuple of (schema, timestamp) where timestamp is the one used for all records in this batch.
 async fn save_enrichment_batch(
     org_id: &str,
     table_name: &str,
     payload: Vec<json::Map<String, json::Value>>,
     append_data: bool,
     is_first_batch: bool,
-) -> Result<arrow_schema::Schema> {
+) -> Result<(arrow_schema::Schema, i64)> {
     use std::collections::HashMap;
 
     use config::{
@@ -1720,7 +1727,7 @@ async fn save_enrichment_batch(
 
     if records.is_empty() {
         // Return empty schema if no records
-        return Ok(arrow_schema::Schema::empty());
+        return Ok((arrow_schema::Schema::empty(), timestamp));
     }
 
     let schema = stream_schema_map
@@ -1733,7 +1740,7 @@ async fn save_enrichment_batch(
 
     // If this is the first batch and schema is empty, return it immediately
     if is_first_batch && schema.fields().is_empty() {
-        return Ok(schema);
+        return Ok((schema, timestamp));
     }
 
     // Store data based on size threshold
@@ -1766,7 +1773,7 @@ async fn save_enrichment_batch(
     // Note: We skip local storage here - it will be done once at the end for efficiency
     // Note: We skip meta stats updates and notifications here - done once at the end
 
-    Ok(schema)
+    Ok((schema, timestamp))
 }
 
 #[cfg(test)]

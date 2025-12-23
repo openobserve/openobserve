@@ -123,8 +123,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-input>
             </div>
 
-            <!-- Append Data Toggle (only for file-based tables or new URL tables) -->
-            <div v-if="(isUpdating && formData.source === 'file') || (!isUpdating && formData.source === 'url')" class="col-12">
+            <!-- Append Data Toggle (only when updating existing tables) -->
+            <div v-if="isUpdating" class="col-12">
               <q-toggle
                 class="q-py-md text-grey-8 text-bold"
                 v-model="formData.append"
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             compilationErr
           }}</pre>
 
-          <div class="flex justify-start">
+          <div class="flex justify-start q-mt-md">
             <q-btn
               v-close-popup
               class="q-mr-md o2-secondary-button tw-h-[36px]"
