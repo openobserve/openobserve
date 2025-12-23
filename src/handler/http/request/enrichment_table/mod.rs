@@ -461,12 +461,16 @@ pub async fn save_enrichment_table_from_url(
     responses(
         (status = StatusCode::OK, description = "Statuses retrieved", body = HashMap<String, config::meta::enrichment_table::EnrichmentTableUrlJob>),
         (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = String),
+        (status = StatusCode::FORBIDDEN, description = "Forbidden", body = String),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = String),
     )
 )]
 #[get("/{org_id}/enrichment_tables/status")]
 pub async fn get_all_enrichment_table_statuses(
     path: web::Path<String>,
+    crate::handler::http::extractors::Headers(_user_email): crate::handler::http::extractors::Headers<
+        crate::common::utils::auth::UserEmail,
+    >,
 ) -> Result<HttpResponse, Error> {
     use crate::service::db::enrichment_table::list_url_jobs;
 
@@ -479,15 +483,65 @@ pub async fn get_all_enrichment_table_statuses(
         ));
     }
 
+    // ===== OPENFGA PERMISSION CHECK (ENTERPRISE) =====
+    // Get list of enrichment tables the user has permission to access.
+    // This follows the same pattern as stream list endpoint.
+    #[cfg(feature = "enterprise")]
+    let permitted_tables: Option<Vec<String>> = {
+        use o2_openfga::meta::mapping::OFGA_MODELS;
+
+        match crate::handler::http::auth::validator::list_objects_for_user(
+            &org_id,
+            &_user_email.user_id,
+            "GET",
+            OFGA_MODELS
+                .get("enrichment_tables")
+                .map_or("enrichment_tables", |model| model.key),
+        )
+        .await
+        {
+            Ok(table_list) => table_list,
+            Err(e) => {
+                return Ok(MetaHttpResponse::forbidden(e.to_string()));
+            }
+        }
+    };
+
+    #[cfg(not(feature = "enterprise"))]
+    let permitted_tables: Option<Vec<String>> = None;
+
     // ===== FETCH ALL URL JOBS FOR THIS ORG =====
     // This returns all URL-based enrichment table jobs in a single query.
     // Much more efficient than N separate queries for N tables.
     // Frontend can then map table names to their job status locally.
     match list_url_jobs(&org_id).await {
         Ok(jobs) => {
+            // ===== FILTER BY OPENFGA PERMISSIONS =====
+            // Filter jobs based on user permissions, following the same pattern
+            // as stream::get_streams() function.
+            let filtered_jobs = if let Some(permitted) = permitted_tables {
+                // Check if user has access to all enrichment tables
+                let all_tables_key = format!("enrichment_table:_all_{}", org_id);
+                if permitted.contains(&all_tables_key) {
+                    // User has wildcard access to all tables
+                    jobs
+                } else {
+                    // Filter to only tables the user has explicit permission for
+                    jobs.into_iter()
+                        .filter(|job| {
+                            permitted.contains(&format!("enrichment_table:{}", job.table_name))
+                        })
+                        .collect::<Vec<_>>()
+                }
+            } else {
+                // No OpenFGA filtering (non-enterprise or permission check disabled)
+                jobs
+            };
+
             // Convert Vec<Job> to HashMap<table_name, Job> for easier frontend lookup
             let job_map: HashMap<String, config::meta::enrichment_table::EnrichmentTableUrlJob> =
-                jobs.into_iter()
+                filtered_jobs
+                    .into_iter()
                     .map(|job| (job.table_name.clone(), job))
                     .collect();
 
