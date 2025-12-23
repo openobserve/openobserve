@@ -265,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="space"></div>
 
     <q-toggle
-      v-if="dashboardPanelData.data.type == 'table'"
+      v-if="dashboardPanelData.data.type == 'table' && !promqlMode"
       v-model="dashboardPanelData.data.config.table_transpose"
       :label="t('dashboard.tableTranspose')"
       data-test="dashboard-config-table_transpose"
@@ -277,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="space"></div>
 
     <q-toggle
-      v-if="dashboardPanelData.data.type == 'table'"
+      v-if="dashboardPanelData.data.type == 'table' && !promqlMode"
       v-model="dashboardPanelData.data.config.table_dynamic_columns"
       :label="t('dashboard.tableDynamicColumns')"
       data-test="dashboard-config-table_dynamic_columns"
