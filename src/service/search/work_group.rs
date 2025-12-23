@@ -125,35 +125,20 @@ pub async fn check_work_group(
             })?
     };
 
-    // Check global concurrency
+    // Check all three concurrency levels (global, org, user) in a single query
     work_group_need_wait(
         trace_id,
         stop_watch,
         org_id,
         timeout,
         &work_group,
-        None,
+        user_id,
         caller,
     )
     .await?;
 
-    // Check user concurrency (skip for background tasks)
-    let is_background = matches!(work_group, WorkGroup::Background);
-    if user_id.is_some() && !is_background {
-        work_group_need_wait(
-            trace_id,
-            stop_watch,
-            org_id,
-            timeout,
-            &work_group,
-            user_id,
-            caller,
-        )
-        .await?;
-    }
-
     // Add to workgroup queue
-    if let Err(e) = work_group.process(trace_id, user_id).await {
+    if let Err(e) = work_group.process(trace_id, Some(org_id), user_id).await {
         metrics::QUERY_PENDING_NUMS
             .with_label_values(&[org_id])
             .dec();
@@ -170,7 +155,7 @@ pub async fn check_work_group(
         metrics::QUERY_PENDING_NUMS
             .with_label_values(&[org_id])
             .dec();
-        if let Err(done_err) = work_group.done(trace_id, user_id).await {
+        if let Err(done_err) = work_group.done(trace_id, Some(org_id), user_id).await {
             log::error!(
                 "[trace_id {trace_id}] {caller}->search: failed to mark work group as done after unlock error: {done_err:?}"
             );
@@ -189,7 +174,11 @@ pub async fn check_work_group(
     let caller_owned = caller.to_string();
     let guard = AsyncDefer::new(async move {
         if let Err(e) = work_group_clone
-            .done(&trace_id_owned, user_id_owned.as_deref())
+            .done(
+                &trace_id_owned,
+                Some(&org_id_owned),
+                user_id_owned.as_deref(),
+            )
             .await
         {
             log::error!(
@@ -238,22 +227,34 @@ async fn work_group_need_wait(
             )));
         }
 
-        match work_group.need_wait(user_id).await {
-            Ok((true, cur, max)) => {
+        match work_group.need_wait(Some(org_id), user_id).await {
+            Ok((true, status)) => {
                 // Need to wait - concurrency limit reached
                 if !log_wait {
                     log::info!(
-                        "[trace_id {trace_id}] user: {user_id:?} is waiting in work_group {work_group:?}[{cur}/{max}]"
+                        "[trace_id {trace_id}] user: {user_id:?} is waiting in work_group {work_group:?}[global:{}/{}, org:{}/{}, user:{}/{}]",
+                        status.global_current,
+                        status.global_limit,
+                        status.org_current,
+                        status.org_limit,
+                        status.user_current,
+                        status.user_limit
                     );
                     log_wait = true;
                 }
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             }
-            Ok((false, cur, max)) => {
+            Ok((false, status)) => {
                 // Got approval - slot available
                 if log_wait {
                     log::info!(
-                        "[trace_id {trace_id}] user: {user_id:?} get approved in work_group {work_group:?}[{cur}/{max}]"
+                        "[trace_id {trace_id}] user: {user_id:?} get approved in work_group {work_group:?}[global:{}/{}, org:{}/{}, user:{}/{}]",
+                        status.global_current,
+                        status.global_limit,
+                        status.org_current,
+                        status.org_limit,
+                        status.user_current,
+                        status.user_limit
                     );
                 }
                 return Ok(());

@@ -102,20 +102,32 @@ pub async fn work_group_need_wait(
             )));
         }
         if let Some(wg) = work_group.as_ref() {
-            match wg.need_wait(user_id).await {
-                Ok((true, cur, max)) => {
+            match wg.need_wait(Some(&req.org_id), user_id).await {
+                Ok((true, status)) => {
                     if !log_wait {
                         log::info!(
-                            "[trace_id {trace_id}] user: {user_id:?} is waiting in work_group {wg:?}[{cur}/{max}]"
+                            "[trace_id {trace_id}] user: {user_id:?} is waiting in work_group {wg:?}[global:{}/{}, org:{}/{}, user:{}/{}]",
+                            status.global_current,
+                            status.global_limit,
+                            status.org_current,
+                            status.org_limit,
+                            status.user_current,
+                            status.user_limit
                         );
                         log_wait = true;
                     }
                     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
                 }
-                Ok((false, cur, max)) => {
+                Ok((false, status)) => {
                     if log_wait {
                         log::info!(
-                            "[trace_id {trace_id}] user: {user_id:?} get approved in work_group  {wg:?}[{cur}/{max}]"
+                            "[trace_id {trace_id}] user: {user_id:?} get approved in work_group {wg:?}[global:{}/{}, org:{}/{}, user:{}/{}]",
+                            status.global_current,
+                            status.global_limit,
+                            status.org_current,
+                            status.org_limit,
+                            status.user_current,
+                            status.user_limit
                         );
                     }
                     return Ok(());
