@@ -336,6 +336,7 @@ export class PipelinesPage {
     // Method to save the query
     async saveQuery() {
         await this.saveQueryButton.click();
+        await this.waitForQuerySectionHidden();
     }
 
     async selectFunction() {

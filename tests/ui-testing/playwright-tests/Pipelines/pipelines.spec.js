@@ -185,7 +185,7 @@ test.describe("Pipeline testcases", { tag: ['@all', '@pipelines'] }, () => {
     await pipelinePage.dragStreamToTarget(pipelinePage.queryButton);
 
     // Setup query source using page object method
-    await pipelinePage.setupQuerySource('select * from "default"');
+    await pipelinePage.setupQuerySource('select * from "e2e_automate"');
 
     // Delete the query node using page object method
     await pipelinePage.deleteQueryNode();
