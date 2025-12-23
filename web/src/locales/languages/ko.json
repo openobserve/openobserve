@@ -617,7 +617,10 @@
     "streamRouting": "스트림 라우팅",
     "testFunction": "테스트 기능",
     "errorDetails": "오류",
-    "function_definition": "함수 정의"
+    "function_definition": "함수 정의",
+    "enrichmentTableURL": "인리치먼트 테이블 URL",
+    "urlCannotBeModified": "생성 후에는 URL을 수정할 수 없습니다.",
+    "close": "닫기"
   },
   "confirmDialog": {
     "cancel": "취소",

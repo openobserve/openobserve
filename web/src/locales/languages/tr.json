@@ -617,7 +617,10 @@
     "streamRouting": "Akış Yönlendirmesi",
     "testFunction": "Test Fonksiyonu",
     "errorDetails": "Hata",
-    "function_definition": "Fonksiyon Tanımı"
+    "function_definition": "Fonksiyon Tanımı",
+    "enrichmentTableURL": "Zenginleştirme Tablosu URL",
+    "urlCannotBeModified": "URL oluşturulduktan sonra değiştirilemez",
+    "close": "Kapat"
   },
   "confirmDialog": {
     "cancel": "İptal",

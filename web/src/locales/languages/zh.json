@@ -617,7 +617,10 @@
     "streamRouting": "数据流路由",
     "testFunction": "测试功能",
     "errorDetails": "错误",
-    "function_definition": "函数定义"
+    "function_definition": "函数定义",
+    "enrichmentTableURL": "丰富表网址",
+    "urlCannotBeModified": "创建后无法修改 URL",
+    "close": "关闭"
   },
   "confirmDialog": {
     "cancel": "取消",

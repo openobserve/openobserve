@@ -617,7 +617,10 @@
     "streamRouting": "Routing dello streaming",
     "testFunction": "Funzione di test",
     "errorDetails": "Errore",
-    "function_definition": "Definizione della funzione"
+    "function_definition": "Definizione della funzione",
+    "enrichmentTableURL": "URL della tabella di arricchimento",
+    "urlCannotBeModified": "L'URL non può essere modificato dopo la creazione",
+    "close": "Chiudi"
   },
   "confirmDialog": {
     "cancel": "Annulla",
