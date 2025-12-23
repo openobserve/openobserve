@@ -13,6 +13,19 @@ jobs:
     steps:
       - name: Build and send payload to OpenObserve
         run: |
+          # Create temporary files for body content
+          cat << 'ISSUE_BODY_EOF' > issue_body.txt
+          ${{ github.event.issue.body }}
+          ISSUE_BODY_EOF
+          
+          cat << 'COMMENT_BODY_EOF' > comment_body.txt
+          ${{ github.event.comment.body }}
+          COMMENT_BODY_EOF
+          
+          # Read and process the body files
+          ISSUE_BODY=$(cat issue_body.txt | tr '\n' ' ' | sed 's/"/\\"/g')
+          COMMENT_BODY=$(cat comment_body.txt | tr '\n' ' ' | sed 's/"/\\"/g')
+          
           # Build payload using jq to properly handle JSON
           jq -n \
             --arg event_name "${{ github.event_name }}" \
@@ -66,7 +79,7 @@ jobs:
             --arg issue_updated_at "${{ github.event.issue.updated_at }}" \
             --arg issue_closed_at "${{ github.event.issue.closed_at }}" \
             --arg issue_author_association "${{ github.event.issue.author_association }}" \
-            --arg issue_body "${{ github.event.issue.body }}" \
+            --arg issue_body "$ISSUE_BODY" \
             --arg comment_id "${{ github.event.comment.id }}" \
             --arg comment_node_id "${{ github.event.comment.node_id }}" \
             --arg comment_user_login "${{ github.event.comment.user.login }}" \
@@ -77,7 +90,7 @@ jobs:
             --arg comment_created_at "${{ github.event.comment.created_at }}" \
             --arg comment_updated_at "${{ github.event.comment.updated_at }}" \
             --arg comment_author_association "${{ github.event.comment.author_association }}" \
-            --arg comment_body "${{ github.event.comment.body }}" \
+            --arg comment_body "$COMMENT_BODY" \
             --arg sender_login "${{ github.event.sender.login }}" \
             --arg sender_id "${{ github.event.sender.id }}" \
             --arg sender_node_id "${{ github.event.sender.node_id }}" \
@@ -201,7 +214,10 @@ jobs:
               },
               changes: $changes
             } | walk(if type == "object" then with_entries(select(.value != "" and .value != null and .value != "null")) else . end)' > payload.json
-
+          
+          # Clean up temporary files
+          rm -f issue_body.txt comment_body.txt
+          
       - name: Send to OpenObserve
         run: |
           curl -X POST "${{ secrets.OO_CLOUD_INGEST_URL }}" \
