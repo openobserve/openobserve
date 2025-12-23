@@ -42,17 +42,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         />
         <PromQLTableChart
-          v-else-if="panelSchema.type == 'table' && panelSchema.queryType === 'promql'"
+          v-else-if="
+            panelSchema.type == 'table' && panelSchema.queryType === 'promql'
+          "
           :data="tableRendererData"
           :config="panelSchema.config"
         />
         <TableRenderer
           v-else-if="panelSchema.type == 'table'"
-          :data="tableRendererData"
-          :value-mapping="panelSchema?.config?.mappings ?? []"
-          @row-click="onChartClick"
-          ref="tableRendererRef"
-          :wrap-cells="panelSchema.config?.wrap_table_cells"
+          :data="
+            panelData.chartType == 'table'
+              ? panelData
+              : { options: { backgroundColor: 'transparent' } }
+          "
         />
         <div
           v-else-if="panelSchema.type == 'html'"
@@ -162,7 +164,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="isCursorOverPanel"
         class="flex items-center q-gutter-x-xs"
-        style="position: absolute; top: 0px; right: 0px; z-index: 9; padding-right: 2px; padding-top: 2px;"
+        style="
+          position: absolute;
+          top: 0px;
+          right: 0px;
+          z-index: 9;
+          padding-right: 2px;
+          padding-top: 2px;
+        "
         @click.stop
       >
         <q-btn
@@ -339,7 +348,10 @@ import { generateDurationLabel } from "../../utils/date";
 import { onBeforeMount } from "vue";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
-import { getUTCTimestampFromZonedTimestamp, validateSQLPanelFields } from "@/utils/dashboard/convertDataIntoUnitValue";
+import {
+  getUTCTimestampFromZonedTimestamp,
+  validateSQLPanelFields,
+} from "@/utils/dashboard/convertDataIntoUnitValue";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 import { event } from "quasar";
 import { exportFile } from "quasar";
@@ -994,7 +1006,10 @@ export default defineComponent({
       panelData,
       () => {
         // Debug logging for table charts
-        if (panelSchema.value.type === "table" && panelSchema.value.queryType === "promql") {
+        if (
+          panelSchema.value.type === "table" &&
+          panelSchema.value.queryType === "promql"
+        ) {
           console.log("=== [PanelSchemaRenderer] panelData updated ===");
           console.log("panelData:", panelData.value);
           console.log("panelData.tableData:", panelData.value?.tableData);
@@ -2235,17 +2250,23 @@ export default defineComponent({
           // For PromQL tables, the data is in panelData.options (same as pie/donut)
           // The TableConverter returns {columns, rows, ...} which gets placed in options
           tableData = panelData.value?.options || { rows: [], columns: [] };
-          console.log("=== [PanelSchemaRenderer] Computing tableRendererData for PromQL ===");
+          console.log(
+            "=== [PanelSchemaRenderer] Computing tableRendererData for PromQL ===",
+          );
           console.log("panelData.value:", panelData.value);
           console.log("panelData.value.options:", panelData.value?.options);
           console.log("tableData:", tableData);
         } else if (panelData.value?.chartType == "table") {
           tableData = panelData.value;
-          console.log("=== [PanelSchemaRenderer] Computing tableRendererData for SQL ===");
+          console.log(
+            "=== [PanelSchemaRenderer] Computing tableRendererData for SQL ===",
+          );
           console.log("tableData:", tableData);
         } else {
           tableData = { options: { backgroundColor: "transparent" } };
-          console.log("=== [PanelSchemaRenderer] Computing tableRendererData - fallback ===");
+          console.log(
+            "=== [PanelSchemaRenderer] Computing tableRendererData - fallback ===",
+          );
         }
 
         console.log("Final table data structure:", {
