@@ -267,6 +267,58 @@ pub struct IncidentStats {
     pub alerts_per_incident_avg: f64,
 }
 
+/// Service Graph visualization for an incident
+///
+/// Shows all services involved in the incident with their dependencies
+/// and alert counts for visualization in the incident details drawer.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct IncidentServiceGraph {
+    /// Primary service from incident.stable_dimensions
+    pub incident_service: String,
+    /// Root cause from incident.topology_context (if available)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub root_cause_service: Option<String>,
+    /// All services involved in the incident
+    pub nodes: Vec<IncidentServiceNode>,
+    /// Service dependencies (edges between services)
+    pub edges: Vec<IncidentServiceEdge>,
+    /// Summary statistics
+    pub stats: IncidentGraphStats,
+}
+
+/// A service node in the incident service graph
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct IncidentServiceNode {
+    /// Service name
+    pub service_name: String,
+    /// Number of alerts for this service in the incident
+    pub alert_count: u32,
+    /// Whether this service is the suspected root cause
+    pub is_root_cause: bool,
+    /// Whether this is the primary incident service
+    pub is_primary: bool,
+}
+
+/// An edge between services in the incident graph
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct IncidentServiceEdge {
+    /// Source service (caller)
+    pub from: String,
+    /// Target service (callee)
+    pub to: String,
+}
+
+/// Summary statistics for the incident service graph
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct IncidentGraphStats {
+    /// Total number of services in the graph
+    pub total_services: usize,
+    /// Total number of alerts across all services
+    pub total_alerts: u32,
+    /// Number of services that have at least one alert
+    pub services_with_alerts: usize,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

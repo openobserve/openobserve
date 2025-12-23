@@ -450,6 +450,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               label="Incident Analysis"
             />
             <q-tab
+              name="serviceGraph"
+              icon="hub"
+              label="Alert Graph"
+            />
+            <q-tab
               name="alertTriggers"
               icon="notifications_active"
             >
@@ -584,6 +589,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else class="tw:rounded tw:p-3 tw:text-sm tw:flex-1 tw:border" :class="isDarkMode ? 'tw:bg-gray-700 tw:border-gray-600 tw:text-gray-300' : 'tw:bg-gray-50 tw:border-gray-200 tw:text-gray-500'">
             No analysis performed yet
           </div>
+        </div>
+
+        <!-- Service Graph Tab Content -->
+        <div v-if="activeTab === 'serviceGraph'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
+          <IncidentServiceGraph
+            v-if="incidentDetails"
+            :org-id="store.state.selectedOrganization.identifier"
+            :incident-id="incidentDetails.id"
+          />
         </div>
 
         <!-- Alert Triggers Tab Content -->
@@ -856,11 +870,13 @@ import { getImageURL } from "@/utils/zincutils";
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
+import IncidentServiceGraph from "./IncidentServiceGraph.vue";
 
 export default defineComponent({
   name: "IncidentDetailDrawer",
   components: {
     TelemetryCorrelationDashboard,
+    IncidentServiceGraph,
   },
   props: {
     incident: {

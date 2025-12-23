@@ -424,6 +424,152 @@ pub async fn enrich_with_topology(
     Ok(())
 }
 
+/// Get service graph data for an incident
+///
+/// Builds a graph showing all services involved in the incident with their
+/// dependencies and alert counts. Uses topology_context from the incident
+/// record and counts alerts per service from the junction table.
+pub async fn get_service_graph(
+    org_id: &str,
+    incident_id: &str,
+) -> Result<Option<config::meta::alerts::incidents::IncidentServiceGraph>, anyhow::Error> {
+    use config::meta::alerts::incidents::{
+        IncidentGraphStats, IncidentServiceEdge, IncidentServiceGraph, IncidentServiceNode,
+    };
+
+    // Get incident with its alerts
+    let incident = match infra::table::alert_incidents::get(org_id, incident_id).await? {
+        Some(i) => i,
+        None => return Ok(None),
+    };
+
+    // Get stable dimensions
+    let stable_dimensions: HashMap<String, String> =
+        serde_json::from_value(incident.stable_dimensions).unwrap_or_default();
+
+    // Get primary service from stable_dimensions
+    let incident_service = stable_dimensions
+        .get("service")
+        .or_else(|| stable_dimensions.get("service_name"))
+        .or_else(|| stable_dimensions.get("service.name"))
+        .cloned()
+        .unwrap_or_default();
+
+    if incident_service.is_empty() {
+        // No service dimension - return empty graph
+        return Ok(Some(IncidentServiceGraph {
+            incident_service: String::new(),
+            root_cause_service: None,
+            nodes: vec![],
+            edges: vec![],
+            stats: IncidentGraphStats {
+                total_services: 0,
+                total_alerts: 0,
+                services_with_alerts: 0,
+            },
+        }));
+    }
+
+    // Get topology context if available
+    let topology: Option<config::meta::alerts::incidents::IncidentTopology> = incident
+        .topology_context
+        .and_then(|v| serde_json::from_value(v).ok());
+
+    // Get all alerts for this incident to count by service
+    let incident_alerts = infra::table::alert_incidents::get_incident_alerts(incident_id).await?;
+
+    // Count alerts by service
+    // We need to get service info from alerts - for now, count all alerts under primary service
+    // In a more complete implementation, we'd look up each alert's labels
+    let mut service_alert_counts: HashMap<String, u32> = HashMap::new();
+
+    // For each alert, try to extract service name
+    // The alert_name often contains service info, or we can look up the alert
+    for _alert in &incident_alerts {
+        // For now, attribute all alerts to the primary service
+        // A more complete implementation would look up each alert's labels
+        *service_alert_counts
+            .entry(incident_service.clone())
+            .or_insert(0) += 1;
+    }
+
+    // Build nodes and edges based on topology
+    let root_cause_service = topology
+        .as_ref()
+        .and_then(|t| t.suggested_root_cause.clone());
+
+    let mut nodes = Vec::new();
+    let mut edges = Vec::new();
+    let mut all_services: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    // Add primary service
+    all_services.insert(incident_service.clone());
+
+    if let Some(ref topo) = topology {
+        // Add upstream services
+        for upstream in &topo.upstream_services {
+            all_services.insert(upstream.clone());
+        }
+
+        // Add downstream services
+        for downstream in &topo.downstream_services {
+            all_services.insert(downstream.clone());
+        }
+
+        // Build edges: upstream -> primary
+        for upstream in &topo.upstream_services {
+            edges.push(IncidentServiceEdge {
+                from: upstream.clone(),
+                to: incident_service.clone(),
+            });
+        }
+
+        // Build edges: primary -> downstream
+        for downstream in &topo.downstream_services {
+            edges.push(IncidentServiceEdge {
+                from: incident_service.clone(),
+                to: downstream.clone(),
+            });
+        }
+    }
+
+    // Build nodes for all services
+    for service in &all_services {
+        let alert_count = *service_alert_counts.get(service).unwrap_or(&0);
+        let is_root_cause = root_cause_service
+            .as_ref()
+            .map(|r| r == service)
+            .unwrap_or(false);
+        let is_primary = service == &incident_service;
+
+        nodes.push(IncidentServiceNode {
+            service_name: service.clone(),
+            alert_count,
+            is_root_cause,
+            is_primary,
+        });
+    }
+
+    // Calculate stats
+    let total_alerts: u32 = service_alert_counts.values().sum();
+    let services_with_alerts = service_alert_counts
+        .values()
+        .filter(|&&count| count > 0)
+        .count();
+
+    Ok(Some(IncidentServiceGraph {
+        incident_service,
+        root_cause_service,
+        nodes,
+        edges,
+        stats: IncidentGraphStats {
+            total_services: all_services.len(),
+            total_alerts,
+            services_with_alerts,
+        },
+    }))
+}
+
 /// Update incident status
 pub async fn update_status(
     org_id: &str,
