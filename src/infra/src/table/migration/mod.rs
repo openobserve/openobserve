@@ -41,6 +41,7 @@ mod m20241227_000300_create_org_users_table;
 mod m20241227_000400_populate_users_table;
 // mod m20241227_000500_delete_meta_users_table;
 mod m20250107_160900_delete_bad_dashboards;
+mod m20250109_000001_create_backfill_jobs;
 mod m20250109_092400_recreate_tables_with_ksuids;
 mod m20250113_144600_create_unique_folder_name_idx;
 mod m20250121_120000_create_cipher_table;
@@ -145,6 +146,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20251126_100002_create_service_streams_dimensions_table::Migration),
             Box::new(m20251204_000001_create_alert_incidents_table::Migration),
             Box::new(m20251207_000001_create_system_settings_table::Migration),
+            Box::new(m20250109_000001_create_backfill_jobs::Migration),
         ]
     }
 }

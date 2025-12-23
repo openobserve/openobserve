@@ -970,7 +970,7 @@ export default defineComponent({
         "yyyy/MM/dd",
       );
       if (props.disableRelative) {
-        return date >= props.minDate;
+        return date >= props.minDate && date <= formattedDate;
       }
       return date >= "1999/01/01" && date <= formattedDate;
     };

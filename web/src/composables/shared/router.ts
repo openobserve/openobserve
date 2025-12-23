@@ -329,6 +329,18 @@ const useRoutes = () => {
                 routeGuard(to, from, next);
               },
             },
+            {
+              path: "backfill",
+              name: "pipelineBackfill",
+              component: () =>
+                import("@/components/pipelines/BackfillJobsList.vue"),
+              meta: {
+                title: "Pipeline Backfill Jobs",
+              },
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
           ],
         },
       ],
