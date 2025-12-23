@@ -680,7 +680,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-for="(value, key) in incidentDetails.stable_dimensions" :key="key" class="tw-flex tw-gap-2 tw-mb-1">
                 <span class="label-text">{{ key }}:</span>
                 <span class="tw-font-mono">{{ value }}</span>
-                <q-btn flat dense size="xs" icon="content_copy" @click="$q.notify({ message: 'Copied!', type: 'positive' })" />
+                <q-btn flat dense size="xs" icon="content_copy" @click="() => { navigator.clipboard.writeText(value); $q.notify({ message: 'Copied!', type: 'positive' }); }" />
               </div>
             </div>
           </div>
@@ -751,7 +751,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-for="(value, key) in incidentDetails.stable_dimensions" :key="key" class="tw-flex tw-gap-2 tw-mb-1">
                 <span class="label-text">{{ key }}:</span>
                 <span class="tw-font-mono">{{ value }}</span>
-                <q-btn flat dense size="xs" icon="content_copy" @click="$q.notify({ message: 'Copied!', type: 'positive' })" />
+                <q-btn flat dense size="xs" icon="content_copy" @click="() => { navigator.clipboard.writeText(value); $q.notify({ message: 'Copied!', type: 'positive' }); }" />
               </div>
             </div>
           </div>
@@ -822,7 +822,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-for="(value, key) in incidentDetails.stable_dimensions" :key="key" class="tw-flex tw-gap-2 tw-mb-1">
                 <span class="label-text">{{ key }}:</span>
                 <span class="tw-font-mono">{{ value }}</span>
-                <q-btn flat dense size="xs" icon="content_copy" @click="$q.notify({ message: 'Copied!', type: 'positive' })" />
+                <q-btn flat dense size="xs" icon="content_copy" @click="() => { navigator.clipboard.writeText(value); $q.notify({ message: 'Copied!', type: 'positive' }); }" />
               </div>
             </div>
           </div>

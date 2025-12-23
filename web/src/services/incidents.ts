@@ -193,7 +193,12 @@ const incidents = {
     const dimensions = incident.stable_dimensions;
 
     const request: CorrelationRequest = {
-      source_stream: dimensions.service || "default",
+      source_stream:
+        dimensions.service ||
+        dimensions.serviceName ||
+        dimensions["service.name"] ||
+        dimensions["service_name"] ||
+        "default",
       source_type: "logs",
       available_dimensions: dimensions,
     };
