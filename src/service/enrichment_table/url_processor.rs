@@ -103,6 +103,64 @@ static URL_JOB_SENDER: Lazy<mpsc::UnboundedSender<EnrichmentUrlJobEvent>> = Lazy
         process_url_jobs(rx).await;
     });
 
+    // Spawn the stale job recovery task for distributed deployments.
+    // This task runs periodically to recover jobs stuck in Processing status.
+    // Note: This is a no-op for SQLite (single-node) deployments.
+    tokio::spawn(async move {
+        use config::get_config;
+
+        log::info!("[ENRICHMENT::URL] Starting stale job recovery task");
+
+        loop {
+            let cfg = get_config();
+            let stale_threshold_secs = cfg.enrichment_table.url_stale_job_threshold_secs;
+            let check_interval_secs = cfg.enrichment_table.url_recovery_check_interval_secs;
+            let jobs_per_check = cfg.enrichment_table.url_recovery_jobs_per_check;
+
+            tokio::time::sleep(tokio::time::Duration::from_secs(check_interval_secs)).await;
+
+            // Attempt to claim multiple stale jobs per check (configurable)
+            match db::enrichment_table::claim_stale_url_jobs(stale_threshold_secs, jobs_per_check)
+                .await
+            {
+                Ok(jobs) => {
+                    if jobs.is_empty() {
+                        log::debug!("[ENRICHMENT::URL] No stale jobs found during recovery check");
+                    } else {
+                        log::warn!("[ENRICHMENT::URL] Recovered {} stale job(s)", jobs.len());
+
+                        for job in jobs {
+                            log::warn!(
+                                "[ENRICHMENT::URL] Recovered stale job: {}/{} (last updated: {} seconds ago)",
+                                job.org_id,
+                                job.table_name,
+                                (chrono::Utc::now().timestamp_micros() - job.updated_at)
+                                    / 1_000_000
+                            );
+
+                            if let Err(e) = trigger_url_job_processing(job.org_id, job.table_name) {
+                                log::error!(
+                                    "[ENRICHMENT::URL] Failed to trigger recovered job: {}",
+                                    e
+                                );
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    let error_msg = e.to_string();
+                    if error_msg.contains("SQLite") || error_msg.contains("single-node") {
+                        log::debug!(
+                            "[ENRICHMENT::URL] Stale job recovery skipped (SQLite single-node mode)"
+                        );
+                    } else {
+                        log::error!("[ENRICHMENT::URL] Failed to claim stale jobs: {}", e);
+                    }
+                }
+            }
+        }
+    });
+
     tx
 });
 

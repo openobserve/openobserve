@@ -2201,6 +2201,24 @@ pub struct EnrichmentTable {
         help = "Delay between retry attempts (in seconds)"
     )]
     pub url_retry_delay_secs: u64,
+    #[env_config(
+        name = "ZO_ENRICHMENT_URL_STALE_JOB_THRESHOLD",
+        default = 600,
+        help = "Jobs stuck in Processing status for longer than this are considered stale (in seconds). Used for automatic recovery."
+    )]
+    pub url_stale_job_threshold_secs: i64,
+    #[env_config(
+        name = "ZO_ENRICHMENT_URL_RECOVERY_CHECK_INTERVAL",
+        default = 120,
+        help = "Interval between stale job recovery checks (in seconds). Each ingester will attempt to claim one stale job per interval."
+    )]
+    pub url_recovery_check_interval_secs: u64,
+    #[env_config(
+        name = "ZO_ENRICHMENT_URL_RECOVERY_JOBS_PER_CHECK",
+        default = 1,
+        help = "Number of stale jobs each ingester attempts to claim per recovery check. Higher values allow faster recovery but may cause uneven distribution."
+    )]
+    pub url_recovery_jobs_per_check: usize,
 }
 
 pub fn init() -> Config {

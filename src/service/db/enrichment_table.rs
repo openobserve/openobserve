@@ -697,6 +697,60 @@ pub async fn list_url_jobs(
     Ok(jobs)
 }
 
+/// Atomically claims stale URL jobs for recovery
+///
+/// This is used by the stale job recovery background task. It finds jobs stuck in
+/// Processing status and atomically resets them to Pending status.
+///
+/// # Important
+/// - Only works with PostgreSQL/MySQL (distributed deployments)
+/// - Returns error for SQLite (single-node, no distribution needed)
+///
+/// # Arguments
+/// * `stale_threshold_secs` - Jobs idle for longer than this are considered stale
+/// * `limit` - Maximum number of jobs to claim
+///
+/// # Returns
+/// * `Ok(vec![jobs])` - Successfully claimed stale jobs (may be empty)
+/// * `Err` - Database error or unsupported backend
+pub async fn claim_stale_url_jobs(
+    stale_threshold_secs: i64,
+    limit: usize,
+) -> Result<Vec<config::meta::enrichment_table::EnrichmentTableUrlJob>, infra::errors::Error> {
+    let now = chrono::Utc::now().timestamp_micros();
+    let stale_threshold_timestamp = now - (stale_threshold_secs * 1_000_000);
+
+    let processing_status = 1; // EnrichmentTableStatus::Processing
+    let pending_status = 0; // EnrichmentTableStatus::Pending
+
+    let records = enrichment_table_urls::claim_stale_jobs(
+        stale_threshold_timestamp,
+        processing_status,
+        pending_status,
+        limit,
+    )
+    .await?;
+
+    Ok(records
+        .into_iter()
+        .map(|r| config::meta::enrichment_table::EnrichmentTableUrlJob {
+            org_id: r.org,
+            table_name: r.name,
+            url: r.url,
+            status: i16_to_status(r.status),
+            error_message: r.error_message,
+            created_at: r.created_at,
+            updated_at: r.updated_at,
+            total_bytes_fetched: r.total_bytes_fetched as u64,
+            total_records_processed: r.total_records_processed,
+            retry_count: r.retry_count as u32,
+            append_data: r.append_data,
+            last_byte_position: r.last_byte_position as u64,
+            supports_range: r.supports_range,
+        })
+        .collect())
+}
+
 // write test for convert_to_vrl
 #[cfg(test)]
 mod tests {

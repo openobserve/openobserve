@@ -180,3 +180,142 @@ pub async fn list_by_org(org: &str) -> Result<Vec<EnrichmentTableUrlRecord>, err
 
     Ok(records.into_iter().map(|model| model.into()).collect())
 }
+
+/// Atomically claims stale jobs that are stuck in Processing status
+///
+/// This function is used for stale job recovery in distributed deployments (PostgreSQL/MySQL).
+/// It uses database-level atomic operations to ensure only ONE ingester claims each stale job.
+///
+/// # Important: SQLite is NOT supported
+///
+/// This function returns an error if called with SQLite backend. SQLite is only used in
+/// single-node deployments where there's only one ingester, so distributed job claiming
+/// is not needed.
+///
+/// # How it works (PostgreSQL/MySQL only)
+///
+/// 1. Finds jobs in Processing status where updated_at < stale_threshold
+/// 2. Selects up to `limit` jobs (LIMIT N)
+/// 3. Atomically updates their status to Pending and updated_at to now
+/// 4. Returns the claimed jobs (or empty vec if no stale jobs exist)
+///
+/// The SELECT and UPDATE happen atomically, so only one ingester succeeds per job.
+///
+/// # Arguments
+/// * `stale_threshold_timestamp` - Jobs with updated_at older than this are considered stale (in
+///   microseconds)
+/// * `processing_status` - The status value for "Processing" (typically 1)
+/// * `pending_status` - The status value for "Pending" (typically 0)
+/// * `limit` - Maximum number of jobs to claim in one call
+///
+/// # Returns
+/// * `Result<Vec<EnrichmentTableUrlRecord>, errors::Error>` - The claimed jobs or empty vec
+pub async fn claim_stale_jobs(
+    stale_threshold_timestamp: i64,
+    processing_status: i16,
+    pending_status: i16,
+    limit: usize,
+) -> Result<Vec<EnrichmentTableUrlRecord>, errors::Error> {
+    use sea_orm::{ConnectionTrait, Statement};
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let backend = client.get_database_backend();
+
+    // SQLite doesn't need distributed job claiming - only one ingester in single-node mode
+    if backend == sea_orm::DatabaseBackend::Sqlite {
+        return Err(errors::Error::Message(
+            "Stale job claiming is not supported for SQLite backend. SQLite is single-node only."
+                .to_string(),
+        ));
+    }
+
+    let _lock = get_lock().await;
+    let now = chrono::Utc::now().timestamp_micros();
+
+    // Use raw SQL for atomic claim operation
+    let sql = match backend {
+        sea_orm::DatabaseBackend::Postgres => {
+            // PostgreSQL supports UPDATE ... RETURNING with subquery
+            format!(
+                r#"
+                UPDATE enrichment_table_urls
+                SET status = {}, updated_at = {}
+                WHERE (org, name) IN (
+                    SELECT org, name
+                    FROM enrichment_table_urls
+                    WHERE status = {} AND updated_at < {}
+                    LIMIT {}
+                )
+                RETURNING id, org, name, url, status, error_message, created_at, updated_at,
+                          total_bytes_fetched, total_records_processed, retry_count,
+                          append_data, last_byte_position, supports_range
+                "#,
+                pending_status, now, processing_status, stale_threshold_timestamp, limit
+            )
+        }
+        sea_orm::DatabaseBackend::MySql => {
+            // MySQL supports UPDATE with subquery
+            format!(
+                r#"
+                UPDATE enrichment_table_urls
+                SET status = {}, updated_at = {}
+                WHERE (org, name) IN (
+                    SELECT org, name
+                    FROM (
+                        SELECT org, name
+                        FROM enrichment_table_urls
+                        WHERE status = {} AND updated_at < {}
+                        LIMIT {}
+                    ) AS subquery
+                )
+                "#,
+                pending_status, now, processing_status, stale_threshold_timestamp, limit
+            )
+        }
+        _ => {
+            return Err(errors::Error::Message(format!(
+                "Unsupported database backend: {:?}",
+                backend
+            )));
+        }
+    };
+
+    // MySQL doesn't support RETURNING, so we need separate UPDATE and SELECT
+    if backend == sea_orm::DatabaseBackend::MySql {
+        // Execute UPDATE
+        let result = client.execute(Statement::from_string(backend, sql)).await?;
+
+        if result.rows_affected() == 0 {
+            return Ok(vec![]);
+        }
+
+        // SELECT the jobs we just updated
+        let select_sql = format!(
+            r#"
+            SELECT id, org, name, url, status, error_message, created_at, updated_at,
+                   total_bytes_fetched, total_records_processed, retry_count,
+                   append_data, last_byte_position, supports_range
+            FROM enrichment_table_urls
+            WHERE status = {} AND updated_at = {}
+            ORDER BY updated_at DESC
+            LIMIT {}
+            "#,
+            pending_status, now, limit
+        );
+
+        let models = Entity::find()
+            .from_raw_sql(Statement::from_string(backend, select_sql))
+            .all(client)
+            .await?;
+
+        Ok(models.into_iter().map(|model| model.into()).collect())
+    } else {
+        // PostgreSQL supports RETURNING
+        let models = Entity::find()
+            .from_raw_sql(Statement::from_string(backend, sql))
+            .all(client)
+            .await?;
+
+        Ok(models.into_iter().map(|model| model.into()).collect())
+    }
+}
