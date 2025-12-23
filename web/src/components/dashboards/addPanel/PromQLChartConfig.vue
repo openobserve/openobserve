@@ -501,7 +501,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, ref } from "vue";
+import { defineComponent, computed, ref, inject, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 
@@ -515,7 +515,13 @@ export default defineComponent({
   },
   setup(props) {
     const { t } = useI18n();
-    const { dashboardPanelData } = useDashboardPanelData();
+    const dashboardPanelDataPageKey = inject(
+      "dashboardPanelDataPageKey",
+      "dashboard",
+    );
+    const { dashboardPanelData } = useDashboardPanelData(
+      dashboardPanelDataPageKey,
+    );
 
     // Aggregation function options
     const aggregationOptions = [
