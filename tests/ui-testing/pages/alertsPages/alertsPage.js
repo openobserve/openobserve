@@ -43,6 +43,7 @@ export class AlertsPage {
         this.operatorSelect = '[data-test="alert-conditions-operator-select"]';
         this.conditionValueInput = '[data-test="alert-conditions-value-input"]';
         this.addConditionButton = '[data-test="alert-conditions-add-condition-btn"]';
+        this.addFirstConditionButton = '[data-test="alert-conditions-add-btn"]';  // Button shown when no conditions exist
         this.addConditionGroupButton = '[data-test="alert-conditions-add-condition-group-btn"]';
         this.deleteConditionButton = '[data-test="alert-conditions-delete-condition-btn"]';
         this.columnInput = '[data-test="alert-conditions-select-column"]';  // Alias for backward compatibility
@@ -372,6 +373,137 @@ export class AlertsPage {
         const nameToVerify = alertName || this.currentAlertName;  // Use provided name or stored name
         await expect(this.page.getByRole('cell', { name: nameToVerify }).first()).toBeVisible();
         await expect(this.page.locator(this.pauseStartAlert.replace('{alertName}', nameToVerify)).first()).toBeVisible();
+    }
+
+    /**
+     * Create a real-time alert with default/first available column using Alerts 2.0 wizard UI
+     * This is more resilient than createAlert as it doesn't require a specific column name
+     * @param {string} streamName - Name of the stream
+     * @param {string} destinationName - Name of the destination
+     * @param {string} randomValue - Random string for unique naming
+     */
+    async createAlertWithDefaults(streamName, destinationName, randomValue) {
+        const randomAlertName = 'Automation_Alert_' + randomValue;
+        this.currentAlertName = randomAlertName;
+
+        // Click Add Alert button to start wizard
+        await this.page.locator(this.addAlertButton).click();
+        await this.page.waitForLoadState('networkidle');
+        testLogger.info('Starting alert creation wizard', { alertName: randomAlertName });
+
+        // ==================== STEP 1: ALERT SETUP ====================
+        await expect(this.page.locator(this.alertNameInput)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(this.alertNameInput).click();
+        await this.page.locator(this.alertNameInput).fill(randomAlertName);
+        testLogger.info('Filled alert name', { alertName: randomAlertName });
+
+        // Select stream type (logs)
+        await this.page.locator(this.streamTypeDropdown).click();
+        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
+        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Selected stream type: logs');
+
+        // Select stream name
+        await expect(this.page.locator(this.streamNameDropdown)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(this.streamNameDropdown).click();
+        try {
+            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
+        } catch (e) {
+            await this.page.locator(this.streamNameDropdown).click();
+            await this.page.waitForTimeout(1000);
+        }
+        await this.page.getByText(streamName, { exact: true }).click();
+        testLogger.info('Selected stream name', { streamName });
+
+        // Select Real-time alert type
+        await expect(this.page.locator(this.realtimeAlertRadio)).toBeVisible({ timeout: 5000 });
+        await this.page.locator(this.realtimeAlertRadio).click();
+        testLogger.info('Selected real-time alert type');
+
+        // ==================== STEP 2: CONDITIONS ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Navigated to Step 2: Conditions');
+
+        // Add condition - check which button is visible
+        const firstCondBtn = this.page.locator(this.addFirstConditionButton);
+        if (await firstCondBtn.isVisible({ timeout: 3000 })) {
+            await firstCondBtn.click();
+        } else {
+            await this.page.locator(this.addConditionButton).first().click();
+        }
+        await this.page.waitForTimeout(1000);
+
+        // Wait for condition to appear
+        await expect(this.page.locator(this.conditionColumnSelect).first()).toBeVisible({ timeout: 10000 });
+
+        // Select first available column (flexible)
+        const columnSelect = this.page.locator(this.conditionColumnSelect).first().locator('.q-select');
+        await columnSelect.click();
+        await this.page.waitForTimeout(500);
+        await expect(this.page.locator('.q-menu .q-item').first()).toBeVisible({ timeout: 5000 });
+        await this.page.locator('.q-menu .q-item').first().click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Selected first available column');
+
+        // Select operator (Contains)
+        const operatorSelect = this.page.locator(this.operatorSelect).first().locator('.q-select');
+        await operatorSelect.click();
+        await this.page.waitForTimeout(500);
+        await this.page.getByRole('option', { name: 'Contains', exact: true }).click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Selected operator: Contains');
+
+        // Fill value
+        await this.page.locator(this.conditionValueInput).first().locator('input').fill('test');
+        testLogger.info('Filled condition value: test');
+
+        // ==================== STEP 4: ALERT SETTINGS ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Navigated to Step 4: Alert Settings');
+
+        // Set Silence Notification to 0 minutes
+        const silenceInput = this.page.locator(this.silenceNotificationInput);
+        if (await silenceInput.isVisible({ timeout: 3000 })) {
+            await silenceInput.fill('0');
+            testLogger.info('Set silence notification to 0 minutes');
+        }
+
+        // Select destination for REAL-TIME alerts
+        const destinationSection = this.page.locator('div.flex.items-start').filter({
+            has: this.page.locator('span:has-text("Destination")')
+        }).first();
+        await destinationSection.waitFor({ state: 'visible', timeout: 10000 });
+        const destinationDropdown = destinationSection.locator('.q-select').first();
+        await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
+        await destinationDropdown.click();
+        await this.page.waitForTimeout(1000);
+
+        const destinationOption = this.page.getByText(destinationName, { exact: true }).first();
+        if (await destinationOption.isVisible({ timeout: 3000 })) {
+            await destinationOption.click();
+        } else {
+            await this.commonActions.scrollAndFindOption(destinationName, 'destination');
+        }
+        await this.page.keyboard.press('Escape');
+        testLogger.info('Selected destination', { destinationName });
+
+        // ==================== STEP 6: ADVANCED (Skip) ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(500);
+        testLogger.info('Navigated to Step 6: Advanced (skipping)');
+
+        // ==================== SUBMIT ALERT ====================
+        await this.page.locator(this.alertSubmitButton).click();
+        await expect(this.page.getByText(this.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        testLogger.info('Successfully created alert with defaults', { alertName: randomAlertName });
+
+        return randomAlertName;
     }
 
     /**
@@ -1286,5 +1418,572 @@ export class AlertsPage {
         const alertCell = this.page.getByRole('cell', { name: alertName }).first();
         await expect(alertCell).toBeVisible({ timeout });
         testLogger.info('Verified alert cell is visible', { alertName });
+    }
+
+    // ==================== PROMQL ALERTS ====================
+
+    /**
+     * Create a scheduled alert with PromQL query using Alerts 2.0 wizard UI
+     * @param {string} streamName - Name of the metrics stream
+     * @param {string} destinationName - Name of the destination
+     * @param {string} randomValue - Random string for unique naming
+     */
+    async createScheduledAlertWithPromQL(streamName, destinationName, randomValue) {
+        const randomAlertName = 'auto_promql_alert_' + randomValue;
+        this.currentAlertName = randomAlertName;
+
+        // Click Add Alert button to start wizard
+        await this.page.locator(this.addAlertButton).click();
+        await this.page.waitForLoadState('networkidle');
+        testLogger.info('Starting PromQL alert creation wizard', { alertName: randomAlertName });
+
+        // ==================== STEP 1: ALERT SETUP ====================
+        await expect(this.page.locator(this.alertNameInput)).toBeVisible({ timeout: 10000 });
+
+        // Fill alert name
+        await this.page.locator(this.alertNameInput).click();
+        await this.page.locator(this.alertNameInput).fill(randomAlertName);
+        testLogger.info('Filled alert name', { alertName: randomAlertName });
+
+        // Select stream type (metrics)
+        await this.page.locator(this.streamTypeDropdown).click();
+        await expect(this.page.getByRole('option', { name: 'metrics' })).toBeVisible({ timeout: 10000 });
+        await this.page.getByRole('option', { name: 'metrics' }).locator('div').nth(2).click();
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Selected stream type: metrics');
+
+        // Select stream name
+        await expect(this.page.locator(this.streamNameDropdown)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(this.streamNameDropdown).click();
+
+        try {
+            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
+        } catch (e) {
+            testLogger.warn('Stream dropdown options not visible after first click, retrying');
+            await this.page.locator(this.streamNameDropdown).click();
+            await this.page.waitForTimeout(1000);
+            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
+        }
+        await this.page.getByText(streamName, { exact: true }).click();
+        testLogger.info('Selected stream name', { streamName });
+
+        // Select Scheduled alert type
+        await expect(this.page.locator(this.scheduledAlertRadio)).toBeVisible({ timeout: 5000 });
+        await this.page.locator(this.scheduledAlertRadio).click();
+        testLogger.info('Selected scheduled alert type');
+
+        // ==================== STEP 2: CONDITIONS (PromQL) ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Navigated to Step 2: Conditions');
+
+        // Switch to PromQL tab
+        const promqlTab = this.page.locator('[data-test="tab-promql"]');
+        await promqlTab.waitFor({ state: 'visible', timeout: 10000 });
+        await promqlTab.click();
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Switched to PromQL tab');
+
+        // Click View Editor button to open PromQL editor dialog
+        const viewEditorBtn = this.page.locator(this.viewEditorButton);
+        await viewEditorBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await viewEditorBtn.click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Opened PromQL Editor dialog');
+
+        // Enter PromQL query in the dialog
+        const promqlEditor = this.page.locator(this.promqlEditorDialog).locator('.inputarea');
+        await this.page.locator(this.viewLineLocator).first().click();
+        await promqlEditor.fill(`sum(rate(${streamName}[5m]))`);
+        testLogger.info('Entered PromQL query');
+
+        // Run the query
+        await this.page.locator(this.runQueryButton).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(2000);
+        testLogger.info('Ran PromQL query');
+
+        // Close the PromQL editor dialog
+        try {
+            const closeButton = this.page.locator('[data-test="add-alert-back-btn"]').first();
+            if (await closeButton.isVisible({ timeout: 3000 })) {
+                await closeButton.click();
+            } else {
+                await this.page.keyboard.press('Escape');
+            }
+        } catch (error) {
+            testLogger.warn('Close button click failed, trying keyboard escape', { error: error.message });
+            await this.page.keyboard.press('Escape');
+        }
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Closed PromQL Editor dialog');
+
+        // ==================== STEP 3: COMPARE WITH PAST (Skip) ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Navigated to Step 3: Compare with Past (skipping)');
+
+        // ==================== STEP 4: ALERT SETTINGS ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Navigated to Step 4: Alert Settings');
+
+        // Set threshold (>= 1)
+        const thresholdOperator = this.page.locator(this.stepAlertConditionsQSelect).first();
+        await thresholdOperator.waitFor({ state: 'visible', timeout: 5000 });
+        await thresholdOperator.click();
+        await this.page.waitForTimeout(500);
+        await this.page.getByText('>=', { exact: true }).click();
+        testLogger.info('Set threshold operator: >=');
+
+        // Set threshold value
+        const thresholdInput = this.page.locator(this.stepAlertConditionsNumberInput).first();
+        await thresholdInput.waitFor({ state: 'visible', timeout: 5000 });
+        await thresholdInput.fill('1');
+        testLogger.info('Set threshold value: 1');
+
+        // Select destination
+        const destinationRow = this.page.locator(this.alertSettingsRow).filter({ hasText: /Destination/ });
+        const destinationDropdown = destinationRow.locator('.q-select').first();
+        await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
+        await destinationDropdown.click();
+        await this.page.waitForTimeout(1000);
+
+        const destinationOption = this.page.getByText(destinationName, { exact: true }).first();
+        if (await destinationOption.isVisible({ timeout: 3000 })) {
+            await destinationOption.click();
+        } else {
+            await this.commonActions.scrollAndFindOption(destinationName, 'destination');
+        }
+        await this.page.waitForTimeout(500);
+        await this.page.keyboard.press('Escape');
+        testLogger.info('Selected destination', { destinationName });
+
+        // ==================== STEP 5 & 6: Skip ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(500);
+        testLogger.info('Navigated to Step 5: Deduplication (skipping)');
+
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(500);
+        testLogger.info('Navigated to Step 6: Advanced (skipping)');
+
+        // ==================== SUBMIT ALERT ====================
+        await this.page.locator(this.alertSubmitButton).click();
+        await expect(this.page.getByText(this.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        testLogger.info('Successfully created PromQL alert', { alertName: randomAlertName });
+
+        return randomAlertName;
+    }
+
+    // ==================== ADVANCED CONDITIONS ====================
+
+    /**
+     * Create a real-time alert with multiple conditions using AND/OR groups
+     * @param {string} streamName - Name of the stream
+     * @param {string} destinationName - Name of the destination
+     * @param {string} randomValue - Random string for unique naming
+     */
+    async createAlertWithMultipleConditions(streamName, destinationName, randomValue) {
+        const randomAlertName = 'auto_multicond_alert_' + randomValue;
+        this.currentAlertName = randomAlertName;
+
+        // Click Add Alert button to start wizard
+        await this.page.locator(this.addAlertButton).click();
+        await this.page.waitForLoadState('networkidle');
+        testLogger.info('Starting multi-condition alert creation', { alertName: randomAlertName });
+
+        // ==================== STEP 1: ALERT SETUP ====================
+        await expect(this.page.locator(this.alertNameInput)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(this.alertNameInput).click();
+        await this.page.locator(this.alertNameInput).fill(randomAlertName);
+
+        // Select stream type (logs)
+        await this.page.locator(this.streamTypeDropdown).click();
+        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
+        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
+        await this.page.waitForTimeout(1000);
+
+        // Select stream name
+        await this.page.locator(this.streamNameDropdown).click();
+        try {
+            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
+        } catch (e) {
+            await this.page.locator(this.streamNameDropdown).click();
+            await this.page.waitForTimeout(1000);
+        }
+        await this.page.getByText(streamName, { exact: true }).click();
+
+        // Select Real-time alert type
+        await this.page.locator(this.realtimeAlertRadio).click();
+        testLogger.info('Alert setup complete');
+
+        // ==================== STEP 2: CONDITIONS (Multiple) ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Navigated to Step 2: Conditions');
+
+        // Add first condition - check which button is visible
+        const firstCondBtn = this.page.locator(this.addFirstConditionButton);
+        const addCondBtn = this.page.locator(this.addConditionButton).first();
+
+        if (await firstCondBtn.isVisible({ timeout: 3000 })) {
+            await firstCondBtn.click();
+            testLogger.info('Clicked initial Add Condition button');
+        } else if (await addCondBtn.isVisible({ timeout: 3000 })) {
+            await addCondBtn.click();
+            testLogger.info('Clicked Add Condition button (conditions already exist)');
+        }
+        await this.page.waitForTimeout(1000);
+
+        // Wait for condition column select to appear (this works for both FieldsInput and FilterCondition UI)
+        await expect(this.page.locator(this.conditionColumnSelect).first()).toBeVisible({ timeout: 10000 });
+        testLogger.info('First condition visible');
+
+        // Configure first condition - click the q-select inside the column container
+        const columnSelect1 = this.page.locator(this.conditionColumnSelect).first().locator('.q-select');
+        await columnSelect1.click();
+        await this.page.waitForTimeout(500);
+
+        // Wait for dropdown options and select first available field
+        await expect(this.page.locator('.q-menu .q-item').first()).toBeVisible({ timeout: 5000 });
+        await this.page.locator('.q-menu .q-item').first().click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Selected column for first condition');
+
+        // Click operator select (inside the container)
+        const operatorSelect1 = this.page.locator(this.operatorSelect).first().locator('.q-select');
+        await expect(operatorSelect1).toBeVisible({ timeout: 5000 });
+        await operatorSelect1.click();
+        await this.page.waitForTimeout(500);
+
+        // Select "Contains" operator (available options: =, !=, >=, <=, >, <, Contains, NotContains)
+        await expect(this.page.getByText('Contains', { exact: true })).toBeVisible({ timeout: 5000 });
+        await this.page.getByText('Contains', { exact: true }).click();
+        await this.page.waitForTimeout(500);
+
+        // Fill value for first condition
+        const valueInput1 = this.page.locator(this.conditionValueInput).first().locator('input');
+        await valueInput1.fill('test1');
+        testLogger.info('Added first condition with Contains operator');
+
+        // Add second condition using "Add Condition" button (now it should be visible)
+        await expect(this.page.locator(this.addConditionButton).first()).toBeVisible({ timeout: 5000 });
+        await this.page.locator(this.addConditionButton).first().click();
+        await this.page.waitForTimeout(1000);
+
+        // Wait for second condition column select to appear
+        await expect(this.page.locator(this.conditionColumnSelect).nth(1)).toBeVisible({ timeout: 10000 });
+        testLogger.info('Second condition visible');
+
+        // Configure second condition
+        const columnSelect2 = this.page.locator(this.conditionColumnSelect).nth(1).locator('.q-select');
+        await columnSelect2.click();
+        await this.page.waitForTimeout(500);
+
+        // Select second available field
+        await expect(this.page.locator('.q-menu .q-item').first()).toBeVisible({ timeout: 5000 });
+        await this.page.locator('.q-menu .q-item').nth(1).click();  // Select 2nd option to be different
+        await this.page.waitForTimeout(500);
+        testLogger.info('Selected column for second condition');
+
+        const operatorSelect2 = this.page.locator(this.operatorSelect).nth(1).locator('.q-select');
+        await expect(operatorSelect2).toBeVisible({ timeout: 5000 });
+        await operatorSelect2.click();
+        await this.page.waitForTimeout(500);
+        // Use getByRole to specifically target the dropdown option, not text already displayed on page
+        await expect(this.page.getByRole('option', { name: 'Contains', exact: true })).toBeVisible({ timeout: 5000 });
+        await this.page.getByRole('option', { name: 'Contains', exact: true }).click();
+        await this.page.waitForTimeout(500);
+
+        // Fill value for second condition
+        const valueInput2 = this.page.locator(this.conditionValueInput).nth(1).locator('input');
+        await valueInput2.fill('test2');
+        testLogger.info('Added second condition with Contains operator');
+
+        // Verify AND operator is shown between conditions (default)
+        await expect(this.page.getByText('AND', { exact: true }).first()).toBeVisible({ timeout: 5000 });
+        testLogger.info('Verified AND operator between conditions');
+
+        // ==================== STEP 4: ALERT SETTINGS ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Navigated to Step 4: Alert Settings');
+
+        // Set Silence Notification to 0 minutes
+        const silenceInput = this.page.locator(this.silenceNotificationInput);
+        if (await silenceInput.isVisible({ timeout: 3000 })) {
+            await silenceInput.fill('0');
+        }
+
+        // Select destination for REAL-TIME alerts
+        // Real-time alerts use a different layout - find by "Destination" label
+        const destinationSection = this.page.locator('div.flex.items-start').filter({
+            has: this.page.locator('span:has-text("Destination")')
+        }).first();
+        await destinationSection.waitFor({ state: 'visible', timeout: 10000 });
+
+        const destinationDropdown = destinationSection.locator('.q-select').first();
+        await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
+        await destinationDropdown.click();
+        await this.page.waitForTimeout(1000);
+
+        const destinationOption = this.page.getByText(destinationName, { exact: true }).first();
+        if (await destinationOption.isVisible({ timeout: 3000 })) {
+            await destinationOption.click();
+        } else {
+            await this.commonActions.scrollAndFindOption(destinationName, 'destination');
+        }
+        await this.page.keyboard.press('Escape');
+        testLogger.info('Selected destination', { destinationName });
+
+        // ==================== STEP 6: ADVANCED (Skip) ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(500);
+
+        // ==================== SUBMIT ALERT ====================
+        await this.page.locator(this.alertSubmitButton).click();
+        await expect(this.page.getByText(this.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        testLogger.info('Successfully created multi-condition alert', { alertName: randomAlertName });
+
+        return randomAlertName;
+    }
+
+    /**
+     * Add a condition group (AND/OR) during alert creation in Step 2
+     */
+    async addConditionGroup() {
+        const addGroupBtn = this.page.locator('[data-test="alert-conditions-add-condition-group-btn"]');
+        await addGroupBtn.waitFor({ state: 'visible', timeout: 5000 });
+        await addGroupBtn.click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Added condition group');
+    }
+
+    /**
+     * Toggle the AND/OR operator for conditions
+     */
+    async toggleConditionOperator() {
+        const toggleBtn = this.page.locator('[data-test="alert-conditions-toggle-operator-btn"]');
+        await toggleBtn.waitFor({ state: 'visible', timeout: 5000 });
+        await toggleBtn.click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Toggled condition operator');
+    }
+
+    /**
+     * Delete a specific condition by index
+     * @param {number} index - Index of the condition to delete (0-based)
+     */
+    async deleteCondition(index = 0) {
+        const deleteBtn = this.page.locator('[data-test="alert-conditions-delete-condition-btn"]').nth(index);
+        await deleteBtn.waitFor({ state: 'visible', timeout: 5000 });
+        await deleteBtn.click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Deleted condition', { index });
+    }
+
+    /**
+     * Test condition operator toggle (AND to OR) during alert creation
+     * Creates a temporary alert wizard session to test the toggle functionality
+     * @param {string} streamName - Name of the stream
+     * @param {string} randomValue - Random string for unique naming
+     * @returns {Object} Result with toggleSuccessful and message
+     */
+    async testConditionOperatorToggle(streamName, randomValue) {
+        const alertName = 'auto_toggle_test_' + randomValue;
+
+        // Start creating an alert
+        await this.page.locator(this.addAlertButton).click();
+        await this.page.waitForLoadState('networkidle');
+
+        // Fill Step 1: Alert Setup
+        await expect(this.page.locator(this.alertNameInput)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(this.alertNameInput).fill(alertName);
+
+        // Select stream type (logs)
+        await this.page.locator(this.streamTypeDropdown).click();
+        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
+        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
+        await this.page.waitForTimeout(1000);
+
+        // Select stream
+        await this.page.locator(this.streamNameDropdown).click();
+        await this.page.waitForTimeout(500);
+        await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
+        await this.page.getByText(streamName, { exact: true }).click();
+
+        // Select real-time alert type
+        await this.page.locator(this.realtimeAlertRadio).click();
+
+        // Navigate to Step 2: Conditions
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(1000);
+
+        // Add first condition - check which button is visible
+        const firstCondBtn = this.page.locator(this.addFirstConditionButton);
+        if (await firstCondBtn.isVisible({ timeout: 3000 })) {
+            await firstCondBtn.click();
+        } else {
+            await this.page.locator(this.addConditionButton).first().click();
+        }
+        await this.page.waitForTimeout(1000);
+
+        // Wait for condition column select to appear
+        await expect(this.page.locator(this.conditionColumnSelect).first()).toBeVisible({ timeout: 10000 });
+
+        // Configure first condition - use q-select inside container
+        const columnSelect1 = this.page.locator(this.conditionColumnSelect).first().locator('.q-select');
+        await columnSelect1.click();
+        await this.page.waitForTimeout(500);
+        await expect(this.page.locator('.q-menu .q-item').first()).toBeVisible({ timeout: 5000 });
+        await this.page.locator('.q-menu .q-item').first().click();
+        await this.page.waitForTimeout(500);
+
+        const operatorSelect1 = this.page.locator(this.operatorSelect).first().locator('.q-select');
+        await operatorSelect1.click();
+        await this.page.waitForTimeout(500);
+        await expect(this.page.getByText('Contains', { exact: true })).toBeVisible({ timeout: 5000 });
+        await this.page.getByText('Contains', { exact: true }).click();
+        await this.page.waitForTimeout(500);
+
+        // Fill value for first condition
+        const valueInput1 = this.page.locator(this.conditionValueInput).first().locator('input');
+        await valueInput1.fill('test');
+        testLogger.info('Added first condition');
+
+        // Add second condition
+        await expect(this.page.locator(this.addConditionButton).first()).toBeVisible({ timeout: 5000 });
+        await this.page.locator(this.addConditionButton).first().click();
+        await this.page.waitForTimeout(1000);
+
+        // Wait for second condition column select to appear
+        await expect(this.page.locator(this.conditionColumnSelect).nth(1)).toBeVisible({ timeout: 10000 });
+        testLogger.info('Added second condition');
+
+        // Verify AND operator is visible (default)
+        await expect(this.page.getByText('AND', { exact: true }).first()).toBeVisible();
+        testLogger.info('Verified AND operator is default between conditions');
+
+        // Try to toggle operator to OR
+        const toggleBtn = this.page.locator('[data-test="alert-conditions-toggle-operator-btn"]');
+        let toggleSuccessful = false;
+        let message = '';
+
+        if (await toggleBtn.isVisible({ timeout: 3000 })) {
+            await toggleBtn.click();
+            await this.page.waitForTimeout(500);
+
+            // Verify OR operator is now visible
+            try {
+                await expect(this.page.getByText('OR', { exact: true }).first()).toBeVisible({ timeout: 5000 });
+                toggleSuccessful = true;
+                message = 'Successfully toggled from AND to OR';
+                testLogger.info(message);
+            } catch (e) {
+                message = 'Toggle clicked but OR operator not visible';
+                testLogger.warn(message);
+            }
+        } else {
+            message = 'Toggle operator button not visible, may need at least 2 conditions in same group';
+            testLogger.warn(message);
+        }
+
+        // Cancel alert creation (go back to alert list)
+        await this.page.locator(this.alertBackButton).click();
+        await this.page.waitForLoadState('networkidle');
+
+        return { toggleSuccessful, message };
+    }
+
+    // ==================== BULK OPERATIONS ====================
+
+    /**
+     * Select multiple alerts by name
+     * @param {string[]} alertNames - Array of alert names to select
+     */
+    async selectMultipleAlerts(alertNames) {
+        for (const alertName of alertNames) {
+            // Find the row containing the alert and click its checkbox
+            const alertRow = this.page.locator(`tr:has-text("${alertName}")`).first();
+            const checkbox = alertRow.locator('.o2-table-checkbox');
+            await checkbox.waitFor({ state: 'visible', timeout: 5000 });
+            await checkbox.click();
+            await this.page.waitForTimeout(300);
+            testLogger.debug('Selected alert', { alertName });
+        }
+        testLogger.info('Selected multiple alerts', { count: alertNames.length });
+    }
+
+    /**
+     * Bulk pause all selected alerts
+     */
+    async bulkPauseAlerts() {
+        const pauseBtn = this.page.locator('[data-test="alert-list-pause-alerts-btn"]');
+        await pauseBtn.waitFor({ state: 'visible', timeout: 5000 });
+        await pauseBtn.click();
+        await this.page.waitForTimeout(1000);
+
+        // Wait for success messages - bulk operations show "Alerts paused successfully"
+        await expect(this.page.getByText(/Alerts? paused successfully/i).first()).toBeVisible({ timeout: 10000 });
+        testLogger.info('Bulk paused selected alerts');
+    }
+
+    /**
+     * Bulk unpause all selected alerts
+     */
+    async bulkUnpauseAlerts() {
+        const unpauseBtn = this.page.locator('[data-test="alert-list-unpause-alerts-btn"]');
+        await unpauseBtn.waitFor({ state: 'visible', timeout: 5000 });
+        await unpauseBtn.click();
+        await this.page.waitForTimeout(1000);
+
+        // Wait for success messages - bulk operations show "Alerts resumed successfully"
+        await expect(this.page.getByText(/Alerts? resumed successfully/i).first()).toBeVisible({ timeout: 10000 });
+        testLogger.info('Bulk unpaused selected alerts');
+    }
+
+    /**
+     * Verify bulk pause button is visible when alerts are selected
+     */
+    async verifyBulkPauseButtonVisible() {
+        const pauseBtn = this.page.locator('[data-test="alert-list-pause-alerts-btn"]');
+        await expect(pauseBtn).toBeVisible({ timeout: 5000 });
+        testLogger.info('Bulk pause button is visible');
+    }
+
+    /**
+     * Verify bulk unpause button is visible when alerts are selected
+     */
+    async verifyBulkUnpauseButtonVisible() {
+        const unpauseBtn = this.page.locator('[data-test="alert-list-unpause-alerts-btn"]');
+        await expect(unpauseBtn).toBeVisible({ timeout: 5000 });
+        testLogger.info('Bulk unpause button is visible');
+    }
+
+    /**
+     * Get count of selected alerts from UI
+     * @returns {Promise<number>} Number of selected alerts
+     */
+    async getSelectedAlertsCount() {
+        // Look for text like "2 selected" or similar
+        try {
+            const selectedText = await this.page.locator('text=/\\d+ selected/i').textContent({ timeout: 3000 });
+            const count = parseInt(selectedText.match(/(\d+)/)[1], 10);
+            return count;
+        } catch (e) {
+            return 0;
+        }
     }
 } 
