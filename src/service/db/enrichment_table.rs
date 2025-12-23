@@ -27,11 +27,16 @@ use config::{
         time::{BASE_TIME, now_micros},
     },
 };
-use infra::{cache::stats, db as infra_db};
+use infra::{cache::stats, db as infra_db, table::enrichment_table_urls};
 use rayon::prelude::*;
 use vrl::prelude::NotNan;
 #[cfg(feature = "enterprise")]
-use {crate::service::search::SEARCH_SERVER, o2_enterprise::enterprise::search::TaskStatus};
+use {
+    crate::service::search::SEARCH_SERVER,
+    o2_enterprise::enterprise::{
+        search::TaskStatus, super_cluster::queue::ENRICHMENT_TABLE_URL_JOB_KEY,
+    },
+};
 
 use crate::{
     common::infra::config::ENRICHMENT_TABLES,
@@ -529,6 +534,200 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         }
     }
     Ok(())
+}
+
+/// Save enrichment table URL job state
+pub async fn save_url_job(
+    job: &config::meta::enrichment_table::EnrichmentTableUrlJob,
+) -> Result<(), infra::errors::Error> {
+    let record = enrichment_table_urls::EnrichmentTableUrlRecord {
+        org: job.org_id.clone(),
+        name: job.table_name.clone(),
+        url: job.url.clone(),
+        status: (&job.status).into(),
+        error_message: job.error_message.clone(),
+        created_at: job.created_at,
+        updated_at: job.updated_at,
+        total_bytes_fetched: job.total_bytes_fetched as i64,
+        total_records_processed: job.total_records_processed,
+        retry_count: job.retry_count as i32,
+        append_data: job.append_data,
+        last_byte_position: job.last_byte_position as i64,
+        supports_range: job.supports_range,
+    };
+    enrichment_table_urls::put(record.clone()).await?;
+
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        let key = format!(
+            "{ENRICHMENT_TABLE_URL_JOB_KEY}/{}/{}",
+            job.org_id, job.table_name
+        );
+        match config::utils::json::to_vec(&record) {
+            Err(e) => {
+                log::error!(
+                    "[Enrichment::Url] error serializing enrichment table {}/{} for super_cluster event: {e}",
+                    job.org_id,
+                    job.table_name
+                );
+            }
+            Ok(value_vec) => {
+                if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::enrichment_url_put(
+                    &key,
+                    value_vec.into(),
+                )
+                .await
+                {
+                    log::error!(
+                        "[Enrichment::Url] error sending enrichment table {}/{} for super_cluster event: {e}",
+                        job.org_id,
+                        job.table_name
+                    );
+                }
+            }
+        };
+    }
+
+    Ok(())
+}
+
+/// Get enrichment table URL job state
+pub async fn get_url_job(
+    org_id: &str,
+    table_name: &str,
+) -> Result<Option<config::meta::enrichment_table::EnrichmentTableUrlJob>, infra::errors::Error> {
+    match enrichment_table_urls::get(org_id, table_name).await? {
+        Some(record) => {
+            let job = config::meta::enrichment_table::EnrichmentTableUrlJob {
+                org_id: record.org,
+                table_name: record.name,
+                url: record.url,
+                status: record.status.into(),
+                error_message: record.error_message,
+                created_at: record.created_at,
+                updated_at: record.updated_at,
+                total_bytes_fetched: record.total_bytes_fetched as u64,
+                total_records_processed: record.total_records_processed,
+                retry_count: record.retry_count as u32,
+                append_data: record.append_data,
+                last_byte_position: record.last_byte_position as u64,
+                supports_range: record.supports_range,
+            };
+            Ok(Some(job))
+        }
+        None => Ok(None),
+    }
+}
+
+/// Delete enrichment table URL job state
+pub async fn delete_url_job(org_id: &str, table_name: &str) -> Result<(), infra::errors::Error> {
+    enrichment_table_urls::delete(org_id, table_name).await?;
+
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        let key = format!("{ENRICHMENT_TABLE_URL_JOB_KEY}/{}/{}", org_id, table_name);
+        if let Err(e) =
+            o2_enterprise::enterprise::super_cluster::queue::enrichment_url_delete(&key).await
+        {
+            log::error!(
+                "[Enrichment::Url] error sending enrichment table {}/{} for super_cluster delete event: {e}",
+                org_id,
+                table_name
+            );
+        }
+    }
+
+    Ok(())
+}
+
+/// List all enrichment table URL jobs for an organization
+pub async fn list_url_jobs(
+    org_id: &str,
+) -> Result<Vec<config::meta::enrichment_table::EnrichmentTableUrlJob>, infra::errors::Error> {
+    let records = enrichment_table_urls::list_by_org(org_id).await?;
+
+    let jobs = records
+        .into_iter()
+        .map(
+            |record| config::meta::enrichment_table::EnrichmentTableUrlJob {
+                org_id: record.org,
+                table_name: record.name,
+                url: record.url,
+                status: record.status.into(),
+                error_message: record.error_message,
+                created_at: record.created_at,
+                updated_at: record.updated_at,
+                total_bytes_fetched: record.total_bytes_fetched as u64,
+                total_records_processed: record.total_records_processed,
+                retry_count: record.retry_count as u32,
+                append_data: record.append_data,
+                last_byte_position: record.last_byte_position as u64,
+                supports_range: record.supports_range,
+            },
+        )
+        .collect();
+
+    Ok(jobs)
+}
+
+/// Atomically claims stale URL jobs for recovery
+///
+/// This is used by the stale job recovery background task. It finds jobs stuck in
+/// Processing status and atomically resets them to Pending status.
+///
+/// # Important
+/// - Only works with PostgreSQL/MySQL (distributed deployments)
+/// - Returns error for SQLite (single-node, no distribution needed)
+///
+/// # Arguments
+/// * `stale_threshold_secs` - Jobs idle for longer than this are considered stale
+/// * `limit` - Maximum number of jobs to claim
+///
+/// # Returns
+/// * `Ok(vec![jobs])` - Successfully claimed stale jobs (may be empty)
+/// * `Err` - Database error or unsupported backend
+pub async fn claim_stale_url_jobs(
+    stale_threshold_secs: i64,
+    limit: usize,
+) -> Result<Vec<config::meta::enrichment_table::EnrichmentTableUrlJob>, infra::errors::Error> {
+    let now = chrono::Utc::now().timestamp_micros();
+    let stale_threshold_timestamp = now - (stale_threshold_secs * 1_000_000);
+
+    let processing_status = 1; // EnrichmentTableStatus::Processing
+    let pending_status = 0; // EnrichmentTableStatus::Pending
+
+    let records = enrichment_table_urls::claim_stale_jobs(
+        stale_threshold_timestamp,
+        processing_status,
+        pending_status,
+        limit,
+    )
+    .await?;
+
+    Ok(records
+        .into_iter()
+        .map(|r| config::meta::enrichment_table::EnrichmentTableUrlJob {
+            org_id: r.org,
+            table_name: r.name,
+            url: r.url,
+            status: r.status.into(),
+            error_message: r.error_message,
+            created_at: r.created_at,
+            updated_at: r.updated_at,
+            total_bytes_fetched: r.total_bytes_fetched as u64,
+            total_records_processed: r.total_records_processed,
+            retry_count: r.retry_count as u32,
+            append_data: r.append_data,
+            last_byte_position: r.last_byte_position as u64,
+            supports_range: r.supports_range,
+        })
+        .collect())
 }
 
 // write test for convert_to_vrl

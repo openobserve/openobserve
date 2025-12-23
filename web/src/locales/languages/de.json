@@ -617,7 +617,10 @@
     "streamRouting": "Stream-Routing",
     "testFunction": "Funktion testen",
     "errorDetails": "Fehler",
-    "function_definition": "Definition der Funktion"
+    "function_definition": "Definition der Funktion",
+    "enrichmentTableURL": "URL der Anreicherungstabelle",
+    "urlCannotBeModified": "URL kann nach der Erstellung nicht geändert werden",
+    "close": "Schliessen"
   },
   "confirmDialog": {
     "cancel": "Abbrechen",

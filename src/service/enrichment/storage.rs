@@ -484,23 +484,39 @@ pub mod local {
         let key = get_key(org_id, table_name);
         let file_dir = get_table_dir(&key);
         let metadata_path = get_metadata_path();
+        log::debug!(
+            "enrichment table {org_id}/{table_name} to be deleted metadata path: {:?}",
+            metadata_path
+        );
         if !metadata_path.exists() {
             return Ok(());
         }
 
+        log::debug!(
+            "enrichment table {org_id}/{table_name} to be deleted metadata_path exists, file dir: {:?}",
+            file_dir
+        );
         if file_dir.exists() {
             tokio::fs::remove_dir_all(&file_dir)
                 .await
                 .map_err(|e| anyhow!("Failed to remove enrichment table file: {}", e))?;
         }
 
+        log::debug!("enrichment table {org_id}/{table_name} to be deleted file dir removed");
         let mut metadata_content = get_metadata_content().await?;
         metadata_content.remove(&key);
 
+        log::debug!(
+            "enrichment table {org_id}/{table_name} to be deleted, metadata_content: {:?}",
+            metadata_content
+        );
         // Serialize the metadata content
         let metadata_json = serde_json::to_string_pretty(&metadata_content)
             .map_err(|e| anyhow!("Failed to serialize metadata: {}", e))?;
 
+        log::debug!(
+            "enrichment table {org_id}/{table_name} to be deleted metadata_json updated: {metadata_json}"
+        );
         // Serialize and write metadata
         tokio::fs::write(&metadata_path, metadata_json)
             .await
@@ -525,6 +541,9 @@ pub mod local {
         let key = get_key(org_id, table_name);
         let metadata_content = get_metadata_content().await?;
         let last_updated_at = metadata_content.get(&key).cloned().unwrap_or_default();
+        log::debug!(
+            "Checking if need to store the latest enrichment table here: metadata json updated: {last_updated_at}, updated at : {updated_at}"
+        );
         if last_updated_at < updated_at || last_updated_at == 0 {
             delete(org_id, table_name).await?;
             store(org_id, table_name, data, updated_at).await?;
@@ -541,7 +560,9 @@ pub mod local {
         let org_id = org_id.to_string();
         let table_name = table_name.to_string();
         tokio::task::spawn(async move {
-            store_data_if_needed(&org_id, &table_name, data, updated_at).await
+            if let Err(e) = store_data_if_needed(&org_id, &table_name, data, updated_at).await {
+                log::error!("Failed to save {org_id}/{table_name} data in the disk: {e}");
+            }
         });
         Ok(())
     }

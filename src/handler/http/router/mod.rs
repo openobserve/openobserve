@@ -563,6 +563,8 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(kv::delete)
         .service(kv::list)
         .service(enrichment_table::save_enrichment_table)
+        .service(enrichment_table::save_enrichment_table_from_url)
+        .service(enrichment_table::get_all_enrichment_table_statuses)
         .service(logs::ingest::handle_kinesis_request)
         .service(logs::ingest::handle_gcp_request)
         .service(organization::org::create_org)
