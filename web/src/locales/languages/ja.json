@@ -634,7 +634,10 @@
     "streamRouting": "ストリームルーティング",
     "testFunction": "関数をテスト",
     "errorDetails": "エラー",
-    "function_definition": "関数定義"
+    "function_definition": "関数定義",
+    "enrichmentTableURL": "エンリッチメントテーブルの URL",
+    "urlCannotBeModified": "作成後に URL を変更することはできません",
+    "close": "閉じる"
   },
   "confirmDialog": {
     "cancel": "キャンセル",
