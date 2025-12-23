@@ -712,7 +712,10 @@
     "streamRouting": "Stream Routing",
     "testFunction": "Test Function",
     "errorDetails": "Error",
-    "function_definition": "Function Definition"
+    "function_definition": "Function Definition",
+    "enrichmentTableURL": "Enrichment Table URL",
+    "urlCannotBeModified": "URL cannot be modified after creation",
+    "close": "Close"
   },
   "latencyInsights": {
     "title": "Insights",

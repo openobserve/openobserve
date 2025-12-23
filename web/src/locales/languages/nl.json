@@ -617,7 +617,10 @@
     "streamRouting": "Routering van streams",
     "testFunction": "Testfunctie",
     "errorDetails": "Fout",
-    "function_definition": "Definitie van de functie"
+    "function_definition": "Definitie van de functie",
+    "enrichmentTableURL": "URL van de verrijkingstabel",
+    "urlCannotBeModified": "De URL kan na het aanmaken niet worden gewijzigd",
+    "close": "Sluiten"
   },
   "confirmDialog": {
     "cancel": "Annuleer",

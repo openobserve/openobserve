@@ -506,7 +506,10 @@ impl FromRequest for AuthExtractor {
                     // this will take form org:dashboard or org:folders
 
                     // handle ratelimit:org
-                    if method.eq("GET") && path_columns[1].starts_with("ratelimit") {
+                    if method.eq("GET")
+                        && (path_columns[1].starts_with("ratelimit")
+                            || path_columns[1].starts_with("enrichment_tables"))
+                    {
                         method = "LIST".to_string();
                     }
 
@@ -611,6 +614,14 @@ impl FromRequest for AuthExtractor {
                             .get(path_columns[2])
                             .map_or(path_columns[2], |model| model.key),
                         path_columns[3]
+                    )
+                } else if method.eq("POST") && path_columns[1].eq("enrichment_tables") {
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get(path_columns[1])
+                            .map_or(path_columns[1], |model| model.key),
+                        path_columns[0]
                     )
                 } else {
                     // for other get/put requests on any entities such as templates,
