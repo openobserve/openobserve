@@ -2017,7 +2017,13 @@
     "confirmRefreshMsg": "Bu hizmet hesabı belirtecini yenilemek istediğinizden emin misiniz?",
     "confirmRefreshHead": "Hizmet Belirtecini Yenile",
     "downloadToken": "Token indir",
-    "token": "Simge"
+    "token": "Simge",
+    "viewAllTokens": "Tüm Jetonları Görüntüle",
+    "viewAndCopyTokens": "Belirteçleri Görüntüle ve Kopyala",
+    "copyAllTokens": "Tüm Jetonları Kopyala",
+    "downloadAllTokens": "Tüm Jetonları İndir",
+    "serviceAccountToken": "Hizmet Hesabı Simgesi",
+    "serviceAccountTokensAllOrgs": "Hizmet Hesabı Belirteçleri (Tüm Kuruluşlar)"
   },
   "pipeline_destinations": {
     "header": "Boru Hattı Destinasyonları",

@@ -2017,7 +2017,13 @@
     "confirmRefreshMsg": "Êtes-vous sûr de vouloir actualiser le jeton de ce compte de service ?",
     "confirmRefreshHead": "Actualiser le jeton de service",
     "downloadToken": "Télécharger Token",
-    "token": "Jeton"
+    "token": "Jeton",
+    "viewAllTokens": "Afficher tous les jetons",
+    "viewAndCopyTokens": "Afficher et copier les jetons",
+    "copyAllTokens": "Copiez tous les jetons",
+    "downloadAllTokens": "Télécharger tous les jetons",
+    "serviceAccountToken": "Jeton de compte de service",
+    "serviceAccountTokensAllOrgs": "Jetons de compte de service (toutes les organisations)"
   },
   "pipeline_destinations": {
     "header": "Destinations des pipelines",

@@ -2017,7 +2017,13 @@
     "confirmRefreshMsg": "Weet je zeker dat je dit serviceaccounttoken wilt vernieuwen?",
     "confirmRefreshHead": "Servicetoken vernieuwen",
     "downloadToken": "Token downloaden",
-    "token": "Blijk"
+    "token": "Blijk",
+    "viewAllTokens": "Bekijk alle tokens",
+    "viewAndCopyTokens": "Tokens bekijken en kopiëren",
+    "copyAllTokens": "Kopieer alle tokens",
+    "downloadAllTokens": "Alle tokens downloaden",
+    "serviceAccountToken": "Token voor serviceaccount",
+    "serviceAccountTokensAllOrgs": "Tokens voor serviceaccounts (alle organisaties)"
   },
   "pipeline_destinations": {
     "header": "Bestemmingen voor pijpleidingen",
