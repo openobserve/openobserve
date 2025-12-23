@@ -177,7 +177,7 @@ export default defineComponent({
             name: "",
             description: "",
           };
-          await addFolderForm.value.resetValidation();
+          await addFolderForm.value?.resetValidation();
         } catch (err: any) {
           showErrorNotification(
             err?.message ??

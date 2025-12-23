@@ -125,7 +125,7 @@ test.describe("Stream multiselect testcases", () => {
 
 async function multistreamselect(page) {
     const pageManager = new PageManager(page);
-    
+
     // Add second stream using POM (we're already on logs page from beforeEach with e2e_automate selected and all fields enabled)
     await pageManager.logsPage.fillStreamFilter('e2e_stream1');
     await page.waitForTimeout(2000);
@@ -134,21 +134,23 @@ async function multistreamselect(page) {
 
     // Enable function editor using POM (all fields already clicked in beforeEach)
     await pageManager.logsPage.toggleQueryModeEditor();
+    // Extra wait for Firefox to render the Monaco editor
+    await page.waitForTimeout(3000);
     await pageManager.logsPage.clickMonacoEditor();
-    
+
     // Run query to populate results first
     await pageManager.logsPage.selectRunQuery();
     await page.waitForTimeout(3000);
-    
+
     // Verify Common Group Fields are present using POM
     const cell = await pageManager.logsPage.getCellByName(/Common Group Fields/);
     const cellText = await cell.textContent();
     expect(cellText).toContain('Common Group Fields');
-  
+
     // Select both streams using POM
     await pageManager.logsPage.clickCellByName(/E2e_automate/);
     await pageManager.logsPage.clickCellByName(/E2e_stream1/);
-    
+
     // Execute query and navigate time picker using POM
     await pageManager.logsPage.selectRunQuery();
     await pageManager.logsPage.clickDateTimeButton();
@@ -157,9 +159,11 @@ async function multistreamselect(page) {
 }
   
 
-  test("should add a function and display it in streams", async ({ page }) => {
+  test("should add a function and display it in streams", {
+    tag: ['@vrl', '@function', '@multistream', '@all']
+  }, async ({ page }) => {
     const pageManager = new PageManager(page);
-    
+
     await multistreamselect(page);
     await pageManager.logsPage.fillMonacoEditor('.a=2');
     await page.waitForTimeout(1000);
@@ -205,9 +209,9 @@ async function multistreamselect(page) {
   //   await applyQueryButton(page);
   // });
 
-  test("should redirect to logs after clicking on stream explorer via stream page", async ({
-    page,
-  }) => {
+  test("should redirect to logs after clicking on stream explorer via stream page", {
+    tag: ['@navigation', '@streamExplorer', '@multistream', '@all']
+  }, async ({ page }) => {
     const pageManager = new PageManager(page);
     
     await multistreamselect(page);
@@ -222,42 +226,40 @@ async function multistreamselect(page) {
     await expect(page.url()).toContain("logs");
   });
 
-    // This is flicky, sometimes we get first record from stream1 and sometimes from e2e_automate
-  test.skip("should click on interesting fields icon and display query in editor", async ({
-    page,
-  }) => {
+  // Note: This test can be flaky due to non-deterministic record ordering across streams
+  test.skip("should click on interesting fields icon and display query in editor", {
+    tag: ['@interestingFields', '@multistream', '@flaky']
+  }, async ({ page }) => {
+    const pageManager = new PageManager(page);
+    testLogger.info('Testing interesting fields with multistream selection');
+
     await multistreamselect(page);
-    await page
-      .locator('[data-cy="index-field-search-input"]')
-      .fill("job");
-    await page.waitForTimeout(2000);
-    await page
-      .locator(
-        '[data-test="log-search-index-list-interesting-job-field-btn"]'
-      )
-      .last()
-      .click({
-        force: true,
-      });
-    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
-    await page.waitForTimeout(2000);
-    await page
-        .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')
-        .click({
-          force: true,
-        });
 
-    await page
-        .locator('[data-test="log-table-column-0-source"]')
-        .click({ force: true });
+    // Search for job field using POM
+    await pageManager.logsPage.searchFieldByName('job');
+    await page.waitForTimeout(2000);
+
+    // Click interesting field button
+    await page.locator('[data-test="log-search-index-list-interesting-job-field-btn"]').last().click({ force: true });
+
+    // Enable SQL mode using POM
+    await pageManager.logsPage.enableSQLMode();
+    await page.waitForTimeout(2000);
+
+    // Run query using POM
+    await pageManager.logsPage.clickSearchBarRefreshButton();
+
+    // Click on first result
+    await page.locator('[data-test="log-table-column-0-source"]').click({ force: true });
+
+    // Verify table is visible
     await pageManager.logsPage.expectLogsTableVisible();
-
-    
+    testLogger.info('Interesting fields test completed');
   });
 
-  test("should display results in selected time when multiple stream selected", async ({
-    page,
-  }) => {
+  test("should display results in selected time when multiple stream selected", {
+    tag: ['@timePicker', '@dateTime', '@multistream', '@all']
+  }, async ({ page }) => {
     const pageManager = new PageManager(page);
     await multistreamselect(page);
     await pageManager.logsPage.setDateTimeToToday(); 
@@ -308,17 +310,17 @@ async function multistreamselect(page) {
     tag: ['@filter', '@invalidfield', '@multistream']
   }, async ({ page }) => {
     testLogger.info('Testing search filter functionality with multiple streams');
-    
+
     const pageManager = new PageManager(page);
-    
+
     // Setup multistream selection using helper
     await setupBasicMultistream(page);
-    
+
     // Add query in query editor and run
     await pageManager.logsPage.fillQueryEditorWithRole(MULTISTREAM_CONFIG.TEST_DATA.QUERIES.INVALID_FIELD);
     await pageManager.logsPage.clickSearchBarRefreshButton();
     await page.waitForTimeout(MULTISTREAM_CONFIG.TIMEOUTS.QUERY_EXECUTION);
-    
+
     testLogger.info('Search filter steps executed successfully with multiple streams');
   });
 
@@ -326,23 +328,23 @@ async function multistreamselect(page) {
     tag: ['@vrl', '@function', '@transformation']
   }, async ({ page }) => {
     testLogger.info('Testing Monaco editor function with multiple streams');
-    
+
     const pageManager = new PageManager(page);
-    
+
     // Setup multiple streams using existing multistreamselect function
     await multistreamselect(page);
-    
+
     // Fill Monaco editor with VRL function using constant
     await pageManager.logsPage.fillMonacoEditor(MULTISTREAM_CONFIG.TEST_DATA.QUERIES.VRL_FUNCTION);
     await page.waitForTimeout(MULTISTREAM_CONFIG.TIMEOUTS.UI_INTERACTION);
     await applyQueryButton(page);
     await pageManager.logsPage.clickTableExpandMenuFirst();
-    
+
     // Verify VRL function is visible and table is displayed
     await pageManager.logsPage.expectVrlFunctionVisible(MULTISTREAM_CONFIG.TEST_DATA.QUERIES.VRL_FUNCTION);
     await pageManager.logsPage.expectLogsTableVisible();
     await pageManager.logsPage.selectRunQuery();
-    
+
     testLogger.info('Monaco editor function test with multiple streams completed successfully');
   });
 

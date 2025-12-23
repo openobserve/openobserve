@@ -1,0 +1,232 @@
+name: GitHub Issues → OpenObserve
+
+on:
+  issues:
+    types: [opened, edited, deleted, closed, reopened, assigned, unassigned, labeled, unlabeled, locked, unlocked, transferred, pinned, unpinned, milestoned, demilestoned]
+  issue_comment:
+    types: [created, edited, deleted]
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Build and send payload to OpenObserve
+        run: |
+          # Create temporary files for body content
+          cat << 'ISSUE_BODY_EOF' > issue_body.txt
+          ${{ github.event.issue.body }}
+          ISSUE_BODY_EOF
+          
+          cat << 'COMMENT_BODY_EOF' > comment_body.txt
+          ${{ github.event.comment.body }}
+          COMMENT_BODY_EOF
+          
+          # Read and process the body files
+          ISSUE_BODY=$(cat issue_body.txt | tr '\n' ' ' | sed 's/"/\\"/g')
+          COMMENT_BODY=$(cat comment_body.txt | tr '\n' ' ' | sed 's/"/\\"/g')
+          
+          # Build payload using jq to properly handle JSON
+          jq -n \
+            --arg event_name "${{ github.event_name }}" \
+            --arg action "${{ github.event.action }}" \
+            --arg workflow "${{ github.workflow }}" \
+            --arg run_id "${{ github.run_id }}" \
+            --arg run_number "${{ github.run_number }}" \
+            --arg timestamp "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+            --arg repo_id "${{ github.event.repository.id }}" \
+            --arg repo_node_id "${{ github.event.repository.node_id }}" \
+            --arg repo_name "${{ github.event.repository.name }}" \
+            --arg repo_full_name "${{ github.event.repository.full_name }}" \
+            --arg repo_private "${{ github.event.repository.private }}" \
+            --arg repo_owner_login "${{ github.event.repository.owner.login }}" \
+            --arg repo_owner_id "${{ github.event.repository.owner.id }}" \
+            --arg repo_owner_node_id "${{ github.event.repository.owner.node_id }}" \
+            --arg repo_owner_type "${{ github.event.repository.owner.type }}" \
+            --arg repo_owner_site_admin "${{ github.event.repository.owner.site_admin }}" \
+            --arg repo_html_url "${{ github.event.repository.html_url }}" \
+            --arg repo_description "${{ github.event.repository.description }}" \
+            --arg repo_fork "${{ github.event.repository.fork }}" \
+            --arg repo_created_at "${{ github.event.repository.created_at }}" \
+            --arg repo_updated_at "${{ github.event.repository.updated_at }}" \
+            --arg repo_pushed_at "${{ github.event.repository.pushed_at }}" \
+            --arg repo_size "${{ github.event.repository.size }}" \
+            --arg repo_stargazers_count "${{ github.event.repository.stargazers_count }}" \
+            --arg repo_watchers_count "${{ github.event.repository.watchers_count }}" \
+            --arg repo_language "${{ github.event.repository.language }}" \
+            --arg repo_forks_count "${{ github.event.repository.forks_count }}" \
+            --arg repo_open_issues_count "${{ github.event.repository.open_issues_count }}" \
+            --arg repo_default_branch "${{ github.event.repository.default_branch }}" \
+            --arg repo_visibility "${{ github.event.repository.visibility }}" \
+            --arg org_login "${{ github.event.organization.login }}" \
+            --arg org_id "${{ github.event.organization.id }}" \
+            --arg org_node_id "${{ github.event.organization.node_id }}" \
+            --arg org_url "${{ github.event.organization.url }}" \
+            --arg org_description "${{ github.event.organization.description }}" \
+            --arg issue_id "${{ github.event.issue.id }}" \
+            --arg issue_node_id "${{ github.event.issue.node_id }}" \
+            --arg issue_number "${{ github.event.issue.number }}" \
+            --arg issue_title "${{ github.event.issue.title }}" \
+            --arg issue_user_login "${{ github.event.issue.user.login }}" \
+            --arg issue_user_id "${{ github.event.issue.user.id }}" \
+            --arg issue_user_node_id "${{ github.event.issue.user.node_id }}" \
+            --arg issue_user_type "${{ github.event.issue.user.type }}" \
+            --arg issue_user_site_admin "${{ github.event.issue.user.site_admin }}" \
+            --arg issue_state "${{ github.event.issue.state }}" \
+            --arg issue_locked "${{ github.event.issue.locked }}" \
+            --arg issue_comments "${{ github.event.issue.comments }}" \
+            --arg issue_created_at "${{ github.event.issue.created_at }}" \
+            --arg issue_updated_at "${{ github.event.issue.updated_at }}" \
+            --arg issue_closed_at "${{ github.event.issue.closed_at }}" \
+            --arg issue_author_association "${{ github.event.issue.author_association }}" \
+            --arg issue_body "$ISSUE_BODY" \
+            --arg comment_id "${{ github.event.comment.id }}" \
+            --arg comment_node_id "${{ github.event.comment.node_id }}" \
+            --arg comment_user_login "${{ github.event.comment.user.login }}" \
+            --arg comment_user_id "${{ github.event.comment.user.id }}" \
+            --arg comment_user_node_id "${{ github.event.comment.user.node_id }}" \
+            --arg comment_user_type "${{ github.event.comment.user.type }}" \
+            --arg comment_user_site_admin "${{ github.event.comment.user.site_admin }}" \
+            --arg comment_created_at "${{ github.event.comment.created_at }}" \
+            --arg comment_updated_at "${{ github.event.comment.updated_at }}" \
+            --arg comment_author_association "${{ github.event.comment.author_association }}" \
+            --arg comment_body "$COMMENT_BODY" \
+            --arg sender_login "${{ github.event.sender.login }}" \
+            --arg sender_id "${{ github.event.sender.id }}" \
+            --arg sender_node_id "${{ github.event.sender.node_id }}" \
+            --arg sender_type "${{ github.event.sender.type }}" \
+            --arg sender_site_admin "${{ github.event.sender.site_admin }}" \
+            --arg assignee_login "${{ github.event.assignee.login }}" \
+            --arg assignee_id "${{ github.event.assignee.id }}" \
+            --arg assignee_node_id "${{ github.event.assignee.node_id }}" \
+            --arg assignee_type "${{ github.event.assignee.type }}" \
+            --arg assignee_site_admin "${{ github.event.assignee.site_admin }}" \
+            --arg label_id "${{ github.event.label.id }}" \
+            --arg label_node_id "${{ github.event.label.node_id }}" \
+            --arg label_name "${{ github.event.label.name }}" \
+            --arg label_color "${{ github.event.label.color }}" \
+            --arg label_description "${{ github.event.label.description }}" \
+            --argjson issue_assignees '${{ toJson(github.event.issue.assignees) }}' \
+            --argjson issue_labels '${{ toJson(github.event.issue.labels) }}' \
+            --argjson changes '${{ toJson(github.event.changes) }}' \
+            '{
+              workflow_metadata: {
+                event_name: $event_name,
+                action: $action,
+                workflow: $workflow,
+                run_id: $run_id,
+                run_number: $run_number,
+                timestamp: $timestamp
+              },
+              repository: {
+                id: $repo_id,
+                node_id: $repo_node_id,
+                name: $repo_name,
+                full_name: $repo_full_name,
+                private: $repo_private,
+                owner: {
+                  login: $repo_owner_login,
+                  id: $repo_owner_id,
+                  node_id: $repo_owner_node_id,
+                  type: $repo_owner_type,
+                  site_admin: $repo_owner_site_admin
+                },
+                html_url: $repo_html_url,
+                description: $repo_description,
+                fork: $repo_fork,
+                created_at: $repo_created_at,
+                updated_at: $repo_updated_at,
+                pushed_at: $repo_pushed_at,
+                size: $repo_size,
+                stargazers_count: $repo_stargazers_count,
+                watchers_count: $repo_watchers_count,
+                language: $repo_language,
+                forks_count: $repo_forks_count,
+                open_issues_count: $repo_open_issues_count,
+                default_branch: $repo_default_branch,
+                visibility: $repo_visibility
+              },
+              organization: {
+                login: $org_login,
+                id: $org_id,
+                node_id: $org_node_id,
+                url: $org_url,
+                description: $org_description
+              },
+              issue: {
+                id: $issue_id,
+                node_id: $issue_node_id,
+                number: $issue_number,
+                title: $issue_title,
+                user: {
+                  login: $issue_user_login,
+                  id: $issue_user_id,
+                  node_id: $issue_user_node_id,
+                  type: $issue_user_type,
+                  site_admin: $issue_user_site_admin
+                },
+                state: $issue_state,
+                locked: $issue_locked,
+                assignees: $issue_assignees,
+                labels: $issue_labels,
+                comments: $issue_comments,
+                created_at: $issue_created_at,
+                updated_at: $issue_updated_at,
+                closed_at: $issue_closed_at,
+                author_association: $issue_author_association,
+                body: $issue_body
+              },
+              comment: {
+                id: $comment_id,
+                node_id: $comment_node_id,
+                user: {
+                  login: $comment_user_login,
+                  id: $comment_user_id,
+                  node_id: $comment_user_node_id,
+                  type: $comment_user_type,
+                  site_admin: $comment_user_site_admin
+                },
+                created_at: $comment_created_at,
+                updated_at: $comment_updated_at,
+                author_association: $comment_author_association,
+                body: $comment_body
+              },
+              sender: {
+                login: $sender_login,
+                id: $sender_id,
+                node_id: $sender_node_id,
+                type: $sender_type,
+                site_admin: $sender_site_admin
+              },
+              assignee: {
+                login: $assignee_login,
+                id: $assignee_id,
+                node_id: $assignee_node_id,
+                type: $assignee_type,
+                site_admin: $assignee_site_admin
+              },
+              label: {
+                id: $label_id,
+                node_id: $label_node_id,
+                name: $label_name,
+                color: $label_color,
+                description: $label_description
+              },
+              changes: $changes
+            } | walk(if type == "object" then with_entries(select(.value != "" and .value != null and .value != "null")) else . end)' > payload.json
+          
+          # Clean up temporary files
+          rm -f issue_body.txt comment_body.txt
+          
+      - name: Send to OpenObserve
+        run: |
+          curl -X POST "${{ secrets.OO_CLOUD_INGEST_URL }}" \
+            -H "Authorization: Basic ${{ secrets.OO_CLOUD_AUTH }}" \
+            -H "Content-Type: application/json" \
+            -d @payload.json
+
+      - name: Log payload for debugging (optional)
+        if: false
+        run: |
+          echo "=== Sent Payload ==="
+          cat payload.json

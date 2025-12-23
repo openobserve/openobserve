@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         if (hoveredSeriesState) hoveredSeriesState.setIndex(-1, -1, -1, null);
       }
     "
+    @contextmenu="handleNativeContextMenu"
     style="height: 100%; width: 100%"
   ></div>
 </template>
@@ -199,6 +200,7 @@ export default defineComponent({
     "mousemove",
     "mouseout",
     "contextmenu",
+    "domcontextmenu",
   ],
   props: {
     data: {
@@ -349,6 +351,7 @@ export default defineComponent({
       });
     };
 
+    // Handle ECharts contextmenu event when clicking on data points
     const handleContextMenu = (params: any) => {
       // Get chart type from the first series
       const chartType = chart?.getOption()?.series?.[0]?.type;
@@ -406,6 +409,71 @@ export default defineComponent({
           dataIndex: params.dataIndex,
           seriesIndex: params.seriesIndex,
         });
+
+        emit("domcontextmenu", {
+          x: event.clientX,
+          y: event.clientY,
+          value: Number(dataPointValue),
+        });
+      }
+    };
+
+    // Handle native DOM contextmenu event for alert creation
+    // This handles right-clicks anywhere on the chart (including empty space)
+    const handleNativeContextMenu = (event: MouseEvent) => {
+      // Get chart type from the first series
+      const chartType = chart?.getOption()?.series?.[0]?.type;
+
+      // Only handle contextmenu for bar and line charts
+      if (!chartType || !["bar", "line"].includes(chartType)) {
+        return;
+      }
+
+      // Prevent default browser context menu
+      event.preventDefault();
+      event.stopPropagation();
+
+      try {
+        // Get the chart container's bounding rect to calculate relative position
+        const chartContainer = chartRef.value;
+        if (!chartContainer || !chart) {
+          return;
+        }
+
+        const rect = chartContainer.getBoundingClientRect();
+        const pixelPoint = [
+          event.clientX - rect.left,
+          event.clientY - rect.top,
+        ];
+
+        // Convert pixel coordinates to data values using the chart's coordinate system
+        const pointInGrid = chart.convertFromPixel(
+          { gridIndex: 0 },
+          pixelPoint,
+        );
+
+        if (
+          pointInGrid &&
+          Array.isArray(pointInGrid) &&
+          pointInGrid.length >= 2
+        ) {
+          const yAxisValue = pointInGrid[1]; // Y-axis value at cursor position
+
+          // Emit domcontextmenu event for alert creation
+          if (
+            yAxisValue !== null &&
+            yAxisValue !== undefined &&
+            !isNaN(Number(yAxisValue))
+          ) {
+            emit("domcontextmenu", {
+              x: event.clientX,
+              y: event.clientY,
+              value: Number(yAxisValue),
+            });
+          }
+        }
+      } catch (error) {
+        console.warn("Could not convert pixel to data point:", error);
       }
     };
 
@@ -584,8 +652,10 @@ export default defineComponent({
         options.animation = false;
         try {
           // Use notMerge flag from data prop if available, otherwise default to true
-          const notMerge = props.data?.notMerge !== undefined ? props.data.notMerge : true;
-          const lazyUpdate = props.data?.lazyUpdate !== undefined ? props.data.lazyUpdate : true;
+          const notMerge =
+            props.data?.notMerge !== undefined ? props.data.notMerge : true;
+          const lazyUpdate =
+            props.data?.lazyUpdate !== undefined ? props.data.lazyUpdate : true;
           chart?.setOption(options, { lazyUpdate, notMerge });
           chart?.setOption({ animation: true }, { lazyUpdate: true });
         } catch (e: any) {
@@ -777,7 +847,7 @@ export default defineComponent({
       },
       { deep: true },
     );
-    return { chartRef, hoveredSeriesState };
+    return { chartRef, hoveredSeriesState, handleNativeContextMenu };
   },
 });
 </script>

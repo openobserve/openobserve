@@ -119,7 +119,7 @@ describe("Group.vue", () => {
   });
 
   describe("Logical Operator Select", () => {
-    it("should render logical operator select when groupIndex !== 0", () => {
+    it("should not render logical operator select (commented out in template)", () => {
       const wrapper = createWrapper({
         groupIndex: 1,
         group: {
@@ -127,12 +127,13 @@ describe("Group.vue", () => {
           conditions: []
         }
       });
-      
+
+      // The logical operator select is commented out in the template
       const logicalOperatorSelect = wrapper.find('[data-test="dashboard-add-group-logical-operator"]');
-      expect(logicalOperatorSelect.exists()).toBe(true);
+      expect(logicalOperatorSelect.exists()).toBe(false);
     });
 
-    it("should set correct model value for logical operator select", () => {
+    it("should have logicalOperator in group prop", () => {
       const wrapper = createWrapper({
         groupIndex: 1,
         group: {
@@ -140,12 +141,12 @@ describe("Group.vue", () => {
           conditions: []
         }
       });
-      
-      const logicalOperatorSelect = wrapper.find('[data-test="dashboard-add-group-logical-operator"]');
-      expect(logicalOperatorSelect.exists()).toBe(true);
+
+      // Verify the group has the logical operator property
+      expect(wrapper.vm.group.logicalOperator).toBe("OR");
     });
 
-    it("should emit logical operator change on update", async () => {
+    it("should emit logical operator change when called", async () => {
       const wrapper = createWrapper({
         groupIndex: 1,
         group: {
@@ -153,10 +154,10 @@ describe("Group.vue", () => {
           conditions: []
         }
       });
-      
-      const logicalOperatorSelect = wrapper.findComponent({ name: 'QSelect' });
-      await logicalOperatorSelect.vm.$emit('update:model-value', 'OR');
-      
+
+      // Call the method directly since the UI element is commented out
+      wrapper.vm.emitLogicalOperatorChange('OR');
+
       expect(wrapper.emitted('logical-operator-change')).toBeTruthy();
       expect(wrapper.emitted('logical-operator-change')[0]).toEqual(['OR']);
     });
@@ -169,7 +170,7 @@ describe("Group.vue", () => {
           conditions: []
         }
       });
-      
+
       const logicalOperatorSelect = wrapper.find('[data-test="dashboard-add-group-logical-operator"]');
       expect(logicalOperatorSelect.exists()).toBe(false);
     });

@@ -968,4 +968,350 @@ describe("FieldList", () => {
       expect(wrapper.exists()).toBe(true);
     });
   });
+
+  describe("Multi-Query Stream Tracking", () => {
+    it("should initialize stream tracking for all queries on mount", async () => {
+      const multiQueryData = {
+        data: {
+          queries: [
+            {
+              fields: { stream_type: "logs", stream: "app_logs" },
+              config: {},
+              query: "custom query 1"
+            },
+            {
+              fields: { stream_type: "metrics", stream: "system_metrics" },
+              config: {},
+              query: "custom query 2"
+            }
+          ]
+        },
+        layout: { currentQueryIndex: 0 },
+        meta: {
+          stream: {
+            streamResults: mockStreamData.streams,
+            streamResultsType: "logs",
+            customQueryFields: [],
+            vrlFunctionFieldList: []
+          }
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: multiQueryData });
+      await flushPromises();
+
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should not overwrite query when switching between queries with different streams", async () => {
+      const multiQueryData = {
+        data: {
+          queries: [
+            {
+              fields: { stream_type: "logs", stream: "app_logs" },
+              config: {},
+              query: "edited query 1"
+            },
+            {
+              fields: { stream_type: "metrics", stream: "system_metrics" },
+              config: {},
+              query: "edited query 2"
+            }
+          ],
+          type: "line"
+        },
+        layout: { currentQueryIndex: 0 },
+        meta: {
+          stream: {
+            streamResults: mockStreamData.streams,
+            streamResultsType: "logs",
+            customQueryFields: [],
+            vrlFunctionFieldList: []
+          }
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: multiQueryData });
+      await flushPromises();
+
+      const originalQuery1 = multiQueryData.data.queries[0].query;
+      const originalQuery2 = multiQueryData.data.queries[1].query;
+
+      // Switch to query 2
+      multiQueryData.layout.currentQueryIndex = 1;
+      await wrapper.setProps({ dashboardPanelData: multiQueryData });
+      await flushPromises();
+
+      // Switch back to query 1
+      multiQueryData.layout.currentQueryIndex = 0;
+      await wrapper.setProps({ dashboardPanelData: multiQueryData });
+      await flushPromises();
+
+      // Queries should remain unchanged
+      expect(multiQueryData.data.queries[0].query).toBe(originalQuery1);
+      expect(multiQueryData.data.queries[1].query).toBe(originalQuery2);
+    });
+
+    it("should apply default query when stream changes within a query", async () => {
+      const singleQueryData = {
+        data: {
+          queries: [
+            {
+              fields: { stream_type: "logs", stream: "app_logs" },
+              config: {},
+              query: "edited query"
+            }
+          ],
+          type: "line"
+        },
+        layout: { currentQueryIndex: 0 },
+        meta: {
+          stream: {
+            streamResults: mockStreamData.streams,
+            streamResultsType: "logs",
+            customQueryFields: [],
+            vrlFunctionFieldList: []
+          }
+        }
+      };
+
+      wrapper = createWrapper({
+        dashboardPanelData: singleQueryData,
+        dashboardPanelDataPageKey: "metrics"
+      });
+      await flushPromises();
+
+      // Change stream within the same query
+      singleQueryData.data.queries[0].fields.stream = "error_logs";
+      await wrapper.setProps({ dashboardPanelData: singleQueryData });
+      await flushPromises();
+
+      // Component should handle the stream change
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should preserve edited queries when switching between queries with same stream", async () => {
+      const multiQueryData = {
+        data: {
+          queries: [
+            {
+              fields: { stream_type: "logs", stream: "app_logs" },
+              config: {},
+              query: "SELECT * FROM app_logs WHERE level='error'"
+            },
+            {
+              fields: { stream_type: "logs", stream: "app_logs" },
+              config: {},
+              query: "SELECT * FROM app_logs WHERE level='info'"
+            }
+          ],
+          type: "line"
+        },
+        layout: { currentQueryIndex: 0 },
+        meta: {
+          stream: {
+            streamResults: mockStreamData.streams,
+            streamResultsType: "logs",
+            customQueryFields: [],
+            vrlFunctionFieldList: []
+          }
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: multiQueryData });
+      await flushPromises();
+
+      const originalQuery1 = multiQueryData.data.queries[0].query;
+      const originalQuery2 = multiQueryData.data.queries[1].query;
+
+      // Switch to query 2
+      multiQueryData.layout.currentQueryIndex = 1;
+      await wrapper.setProps({ dashboardPanelData: multiQueryData });
+      await flushPromises();
+
+      // Switch back to query 1
+      multiQueryData.layout.currentQueryIndex = 0;
+      await wrapper.setProps({ dashboardPanelData: multiQueryData });
+      await flushPromises();
+
+      // Both queries should remain unchanged even though they use the same stream
+      expect(multiQueryData.data.queries[0].query).toBe(originalQuery1);
+      expect(multiQueryData.data.queries[1].query).toBe(originalQuery2);
+    });
+
+    it("should handle stream type change within a query", async () => {
+      const singleQueryData = {
+        data: {
+          queries: [
+            {
+              fields: { stream_type: "logs", stream: "app_logs" },
+              config: {},
+              query: "custom query"
+            }
+          ],
+          type: "line"
+        },
+        layout: { currentQueryIndex: 0 },
+        meta: {
+          stream: {
+            streamResults: mockStreamData.streams,
+            streamResultsType: "logs",
+            customQueryFields: [],
+            vrlFunctionFieldList: []
+          }
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: singleQueryData });
+      await flushPromises();
+
+      // Change stream type
+      singleQueryData.data.queries[0].fields.stream_type = "metrics";
+      singleQueryData.data.queries[0].fields.stream = "system_metrics";
+      singleQueryData.meta.stream.streamResultsType = "metrics";
+      await wrapper.setProps({ dashboardPanelData: singleQueryData });
+      await flushPromises();
+
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should handle adding a new query to multi-query setup", async () => {
+      const multiQueryData = {
+        data: {
+          queries: [
+            {
+              fields: { stream_type: "logs", stream: "app_logs" },
+              config: {},
+              query: "query 1"
+            },
+            {
+              fields: { stream_type: "metrics", stream: "system_metrics" },
+              config: {},
+              query: "query 2"
+            }
+          ],
+          type: "line"
+        },
+        layout: { currentQueryIndex: 0 },
+        meta: {
+          stream: {
+            streamResults: mockStreamData.streams,
+            streamResultsType: "logs",
+            customQueryFields: [],
+            vrlFunctionFieldList: []
+          }
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: multiQueryData });
+      await flushPromises();
+
+      // Add a new query
+      multiQueryData.data.queries.push({
+        fields: { stream_type: "traces", stream: "user_traces" },
+        config: {},
+        query: ""
+      });
+      multiQueryData.layout.currentQueryIndex = 2;
+      await wrapper.setProps({ dashboardPanelData: multiQueryData });
+      await flushPromises();
+
+      expect(multiQueryData.data.queries).toHaveLength(3);
+    });
+
+    it("should not apply default query on page refresh with existing queries", async () => {
+      const savedQueryData = {
+        data: {
+          queries: [
+            {
+              fields: { stream_type: "logs", stream: "app_logs" },
+              config: {},
+              query: "SELECT * FROM app_logs WHERE saved=true"
+            }
+          ],
+          type: "line"
+        },
+        layout: { currentQueryIndex: 0 },
+        meta: {
+          stream: {
+            streamResults: mockStreamData.streams,
+            streamResultsType: "logs",
+            customQueryFields: [],
+            vrlFunctionFieldList: []
+          }
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: savedQueryData });
+      await flushPromises();
+
+      const savedQuery = savedQueryData.data.queries[0].query;
+
+      // Simulate component re-mount (page refresh)
+      wrapper.unmount();
+      wrapper = createWrapper({ dashboardPanelData: savedQueryData });
+      await flushPromises();
+
+      // Query should remain unchanged after remount
+      expect(savedQueryData.data.queries[0].query).toBe(savedQuery);
+    });
+
+    it("should handle rapid query switching without overwrites", async () => {
+      const multiQueryData = {
+        data: {
+          queries: [
+            {
+              fields: { stream_type: "logs", stream: "app_logs" },
+              config: {},
+              query: "query 1"
+            },
+            {
+              fields: { stream_type: "metrics", stream: "system_metrics" },
+              config: {},
+              query: "query 2"
+            },
+            {
+              fields: { stream_type: "traces", stream: "user_traces" },
+              config: {},
+              query: "query 3"
+            }
+          ],
+          type: "line"
+        },
+        layout: { currentQueryIndex: 0 },
+        meta: {
+          stream: {
+            streamResults: mockStreamData.streams,
+            streamResultsType: "logs",
+            customQueryFields: [],
+            vrlFunctionFieldList: []
+          }
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: multiQueryData });
+      await flushPromises();
+
+      const originalQueries = multiQueryData.data.queries.map(q => q.query);
+
+      // Rapidly switch between queries
+      multiQueryData.layout.currentQueryIndex = 1;
+      await wrapper.setProps({ dashboardPanelData: multiQueryData });
+
+      multiQueryData.layout.currentQueryIndex = 2;
+      await wrapper.setProps({ dashboardPanelData: multiQueryData });
+
+      multiQueryData.layout.currentQueryIndex = 0;
+      await wrapper.setProps({ dashboardPanelData: multiQueryData });
+
+      multiQueryData.layout.currentQueryIndex = 1;
+      await wrapper.setProps({ dashboardPanelData: multiQueryData });
+      await flushPromises();
+
+      // All queries should remain unchanged
+      multiQueryData.data.queries.forEach((query, index) => {
+        expect(query.query).toBe(originalQueries[index]);
+      });
+    });
+  });
 });

@@ -120,7 +120,7 @@ test.describe("Alerts UI Operations", () => {
     // Clean up
     await pm.alertsPage.deleteAlertByRow(alertName);
     await pm.dashboardFolder.searchFolder(folderName);
-    await expect(page.locator(`text=${folderName}`)).toBeVisible();
+    await pm.dashboardFolder.verifyFolderVisible(folderName);
     await pm.dashboardFolder.deleteFolder(folderName);
   });
 
@@ -194,7 +194,7 @@ test.describe("Alerts UI Operations", () => {
     await page.waitForTimeout(2000);
 
     // Verify alert is visible before clone validation
-    await expect(page.getByRole('cell', { name: alertName })).toBeVisible({ timeout: 10000 });
+    await pm.alertsPage.verifyAlertCellVisible(alertName);
     testLogger.info('Alert is visible before clone validation', { alertName });
 
     // Now verify clone validation
@@ -210,7 +210,7 @@ test.describe("Alerts UI Operations", () => {
     await pm.alertsPage.moveAllAlertsToFolder(targetFolderName);
 
     await pm.dashboardFolder.searchFolder(folderName);
-    await expect(page.locator(`text=${folderName}`)).toBeVisible();
+    await pm.dashboardFolder.verifyFolderVisible(folderName);
     await pm.dashboardFolder.deleteFolder(folderName);
 
     // Verify alerts in target folder

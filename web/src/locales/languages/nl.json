@@ -276,7 +276,8 @@
     "actionLabel": "Actie",
     "transformLabel": "Transformeren",
     "addToDashboard": "Aan dashboard toevoegen",
-    "selectStream": "Selecteer Stream"
+    "selectStream": "Selecteer Stream",
+    "pattern_summary": "Toont 1 tot 50 van de {totalEvents} -gebeurtenissen en {PatternsFound} -patronen gevonden in {logsAnalyzed} -gebeurtenissen in {totalTime} ms."
   },
   "menu": {
     "home": "Home",
@@ -1000,7 +1001,11 @@
     "colorBySeriesTitle": "Kleur per serie",
     "colorBySeriesTooltip": "Pas kleuren toe op series voor een beter visueel onderscheid in diagrammen. Pas kleuren aan voor elke serie om de datavisualisatie te verbeteren.",
     "editColorBySeries": " Kleur per serie bewerken",
-    "applyColorBySeries": " Kleur per serie aanbrengen"
+    "applyColorBySeries": " Kleur per serie aanbrengen",
+    "showAllLegends": "Alle legendes weergeven",
+    "legendsOfCharts": "Legenden van hitlijsten",
+    "totalLegends": "Totaal: {count}",
+    "noLegendsAvailable": "Geen legendes beschikbaar"
   },
   "panel": {
     "header": "Paneel",
@@ -1067,7 +1072,15 @@
     "mapvalue": "Waarde",
     "customChartTypeSelector": "Aangepaste grafiektypekiezer",
     "customChartTypeSelectorHint": "Selecteer een diagramtype uit de eCharts bibliotheek om aan de slag te gaan met een eenvoudige codestructuur",
-    "selectChartType": "Diagramtype selecteren"
+    "selectChartType": "Diagramtype selecteren",
+    "joins": "Sluit zich aan",
+    "addJoin": "Join toevoegen",
+    "removeJoin": "Join verwijderen",
+    "leftJoin": "Links aansluiten",
+    "innerJoin": "Innerlijke verbinding",
+    "rightJoin": "Right Join",
+    "addClause": "Clausule toevoegen",
+    "removeClause": "Clausule verwijderen"
   },
   "home": {
     "streams": "Streams",
@@ -1349,6 +1362,76 @@
       "rcaInProgress": "De hoofdoorzaak analyseren...",
       "rcaCompleted": "Analyse van de hoofdoorzaak voltooid",
       "noRcaYet": "Geen analyse van de hoofdoorzaak beschikbaar. Klik op 'Analyseren' om te beginnen."
+    },
+    "events": "Evenementen",
+    "multiWindow": "Vergelijk met het verleden",
+    "multiWindowSubLabel": "Vergelijk de huidige resultaten met gegevens uit een andere periode",
+    "summary": {
+      "configureAlert": "Configureer je waarschuwing om een samenvatting te zien",
+      "monitors": "Monitoren",
+      "from": "uit",
+      "inRealTime": "in realtime",
+      "ofData": "van gegevens",
+      "triggersWhen": "Triggert wanneer",
+      "queryConditions": "voorwaarden voor de zoekopdracht",
+      "areMet": "zijn voldaan",
+      "orMore": "of meer",
+      "orLess": "of minder",
+      "equalTo": "gelijk aan",
+      "notEqualTo": "niet gelijk aan",
+      "eventsDetected": "gedetecteerde gebeurtenissen",
+      "sendsTo": "Verstuurt naar",
+      "noDestination": "Geen bestemming",
+      "notSetupYet": "(nog niet ingesteld)",
+      "cooldown": "Afkoelen",
+      "betweenAlerts": "tussen waarschuwingen",
+      "noCooldown": "Geen afkoelperiode",
+      "minute": "minuut",
+      "minutes": "minuten",
+      "hour": "uur",
+      "hours": "uren",
+      "plainEnglish": {
+        "realTime": "Waarschuw me onmiddellijk wanneer er in realtime overeenkomende gebeurtenissen plaatsvinden",
+        "eventsPlural": "gebeurtenissen",
+        "eventSingular": "evenement",
+        "moreThan": "meer dan",
+        "exactly": "precies",
+        "orFewer": "of minder",
+        "fewerThan": "minder dan",
+        "not": "niet",
+        "occurInAny": "komen voor in elk",
+        "period": "periode",
+        "alertMeWhen": "Waarschuw me wanneer",
+        "butNoMoreThan": ", maar niet meer dan eens per",
+        "defaultConditions": "Waarschuw me wanneer aan de geconfigureerde voorwaarden is voldaan"
+      }
+    },
+    "correlation": {
+      "title": "Correlatie tussen waarschuwingen",
+      "description": "Configureer hoe waarschuwingen in de hele organisatie worden gecorreleerd en ontdubbeld. Waarschuwingen met overeenkomende vingerafdrukwaarden worden gegroepeerd.",
+      "semanticFieldNote": "Opmerking: Semantische veldtoewijzingen worden geconfigureerd op het tabblad Service Identity.",
+      "enableOrgLevel": "Deduplicatie op organisatieniveau inschakelen",
+      "enableOrgLevelTooltip": "Schakel deduplicatie- en correlatiefuncties in voor alle meldingen in deze organisatie",
+      "enableCrossAlert": "Cross-Alert-deduplicatie inschakelen",
+      "enableCrossAlertTooltip": "Sta toe dat verschillende meldingen elkaar ontdubbelen wanneer ze dezelfde vingerafdruk delen",
+      "fingerprintGroups": "Cross-Alert-vingerafdrukgroepen",
+      "fingerprintGroupsTooltip": "Selecteer welke semantische groepen u wilt gebruiken voor het nemen van vingerafdrukken met kruiswaarschuwingen. Waarschuwingen worden ontdubbeld als ze dezelfde waarden hebben voor deze dimensies.",
+      "fingerprintGroupsHint": "Selecteer ten minste één semantische groep voor deduplicatie van kruiswaarschuwingen",
+      "fingerprintGroupsRequired": "Er moet minstens één semantische groep worden geselecteerd",
+      "defaultWindow": "Standaard correlatievenster (minuten)",
+      "defaultWindowTooltip": "Als er geen semantische veldovereenkomst is, worden waarschuwingen en gegevens van een bepaalde duur als gerelateerd beschouwd",
+      "defaultWindowDescription": "Als er geen semantische veldovereenkomst is, worden waarschuwingen en gegevens van een bepaalde duur als gerelateerd beschouwd",
+      "defaultWindowPlaceholder": "Gebruik standaard de waarschuwingsperiode",
+      "cancelButton": "Annuleer",
+      "saveButton": "Instellingen opslaan"
+    },
+    "placeholders": {
+      "typeSomething": "Typ iets",
+      "value": "Waarde",
+      "selectColumn": "Kolom selecteren",
+      "searchField": "Zoek naar een veld",
+      "savedFunctions": "Opgeslagen functies",
+      "autoUsesCheckInterval": "Auto (maakt gebruik van controle-interval)"
     }
   },
   "alert_templates": {
@@ -1936,7 +2019,8 @@
     "period": "Periode",
     "cron": "Cron",
     "type": "Typ",
-    "run_pipeline": "Pipeline uitvoeren"
+    "run_pipeline": "Pipeline uitvoeren",
+    "showLegends": "Legendes weergeven"
   },
   "alert_list": {
     "alert_details": "Details van de waarschuwing"

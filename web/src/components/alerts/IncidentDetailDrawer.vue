@@ -15,106 +15,259 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-drawer
-    v-model="isOpen"
-    side="right"
-    :width="900"
-    bordered
-    overlay
-    elevated
-    class="incident-detail-drawer"
-    data-test="incident-detail-drawer"
+  <div
+    :class="[store.state.theme === 'dark' ? 'bg-dark' : 'bg-white']"
+    class="tw-h-full tw-flex tw-flex-col"
+    style="width: 94vw"
   >
-    <div v-if="incidentDetails" class="tw-h-full tw-flex tw-flex-col">
-      <!-- Header -->
-      <div class="tw-p-4 tw-border-b tw-flex tw-justify-between tw-items-center">
-        <div>
-          <div class="tw-text-lg tw-font-semibold">
-            {{ incidentDetails.title || t("alerts.incidents.header") }}
+    <!-- Header -->
+    <div class="incident-detail-header row items-center no-wrap q-px-md tw-p-4">
+      <div class="col">
+        <div class="tw-text-[18px] tw-flex tw-items-center">
+          {{ t("alerts.incidents.header") }}
+          <!-- Incident name with colored indicator -->
+          <span
+            :class="[
+              'tw-font-bold tw-mr-4 tw-px-2 tw-py-1 tw-rounded-md tw-ml-2 tw-max-w-xs tw-truncate tw-inline-block',
+              store.state.theme === 'dark'
+                ? 'tw-text-blue-400 tw-bg-blue-900/50'
+                : 'tw-text-blue-600 tw-bg-blue-50'
+            ]"
+            data-test="incident-detail-title"
+          >
+            {{ incidentDetails?.title }}
+            <q-tooltip v-if="incidentDetails && incidentDetails.title.length > 35" class="tw-text-xs">
+              {{ incidentDetails.title }}
+            </q-tooltip>
+          </span>
+        </div>
+      </div>
+      <div class="col-auto">
+        <q-btn
+          data-test="incident-detail-close-btn"
+          v-close-popup="true"
+          round
+          flat
+          icon="cancel"
+        />
+      </div>
+    </div>
+    <q-separator />
+
+    <!-- Content -->
+    <div v-if="!loading && incidentDetails" class="tw-flex-1 tw-flex tw-overflow-hidden">
+      <!-- Left Column: Incident Details -->
+      <div class="incident-details-column tw-w-[400px] tw-flex-shrink-0 tw-p-4 q-px-md tw-overflow-auto" :class="store.state.theme === 'dark' ? 'tw-border-r tw-border-gray-700' : 'tw-border-r tw-border-gray-200'">
+        <!-- Status, Severity, Alerts - Vertical Stack -->
+        <div class="tw-flex tw-flex-col tw-gap-3 tw-mb-4">
+          <!-- Status Tile -->
+          <div class="tile">
+            <div
+              class="tile-content tw-rounded-lg tw-p-3 tw-border tw-shadow-sm tw-h-20 tw-flex tw-flex-col tw-justify-between"
+              :class="store.state.theme === 'dark' ? 'tile-content-dark tw-border-gray-700' : 'tile-content-light tw-border-gray-200'"
+            >
+              <div class="tile-header tw-flex tw-justify-between tw-items-start">
+                <div
+                  class="tile-title tw-text-xs tw-font-bold tw-text-left"
+                  :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'"
+                >
+                  {{ t("alerts.incidents.status") }}
+                </div>
+                <div class="tile-icon tw-opacity-80">
+                  <q-icon name="info" size="24px" :color="getStatusColor(incidentDetails.status)" />
+                </div>
+              </div>
+              <div
+                class="tile-value tw-text-lg tw-flex tw-items-end tw-justify-start"
+                :class="store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-gray-900'"
+              >
+                {{ getStatusLabel(incidentDetails.status) }}
+              </div>
+            </div>
           </div>
-          <div class="tw-text-sm tw-text-gray-500">
-            ID: {{ incidentDetails.id }}
+
+          <!-- Severity Tile -->
+          <div class="tile">
+            <div
+              class="tile-content tw-rounded-lg tw-p-3 tw-border tw-shadow-sm tw-h-20 tw-flex tw-flex-col tw-justify-between"
+              :class="store.state.theme === 'dark' ? 'tile-content-dark tw-border-gray-700' : 'tile-content-light tw-border-gray-200'"
+            >
+              <div class="tile-header tw-flex tw-justify-between tw-items-start">
+                <div
+                  class="tile-title tw-text-xs tw-font-bold tw-text-left"
+                  :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'"
+                >
+                  {{ t("alerts.incidents.severity") }}
+                </div>
+                <div class="tile-icon tw-opacity-80">
+                  <q-icon name="warning" size="24px" :color="getSeverityColor(incidentDetails.severity)" />
+                </div>
+              </div>
+              <div
+                class="tile-value tw-text-lg tw-flex tw-items-end tw-justify-start"
+                :class="store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-gray-900'"
+              >
+                {{ incidentDetails.severity }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Alert Count Tile -->
+          <div class="tile">
+            <div
+              class="tile-content tw-rounded-lg tw-p-3 tw-border tw-shadow-sm tw-h-20 tw-flex tw-flex-col tw-justify-between"
+              :class="store.state.theme === 'dark' ? 'tile-content-dark tw-border-gray-700' : 'tile-content-light tw-border-gray-200'"
+            >
+              <div class="tile-header tw-flex tw-justify-between tw-items-start">
+                <div
+                  class="tile-title tw-text-xs tw-font-bold tw-text-left"
+                  :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'"
+                >
+                  {{ t("alerts.incidents.alertCount") }}
+                </div>
+                <div class="tile-icon tw-opacity-80">
+                  <q-icon name="notifications_active" size="24px" color="primary" />
+                </div>
+              </div>
+              <div
+                class="tile-value tw-text-lg tw-flex tw-items-end tw-justify-start"
+                :class="store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-gray-900'"
+              >
+                {{ incidentDetails.alert_count }}
+              </div>
+            </div>
           </div>
         </div>
-        <q-btn flat round icon="close" @click="close" />
-      </div>
 
-      <!-- Content -->
-      <div class="tw-flex-1 tw-overflow-auto tw-p-4">
-        <!-- Status, Severity, Alerts row -->
-        <div class="tw-flex tw-items-center tw-gap-4 tw-mb-3">
-          <div class="tw-flex tw-flex-col tw-items-center">
-            <span class="tw-text-xs tw-text-gray-500 tw-mb-1">{{ t("alerts.incidents.status") }}</span>
-            <q-badge
-              :color="getStatusColor(incidentDetails.status)"
-              :label="getStatusLabel(incidentDetails.status)"
-              class="tw-text-sm"
-            />
-          </div>
-          <div class="tw-flex tw-flex-col tw-items-center">
-            <span class="tw-text-xs tw-text-gray-500 tw-mb-1">{{ t("alerts.incidents.severity") }}</span>
-            <q-badge
-              :color="getSeverityColor(incidentDetails.severity)"
-              :label="incidentDetails.severity"
-              class="tw-text-sm"
-            />
-          </div>
-          <div class="tw-flex tw-flex-col tw-items-center">
-            <span class="tw-text-xs tw-text-gray-500 tw-mb-1">{{ t("alerts.incidents.alertCount") }}</span>
-            <q-badge color="grey-7" :label="incidentDetails.alert_count" class="tw-text-sm" />
-          </div>
-          <!-- Divider -->
-          <div class="tw-h-8 tw-w-px tw-bg-gray-300"></div>
-          <!-- Action buttons -->
+        <!-- Action buttons -->
+        <div class="tw-mb-4">
           <div class="tw-flex tw-gap-2">
             <q-btn
               v-if="incidentDetails.status === 'open'"
               color="warning"
               no-caps
+              unelevated
+              dense
               @click="acknowledgeIncident"
               :loading="updating"
+              align="left"
+              class="action-btn-compact tw-justify-start tw-flex-1"
             >
-              {{ t("alerts.incidents.acknowledge") }}
+              <q-icon name="check_circle" size="xs" class="tw-mr-1.5" />
+              <span class="tw-text-xs tw-font-medium">{{ t("alerts.incidents.acknowledge") }}</span>
+              <q-tooltip :delay="500">Mark incident as acknowledged and being worked on</q-tooltip>
             </q-btn>
             <q-btn
               v-if="incidentDetails.status !== 'resolved'"
               color="positive"
               no-caps
+              unelevated
+              dense
               @click="resolveIncident"
               :loading="updating"
+              align="left"
+              class="action-btn-compact tw-justify-start tw-flex-1"
             >
-              {{ t("alerts.incidents.resolve") }}
+              <q-icon name="task_alt" size="xs" class="tw-mr-1.5" />
+              <span class="tw-text-xs tw-font-medium">{{ t("alerts.incidents.resolve") }}</span>
+              <q-tooltip :delay="500">Mark incident as resolved and close it</q-tooltip>
             </q-btn>
             <q-btn
               v-if="incidentDetails.status === 'resolved'"
               color="negative"
               no-caps
+              unelevated
+              dense
               @click="reopenIncident"
               :loading="updating"
+              align="left"
+              class="action-btn-compact tw-justify-start"
             >
-              {{ t("alerts.incidents.reopen") }}
+              <q-icon name="restart_alt" size="xs" class="tw-mr-1.5" />
+              <span class="tw-text-xs tw-font-medium">{{ t("alerts.incidents.reopen") }}</span>
+              <q-tooltip :delay="500">Reopen this resolved incident</q-tooltip>
             </q-btn>
           </div>
         </div>
 
-        <!-- Timestamps - inline -->
-        <div class="tw-flex tw-flex-wrap tw-gap-x-4 tw-gap-y-1 tw-text-xs tw-mb-3">
-          <span>
-            <span class="tw-text-gray-500">{{ t("alerts.incidents.firstAlertAt") }}:</span>
-            <span class="tw-ml-1">{{ formatTimestamp(incidentDetails.first_alert_at) }}</span>
-          </span>
-          <span>
-            <span class="tw-text-gray-500">{{ t("alerts.incidents.lastAlertAt") }}:</span>
-            <span class="tw-ml-1">{{ formatTimestamp(incidentDetails.last_alert_at) }}</span>
-          </span>
-          <span v-if="incidentDetails.resolved_at">
-            <span class="tw-text-gray-500">{{ t("alerts.incidents.resolvedAt") }}:</span>
-            <span class="tw-ml-1">{{ formatTimestamp(incidentDetails.resolved_at) }}</span>
-          </span>
+        <!-- Timeline with UTC timestamps -->
+        <div
+          :class="[
+            'tw-rounded-lg tw-border tw-mb-4 tw-overflow-hidden',
+            store.state.theme === 'dark'
+              ? 'tw-border-gray-700'
+              : 'tw-border-gray-200'
+          ]"
+        >
+          <!-- Header -->
+          <div
+            :class="[
+              'tw-px-3 tw-py-2 tw-flex tw-items-center tw-justify-between tw-border-b',
+              store.state.theme === 'dark'
+                ? 'tw-bg-gray-800 tw-border-gray-700'
+                : 'tw-bg-gray-100 tw-border-gray-200'
+            ]"
+          >
+            <div class="tw-flex tw-items-center tw-gap-2">
+              <q-icon name="schedule" size="16px" class="tw-opacity-80" />
+              <span :class="store.state.theme === 'dark' ? 'tw-text-gray-300' : 'tw-text-gray-700'" class="tw-text-xs tw-font-semibold">
+                Timeline
+              </span>
+            </div>
+            <span
+              :class="[
+                'tw-text-[10px] tw-font-medium tw-px-2 tw-py-0.5 tw-rounded-full',
+                store.state.theme === 'dark'
+                  ? 'tw-text-blue-300 tw-bg-blue-900/30'
+                  : 'tw-text-blue-700 tw-bg-blue-100'
+              ]"
+            >
+              UTC
+            </span>
+          </div>
+
+          <!-- Content -->
+          <div :class="store.state.theme === 'dark' ? 'tw-bg-gray-800/30' : 'tw-bg-white'" class="tw-p-3">
+            <div class="tw-space-y-3">
+              <div class="tw-flex tw-items-start tw-gap-2">
+                <q-icon name="play_arrow" size="14px" :class="store.state.theme === 'dark' ? 'tw-text-green-400' : 'tw-text-green-600'" class="tw-mt-0.5" />
+                <div class="tw-flex-1">
+                  <div :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'" class="tw-text-[11px] tw-mb-0.5">
+                    First Alert
+                  </div>
+                  <div
+                    :class="[
+                      'tw-text-xs tw-font-semibold tw-font-mono',
+                      store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-900'
+                    ]"
+                  >
+                    {{ formatTimestampUTC(incidentDetails.first_alert_at) }}
+                  </div>
+                </div>
+              </div>
+
+              <div class="tw-flex tw-items-start tw-gap-2">
+                <q-icon name="flag" size="14px" :class="store.state.theme === 'dark' ? 'tw-text-orange-400' : 'tw-text-orange-600'" class="tw-mt-0.5" />
+                <div class="tw-flex-1">
+                  <div :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'" class="tw-text-[11px] tw-mb-0.5">
+                    Last Alert
+                  </div>
+                  <div
+                    :class="[
+                      'tw-text-xs tw-font-semibold tw-font-mono',
+                      store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-900'
+                    ]"
+                  >
+                    {{ formatTimestampUTC(incidentDetails.last_alert_at) }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Dimensions & Topology - side by side -->
-        <div class="tw-flex tw-gap-3 tw-mb-3">
+        <div class="tw-flex tw-gap-3 tw-mb-4">
           <!-- Stable Dimensions -->
           <div class="tw-flex-1 tw-min-w-0">
             <div class="tw-text-xs tw-font-medium tw-mb-1">
@@ -177,15 +330,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
+      </div>
 
-        <!-- Incident Analysis -->
-        <div class="tw-mb-4">
-          <div class="tw-text-sm tw-font-medium tw-mb-2 tw-flex tw-items-center tw-gap-2">
-            <q-icon name="psychology" color="primary" />
-            Incident Analysis
-            <!-- Trigger button when no analysis exists and not loading -->
+      <!-- Right Column: Tabs and Content -->
+      <div class="tabs-content-column tw-flex-1 tw-flex tw-flex-col tw-overflow-hidden">
+        <!-- Tabs -->
+        <div class="tw-flex tw-items-center tw-justify-between tw-px-4 tw-pt-4 tw-pb-2 q-px-md tw-flex-shrink-0">
+          <q-tabs v-model="activeTab" inline-label dense no-caps align="left">
+            <q-tab
+              name="incidentAnalysis"
+              icon="psychology"
+              label="Incident Analysis"
+            />
+            <q-tab
+              name="alertTriggers"
+              icon="notifications_active"
+            >
+              <template #default>
+                <div class="tw-flex tw-items-center tw-gap-1.5">
+                  <span>Alert Triggers</span>
+                  <span class="tw-text-xs tw-opacity-70">({{ triggers.length }})</span>
+                </div>
+              </template>
+            </q-tab>
+          </q-tabs>
+          <!-- AI Chat Button -->
+          <q-btn
+            size="sm"
+            flat
+            dense
+            @click="openSREChat"
+            class="tw-ml-auto"
+          >
+            <img :src="getAIIconURL()" class="tw-w-5 tw-h-5" />
+            <q-tooltip :delay="500" style="width: 180px;">Chat with SRE Assistant</q-tooltip>
+          </q-btn>
+        </div>
+
+        <!-- Tab Content Area -->
+        <div class="tw-flex-1 tw-flex tw-flex-col tw-px-4 tw-pt-2 q-px-md tw-pb-2 tw-overflow-hidden">
+        <!-- Incident Analysis Tab Content -->
+        <div v-if="activeTab === 'incidentAnalysis'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
+          <!-- Trigger button when no analysis exists and not loading -->
+          <div v-if="!hasExistingRca && !rcaLoading" class="tw-mb-2 tw-flex-shrink-0">
             <q-btn
-              v-if="!hasExistingRca && !rcaLoading"
               size="sm"
               color="primary"
               outline
@@ -195,21 +383,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               Analyze Incident
             </q-btn>
-            <!-- Chat button -->
-            <q-btn
-              size="sm"
-              color="primary"
-              flat
-              dense
-              icon="chat"
-              @click="openSREChat"
-            >
-              <q-tooltip>Chat with SRE Assistant</q-tooltip>
-            </q-btn>
           </div>
 
           <!-- Loading state with streaming content -->
-          <div v-if="rcaLoading" class="rca-container tw-rounded tw-p-3" :class="isDarkMode ? 'rca-container-dark' : 'rca-container-light'">
+          <div v-if="rcaLoading" class="rca-container tw-rounded tw-p-3 tw-flex-1 tw-overflow-auto tw-border" :class="isDarkMode ? 'tw-bg-gray-800 tw-border-gray-700' : 'tw-bg-blue-50 tw-border-blue-200'">
             <div class="tw-flex tw-items-center tw-gap-2 tw-mb-2">
               <q-spinner size="sm" color="primary" />
               <span class="tw-text-sm">Analysis in progress...</span>
@@ -222,7 +399,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Existing analysis content -->
-          <div v-else-if="hasExistingRca" class="rca-container tw-rounded tw-p-3" :class="isDarkMode ? 'rca-container-dark' : 'rca-container-light'">
+          <div v-else-if="hasExistingRca" class="rca-container tw-rounded tw-p-3 tw-flex-1 tw-overflow-auto tw-border" :class="isDarkMode ? 'tw-bg-gray-800 tw-border-gray-700' : 'tw-bg-blue-50 tw-border-blue-200'">
             <div
               class="tw-text-sm tw-whitespace-pre-wrap rca-content"
               v-html="formatRcaContent(incidentDetails.topology_context.suggested_root_cause)"
@@ -230,50 +407,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- No analysis yet -->
-          <div v-else class="no-rca-container tw-rounded tw-p-3 tw-text-sm" :class="isDarkMode ? 'no-rca-container-dark' : 'no-rca-container-light'">
+          <div v-else class="tw-rounded tw-p-3 tw-text-sm tw-flex-1 tw-border" :class="isDarkMode ? 'tw-bg-gray-700 tw-border-gray-600 tw-text-gray-300' : 'tw-bg-gray-50 tw-border-gray-200 tw-text-gray-500'">
             No analysis performed yet
           </div>
         </div>
 
-        <!-- Alert Triggers -->
-        <div>
-          <div class="tw-text-sm tw-font-medium tw-mb-2">
-            Alert Triggers
-            <span class="tw-text-gray-500">({{ triggers.length }})</span>
+        <!-- Alert Triggers Tab Content -->
+        <div v-if="activeTab === 'alertTriggers'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
+          <div class="tw-flex-1 tw-overflow-auto">
+            <q-list bordered separator class="tw-rounded">
+              <q-item v-for="trigger in triggers" :key="trigger.alert_id + trigger.alert_fired_at">
+                <q-item-section>
+                  <q-item-label class="tw-font-medium">
+                    {{ trigger.alert_name }}
+                  </q-item-label>
+                  <q-item-label caption>
+                    {{ formatTimestamp(trigger.alert_fired_at) }}
+                  </q-item-label>
+                </q-item-section>
+                <q-item-section side>
+                  <q-badge
+                    :color="getReasonColor(trigger.correlation_reason)"
+                    :label="getReasonLabel(trigger.correlation_reason)"
+                    outline
+                  />
+                </q-item-section>
+              </q-item>
+              <q-item v-if="triggers.length === 0">
+                <q-item-section class="tw-text-gray-400">
+                  No triggers loaded
+                </q-item-section>
+              </q-item>
+            </q-list>
           </div>
-          <q-list bordered separator class="tw-rounded">
-            <q-item v-for="trigger in triggers" :key="trigger.alert_id + trigger.alert_fired_at">
-              <q-item-section>
-                <q-item-label class="tw-font-medium">
-                  {{ trigger.alert_name }}
-                </q-item-label>
-                <q-item-label caption>
-                  {{ formatTimestamp(trigger.alert_fired_at) }}
-                </q-item-label>
-              </q-item-section>
-              <q-item-section side>
-                <q-badge
-                  :color="getReasonColor(trigger.correlation_reason)"
-                  :label="getReasonLabel(trigger.correlation_reason)"
-                  outline
-                />
-              </q-item-section>
-            </q-item>
-            <q-item v-if="triggers.length === 0">
-              <q-item-section class="tw-text-gray-400">
-                No triggers loaded
-              </q-item-section>
-            </q-item>
-          </q-list>
+        </div>
         </div>
       </div>
     </div>
 
     <!-- Loading state -->
-    <div v-else-if="loading" class="tw-h-full tw-flex tw-items-center tw-justify-center">
-      <q-spinner size="lg" color="primary" />
+    <div v-if="loading" class="tw-flex-1 tw-flex tw-items-center tw-justify-center">
+      <q-spinner-hourglass size="lg" color="primary" />
     </div>
-  </q-drawer>
+  </div>
 </template>
 
 <script lang="ts">
@@ -283,20 +459,17 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { date } from "quasar";
 import incidentsService, { Incident, IncidentWithAlerts, IncidentAlert } from "@/services/incidents";
+import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "IncidentDetailDrawer",
   props: {
-    modelValue: {
-      type: Boolean,
-      required: true,
-    },
     incident: {
       type: Object as PropType<Incident | null>,
       default: null,
     },
   },
-  emits: ["update:modelValue", "status-updated"],
+  emits: ["close", "status-updated"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
@@ -310,7 +483,8 @@ export default defineComponent({
     const rcaLoading = ref(false);
     const rcaStreamContent = ref("");
 
-    const isOpen = ref(props.modelValue);
+    // Tab management
+    const activeTab = ref("incidentAnalysis");
 
     // Computed to check if analysis already exists
     const hasExistingRca = computed(() => {
@@ -322,27 +496,13 @@ export default defineComponent({
       return store.state.theme === "dark";
     });
 
-    watch(
-      () => props.modelValue,
-      (val) => {
-        isOpen.value = val;
-        if (val && props.incident) {
-          loadDetails(props.incident.id);
-        }
-      }
-    );
-
-    watch(isOpen, (val) => {
-      emit("update:modelValue", val);
-    });
-
     const loadDetails = async (incidentId: string) => {
       loading.value = true;
       try {
         const org = store.state.selectedOrganization.identifier;
         const response = await incidentsService.get(org, incidentId);
         incidentDetails.value = response.data;
-        triggers.value = response.data.triggers || [];
+        triggers.value = (response.data as any).triggers || [];
         alerts.value = response.data.alerts || [];
       } catch (error) {
         console.error("Failed to load incident details:", error);
@@ -355,8 +515,18 @@ export default defineComponent({
       }
     };
 
+    watch(
+      () => props.incident,
+      (incident) => {
+        if (incident) {
+          loadDetails(incident.id);
+        }
+      },
+      { immediate: true }
+    );
+
     const close = () => {
-      isOpen.value = false;
+      emit("close");
     };
 
     const updateStatus = async (newStatus: "open" | "acknowledged" | "resolved") => {
@@ -404,6 +574,32 @@ export default defineComponent({
       }
     };
 
+    const getStatusDotColor = (status: string) => {
+      switch (status) {
+        case "open":
+          return "#ef4444"; // red-500
+        case "acknowledged":
+          return "#f59e0b"; // amber-500
+        case "resolved":
+          return "#10b981"; // green-500
+        default:
+          return "#6b7280"; // gray-500
+      }
+    };
+
+    const getStatusTextColor = (status: string) => {
+      switch (status) {
+        case "open":
+          return "#dc2626"; // red-600
+        case "acknowledged":
+          return "#d97706"; // amber-600
+        case "resolved":
+          return "#059669"; // green-600
+        default:
+          return "#4b5563"; // gray-600
+      }
+    };
+
     const getStatusLabel = (status: string) => {
       switch (status) {
         case "open":
@@ -429,6 +625,36 @@ export default defineComponent({
           return "grey-7";
         default:
           return "grey";
+      }
+    };
+
+    const getSeverityDotColor = (severity: string) => {
+      switch (severity) {
+        case "P1":
+          return "#991b1b"; // red-900
+        case "P2":
+          return "#ea580c"; // orange-600
+        case "P3":
+          return "#f59e0b"; // amber-500
+        case "P4":
+          return "#6b7280"; // gray-500
+        default:
+          return "#9ca3af"; // gray-400
+      }
+    };
+
+    const getSeverityTextColor = (severity: string) => {
+      switch (severity) {
+        case "P1":
+          return "#b91c1c"; // red-700
+        case "P2":
+          return "#c2410c"; // orange-700
+        case "P3":
+          return "#d97706"; // amber-600
+        case "P4":
+          return "#6b7280"; // gray-500
+        default:
+          return "#6b7280"; // gray-500
       }
     };
 
@@ -463,6 +689,18 @@ export default defineComponent({
       return date.formatDate(timestamp / 1000, "YYYY-MM-DD HH:mm:ss");
     };
 
+    const formatTimestampUTC = (timestamp: number) => {
+      // Backend sends microseconds, format in UTC
+      const d = new Date(timestamp / 1000);
+      const year = d.getUTCFullYear();
+      const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(d.getUTCDate()).padStart(2, '0');
+      const hours = String(d.getUTCHours()).padStart(2, '0');
+      const minutes = String(d.getUTCMinutes()).padStart(2, '0');
+      const seconds = String(d.getUTCSeconds()).padStart(2, '0');
+      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    };
+
     const escapeHtml = (text: string): string => {
       const div = document.createElement('div');
       div.textContent = text;
@@ -473,16 +711,29 @@ export default defineComponent({
       // First, escape all HTML to prevent XSS attacks
       const escaped = escapeHtml(content);
 
+      // Collapse only consecutive/multiple newlines (2 or more) into single newline
+      let normalized = escaped.replace(/\n{2,}/g, '\n');
+
       // Simple markdown-like formatting for RCA content
+      let formatted = normalized;
+
+      // Convert # headers with better styling
+      formatted = formatted.replace(/^# (.+)$/gm, '<div class="tw-font-bold tw-text-base tw-mt-5 tw-mb-3 tw-border-b tw-pb-2 tw-text-gray-800">$1</div>');
+      formatted = formatted.replace(/^## (.+)$/gm, '<div class="tw-font-bold tw-text-sm tw-mt-4 tw-mb-2 tw-text-blue-600">$1</div>');
+      formatted = formatted.replace(/^### (.+)$/gm, '<div class="tw-font-semibold tw-text-sm tw-mt-3 tw-mb-2 tw-text-gray-700">$1</div>');
+
       // Convert **bold** to <strong>
-      let formatted = escaped.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-      // Convert headers (##, ###) to styled divs
-      formatted = formatted.replace(/^### (.+)$/gm, '<div class="tw-font-semibold tw-mt-3 tw-mb-1">$1</div>');
-      formatted = formatted.replace(/^## (.+)$/gm, '<div class="tw-font-bold tw-text-base tw-mt-4 tw-mb-2">$1</div>');
-      // Convert - list items to proper formatting
-      formatted = formatted.replace(/^- (.+)$/gm, '<div class="tw-ml-2">• $1</div>');
-      // Convert numbered lists
-      formatted = formatted.replace(/^(\d+)\. (.+)$/gm, '<div class="tw-ml-2">$1. $2</div>');
+      formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong class="tw-font-semibold tw-text-gray-900">$1</strong>');
+
+      // Convert - list items with better spacing
+      formatted = formatted.replace(/^- (.+)$/gm, '<div class="tw-flex tw-gap-2 tw-ml-2 tw-mb-2"><span class="tw-text-blue-500 tw-font-bold">•</span><span class="tw-flex-1">$1</span></div>');
+
+      // Convert numbered lists with better spacing
+      formatted = formatted.replace(/^(\d+)\. (.+)$/gm, '<div class="tw-flex tw-gap-2 tw-ml-2 tw-mb-2"><span class="tw-font-semibold tw-text-gray-600 tw-min-w-[20px]">$1.</span><span class="tw-flex-1">$2</span></div>');
+
+      // Convert remaining single newlines to <br>
+      formatted = formatted.replace(/\n/g, '<br>');
+
       return formatted;
     };
 
@@ -520,7 +771,7 @@ export default defineComponent({
     };
 
     const openSREChat = () => {
-      // Open SRE chat with full incident context
+      // Set SRE chat context with full incident context
       store.state.sreChatContext = {
         type: 'incident',
         data: {
@@ -539,12 +790,27 @@ export default defineComponent({
             : rcaStreamContent.value,
         },
       };
+
+      // Close the drawer first
+      close();
+
+      // Then open the SRE chat
       store.dispatch("setIsSREChatOpen", true);
+    };
+
+    const getTimezone = () => {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone;
+    };
+
+    const getAIIconURL = () => {
+      return store.state.theme === 'dark'
+        ? getImageURL('images/common/ai_icon_dark.svg')
+        : getImageURL('images/common/ai_icon.svg');
     };
 
     return {
       t,
-      isOpen,
+      store,
       loading,
       updating,
       incidentDetails,
@@ -554,6 +820,7 @@ export default defineComponent({
       rcaStreamContent,
       hasExistingRca,
       isDarkMode,
+      activeTab,
       close,
       acknowledgeIncident,
       resolveIncident,
@@ -561,67 +828,120 @@ export default defineComponent({
       triggerRca,
       openSREChat,
       getStatusColor,
+      getStatusDotColor,
+      getStatusTextColor,
       getStatusLabel,
       getSeverityColor,
+      getSeverityDotColor,
+      getSeverityTextColor,
       getReasonColor,
       getReasonLabel,
       formatTimestamp,
+      formatTimestampUTC,
       formatRcaContent,
+      getTimezone,
+      getAIIconURL,
     };
   },
 });
 </script>
 
 <style scoped>
-.incident-detail-drawer {
-  background: white;
+.incident-detail-header {
+  min-height: 60px;
 }
 
-.incident-detail-drawer :deep(.q-drawer) {
-  top: 57px !important;
-  height: calc(100vh - 57px) !important;
+/* Tile Styles - matching schema.vue */
+.tile-content-light {
+  background-color: #ffffff;
+  transition: all 0.2s ease;
+}
+
+.tile-content-dark {
+  background-color: #1e1e1e;
+  transition: all 0.2s ease;
+}
+
+.tile-content:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+body.body--dark .tile-content:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Action Buttons - Compact */
+.action-btn-compact {
+  min-height: 28px;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.action-btn-compact:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.action-btn-compact:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .rca-content {
-  line-height: 1.6;
-  max-height: 400px;
-  overflow-y: auto;
+  line-height: 1.7;
+  font-size: 14px;
 }
 
-/* RCA Container - Light Mode */
-.rca-container-light {
-  background-color: #eff6ff; /* blue-50 */
-  border: 1px solid #bfdbfe; /* blue-200 */
+/* RCA Content Styling - Dark Mode */
+body.body--dark .rca-content :deep(strong) {
+  font-weight: 600;
+  color: #cbd5e1; /* slate-300 - soft, readable */
 }
 
-.rca-container-light :deep(strong) {
+body.body--dark .rca-content :deep(.tw-text-blue-600) {
+  color: #94a3b8; /* slate-400 - muted */
+}
+
+body.body--dark .rca-content :deep(.tw-text-blue-500) {
+  color: #94a3b8; /* slate-400 - muted bullet */
+}
+
+body.body--dark .rca-content :deep(.tw-text-gray-800) {
+  color: #e5e7eb; /* gray-200 */
+}
+
+body.body--dark .rca-content :deep(.tw-text-gray-700) {
+  color: #d1d5db; /* gray-300 */
+}
+
+body.body--dark .rca-content :deep(.tw-text-gray-600) {
+  color: #9ca3af; /* gray-400 */
+}
+
+body.body--dark .rca-content :deep(.tw-text-gray-900) {
+  color: #f3f4f6; /* gray-100 */
+}
+
+body.body--dark .rca-content :deep(.tw-border-b) {
+  border-color: #4b5563; /* gray-600 border */
+}
+
+/* RCA Content Styling - Light Mode */
+.rca-content :deep(strong) {
   font-weight: 600;
   color: #1e40af; /* blue-800 */
 }
 
-/* RCA Container - Dark Mode */
-.rca-container-dark {
-  background-color: #1e3a5f; /* dark blue background */
-  border: 1px solid #3b5875; /* darker blue border */
+.rca-content :deep(.tw-text-blue-600) {
+  color: #2563eb; /* blue-600 */
 }
 
-.rca-container-dark :deep(strong) {
-  font-weight: 600;
-  color: #93c5fd; /* blue-300 - brighter for dark mode */
-}
-
-/* No RCA Container - Light Mode */
-.no-rca-container-light {
-  background-color: #f9fafb; /* gray-50 */
-  border: 1px solid #e5e7eb; /* gray-200 */
-  color: #6b7280; /* gray-500 */
-}
-
-/* No RCA Container - Dark Mode */
-.no-rca-container-dark {
-  background-color: #374151; /* gray-700 */
-  border: 1px solid #4b5563; /* gray-600 */
-  color: #d1d5db; /* gray-300 */
+.rca-content :deep(.tw-border-b) {
+  border-color: #bfdbfe; /* blue-200 */
 }
 
 /* Info Box (Stable Dimensions, Topology) - Light Mode */
@@ -650,5 +970,37 @@ body.body--dark .label-text {
 
 body.body--dark .muted-text {
   color: #6b7280; /* gray-500 in dark mode */
+}
+
+/* Two-Column Layout Styles */
+.incident-details-column {
+  min-width: 400px;
+  max-width: 400px;
+}
+
+.tabs-content-column {
+  min-width: 0; /* Allow flex shrinking */
+}
+
+/* Responsive scrolling */
+.incident-details-column::-webkit-scrollbar,
+.tabs-content-column .tw-overflow-auto::-webkit-scrollbar {
+  width: 6px;
+}
+
+.incident-details-column::-webkit-scrollbar-track,
+.tabs-content-column .tw-overflow-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.incident-details-column::-webkit-scrollbar-thumb,
+.tabs-content-column .tw-overflow-auto::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+body.body--dark .incident-details-column::-webkit-scrollbar-thumb,
+body.body--dark .tabs-content-column .tw-overflow-auto::-webkit-scrollbar-thumb {
+  background: #475569;
 }
 </style>

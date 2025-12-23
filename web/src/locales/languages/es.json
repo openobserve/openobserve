@@ -276,7 +276,8 @@
     "actionLabel": "Acción",
     "transformLabel": "Transformar",
     "addToDashboard": "Agregar al panel",
-    "selectStream": "Selecciona Stream"
+    "selectStream": "Selecciona Stream",
+    "pattern_summary": "Se muestran de 1 a 50 de los eventos y {patternsFound} patrones de {totalEvents} encontrados en eventos de {logsAnalyzed} en {totalTime} ms."
   },
   "menu": {
     "home": "Inicio",
@@ -1000,7 +1001,11 @@
     "colorBySeriesTitle": "Color por serie",
     "colorBySeriesTooltip": "Aplica colores a las series para lograr una mejor distinción visual en los gráficos. Personalice los colores de cada serie para mejorar la visualización de los datos.",
     "editColorBySeries": " Edición de colores por serie",
-    "applyColorBySeries": " Aplicar color por serie"
+    "applyColorBySeries": " Aplicar color por serie",
+    "showAllLegends": "Mostrar todas las leyendas",
+    "legendsOfCharts": "Leyendas de las listas",
+    "totalLegends": "Total: {count}",
+    "noLegendsAvailable": "No hay leyendas disponibles"
   },
   "panel": {
     "header": "Panel",
@@ -1067,7 +1072,15 @@
     "mapvalue": "Valor",
     "customChartTypeSelector": "Selector de tipo de gráfico personalizado",
     "customChartTypeSelectorHint": "Seleccione un tipo de gráfico de la biblioteca ECharts para comenzar con una estructura de código básica",
-    "selectChartType": "Seleccione el tipo de gráfico"
+    "selectChartType": "Seleccione el tipo de gráfico",
+    "joins": "Se une",
+    "addJoin": "Agregar unirse",
+    "removeJoin": "Eliminar Join",
+    "leftJoin": "Unirse a la izquierda",
+    "innerJoin": "Inner Join",
+    "rightJoin": "Únete a la derecha",
+    "addClause": "Agregar cláusula",
+    "removeClause": "Eliminar cláusula"
   },
   "home": {
     "streams": "Transmisiones",
@@ -1349,6 +1362,76 @@
       "rcaInProgress": "Analizando la causa raíz...",
       "rcaCompleted": "Se completó el análisis de la causa raíz",
       "noRcaYet": "No hay ningún análisis de causa raíz disponible. Haga clic en «Analizar» para empezar."
+    },
+    "events": "Eventos",
+    "multiWindow": "Comparar con el pasado",
+    "multiWindowSubLabel": "Compare los resultados actuales con los datos de otro período",
+    "summary": {
+      "configureAlert": "Configura tu alerta para ver un resumen",
+      "monitors": "Monitores",
+      "from": "de",
+      "inRealTime": "en tiempo real",
+      "ofData": "de datos",
+      "triggersWhen": "Se activa cuando",
+      "queryConditions": "condiciones de consulta",
+      "areMet": "se cumplen",
+      "orMore": "o más",
+      "orLess": "o menos",
+      "equalTo": "igual a",
+      "notEqualTo": "no igual a",
+      "eventsDetected": "eventos detectados",
+      "sendsTo": "Envía a",
+      "noDestination": "Sin destino",
+      "notSetupYet": "(aún no está configurado)",
+      "cooldown": "Enfriamiento",
+      "betweenAlerts": "entre alertas",
+      "noCooldown": "Sin tiempo de recarga",
+      "minute": "minuto",
+      "minutes": "minutos",
+      "hour": "hora",
+      "hours": "horas",
+      "plainEnglish": {
+        "realTime": "Avisarme inmediatamente cuando se produzcan eventos coincidentes en tiempo real",
+        "eventsPlural": "eventos",
+        "eventSingular": "acto",
+        "moreThan": "más de",
+        "exactly": "exactamente",
+        "orFewer": "o menos",
+        "fewerThan": "menos de",
+        "not": "no",
+        "occurInAny": "ocurren en cualquier",
+        "period": "período",
+        "alertMeWhen": "Avisarme cuando",
+        "butNoMoreThan": ", pero no más de una vez cada",
+        "defaultConditions": "Avisarme cuando se cumplan las condiciones configuradas"
+      }
+    },
+    "correlation": {
+      "title": "Correlación de alertas",
+      "description": "Configure cómo se correlacionan y deduplican las alertas en toda la organización. Las alertas con valores de huellas digitales coincidentes se agruparán.",
+      "semanticFieldNote": "Nota: Las asignaciones de campos semánticos se configuran en la pestaña Identidad del servicio.",
+      "enableOrgLevel": "Habilite la deduplicación a nivel de organización",
+      "enableOrgLevelTooltip": "Habilite las funciones de deduplicación y correlación para todas las alertas de esta organización",
+      "enableCrossAlert": "Habilitar la deduplicación de alertas cruzadas",
+      "enableCrossAlertTooltip": "Permitir que diferentes alertas se desdupliquen entre sí cuando comparten la misma huella digital",
+      "fingerprintGroups": "Grupos de huellas dactilares de alerta cruzada",
+      "fingerprintGroupsTooltip": "Seleccione los grupos semánticos que desea utilizar para la toma de huellas dactilares en alertas cruzadas. Las alertas se deduplicarán si comparten los mismos valores para estas dimensiones.",
+      "fingerprintGroupsHint": "Seleccione al menos un grupo semántico para la deduplicación de alertas cruzadas",
+      "fingerprintGroupsRequired": "Debe seleccionarse al menos un grupo semántico",
+      "defaultWindow": "Ventana de correlación predeterminada (minutos)",
+      "defaultWindowTooltip": "En ausencia de una coincidencia de campo semántica, las alertas y los datos de una duración determinada se consideran relacionados",
+      "defaultWindowDescription": "En ausencia de una coincidencia de campo semántica, las alertas y los datos de una duración determinada se consideran relacionados",
+      "defaultWindowPlaceholder": "Usa el período de alerta de forma predeterminada",
+      "cancelButton": "Cancelar",
+      "saveButton": "Guardar configuración"
+    },
+    "placeholders": {
+      "typeSomething": "Escriba algo",
+      "value": "Valor",
+      "selectColumn": "Seleccionar columna",
+      "searchField": "Buscar un campo",
+      "savedFunctions": "Funciones guardadas",
+      "autoUsesCheckInterval": "Automático (usa el intervalo de verificación)"
     }
   },
   "alert_templates": {
@@ -1936,7 +2019,8 @@
     "period": "Período",
     "cron": "Cron",
     "type": "Tipo",
-    "run_pipeline": "Ejecute Pipeline"
+    "run_pipeline": "Ejecute Pipeline",
+    "showLegends": "Mostrar leyendas"
   },
   "alert_list": {
     "alert_details": "Detalles de la alerta"

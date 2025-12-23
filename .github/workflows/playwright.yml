@@ -125,6 +125,8 @@ jobs:
                 "org.spec.js",
                 "theme-management.spec.js",
                 "ingestion-config.spec.js",
+                "landingPage.spec.js",
+                "languageTranslation.spec.js",
               ]
           - testfolder: "Logs-Core"
             browser: "chrome"
@@ -179,6 +181,8 @@ jobs:
                 "dashboard-tabs-setting.spec.js",
                 "dashboard-variables-setting.spec.js",
                 "dashboard-transpose.spec.js",
+                "dashboard-join.spec.js",
+                "dashboard-nested-functions.spec.js",
               ]
           - testfolder: "Dashboards-Charts"
             browser: "chrome"
@@ -221,7 +225,7 @@ jobs:
               ]
           - testfolder: "RegressionSet"
             browser: "chrome"
-            run_files: ["logs-regression.spec.js", "streams-regression.spec.js"]
+            run_files: ["logs-regression.spec.js", "streams-regression.spec.js", "enrichment-regression.spec.js", "ui-regression.spec.js"]
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
