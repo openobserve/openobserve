@@ -87,7 +87,7 @@ test.describe("Alerts Import/Export", () => {
     await pm.alertsPage.deleteImportedAlert(alertName);
 
     await pm.dashboardFolder.searchFolder(folderName);
-    await expect(page.locator(`text=${folderName}`)).toBeVisible();
+    await pm.dashboardFolder.verifyFolderVisible(folderName);
     await pm.dashboardFolder.deleteFolder(folderName);
 
     await pm.alertsPage.cleanupDownloadedFile(downloadPath);
@@ -196,7 +196,7 @@ test.describe("Alerts Import/Export", () => {
     // Test 2: Import webhook destination from file
     await pm.alertDestinationsPage.importDestinationFromFile('utils/webhookDestinationImport.json', webhookTemplateName, webhookDestinationName);
     testLogger.info('Imported webhook destination from file', { destinationName: webhookDestinationName });
-    await expect(page.getByText('Successfully imported')).toBeVisible();
+    await pm.alertDestinationsPage.verifySuccessfulImportMessage();
     await pm.alertDestinationsPage.verifyDestinationExists(webhookDestinationName);
     testLogger.info('Successfully verified webhook destination exists');
     await pm.alertDestinationsPage.deleteDestinationWithSearch(webhookDestinationName);
@@ -207,14 +207,14 @@ test.describe("Alerts Import/Export", () => {
     const emailDestinationName = 'auto_email_dest_' + sharedRandomValue;
     await pm.alertDestinationsPage.importDestinationFromUrl(emailDestinationUrl, emailTemplateName, emailDestinationName);
     testLogger.info('Imported email destination from URL', { destinationName: emailDestinationName });
-    await expect(page.getByText('Destination - 1: "')).toBeVisible();
+    await pm.alertDestinationsPage.verifyDestinationCountMessage();
     await pm.alertDestinationsPage.cancelDestinationImport();
     testLogger.info('Successfully cancelled email destination import');
 
     // Test 4: Import email destination from file
     await pm.alertDestinationsPage.importDestinationFromFile('utils/emailDestinationImport.json', emailTemplateName, emailDestinationName);
     testLogger.info('Imported email destination from file', { destinationName: emailDestinationName });
-    await expect(page.getByText('Destination - 1: "')).toBeVisible();
+    await pm.alertDestinationsPage.verifyDestinationCountMessage();
     await pm.alertDestinationsPage.cancelDestinationImport();
     testLogger.info('Successfully cancelled email destination import');
 
