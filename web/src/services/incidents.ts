@@ -76,6 +76,7 @@ export interface IncidentStats {
   alerts_per_incident_avg: number;
 }
 
+// Telemetry correlation types
 export interface IncidentCorrelatedStreams {
   serviceName: string;
   matchedDimensions: Record<string, string>;
@@ -84,6 +85,33 @@ export interface IncidentCorrelatedStreams {
   metricStreams: StreamInfo[];
   traceStreams: StreamInfo[];
   correlationData: CorrelationResponse;
+}
+
+// Service Graph visualization types
+export interface IncidentServiceGraph {
+  incident_service: string;
+  root_cause_service?: string;
+  nodes: IncidentServiceNode[];
+  edges: IncidentServiceEdge[];
+  stats: IncidentGraphStats;
+}
+
+export interface IncidentServiceNode {
+  service_name: string;
+  alert_count: number;
+  is_root_cause: boolean;
+  is_primary: boolean;
+}
+
+export interface IncidentServiceEdge {
+  from: string;
+  to: string;
+}
+
+export interface IncidentGraphStats {
+  total_services: number;
+  total_alerts: number;
+  services_with_alerts: number;
 }
 
 const incidents = {
@@ -202,6 +230,15 @@ const incidents = {
       dimensions["traceId"] ||
       dimensions["trace.id"] ||
       dimensions["TraceId"]
+    );
+  },
+
+  /**
+   * Get service graph visualization data for an incident
+   */
+  getServiceGraph: (org_identifier: string, incident_id: string) => {
+    return http().get<IncidentServiceGraph>(
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/service_graph`
     );
   },
 };

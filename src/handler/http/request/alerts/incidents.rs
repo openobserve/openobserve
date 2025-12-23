@@ -350,6 +350,73 @@ pub async fn trigger_incident_rca(
     }
 }
 
+#[cfg(feature = "enterprise")]
+/// GetIncidentServiceGraph
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "GetIncidentServiceGraph",
+    summary = "Get incident service graph",
+    description = "Retrieves service graph visualization data for an incident, showing all involved services, their dependencies, and alert counts.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::alerts::incidents::IncidentServiceGraph),
+        (status = 404, description = "Not found", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"}))
+    )
+)]
+#[get("/v2/{org_id}/alerts/incidents/{incident_id}/service_graph")]
+pub async fn get_incident_service_graph(path: web::Path<(String, String)>) -> HttpResponse {
+    use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+
+    let (org_id, incident_id) = path.into_inner();
+    let o2_config = get_o2_config();
+
+    // Check if alert graph is enabled
+    if !o2_config.incidents.alert_graph_enabled {
+        return MetaHttpResponse::bad_request(
+            "Alert graph visualization is not enabled. Set O2_INCIDENTS_ALERT_GRAPH_ENABLED=true to enable.",
+        );
+    }
+
+    match crate::service::alerts::incidents::get_service_graph(&org_id, &incident_id).await {
+        Ok(Some(graph)) => MetaHttpResponse::json(graph),
+        Ok(None) => MetaHttpResponse::not_found("Incident not found"),
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "GetIncidentServiceGraph",
+    summary = "Get incident service graph",
+    description = "Retrieves service graph visualization data for an incident. This endpoint is only available with enterprise features enabled.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::alerts::incidents::IncidentServiceGraph),
+        (status = 403, description = "Enterprise feature", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"}))
+    )
+)]
+#[get("/v2/{org_id}/alerts/incidents/{incident_id}/service_graph")]
+pub async fn get_incident_service_graph(_path: web::Path<(String, String)>) -> HttpResponse {
+    MetaHttpResponse::forbidden("Not Supported")
+}
+
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     context_path = "/api",
