@@ -150,14 +150,13 @@
     <!-- Operation Selector Dialog -->
     <q-dialog v-model="showOperationSelector">
       <q-card style="min-width: 500px">
-        <q-card-section>
-          <div class="text-h6">Add Operation</div>
+        <q-card-section class="!tw-pt-[0.625rem] !tw-pb-[0.625rem]">
+          <div class="tw-text-[1.2rem]">Add Operation</div>
         </q-card-section>
 
-        <q-card-section>
+        <q-card-section class="!tw-py-[0.625rem]">
           <q-input
             v-model="searchQuery"
-            label="Search operations"
             dense
             borderless
             stack-label
@@ -271,6 +270,7 @@ const getFilteredOperationsForCategory = (
   category: string
 ): QueryBuilderOperationDef[] => {
   const operations = promQueryModeller.getOperationsForCategory(category);
+  console.log("category operations ------ ", category, operations);
   if (!searchQuery.value) return operations;
 
   const needle = searchQuery.value.toLowerCase();
@@ -278,7 +278,8 @@ const getFilteredOperationsForCategory = (
     (op) =>
       op.name.toLowerCase().includes(needle) ||
       op.id.toLowerCase().includes(needle) ||
-      op.documentation?.toLowerCase().includes(needle)
+      op.documentation?.toLowerCase().includes(needle) ||
+      op.category?.toLowerCase().includes(needle)
   );
 };
 

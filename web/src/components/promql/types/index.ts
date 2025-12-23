@@ -158,6 +158,23 @@ export enum PromOperationId {
   DayOfWeek = "day_of_week",
   DaysInMonth = "days_in_month",
 
+  // Trigonometric functions
+  Sin = "sin",
+  Cos = "cos",
+  Tan = "tan",
+  Asin = "asin",
+  Acos = "acos",
+  Atan = "atan",
+  Sinh = "sinh",
+  Cosh = "cosh",
+  Tanh = "tanh",
+  Asinh = "asinh",
+  Acosh = "acosh",
+  Atanh = "atanh",
+  Deg = "deg",
+  Rad = "rad",
+  Pi = "pi",
+
   // Binary operations
   Addition = "__addition",
   Subtraction = "__subtraction",

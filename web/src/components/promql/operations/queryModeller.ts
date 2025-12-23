@@ -104,7 +104,7 @@ class PromQueryModellerClass implements PromQueryModeller {
           .filter((l) => l);
       }
 
-      // Use INFIX form: sum by (label) (...) like Grafana
+      // Use INFIX form: sum by (label) (...)
       if (labels.length > 0) {
         const byClause = ` by (${labels.join(", ")})`;
 
@@ -129,6 +129,27 @@ class PromQueryModellerClass implements PromQueryModeller {
     if (operation.id === PromOperationId.HistogramQuantile) {
       const quantile = params[0] || 0.95;
       return `${operation.id}(${quantile}, ${innerExpr})`;
+    }
+
+    // Handle binary operations (arithmetic)
+    if (def.category === PromVisualQueryOperationCategory.BinaryOps) {
+      const value = params[0] || 0;
+      switch (operation.id) {
+        case PromOperationId.Addition:
+          return `${innerExpr} + ${value}`;
+        case PromOperationId.Subtraction:
+          return `${innerExpr} - ${value}`;
+        case PromOperationId.MultiplyBy:
+          return `${innerExpr} * ${value}`;
+        case PromOperationId.DivideBy:
+          return `${innerExpr} / ${value}`;
+        case PromOperationId.Modulo:
+          return `${innerExpr} % ${value}`;
+        case PromOperationId.Exponent:
+          return `${innerExpr} ^ ${value}`;
+        default:
+          return innerExpr;
+      }
     }
 
     // Handle functions with no parameters
