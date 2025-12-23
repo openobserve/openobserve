@@ -980,6 +980,7 @@ pub async fn merge_files(
                     &index_fields,
                     &retain_file_list,
                     &mut new_file_meta,
+                    latest_schema.clone(),
                     &buf,
                 )
                 .await?;
@@ -1020,6 +1021,7 @@ pub async fn merge_files(
                         &index_fields,
                         &retain_file_list,
                         &mut new_file_meta,
+                        latest_schema.clone(),
                         &buf,
                     )
                     .await?;
@@ -1050,15 +1052,16 @@ async fn generate_inverted_index(
     index_fields: &[String],
     retain_file_list: &[FileKey],
     new_file_meta: &mut FileMeta,
+    latest_schema: Arc<Schema>,
     buf: &Bytes,
 ) -> Result<(), anyhow::Error> {
-    let (schema, reader) = get_recordbatch_reader_from_bytes(buf).await?;
+    let (_parquet_schema, reader) = get_recordbatch_reader_from_bytes(buf).await?;
     let index_size = create_tantivy_index(
         "COMPACTOR",
         new_file_key,
         full_text_search_fields,
         index_fields,
-        schema,
+        latest_schema, // Use stream schema to include all configured fields
         reader,
     )
     .await
