@@ -125,7 +125,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
       </q-input>
-
     </div>
 
     <!-- Maps Label Configuration -->
@@ -172,7 +171,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
       </q-select>
-
     </div>
 
     <!-- Table Configuration -->
@@ -634,34 +632,15 @@ export default defineComponent({
       const queries = dashboardPanelData.data.queries || [];
       const allFieldNames = new Set<string>();
 
-      console.log("[PromQL Config] Total queries:", queries.length);
-
       if (!dashboardPanelData.meta?.streamFields?.groupedFields) {
-        console.log("[PromQL Config] No groupedFields available");
         return [];
       }
 
-      console.log(
-        "[PromQL Config] Available streams in groupedFields:",
-        dashboardPanelData.meta.streamFields.groupedFields.map(
-          (g: any) => g.name,
-        ),
-      );
-
       // Iterate through ALL queries and collect unique field names
       queries.forEach((query: any, index: number) => {
-        console.log(`[PromQL Config] Query ${index} full object:`, query);
         const streamName = query?.fields?.stream;
-        console.log(`[PromQL Config] Query ${index} stream:`, streamName);
-        console.log(
-          `[PromQL Config] Query ${index} fields object:`,
-          query?.fields,
-        );
 
         if (!streamName) {
-          console.log(
-            `[PromQL Config] Query ${index} skipped - no stream name`,
-          );
           return;
         }
 
@@ -671,29 +650,17 @@ export default defineComponent({
             (group: any) => group.name === streamName,
           );
 
-        console.log(
-          `[PromQL Config] Query ${index} found streamFields:`,
-          streamFields ? "YES" : "NO",
-        );
-
         if (streamFields?.schema) {
           // Extract field names from schema and add to set (automatically removes duplicates)
           const fieldNames = streamFields.schema
             .map((field: any) => field.name)
             .filter(Boolean);
 
-          console.log(
-            `[PromQL Config] Query ${index} fields count: ${fieldNames.length}`,
-            fieldNames,
-          );
           fieldNames.forEach((name: string) => allFieldNames.add(name));
-        } else {
-          console.log(`[PromQL Config] Query ${index} has no schema`);
         }
       });
 
       const result = Array.from(allFieldNames).sort();
-      console.log("[PromQL Config] Combined unique fields:", result);
 
       // Return unique field names as array
       return result;

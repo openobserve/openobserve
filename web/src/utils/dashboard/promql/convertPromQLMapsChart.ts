@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { PromQLChartConverter, ProcessedPromQLData, MapsConfig } from "./shared/types";
+import {
+  PromQLChartConverter,
+  ProcessedPromQLData,
+  MapsConfig,
+} from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
 import { getCountryName } from "../countryMappings";
 
@@ -30,31 +34,25 @@ export class MapsConverter implements PromQLChartConverter {
     panelSchema: any,
     store: any,
     extras: any,
-    chartPanelRef?: any
+    chartPanelRef?: any,
   ) {
     const config: MapsConfig & Record<string, any> = panelSchema.config || {};
     const aggregation = config.aggregation || "last";
 
     // Get label names for location name
-    const nameLabel = config.name_label || "name" || "location" || "country" || "region";
+    const nameLabel =
+      config.name_label || "name" || "location" || "country" || "region";
 
     const locationValueMap = new Map<string, number[]>();
     const errors: string[] = [];
-
-    console.log("=== [MapsConverter] Starting conversion ===");
-    console.log("Name label:", nameLabel);
-    console.log("Aggregation:", aggregation);
-
     processedData.forEach((queryData, qIndex) => {
-      console.log(`Query ${qIndex} - series count:`, queryData.series?.length);
-
       queryData.series.forEach((seriesData, sIndex) => {
         const rawLocationName = seriesData.metric[nameLabel] || seriesData.name;
 
         if (!rawLocationName) {
           errors.push(
             `Series "${seriesData.name}" missing location name. ` +
-              `Expected label: "${nameLabel}"`
+              `Expected label: "${nameLabel}"`,
           );
           return;
         }
@@ -98,15 +96,12 @@ export class MapsConverter implements PromQLChartConverter {
       };
     }
 
-    console.log("=== [MapsConverter] Conversion complete ===");
-    console.log("Map data points:", mapData.length);
-
     // Calculate min/max values from data (matching SQL implementation)
     const numericValues = mapData
       .map((item: any) => item.value)
       .filter(
         (value: any): value is number =>
-          typeof value === "number" && !Number.isNaN(value)
+          typeof value === "number" && !Number.isNaN(value),
       );
 
     const minValue =

@@ -37,18 +37,11 @@ export class TableConverter implements PromQLChartConverter {
     extras: any,
     chartPanelRef?: any,
   ) {
-    console.log("=== [TableConverter] Starting conversion ===");
-    console.log("Processed Data:", processedData);
-    console.log("Panel Schema:", panelSchema);
-
     // Build columns from metric labels + value
     const columns = this.buildColumns(processedData, panelSchema);
-    console.log("Built Columns:", columns);
 
     // Build rows from series data
     const rows = this.buildRows(processedData, panelSchema, store);
-    console.log("Built Rows:", rows);
-    console.log("Rows count:", rows.length);
 
     // Return the same structure as SQL tables (convertTableData)
     // TableRenderer component (q-table) handles pagination, sorting, filtering automatically
@@ -59,8 +52,6 @@ export class TableConverter implements PromQLChartConverter {
       series: [],
     };
 
-    console.log("=== [TableConverter] Conversion complete ===");
-    console.log("Final Result:", result);
     return result;
   }
 
@@ -105,11 +96,6 @@ export class TableConverter implements PromQLChartConverter {
     const aggregations = config.table_aggregations || [
       config.aggregation || "last",
     ];
-
-    console.log("=== [buildColumns] Starting ===");
-    console.log("processedData length:", processedData.length);
-    console.log("Aggregations:", aggregations);
-    console.log("Table Mode:", tableMode);
 
     // In "single" (Timestamp) mode, show timestamp + value columns
     if (tableMode === "single") {
@@ -264,16 +250,12 @@ export class TableConverter implements PromQLChartConverter {
     const labelKeys = new Set<string>();
 
     processedData.forEach((queryData, qIndex) => {
-      // console.log(`Query ${qIndex} - series count:`, queryData.series?.length);
       queryData.series.forEach((seriesData, sIndex) => {
-        // console.log(`Query ${qIndex}, Series ${sIndex} - metric:`, seriesData.metric);
         Object.keys(seriesData.metric).forEach((key) => {
           labelKeys.add(key);
         });
       });
     });
-
-    console.log("Label keys collected:", Array.from(labelKeys));
 
     // Apply column filter if configured
     // config.visible_columns: array of column names to show (if not set, show all)
@@ -289,7 +271,6 @@ export class TableConverter implements PromQLChartConverter {
       filteredLabelKeys = filteredLabelKeys.filter((key) =>
         config.visible_columns.includes(key),
       );
-      console.log("Filtered by visible_columns:", filteredLabelKeys);
     } else if (
       config.hidden_columns &&
       Array.isArray(config.hidden_columns) &&
@@ -299,7 +280,6 @@ export class TableConverter implements PromQLChartConverter {
       filteredLabelKeys = filteredLabelKeys.filter(
         (key) => !config.hidden_columns.includes(key),
       );
-      console.log("Filtered by hidden_columns:", filteredLabelKeys);
     }
 
     // Get sticky columns configuration
@@ -369,10 +349,6 @@ export class TableConverter implements PromQLChartConverter {
 
     // Timestamp column removed as per user request
 
-    console.log(
-      "Built columns:",
-      columns.map((c) => c.name),
-    );
     return columns;
   }
 
@@ -393,11 +369,6 @@ export class TableConverter implements PromQLChartConverter {
     const aggregations = config.table_aggregations || [
       config.aggregation || "last",
     ];
-
-    console.log("=== [buildRows] Starting ===");
-    console.log("Aggregations:", aggregations);
-    console.log("processedData length:", processedData.length);
-    console.log("Table Mode:", tableMode);
 
     // In "single" (Timestamp) mode, create rows with timestamp + value for ALL series
     if (tableMode === "single") {
@@ -421,7 +392,6 @@ export class TableConverter implements PromQLChartConverter {
         return rows.slice(0, config.row_limit);
       }
 
-      console.log("Built rows count (timestamp mode):", rows.length);
       return rows;
     }
 
@@ -449,22 +419,12 @@ export class TableConverter implements PromQLChartConverter {
         return rows.slice(0, config.row_limit);
       }
 
-      console.log(
-        "Built rows count (timestamp with metadata mode):",
-        rows.length,
-      );
       return rows;
     }
 
     // In "all" (Aggregate) mode, create rows with metric labels and aggregated values
     processedData.forEach((queryData, qIndex) => {
-      // console.log(`Query ${qIndex} - timestamps length:`, queryData.timestamps?.length);
-      // console.log(`Query ${qIndex} - series length:`, queryData.series?.length);
-
       queryData.series.forEach((seriesData, sIndex) => {
-        // console.log(`Query ${qIndex}, Series ${sIndex} - values length:`, seriesData.values?.length);
-        // console.log(`Query ${qIndex}, Series ${sIndex} - metric:`, seriesData.metric);
-
         // Create row with metric labels
         const row: any = {
           ...seriesData.metric,
@@ -488,7 +448,6 @@ export class TableConverter implements PromQLChartConverter {
       return rows.slice(0, config.row_limit);
     }
 
-    console.log("Built rows count (aggregate mode):", rows.length);
     return rows;
   }
 }

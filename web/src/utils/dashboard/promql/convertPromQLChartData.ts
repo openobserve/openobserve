@@ -69,33 +69,37 @@ const CONVERTER_REGISTRY = [
  */
 export async function convertPromQLChartData(
   searchQueryData: PromQLResponse[],
-  context: ConversionContext
+  context: ConversionContext,
 ): Promise<{ options: any; extras: any }> {
-  const { panelSchema, store, chartPanelRef, hoveredSeriesState, annotations, metadata } = context;
+  const {
+    panelSchema,
+    store,
+    chartPanelRef,
+    hoveredSeriesState,
+    annotations,
+    metadata,
+  } = context;
   const chartType = panelSchema.type;
-
-  console.log("=== [PromQL Converter] Starting conversion ===");
-  console.log("Chart Type:", chartType);
-  console.log("Input Data:", searchQueryData);
-  console.log("Panel Schema:", panelSchema);
-
   // Step 1: Find appropriate converter for this chart type
-  const converter = CONVERTER_REGISTRY.find((c) => c.supportedTypes.includes(chartType));
+  const converter = CONVERTER_REGISTRY.find((c) =>
+    c.supportedTypes.includes(chartType),
+  );
 
   if (!converter) {
     console.error(`No converter found for chart type: ${chartType}`);
     throw new Error(
       `Unsupported chart type for PromQL: ${chartType}. ` +
-        `Supported types: ${CONVERTER_REGISTRY.flatMap((c) => c.supportedTypes).join(", ")}`
+        `Supported types: ${CONVERTER_REGISTRY.flatMap((c) => c.supportedTypes).join(", ")}`,
     );
   }
 
-  console.log("Converter Found:", converter.constructor.name);
-
   // Step 2: Preprocess data (common for all chart types)
   // This handles timestamp alignment, legend generation, and series limiting
-  const processedData = await processPromQLData(searchQueryData, panelSchema, store);
-  console.log("Processed Data:", processedData);
+  const processedData = await processPromQLData(
+    searchQueryData,
+    panelSchema,
+    store,
+  );
 
   // Step 3: Initialize extras object
   // This will be populated by converters with legends, hover state, etc.
@@ -106,8 +110,13 @@ export async function convertPromQLChartData(
 
   // Step 4: Delegate to chart-specific converter
   // Each converter knows how to transform data for its chart type(s)
-  const chartConfig = converter.convert(processedData, panelSchema, store, extras, chartPanelRef);
-  console.log("Chart Config from Converter:", chartConfig);
+  const chartConfig = converter.convert(
+    processedData,
+    panelSchema,
+    store,
+    extras,
+    chartPanelRef,
+  );
 
   // Step 5: Apply common chart configurations
   const options = {
@@ -123,8 +132,6 @@ export async function convertPromQLChartData(
     }),
   };
 
-  console.log("Final Options (before legend config):", options);
-
   // Step 6: Apply comprehensive legend configuration (same as SQL charts)
   // This handles plain vs scroll types, grid adjustments, and proper positioning
   // Skip for table charts as they don't use ECharts legends
@@ -133,9 +140,8 @@ export async function convertPromQLChartData(
       panelSchema,
       chartPanelRef,
       hoveredSeriesState,
-      options
+      options,
     );
-    console.log("Final Options (after legend config):", options);
   }
 
   // Step 7: Apply annotations (if applicable)
@@ -152,7 +158,6 @@ export async function convertPromQLChartData(
 
   if (!hasEChartsData && !hasTableData) {
     console.warn("No series or columns found - returning empty chart");
-    console.log("Has ECharts data:", hasEChartsData, "Has Table data:", hasTableData);
     return {
       options: {
         series: [],
@@ -162,7 +167,6 @@ export async function convertPromQLChartData(
     };
   }
 
-  console.log("=== [PromQL Converter] Conversion complete ===");
   return { options, extras };
 }
 
@@ -176,7 +180,11 @@ export async function convertPromQLChartData(
  * @param annotations - Array of annotation configurations
  * @param processedData - Processed PromQL data
  */
-function applyAnnotations(options: any, annotations: any[], processedData: any): void {
+function applyAnnotations(
+  options: any,
+  annotations: any[],
+  processedData: any,
+): void {
   if (!Array.isArray(options.series)) return;
 
   // Apply annotations to the first series

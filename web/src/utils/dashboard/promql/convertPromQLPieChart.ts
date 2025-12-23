@@ -32,35 +32,29 @@ export class PieConverter implements PromQLChartConverter {
     panelSchema: any,
     store: any,
     extras: any,
-    chartPanelRef?: any
+    chartPanelRef?: any,
   ) {
-    console.log("=== [Pie Converter] Starting conversion ===");
-    console.log("Processed Data:", processedData);
-    console.log("Panel Schema:", panelSchema);
-
     const chartType = panelSchema.type;
     const config = panelSchema.config || {};
     const data: any[] = [];
 
     // Get aggregation function (default: last)
     const aggregation = config.aggregation || "last";
-    console.log("Aggregation function:", aggregation);
 
     // Calculate min/max for color scaling
     let chartMin = Infinity;
     let chartMax = -Infinity;
 
     // Collect all values first to determine min/max
-    const seriesDataCollection: Array<{ name: string; value: number; rawValues: Array<[number, string]> }> = [];
+    const seriesDataCollection: Array<{
+      name: string;
+      value: number;
+      rawValues: Array<[number, string]>;
+    }> = [];
 
     processedData.forEach((queryData, qIndex) => {
-      console.log(`Processing query ${qIndex}, series count: ${queryData.series.length}`);
       queryData.series.forEach((seriesData, sIndex) => {
-        console.log(`Query ${qIndex}, Series ${sIndex}:`, seriesData.name);
-        console.log(`Values:`, seriesData.values);
-
         const value = applyAggregation(seriesData.values, aggregation);
-        console.log(`Aggregated value:`, value);
 
         if (value < chartMin) chartMin = value;
         if (value > chartMax) chartMax = value;
@@ -78,7 +72,9 @@ export class PieConverter implements PromQLChartConverter {
     // Now apply colors and build data with unit formatting
     seriesDataCollection.forEach((seriesData) => {
       // Extract numeric values for color calculation
-      const numericValues = seriesData.rawValues.map(([_, val]) => parseFloat(val));
+      const numericValues = seriesData.rawValues.map(([_, val]) =>
+        parseFloat(val),
+      );
 
       const color = getSeriesColor(
         config.color || null,
@@ -87,7 +83,7 @@ export class PieConverter implements PromQLChartConverter {
         chartMin,
         chartMax,
         store.state.theme,
-        config.color?.colorBySeries
+        config.color?.colorBySeries,
       );
 
       data.push({
@@ -96,8 +92,6 @@ export class PieConverter implements PromQLChartConverter {
         itemStyle: color ? { color } : undefined,
       });
     });
-
-    console.log("Final pie data:", data);
 
     // Sort by value descending (optional, can be configured)
     if (config.sort_data !== false) {
@@ -109,7 +103,7 @@ export class PieConverter implements PromQLChartConverter {
       panelSchema,
       chartPanelRef,
       data,
-      chartType === "donut"
+      chartType === "donut",
     );
 
     const series = [
@@ -137,14 +131,17 @@ export class PieConverter implements PromQLChartConverter {
               // If custom format is provided, use it with unit formatting
               return config.label_format
                 .replace("{b}", params.name)
-                .replace("{c}", formatUnitValue(
-                  getUnitValue(
-                    params.value,
-                    config?.unit,
-                    config?.unit_custom,
-                    config?.decimals
-                  )
-                ))
+                .replace(
+                  "{c}",
+                  formatUnitValue(
+                    getUnitValue(
+                      params.value,
+                      config?.unit,
+                      config?.unit_custom,
+                      config?.decimals,
+                    ),
+                  ),
+                )
                 .replace("{d}", params.percent.toFixed(1));
             }
             // Default format: name: value (percentage%)
@@ -152,7 +149,7 @@ export class PieConverter implements PromQLChartConverter {
               params.value,
               config?.unit,
               config?.unit_custom,
-              config?.decimals
+              config?.decimals,
             );
             return `${params.name}: ${formatUnitValue(unitValue)} (${params.percent.toFixed(1)}%)`;
           },
@@ -175,8 +172,6 @@ export class PieConverter implements PromQLChartConverter {
       // This ensures consistent behavior with SQL charts
     };
 
-    console.log("=== [Pie Converter] Conversion complete ===");
-    console.log("Result:", result);
     return result;
   }
 }

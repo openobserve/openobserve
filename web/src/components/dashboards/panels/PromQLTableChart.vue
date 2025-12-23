@@ -82,17 +82,12 @@ export default defineComponent({
     const filter = ref("");
     const loading = ref(false);
 
-    console.log("=== [PromQL Table Chart] Component mounted ===");
-    console.log("Table Data:", props.data);
-    console.log("Table Config:", props.config);
-
     // Extract columns and rows from processed data
     const tableColumns = computed(() => {
       if (!props.data?.columns) {
         console.warn("No columns found in table data");
         return [];
       }
-      console.log("Table Columns:", props.data.columns);
       return props.data.columns;
     });
 
@@ -106,7 +101,6 @@ export default defineComponent({
         id: `row_${index}`,
         ...row,
       }));
-      console.log(`Table Rows: ${rows.length} rows`);
       return rows;
     });
 
@@ -143,11 +137,6 @@ export default defineComponent({
           value: legend,
         });
       });
-
-      console.log("Legend Options:", options);
-      console.log("Table Mode:", tableMode);
-      console.log("Unique legends count:", legends.length);
-
       return options;
     });
 
@@ -178,9 +167,6 @@ export default defineComponent({
       const filtered = tableRows.value.filter(
         (row: any) => row.__legend__ === selectedLegend.value,
       );
-      console.log(
-        `Filtered to legend "${selectedLegend.value}": ${filtered.length} rows`,
-      );
       return filtered;
     });
 
@@ -192,9 +178,6 @@ export default defineComponent({
     watch(
       () => props.data,
       (newData) => {
-        console.log("=== [PromQL Table Chart] Data updated ===");
-        console.log("New data:", newData);
-
         // Only set default legend if no legend is selected yet or if current selection is invalid
         if (legendOptions.value.length > 0) {
           const currentSelectionValid = legendOptions.value.some(
@@ -213,10 +196,7 @@ export default defineComponent({
               selectedLegend.value = legendOptions.value[0]?.value || "";
             }
 
-            console.log("Default legend selected:", selectedLegend.value);
-          } else {
-            console.log("Legend selection preserved:", selectedLegend.value);
-          }
+          } 
         }
       },
       { deep: true, immediate: true },

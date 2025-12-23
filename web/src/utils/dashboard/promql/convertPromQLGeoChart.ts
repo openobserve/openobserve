@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { PromQLChartConverter, ProcessedPromQLData, GeoMapConfig } from "./shared/types";
+import {
+  PromQLChartConverter,
+  ProcessedPromQLData,
+  GeoMapConfig,
+} from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
 
 /**
@@ -36,7 +40,7 @@ export class GeoConverter implements PromQLChartConverter {
     panelSchema: any,
     store: any,
     extras: any,
-    chartPanelRef?: any
+    chartPanelRef?: any,
   ) {
     const config: GeoMapConfig & Record<string, any> = panelSchema.config || {};
     const aggregation = config.aggregation || "last";
@@ -48,16 +52,7 @@ export class GeoConverter implements PromQLChartConverter {
 
     const geoData: any[] = [];
     const errors: string[] = [];
-
-    console.log("=== [GeoConverter] Starting conversion ===");
-    console.log("Lat label:", latLabel);
-    console.log("Lon label:", lonLabel);
-    console.log("Weight label:", weightLabel);
-    console.log("Aggregation:", aggregation);
-
     processedData.forEach((queryData, qIndex) => {
-      console.log(`Query ${qIndex} - series count:`, queryData.series?.length);
-
       queryData.series.forEach((seriesData, sIndex) => {
         const lat = seriesData.metric[latLabel];
         const lon = seriesData.metric[lonLabel];
@@ -65,7 +60,7 @@ export class GeoConverter implements PromQLChartConverter {
         if (!lat || !lon) {
           errors.push(
             `Series "${seriesData.name}" missing geo coordinates. ` +
-              `Expected labels: "${latLabel}", "${lonLabel}"`
+              `Expected labels: "${latLabel}", "${lonLabel}"`,
           );
           return;
         }
@@ -80,11 +75,7 @@ export class GeoConverter implements PromQLChartConverter {
           weight = config.weight_fixed || 1; // Default weight if not provided
         }
 
-        geoData.push([
-          parseFloat(lon),
-          parseFloat(lat),
-          weight,
-        ]);
+        geoData.push([parseFloat(lon), parseFloat(lat), weight]);
       });
     });
 
@@ -100,9 +91,6 @@ export class GeoConverter implements PromQLChartConverter {
       };
     }
 
-    console.log("=== [GeoConverter] Conversion complete ===");
-    console.log("Geo data points:", geoData.length);
-
     // Calculate min/max values for visualMap and symbolSize
     const values = geoData.map((item: any) => item[2]);
     const minValue = Math.min(...values);
@@ -111,10 +99,7 @@ export class GeoConverter implements PromQLChartConverter {
     // Return geomap configuration matching SQL implementation
     return {
       lmap: {
-        center: [
-          config.map_view?.lng || 0,
-          config.map_view?.lat || 0,
-        ],
+        center: [config.map_view?.lng || 0, config.map_view?.lat || 0],
         zoom: config.map_view?.zoom || 2,
         roam: true,
         resizeEnable: true,
@@ -190,12 +175,17 @@ export class GeoConverter implements PromQLChartConverter {
           data: geoData,
           symbolSize: function (val: any) {
             const normalizedSize = normalizeValue(val[2], minValue, maxValue);
-            const minSymbolSize = config.map_symbol_style?.size_by_value?.min ?? 1;
-            const maxSymbolSize = config.map_symbol_style?.size_by_value?.max ?? 100;
-            const mapSymbolStyleSelected = config.map_symbol_style?.size ?? "by Value";
+            const minSymbolSize =
+              config.map_symbol_style?.size_by_value?.min ?? 1;
+            const maxSymbolSize =
+              config.map_symbol_style?.size_by_value?.max ?? 100;
+            const mapSymbolStyleSelected =
+              config.map_symbol_style?.size ?? "by Value";
 
             if (mapSymbolStyleSelected === "by Value") {
-              return minSymbolSize + normalizedSize * (maxSymbolSize - minSymbolSize);
+              return (
+                minSymbolSize + normalizedSize * (maxSymbolSize - minSymbolSize)
+              );
             } else if (mapSymbolStyleSelected === "fixed") {
               return config.map_symbol_style?.size_fixed ?? 2;
             }
