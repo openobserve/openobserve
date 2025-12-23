@@ -1253,21 +1253,6 @@ export class PipelinesPage {
     }
 
     /**
-     * Delete a pipeline by name
-     * @param {string} pipelineName - Name of the pipeline to delete
-     */
-    async deletePipelineByName(pipelineName) {
-        await this.page.waitForTimeout(1000);
-        const deletePipelineButton = this.page.locator(
-            `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
-        );
-        await deletePipelineButton.waitFor({ state: "visible" });
-        await deletePipelineButton.click();
-        await this.confirmDeletePipeline();
-        await this.verifyPipelineDeleted();
-    }
-
-    /**
      * Fill condition fields for FilterGroup UI
      * @param {string} columnName - Column name to search for
      * @param {string} columnOption - The option text to select
