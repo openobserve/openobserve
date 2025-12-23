@@ -536,27 +536,6 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// Convert EnrichmentTableStatus enum to i16 for database storage
-fn status_to_i16(status: &config::meta::enrichment_table::EnrichmentTableStatus) -> i16 {
-    match status {
-        config::meta::enrichment_table::EnrichmentTableStatus::Pending => 0,
-        config::meta::enrichment_table::EnrichmentTableStatus::Processing => 1,
-        config::meta::enrichment_table::EnrichmentTableStatus::Completed => 2,
-        config::meta::enrichment_table::EnrichmentTableStatus::Failed => 3,
-    }
-}
-
-/// Convert i16 from database to EnrichmentTableStatus enum
-fn i16_to_status(status: i16) -> config::meta::enrichment_table::EnrichmentTableStatus {
-    match status {
-        0 => config::meta::enrichment_table::EnrichmentTableStatus::Pending,
-        1 => config::meta::enrichment_table::EnrichmentTableStatus::Processing,
-        2 => config::meta::enrichment_table::EnrichmentTableStatus::Completed,
-        3 => config::meta::enrichment_table::EnrichmentTableStatus::Failed,
-        _ => config::meta::enrichment_table::EnrichmentTableStatus::Pending, // Default fallback
-    }
-}
-
 /// Save enrichment table URL job state
 pub async fn save_url_job(
     job: &config::meta::enrichment_table::EnrichmentTableUrlJob,
@@ -565,7 +544,7 @@ pub async fn save_url_job(
         org: job.org_id.clone(),
         name: job.table_name.clone(),
         url: job.url.clone(),
-        status: status_to_i16(&job.status),
+        status: (&job.status).into(),
         error_message: job.error_message.clone(),
         created_at: job.created_at,
         updated_at: job.updated_at,
@@ -626,7 +605,7 @@ pub async fn get_url_job(
                 org_id: record.org,
                 table_name: record.name,
                 url: record.url,
-                status: i16_to_status(record.status),
+                status: record.status.into(),
                 error_message: record.error_message,
                 created_at: record.created_at,
                 updated_at: record.updated_at,
@@ -680,7 +659,7 @@ pub async fn list_url_jobs(
                 org_id: record.org,
                 table_name: record.name,
                 url: record.url,
-                status: i16_to_status(record.status),
+                status: record.status.into(),
                 error_message: record.error_message,
                 created_at: record.created_at,
                 updated_at: record.updated_at,
@@ -737,7 +716,7 @@ pub async fn claim_stale_url_jobs(
             org_id: r.org,
             table_name: r.name,
             url: r.url,
-            status: i16_to_status(r.status),
+            status: r.status.into(),
             error_message: r.error_message,
             created_at: r.created_at,
             updated_at: r.updated_at,

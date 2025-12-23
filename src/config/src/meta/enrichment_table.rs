@@ -25,6 +25,40 @@ pub enum EnrichmentTableStatus {
     Failed,
 }
 
+impl From<EnrichmentTableStatus> for i16 {
+    fn from(status: EnrichmentTableStatus) -> Self {
+        match status {
+            EnrichmentTableStatus::Pending => 0,
+            EnrichmentTableStatus::Processing => 1,
+            EnrichmentTableStatus::Completed => 2,
+            EnrichmentTableStatus::Failed => 3,
+        }
+    }
+}
+
+impl From<&EnrichmentTableStatus> for i16 {
+    fn from(status: &EnrichmentTableStatus) -> Self {
+        match status {
+            EnrichmentTableStatus::Pending => 0,
+            EnrichmentTableStatus::Processing => 1,
+            EnrichmentTableStatus::Completed => 2,
+            EnrichmentTableStatus::Failed => 3,
+        }
+    }
+}
+
+impl From<i16> for EnrichmentTableStatus {
+    fn from(status: i16) -> Self {
+        match status {
+            0 => EnrichmentTableStatus::Pending,
+            1 => EnrichmentTableStatus::Processing,
+            2 => EnrichmentTableStatus::Completed,
+            3 => EnrichmentTableStatus::Failed,
+            _ => EnrichmentTableStatus::Pending, // Default fallback for invalid values
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct EnrichmentTableUrlJob {
     pub org_id: String,
