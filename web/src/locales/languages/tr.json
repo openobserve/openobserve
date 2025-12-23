@@ -1109,7 +1109,8 @@
     "metric": "Metrik",
     "labelFilters": "Etiket Filtreleri",
     "operations": "Operasyonlar",
-    "promQLBuilder": "PromQL Oluşturucu"
+    "promQLBuilder": "PromQL Oluşturucu",
+    "options": "Seçenekler"
   },
   "home": {
     "streams": "Akışlar",

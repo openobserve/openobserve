@@ -1109,7 +1109,8 @@
     "metric": "Métrico",
     "labelFilters": "Filtros de etiqueta",
     "operations": "Operações",
-    "promQLBuilder": "Construtor ProMQL"
+    "promQLBuilder": "Construtor ProMQL",
+    "options": "Opções"
   },
   "home": {
     "streams": "Transmissões",

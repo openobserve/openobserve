@@ -1109,7 +1109,8 @@
     "metric": "미터법",
     "labelFilters": "라벨 필터",
     "operations": "오퍼레이션",
-    "promQLBuilder": "프롬QL 빌더"
+    "promQLBuilder": "프롬QL 빌더",
+    "options": "옵션"
   },
   "home": {
     "streams": "스트림",

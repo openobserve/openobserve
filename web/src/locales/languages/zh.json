@@ -1109,7 +1109,8 @@
     "metric": "公制",
     "labelFilters": "标签筛选器",
     "operations": "运营",
-    "promQLBuilder": "PromQL 生成器"
+    "promQLBuilder": "PromQL 生成器",
+    "options": "选项"
   },
   "home": {
     "streams": "数据流",
