@@ -33,6 +33,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div>
         <button
+          data-test="dashboard-customSql"
+          :class="selectedButtonType === 'custom-sql' ? 'selected' : ''"
+          :style="{
+            backgroundColor:
+            store.state.theme == 'dark' ? 'transparent' : '#f0eaea',
+          }"
+          class="button"
+          @click="onUpdateButton('custom-sql', $event)"
+        >
+          {{ t("panel.customSql") }}
+        </button>
+      </div>
+      <div>
+        <button
           data-test="dashboard-promQL-builder"
           class="button"
           :style="{
@@ -53,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div>
         <button
           data-test="dashboard-promQL"
-          class="button"
+          class="button button-right"
           :style="{
             backgroundColor:
             store.state.theme == 'dark' ? 'transparent' : '#f0eaea',
@@ -67,20 +81,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="onUpdateButton('promql', $event)"
         >
           {{ t("panel.promQL") }}
-        </button>
-      </div>
-      <div>
-        <button
-          data-test="dashboard-customSql"
-          :class="selectedButtonType === 'custom-sql' ? 'selected' : ''"
-          :style="{
-            backgroundColor:
-            store.state.theme == 'dark' ? 'transparent' : '#f0eaea',
-          }"
-          class="button button-right"
-          @click="onUpdateButton('custom-sql', $event)"
-        >
-          {{ t("panel.customSql") }}
         </button>
       </div>
     </div>
