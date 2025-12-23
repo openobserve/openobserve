@@ -13,15 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    cmp::max,
-    num::NonZero,
-    str::FromStr,
-    sync::{
-        Arc,
-        atomic::{AtomicI64, Ordering},
-    },
-};
+use std::{cmp::max, num::NonZero, str::FromStr, sync::Arc};
 
 use arrow::array::RecordBatch;
 use arrow_schema::Field;
@@ -187,14 +179,8 @@ pub async fn merge_parquet_files(
         None
     };
 
-    let records = Arc::new(AtomicI64::new(0));
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
-
-    // Create a shared channel for streaming batches
     let (tx, mut rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
-
-    // Spawn task to read from batch_stream and send to channel
-    let records_clone = records.clone();
     let read_task = tokio::task::spawn(async move {
         loop {
             match batch_stream.try_next().await {
@@ -202,7 +188,6 @@ pub async fn merge_parquet_files(
                     break;
                 }
                 Ok(Some(batch)) => {
-                    records_clone.fetch_add(batch.num_rows() as i64, Ordering::Relaxed);
                     if let Err(e) = tx.send(batch).await {
                         log::error!("merge_parquet_files write to channel error: {e}");
                         return Err(DataFusionError::External(Box::new(e)));
@@ -291,7 +276,6 @@ pub async fn merge_parquet_files(
         start.elapsed().as_millis()
     );
 
-    metadata.records = records.load(Ordering::Relaxed);
     metadata.compressed_size = buf.len() as i64;
     Ok(MergeParquetResult::Single(buf, metadata))
 }
