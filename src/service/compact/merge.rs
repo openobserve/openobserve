@@ -925,13 +925,17 @@ pub async fn merge_files(
         }
     }
 
-    // Always attempt index generation if FTS or index fields are configured in stream settings
-    // The tantivy module will create an empty .ttv file if the parquet data has no matching fields
-    let need_index = !full_text_search_fields.is_empty() || !index_fields.is_empty();
+    let latest_schema_fields = latest_schema
+        .fields()
+        .iter()
+        .map(|f| f.name())
+        .collect::<HashSet<_>>();
+    let need_index = full_text_search_fields
+        .iter()
+        .chain(index_fields.iter())
+        .any(|f| latest_schema_fields.contains(f));
     if !need_index {
-        log::debug!(
-            "skip index generation for stream: {org_id}/{stream_type}/{stream_name} (no fields configured in stream settings)"
-        );
+        log::debug!("skip index generation for stream: {org_id}/{stream_type}/{stream_name}");
     }
 
     let mut new_files = Vec::new();
