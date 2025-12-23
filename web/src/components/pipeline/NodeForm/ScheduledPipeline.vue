@@ -1210,8 +1210,7 @@ size="md" />
                     "
                     class="no-border q-ml-md o2-primary-button tw-h-[36px]"
                     no-caps
-                    type="submit"
-                    @click="$emit('submit:form')"
+                    @click.prevent="$emit('submit:form')"
                     :disable="validatingSqlQuery"
                   />
                 </div>
@@ -2051,9 +2050,9 @@ const getStreamFields = () => {
         });
       })
       .finally(() => {
-        if (tab.value === "sql" && query.value == "") {
+        if (tab.value === "sql") {
           query.value = `SELECT * FROM "${selectedStreamName.value}"`;
-        } else if (tab.value === "promql" && query.value == "") {
+        } else if (tab.value === "promql") {
           query.value = `${selectedStreamName.value}{}`;
         }
         expandState.value.query = true;
@@ -2197,6 +2196,7 @@ const runQuery = async () => {
           org_identifier: store.state.selectedOrganization.identifier,
           query: { query: queryReq },
           page_type: selectedStreamType.value,
+          validate: true,
         },
         "derived_stream",
       )
