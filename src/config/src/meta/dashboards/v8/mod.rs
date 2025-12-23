@@ -128,6 +128,32 @@ pub struct Query {
     pub joins: Option<Vec<Join>>,
 }
 
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(default)]
+pub struct PromQLLabelFilter {
+    pub label: String,
+    pub op: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(default)]
+pub struct PromQLOperation {
+    pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub params: Option<Vec<PromQLOperationParam>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, Hash)]
+#[serde(untagged)]
+pub enum PromQLOperationParam {
+    Array(Vec<String>),
+    String(String),
+    #[schema(value_type = f64)]
+    Number(OrdF64),
+    Bool(bool),
+}
+
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct PanelFields {
     pub stream: String,
@@ -156,6 +182,10 @@ pub struct PanelFields {
     pub value: Option<AxisItem>,
     #[schema(value_type = Object)]
     pub filter: PanelFilter,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub promql_labels: Vec<PromQLLabelFilter>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub promql_operations: Vec<PromQLOperation>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
@@ -376,6 +406,26 @@ pub struct PanelConfig {
     trellis: Option<Trellis>,
     #[serde(skip_serializing_if = "Option::is_none")]
     show_gridlines: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    aggregation: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    lat_label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    lon_label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    weight_label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    name_label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    table_aggregations: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    promql_table_mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    visible_columns: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hidden_columns: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sticky_columns: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -528,6 +578,8 @@ pub struct DrillDownVariables {
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct QueryConfig {
     promql_legend: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    step_value: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     layer_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
