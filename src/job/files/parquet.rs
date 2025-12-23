@@ -37,7 +37,7 @@ use config::{
 use hashbrown::HashSet;
 use infra::{
     schema::{
-        get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
+        SchemaCache, get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
         get_stream_setting_index_fields,
     },
     storage,
@@ -53,6 +53,7 @@ use crate::{
     common::infra::wal,
     service::{
         db,
+        schema::generate_schema_for_defined_schema_fields,
         search::datafusion::exec::{self, MergeParquetResult, TableBuilder},
         tantivy::create_tantivy_index,
     },
@@ -739,6 +740,30 @@ async fn merge_files(
     let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
     let full_text_search_fields = get_stream_setting_fts_fields(&stream_settings);
     let index_fields = get_stream_setting_index_fields(&stream_settings);
+    let (defined_schema_fields, need_original, index_original_data, index_all_values) =
+        match stream_settings {
+            Some(s) => (
+                s.defined_schema_fields,
+                s.store_original_data,
+                s.index_original_data,
+                s.index_all_values,
+            ),
+            None => (Vec::new(), false, false, false),
+        };
+    let latest_schema = if !defined_schema_fields.is_empty() {
+        let latest_schema = SchemaCache::new(latest_schema.as_ref().clone());
+        let latest_schema = generate_schema_for_defined_schema_fields(
+            stream_type,
+            &latest_schema,
+            &defined_schema_fields,
+            need_original,
+            index_original_data,
+            index_all_values,
+        );
+        latest_schema.schema().clone()
+    } else {
+        latest_schema.clone()
+    };
 
     // we shouldn't use the latest schema, because there are too many fields, we need read schema
     // from files only get the fields what we need
