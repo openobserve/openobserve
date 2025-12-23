@@ -1597,7 +1597,8 @@ async fn process_enrichment_table_url(
 /// - Skips local storage (done once at the end)
 /// - Skips meta stats updates and notifications (done once at the end)
 ///
-/// Returns a tuple of (schema, timestamp) where timestamp is the one used for all records in this batch.
+/// Returns a tuple of (schema, timestamp) where timestamp is the one used for all records in this
+/// batch.
 async fn save_enrichment_batch(
     org_id: &str,
     table_name: &str,

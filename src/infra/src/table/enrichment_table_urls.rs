@@ -225,7 +225,8 @@ pub async fn claim_stale_jobs(
     let _lock = get_lock().await;
     let now = chrono::Utc::now().timestamp_micros();
 
-    // For SQLite (single-node), use simple Sea-ORM API since get_lock() provides sufficient protection
+    // For SQLite (single-node), use simple Sea-ORM API since get_lock() provides sufficient
+    // protection
     if backend == sea_orm::DatabaseBackend::Sqlite {
         // Find stale jobs
         let stale_jobs: Vec<Model> = Entity::find()
