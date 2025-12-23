@@ -108,16 +108,6 @@ export class TableConverter implements PromQLChartConverter {
 
     // In "single_with_metadata" mode, show timestamp + all metric labels + value
     if (tableMode === "single_with_metadata") {
-      const columns: any[] = [
-        {
-          name: "timestamp",
-          field: "timestamp",
-          label: "Timestamp",
-          align: "left",
-          sortable: true,
-        },
-      ];
-
       // Collect all unique label keys from all series
       const labelKeys = new Set<string>();
       processedData.forEach((queryData) => {
@@ -128,15 +118,49 @@ export class TableConverter implements PromQLChartConverter {
         });
       });
 
+      // Apply column filter if configured
+      let filteredLabelKeys = Array.from(labelKeys);
+
+      if (config.visible_columns && Array.isArray(config.visible_columns) && config.visible_columns.length > 0) {
+        // If visible_columns is specified, only show those columns
+        filteredLabelKeys = filteredLabelKeys.filter(key => config.visible_columns.includes(key));
+      } else if (config.hidden_columns && Array.isArray(config.hidden_columns) && config.hidden_columns.length > 0) {
+        // If hidden_columns is specified, hide those columns
+        filteredLabelKeys = filteredLabelKeys.filter(key => !config.hidden_columns.includes(key));
+      }
+
+      // Handle sticky columns configuration
+      const stickyColumns = config.sticky_columns || [];
+      const makeFirstSticky = config.sticky_first_column || false;
+
+      const columns: any[] = [
+        {
+          name: "timestamp",
+          field: "timestamp",
+          label: "Timestamp",
+          align: "left",
+          sortable: true,
+          sticky: makeFirstSticky, // Make timestamp sticky if first column should be sticky
+          headerClasses: makeFirstSticky ? "sticky-column" : undefined,
+          classes: makeFirstSticky ? "sticky-column" : undefined,
+        },
+      ];
+
       // Add columns for each label
-      const sortedLabelKeys = Array.from(labelKeys).sort();
+      const sortedLabelKeys = filteredLabelKeys.sort();
       sortedLabelKeys.forEach((key) => {
+        const isSticky = stickyColumns.includes(key);
+        // Note: Don't apply makeFirstSticky here because timestamp is already the first column
+
         columns.push({
           name: key,
           field: key,
           label: key,
           align: "left",
           sortable: true,
+          sticky: isSticky, // Make sticky only if explicitly in sticky_columns list
+          headerClasses: isSticky ? "sticky-column" : undefined,
+          classes: isSticky ? "sticky-column" : undefined,
         });
       });
 
@@ -208,7 +232,8 @@ export class TableConverter implements PromQLChartConverter {
         sortable: true,
         // Mark column as sticky for CSS styling
         sticky: isSticky,
-        stickyClass: isSticky ? "sticky-column" : undefined,
+        headerClasses: isSticky ? "sticky-column" : undefined,
+        classes: isSticky ? "sticky-column" : undefined,
       };
     });
 

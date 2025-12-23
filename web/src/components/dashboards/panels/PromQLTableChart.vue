@@ -37,7 +37,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :virtual-scroll-sticky-size-start="48"
       hide-no-data
     >
-
       <!-- Bottom slot: add legend dropdown alongside pagination -->
       <template v-slot:bottom v-if="showLegendFooter">
         <div class="row items-center full-width">
@@ -159,11 +158,22 @@ export default defineComponent({
     const showLegendFooter = computed(() => {
       const tableMode = props.config?.promql_table_mode || "single";
       // Show legend footer in both "single" and "single_with_metadata" modes when there are multiple series
-      return (tableMode === "single" || tableMode === "single_with_metadata") && legendOptions.value.length > 1;
+      return (
+        (tableMode === "single" || tableMode === "single_with_metadata") &&
+        legendOptions.value.length > 1
+      );
     });
 
     // Filter rows based on selected legend
     const filteredTableRows = computed(() => {
+      const tableMode = props.config?.promql_table_mode || "single";
+
+      // In "all" (Aggregate) mode, never filter by legend - show all rows
+      if (tableMode === "all") {
+        return tableRows.value;
+      }
+
+      // In time series modes, filter by selected legend
       if (!selectedLegend.value || selectedLegend.value === "__all__") {
         return tableRows.value;
       }
@@ -181,26 +191,35 @@ export default defineComponent({
       rowsPerPage: 0, // 0 = show all rows (like SQL table)
     });
 
-    // Watch for data changes and set default legend
+    // Watch for data changes and set default legend only if not already set or legend options changed
     watch(
       () => props.data,
       (newData) => {
         console.log("=== [PromQL Table Chart] Data updated ===");
         console.log("New data:", newData);
 
-        // Set default legend selection
+        // Only set default legend if no legend is selected yet or if current selection is invalid
         if (legendOptions.value.length > 0) {
-          const tableMode = props.config?.promql_table_mode || "single";
+          const currentSelectionValid = legendOptions.value.some(
+            (opt) => opt.value === selectedLegend.value,
+          );
 
-          if (tableMode === "all") {
-            // In "all" mode, default to "All series"
-            selectedLegend.value = "__all__";
+          // Only reset if no selection exists or current selection is invalid
+          if (!selectedLegend.value || !currentSelectionValid) {
+            const tableMode = props.config?.promql_table_mode || "single";
+
+            if (tableMode === "all") {
+              // In "all" mode, default to "All series"
+              selectedLegend.value = "__all__";
+            } else {
+              // In "single" or "single_with_metadata" mode, select first series
+              selectedLegend.value = legendOptions.value[0]?.value || "";
+            }
+
+            console.log("Default legend selected:", selectedLegend.value);
           } else {
-            // In "single" or "single_with_metadata" mode, select first series
-            selectedLegend.value = legendOptions.value[0]?.value || "";
+            console.log("Legend selection preserved:", selectedLegend.value);
           }
-
-          console.log("Default legend selected:", selectedLegend.value);
         }
       },
       { deep: true, immediate: true },
@@ -262,6 +281,33 @@ export default defineComponent({
   :deep(.q-virtual-scroll) {
     will-change: auto !important;
   }
+
+  // Sticky columns (horizontal scroll)
+  :deep(thead tr th.sticky-column),
+  :deep(tbody tr td.sticky-column) {
+    position: sticky !important;
+    left: 0 !important;
+    z-index: 2;
+    background-color: #fff !important;
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
+  }
+
+  :deep(thead tr th.sticky-column) {
+    z-index: 3 !important; // Headers need higher z-index
+  }
+
+  // Support for multiple sticky columns - each subsequent column should be offset
+  :deep(thead tr th.sticky-column:nth-child(2)),
+  :deep(tbody tr td.sticky-column:nth-child(2)) {
+    left: var(--sticky-col-1-width, 150px) !important;
+  }
+
+  :deep(thead tr th.sticky-column:nth-child(3)),
+  :deep(tbody tr td.sticky-column:nth-child(3)) {
+    left: calc(
+      var(--sticky-col-1-width, 150px) + var(--sticky-col-2-width, 150px)
+    ) !important;
+  }
 }
 
 .my-sticky-virtscroll-table.q-dark {
@@ -269,6 +315,12 @@ export default defineComponent({
   :deep(.q-table__bottom),
   :deep(thead tr:first-child th) {
     /* bg color is important for th; just specify one */
+    background-color: $dark-page !important;
+  }
+
+  // Sticky columns in dark mode
+  :deep(thead tr th.sticky-column),
+  :deep(tbody tr td.sticky-column) {
     background-color: $dark-page !important;
   }
 }
