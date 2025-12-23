@@ -514,9 +514,6 @@ export default defineComponent({
     const chartsWithAggregation = [
       "pie",
       "donut",
-      "gauge",
-      "metric",
-      "h-bar",
       "geomap",
       "maps",
     ];
