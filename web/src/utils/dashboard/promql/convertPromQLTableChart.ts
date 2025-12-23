@@ -15,7 +15,12 @@
 
 import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
-import { getUnitValue, formatUnitValue, formatDate } from "../convertDataIntoUnitValue";
+import {
+  getUnitValue,
+  formatUnitValue,
+  formatDate,
+  findFirstValidMappedValue,
+} from "../convertDataIntoUnitValue";
 import { toZonedTime } from "date-fns-tz";
 
 /**
@@ -30,7 +35,7 @@ export class TableConverter implements PromQLChartConverter {
     panelSchema: any,
     store: any,
     extras: any,
-    chartPanelRef?: any
+    chartPanelRef?: any,
   ) {
     console.log("=== [TableConverter] Starting conversion ===");
     console.log("Processed Data:", processedData);
@@ -65,12 +70,41 @@ export class TableConverter implements PromQLChartConverter {
    * Supports column filtering: show/hide specific columns via config
    * Supports sticky columns: mark columns as sticky to keep them visible while scrolling
    */
-  private buildColumns(processedData: ProcessedPromQLData[], panelSchema: any): any[] {
+  private buildColumns(
+    processedData: ProcessedPromQLData[],
+    panelSchema: any,
+  ): any[] {
     const config = panelSchema.config || {};
     const tableMode = config.promql_table_mode || "single";
 
+    // Build override maps (color/unit) to mimic SQL table behavior
+    const overrideConfigs = panelSchema.config?.override_config || [];
+    const colorConfigMap: Record<string, any> = {};
+    const unitConfigMap: Record<string, any> = {};
+
+    overrideConfigs.forEach((o: any) => {
+      const alias = o?.field?.value;
+      const cfg = o?.config?.[0];
+      if (alias && cfg) {
+        const aliasLower = alias.toLowerCase();
+        if (cfg.type === "unique_value_color") {
+          colorConfigMap[aliasLower] = { autoColor: cfg.autoColor };
+        } else if (cfg.type === "unit") {
+          unitConfigMap[aliasLower] = {
+            unit: cfg.value?.unit,
+            customUnit: cfg.value?.customUnit,
+          };
+        }
+      }
+    });
+
+    // Mappings for value text replacements
+    const mappings = panelSchema.config?.mappings || [];
+
     // Get selected aggregations (default: ['last'])
-    const aggregations = config.table_aggregations || [config.aggregation || 'last'];
+    const aggregations = config.table_aggregations || [
+      config.aggregation || "last",
+    ];
 
     console.log("=== [buildColumns] Starting ===");
     console.log("processedData length:", processedData.length);
@@ -94,11 +128,21 @@ export class TableConverter implements PromQLChartConverter {
           align: "right",
           sortable: true,
           format: (val: any) => {
+            // Apply configured value mappings first
+            const mapped = findFirstValidMappedValue(val, mappings, "text");
+            if (mapped && mapped.text) return mapped.text;
+
+            // Allow per-field unit override via override_config
+            const aliasLower = "value";
+            const unitToUse = unitConfigMap[aliasLower]?.unit || config?.unit;
+            const customUnitToUse =
+              unitConfigMap[aliasLower]?.customUnit || config?.unit_custom;
+
             const unitValue = getUnitValue(
               val,
-              config?.unit,
-              config?.unit_custom,
-              config?.decimals
+              unitToUse,
+              customUnitToUse,
+              config?.decimals,
             );
             return formatUnitValue(unitValue);
           },
@@ -121,12 +165,24 @@ export class TableConverter implements PromQLChartConverter {
       // Apply column filter if configured
       let filteredLabelKeys = Array.from(labelKeys);
 
-      if (config.visible_columns && Array.isArray(config.visible_columns) && config.visible_columns.length > 0) {
+      if (
+        config.visible_columns &&
+        Array.isArray(config.visible_columns) &&
+        config.visible_columns.length > 0
+      ) {
         // If visible_columns is specified, only show those columns
-        filteredLabelKeys = filteredLabelKeys.filter(key => config.visible_columns.includes(key));
-      } else if (config.hidden_columns && Array.isArray(config.hidden_columns) && config.hidden_columns.length > 0) {
+        filteredLabelKeys = filteredLabelKeys.filter((key) =>
+          config.visible_columns.includes(key),
+        );
+      } else if (
+        config.hidden_columns &&
+        Array.isArray(config.hidden_columns) &&
+        config.hidden_columns.length > 0
+      ) {
         // If hidden_columns is specified, hide those columns
-        filteredLabelKeys = filteredLabelKeys.filter(key => !config.hidden_columns.includes(key));
+        filteredLabelKeys = filteredLabelKeys.filter(
+          (key) => !config.hidden_columns.includes(key),
+        );
       }
 
       // Handle sticky columns configuration
@@ -161,6 +217,15 @@ export class TableConverter implements PromQLChartConverter {
           sticky: isSticky, // Make sticky only if explicitly in sticky_columns list
           headerClasses: isSticky ? "sticky-column" : undefined,
           classes: isSticky ? "sticky-column" : undefined,
+          // apply value mapping for label columns
+          format: (val: any) => {
+            const mapped = findFirstValidMappedValue(val, mappings, "text");
+            return mapped && mapped.text ? mapped.text : val;
+          },
+          // support override configs for coloring
+          colorMode: colorConfigMap[key.toLowerCase()]?.autoColor
+            ? "auto"
+            : undefined,
         });
       });
 
@@ -172,11 +237,21 @@ export class TableConverter implements PromQLChartConverter {
         align: "right",
         sortable: true,
         format: (val: any) => {
+          // Apply configured value mappings first
+          const mapped = findFirstValidMappedValue(val, mappings, "text");
+          if (mapped && mapped.text) return mapped.text;
+
+          // Unit override support
+          const aliasLower = "value";
+          const unitToUse = unitConfigMap[aliasLower]?.unit || config?.unit;
+          const customUnitToUse =
+            unitConfigMap[aliasLower]?.customUnit || config?.unit_custom;
+
           const unitValue = getUnitValue(
             val,
-            config?.unit,
-            config?.unit_custom,
-            config?.decimals
+            unitToUse,
+            customUnitToUse,
+            config?.decimals,
           );
           return formatUnitValue(unitValue);
         },
@@ -205,13 +280,25 @@ export class TableConverter implements PromQLChartConverter {
     // config.hidden_columns: array of column names to hide (if not set, hide none)
     let filteredLabelKeys = Array.from(labelKeys);
 
-    if (config.visible_columns && Array.isArray(config.visible_columns) && config.visible_columns.length > 0) {
+    if (
+      config.visible_columns &&
+      Array.isArray(config.visible_columns) &&
+      config.visible_columns.length > 0
+    ) {
       // If visible_columns is specified, only show those columns
-      filteredLabelKeys = filteredLabelKeys.filter(key => config.visible_columns.includes(key));
+      filteredLabelKeys = filteredLabelKeys.filter((key) =>
+        config.visible_columns.includes(key),
+      );
       console.log("Filtered by visible_columns:", filteredLabelKeys);
-    } else if (config.hidden_columns && Array.isArray(config.hidden_columns) && config.hidden_columns.length > 0) {
+    } else if (
+      config.hidden_columns &&
+      Array.isArray(config.hidden_columns) &&
+      config.hidden_columns.length > 0
+    ) {
       // If hidden_columns is specified, hide those columns
-      filteredLabelKeys = filteredLabelKeys.filter(key => !config.hidden_columns.includes(key));
+      filteredLabelKeys = filteredLabelKeys.filter(
+        (key) => !config.hidden_columns.includes(key),
+      );
       console.log("Filtered by hidden_columns:", filteredLabelKeys);
     }
 
@@ -222,7 +309,8 @@ export class TableConverter implements PromQLChartConverter {
 
     // Create columns for each label
     const columns = filteredLabelKeys.map((key, index) => {
-      const isSticky = stickyColumns.includes(key) || (makeFirstSticky && index === 0);
+      const isSticky =
+        stickyColumns.includes(key) || (makeFirstSticky && index === 0);
 
       return {
         name: key,
@@ -234,13 +322,23 @@ export class TableConverter implements PromQLChartConverter {
         sticky: isSticky,
         headerClasses: isSticky ? "sticky-column" : undefined,
         classes: isSticky ? "sticky-column" : undefined,
+        // value mapping for text replacement
+        format: (val: any) => {
+          const mapped = findFirstValidMappedValue(val, mappings, "text");
+          return mapped && mapped.text ? mapped.text : val;
+        },
+        // optional override-config based automatic color
+        colorMode: colorConfigMap[key.toLowerCase()]?.autoColor
+          ? "auto"
+          : undefined,
       };
     });
 
     // Add value columns for each selected aggregation
     aggregations.forEach((agg: string) => {
       const columnName = aggregations.length === 1 ? "value" : `value_${agg}`;
-      const columnLabel = aggregations.length === 1 ? "Value" : `Value (${agg})`;
+      const columnLabel =
+        aggregations.length === 1 ? "Value" : `Value (${agg})`;
 
       columns.push({
         name: columnName,
@@ -248,12 +346,21 @@ export class TableConverter implements PromQLChartConverter {
         label: columnLabel,
         align: "right",
         sortable: true,
+        // Apply value mapping and per-column unit overrides
         format: (val: any) => {
+          const mapped = findFirstValidMappedValue(val, mappings, "text");
+          if (mapped && mapped.text) return mapped.text;
+
+          const aliasLower = columnName.toLowerCase();
+          const unitToUse = unitConfigMap[aliasLower]?.unit || config?.unit;
+          const customUnitToUse =
+            unitConfigMap[aliasLower]?.customUnit || config?.unit_custom;
+
           const unitValue = getUnitValue(
             val,
-            config?.unit,
-            config?.unit_custom,
-            config?.decimals
+            unitToUse,
+            customUnitToUse,
+            config?.decimals,
           );
           return formatUnitValue(unitValue);
         },
@@ -262,7 +369,10 @@ export class TableConverter implements PromQLChartConverter {
 
     // Timestamp column removed as per user request
 
-    console.log("Built columns:", columns.map(c => c.name));
+    console.log(
+      "Built columns:",
+      columns.map((c) => c.name),
+    );
     return columns;
   }
 
@@ -270,13 +380,19 @@ export class TableConverter implements PromQLChartConverter {
    * Build table rows from processed data
    * Supports multi-aggregation: calculates all selected aggregations for each series
    */
-  private buildRows(processedData: ProcessedPromQLData[], panelSchema: any, store: any): any[] {
+  private buildRows(
+    processedData: ProcessedPromQLData[],
+    panelSchema: any,
+    store: any,
+  ): any[] {
     const config = panelSchema.config || {};
     const tableMode = config.promql_table_mode || "single";
     const rows: any[] = [];
 
     // Get selected aggregations (default: ['last'])
-    const aggregations = config.table_aggregations || [config.aggregation || 'last'];
+    const aggregations = config.table_aggregations || [
+      config.aggregation || "last",
+    ];
 
     console.log("=== [buildRows] Starting ===");
     console.log("Aggregations:", aggregations);
@@ -333,7 +449,10 @@ export class TableConverter implements PromQLChartConverter {
         return rows.slice(0, config.row_limit);
       }
 
-      console.log("Built rows count (timestamp with metadata mode):", rows.length);
+      console.log(
+        "Built rows count (timestamp with metadata mode):",
+        rows.length,
+      );
       return rows;
     }
 
@@ -355,7 +474,8 @@ export class TableConverter implements PromQLChartConverter {
 
         // Calculate each aggregation for the series
         aggregations.forEach((agg: string) => {
-          const columnName = aggregations.length === 1 ? "value" : `value_${agg}`;
+          const columnName =
+            aggregations.length === 1 ? "value" : `value_${agg}`;
           row[columnName] = applyAggregation(seriesData.values, agg);
         });
 

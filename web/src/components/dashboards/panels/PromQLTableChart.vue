@@ -25,49 +25,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       position: relative;
     "
   >
-    <q-table
-      :class="['my-sticky-virtscroll-table']"
-      :rows="filteredTableRows"
-      :columns="tableColumns"
-      v-model:pagination="pagination"
-      row-key="id"
-      dense
-      virtual-scroll
-      :rows-per-page-options="[0]"
-      :virtual-scroll-sticky-size-start="48"
-      hide-no-data
-    >
-      <!-- Bottom slot: add legend dropdown alongside pagination -->
-      <template v-slot:bottom v-if="showLegendFooter">
-        <div class="row items-center full-width">
-          <div class="row items-center q-gutter-sm q-pl-md">
-            <q-select
-              v-model="selectedLegend"
-              :options="legendOptions"
-              outlined
-              dense
-              emit-value
-              map-options
-              style="min-width: 300px; max-width: 500px"
-              placeholder="Select series to filter"
-            >
-              <template v-slot:prepend>
-                <q-icon name="filter_list" size="xs" />
-              </template>
-            </q-select>
+    <div style="height: 100%; position: relative">
+      <TableRenderer
+        :data="{ rows: filteredTableRows, columns: tableColumns }"
+        :wrap-cells="config?.wrap_table_cells"
+        :value-mapping="config?.mappings ?? []"
+        @row-click="$emit('row-click', $event)"
+      >
+        <template #bottom v-if="showLegendFooter">
+          <div class="row items-center full-width" style="width: 100%">
+            <div class="row items-center q-gutter-sm q-pl-md">
+              <q-select
+                v-model="selectedLegend"
+                :options="legendOptions"
+                outlined
+                dense
+                emit-value
+                map-options
+                style="min-width: 300px; max-width: 500px"
+                placeholder="Select series to filter"
+              >
+                <template v-slot:prepend>
+                  <q-icon name="filter_list" size="xs" />
+                </template>
+              </q-select>
+            </div>
+            <q-space />
+            <div class="q-pr-md text-body2">
+              1-{{ filteredTableRows.length }} of {{ filteredTableRows.length }}
+            </div>
           </div>
-          <q-space />
-          <div class="q-pr-md text-body2">
-            1-{{ filteredTableRows.length }} of {{ filteredTableRows.length }}
-          </div>
-        </div>
-      </template>
-    </q-table>
+        </template>
+      </TableRenderer>
+    </div>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
+import TableRenderer from "./TableRenderer.vue";
 
 export default defineComponent({
   name: "PromQLTableChart",
@@ -81,6 +77,7 @@ export default defineComponent({
       default: () => ({}),
     },
   },
+  components: { TableRenderer },
   setup(props) {
     const filter = ref("");
     const loading = ref(false);
@@ -225,6 +222,8 @@ export default defineComponent({
       { deep: true, immediate: true },
     );
 
+    const config = props.config || {};
+
     return {
       filter,
       loading,
@@ -235,6 +234,7 @@ export default defineComponent({
       selectedLegend,
       legendOptions,
       showLegendFooter,
+      config,
     };
   },
 });

@@ -54,29 +54,29 @@ const mockTableData = {
       label: "Timestamp",
       field: "timestamp",
       sortable: true,
-      align: "left"
+      align: "left",
     },
     {
       name: "level",
       label: "Level",
       field: "level",
       sortable: true,
-      align: "center"
+      align: "center",
     },
     {
       name: "message",
       label: "Message",
       field: "message",
       sortable: false,
-      align: "left"
+      align: "left",
     },
     {
       name: "count",
       label: "Count",
       field: "count",
       sortable: true,
-      align: "right"
-    }
+      align: "right",
+    },
   ],
   rows: [
     {
@@ -84,23 +84,23 @@ const mockTableData = {
       timestamp: "2023-01-01T00:00:00Z",
       level: "INFO",
       message: "Application started",
-      count: 1
+      count: 1,
     },
     {
       id: 2,
       timestamp: "2023-01-01T00:01:00Z",
       level: "ERROR",
       message: "Database connection failed",
-      count: 5
+      count: 5,
     },
     {
       id: 3,
       timestamp: "2023-01-01T00:02:00Z",
       level: "WARN",
       message: null, // Test null value handling
-      count: undefined // Test undefined value handling
-    }
-  ]
+      count: undefined, // Test undefined value handling
+    },
+  ],
 };
 
 const mockValueMapping = [
@@ -109,9 +109,9 @@ const mockValueMapping = [
     mappings: [
       { value: "INFO", displayText: "Information", color: "#green" },
       { value: "ERROR", displayText: "Error", color: "#red" },
-      { value: "WARN", displayText: "Warning", color: "#orange" }
-    ]
-  }
+      { value: "WARN", displayText: "Warning", color: "#orange" },
+    ],
+  },
 ];
 
 describe("TableRenderer", () => {
@@ -120,12 +120,12 @@ describe("TableRenderer", () => {
   const defaultProps = {
     data: mockTableData,
     wrapCells: false,
-    valueMapping: []
+    valueMapping: [],
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     store.state.selectedOrganization = { identifier: "test-org" };
     store.state.printMode = false;
   });
@@ -140,14 +140,14 @@ describe("TableRenderer", () => {
     return mount(TableRenderer, {
       props: {
         ...defaultProps,
-        ...props
+        ...props,
       },
       global: {
         plugins: [i18n, store],
         mocks: {
-          $t: (key: string) => key
-        }
-      }
+          $t: (key: string) => key,
+        },
+      },
     });
   };
 
@@ -155,16 +155,18 @@ describe("TableRenderer", () => {
     it("should render table with correct structure", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find('[data-test="dashboard-panel-table"]').exists()).toBe(true);
-      expect(wrapper.find('table').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-panel-table"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find("table").exists()).toBe(true);
     });
 
     it("should render table headers correctly", () => {
       wrapper = createWrapper();
 
-      const headers = wrapper.findAll('th');
+      const headers = wrapper.findAll("th");
       expect(headers.length).toBeGreaterThan(0);
-      
+
       // Check if column labels are rendered
       const headerText = wrapper.text();
       expect(headerText).toContain("Timestamp");
@@ -178,31 +180,53 @@ describe("TableRenderer", () => {
 
       // QTable with virtual scrolling doesn't use traditional tbody tr structure
       // Instead, check if the component received the correct data
-      const table = wrapper.findComponent({ name: 'QTable' });
-      expect(table.props('rows')).toEqual(mockTableData.rows);
-      expect(table.props('rows').length).toBe(mockTableData.rows.length);
+      const table = wrapper.findComponent({ name: "QTable" });
+      expect(table.props("rows")).toEqual(mockTableData.rows);
+      expect(table.props("rows").length).toBe(mockTableData.rows.length);
     });
 
     it("should handle empty table data", () => {
       const emptyData = { columns: [], rows: [] };
       wrapper = createWrapper({ data: emptyData });
 
-      expect(wrapper.find('table').exists()).toBe(true);
-      const table = wrapper.findComponent({ name: 'QTable' });
-      expect(table.props('rows')).toEqual([]);
-      expect(table.props('rows').length).toBe(0);
+      expect(wrapper.find("table").exists()).toBe(true);
+      const table = wrapper.findComponent({ name: "QTable" });
+      expect(table.props("rows")).toEqual([]);
+      expect(table.props("rows").length).toBe(0);
     });
 
     it("should apply wrap cells class when wrapCells is true", () => {
       wrapper = createWrapper({ wrapCells: true });
 
-      expect(wrapper.find('.wrap-enabled').exists()).toBe(true);
+      expect(wrapper.find(".wrap-enabled").exists()).toBe(true);
+      // Inner copy-cell-content should exist and will receive wrap styles in the UI
+      expect(wrapper.find(".copy-cell-content").exists()).toBe(true);
     });
 
     it("should not apply wrap cells class when wrapCells is false", () => {
       wrapper = createWrapper({ wrapCells: false });
 
-      expect(wrapper.find('.wrap-enabled').exists()).toBe(false);
+      expect(wrapper.find(".wrap-enabled").exists()).toBe(false);
+    });
+
+    it("should render bottom slot content when provided", () => {
+      wrapper = mount(TableRenderer, {
+        props: {
+          ...defaultProps,
+        },
+        global: {
+          plugins: [i18n, store],
+          mocks: {
+            $t: (key: string) => key,
+          },
+        },
+        slots: {
+          bottom: '<div class="test-bottom">Footer content</div>',
+        },
+      });
+
+      expect(wrapper.find(".test-bottom").exists()).toBe(true);
+      expect(wrapper.find(".test-bottom").text()).toBe("Footer content");
     });
   });
 
@@ -211,14 +235,14 @@ describe("TableRenderer", () => {
       store.state.printMode = true;
       wrapper = createWrapper();
 
-      expect(wrapper.find('.no-position-absolute').exists()).toBe(true);
+      expect(wrapper.find(".no-position-absolute").exists()).toBe(true);
     });
 
     it("should not apply no-position-absolute class when not in print mode", () => {
       store.state.printMode = false;
       wrapper = createWrapper();
 
-      expect(wrapper.find('.no-position-absolute').exists()).toBe(false);
+      expect(wrapper.find(".no-position-absolute").exists()).toBe(false);
     });
   });
 
@@ -235,8 +259,8 @@ describe("TableRenderer", () => {
       wrapper = createWrapper();
 
       // The null message should not be displayed
-      const cells = wrapper.findAll('td');
-      const nullCell = cells.find(cell => cell.text() === '');
+      const cells = wrapper.findAll("td");
+      const nullCell = cells.find((cell) => cell.text() === "");
       expect(nullCell).toBeDefined();
     });
 
@@ -244,26 +268,30 @@ describe("TableRenderer", () => {
       wrapper = createWrapper();
 
       // Check that the component received the correct data
-      const table = wrapper.findComponent({ name: 'QTable' });
-      const rows = table.props('rows');
-      
+      const table = wrapper.findComponent({ name: "QTable" });
+      const rows = table.props("rows");
+
       // Verify the data contains our test values
-      expect(rows.some(row => row.message === "Application started")).toBe(true);
-      expect(rows.some(row => row.message === "Database connection failed")).toBe(true);
-      expect(rows.some(row => row.level === "INFO")).toBe(true);
-      expect(rows.some(row => row.level === "ERROR")).toBe(true);
+      expect(rows.some((row) => row.message === "Application started")).toBe(
+        true,
+      );
+      expect(
+        rows.some((row) => row.message === "Database connection failed"),
+      ).toBe(true);
+      expect(rows.some((row) => row.level === "INFO")).toBe(true);
+      expect(rows.some((row) => row.level === "ERROR")).toBe(true);
     });
 
     it("should handle numeric values", () => {
       wrapper = createWrapper();
 
       // Check that the component received the correct numeric data
-      const table = wrapper.findComponent({ name: 'QTable' });
-      const rows = table.props('rows');
-      
+      const table = wrapper.findComponent({ name: "QTable" });
+      const rows = table.props("rows");
+
       // Verify the data contains our test numeric values
-      expect(rows.some(row => row.count === 1)).toBe(true);
-      expect(rows.some(row => row.count === 5)).toBe(true);
+      expect(rows.some((row) => row.count === 1)).toBe(true);
+      expect(rows.some((row) => row.count === 5)).toBe(true);
     });
   });
 
@@ -288,7 +316,7 @@ describe("TableRenderer", () => {
       const mockProps = {
         col: { name: "level" },
         value: "ERROR",
-        row: { level: "ERROR" }
+        row: { level: "ERROR" },
       };
 
       const style = wrapper.vm.getStyle(mockProps);
@@ -301,19 +329,19 @@ describe("TableRenderer", () => {
       wrapper = createWrapper();
 
       // Simulate row click through the QTable component
-      const table = wrapper.findComponent({ name: 'QTable' });
-      await table.vm.$emit('row-click', {}, mockTableData.rows[0]);
-      
-      expect(wrapper.emitted('row-click')).toBeTruthy();
+      const table = wrapper.findComponent({ name: "QTable" });
+      await table.vm.$emit("row-click", {}, mockTableData.rows[0]);
+
+      expect(wrapper.emitted("row-click")).toBeTruthy();
     });
 
     it("should handle row selection", async () => {
       wrapper = createWrapper();
 
-      const tableComponent = wrapper.findComponent({ name: 'QTable' });
+      const tableComponent = wrapper.findComponent({ name: "QTable" });
       if (tableComponent.exists()) {
-        await tableComponent.vm.$emit('row-click', {}, mockTableData.rows[0]);
-        expect(wrapper.emitted('row-click')).toBeTruthy();
+        await tableComponent.vm.$emit("row-click", {}, mockTableData.rows[0]);
+        expect(wrapper.emitted("row-click")).toBeTruthy();
       }
     });
   });
@@ -322,15 +350,15 @@ describe("TableRenderer", () => {
     it("should enable virtual scrolling", () => {
       wrapper = createWrapper();
 
-      const table = wrapper.findComponent({ name: 'QTable' });
-      expect(table.props('virtualScroll')).toBe(true);
+      const table = wrapper.findComponent({ name: "QTable" });
+      expect(table.props("virtualScroll")).toBe(true);
     });
 
     it("should configure virtual scroll properties", () => {
       wrapper = createWrapper();
 
-      const table = wrapper.findComponent({ name: 'QTable' });
-      expect(table.props('virtualScrollStickySizeStart')).toBeDefined();
+      const table = wrapper.findComponent({ name: "QTable" });
+      expect(table.props("virtualScrollStickySizeStart")).toBeDefined();
     });
 
     it("should handle large datasets efficiently", () => {
@@ -339,16 +367,18 @@ describe("TableRenderer", () => {
         columns: mockTableData.columns,
         rows: Array.from({ length: 1000 }, (_, i) => ({
           id: i,
-          timestamp: `2023-01-01T00:${String(i % 60).padStart(2, '0')}:00Z`,
+          timestamp: `2023-01-01T00:${String(i % 60).padStart(2, "0")}:00Z`,
           level: ["INFO", "ERROR", "WARN"][i % 3],
           message: `Message ${i}`,
-          count: i + 1
-        }))
+          count: i + 1,
+        })),
       };
 
       wrapper = createWrapper({ data: largeData });
 
-      expect(wrapper.find('[data-test="dashboard-panel-table"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-panel-table"]').exists()).toBe(
+        true,
+      );
       expect(wrapper.vm.data.rows.length).toBe(1000);
     });
   });
@@ -362,7 +392,7 @@ describe("TableRenderer", () => {
       expect(exportFile).toHaveBeenCalledWith(
         "test-table.csv",
         expect.stringContaining("Timestamp"),
-        "text/csv"
+        "text/csv",
       );
     });
 
@@ -371,9 +401,9 @@ describe("TableRenderer", () => {
         columns: [{ name: "field", label: "Field", field: "field" }],
         rows: [
           { id: 1, field: 'Text with "quotes"' },
-          { id: 2, field: 'Text with\nnewline' },
-          { id: 3, field: 'Text with, comma' }
-        ]
+          { id: 2, field: "Text with\nnewline" },
+          { id: 3, field: "Text with, comma" },
+        ],
       };
 
       wrapper = createWrapper({ data: dataWithSpecialChars });
@@ -394,7 +424,7 @@ describe("TableRenderer", () => {
       expect(exportFile).toHaveBeenCalledWith(
         "empty-table.csv",
         expect.any(String),
-        "text/csv"
+        "text/csv",
       );
     });
 
@@ -407,7 +437,7 @@ describe("TableRenderer", () => {
       expect(exportFile).toHaveBeenCalledWith(
         "test-csv.csv",
         expect.any(String),
-        "text/csv"
+        "text/csv",
       );
     });
 
@@ -417,8 +447,8 @@ describe("TableRenderer", () => {
         rows: [
           { id: 1, field: null },
           { id: 2, field: undefined },
-          { id: 3, field: "" }
-        ]
+          { id: 3, field: "" },
+        ],
       };
 
       wrapper = createWrapper({ data: dataWithNulls });
@@ -433,8 +463,8 @@ describe("TableRenderer", () => {
     it("should configure pagination correctly", () => {
       wrapper = createWrapper();
 
-      const table = wrapper.findComponent({ name: 'QTable' });
-      expect(table.props('rowsPerPageOptions')).toEqual([0]);
+      const table = wrapper.findComponent({ name: "QTable" });
+      expect(table.props("rowsPerPageOptions")).toEqual([0]);
     });
 
     it("should handle pagination model", () => {
@@ -449,14 +479,14 @@ describe("TableRenderer", () => {
     it("should apply sticky header styling", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find('.my-sticky-virtscroll-table').exists()).toBe(true);
+      expect(wrapper.find(".my-sticky-virtscroll-table").exists()).toBe(true);
     });
 
     it("should apply dense table styling", () => {
       wrapper = createWrapper();
 
-      const table = wrapper.findComponent({ name: 'QTable' });
-      expect(table.props('dense')).toBe(true);
+      const table = wrapper.findComponent({ name: "QTable" });
+      expect(table.props("dense")).toBe(true);
     });
 
     it("should compute cell styles based on value mappings", () => {
@@ -465,7 +495,7 @@ describe("TableRenderer", () => {
       const mockProps = {
         col: { name: "level" },
         value: "ERROR",
-        row: { level: "ERROR" }
+        row: { level: "ERROR" },
       };
 
       const style = wrapper.vm.getStyle(mockProps);
@@ -477,24 +507,26 @@ describe("TableRenderer", () => {
     it("should handle malformed table data", () => {
       const malformedData = {
         columns: [], // Use empty array instead of null to avoid QTable internal errors
-        rows: null
+        rows: null,
       };
 
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      
+      const consoleWarnSpy = vi
+        .spyOn(console, "warn")
+        .mockImplementation(() => {});
+
       wrapper = createWrapper({ data: malformedData });
 
       expect(wrapper.exists()).toBe(true);
       // Component should handle null/undefined gracefully by using fallbacks
-      const table = wrapper.findComponent({ name: 'QTable' });
-      expect(table.props('rows')).toEqual([]); // Should fallback to empty array
-      expect(table.props('columns')).toEqual([]); // Should use empty array
+      const table = wrapper.findComponent({ name: "QTable" });
+      expect(table.props("rows")).toEqual([]); // Should fallback to empty array
+      expect(table.props("columns")).toEqual([]); // Should use empty array
       consoleWarnSpy.mockRestore();
     });
 
     it("should handle missing columns", () => {
       const dataWithoutColumns = {
-        rows: mockTableData.rows
+        rows: mockTableData.rows,
       };
 
       wrapper = createWrapper({ data: dataWithoutColumns });
@@ -504,15 +536,15 @@ describe("TableRenderer", () => {
 
     it("should handle missing rows", () => {
       const dataWithoutRows = {
-        columns: mockTableData.columns
+        columns: mockTableData.columns,
       };
 
       wrapper = createWrapper({ data: dataWithoutRows });
 
       expect(wrapper.exists()).toBe(true);
       // Check that the component handles missing rows properly using fallback
-      const table = wrapper.findComponent({ name: 'QTable' });
-      expect(table.props('rows')).toEqual([]); // Should fallback to empty array
+      const table = wrapper.findComponent({ name: "QTable" });
+      expect(table.props("rows")).toEqual([]); // Should fallback to empty array
     });
   });
 
@@ -525,8 +557,8 @@ describe("TableRenderer", () => {
           timestamp: new Date(Date.now() + i * 1000).toISOString(),
           level: ["INFO", "ERROR", "WARN"][i % 3],
           message: `Performance test message ${i}`,
-          count: i
-        }))
+          count: i,
+        })),
       };
 
       const startTime = performance.now();
@@ -544,7 +576,10 @@ describe("TableRenderer", () => {
       for (let i = 0; i < 10; i++) {
         const newData = {
           ...mockTableData,
-          rows: mockTableData.rows.map(row => ({ ...row, count: row.count + i }))
+          rows: mockTableData.rows.map((row) => ({
+            ...row,
+            count: row.count + i,
+          })),
         };
         await wrapper.setProps({ data: newData });
       }

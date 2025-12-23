@@ -71,6 +71,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </q-td>
     </template>
+
+    <!-- Expose a bottom slot so callers (e.g., PromQL table) can provide footer content -->
+    <template v-slot:bottom>
+      <slot name="bottom" />
+    </template>
   </q-table>
 </template>
 
@@ -363,6 +368,14 @@ export default defineComponent({
     word-break: break-word;
     overflow-wrap: break-word;
     white-space: normal !important;
+  }
+
+  // also ensure the inner content (which uses flex and a 'no-wrap' utility) allows wrapping
+  :deep(.copy-cell-content) {
+    white-space: normal !important;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    flex-wrap: wrap !important;
   }
 }
 
