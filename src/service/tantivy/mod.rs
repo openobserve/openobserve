@@ -133,18 +133,8 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         .cloned()
         .collect::<HashSet<_>>();
 
-    // Determine if we should create an empty index
-    // This is true when stream settings have FTS/index fields configured that exist
-    // in the stream schema, even if the actual parquet data doesn't contain those fields
-    let should_create_empty_index = !fts_fields.is_empty() || !index_fields.is_empty();
-
-    // no fields need to create index, return
     if tantivy_fields.is_empty() {
-        if !should_create_empty_index {
-            return Ok(None);
-        }
-        // Continue to create an empty index structure as a marker
-        log::debug!("Creating empty tantivy index (no matching fields in parquet data)");
+        return Ok(None);
     }
 
     // add fields to tantivy schema
@@ -310,10 +300,8 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         }
     }
     let total_num_rows = task.await??;
-    // no docs need to create index, return
-    if total_num_rows == 0 && !should_create_empty_index {
-        return Ok(None);
-    }
+    // Create index even with 0 rows since we have valid configured fields in stream schema
+    // (empty index acts as a marker to prevent expensive DataFusion scans)
     log::debug!(
         "write documents to tantivy index success (rows: {}, empty_index: {})",
         total_num_rows,
