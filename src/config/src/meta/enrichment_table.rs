@@ -287,4 +287,62 @@ mod tests {
         assert_eq!(job.total_bytes_fetched, 3072);
         assert_eq!(job.total_records_processed, 30);
     }
+
+    #[test]
+    fn test_job_with_append_data_true() {
+        let job = EnrichmentTableUrlJob::new(
+            "org".to_string(),
+            "table".to_string(),
+            "url".to_string(),
+            true,
+        );
+        assert_eq!(job.append_data, true);
+    }
+
+    #[test]
+    fn test_multiple_status_transitions() {
+        let mut job = EnrichmentTableUrlJob::new(
+            "org".to_string(),
+            "table".to_string(),
+            "url".to_string(),
+            false,
+        );
+
+        // Pending -> Processing
+        job.mark_processing();
+        assert_eq!(job.status, EnrichmentTableStatus::Processing);
+
+        // Processing -> Failed
+        job.mark_failed("Error occurred".to_string());
+        assert_eq!(job.status, EnrichmentTableStatus::Failed);
+        assert_eq!(job.error_message, Some("Error occurred".to_string()));
+
+        // Failed -> Pending (via increment_retry)
+        job.increment_retry("Retrying after failure".to_string());
+        assert_eq!(job.status, EnrichmentTableStatus::Pending);
+        assert_eq!(job.retry_count, 1);
+
+        // Pending -> Processing -> Completed
+        job.mark_processing();
+        job.mark_completed();
+        assert_eq!(job.status, EnrichmentTableStatus::Completed);
+        assert_eq!(job.error_message, None);
+    }
+
+    #[test]
+    fn test_bidirectional_status_conversion() {
+        // Test round-trip conversion
+        let statuses = vec![
+            EnrichmentTableStatus::Pending,
+            EnrichmentTableStatus::Processing,
+            EnrichmentTableStatus::Completed,
+            EnrichmentTableStatus::Failed,
+        ];
+
+        for status in statuses {
+            let as_i16: i16 = status.clone().into();
+            let back_to_status: EnrichmentTableStatus = as_i16.into();
+            assert_eq!(status, back_to_status);
+        }
+    }
 }
