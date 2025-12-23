@@ -59,7 +59,8 @@ impl UserRequest {
             password,
             salt,
             organizations: vec![UserOrg {
-                name: org,
+                name: org.clone(),
+                org_name: org,
                 token,
                 rum_token: Some(rum_token),
                 role: self.role.base_role.clone(),
@@ -147,6 +148,7 @@ impl UserUpdateMode {
 pub fn get_default_user_org() -> UserOrg {
     UserOrg {
         name: "".to_string(),
+        org_name: "".to_string(),
         token: "".to_string(),
         rum_token: None,
         role: get_default_user_role(),

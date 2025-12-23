@@ -14,6 +14,7 @@ pub struct Model {
     pub rum_token: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
+    pub is_meta_service_account: Option<bool>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
