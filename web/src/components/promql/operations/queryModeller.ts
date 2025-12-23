@@ -47,9 +47,11 @@ class PromQueryModellerClass implements PromQueryModeller {
     if (labels.length === 0) return "";
 
     const labelStrings = labels.map((label) => {
-      const value = label?.value?.includes('"')
-        ? label.value.replace(/"/g, '\\"')
-        : label.value;
+      // Properly escape backslashes first, then double quotes
+      // This is required for PromQL string literals
+      const value = label.value
+        .replace(/\\/g, '\\\\')  // Escape backslashes first
+        .replace(/"/g, '\\"');    // Then escape double quotes
       return `${label.label}${label.op}"${value}"`;
     });
 

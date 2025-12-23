@@ -71,7 +71,31 @@ describe("QueryModeller", () => {
 
       const result = promQueryModeller.renderLabels(labels);
 
-      expect(result).toContain('\\"');
+      expect(result).toBe('{msg="Error \\"critical\\""}');
+    });
+
+    it("should escape backslashes in values", () => {
+      const labels = [{ label: "path", op: "=", value: 'C:\\Users\\test' }];
+
+      const result = promQueryModeller.renderLabels(labels);
+
+      expect(result).toBe('{path="C:\\\\Users\\\\test"}');
+    });
+
+    it("should escape both backslashes and quotes", () => {
+      const labels = [{ label: "path", op: "=", value: 'C:\\path\\"with\\"quotes' }];
+
+      const result = promQueryModeller.renderLabels(labels);
+
+      expect(result).toBe('{path="C:\\\\path\\\\\\"with\\\\\\"quotes"}');
+    });
+
+    it("should handle values with no special characters", () => {
+      const labels = [{ label: "status", op: "=", value: "success" }];
+
+      const result = promQueryModeller.renderLabels(labels);
+
+      expect(result).toBe('{status="success"}');
     });
 
     it("should return empty string for empty labels", () => {
