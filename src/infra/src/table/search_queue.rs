@@ -120,11 +120,12 @@ pub async fn count_all_levels(
             LIMIT 1"
         }
         sea_orm::DatabaseBackend::MySql => {
-            // MySQL and SQLite use ? for parameter placeholders
+            // MySQL uses ? for parameter placeholders
+            // MySQL's SUM() returns DECIMAL, so cast to SIGNED INTEGER
             "SELECT
                 COUNT(*) as global_count,
-                SUM(CASE WHEN org_id = ? THEN 1 ELSE 0 END) as org_count,
-                SUM(CASE WHEN org_id = ? AND user_id = ? THEN 1 ELSE 0 END) as user_count
+                CAST(SUM(CASE WHEN org_id = ? THEN 1 ELSE 0 END) AS SIGNED) as org_count,
+                CAST(SUM(CASE WHEN org_id = ? AND user_id = ? THEN 1 ELSE 0 END) AS SIGNED) as user_count
             FROM search_queue
             WHERE work_group = ?
             LIMIT 1"
