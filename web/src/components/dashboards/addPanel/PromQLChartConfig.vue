@@ -228,16 +228,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="row items-center all-pointer-events">
             {{ t("dashboard.promqlTableMode") }}
             <q-icon class="q-ml-xs" size="20px" name="info" />
-            <q-tooltip class="bg-grey-8" max-width="350px">
+            <q-tooltip class="bg-grey-8" max-width="400px">
               <b>PromQL Table Mode - </b>
               Controls how time-series data is displayed in the table.
               <br /><br />
-              <b>Time Series:</b> Shows timestamp and value columns for selected
-              series with legend dropdown. <br /><br />
-              <b>Aggregate:</b> Shows aggregated values across all series
-              without Time Series (no legend dropdown). <br /><br />
-              <b>Note:</b> The legend dropdown only appears in Time Series mode
-              when multiple series are present.
+              <b>Time Series:</b> Shows timestamp and value columns for selected series with legend dropdown.
+              <br /><br />
+              <b>Time Series with Metadata:</b> Shows timestamp, value, and all metric labels (job, instance, etc.) for selected series with legend dropdown.
+              <br /><br />
+              <b>Aggregate:</b> Shows aggregated values across all series without timestamps (no legend dropdown).
+              <br /><br />
+              <b>Note:</b> The legend dropdown only appears in time series modes when multiple series are present.
             </q-tooltip>
           </div>
         </template>
@@ -291,7 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- Column Filters -->
-      <template v-if="promqlTableMode === 'all'">
+      <template v-if="promqlTableMode === 'all' || promqlTableMode === 'single_with_metadata'">
         <div class="q-mb-sm text-subtitle2 q-mt-md">Column Filters</div>
 
         <q-select
@@ -400,7 +401,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- Sticky Columns -->
-      <template v-if="promqlTableMode === 'all'">
+      <template v-if="promqlTableMode === 'all' || promqlTableMode === 'single_with_metadata'">
         <div class="q-mb-sm text-subtitle2 q-mt-md">Sticky Columns</div>
 
         <q-toggle
@@ -650,6 +651,7 @@ export default defineComponent({
     // Options for PromQL table mode
     const promqlTableModeOptions = [
       { label: "Time Series", value: "single" },
+      { label: "Time Series with Metadata", value: "single_with_metadata" },
       { label: "Aggregate", value: "all" },
     ];
 

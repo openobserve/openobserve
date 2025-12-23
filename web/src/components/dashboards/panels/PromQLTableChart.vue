@@ -158,8 +158,8 @@ export default defineComponent({
     // Determine if legend footer should be shown
     const showLegendFooter = computed(() => {
       const tableMode = props.config?.promql_table_mode || "single";
-      // Only show legend footer in "single" (timestamp) mode when there are multiple series
-      return tableMode === "single" && legendOptions.value.length > 1;
+      // Show legend footer in both "single" and "single_with_metadata" modes when there are multiple series
+      return (tableMode === "single" || tableMode === "single_with_metadata") && legendOptions.value.length > 1;
     });
 
     // Filter rows based on selected legend
@@ -196,7 +196,7 @@ export default defineComponent({
             // In "all" mode, default to "All series"
             selectedLegend.value = "__all__";
           } else {
-            // In "single" mode (default), select first series
+            // In "single" or "single_with_metadata" mode, select first series
             selectedLegend.value = legendOptions.value[0]?.value || "";
           }
 

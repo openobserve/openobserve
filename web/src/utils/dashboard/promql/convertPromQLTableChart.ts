@@ -106,6 +106,61 @@ export class TableConverter implements PromQLChartConverter {
       ];
     }
 
+    // In "single_with_metadata" mode, show timestamp + all metric labels + value
+    if (tableMode === "single_with_metadata") {
+      const columns: any[] = [
+        {
+          name: "timestamp",
+          field: "timestamp",
+          label: "Timestamp",
+          align: "left",
+          sortable: true,
+        },
+      ];
+
+      // Collect all unique label keys from all series
+      const labelKeys = new Set<string>();
+      processedData.forEach((queryData) => {
+        queryData.series.forEach((seriesData) => {
+          Object.keys(seriesData.metric).forEach((key) => {
+            labelKeys.add(key);
+          });
+        });
+      });
+
+      // Add columns for each label
+      const sortedLabelKeys = Array.from(labelKeys).sort();
+      sortedLabelKeys.forEach((key) => {
+        columns.push({
+          name: key,
+          field: key,
+          label: key,
+          align: "left",
+          sortable: true,
+        });
+      });
+
+      // Add value column at the end
+      columns.push({
+        name: "value",
+        field: "value",
+        label: "Value",
+        align: "right",
+        sortable: true,
+        format: (val: any) => {
+          const unitValue = getUnitValue(
+            val,
+            config?.unit,
+            config?.unit_custom,
+            config?.decimals
+          );
+          return formatUnitValue(unitValue);
+        },
+      });
+
+      return columns;
+    }
+
     // In "all" (Aggregate) mode, collect all unique label keys across all series
     const labelKeys = new Set<string>();
 
@@ -226,6 +281,34 @@ export class TableConverter implements PromQLChartConverter {
       }
 
       console.log("Built rows count (timestamp mode):", rows.length);
+      return rows;
+    }
+
+    // In "single_with_metadata" mode, create rows with timestamp + all metric labels + value
+    if (tableMode === "single_with_metadata") {
+      const timezone = store.state.timezone;
+
+      processedData.forEach((queryData, qIndex) => {
+        queryData.series.forEach((seriesData, sIndex) => {
+          // Create a row for each data point with all metadata
+          seriesData.values.forEach(([timestamp, value]) => {
+            const row: any = {
+              timestamp: formatDate(toZonedTime(timestamp * 1000, timezone)),
+              ...seriesData.metric, // Spread all metric labels (job, instance, etc.)
+              value: parseFloat(value),
+              __legend__: seriesData.name, // Store legend for filtering
+            };
+            rows.push(row);
+          });
+        });
+      });
+
+      // Apply row limit if specified
+      if (config.row_limit) {
+        return rows.slice(0, config.row_limit);
+      }
+
+      console.log("Built rows count (timestamp with metadata mode):", rows.length);
       return rows;
     }
 
