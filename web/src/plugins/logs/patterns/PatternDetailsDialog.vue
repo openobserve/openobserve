@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             Pattern Template
           </div>
           <div
-            class="tw-px-[0.625rem] tw-py-[0.375rem] o2-monospace-font tw-text-[0.8125rem] tw-leading-[1.6] tw-rounded tw-border-l-[0.25rem] tw-border-solid tw-border-l-[var(--q-primary)] tw-break-all tw-whitespace-pre-wrap"
+            class="tw-px-[0.625rem] tw-py-[0.375rem] pattern-detail-text tw-text-[0.8125rem] tw-leading-[1.6] tw-rounded tw-border-l-[0.25rem] tw-border-solid tw-border-l-[var(--q-primary)] tw-break-all tw-whitespace-pre-wrap"
             :class="
               store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'
             "
@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(example, exIdx) in selectedPattern.pattern.examples"
             :key="exIdx"
-            class="tw-px-[0.625rem] tw-py-[0.375rem] tw-mb-[0.375rem] o2-monospace-font tw-text-[0.75rem] tw-leading-[1.6] tw-rounded tw-break-all tw-whitespace-pre-wrap tw-border-l-[0.1875rem] tw-border-solid"
+            class="tw-px-[0.625rem] tw-py-[0.375rem] tw-mb-[0.375rem] pattern-detail-text tw-text-[0.75rem] tw-leading-[1.6] tw-rounded tw-break-all tw-whitespace-pre-wrap tw-border-l-[0.1875rem] tw-border-solid"
             :class="[
               store.state.theme === 'dark' ? 'bg-grey-10 tw-border-l-[#3a3a3a]' : 'bg-grey-1 tw-border-l-[#e0e0e0]'
             ]"
@@ -293,3 +293,9 @@ const variableColumns = [
   },
 ];
 </script>
+
+<style scoped lang="scss">
+.pattern-detail-text {
+  font-family: monospace;
+}
+</style>
