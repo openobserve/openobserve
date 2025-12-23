@@ -32,8 +32,9 @@ use config::{
         stream::{FileKey, FileMeta, StreamType},
     },
     utils::{
-        file_writer::VORTEX_RUNTIME, parquet::new_parquet_writer, schema_ext::SchemaExt,
-        vortex::Utf8Compressor,
+        parquet::new_parquet_writer,
+        schema_ext::SchemaExt,
+        vortex::{Utf8Compressor, VORTEX_RUNTIME},
     },
 };
 use datafusion::{

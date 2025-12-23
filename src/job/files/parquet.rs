@@ -29,8 +29,7 @@ use config::{
         async_file::{get_file_meta, get_file_size},
         file::scan_files_with_channel,
         parquet::{
-            get_recordbatch_reader_from_bytes, parse_metadata_from_filename,
-            read_metadata_from_file, read_schema_from_file,
+            get_recordbatch_reader_from_bytes, read_metadata_from_file, read_schema_from_file,
         },
         schema_ext::SchemaExt,
     },
@@ -307,32 +306,14 @@ async fn prepare_files(
             continue;
         }
 
-        // Check if the file has valid metadata, either from cache or by reading the file
-        let meta = if let Some(meta) = WAL_PARQUET_METADATA.read().await.get(&file_key) {
+        let parquet_meta = if let Some(meta) = WAL_PARQUET_METADATA.read().await.get(&file_key) {
             meta.clone()
-        } else if file_key.ends_with(".parquet")
-            && let Some(meta) = read_metadata_from_file(&wal_dir.join(&file_key)).await
-        {
-            meta
+        } else if let Ok(parquet_meta) = read_metadata_from_file(&(&file).into()).await {
+            parquet_meta
         } else {
-            let (min_ts, max_ts, original_size) = parse_metadata_from_filename(&file_key);
-            if original_size == 0 {
-                log::warn!("[INGESTER:JOB] original_size is 0 for file: {file_key}");
-            }
-            let compressed_size = get_file_size(&wal_dir.join(&file_key))
-                .await
-                .unwrap_or_default();
-            FileMeta {
-                min_ts,
-                max_ts,
-                original_size,
-                compressed_size: compressed_size as i64,
-                ..Default::default()
-            }
+            continue;
         };
-
-        // If the file is empty, delete it immediately
-        if meta.eq(&FileMeta::default()) {
+        if parquet_meta.eq(&FileMeta::default()) {
             log::warn!("[INGESTER:JOB] the file is empty, just delete file: {file}");
             // delete metadata from cache
             WAL_PARQUET_METADATA.write().await.remove(&file_key);
@@ -342,7 +323,6 @@ async fn prepare_files(
             }
             continue;
         }
-
         let prefix = file_key[..file_key.rfind('/').unwrap()].to_string();
         // remove thread_id from prefix
         // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/
@@ -354,7 +334,7 @@ async fn prepare_files(
             0,
             "".to_string(), // here we don't need it
             file_key.clone(),
-            meta,
+            parquet_meta,
             false,
         ));
         // mark the file as processing
@@ -710,6 +690,9 @@ async fn merge_files(
         flattened: false,
         ..Default::default()
     };
+    if new_file_meta.records == 0 {
+        return Err(anyhow::anyhow!("merge_files error: records is 0"));
+    }
 
     // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/7099303408192061440f3XQ2p.
     // parquet eg: files/default/traces/default/2/2023/09/04/05/default/service_name=ingester/
@@ -949,7 +932,7 @@ async fn merge_files(
     }
 
     // generate tantivy inverted index and write to storage
-    let file_format = get_config().common.file_format;
+    let file_format = config::get_config().common.file_format;
     let (schema, reader) = get_recordbatch_reader_from_bytes(file_format, &buf).await?;
     let index_size = create_tantivy_index(
         "INGESTER",
@@ -992,7 +975,7 @@ async fn extract_patterns_from_parquet(
 
     // Read parquet data and extract log messages
     let parquet_bytes = Bytes::from(parquet_data.to_vec());
-    let file_format = get_config().common.file_format;
+    let file_format = config::get_config().common.file_format;
     let (_schema, mut reader) =
         get_recordbatch_reader_from_bytes(file_format, &parquet_bytes).await?;
     let mut log_messages = Vec::new();
@@ -1164,7 +1147,7 @@ async fn queue_services_from_parquet(
         let mut records_dropped = 0u64;
         let mut batches_sent = 0u64;
 
-        let file_format = get_config().common.file_format;
+        let file_format = config::get_config().common.file_format;
         let reader_result = get_recordbatch_reader_from_bytes(file_format, &parquet_bytes).await;
         let (_schema, mut reader) = match reader_result {
             Ok(r) => r,

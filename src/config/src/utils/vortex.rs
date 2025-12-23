@@ -5,6 +5,8 @@
 //! - If dict encoding is not beneficial: Fall back to Zstd compression.
 //! - For other types: Use BtrBlocks compression.
 
+use once_cell::sync::Lazy;
+use tokio::runtime::Runtime;
 use vortex::{
     array::{Array, ArrayRef, IntoArray},
     compressor::BtrBlocksCompressor,
@@ -14,6 +16,18 @@ use vortex::{
     layout::layouts::compressed::CompressorPlugin,
 };
 use vortex_array::Canonical;
+
+use crate::config;
+
+pub static VORTEX_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
+    tokio::runtime::Builder::new_multi_thread()
+        .thread_name("vortex_runtime")
+        .worker_threads(config::get_config().limit.vortex_thread_num)
+        .thread_stack_size(16 * 1024 * 1024)
+        .enable_all()
+        .build()
+        .unwrap()
+});
 
 /// A compressor optimized for UTF8 fields using Zstd compression.
 ///

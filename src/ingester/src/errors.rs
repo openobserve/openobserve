@@ -97,9 +97,6 @@ pub enum Error {
     WriteParquetRecordBatchError {
         source: parquet::errors::ParquetError,
     },
-    WriteFileRecordBatchError {
-        source: Box<dyn std::error::Error + Send + Sync>,
-    },
     MergeRecordBatchError {
         source: datafusion::error::DataFusionError,
     },

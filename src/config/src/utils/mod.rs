@@ -19,7 +19,6 @@ pub mod base64;
 pub mod download_utils;
 pub mod enrichment_local_cache;
 pub mod file;
-pub mod file_writer;
 pub mod flatten;
 pub mod hash;
 pub mod inverted_index;
