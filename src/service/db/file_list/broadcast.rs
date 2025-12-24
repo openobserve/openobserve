@@ -24,12 +24,13 @@ use config::{
     },
 };
 use hashbrown::HashMap;
+use infra::cluster::*;
 use once_cell::sync::Lazy;
 use proto::cluster_rpc;
 use tokio::sync::{RwLock, mpsc};
 use tonic::{Request, codec::CompressionEncoding, metadata::MetadataValue};
 
-use crate::{common::infra::cluster, service::grpc::get_cached_channel};
+use crate::service::grpc::get_cached_channel;
 
 /// use queue to batch send broadcast to other nodes
 pub static BROADCAST_QUEUE: Lazy<RwLock<Vec<FileKey>>> =
@@ -46,7 +47,7 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
     if cfg.common.local_mode || items.is_empty() {
         return Ok(());
     }
-    let nodes = cluster::get_cached_nodes(|node| {
+    let nodes = get_cached_nodes(|node| {
         node.scheduled && node.is_querier() && node.status == NodeStatus::Online
     })
     .await
@@ -64,7 +65,7 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
                 continue;
             }
             // check if the item is for interactive node
-            if let Some(node_name) = cluster::get_node_from_consistent_hash(
+            if let Some(node_name) = get_node_from_consistent_hash(
                 &item.id.to_string(),
                 &Role::Querier,
                 Some(RoleGroup::Interactive),
@@ -76,7 +77,7 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
                 continue;
             }
             // check if the item is for background node
-            if let Some(node_name) = cluster::get_node_from_consistent_hash(
+            if let Some(node_name) = get_node_from_consistent_hash(
                 &item.id.to_string(),
                 &Role::Querier,
                 Some(RoleGroup::Background),
@@ -153,7 +154,7 @@ async fn send_to_node(
     loop {
         // waiting for the node to be online
         loop {
-            match cluster::get_node_by_uuid(&node.uuid).await {
+            match get_node_by_uuid(&node.uuid).await {
                 None => {
                     EVENTS.write().await.remove(&node.uuid);
                     log::error!(
@@ -234,7 +235,7 @@ async fn send_to_node(
                 match client.send_file_list(request).await {
                     Ok(_) => break,
                     Err(e) => {
-                        if cluster::get_node_by_uuid(&node.uuid).await.is_none() {
+                        if get_node_by_uuid(&node.uuid).await.is_none() {
                             EVENTS.write().await.remove(&node.uuid);
                             log::error!(
                                 "[broadcast] node[{}] leaved cluster, dropping events",

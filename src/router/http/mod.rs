@@ -29,9 +29,9 @@ use actix_web::{
     route, web,
 };
 use hashbrown::HashMap;
-pub use ws::remove_querier_from_handler;
+use infra::cluster::*;
 
-use crate::common::{infra::cluster, utils::http::get_search_type_from_request};
+use crate::common::utils::http::get_search_type_from_request;
 
 pub(crate) mod ws;
 
@@ -205,7 +205,7 @@ async fn get_url(path: &str, cfg: &Config) -> URLDetails {
                     .unwrap_or(RoleGroup::Interactive)
             })
             .unwrap_or(RoleGroup::Interactive);
-        let nodes = cluster::get_cached_online_querier_nodes(Some(role_group)).await;
+        let nodes = get_cached_online_querier_nodes(Some(role_group)).await;
         if is_fixed_querier_route(path) && nodes.is_some() && !nodes.as_ref().unwrap().is_empty() {
             nodes.map(|v| v.into_iter().take(1).collect())
         } else {
@@ -213,7 +213,7 @@ async fn get_url(path: &str, cfg: &Config) -> URLDetails {
         }
     } else {
         node_type = Role::Ingester;
-        cluster::get_cached_schedulable_ingester_nodes().await
+        get_cached_schedulable_ingester_nodes().await
     };
 
     if nodes.is_none() || nodes.as_ref().unwrap().is_empty() {
@@ -227,7 +227,7 @@ async fn get_url(path: &str, cfg: &Config) -> URLDetails {
     }
 
     let nodes = nodes.unwrap();
-    let node = cluster::select_best_node(&nodes).unwrap_or(get_rand_element(&nodes));
+    let node = select_best_node(&nodes).unwrap_or(get_rand_element(&nodes));
     URLDetails {
         is_error: false,
         error: None,
@@ -411,8 +411,7 @@ async fn proxy_querier_by_body(
     };
 
     // get node name by consistent hash
-    let Some(node_name) = cluster::get_node_from_consistent_hash(&key, &Role::Querier, None).await
-    else {
+    let Some(node_name) = get_node_from_consistent_hash(&key, &Role::Querier, None).await else {
         log::error!(
             "dispatch: {} to {}, get node from consistent hash error: {:?}, took: {} ms",
             new_url.path,
@@ -426,7 +425,7 @@ async fn proxy_querier_by_body(
     };
 
     // get node by name
-    let Some(node) = cluster::get_cached_node_by_name(&node_name).await else {
+    let Some(node) = get_cached_node_by_name(&node_name).await else {
         log::error!(
             "dispatch: {} to {}, get node from cache error: {:?}, took: {} ms",
             new_url.path,

@@ -38,7 +38,7 @@ use tokio_tungstenite::{
 
 use super::pool::QuerierConnectionPool;
 use crate::{
-    common::{infra::cluster, utils::websocket::get_ping_interval_secs_with_jitter},
+    common::utils::websocket::get_ping_interval_secs_with_jitter,
     router::http::ws::{
         error::*,
         handler::{QuerierName, TraceId},
@@ -127,7 +127,7 @@ impl ResponseRouter {
 
 pub async fn create_connection(querier_name: &QuerierName) -> WsResult<Arc<QuerierConnection>> {
     // Get querier info from cluster
-    let node = cluster::get_cached_node_by_name(querier_name)
+    let node = infra::cluster::get_cached_node_by_name(querier_name)
         .await
         .ok_or_else(|| WsError::QuerierWsConnNotAvailable(querier_name.to_string()))?;
 

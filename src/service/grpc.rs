@@ -32,7 +32,6 @@ use tonic::{
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use super::search::MetadataMap;
-use crate::common::infra::cluster;
 
 static CHANNELS: Lazy<RwAHashMap<String, Channel>> = Lazy::new(Default::default);
 
@@ -44,7 +43,7 @@ pub(crate) async fn get_ingester_channel() -> Result<(String, Channel), tonic::S
 }
 
 async fn get_rand_ingester_addr() -> Result<String, tonic::Status> {
-    let nodes = cluster::get_cached_schedulable_ingester_nodes().await;
+    let nodes = infra::cluster::get_cached_schedulable_ingester_nodes().await;
     let Some(nodes) = nodes else {
         return Err(tonic::Status::internal(
             "No online ingester nodes".to_string(),

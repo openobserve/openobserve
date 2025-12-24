@@ -16,17 +16,17 @@
 use std::str::FromStr;
 
 use config::{cluster::LOCAL_NODE, get_config, meta::cluster::get_internal_grpc_token};
-use infra::errors::{Error, ErrorCodes};
+use infra::{
+    cluster::{get_cached_online_querier_nodes, get_node_by_uuid},
+    errors::{Error, ErrorCodes},
+};
 use proto::cluster_rpc::{self, QueryCacheRequest};
 use tonic::{Request, codec::CompressionEncoding, metadata::MetadataValue};
 use tracing::{Instrument, info_span};
 
 use crate::{
     common::meta::search::{CacheQueryRequest, CachedQueryResponse, ResultCacheSelectionStrategy},
-    service::{
-        grpc::get_cached_channel,
-        search::{infra_cluster, server_internal_error},
-    },
+    service::{grpc::get_cached_channel, search::server_internal_error},
 };
 
 #[tracing::instrument(name = "service:search:cluster:cacher:get_cached_results", skip_all)]
@@ -40,9 +40,9 @@ pub async fn get_cached_results(
     // get nodes from cluster
     let ts_column = &cache_req.ts_column;
     let mut results = Vec::new();
-    let local_node = infra_cluster::get_node_by_uuid(LOCAL_NODE.uuid.as_str()).await;
+    let local_node = get_node_by_uuid(LOCAL_NODE.uuid.as_str()).await;
     if !is_streaming {
-        let mut nodes = match infra_cluster::get_cached_online_querier_nodes(None).await {
+        let mut nodes = match get_cached_online_querier_nodes(None).await {
             Some(nodes) => nodes,
             None => {
                 log::error!("[trace_id {trace_id}] get_cached_results: no querier node online");
@@ -54,7 +54,7 @@ pub async fn get_cached_results(
 
         nodes.sort_by_key(|x| x.id);
 
-        let local_node = infra_cluster::get_node_by_uuid(LOCAL_NODE.uuid.as_str()).await;
+        let local_node = get_node_by_uuid(LOCAL_NODE.uuid.as_str()).await;
         nodes.retain(|node| node.is_querier() && !node.uuid.eq(LOCAL_NODE.uuid.as_str()));
 
         let querier_num = nodes.len();

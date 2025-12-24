@@ -25,15 +25,12 @@ use config::{
     utils::time::{BASE_TIME, day_micros, get_ymdh_from_micros, hour_micros},
 };
 use infra::{
-    cache, dist_lock, file_list as infra_file_list,
+    cache, cluster::get_node_by_uuid, file_list as infra_file_list,
     table::compactor_manual_jobs::Status as CompactorManualJobStatus,
 };
 use itertools::Itertools;
 
-use crate::{
-    common::infra::cluster::get_node_by_uuid,
-    service::{db, file_list},
-};
+use crate::service::{db, file_list};
 
 /// This function will split the original time range based on the exclude range
 /// It expects a mutable reference to a Vec which will be populated with the split time ranges
@@ -262,28 +259,21 @@ pub async fn delete_all(
     stream_type: StreamType,
     stream_name: &str,
 ) -> Result<(), anyhow::Error> {
-    let lock_key = format!("/compact/retention/{org_id}/{stream_type}/{stream_name}");
-    let locker = dist_lock::lock(&lock_key, 0).await?;
     let node = db::compact::retention::get_stream(org_id, stream_type, stream_name, None).await;
     if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         log::warn!("[COMPACTOR] stream {org_id}/{stream_type}/{stream_name} is deleting by {node}");
-        dist_lock::unlock(&locker).await?;
         return Ok(()); // not this node, just skip
     }
 
     // before start merging, set current node to lock the stream
-    let ret = db::compact::retention::process_stream(
+    db::compact::retention::process_stream(
         org_id,
         stream_type,
         stream_name,
         None,
         &LOCAL_NODE.uuid.clone(),
     )
-    .await;
-    // already bind to this node, we can unlock now
-    dist_lock::unlock(&locker).await?;
-    drop(locker);
-    ret?;
+    .await?;
 
     let start_time = BASE_TIME.timestamp_micros();
     let end_time = Utc::now().timestamp_micros();
@@ -328,8 +318,6 @@ pub async fn delete_by_date(
     stream_name: &str,
     date_range: (&str, &str),
 ) -> Result<(), anyhow::Error> {
-    let lock_key = format!("/compact/retention/{org_id}/{stream_type}/{stream_name}");
-    let locker = dist_lock::lock(&lock_key, 0).await?;
     let node =
         db::compact::retention::get_stream(org_id, stream_type, stream_name, Some(date_range))
             .await;
@@ -338,23 +326,18 @@ pub async fn delete_by_date(
             "[COMPACTOR] stream {org_id}/{stream_type}/{stream_name}/{:?} is deleting by {node}",
             date_range
         );
-        dist_lock::unlock(&locker).await?;
         return Ok(()); // not this node, just skip
     }
 
     // before start merging, set current node to lock the stream
-    let ret = db::compact::retention::process_stream(
+    db::compact::retention::process_stream(
         org_id,
         stream_type,
         stream_name,
         Some(date_range),
         &LOCAL_NODE.uuid.clone(),
     )
-    .await;
-    // already bind to this node, we can unlock now
-    dist_lock::unlock(&locker).await?;
-    drop(locker);
-    ret?;
+    .await?;
 
     // same date, just mark delete done
     if date_range.0 == date_range.1 {

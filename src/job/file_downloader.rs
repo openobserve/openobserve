@@ -24,7 +24,10 @@ use config::{
 };
 use futures_util::StreamExt;
 use hashbrown::{HashMap, HashSet};
-use infra::cache::file_data;
+use infra::{
+    cache::file_data,
+    cluster::{get_cached_node_by_name, get_node_from_consistent_hash},
+};
 use once_cell::sync::Lazy;
 use proto::cluster_rpc::{SimpleFileList, event_client::EventClient};
 use tokio::sync::{
@@ -32,8 +35,6 @@ use tokio::sync::{
     mpsc::{Receiver, Sender},
 };
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue};
-
-use crate::common::infra::cluster;
 
 /// (trace_id, file_id, account, file, size, cache_type)
 type FileInfo = (String, i64, String, String, usize, file_data::CacheType);
@@ -326,17 +327,13 @@ async fn download_file_with_consistent_hash(
     } else {
         RoleGroup::Background
     };
-    let Some(node_name) = cluster::get_node_from_consistent_hash(
-        &file_id.to_string(),
-        &Role::Querier,
-        Some(role_group),
-    )
-    .await
+    let Some(node_name) =
+        get_node_from_consistent_hash(&file_id.to_string(), &Role::Querier, Some(role_group)).await
     else {
         return Ok(false);
     };
     // get node by file_id
-    let Some(node) = cluster::get_cached_node_by_name(&node_name).await else {
+    let Some(node) = get_cached_node_by_name(&node_name).await else {
         return Ok(false);
     };
     // download file from node

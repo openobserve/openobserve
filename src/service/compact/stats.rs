@@ -15,9 +15,9 @@
 
 use config::{cluster::LOCAL_NODE, meta::stream::StreamStats};
 use hashbrown::HashMap;
-use infra::{dist_lock, file_list as infra_file_list};
+use infra::{cluster::get_node_by_uuid, dist_lock, file_list as infra_file_list};
 
-use crate::{common::infra::cluster::get_node_by_uuid, service::db};
+use crate::service::db;
 
 pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow::Error> {
     let latest_pk = infra_file_list::get_max_pk_value()

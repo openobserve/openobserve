@@ -23,7 +23,7 @@ use config::{
     utils::async_file::scan_files,
 };
 use hashbrown::HashMap;
-use infra::{cache, db::get_db};
+use infra::{cache, cluster::get_cached_online_nodes, db::get_db};
 use once_cell::sync::Lazy;
 use opentelemetry::{KeyValue, global, metrics::Histogram};
 use opentelemetry_sdk::{
@@ -37,7 +37,7 @@ use opentelemetry_sdk::{
 use tokio::{sync::Mutex, time};
 
 use crate::{
-    common::infra::{cluster::get_cached_online_nodes, config::USERS},
+    common::infra::config::USERS,
     service::{
         db,
         exporter::otlp_metrics_exporter::{O2MetricsClient, O2MetricsExporter},
