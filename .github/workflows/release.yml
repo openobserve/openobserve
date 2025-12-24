@@ -159,7 +159,7 @@ jobs:
           fetch-depth: 0
 
       - name: Download artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
