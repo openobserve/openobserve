@@ -54,7 +54,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Page Title -->
-            <div class="page-title tw-font-[600] tw-text-[20px]" data-test="page-title">
+            <div
+              class="page-title tw-font-[600] tw-text-[20px]"
+              :data-test="viewMode === 'alerts' ? 'alerts-list-title' : 'incidents-list-title'"
+            >
               {{ viewMode === 'alerts' ? t('alerts.header') : t('alerts.incidents.title') }}
             </div>
           </div>

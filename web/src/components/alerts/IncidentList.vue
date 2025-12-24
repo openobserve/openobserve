@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Empty state -->
         <template #no-data>
-          <div v-if="!loading">
+          <div v-if="!loading" class="tw-flex tw-items-center tw-justify-center tw-w-full tw-h-full">
             <no-data />
           </div>
         </template>
@@ -203,6 +203,7 @@ export default defineComponent({
     const qTableRef: any = ref(null);
     const loading = ref(false);
     const incidents = ref<Incident[]>([]);
+    const allIncidents = ref<Incident[]>([]); // Store all incidents for FE filtering
     const showDetailDrawer = ref(false);
     const selectedIncident = ref<Incident | null>(null);
 
@@ -285,13 +286,56 @@ export default defineComponent({
       },
     ]);
 
+    // Frontend search filter function
+    const applyFrontendSearch = (incidentsList: Incident[], searchQuery: string) => {
+      if (!searchQuery || searchQuery.trim() === "") {
+        return incidentsList;
+      }
+
+      const query = searchQuery.toLowerCase().trim();
+
+      return incidentsList.filter((incident) => {
+        // Search in title
+        const title = incident.title || formatDimensions(incident.stable_dimensions);
+        if (title.toLowerCase().includes(query)) {
+          return true;
+        }
+
+        // Search in status
+        const statusLabel = getStatusLabel(incident.status).toLowerCase();
+        if (statusLabel.includes(query) || incident.status.toLowerCase().includes(query)) {
+          return true;
+        }
+
+        // Search in severity
+        if (incident.severity.toLowerCase().includes(query)) {
+          return true;
+        }
+
+        // Search in stable dimensions (key-value pairs)
+        if (incident.stable_dimensions) {
+          const dimensionsStr = Object.entries(incident.stable_dimensions)
+            .map(([k, v]) => `${k}=${v}`)
+            .join(" ")
+            .toLowerCase();
+          if (dimensionsStr.includes(query)) {
+            return true;
+          }
+        }
+
+        return false;
+      });
+    };
+
     const loadIncidents = async () => {
       loading.value = true;
       try {
         const org = store.state.selectedOrganization.identifier;
-        const limit = pagination.value.rowsPerPage;
-        const offset = (pagination.value.page - 1) * limit;
-        const keyword = props.searchQuery?.trim() || undefined;
+        // Load all incidents for now (can be paginated when BE supports it)
+        const limit = 1000; // Large limit for FE filtering
+        const offset = 0;
+        // Keep keyword parameter for future BE implementation
+        const keyword = undefined; // props.searchQuery?.trim() || undefined;
 
         const response = await incidentsService.list(
           org,
@@ -301,8 +345,17 @@ export default defineComponent({
           keyword
         );
 
-        incidents.value = response.data.incidents;
-        pagination.value.rowsNumber = response.data.total;
+        // Store all incidents
+        allIncidents.value = response.data.incidents;
+
+        // Apply frontend search filter
+        const filteredIncidents = applyFrontendSearch(allIncidents.value, props.searchQuery);
+
+        // Apply pagination on filtered results
+        const startIndex = (pagination.value.page - 1) * pagination.value.rowsPerPage;
+        const endIndex = startIndex + pagination.value.rowsPerPage;
+        incidents.value = filteredIncidents.slice(startIndex, endIndex);
+        pagination.value.rowsNumber = filteredIncidents.length;
       } catch (error: any) {
         $q.notify({
           type: "negative",
@@ -319,7 +372,13 @@ export default defineComponent({
       pagination.value.rowsPerPage = props.pagination.rowsPerPage;
       pagination.value.sortBy = props.pagination.sortBy;
       pagination.value.descending = props.pagination.descending;
-      await loadIncidents();
+
+      // For FE filtering, just reapply filters and pagination without API call
+      const filteredIncidents = applyFrontendSearch(allIncidents.value, props.searchQuery);
+      const startIndex = (pagination.value.page - 1) * pagination.value.rowsPerPage;
+      const endIndex = startIndex + pagination.value.rowsPerPage;
+      incidents.value = filteredIncidents.slice(startIndex, endIndex);
+      pagination.value.rowsNumber = filteredIncidents.length;
     };
 
     const viewIncident = (incident: Incident) => {
@@ -420,11 +479,17 @@ export default defineComponent({
       loadIncidents();
     });
 
-    // Watch for search query changes and reload incidents
+    // Watch for search query changes and apply FE filter
     watch(() => props.searchQuery, () => {
       // Reset to page 1 when search query changes
       pagination.value.page = 1;
-      loadIncidents();
+
+      // Apply FE search filter without API call
+      const filteredIncidents = applyFrontendSearch(allIncidents.value, props.searchQuery);
+      const startIndex = 0; // Always start from first page
+      const endIndex = pagination.value.rowsPerPage;
+      incidents.value = filteredIncidents.slice(startIndex, endIndex);
+      pagination.value.rowsNumber = filteredIncidents.length;
     });
 
     // Filter toggle functions
@@ -480,6 +545,7 @@ export default defineComponent({
       t,
       loading,
       incidents,
+      allIncidents,
       statusFilter,
       severityFilter,
       statusOptions,
