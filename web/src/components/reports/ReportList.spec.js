@@ -670,7 +670,10 @@ describe("ReportList Component", () => {
       await addButton.trigger('click');
 
       expect(mockRouter.push).toHaveBeenCalledWith({
-        name: "createReport"
+        name: "createReport",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier
+        }
       });
     });
   });
