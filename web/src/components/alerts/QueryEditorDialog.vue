@@ -816,6 +816,7 @@ const triggerQuery = async (fn = false) => {
       org_identifier: store.state.selectedOrganization.identifier,
       query: queryReq,
       page_type: props.streamType,
+      validate: true,
     });
 
     if (res.data.hits.length > 0) {

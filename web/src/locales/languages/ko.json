@@ -617,7 +617,10 @@
     "streamRouting": "스트림 라우팅",
     "testFunction": "테스트 기능",
     "errorDetails": "오류",
-    "function_definition": "함수 정의"
+    "function_definition": "함수 정의",
+    "enrichmentTableURL": "인리치먼트 테이블 URL",
+    "urlCannotBeModified": "생성 후에는 URL을 수정할 수 없습니다.",
+    "close": "닫기"
   },
   "confirmDialog": {
     "cancel": "취소",
@@ -1005,7 +1008,29 @@
     "showAllLegends": "모든 레전드 보기",
     "legendsOfCharts": "레전드 오브 차트",
     "totalLegends": "합계: {개수}",
-    "noLegendsAvailable": "레전드 없음"
+    "noLegendsAvailable": "레전드 없음",
+    "aggregationFunction": "어그리게이션 함수",
+    "geoLatLabel": "래티튜드 라벨",
+    "geoLonLabel": "경도 레이블",
+    "geoWeightLabel": "무게 라벨",
+    "geoNameLabel": "이름 라벨",
+    "geoSymbolSize": "심볼 크기",
+    "geoEnableRoam": "줌/팬 활성화",
+    "mapsNameLabel": "위치 이름 라벨",
+    "mapsMapType": "맵 유형",
+    "mapsEnableRoam": "줌/팬 활성화",
+    "tableAggregations": "테이블 어그리게이션",
+    "showTimestamp": "타임스탬프 열 표시",
+    "pageSize": "페이지당 행 수",
+    "enableSorting": "정렬 활성화",
+    "enableFiltering": "필터링 활성화",
+    "enablePagination": "페이지 매김 활성화",
+    "aggregateRows": "시계열 데이터 집계",
+    "visibleColumns": "보이는 컬럼",
+    "hiddenColumns": "히든 컬럼",
+    "stickyFirstColumn": "스티키 퍼스트 컬럼",
+    "stickyColumns": "스티키 컬럼",
+    "promqlTableMode": "ProMQL 테이블 모드"
   },
   "panel": {
     "header": "패널",
@@ -1080,7 +1105,12 @@
     "innerJoin": "내부 조인",
     "rightJoin": "오른쪽 조인",
     "addClause": "조항 추가",
-    "removeClause": "조항 제거"
+    "removeClause": "조항 제거",
+    "metric": "미터법",
+    "labelFilters": "라벨 필터",
+    "operations": "오퍼레이션",
+    "promQLBuilder": "프롬QL 빌더",
+    "options": "옵션"
   },
   "home": {
     "streams": "스트림",

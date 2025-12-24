@@ -432,7 +432,7 @@ ORDER BY x_axis_1`;
         x: 0,
         y: 0,
         w: 192,
-        h: 36,
+        h: 44,
         i: 1,
       },
       htmlContent: "",

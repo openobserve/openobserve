@@ -617,7 +617,10 @@
     "streamRouting": "Routering van streams",
     "testFunction": "Testfunctie",
     "errorDetails": "Fout",
-    "function_definition": "Definitie van de functie"
+    "function_definition": "Definitie van de functie",
+    "enrichmentTableURL": "URL van de verrijkingstabel",
+    "urlCannotBeModified": "De URL kan na het aanmaken niet worden gewijzigd",
+    "close": "Sluiten"
   },
   "confirmDialog": {
     "cancel": "Annuleer",
@@ -1005,7 +1008,29 @@
     "showAllLegends": "Alle legendes weergeven",
     "legendsOfCharts": "Legenden van hitlijsten",
     "totalLegends": "Totaal: {count}",
-    "noLegendsAvailable": "Geen legendes beschikbaar"
+    "noLegendsAvailable": "Geen legendes beschikbaar",
+    "aggregationFunction": "Aggregatiefunctie",
+    "geoLatLabel": "Latitude-label",
+    "geoLonLabel": "Lengtegraadlabel",
+    "geoWeightLabel": "Gewichtslabel",
+    "geoNameLabel": "Naamlabel",
+    "geoSymbolSize": "Grootte van het symbool",
+    "geoEnableRoam": "Zoom/Pan inschakelen",
+    "mapsNameLabel": "Label met de naam van de locatie",
+    "mapsMapType": "Kaarttype",
+    "mapsEnableRoam": "Zoom/Pan inschakelen",
+    "tableAggregations": "Tabelaggregaties",
+    "showTimestamp": "Tijdstempelkolom weergeven",
+    "pageSize": "Rijen per pagina",
+    "enableSorting": "Sorteren inschakelen",
+    "enableFiltering": "Filteren inschakelen",
+    "enablePagination": "Paginering inschakelen",
+    "aggregateRows": "Geaggregeerde tijdreeksgegevens",
+    "visibleColumns": "Zichtbare kolommen",
+    "hiddenColumns": "Verborgen kolommen",
+    "stickyFirstColumn": "Sticky eerste kolom",
+    "stickyColumns": "Kleverige kolommen",
+    "promqlTableMode": "ProMQL-tabelmodus"
   },
   "panel": {
     "header": "Paneel",
@@ -1080,7 +1105,12 @@
     "innerJoin": "Innerlijke verbinding",
     "rightJoin": "Right Join",
     "addClause": "Clausule toevoegen",
-    "removeClause": "Clausule verwijderen"
+    "removeClause": "Clausule verwijderen",
+    "metric": "Metrisch",
+    "labelFilters": "Filters voor etiketten",
+    "operations": "Operaties",
+    "promQLBuilder": "ProMQL Builder",
+    "options": "Opties"
   },
   "home": {
     "streams": "Streams",

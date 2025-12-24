@@ -60,6 +60,7 @@
             :stream-fields="props.streamFields"
             :condition-input-width="props.conditionInputWidth"
             :allow-custom-columns="props.allowCustomColumns"
+            :module="props.module"
             @input:update="(name, field) => inputUpdate(name, field)"
           />
           <div
@@ -77,6 +78,7 @@
                 :input-width="props.conditionInputWidth"
                 :is-first-in-group="index === 0"
                 :allow-custom-columns="props.allowCustomColumns"
+                :module="props.module"
             />
             <div class="tw-mb-3">
                 <q-btn data-test="alert-conditions-delete-condition-btn" icon="close" size="10px" flat border-less @click="removeCondition(item.id)" />
@@ -209,6 +211,12 @@
         type: String,
         default: '',
         required: false,
+    },
+    module: {
+        type: String,
+        default: 'alerts',
+        required: false,
+        validator: (value: string) => ['alerts', 'pipelines'].includes(value),
     },
     });
   

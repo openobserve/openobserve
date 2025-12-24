@@ -68,6 +68,7 @@ use crate::{common::meta, handler::http::request};
         request::promql::label_values,
         request::promql::format_query_get,
         request::enrichment_table::save_enrichment_table,
+        request::enrichment_table::save_enrichment_table_from_url,
         request::rum::ingest::log,
         request::rum::ingest::data,
         request::rum::ingest::sessionreplay,
@@ -273,6 +274,10 @@ use crate::{common::meta, handler::http::request};
             config::meta::timed_annotations::TimedAnnotationReq,
             config::meta::timed_annotations::TimedAnnotationDelete,
             config::meta::timed_annotations::TimedAnnotationUpdate,
+            // Enrichment Tables
+            config::meta::enrichment_table::EnrichmentTableStatus,
+            config::meta::enrichment_table::EnrichmentTableUrlJob,
+            crate::handler::http::request::enrichment_table::EnrichmentTableUrlRequest,
             // Dashboards
             crate::handler::http::models::dashboards::DashboardRequestBody,
             crate::handler::http::models::dashboards::DashboardResponseBody,
