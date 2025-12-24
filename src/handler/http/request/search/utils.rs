@@ -135,8 +135,7 @@ pub async fn validate_query_fields(
         // Check 2: If UDS is defined, field must be in UDS
         if !uds_fields.is_empty() && !uds_fields.contains(&field) {
             return Err(Error::ErrorCode(ErrorCodes::SearchFieldNotFound(format!(
-                "{}. Field exists but not in User-Defined Schema (UDS). Available UDS fields: {:?}",
-                field, uds_fields
+                "{field}. Field exists but not in User-Defined Schema (UDS)",
             ))));
         }
     }

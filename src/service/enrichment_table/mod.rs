@@ -52,6 +52,7 @@ use crate::{
 };
 
 pub mod geoip;
+pub mod url_processor;
 
 pub async fn save_enrichment_data(
     org_id: &str,
@@ -455,6 +456,11 @@ pub async fn cleanup_enrichment_table_resources(
     // delete stream key
     if let Err(e) = db::enrichment_table::delete(org_id, stream_name).await {
         log::error!("Error deleting enrichment table: {e}");
+    }
+
+    // delete URL job record if it exists
+    if let Err(e) = db::enrichment_table::delete_url_job(org_id, stream_name).await {
+        log::error!("Error deleting enrichment table URL job: {e}");
     }
 
     // delete stream stats cache

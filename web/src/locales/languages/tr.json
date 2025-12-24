@@ -617,7 +617,10 @@
     "streamRouting": "Akış Yönlendirmesi",
     "testFunction": "Test Fonksiyonu",
     "errorDetails": "Hata",
-    "function_definition": "Fonksiyon Tanımı"
+    "function_definition": "Fonksiyon Tanımı",
+    "enrichmentTableURL": "Zenginleştirme Tablosu URL",
+    "urlCannotBeModified": "URL oluşturulduktan sonra değiştirilemez",
+    "close": "Kapat"
   },
   "confirmDialog": {
     "cancel": "İptal",
@@ -1005,7 +1008,29 @@
     "showAllLegends": "Tüm Efsaneleri Göster",
     "legendsOfCharts": "Grafiklerin efsaneleri",
     "totalLegends": "Toplam: {count}",
-    "noLegendsAvailable": "Efsane yok"
+    "noLegendsAvailable": "Efsane yok",
+    "aggregationFunction": "Toplama Fonksiyonu",
+    "geoLatLabel": "Latitude Etiketi",
+    "geoLonLabel": "Boylam Etiketi",
+    "geoWeightLabel": "Ağırlık Etiketi",
+    "geoNameLabel": "İsim Etiketi",
+    "geoSymbolSize": "Sembol Boyutu",
+    "geoEnableRoam": "Yakınlaştırma/Kaydırmayı Etkinleştir",
+    "mapsNameLabel": "Konum Adı Etiketi",
+    "mapsMapType": "Harita Türü",
+    "mapsEnableRoam": "Yakınlaştırma/Kaydırmayı Etkinleştir",
+    "tableAggregations": "Tablo Toplamaları",
+    "showTimestamp": "Zaman Damgası Sütununu Göster",
+    "pageSize": "Sayfa Başına Satır",
+    "enableSorting": "Sıralamayı Etkinleştir",
+    "enableFiltering": "Filtrelemeyi Etkinleştir",
+    "enablePagination": "Sayfalandırmayı Etkinleştir",
+    "aggregateRows": "Toplu Zaman Serisi Verileri",
+    "visibleColumns": "Görünür Sütunlar",
+    "hiddenColumns": "Gizli Sütunlar",
+    "stickyFirstColumn": "Yapışkan İlk Sütun",
+    "stickyColumns": "Yapışkan Sütunlar",
+    "promqlTableMode": "PromQL Tablo Modu"
   },
   "panel": {
     "header": "Panel",
@@ -1080,7 +1105,12 @@
     "innerJoin": "İç Katılım",
     "rightJoin": "Sağ Katıl",
     "addClause": "Madde Ekle",
-    "removeClause": "Maddeyi Kaldır"
+    "removeClause": "Maddeyi Kaldır",
+    "metric": "Metrik",
+    "labelFilters": "Etiket Filtreleri",
+    "operations": "Operasyonlar",
+    "promQLBuilder": "PromQL Oluşturucu",
+    "options": "Seçenekler"
   },
   "home": {
     "streams": "Akışlar",

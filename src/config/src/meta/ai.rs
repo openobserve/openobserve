@@ -78,3 +78,51 @@ impl AIPrompt {
         Self::new(PromptType::System, content)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_prompt_type_from_str() {
+        assert_eq!(PromptType::from("system"), PromptType::System);
+        assert_eq!(PromptType::from("user"), PromptType::User);
+        assert_eq!(PromptType::from("invalid"), PromptType::System); // default
+        assert_eq!(PromptType::from(""), PromptType::System); // default
+    }
+
+    #[test]
+    fn test_prompt_type_display() {
+        assert_eq!(format!("{}", PromptType::System), "system");
+        assert_eq!(format!("{}", PromptType::User), "user");
+    }
+
+    #[test]
+    fn test_ai_prompt_user() {
+        let prompt = AIPrompt::user("Test user message".to_string());
+        assert_eq!(prompt.r#type, PromptType::User);
+        assert_eq!(prompt.content, "Test user message");
+        assert!(prompt.updated_at > 0); // Should have a timestamp
+    }
+
+    #[test]
+    fn test_ai_prompt_system() {
+        let prompt = AIPrompt::system("Test system message".to_string());
+        assert_eq!(prompt.r#type, PromptType::System);
+        assert_eq!(prompt.content, "Test system message");
+        assert_eq!(prompt.updated_at, 0); // System prompts have timestamp 0
+    }
+
+    #[test]
+    fn test_prompt_type_default() {
+        let default_type = PromptType::default();
+        assert_eq!(default_type, PromptType::System);
+    }
+
+    #[test]
+    fn test_prompt_type_equality() {
+        assert_eq!(PromptType::System, PromptType::System);
+        assert_eq!(PromptType::User, PromptType::User);
+        assert_ne!(PromptType::System, PromptType::User);
+    }
+}

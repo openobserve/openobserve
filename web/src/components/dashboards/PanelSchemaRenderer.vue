@@ -41,6 +41,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : { options: { backgroundColor: 'transparent' } }
           "
         />
+        <PromQLTableChart
+          v-else-if="
+            panelSchema.type == 'table' && panelSchema.queryType === 'promql'
+          "
+          :data="tableRendererData"
+          :config="panelSchema.config"
+        />
         <TableRenderer
           v-else-if="panelSchema.type == 'table'"
           :data="
@@ -161,7 +168,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="isCursorOverPanel"
         class="flex items-center q-gutter-x-xs"
-        style="position: absolute; top: 0px; right: 0px; z-index: 9; padding-right: 2px; padding-top: 2px;"
+        style="
+          position: absolute;
+          top: 0px;
+          right: 0px;
+          z-index: 9;
+          padding-right: 2px;
+          padding-top: 2px;
+        "
         @click.stop
       >
         <q-btn
@@ -338,7 +352,10 @@ import { generateDurationLabel } from "../../utils/date";
 import { onBeforeMount } from "vue";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
-import { getUTCTimestampFromZonedTimestamp, validateSQLPanelFields } from "@/utils/dashboard/convertDataIntoUnitValue";
+import {
+  getUTCTimestampFromZonedTimestamp,
+  validateSQLPanelFields,
+} from "@/utils/dashboard/convertDataIntoUnitValue";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 import { event } from "quasar";
 import { exportFile } from "quasar";
@@ -350,6 +367,10 @@ const ChartRenderer = defineAsyncComponent(() => {
 
 const TableRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/TableRenderer.vue");
+});
+
+const PromQLTableChart = defineAsyncComponent(() => {
+  return import("@/components/dashboards/panels/PromQLTableChart.vue");
 });
 
 const GeoMapRenderer = defineAsyncComponent(() => {
@@ -385,6 +406,7 @@ export default defineComponent({
     ChartRenderer,
     AlertContextMenu,
     TableRenderer,
+    PromQLTableChart,
     GeoMapRenderer,
     MapsRenderer,
     HTMLRenderer,
@@ -2212,6 +2234,26 @@ export default defineComponent({
       emit("is-partial-data-update", newValue);
     });
 
+    // Computed property for table data with logging
+    const tableRendererData = computed(() => {
+      if (panelSchema.value.type === "table") {
+        let tableData;
+
+        if (panelSchema.value.queryType === "promql") {
+          // For PromQL tables, the data is in panelData.options (same as pie/donut)
+          // The TableConverter returns {columns, rows, ...} which gets placed in options
+          tableData = panelData.value?.options || { rows: [], columns: [] };
+        } else if (panelData.value?.chartType == "table") {
+          tableData = panelData.value;
+        } else {
+          tableData = { options: { backgroundColor: "transparent" } };
+        }
+
+        return tableData;
+      }
+      return { options: { backgroundColor: "transparent" } };
+    });
+
     return {
       store,
       chartPanelRef,
@@ -2223,6 +2265,7 @@ export default defineComponent({
       noData,
       metadata,
       tableRendererRef,
+      tableRendererData,
       onChartClick,
       onDataZoom,
       drilldownArray,
