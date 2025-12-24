@@ -62,9 +62,8 @@ jobs:
           prefix-key: api-testing
 
       - name: Install Protoc
-        uses: arduino/setup-protoc@v3
-        with:
-          version: "21.12"
+        run: |
+          bash ./.github/protoc.sh
 
       - name: Build OpenObserve debug binary
         run: cargo build --features mimalloc

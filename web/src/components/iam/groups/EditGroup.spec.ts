@@ -431,10 +431,15 @@ describe("EditGroup Component", () => {
   describe("Navigation", () => {
     it("navigates back to groups page when cancel is clicked", async () => {
       const routerPushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
-      
+
       await wrapper.vm.cancelEditGroup();
-      
-      expect(routerPushSpy).toHaveBeenCalledWith({ name: "groups" });
+
+      expect(routerPushSpy).toHaveBeenCalledWith({
+        name: "groups",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier
+        }
+      });
     });
 
     it("triggers navigation when cancel button is clicked", async () => {
