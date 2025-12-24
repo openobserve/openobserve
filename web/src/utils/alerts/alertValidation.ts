@@ -525,6 +525,7 @@ export const validateSqlQuery = async (
         org_identifier: store.state.selectedOrganization.identifier,
         query,
         page_type: formData.stream_type,
+        validate: true,
       })
       .then((res: any) => {
         sqlQueryErrorMsg.value = "";

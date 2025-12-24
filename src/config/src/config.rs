@@ -53,7 +53,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 17;
+pub const DB_SCHEMA_VERSION: u64 = 19;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -2229,6 +2229,54 @@ pub struct EnrichmentTable {
         help = "Background sync interval in seconds"
     )]
     pub merge_interval: u64,
+    #[env_config(
+        name = "ZO_ENRICHMENT_URL_FETCH_MAX_SIZE",
+        default = 500,
+        help = "Maximum size of each batch when fetching from URL (in MB). Batches are saved to reduce database checkpoint frequency."
+    )]
+    pub url_fetch_max_size_mb: usize,
+    #[env_config(
+        name = "ZO_ENRICHMENT_URL_FETCH_TIMEOUT",
+        default = 7200,
+        help = "Timeout for URL fetch operations (in seconds)"
+    )]
+    pub url_fetch_timeout_secs: u64,
+    #[env_config(
+        name = "ZO_ENRICHMENT_URL_HEADER_FETCH_SIZE",
+        default = 8192,
+        help = "Size of initial fetch for CSV headers when resuming (in bytes). Should be large enough to contain the header row."
+    )]
+    pub url_header_fetch_size_bytes: usize,
+    #[env_config(
+        name = "ZO_ENRICHMENT_URL_MAX_RETRIES",
+        default = 3,
+        help = "Maximum retry attempts for failed URL fetches"
+    )]
+    pub url_max_retries: u32,
+    #[env_config(
+        name = "ZO_ENRICHMENT_URL_RETRY_DELAY",
+        default = 5,
+        help = "Delay between retry attempts (in seconds)"
+    )]
+    pub url_retry_delay_secs: u64,
+    #[env_config(
+        name = "ZO_ENRICHMENT_URL_STALE_JOB_THRESHOLD",
+        default = 600,
+        help = "Jobs stuck in Processing status for longer than this are considered stale (in seconds). Used for automatic recovery."
+    )]
+    pub url_stale_job_threshold_secs: i64,
+    #[env_config(
+        name = "ZO_ENRICHMENT_URL_RECOVERY_CHECK_INTERVAL",
+        default = 120,
+        help = "Interval between stale job recovery checks (in seconds). Each ingester will attempt to claim one stale job per interval."
+    )]
+    pub url_recovery_check_interval_secs: u64,
+    #[env_config(
+        name = "ZO_ENRICHMENT_URL_RECOVERY_JOBS_PER_CHECK",
+        default = 1,
+        help = "Number of stale jobs each ingester attempts to claim per recovery check. Higher values allow faster recovery but may cause uneven distribution."
+    )]
+    pub url_recovery_jobs_per_check: usize,
 }
 
 pub fn init() -> Config {

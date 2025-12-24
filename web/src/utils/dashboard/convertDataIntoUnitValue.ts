@@ -1306,7 +1306,7 @@ const validateJoinFields = (joins: any, errors: string[]) => {
  */
 const validatePanelFields = (panel: any, errors: string[] = []) => {
   // Check if panel has promQL query type
-  const isPromQLMode = panel?.queryType === "promql";
+  const isPromQLMode = panel?.queryType === "promql" || panel?.queryType === "promql-builder";
   const currentQueryIndex = 0; // Default to first query
 
   // Validate panel content based on type
@@ -1427,7 +1427,7 @@ export const validatePanel = (
   const currentQueryIndex = panelData?.layout?.currentQueryIndex || 0;
 
   // Check if panel has promQL query type
-  const isPromQLMode = panelData?.data?.queryType === "promql";
+  const isPromQLMode = panelData?.data?.queryType === "promql" || panelData?.data?.queryType === "promql-builder";
 
   // Validate panel content based on type
   validatePanelContentByType(panelData?.data, errors);
@@ -1461,6 +1461,15 @@ export const validatePanel = (
       "html",
       "markdown",
       "custom_chart",
+      "table",
+      "maps",
+      "heatmap",
+      "geomap",
+      "donut",
+      "pie",
+      "h-bar",
+      "stacked",
+      "h-stacked",
     ];
     if (!allowedChartTypes.includes(panelData?.data?.type)) {
       errors.push(

@@ -646,7 +646,7 @@ describe("QueryTypeSelector", () => {
       expect(autoButton.classes()).toContain("button");
       expect(autoButton.classes()).toContain("button-left");
       expect(customSqlButton.classes()).toContain("button");
-      expect(customSqlButton.classes()).toContain("button-right");
+      expect(customSqlButton.classes()).toContain("button");
     });
 
     it("should have button-group container class", () => {

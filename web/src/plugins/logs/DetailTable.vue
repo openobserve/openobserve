@@ -387,7 +387,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator v-if="tab === 'json' || tab === 'table'" />
     <q-card-section v-if="tab === 'json' || tab === 'table'" class="q-pa-md q-pb-md">
       <div class="row items-center no-wrap justify-between">
-        <div class="col-2">
+        <div class="col-1">
           <q-btn
             data-test="log-detail-previous-detail-btn"
             class="o2-secondary-button tw-h-[36px]"
@@ -404,7 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.data.stream.selectedStream.length <= 1 &&
             hasAggregationQuery == false
           "
-          class="col-8 row justify-center align-center q-gutter-sm"
+          class="col row justify-center align-center q-gutter-sm"
         >
           <div class="tw-leading-10 tw-font-bold">
             {{ t("common.noOfRecords") }}
@@ -430,7 +430,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </div>
-        <div class="col-2 items-end">
+        <div class="col-1 items-end" style="display: contents;">
           <q-btn
             data-test="log-detail-next-detail-btn"
             class="o2-secondary-button tw-h-[36px]"
@@ -518,6 +518,10 @@ export default defineComponent({
       type: String,
       default: null,
     },
+    initialTab: {
+      type: String,
+      default: "json",
+    },
   },
   methods: {
     toggleIncludeSearchTerm(
@@ -547,7 +551,7 @@ export default defineComponent({
     const rowData: any = ref({});
     const router = useRouter();
     const store = useStore();
-    const tab = ref("json");
+    const tab = ref(props.initialTab || "json");
     const selectedRelativeValue = ref("10");
     const recordSizeOptions: any = ref([10, 20, 50, 100, 200, 500, 1000]);
     const shouldWrapValues: any = ref(true);
@@ -556,15 +560,57 @@ export default defineComponent({
 
     const $q = useQuasar();
 
+    // Watch for initialTab prop changes to update tab
+    watch(
+      () => props.initialTab,
+      (newInitialTab) => {
+        if (newInitialTab) {
+          tab.value = newInitialTab;
+        }
+      },
+      { immediate: true }, // Run on mount to handle initial tab
+    );
+
+    // Watch for rowData to become available and trigger correlation load if needed
+    watch(
+      rowData,
+      (newRowData) => {
+        // If tab is correlation and data not loaded, trigger load once rowData is available
+        if (
+          newRowData &&
+          Object.keys(newRowData).length > 0 &&
+          tab.value.startsWith("correlated-") &&
+          !props.correlationProps
+        ) {
+          console.log(
+            "[DetailTable] rowData available + correlation tab active, emitting load-correlation",
+          );
+          // Emit the original modelValue (not flattened rowData) as it has _timestamp
+          emit("load-correlation", props.modelValue);
+        }
+      },
+      { deep: true },
+    );
+
     // Watch for tab changes - load correlation data when user clicks a correlation tab
     watch(tab, (newTab, oldTab) => {
-      const isCorrelationTab = newTab.startsWith('correlated-');
-      const wasCorrelationTab = oldTab?.startsWith('correlated-');
+      const isCorrelationTab = newTab.startsWith("correlated-");
+      const wasCorrelationTab = oldTab?.startsWith("correlated-");
 
       // Only emit if switching TO a correlation tab AND we don't have data yet
-      if (isCorrelationTab && !props.correlationProps) {
-        console.log("[DetailTable] User clicked correlation tab, emitting load-correlation");
-        emit("load-correlation", rowData.value);
+      // Skip if this is the initial load (oldTab is undefined) as rowData watcher handles it
+      if (
+        isCorrelationTab &&
+        !props.correlationProps &&
+        oldTab !== undefined &&
+        rowData.value &&
+        Object.keys(rowData.value).length > 0
+      ) {
+        console.log(
+          "[DetailTable] User clicked correlation tab, emitting load-correlation",
+        );
+        // Emit the original modelValue (not flattened rowData) as it has _timestamp
+        emit("load-correlation", props.modelValue);
       }
 
       // If switching FROM correlation tab back to JSON/Table, we keep the data loaded
@@ -682,9 +728,12 @@ export default defineComponent({
     };
 
     const showCorrelation = () => {
-      console.log("[DetailTable] showCorrelation called with rowData:", rowData.value);
-      console.log("[DetailTable] Emitting show-correlation event with log data");
-      emit("show-correlation", rowData.value);
+      console.log(
+        "[DetailTable] showCorrelation called, emitting with modelValue:",
+        props.modelValue,
+      );
+      // Emit the original modelValue (not flattened rowData) as it has _timestamp
+      emit("show-correlation", props.modelValue);
     };
 
     return {

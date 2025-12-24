@@ -634,7 +634,10 @@
     "streamRouting": "ストリームルーティング",
     "testFunction": "関数をテスト",
     "errorDetails": "エラー",
-    "function_definition": "関数定義"
+    "function_definition": "関数定義",
+    "enrichmentTableURL": "エンリッチメントテーブルの URL",
+    "urlCannotBeModified": "作成後に URL を変更することはできません",
+    "close": "閉じる"
   },
   "confirmDialog": {
     "cancel": "キャンセル",
@@ -1021,7 +1024,29 @@
     "showAllLegends": "すべてのレジェンドを表示",
     "legendsOfCharts": "レジェンド・オブ・チャート",
     "totalLegends": "合計:{カウント}",
-    "noLegendsAvailable": "レジェンドはありません"
+    "noLegendsAvailable": "レジェンドはありません",
+    "aggregationFunction": "アグリゲーション機能",
+    "geoLatLabel": "緯度ラベル",
+    "geoLonLabel": "経度ラベル",
+    "geoWeightLabel": "ウェイトラベル",
+    "geoNameLabel": "名前ラベル",
+    "geoSymbolSize": "シンボルサイズ",
+    "geoEnableRoam": "ズーム/パンを有効にする",
+    "mapsNameLabel": "ロケーション名ラベル",
+    "mapsMapType": "マップタイプ",
+    "mapsEnableRoam": "ズーム/パンを有効にする",
+    "tableAggregations": "テーブル集約",
+    "showTimestamp": "タイムスタンプ列を表示",
+    "pageSize": "1 ページあたりの行数",
+    "enableSorting": "ソートを有効にする",
+    "enableFiltering": "フィルタリングを有効にする",
+    "enablePagination": "ページネーションを有効にする",
+    "aggregateRows": "時系列データの集約",
+    "visibleColumns": "表示カラム",
+    "hiddenColumns": "非表示列",
+    "stickyFirstColumn": "スティッキー・ファースト・カラム",
+    "stickyColumns": "スティッキーカラム",
+    "promqlTableMode": "プロムQL テーブルモード"
   },
   "panel": {
     "header": "パネル",
@@ -1096,7 +1121,12 @@
     "innerJoin": "インナー・ジョイン",
     "rightJoin": "右結合",
     "addClause": "条項を追加",
-    "removeClause": "条項を削除"
+    "removeClause": "条項を削除",
+    "metric": "メトリック",
+    "labelFilters": "ラベルフィルター",
+    "operations": "オペレーション",
+    "promQLBuilder": "プロムQLビルダー",
+    "options": "[オプション]"
   },
   "home": {
     "streams": "ストリーム",

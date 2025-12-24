@@ -925,13 +925,13 @@ async fn merge_files(
 
     // generate tantivy inverted index and write to storage
     let file_format = config::get_config().common.file_format;
-    let (schema, reader) = get_recordbatch_reader_from_bytes(file_format, &buf).await?;
+    let (_, reader) = get_recordbatch_reader_from_bytes(file_format, &buf).await?;
     let index_size = create_tantivy_index(
         "INGESTER",
         &new_file_key,
         &full_text_search_fields,
         &index_fields,
-        schema,
+        latest_schema, // Use stream schema to include all configured fields
         reader,
     )
     .await

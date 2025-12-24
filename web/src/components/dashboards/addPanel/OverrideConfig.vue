@@ -69,7 +69,7 @@ export default defineComponent({
       "dashboardPanelDataPageKey",
       "dashboard",
     );
-    const { dashboardPanelData } = useDashboardPanelData(
+    const { dashboardPanelData, promqlMode } = useDashboardPanelData(
       dashboardPanelDataPageKey,
     );
 
@@ -78,9 +78,50 @@ export default defineComponent({
     const overrideConfigs = ref<OverrideConfig[]>([]);
 
     const fetchColumns = () => {
-      const x = dashboardPanelData.data.queries[0].fields.x || [];
-      const y = dashboardPanelData.data.queries[0].fields.y || [];
-      columns.value = [...x, ...y];
+      // Different logic for PromQL vs SQL queries
+      if (promqlMode.value) {
+        // PromQL mode: Get fields from stream schema across ALL queries
+        const allFieldNames = new Set<string>();
+
+        if (!dashboardPanelData.meta?.streamFields?.groupedFields) {
+          columns.value = [];
+          return;
+        }
+
+        // Iterate through ALL queries and collect unique field names
+        dashboardPanelData.data.queries.forEach((query: any) => {
+          const streamName = query?.fields?.stream;
+
+          if (!streamName) return;
+
+          // Find the stream in groupedFields
+          const streamFields =
+            dashboardPanelData.meta.streamFields.groupedFields.find(
+              (group: any) => group.name === streamName,
+            );
+
+          if (streamFields?.schema) {
+            // Extract field names from schema and add to set (automatically removes duplicates)
+            streamFields.schema.forEach((field: any) => {
+              if (field.name) {
+                allFieldNames.add(field.name);
+              }
+            });
+          }
+        });
+
+        // Convert to column format expected by OverrideConfigPopup
+        columns.value = Array.from(allFieldNames)
+          .sort()
+          .map((fieldName) => ({
+            alias: fieldName,
+            label: fieldName,
+          }));
+      } else {
+        const x = dashboardPanelData.data.queries[0].fields.x || [];
+        const y = dashboardPanelData.data.queries[0].fields.y || [];
+        columns.value = [...x, ...y];
+      }
     };
 
     const openOverrideConfigPopup = () => {
