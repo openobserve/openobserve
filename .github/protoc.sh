@@ -1,17 +1,18 @@
 #! /bin/bash
-#
+set -e
 
 PLATFORM=$(uname -p)
 
-if [[ $PLATFORM -eq "x86_64" ]]; then
-  wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-x86_64.zip
-  unzip protoc-21.12-linux-x86_64.zip -d protoc
-elif [[ $PLATFORM -eq "aarch64" ]]; then
-  wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-aarch_64.zip
-  unzip protoc-21.12-linux-aarch_64.zip -d protoc
+if [[ $PLATFORM == "x86_64" ]]; then
+  curl --output protoc.zip "https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-x86_64.zip"
+elif [[ $PLATFORM == "aarch64" ]]; then
+  curl --output protoc.zip "https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-aarch_64.zip"
 else
   echo "unsupported platform $PLATFORM"
+  exit 1
 fi
+
+unzip protoc.zip -d protoc
 
 sudo cp protoc/bin/protoc /usr/local/bin/
 sudo cp -r protoc/include/google /usr/local/include/
