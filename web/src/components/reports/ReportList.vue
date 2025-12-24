@@ -500,7 +500,7 @@ const createNewReport = () => {
     button: "Add Report",
     page: "Reports"
   });
-  router.push({ name: "createReport" });
+  router.push({ name: "createReport", query: { org_identifier: store.state.selectedOrganization.identifier } });
 };
 
 const filterReports = () => {
