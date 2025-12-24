@@ -17,7 +17,7 @@ use bytes::Bytes;
 use config::{
     TIMESTAMP_COL_NAME,
     meta::{search::Response, sql::OrderBy, stream::StreamType},
-    utils::{file::scan_files, json, time::now_micros},
+    utils::{file::scan_files, json},
 };
 use infra::cache::{
     file_data::disk::{self, QUERY_RESULT_CACHE},
