@@ -441,14 +441,12 @@ pub async fn create_org(
                     crate::service::users::get_user(Some(config::META_ORG_ID), user_email).await
                 {
                     if meta_user.role == UserRole::ServiceAccount {
-                        let token = mask_token_if_needed(
-                            new_org_user.token.clone(),
-                            Some(&org.identifier),
-                            &new_org_user.email,
-                        );
+                        // IMPORTANT: Do NOT mask the token in the creation response
+                        // The whole point of returning it is so automation can use it immediately
+                        // Token masking should only apply when viewing/retrieving tokens later
                         Some(crate::common::meta::organization::ServiceAccountTokenInfo {
                             email: new_org_user.email.clone(),
-                            token,
+                            token: new_org_user.token.clone(),
                             role: format!("{}", new_org_user.role),
                         })
                     } else {
