@@ -1603,7 +1603,10 @@ export default defineComponent({
 
           let modifiedQuery = originalQuery;
 
-          if (drilldownData.data.logsMode === "auto") {
+          // Check if this is a PromQL query - if so, skip auto mode SQL parsing
+          const isPromQLQuery = panelSchema.value.queryType === "promql";
+
+          if (drilldownData.data.logsMode === "auto" && !isPromQLQuery) {
             if (!parser) {
               await importSqlParser();
             }
@@ -1638,6 +1641,10 @@ export default defineComponent({
             );
 
             modifiedQuery = `SELECT * FROM "${streamName}"${aliasClause} ${whereClause}`;
+          } else if (drilldownData.data.logsMode === "auto" && isPromQLQuery) {
+            // For PromQL queries in auto mode, create a simple SELECT * query
+            // since we can't parse PromQL syntax with SQL parser
+            modifiedQuery = `SELECT * FROM "${streamName}"`;
           } else {
             // Create drilldown variables object exactly as you do for other drilldown types
             const drilldownVariables: any = {};
