@@ -176,6 +176,8 @@ pub struct RequestQuery {
     pub time: Option<String>,
     /// Evaluation timeout.
     pub timeout: Option<String>,
+    /// Use streaming output.
+    pub use_streaming: Option<bool>,
 }
 
 /// Range query.

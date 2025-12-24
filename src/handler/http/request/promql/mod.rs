@@ -99,6 +99,7 @@ pub async fn remote_write(
         ("query" = String, Query, description = "Prometheus expression query string"),
         ("time" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: Evaluation timestamp. Optional"),
         ("timeout" = Option<String>, Query, description = "Evaluation timeout"),
+        ("use_streaming" = Option<bool>, Query, description = "Enable streaming response for large result sets"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
@@ -245,7 +246,8 @@ async fn query(
     let end = start;
     let timeout = search_timeout(req.timeout);
 
-    let req = promql::MetricsQueryRequest {
+    let use_streaming = req.use_streaming;
+    let search_req = promql::MetricsQueryRequest {
         query: req.query.unwrap_or_default(),
         start,
         end,
@@ -257,7 +259,13 @@ async fn query(
         clusters: vec![],
     };
 
-    search(&trace_id, org_id, req, user_email, timeout).await
+    if let Some(use_streaming) = use_streaming
+        && use_streaming
+    {
+        search_streaming(&trace_id, org_id, search_req, user_email, timeout).await
+    } else {
+        search(&trace_id, org_id, search_req, user_email, timeout).await
+    }
 }
 
 /// prometheus range queries
