@@ -49,7 +49,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{
                 props.value == "undefined" || props.value === null
                   ? ""
-                  : props.value
+                  : props.col.format
+                    ? props.col.format(props.value, props.row)
+                    : props.value
               }}
             </span>
           </template>
