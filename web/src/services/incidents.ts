@@ -79,11 +79,15 @@ const incidents = {
     org_identifier: string,
     status?: string,
     limit: number = 50,
-    offset: number = 0
+    offset: number = 0,
+    keyword?: string
   ) => {
     let url = `/api/v2/${org_identifier}/alerts/incidents?limit=${limit}&offset=${offset}`;
     if (status) {
       url += `&status=${status}`;
+    }
+    if (keyword) {
+      url += `&keyword=${encodeURIComponent(keyword)}`;
     }
     return http().get<ListIncidentsResponse>(url);
   },
