@@ -214,6 +214,9 @@ const editRole = (role: any) => {
     params: {
       role_name: role.role_name,
     },
+    query:{
+      org_identifier: store.state.selectedOrganization.identifier
+    }
   });
 };
 
