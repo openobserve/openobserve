@@ -1675,6 +1675,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OverrideConfig
       v-if="dashboardPanelData.data.type == 'table'"
       :dashboardPanelData="dashboardPanelData"
+      :panelData="panelData"
     />
     <div class="space"></div>
 
