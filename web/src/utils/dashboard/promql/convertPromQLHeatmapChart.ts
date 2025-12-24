@@ -118,6 +118,10 @@ export class HeatmapConverter implements PromQLChartConverter {
         splitArea: {
           show: true,
         },
+        axisLabel: {
+          overflow: "truncate",
+          width: config.axis_width || 150,
+        },
       },
       visualMap: {
         min: config.min_value ?? minValue,
