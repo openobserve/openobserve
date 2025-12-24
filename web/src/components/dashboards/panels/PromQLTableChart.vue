@@ -143,9 +143,9 @@ export default defineComponent({
     // Determine if legend footer should be shown
     const showLegendFooter = computed(() => {
       const tableMode = props.config?.promql_table_mode || "single";
-      // Show legend footer in both "single" and "single_with_metadata" modes when there are multiple series
+      // Show legend footer in both "single" and "expanded_timeseries" modes when there are multiple series
       return (
-        (tableMode === "single" || tableMode === "single_with_metadata") &&
+        (tableMode === "single" || tableMode === "expanded_timeseries") &&
         legendOptions.value.length > 1
       );
     });
@@ -192,11 +192,10 @@ export default defineComponent({
               // In "all" mode, default to "All series"
               selectedLegend.value = "__all__";
             } else {
-              // In "single" or "single_with_metadata" mode, select first series
+              // In "single" or "expanded_timeseries" mode, select first series
               selectedLegend.value = legendOptions.value[0]?.value || "";
             }
-
-          } 
+          }
         }
       },
       { deep: true, immediate: true },

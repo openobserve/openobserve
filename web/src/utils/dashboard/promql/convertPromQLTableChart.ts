@@ -137,15 +137,13 @@ export class TableConverter implements PromQLChartConverter {
             return formatUnitValue(unitValue);
           },
           // support override configs for coloring
-          colorMode: colorConfigMap["value"]?.autoColor
-            ? "auto"
-            : undefined,
+          colorMode: colorConfigMap["value"]?.autoColor ? "auto" : undefined,
         },
       ];
     }
 
-    // In "single_with_metadata" mode, show timestamp + all metric labels + value
-    if (tableMode === "single_with_metadata") {
+    // In "expanded_timeseries" mode, show timestamp + all metric labels + value
+    if (tableMode === "expanded_timeseries") {
       // Collect all unique label keys from all series
       const labelKeys = new Set<string>();
       processedData.forEach((queryData) => {
@@ -254,9 +252,7 @@ export class TableConverter implements PromQLChartConverter {
           return formatUnitValue(unitValue);
         },
         // support override configs for coloring
-        colorMode: colorConfigMap["value"]?.autoColor
-          ? "auto"
-          : undefined,
+        colorMode: colorConfigMap["value"]?.autoColor ? "auto" : undefined,
       });
 
       return columns;
@@ -415,8 +411,8 @@ export class TableConverter implements PromQLChartConverter {
       return rows;
     }
 
-    // In "single_with_metadata" mode, create rows with timestamp + all metric labels + value
-    if (tableMode === "single_with_metadata") {
+    // In "expanded_timeseries" mode, create rows with timestamp + all metric labels + value
+    if (tableMode === "expanded_timeseries") {
       const timezone = store.state.timezone;
 
       processedData.forEach((queryData, qIndex) => {

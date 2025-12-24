@@ -113,10 +113,10 @@ export default defineComponent({
             columnNames.add("timestamp");
             columnNames.add("value");
           } else if (
-            tableMode === "single_with_metadata" ||
+            tableMode === "expanded_timeseries" ||
             tableMode === "all"
           ) {
-            if (tableMode === "single_with_metadata") {
+            if (tableMode === "expanded_timeseries") {
               columnNames.add("timestamp");
             }
 
@@ -130,8 +130,9 @@ export default defineComponent({
             }
 
             // Add value column(s)
-            const aggregations =
-              config.table_aggregations || [config.aggregation || "last"];
+            const aggregations = config.table_aggregations || [
+              config.aggregation || "last",
+            ];
             if (aggregations.length === 1) {
               columnNames.add("value");
             } else {
