@@ -931,7 +931,7 @@ async fn merge_files(
         &new_file_key,
         &full_text_search_fields,
         &index_fields,
-        latest_schema, // Use stream schema to include all configured fields
+        latest_schema.clone(), // Use stream schema to include all configured fields
         reader,
     )
     .await
