@@ -1119,6 +1119,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 
   const resetAggregationFunction = () => {
+    // Skip resetting fields for PromQL mode to preserve the query
+    if (dashboardPanelData.data.queryType === "promql") {
+      return;
+    }
+
     switch (dashboardPanelData.data.type) {
       case "heatmap":
         dashboardPanelData.data.queries[
