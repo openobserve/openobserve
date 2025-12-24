@@ -67,7 +67,7 @@ mod tests {
     fn postgres() {
         collapsed_eq!(
             &create_table_stmt().to_string(PostgresQueryBuilder),
-            r#"CREATE TABLE IF NOT EXISTS "kv_store" ( "org_id" varchar(256) NOT NULL, "key" varchar(256) NOT NULL, "value" text NOT NULL, "created_at" bigint NOT NULL, "updated_at" bigint NOT NULL, PRIMARY KEY ("org_id", "key") )"#
+            r#"CREATE TABLE IF NOT EXISTS "kv_store" ( "org_id" varchar(256) NOT NULL, "key" varchar(256) NOT NULL, "value" bytea NOT NULL, "created_at" bigint NOT NULL, "updated_at" bigint NOT NULL, PRIMARY KEY ("org_id", "key") )"#
         );
     }
 
@@ -75,7 +75,7 @@ mod tests {
     fn mysql() {
         collapsed_eq!(
             &create_table_stmt().to_string(MysqlQueryBuilder),
-            r#"CREATE TABLE IF NOT EXISTS `kv_store` ( `org_id` varchar(256) NOT NULL, `key` varchar(256) NOT NULL, `value` text NOT NULL, `created_at` bigint NOT NULL, `updated_at` bigint NOT NULL, PRIMARY KEY (`org_id`, `key`) )"#
+            r#"CREATE TABLE IF NOT EXISTS `kv_store` ( `org_id` varchar(256) NOT NULL, `key` varchar(256) NOT NULL, `value` binary(1) NOT NULL, `created_at` bigint NOT NULL, `updated_at` bigint NOT NULL, PRIMARY KEY (`org_id`, `key`) )"#
         );
     }
 
@@ -83,7 +83,7 @@ mod tests {
     fn sqlite() {
         collapsed_eq!(
             &create_table_stmt().to_string(SqliteQueryBuilder),
-            r#"CREATE TABLE IF NOT EXISTS "kv_store" ( "org_id" varchar(256) NOT NULL, "key" varchar(256) NOT NULL, "value" text NOT NULL, "created_at" bigint NOT NULL, "updated_at" bigint NOT NULL, PRIMARY KEY ("org_id", "key") )"#
+            r#"CREATE TABLE IF NOT EXISTS "kv_store" ( "org_id" varchar(256) NOT NULL, "key" varchar(256) NOT NULL, "value" blob(1) NOT NULL, "created_at" bigint NOT NULL, "updated_at" bigint NOT NULL, PRIMARY KEY ("org_id", "key") )"#
         );
     }
 }
