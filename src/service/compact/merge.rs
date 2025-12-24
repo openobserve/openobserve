@@ -823,6 +823,9 @@ pub async fn merge_files(
         .values()
         .flat_map(|s| s.fields().iter().map(|f| f.name().to_string()))
         .collect::<HashSet<_>>();
+    // Keep original schema for index generation (has all stream fields)
+    let stream_schema_for_index = Arc::new(latest_schema.clone());
+    // Create filtered schema for parquet merging (only fields in parquet files)
     let latest_schema = Arc::new(latest_schema.retain(all_fields));
     let mut latest_schema_fields = HashMap::with_capacity(latest_schema.fields().len());
     for field in latest_schema.fields() {
@@ -980,7 +983,7 @@ pub async fn merge_files(
                     &index_fields,
                     &retain_file_list,
                     &mut new_file_meta,
-                    latest_schema.clone(),
+                    stream_schema_for_index.clone(),
                     &buf,
                 )
                 .await?;
@@ -1021,7 +1024,7 @@ pub async fn merge_files(
                         &index_fields,
                         &retain_file_list,
                         &mut new_file_meta,
-                        latest_schema.clone(),
+                        stream_schema_for_index.clone(),
                         &buf,
                     )
                     .await?;
