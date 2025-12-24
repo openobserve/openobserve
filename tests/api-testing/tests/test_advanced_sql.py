@@ -527,6 +527,14 @@ def test_e2e_time_series_window_functions(create_session, base_url):
     session = create_session
     url = base_url
     org_id = "default"
+
+    # Health check before running complex query
+    try:
+        health_check = session.get(f"{url}healthz", timeout=5)
+        if health_check.status_code != 200:
+            logging.warning(f"Server health check returned status {health_check.status_code}")
+    except Exception as e:
+        logging.warning(f"Server health check failed: {e}. Proceeding with test anyway...")
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
