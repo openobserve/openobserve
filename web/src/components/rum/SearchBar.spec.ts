@@ -22,17 +22,17 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
 // Mock File constructor globally before any imports
-global.File = class MockFile {
-  data: any[];
-  name: string;
-  type: string;
-
-  constructor(data: any[], name: string, options?: any) {
+// Use Object.defineProperty to ensure it overrides jsdom's File
+Object.defineProperty(global, 'File', {
+  value: vi.fn().mockImplementation(function(this: any, data: any[], name: string, options?: any) {
     this.data = data;
     this.name = name;
     this.type = options?.type || '';
-  }
-} as any;
+    return this;
+  }),
+  writable: true,
+  configurable: true
+});
 
 // Mock Vue's defineAsyncComponent
 vi.mock("vue", async (importOriginal) => {
@@ -482,14 +482,13 @@ describe("SearchBar Component", () => {
         revokeObjectURL: vi.fn(),
       };
 
-      // Mock File constructor
-      globalThis.File = vi
-        .fn()
-        .mockImplementation((data, filename, options) => ({
-          data,
-          filename,
-          options,
-        }));
+      // Mock File constructor as a proper constructor function
+      globalThis.File = vi.fn().mockImplementation(function(this: any, data: any, filename: string, options?: any) {
+        this.data = data;
+        this.filename = filename;
+        this.options = options;
+        return this;
+      }) as any;
 
       // Mock document methods only for download operations
       const mockLink = {
