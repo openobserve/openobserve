@@ -343,6 +343,7 @@ import {
 import { useStore } from "vuex";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
+import useDashboardPanelData from "@/composables/useDashboardPanel";
 import {
   getAllDashboardsByFolderId,
   getDashboard,
@@ -529,6 +530,21 @@ export default defineComponent({
     const route = useRoute();
     const router = useRouter();
 
+    // Inject the page key to access dashboard panel data
+    const dashboardPanelDataPageKey: any = inject(
+      "dashboardPanelDataPageKey",
+      "default"
+    );
+
+    // Get dashboard panel data to access hiddenQueries
+    const { dashboardPanelData: dashboardPanelDataForHiding } = useDashboardPanelData(
+      dashboardPanelDataPageKey
+    );
+
+    const hiddenQueries = computed(() => {
+      return dashboardPanelDataForHiding?.layout?.hiddenQueries || [];
+    });
+
     // stores the converted data which can be directly used for rendering different types of panels
     const panelData: any = ref({}); // holds the data to render the panel after getting data from the api based on panel config
     const chartPanelRef: any = ref(null); // holds the ref to the whole div
@@ -620,6 +636,36 @@ export default defineComponent({
       panelSchema.value.id,
       folderId.value,
     );
+
+    // Filter data based on hiddenQueries for PromQL panels
+    const filteredData = computed(() => {
+      // If no data, return as is
+      if (!data.value) {
+        return data.value;
+      }
+
+      // Only filter for PromQL queries
+      if (panelSchema.value.queryType !== "promql") {
+        return data.value;
+      }
+
+      // If no hidden queries or empty array, return as is
+      if (
+        !hiddenQueries.value ||
+        hiddenQueries.value.length === 0 ||
+        !Array.isArray(data.value)
+      ) {
+        return data.value;
+      }
+
+      // Filter out hidden queries
+      const filtered = data.value.filter(
+        (_: any, index: number) => !hiddenQueries.value.includes(index),
+      );
+
+      // Return filtered data
+      return filtered;
+    });
 
     // need tableRendererRef to access downloadTableAsCSV method
     const tableRendererRef: any = ref(null);
@@ -875,7 +921,7 @@ export default defineComponent({
         try {
           panelData.value = await convertPanelData(
             panelSchema.value,
-            data.value,
+            filteredData.value,
             store,
             chartPanelRef,
             hoveredSeriesState,
@@ -929,6 +975,18 @@ export default defineComponent({
           validatePanelData?.value?.length === 0 &&
           data.value?.length
         ) {
+          await convertPanelDataCommon();
+        }
+      },
+      { deep: true },
+    );
+
+    // Watch for hiddenQueries changes to re-render the chart
+    watch(
+      hiddenQueries,
+      async () => {
+        // Only re-convert panel data if we're in promql mode
+        if (panelSchema.value.queryType === "promql" && data.value) {
           await convertPanelDataCommon();
         }
       },
@@ -1152,9 +1210,9 @@ export default defineComponent({
       }
       // Check if the queryType is 'promql'
       else if (panelSchema.value?.queryType == "promql") {
-        // Check if the 'data' array has elements and every item has a non-empty 'result' array
-        return data.value?.length &&
-          data.value.some((item: any) => item?.result?.length)
+        // Check if the 'filteredData' array has elements and every item has a non-empty 'result' array
+        return filteredData.value?.length &&
+          filteredData.value.some((item: any) => item?.result?.length)
           ? "" // Return an empty string if there is data
           : "No Data"; // Return "No Data" if there is no data
       } else {
@@ -2079,7 +2137,8 @@ export default defineComponent({
             const flattenedData: any[] = [];
 
             // Iterate through each response item (multiple queries can produce multiple responses)
-            data?.value?.forEach((promData: any, queryIndex: number) => {
+            // Use filteredData to exclude hidden queries
+            filteredData?.value?.forEach((promData: any, queryIndex: number) => {
               if (!promData?.result || !Array.isArray(promData.result)) return;
 
               // Iterate through each result (time series)
@@ -2214,7 +2273,11 @@ export default defineComponent({
           tableRendererRef?.value?.downloadTableAsJSON(title);
         } else {
           // Handle non-table charts
-          const chartData = data.value;
+          // Use filteredData for PromQL to exclude hidden queries, otherwise use data
+          const chartData =
+            panelSchema.value.queryType === "promql"
+              ? filteredData.value
+              : data.value;
 
           if (!chartData || !chartData.length) {
             showErrorNotification("No data available to download");
