@@ -23,14 +23,16 @@ export default mergeConfig(
       include: ["src/**/*.spec.{ts,js,vue}"],
       root: fileURLToPath(new URL('.', import.meta.url)),
       setupFiles: ['src/test/unit/helpers/setupTests.ts'],
-      deps: {
-        inline: ["monaco-editor", "vitest-canvas-mock"],
+      server: {
+        deps: {
+          inline: ["monaco-editor", "vitest-canvas-mock"],
+        },
       },
       // Prevent unhandled errors from failing the test suite
       dangerouslyIgnoreUnhandledErrors: true,
       coverage: {
         reporter: ["text", "json", "html", "json-summary"],
-        all: true,
+        include: ["src/**"],
         thresholds: {
           lines: 27,
           functions: 27,
