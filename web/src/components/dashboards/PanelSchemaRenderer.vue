@@ -181,6 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <q-btn
           v-if="
+            showLegendsButton &&
             ![
               'table',
               'html',
@@ -501,6 +502,11 @@ export default defineComponent({
       required: false,
       default: false,
     },
+    showLegendsButton: {
+      type: Boolean,
+      required: false,
+      default: true,
+    },
   },
   emits: [
     "updated:data-zoom",
@@ -563,6 +569,7 @@ export default defineComponent({
       searchResponse,
       is_ui_histogram,
       shouldRefreshWithoutCache,
+      showLegendsButton,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
     let {
