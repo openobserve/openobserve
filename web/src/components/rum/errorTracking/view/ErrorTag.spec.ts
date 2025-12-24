@@ -89,14 +89,15 @@ describe("ErrorTag Component", () => {
 
   describe("Tag Key Display", () => {
     it("should display the tag key", () => {
-      const keyElement = wrapper.find(".tag-block .q-px-md:first-child");
-      expect(keyElement.exists()).toBe(true);
-      expect(keyElement.text()).toBe("service");
+      // Vue Test Utils v2.4+ doesn't support :first-child in find(), use findAll()[0]
+      const keyElements = wrapper.findAll(".q-px-md");
+      expect(keyElements.length).toBeGreaterThan(0);
+      expect(keyElements[0].text()).toBe("service");
     });
 
     it("should have correct key styling", () => {
-      const keyElement = wrapper.find(".tag-block .q-px-md:first-child");
-      expect(keyElement.classes()).toContain("q-px-md");
+      const keyElements = wrapper.findAll(".q-px-md");
+      expect(keyElements[0].classes()).toContain("q-px-md");
     });
   });
 
@@ -143,9 +144,9 @@ describe("ErrorTag Component", () => {
 
       await wrapper.setProps({ tag: customTag });
 
-      const keyElement = wrapper.find(".tag-block .q-px-md:first-child");
-      const valueElements = wrapper.findAll(".q-px-md");
-      const valueElement = valueElements[1]; // Second q-px-md is the value
+      const allElements = wrapper.findAll(".q-px-md");
+      const keyElement = allElements[0];
+      const valueElement = allElements[1]; // Second q-px-md is the value
 
       expect(keyElement.text()).toBe("error_type");
       expect(valueElement.text()).toBe("TypeError");
@@ -174,9 +175,9 @@ describe("ErrorTag Component", () => {
 
       await wrapper.setProps({ tag: specialTag });
 
-      const keyElement = wrapper.find(".tag-block .q-px-md:first-child");
-      const valueElements = wrapper.findAll(".q-px-md");
-      const valueElement = valueElements[1]; // Second q-px-md is the value
+      const allElements = wrapper.findAll(".q-px-md");
+      const keyElement = allElements[0];
+      const valueElement = allElements[1]; // Second q-px-md is the value
 
       expect(keyElement.text()).toBe("user@email");
       expect(valueElement.text()).toBe("test@example.com");
@@ -186,10 +187,10 @@ describe("ErrorTag Component", () => {
   describe("Component Structure", () => {
     it("should have proper element hierarchy", () => {
       const container = wrapper.find(".tag-block");
-      const keyElement = container.find(".q-px-md:first-child");
+      const allElements = container.findAll(".q-px-md");
+      const keyElement = allElements[0];
       const separator = container.find('[data-test="separator"]');
-      const valueElements = container.findAll(".q-px-md");
-      const valueElement = valueElements[1]; // Second q-px-md is the value
+      const valueElement = allElements[1]; // Second q-px-md is the value
 
       expect(container.exists()).toBe(true);
       expect(keyElement.exists()).toBe(true);
@@ -225,9 +226,9 @@ describe("ErrorTag Component", () => {
       expect(container.classes()).toContain("q-mr-sm");
       expect(container.classes()).toContain("q-mt-sm");
 
-      const keyElement = wrapper.find(".tag-block .q-px-md:first-child");
-      const valueElements = wrapper.findAll(".q-px-md");
-      const valueElement = valueElements[1]; // Second q-px-md is the value
+      const allElements = wrapper.findAll(".q-px-md");
+      const keyElement = allElements[0];
+      const valueElement = allElements[1]; // Second q-px-md is the value
 
       expect(keyElement.classes()).toContain("q-px-md");
       expect(valueElement.classes()).toContain("q-px-md");
@@ -243,7 +244,7 @@ describe("ErrorTag Component", () => {
 
       await wrapper.setProps({ tag: longKeyTag });
 
-      const keyElement = wrapper.find(".tag-block .q-px-md:first-child");
+      const keyElement = wrapper.findAll(".q-px-md")[0];
       expect(keyElement.text()).toBe(longKeyTag.key);
     });
 
@@ -262,7 +263,7 @@ describe("ErrorTag Component", () => {
 
       await wrapper.setProps({ tag: emptyKeyTag });
 
-      const keyElement = wrapper.find(".tag-block .q-px-md:first-child");
+      const keyElement = wrapper.findAll(".q-px-md")[0];
       expect(keyElement.text()).toBe("");
     });
 

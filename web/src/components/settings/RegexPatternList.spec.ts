@@ -61,11 +61,12 @@ Object.defineProperty(document, 'createElement', {
   configurable: true
 });
 
-// Mock Blob
-global.Blob = vi.fn().mockImplementation((content, options) => ({
-  content,
-  options
-}));
+// Mock Blob as a proper constructor
+global.Blob = vi.fn().mockImplementation(function(this: any, content: any, options: any) {
+  this.content = content;
+  this.options = options;
+  return this;
+}) as any;
 
 // Mock i18n
 const mockT = vi.fn((key) => key);
