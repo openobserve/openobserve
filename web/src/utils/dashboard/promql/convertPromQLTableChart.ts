@@ -106,6 +106,10 @@ export class TableConverter implements PromQLChartConverter {
           label: "Timestamp",
           align: "left",
           sortable: true,
+          // support override configs for coloring
+          colorMode: colorConfigMap["timestamp"]?.autoColor
+            ? "auto"
+            : undefined,
         },
         {
           name: "value",
@@ -132,6 +136,10 @@ export class TableConverter implements PromQLChartConverter {
             );
             return formatUnitValue(unitValue);
           },
+          // support override configs for coloring
+          colorMode: colorConfigMap["value"]?.autoColor
+            ? "auto"
+            : undefined,
         },
       ];
     }
@@ -185,6 +193,10 @@ export class TableConverter implements PromQLChartConverter {
           sticky: makeFirstSticky, // Make timestamp sticky if first column should be sticky
           headerClasses: makeFirstSticky ? "sticky-column" : undefined,
           classes: makeFirstSticky ? "sticky-column" : undefined,
+          // support override configs for coloring
+          colorMode: colorConfigMap["timestamp"]?.autoColor
+            ? "auto"
+            : undefined,
         },
       ];
 
@@ -241,6 +253,10 @@ export class TableConverter implements PromQLChartConverter {
           );
           return formatUnitValue(unitValue);
         },
+        // support override configs for coloring
+        colorMode: colorConfigMap["value"]?.autoColor
+          ? "auto"
+          : undefined,
       });
 
       return columns;
@@ -344,6 +360,10 @@ export class TableConverter implements PromQLChartConverter {
           );
           return formatUnitValue(unitValue);
         },
+        // support override configs for coloring
+        colorMode: colorConfigMap[columnName.toLowerCase()]?.autoColor
+          ? "auto"
+          : undefined,
       } as any);
     });
 
