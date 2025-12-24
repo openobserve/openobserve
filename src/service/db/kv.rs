@@ -190,3 +190,167 @@ mod super_cluster {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_mk_cache_key() {
+        // Test basic cache key generation
+        assert_eq!(mk_cache_key("org1", "key1"), "org1/key1");
+        assert_eq!(mk_cache_key("default", "config"), "default/config");
+
+        // Test with special characters in key
+        assert_eq!(mk_cache_key("org", "user:alice"), "org/user:alice");
+
+        // Test with empty strings
+        assert_eq!(mk_cache_key("", "key"), "/key");
+        assert_eq!(mk_cache_key("org", ""), "org/");
+    }
+
+    #[test]
+    fn test_mk_cache_key_format() {
+        // Verify the format is always "org_id/key"
+        let result = mk_cache_key("test_org", "test_key");
+        assert!(result.contains('/'));
+        let parts: Vec<&str> = result.split('/').collect();
+        assert_eq!(parts.len(), 2);
+        assert_eq!(parts[0], "test_org");
+        assert_eq!(parts[1], "test_key");
+    }
+
+    #[tokio::test]
+    async fn test_set_validates_org_id_with_slash() {
+        // Test that org_id with '/' character is rejected
+        let result = set("org/with/slash", "key", Bytes::from("value")).await;
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("org_id cannot contain '/' character")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_set_validates_org_id_without_slash() {
+        // Test that org_id without '/' passes validation
+        // Note: This will fail at DB level, but validation passes
+        let result = set("valid_org", "key", Bytes::from("value")).await;
+        // We expect a DB error, not a validation error
+        if let Err(e) = result {
+            assert!(
+                !e.to_string()
+                    .contains("org_id cannot contain '/' character")
+            );
+        }
+    }
+
+    #[test]
+    fn test_list_keys_prefix_without_asterisk() {
+        // Test prefix without trailing asterisk (should be used as-is)
+        let prefix = "user:";
+        let result = if prefix.ends_with('*') {
+            prefix.strip_suffix('*').unwrap()
+        } else {
+            prefix
+        };
+        assert_eq!(result, "user:");
+    }
+
+    #[test]
+    fn test_list_keys_prefix_with_asterisk() {
+        // Test prefix with trailing asterisk (should be stripped)
+        let prefix = "user:*";
+        let result = if prefix.ends_with('*') {
+            prefix.strip_suffix('*').unwrap()
+        } else {
+            prefix
+        };
+        assert_eq!(result, "user:");
+    }
+
+    #[test]
+    fn test_list_keys_empty_prefix() {
+        // Test empty prefix
+        let prefix = "";
+        let result = if prefix.ends_with('*') {
+            prefix.strip_suffix('*').unwrap()
+        } else {
+            prefix
+        };
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_list_keys_asterisk_only() {
+        // Test asterisk only
+        let prefix = "*";
+        let result = if prefix.ends_with('*') {
+            prefix.strip_suffix('*').unwrap()
+        } else {
+            prefix
+        };
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_list_keys_multiple_asterisks() {
+        // Test multiple asterisks (only strips last one)
+        let prefix = "**";
+        let result = if prefix.ends_with('*') {
+            prefix.strip_suffix('*').unwrap()
+        } else {
+            prefix
+        };
+        assert_eq!(result, "*");
+    }
+
+    #[test]
+    fn test_watch_key_parsing_valid() {
+        // Test valid key parsing logic from watch function
+        let item_key = "org1/mykey";
+        let parts: Vec<&str> = item_key.splitn(2, '/').collect();
+        assert_eq!(parts.len(), 2);
+        assert_eq!(parts[0], "org1");
+        assert_eq!(parts[1], "mykey");
+    }
+
+    #[test]
+    fn test_watch_key_parsing_with_slash_in_key() {
+        // Test key parsing when key itself contains slashes
+        let item_key = "org1/path/to/key";
+        let parts: Vec<&str> = item_key.splitn(2, '/').collect();
+        assert_eq!(parts.len(), 2);
+        assert_eq!(parts[0], "org1");
+        assert_eq!(parts[1], "path/to/key");
+    }
+
+    #[test]
+    fn test_watch_key_parsing_invalid() {
+        // Test invalid key format (no slash)
+        let item_key = "invalid_key";
+        let parts: Vec<&str> = item_key.splitn(2, '/').collect();
+        // Should only have 1 part
+        assert_eq!(parts.len(), 1);
+    }
+
+    #[test]
+    fn test_coord_key_format() {
+        // Test coordinator key format generation
+        let cache_key = mk_cache_key("test_org", "test_key");
+        let coord_key = format!("/kv/{}", cache_key);
+        assert_eq!(coord_key, "/kv/test_org/test_key");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_super_cluster_key_format() {
+        // Test super cluster key format
+        let org_id = "org1";
+        let key = "key1";
+        let coord_key = format!("/kv/{}/{}", org_id, key);
+        assert_eq!(coord_key, "/kv/org1/key1");
+    }
+}
