@@ -53,7 +53,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-show="
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
-              ].fields.stream_type == 'metrics'
+              ].fields.stream_type == 'metrics' &&
+              dashboardPanelData.data.type != 'custom_chart'
             "
             @click="onUpdateQueryMode('promql', $event)"
           >
