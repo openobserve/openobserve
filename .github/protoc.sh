@@ -1,7 +1,7 @@
 #! /bin/bash
 #
 
-PLATFORM=$(uanme -p)
+PLATFORM=$(uname -p)
 
 if [[ $PLATFORM -eq "x86_64" ]]; then
   wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-x86_64.zip
