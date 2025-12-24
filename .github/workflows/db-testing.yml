@@ -175,7 +175,7 @@ jobs:
 
       - name: Upload OpenObserve logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: openobserve-logs
           path: o2_postgres.log
