@@ -788,9 +788,9 @@ pub async fn merge_files(
             index_original_data,
             index_all_values,
         );
-        latest_schema.schema().as_ref().clone()
+        latest_schema.schema().clone()
     } else {
-        latest_schema
+        Arc::new(latest_schema)
     };
 
     // read schema from parquet file and group files by schema
@@ -815,19 +815,12 @@ pub async fn merge_files(
         }
     }
 
-    // generate the final schema
+    // generate the parquet schema
     let all_fields = schemas
         .values()
         .flat_map(|s| s.fields().iter().map(|f| f.name().to_string()))
         .collect::<HashSet<_>>();
-    // Keep original schema for index generation (has all stream fields)
-    let stream_schema_for_index = Arc::new(latest_schema.clone());
-    // Create filtered schema for parquet merging (only fields in parquet files)
-    let latest_schema = Arc::new(latest_schema.retain(all_fields));
-    let mut latest_schema_fields = HashMap::with_capacity(latest_schema.fields().len());
-    for field in latest_schema.fields() {
-        latest_schema_fields.insert(field.name(), field);
-    }
+    let schema = Arc::new(latest_schema.retain(all_fields));
 
     // generate datafusion tables
     let trace_id = ider::generate();
@@ -840,27 +833,24 @@ pub async fn merge_files(
 
     let tables = match TableBuilder::new()
         .sorted_by_time(true)
-        .build(session, files.clone(), latest_schema.clone())
+        .build(session, files.clone(), schema.clone())
         .await
     {
         Ok(tables) => tables,
         Err(e) => {
-            log::error!(
-                "create_parquet_table err: {e}, files: {files:?}, schema: {latest_schema:?}"
-            );
+            log::error!("create_parquet_table err: {e}, files: {files:?}, schema: {schema:?}");
             return Err(DataFusionError::Plan(format!("create_parquet_table err: {e}")).into());
         }
     };
 
     let merge_result = {
         let stream_name = stream_name.to_string();
-        let latest_schema = latest_schema.clone();
         DATAFUSION_RUNTIME
             .spawn(async move {
                 merge::merge_parquet_files(
                     stream_type,
                     &stream_name,
-                    latest_schema,
+                    schema,
                     tables,
                     &bloom_filter_fields,
                     new_file_meta,
@@ -878,9 +868,7 @@ pub async fn merge_files(
     let buf = match merge_result {
         Ok(v) => v,
         Err(e) => {
-            log::error!(
-                "merge_parquet_files err: {e}, files: {files:?}, schema: {latest_schema:?}"
-            );
+            log::error!("merge_parquet_files err: {e}, files: {files:?}");
             return Err(DataFusionError::Plan(format!("merge_parquet_files err: {e}")).into());
         }
     };
@@ -977,7 +965,7 @@ pub async fn merge_files(
                     &index_fields,
                     &retain_file_list,
                     &mut new_file_meta,
-                    stream_schema_for_index.clone(),
+                    latest_schema.clone(),
                     &buf,
                 )
                 .await?;
@@ -1019,7 +1007,7 @@ pub async fn merge_files(
                         &index_fields,
                         &retain_file_list,
                         &mut new_file_meta,
-                        stream_schema_for_index.clone(),
+                        latest_schema.clone(),
                         &buf,
                     )
                     .await?;
