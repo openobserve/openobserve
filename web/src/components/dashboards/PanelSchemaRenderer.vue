@@ -530,17 +530,44 @@ export default defineComponent({
     const route = useRoute();
     const router = useRouter();
 
-    // Inject the page key to access dashboard panel data
+    // ============================================================================
+    // Hidden Queries Feature Setup
+    // ============================================================================
+    // This feature allows temporarily hiding PromQL query results from charts
+    // on the Add Panel and Metrics pages. It's stored in layout (not config)
+    // so it's not persisted to the dashboard.
+    //
+    // IMPORTANT: PanelSchemaRenderer is used in multiple contexts:
+    // - AddPanel.vue (provides page key "addpanel") - needs hiding feature ✓
+    // - metrics/Index.vue (provides page key "metrics") - needs hiding feature ✓
+    // - ViewPanel.vue (provides page key "dashboard") - doesn't need it
+    // - VisualizeLogsQuery.vue (provides page key "logs") - doesn't need it
+    // - PreviewAlert.vue (no page key) - doesn't need it
+    // - PanelContainer.vue (no page key) - doesn't need it
+    // - PreviewPromqlQuery.vue (no page key) - doesn't need it
+    //
+    // To avoid breaking these other contexts, we:
+    // 1. Inject with null default to detect if page key was explicitly provided
+    // 2. Only call useDashboardPanelData if a page key exists
+    // 3. Return empty array [] if no hiddenQueries (no filtering applied)
+    // ============================================================================
+
     const dashboardPanelDataPageKey: any = inject(
       "dashboardPanelDataPageKey",
-      "default"
+      null // null default allows us to detect if key was provided
     );
 
-    // Get dashboard panel data to access hiddenQueries
-    const { dashboardPanelData: dashboardPanelDataForHiding } = useDashboardPanelData(
-      dashboardPanelDataPageKey
-    );
+    // Only access the composable if we're in a context that provides a page key
+    // This prevents creating unnecessary composable instances and accessing
+    // wrong panel data in contexts that don't need the hiding feature
+    let dashboardPanelDataForHiding: any = null;
+    if (dashboardPanelDataPageKey) {
+      const result = useDashboardPanelData(dashboardPanelDataPageKey);
+      dashboardPanelDataForHiding = result.dashboardPanelData;
+    }
 
+    // Returns array of hidden query indices (e.g., [0, 2] means queries 0 and 2 are hidden)
+    // Returns [] if no page key or no hiddenQueries - which means no filtering
     const hiddenQueries = computed(() => {
       return dashboardPanelDataForHiding?.layout?.hiddenQueries || [];
     });
