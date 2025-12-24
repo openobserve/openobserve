@@ -28,8 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div style="height: 100%; position: relative">
       <TableRenderer
         :data="{ rows: filteredTableRows, columns: tableColumns }"
-        :wrap-cells="config?.wrap_table_cells"
-        :value-mapping="config?.mappings ?? []"
+        :wrap-cells="config.wrap_table_cells"
+        :value-mapping="config.mappings ?? []"
         @row-click="$emit('row-click', $event)"
       >
         <template #bottom v-if="showLegendFooter">
@@ -202,7 +202,8 @@ export default defineComponent({
       { deep: true, immediate: true },
     );
 
-    const config = props.config || {};
+    // Make config reactive to prop changes
+    const config = computed(() => props.config || {});
 
     return {
       filter,
