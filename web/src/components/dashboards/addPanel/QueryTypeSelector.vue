@@ -323,17 +323,8 @@ export default defineComponent({
           dashboardPanelData.data.queryType = "sql";
         }
 
-        // For custom charts, preserve the existing query
-        // Only clear the query for non-custom charts when switching to promql
-        if (
-          dashboardPanelData.data.type !== "custom_chart" &&
-          selectedButtonQueryType.value === "promql"
-        ) {
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].query = "";
-          dashboardPanelData.data.type = "line";
-        }
+        // Preserve the query when switching query types
+        // Query should remain intact when switching between SQL and PromQL
       }
     });
 
@@ -350,6 +341,10 @@ export default defineComponent({
           ].customQuery = false;
           dashboardPanelData.data.queryType = "sql";
         }
+
+        // Don't clear the query when switching between builder and custom modes in PromQL
+        // Only clear when switching query types (SQL/PromQL) and not for custom_chart
+        // Query should be preserved when switching from builder to custom or vice versa
       }
     });
 
