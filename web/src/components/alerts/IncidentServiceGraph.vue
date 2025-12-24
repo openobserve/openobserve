@@ -229,7 +229,8 @@ export default defineComponent({
     };
 
     const getNodeSize = (node: IncidentServiceNode): number => {
-      return 30 + node.alert_count * 5;
+      const size = 30 + node.alert_count * 5;
+      return Math.min(size, 100); // Cap at 100 to prevent oversized nodes
     };
 
     const chartData = computed(() => {
