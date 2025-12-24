@@ -83,11 +83,12 @@ describe("MenuLink", async () => {
   });
 
   it("should call window.open after clicking on external url", async () => {
-    const windowOpen = vi.spyOn(window, "open");
+    const windowOpen = vi.spyOn(window, "open").mockImplementation(() => null as any);
     await wrapper.setProps({ external: true });
     await wrapper.find('[data-test="menu-link-#-item"]').trigger("click");
     expect(windowOpen).toHaveBeenCalledTimes(1);
     expect(windowOpen).toBeCalledWith("#", "_blank");
+    windowOpen.mockRestore();
   });
 
   it("should render icon when icon prop is provided", async () => {
@@ -113,10 +114,26 @@ describe("MenuLink", async () => {
   });
 
   it("should not open external link when external is false", async () => {
-    const windowOpen = vi.spyOn(window, "open");
-    await wrapper.setProps({ external: false });
-    await wrapper.find('[data-test="menu-link-#-item"]').trigger("click");
+    const windowOpen = vi.spyOn(window, "open").mockImplementation(() => null as any);
+    const localWrapper = mount(MenuLink, {
+      props: {
+        title: "Logs",
+        caption: "",
+        link: "#",
+        icon: "",
+        mini: false,
+        external: false,
+      },
+      global: {
+        plugins: [i18n, mockRouter],
+        provide: {
+          store,
+        },
+      },
+    });
+    await localWrapper.find('[data-test="menu-link-#-item"]').trigger("click");
     expect(windowOpen).not.toHaveBeenCalled();
     windowOpen.mockRestore();
+    localWrapper.unmount();
   });
 });

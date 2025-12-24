@@ -21,6 +21,19 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
+// Mock File constructor globally before any imports
+global.File = class MockFile {
+  data: any[];
+  name: string;
+  type: string;
+
+  constructor(data: any[], name: string, options?: any) {
+    this.data = data;
+    this.name = name;
+    this.type = options?.type || '';
+  }
+} as any;
+
 // Mock Vue's defineAsyncComponent
 vi.mock("vue", async (importOriginal) => {
   const mod = await importOriginal<typeof import("vue")>();
@@ -337,6 +350,8 @@ describe("SearchBar Component", () => {
 
     it("should handle SQL mode query parsing", async () => {
       wrapper.vm.searchObj.meta.sqlMode = true;
+      // Initialize streamResults.list to avoid undefined error
+      wrapper.vm.searchObj.data.streamResults = { list: [] };
       const queryValue = "SELECT * FROM test_stream";
 
       await wrapper.vm.updateQueryValue(queryValue);
