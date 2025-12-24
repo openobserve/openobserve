@@ -92,7 +92,17 @@ jobs:
         run: cd web && npm install && npm run build
 
       - name: Build and run binary
-        run: cargo build --release --target x86_64-unknown-linux-gnu
+        env:
+          CARGO_TERM_COLOR: always
+          RUST_BACKTRACE: 1
+          CARGO_BUILD_JOBS: 4
+        run: |
+          echo "Starting Rust binary build..."
+          echo "Cargo version: $(cargo --version)"
+          echo "Rustc version: $(rustc --version)"
+          echo "Number of CPUs: $(nproc)"
+          cargo build --release --target x86_64-unknown-linux-gnu --verbose
+        timeout-minutes: 30
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
