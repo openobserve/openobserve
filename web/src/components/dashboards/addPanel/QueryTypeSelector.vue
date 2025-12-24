@@ -308,13 +308,22 @@ export default defineComponent({
           dashboardPanelData.layout.currentQueryIndex
         ].fields.stream_type,
       () => {
+        // Switch from PromQL to SQL when changing from metrics to logs/other stream types
         if (
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields.stream_type != "metrics" &&
           selectedButtonQueryType.value === "promql"
         ) {
+          selectedButtonQueryType.value = "sql";
           selectedButtonType.value = "builder";
+          dashboardPanelData.data.queryType = "sql";
+          // Clear the query since we're switching query types
+          if (dashboardPanelData.data.type !== "custom_chart") {
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].query = "";
+          }
         }
       },
     );
