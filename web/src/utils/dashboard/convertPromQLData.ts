@@ -952,6 +952,12 @@ export const convertPromQLData = async (
   }
 
   options.series = options.series.flat();
+
+  // For metric chart type, only show one metric value (from last query with data)
+  if (panelSchema.type === "metric" && options.series.length > 1) {
+    options.series = options.series.slice(-1);
+  }
+
   // Apply series color mappings via reusable helper
   applySeriesColorMappings(
     options.series,
