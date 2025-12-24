@@ -154,15 +154,15 @@ export default defineComponent({
       // set a variable to ignore updates for selectedButtonType
 
       ignoreSelectedButtonTypeUpdate.value = true;
+      selectedButtonQueryType.value = dashboardPanelData.data.queryType;
+      selectedButtonType.value = dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ]?.customQuery
+        ? "custom"
+        : "builder";
+
       if (dashboardPanelData.data.type == "custom_chart") {
         // For custom_chart, check the actual query type and customQuery flag
-        selectedButtonQueryType.value = dashboardPanelData.data.queryType;
-        selectedButtonType.value = dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.customQuery
-          ? "custom"
-          : "builder";
-
         ignoreSelectedButtonTypeUpdate.value = false;
         return;
       }
