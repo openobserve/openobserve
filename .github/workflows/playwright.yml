@@ -75,10 +75,11 @@ jobs:
         with:
           cache-on-failure: true
           prefix-key: playwright
+
       - name: Install Protoc
-        uses: arduino/setup-protoc@v3
-        with:
-          version: "21.12"
+        run: |
+          bash ./.github/protoc.sh
+
       - uses: actions/setup-node@v5
         with:
           node-version: 22
