@@ -1215,9 +1215,6 @@ async fn values_v1(
 
     req.use_cache = get_use_cache_from_request(query);
 
-    // Get the size from query parameter for limiting results
-    let size = req.query.size;
-
     // skip fields which aren't part of the schema
     let schema = infra::schema::get(org_id, stream_name, stream_type)
         .await
@@ -1263,11 +1260,11 @@ async fn values_v1(
 
         let sql = if no_count {
             format!(
-                "SELECT \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC limit {size}"
+                "SELECT \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC"
             )
         } else {
             format!(
-                "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_num DESC limit {size}"
+                "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_num DESC"
             )
         };
         let mut req = req.clone();
@@ -1310,6 +1307,7 @@ async fn values_v1(
     let mut hit_values: Vec<json::Value> = Vec::new();
     let mut work_group_set = Vec::with_capacity(query_results.len());
 
+    let size = req.query.size;
     for (key, ret) in query_results {
         let mut top_hits: Vec<(String, i64)> = Vec::with_capacity(size as usize);
         for row in ret.hits {
