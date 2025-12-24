@@ -137,13 +137,6 @@ pub async fn merge_parquet_files(
         println!("{plan}");
     }
 
-    // write result to file (parquet or vortex based on config)
-    let compression = if is_ingester && cfg.common.feature_ingester_none_compression {
-        Some("none")
-    } else {
-        None
-    };
-
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
     let (tx, mut rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
     let read_task = tokio::task::spawn(async move {
@@ -171,6 +164,11 @@ pub async fn merge_parquet_files(
     let buf = match cfg.common.file_format {
         FileFormat::Parquet => {
             let mut buf = Vec::new();
+            let compression = if is_ingester && cfg.common.feature_ingester_none_compression {
+                Some("none")
+            } else {
+                None
+            };
             let mut writer = new_parquet_writer(
                 &mut buf,
                 &schema,
@@ -194,14 +192,11 @@ pub async fn merge_parquet_files(
             buf
         }
         FileFormat::Vortex => {
-            let schema_clone = schema.clone();
-
-            // Spawn writer task in VORTEX_RUNTIME
             let writer_task = VORTEX_RUNTIME.spawn_blocking(move || {
                 VORTEX_RUNTIME.block_on(async move {
                     let mut buf = Vec::new();
                     let session = VortexSession::default().with_tokio();
-                    let dtype = DType::from_arrow(schema_clone.as_ref());
+                    let dtype = DType::from_arrow(schema.as_ref());
                     let write_options = VortexWriteOptions::new(session.clone()).with_strategy(
                         WriteStrategyBuilder::new()
                             .with_compressor(Utf8Compressor::default())
