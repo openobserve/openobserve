@@ -65,7 +65,10 @@ use crate::{
         schema::generate_schema_for_defined_schema_fields,
         search::{
             DATAFUSION_RUNTIME,
-            datafusion::exec::{self, MergeParquetResult, TableBuilder},
+            datafusion::{
+                exec::TableBuilder,
+                merge::{self, MergeParquetResult},
+            },
         },
         tantivy::create_tantivy_index,
     },
@@ -851,7 +854,7 @@ pub async fn merge_files(
         let latest_schema = latest_schema.clone();
         DATAFUSION_RUNTIME
             .spawn(async move {
-                exec::merge_parquet_files(
+                merge::merge_parquet_files(
                     stream_type,
                     &stream_name,
                     latest_schema,
@@ -1344,11 +1347,11 @@ async fn process_service_streams_from_parquet(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    parquet_result: &exec::MergeParquetResult,
+    parquet_result: &MergeParquetResult,
 ) -> Result<(), anyhow::Error> {
     let parquet_bytes = match parquet_result {
-        exec::MergeParquetResult::Single(buf, _file_meta) => buf,
-        exec::MergeParquetResult::Multiple { bufs, .. } => {
+        MergeParquetResult::Single(buf, _) => buf,
+        MergeParquetResult::Multiple { bufs, .. } => {
             // For multiple files, process each one
             for buf in bufs {
                 process_single_parquet_buffer(org_id, stream_name, stream_type, buf).await?;

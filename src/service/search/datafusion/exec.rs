@@ -15,19 +15,14 @@
 
 use std::{cmp::max, num::NonZero, str::FromStr, sync::Arc};
 
-use arrow::array::RecordBatch;
 use arrow_schema::Field;
 use config::{
     FileFormat, PARQUET_BATCH_SIZE, TIMESTAMP_COL_NAME, get_config,
     meta::{
         search::{Session as SearchSession, StorageType},
-        stream::{FileKey, FileMeta, StreamType},
+        stream::FileKey,
     },
-    utils::{
-        parquet::new_parquet_writer,
-        schema_ext::SchemaExt,
-        vortex::{Utf8Compressor, VORTEX_RUNTIME},
-    },
+    utils::schema_ext::SchemaExt,
 };
 use datafusion::{
     arrow::datatypes::{DataType, Schema},
@@ -49,467 +44,25 @@ use datafusion::{
     logical_expr::AggregateUDF,
     optimizer::{AnalyzerRule, OptimizerRule},
     physical_optimizer::PhysicalOptimizerRule,
-    physical_plan::execute_stream,
     prelude::{SessionContext, col},
 };
-use futures::TryStreamExt;
-use vortex::{
-    VortexSessionDefault,
-    array::{ArrayRef, arrow::FromArrowArray},
-    dtype::{DType, arrow::FromArrowType},
-    file::VortexWriteOptions,
-    session::VortexSession,
-};
-use vortex_datafusion::VortexFormat;
-use vortex_file::WriteStrategyBuilder;
-use vortex_io::session::RuntimeSessionExt;
 #[cfg(feature = "enterprise")]
-use {
-    arrow::array::Int64Array,
-    config::meta::promql::{DownsamplingRule, Function, HASH_LABEL, VALUE_LABEL},
-    o2_enterprise::enterprise::{
-        common::config::get_config as get_o2_config,
-        common::downsampling::get_largest_downsampling_rule, search::WorkGroup,
-    },
-};
+use o2_enterprise::enterprise::{common::config::get_config as get_o2_config, search::WorkGroup};
+use vortex::{VortexSessionDefault, session::VortexSession};
+use vortex_datafusion::VortexFormat;
+use vortex_io::session::RuntimeSessionExt;
 
 use super::{
     peak_memory_pool::PeakMemoryPool, planner::extension_planner::OpenobserveQueryPlanner,
     storage::file_list, table_provider::uniontable::NewUnionTable,
     udf::transform_udf::get_all_transform,
 };
-use crate::service::{
-    metadata::distinct_values::DISTINCT_STREAM_PREFIX,
-    search::{
-        datafusion::table_provider::listing_adapter::ListingTableAdapter, index::IndexCondition,
-    },
+use crate::service::search::{
+    datafusion::table_provider::listing_adapter::ListingTableAdapter, index::IndexCondition,
 };
 
-const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
-const DATAFUSION_MIN_PARTITION: usize = 2; // CPU cores
-#[cfg(feature = "enterprise")]
-const TIMESTAMP_ALIAS: &str = "_timestamp_alias";
-
-pub enum MergeParquetResult {
-    Single(Vec<u8>, FileMeta),
-    #[allow(unused)]
-    Multiple {
-        bufs: Vec<Vec<u8>>,
-        file_metas: Vec<FileMeta>,
-    },
-}
-
-pub async fn merge_parquet_files(
-    stream_type: StreamType,
-    stream_name: &str,
-    schema: Arc<Schema>,
-    tables: Vec<Arc<dyn TableProvider>>,
-    bloom_filter_fields: &[String],
-    mut metadata: FileMeta,
-    is_ingester: bool,
-) -> Result<MergeParquetResult> {
-    let start = std::time::Instant::now();
-    let cfg = get_config();
-
-    #[cfg(feature = "enterprise")]
-    if stream_type == StreamType::Metrics && !is_ingester {
-        let rule = get_largest_downsampling_rule(stream_name, metadata.max_ts);
-        if let Some(rule) = rule {
-            return merge_parquet_files_with_downsampling(
-                schema,
-                tables,
-                bloom_filter_fields,
-                rule,
-                &metadata,
-            )
-            .await;
-        }
-    }
-
-    // get all sorted data
-    let sql = if cfg.limit.distinct_values_hourly
-        && stream_type == StreamType::Metadata
-        && stream_name.starts_with(DISTINCT_STREAM_PREFIX)
-    {
-        let fields = schema
-            .fields()
-            .iter()
-            .filter(|f| f.name() != TIMESTAMP_COL_NAME && f.name() != "count")
-            .map(|x| x.name().to_string())
-            .collect::<Vec<_>>();
-        let fields_str = fields.join(", ");
-        format!(
-            "SELECT MIN({TIMESTAMP_COL_NAME}) AS {TIMESTAMP_COL_NAME}, SUM(count) as count, {fields_str} FROM tbl GROUP BY {fields_str} ORDER BY {TIMESTAMP_COL_NAME} DESC"
-        )
-    } else if stream_type == StreamType::Filelist {
-        // for file list we do not have timestamp, so we instead sort by min ts of entries
-        "SELECT * FROM tbl ORDER BY min_ts DESC".to_string()
-    } else {
-        format!("SELECT * FROM tbl ORDER BY {TIMESTAMP_COL_NAME} DESC")
-    };
-    log::debug!("merge_parquet_files sql: {sql}");
-
-    let ctx = DataFusionContextBuilder::new()
-        .sorted_by_time(true)
-        .build(DATAFUSION_MIN_PARTITION)
-        .await?;
-    // register union table
-    let union_table = Arc::new(NewUnionTable::new(schema.clone(), tables));
-    ctx.register_table("tbl", union_table)?;
-
-    let plan = ctx.state().create_logical_plan(&sql).await?;
-    let physical_plan = ctx.state().create_physical_plan(&plan).await?;
-    let schema = physical_plan.schema();
-
-    // print the physical plan
-    if cfg.common.print_key_sql {
-        let plan = datafusion::physical_plan::displayable(physical_plan.as_ref())
-            .indent(false)
-            .to_string();
-        println!("+---------------------------+--------------------------+");
-        println!("merge_parquet_files");
-        println!("+---------------------------+--------------------------+");
-        println!("{plan}");
-    }
-
-    // write result to file (parquet or vortex based on config)
-    let compression = if is_ingester && cfg.common.feature_ingester_none_compression {
-        Some("none")
-    } else {
-        None
-    };
-
-    let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
-    let read_task = tokio::task::spawn(async move {
-        loop {
-            match batch_stream.try_next().await {
-                Ok(None) => {
-                    break;
-                }
-                Ok(Some(batch)) => {
-                    if let Err(e) = tx.send(batch).await {
-                        log::error!("merge_parquet_files write to channel error: {e}");
-                        return Err(DataFusionError::External(Box::new(e)));
-                    }
-                }
-                Err(e) => {
-                    log::error!("merge_parquet_files execute stream error: {e}");
-                    return Err(e);
-                }
-            }
-        }
-        Ok(())
-    });
-
-    // write batches to the appropriate format
-    let buf = match cfg.common.file_format {
-        FileFormat::Parquet => {
-            let mut buf = Vec::new();
-            let mut writer = new_parquet_writer(
-                &mut buf,
-                &schema,
-                bloom_filter_fields,
-                &metadata,
-                false,
-                compression,
-            );
-
-            while let Some(batch) = rx.recv().await {
-                if let Err(e) = writer.write(&batch).await {
-                    log::error!("merge_parquet_files write error: {e}");
-                    return Err(e.into());
-                }
-            }
-
-            read_task
-                .await
-                .map_err(|e| DataFusionError::External(Box::new(e)))??;
-            writer.close().await?;
-            buf
-        }
-        FileFormat::Vortex => {
-            let schema_clone = schema.clone();
-
-            // Spawn writer task in VORTEX_RUNTIME
-            let writer_task = VORTEX_RUNTIME.spawn_blocking(move || {
-                VORTEX_RUNTIME.block_on(async move {
-                    let mut buf = Vec::new();
-                    let session = VortexSession::default().with_tokio();
-                    let dtype = DType::from_arrow(schema_clone.as_ref());
-                    let write_options = VortexWriteOptions::new(session.clone()).with_strategy(
-                        WriteStrategyBuilder::new()
-                            .with_compressor(Utf8Compressor::default())
-                            .build(),
-                    );
-                    let mut writer = write_options.writer(&mut buf, dtype);
-
-                    while let Some(batch) = rx.recv().await {
-                        let array: ArrayRef = ArrayRef::from_arrow(batch, false);
-                        writer.push(array).await?;
-                    }
-
-                    writer.finish().await?;
-
-                    Ok::<Vec<u8>, anyhow::Error>(buf)
-                })
-            });
-
-            // Wait for both tasks to complete
-            read_task
-                .await
-                .map_err(|e| DataFusionError::External(Box::new(e)))??;
-
-            writer_task
-                .await
-                .map_err(|e| {
-                    DataFusionError::Execution(format!("Vortex runtime task failed: {e}"))
-                })?
-                .map_err(|e| {
-                    DataFusionError::Execution(format!("Failed to write vortex file: {e}"))
-                })?
-        }
-    };
-
-    log::debug!(
-        "merge_parquet_files took {} ms",
-        start.elapsed().as_millis()
-    );
-
-    metadata.compressed_size = buf.len() as i64;
-    Ok(MergeParquetResult::Single(buf, metadata))
-}
-
-#[cfg(feature = "enterprise")]
-pub async fn merge_parquet_files_with_downsampling(
-    schema: Arc<Schema>,
-    tables: Vec<Arc<dyn TableProvider>>,
-    bloom_filter_fields: &[String],
-    rule: &DownsamplingRule,
-    metadata: &FileMeta,
-) -> Result<MergeParquetResult> {
-    let start = std::time::Instant::now();
-    let cfg = get_config();
-    let mut metadata = metadata.clone();
-    // assume that the metrics data is sampled at a point every 15 seconds, and then estimate the
-    // records, used for bloom filter.
-    let step = if rule.step < 15 { 15 } else { rule.step };
-    metadata.records = (metadata.records * 15) / step;
-
-    let sql = generate_downsampling_sql(&schema, rule);
-
-    log::debug!("merge_parquet_files_with_downsampling sql: {sql}");
-
-    // create datafusion context
-    let ctx = DataFusionContextBuilder::new()
-        .sorted_by_time(true)
-        .build(DATAFUSION_MIN_PARTITION)
-        .await?;
-    // register union table
-    let union_table = Arc::new(NewUnionTable::new(schema.clone(), tables));
-    ctx.register_table("tbl", union_table)?;
-
-    let plan = ctx.state().create_logical_plan(&sql).await?;
-    let physical_plan = ctx.state().create_physical_plan(&plan).await?;
-    let schema = physical_plan.schema();
-
-    // write result to parquet or vortex file based on config
-    let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
-
-    // Create a shared channel for streaming batches
-    let (tx, rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
-
-    // Spawn task to read from batch_stream and send to channel
-    let read_task = tokio::task::spawn(async move {
-        loop {
-            match batch_stream.try_next().await {
-                Ok(None) => break,
-                Ok(Some(batch)) => {
-                    if let Err(e) = tx.send(batch).await {
-                        log::error!(
-                            "merge_parquet_files_with_downsampling send to channel error: {e}"
-                        );
-                        return Err(DataFusionError::External(Box::new(e)));
-                    }
-                }
-                Err(e) => {
-                    log::error!("merge_parquet_files_with_downsampling execute stream error: {e}");
-                    return Err(e);
-                }
-            }
-        }
-        Ok(())
-    });
-
-    // Write batches to the appropriate format
-    let (bufs, file_metas) = match cfg.common.file_format {
-        FileFormat::Parquet => {
-            write_downsampled_parquet(rx, &schema, bloom_filter_fields, &metadata, &cfg).await?
-        }
-        FileFormat::Vortex => {
-            write_downsampled_vortex(rx, schema.clone(), cfg.compact.max_file_size as i64).await?
-        }
-    };
-
-    // Wait for read task to complete
-    read_task
-        .await
-        .map_err(|e| DataFusionError::External(Box::new(e)))??;
-
-    log::debug!(
-        "merge_parquet_files_with_downsampling took {} ms",
-        start.elapsed().as_millis()
-    );
-
-    Ok(MergeParquetResult::Multiple { bufs, file_metas })
-}
-
-#[cfg(feature = "enterprise")]
-async fn write_downsampled_parquet(
-    mut rx: tokio::sync::mpsc::Receiver<RecordBatch>,
-    schema: &Arc<datafusion::arrow::datatypes::Schema>,
-    bloom_filter_fields: &[String],
-    metadata: &FileMeta,
-    cfg: &config::Config,
-) -> Result<(Vec<Vec<u8>>, Vec<FileMeta>)> {
-    let mut bufs = Vec::new();
-    let mut file_metas = Vec::new();
-
-    let mut buf = Vec::with_capacity(cfg.compact.max_file_size);
-    let mut file_meta = FileMeta::default();
-    let mut writer =
-        new_parquet_writer(&mut buf, schema, bloom_filter_fields, metadata, false, None);
-    let mut last_min_ts = 0;
-
-    while let Some(batch_result) = rx.recv().await {
-        let batch_size = batch_result.get_array_memory_size() as i64;
-        let batch_rows = batch_result.num_rows() as i64;
-
-        // Check if adding this batch would exceed the file size limit
-        let would_exceed_limit = file_meta.records > 0
-            && (file_meta.original_size + batch_size) > cfg.compact.max_file_size as i64;
-
-        if would_exceed_limit {
-            // Close current file before writing the batch that would exceed the limit
-            file_meta.min_ts = last_min_ts;
-            writer.close().await?;
-            bufs.push(std::mem::take(&mut buf));
-            file_metas.push(file_meta);
-
-            // reset for next file
-            buf = Vec::with_capacity(cfg.compact.max_file_size);
-            file_meta = FileMeta::default();
-            writer =
-                new_parquet_writer(&mut buf, schema, bloom_filter_fields, metadata, false, None);
-        }
-
-        // Update metadata for current batch
-        if file_meta.records == 0 {
-            file_meta.max_ts = get_max_timestamp(&batch_result);
-        }
-        file_meta.original_size += batch_size;
-        file_meta.records += batch_rows;
-        last_min_ts = get_min_timestamp(&batch_result);
-
-        // Write batch to current file
-        if let Err(e) = writer.write(&batch_result).await {
-            log::error!("write_downsampled_parquet write error: {e}");
-            return Err(e.into());
-        }
-    }
-
-    // Finalize last file if it has data
-    if file_meta.records > 0 {
-        file_meta.min_ts = last_min_ts;
-        writer.close().await?;
-        bufs.push(buf);
-        file_metas.push(file_meta);
-    }
-
-    Ok((bufs, file_metas))
-}
-
-#[cfg(feature = "enterprise")]
-async fn write_downsampled_vortex(
-    mut rx: tokio::sync::mpsc::Receiver<RecordBatch>,
-    schema: Arc<datafusion::arrow::datatypes::Schema>,
-    max_file_size: i64,
-) -> Result<(Vec<Vec<u8>>, Vec<FileMeta>)> {
-    // Spawn writer task in VORTEX_RUNTIME
-    let writer_task = VORTEX_RUNTIME.spawn_blocking(move || {
-        VORTEX_RUNTIME.block_on(async move {
-            let mut bufs = Vec::new();
-            let mut file_metas = Vec::new();
-
-            let mut buf = Vec::with_capacity(max_file_size as usize);
-            let mut file_meta = FileMeta::default();
-            let mut last_min_ts = 0;
-
-            let session = VortexSession::default().with_tokio();
-            let dtype = DType::from_arrow(schema.as_ref());
-
-            // Helper to create write options - need to recreate for each writer
-            let strategy = WriteStrategyBuilder::new()
-                .with_compressor(Utf8Compressor::default())
-                .build();
-
-            let write_options =
-                VortexWriteOptions::new(session.clone()).with_strategy(strategy.clone());
-            let mut writer = write_options.writer(&mut buf, dtype.clone());
-
-            while let Some(batch_result) = rx.recv().await {
-                let batch_size = batch_result.get_array_memory_size() as i64;
-                let batch_rows = batch_result.num_rows() as i64;
-
-                // Check if adding this batch would exceed the file size limit
-                let would_exceed_limit =
-                    file_meta.records > 0 && (file_meta.original_size + batch_size) > max_file_size;
-
-                if would_exceed_limit {
-                    // Close current file before writing the batch that would exceed the limit
-                    file_meta.min_ts = last_min_ts;
-                    writer.finish().await?;
-                    bufs.push(std::mem::take(&mut buf));
-                    file_metas.push(file_meta);
-
-                    // reset for next file
-                    buf = Vec::with_capacity(max_file_size as usize);
-                    file_meta = FileMeta::default();
-                    let new_write_options =
-                        VortexWriteOptions::new(session.clone()).with_strategy(strategy.clone());
-                    writer = new_write_options.writer(&mut buf, dtype.clone());
-                }
-
-                // Update metadata for current batch
-                if file_meta.records == 0 {
-                    file_meta.max_ts = get_max_timestamp(&batch_result);
-                }
-                file_meta.original_size += batch_size;
-                file_meta.records += batch_rows;
-                last_min_ts = get_min_timestamp(&batch_result);
-
-                // Write batch to current file (convert to Vortex array)
-                let array: ArrayRef = ArrayRef::from_arrow(batch_result, false);
-                writer.push(array).await?;
-            }
-
-            // Finalize last file if it has data
-            if file_meta.records > 0 {
-                file_meta.min_ts = last_min_ts;
-                writer.finish().await?;
-                bufs.push(buf);
-                file_metas.push(file_meta);
-            }
-
-            Ok::<(Vec<Vec<u8>>, Vec<FileMeta>), anyhow::Error>((bufs, file_metas))
-        })
-    });
-
-    writer_task
-        .await
-        .map_err(|e| DataFusionError::Execution(format!("Vortex runtime task failed: {e}")))?
-        .map_err(|e| DataFusionError::Execution(format!("Failed to write vortex file: {e}")))
-}
+pub(crate) const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
+pub(crate) const DATAFUSION_MIN_PARTITION: usize = 2; // CPU cores
 
 pub fn create_session_config(
     sorted_by_time: bool,
@@ -1022,97 +575,6 @@ async fn get_cpu_and_mem_limit(
     Ok((target_partitions, memory_size))
 }
 
-#[cfg(feature = "enterprise")]
-fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> String {
-    let step = rule.step;
-    let fields = schema
-        .fields()
-        .iter()
-        .filter_map(|f| {
-            if f.name() != HASH_LABEL && f.name() != VALUE_LABEL && f.name() != TIMESTAMP_COL_NAME {
-                Some(format!("max({}) as {}", f.name(), f.name()))
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>();
-
-    let fun_str = if rule.function == Function::Last || rule.function == Function::First {
-        format!(
-            "{}({} ORDER BY {} ASC) as {}",
-            rule.function.fun(),
-            VALUE_LABEL,
-            TIMESTAMP_COL_NAME,
-            VALUE_LABEL
-        )
-    } else {
-        format!(
-            "{}({}) as {}",
-            rule.function.fun(),
-            VALUE_LABEL,
-            VALUE_LABEL
-        )
-    };
-
-    let sql = format!(
-        "SELECT {}, to_unixtime(date_bin(interval '{} second', to_timestamp_micros({}), to_timestamp('2001-01-01T00:00:00'))) * 1000000 as {}, {}, {} FROM tbl GROUP BY {}, {}",
-        HASH_LABEL,
-        step,
-        TIMESTAMP_COL_NAME,
-        TIMESTAMP_ALIAS,
-        fields.join(", "),
-        fun_str,
-        HASH_LABEL,
-        TIMESTAMP_ALIAS,
-    );
-
-    let fields = schema
-        .fields()
-        .iter()
-        .filter_map(|f| {
-            if f.name() != HASH_LABEL && f.name() != VALUE_LABEL && f.name() != TIMESTAMP_COL_NAME {
-                Some(f.name().to_string())
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>();
-    format!(
-        "SELECT {}, {}, {}, {} AS {} FROM ({}) ORDER BY {} DESC",
-        HASH_LABEL,
-        VALUE_LABEL,
-        fields.join(", "),
-        TIMESTAMP_ALIAS,
-        TIMESTAMP_COL_NAME,
-        sql,
-        TIMESTAMP_ALIAS,
-    )
-}
-
-#[cfg(feature = "enterprise")]
-fn get_max_timestamp(record_batch: &RecordBatch) -> i64 {
-    record_batch
-        .column_by_name(TIMESTAMP_COL_NAME)
-        .unwrap()
-        .slice(0, 1)
-        .as_any()
-        .downcast_ref::<Int64Array>()
-        .unwrap()
-        .value(0)
-}
-
-#[cfg(feature = "enterprise")]
-fn get_min_timestamp(record_batch: &RecordBatch) -> i64 {
-    record_batch
-        .column_by_name(TIMESTAMP_COL_NAME)
-        .unwrap()
-        .slice(record_batch.num_rows() - 1, 1)
-        .as_any()
-        .downcast_ref::<Int64Array>()
-        .unwrap()
-        .value(0)
-}
-
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -1147,22 +609,6 @@ mod tests {
             ],
         )
         .unwrap()
-    }
-
-    #[cfg(feature = "enterprise")]
-    #[test]
-    fn test_get_max_timestamp() {
-        let batch = create_test_record_batch();
-        let max_ts = get_max_timestamp(&batch);
-        assert_eq!(max_ts, 1000); // first row in timestamp column
-    }
-
-    #[cfg(feature = "enterprise")]
-    #[test]
-    fn test_get_min_timestamp() {
-        let batch = create_test_record_batch();
-        let min_ts = get_min_timestamp(&batch);
-        assert_eq!(min_ts, 3000); // last row in timestamp column
     }
 
     #[tokio::test]
@@ -1323,35 +769,6 @@ mod tests {
         assert_eq!(builder.fst_fields, vec!["field1".to_string()]);
     }
 
-    #[cfg(feature = "enterprise")]
-    #[test]
-    fn test_generate_downsampling_sql() {
-        use config::meta::promql::{DownsamplingRule, Function};
-
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("__hash__", DataType::Utf8, false),
-            Field::new("__value__", DataType::Float64, false),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-            Field::new("instance", DataType::Utf8, true),
-        ]));
-
-        let rule = DownsamplingRule {
-            rule: None,
-            function: Function::Avg,
-            offset: 0,
-            step: 300, // 5 minutes
-        };
-
-        let sql = generate_downsampling_sql(&schema, &rule);
-
-        // Basic checks that SQL contains expected elements
-        assert!(sql.contains("GROUP BY"));
-        assert!(sql.contains("__hash__"));
-        assert!(sql.contains("__value__"));
-        assert!(sql.contains("300 second"));
-        assert!(sql.contains("ORDER BY"));
-    }
-
     #[tokio::test]
     async fn test_create_session_config_memory_pools() -> Result<()> {
         // Test different memory pool configurations by creating runtime environments
@@ -1366,34 +783,10 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn test_merge_parquet_files_error_handling() {
-        // Test with empty tables vector
-        let schema = create_test_schema();
-        let empty_tables: Vec<Arc<dyn TableProvider>> = vec![];
-        let bloom_fields = vec![];
-        let metadata = FileMeta::default();
-
-        let result = merge_parquet_files(
-            StreamType::Logs,
-            "test_stream",
-            schema,
-            empty_tables,
-            &bloom_fields,
-            metadata,
-            false,
-        )
-        .await;
-
-        // Should handle empty tables gracefully or return appropriate error
-        // The exact behavior depends on implementation details
-        assert!(result.is_ok() || result.is_err());
-    }
-
     mod integration_tests {
         use config::meta::{
             search::{Session as SearchSession, StorageType},
-            stream::FileKey,
+            stream::{FileKey, FileMeta},
         };
 
         use super::*;

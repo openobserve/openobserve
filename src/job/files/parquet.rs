@@ -54,7 +54,10 @@ use crate::{
     service::{
         db,
         schema::generate_schema_for_defined_schema_fields,
-        search::datafusion::exec::{self, MergeParquetResult, TableBuilder},
+        search::datafusion::{
+            exec::TableBuilder,
+            merge::{self, MergeParquetResult},
+        },
         tantivy::create_tantivy_index,
     },
 };
@@ -754,7 +757,7 @@ async fn merge_files(
         .await?;
 
     let start = std::time::Instant::now();
-    let merge_result = exec::merge_parquet_files(
+    let merge_result = merge::merge_parquet_files(
         stream_type,
         &stream_name,
         schema,
