@@ -123,7 +123,7 @@ export default defineConfig({
       }),
     enterpriseResolverPlugin,
     vueJsx(),
-    (monacoEditorPlugin as any).default({
+    !isTesting && (monacoEditorPlugin as any).default({
       customDistPath: () => path.resolve(__dirname, "dist/monacoeditorwork"),
     }),
     isTesting && monacoEditorTestResolver(),
