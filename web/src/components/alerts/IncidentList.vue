@@ -215,7 +215,7 @@ export default defineComponent({
       sortBy: "last_alert_at",
       descending: true,
       page: 1,
-      rowsPerPage: 25,
+      rowsPerPage: 20,
       rowsNumber: 0,
     });
 
@@ -225,11 +225,33 @@ export default defineComponent({
 
     // Pagination options
     const perPageOptions: any = [
-      { label: "10", value: 10 },
-      { label: "25", value: 25 },
+      { label: "20", value: 20 },
       { label: "50", value: 50 },
       { label: "100", value: 100 },
+      { label: "250", value: 250 },
+      { label: "500", value: 500 },
     ];
+
+    // Computed property for filtered incidents (used by tests and for consistency)
+    const filteredIncidents = computed(() => {
+      let filtered = allIncidents.value;
+
+      // Apply status filter
+      if (statusFilter.value.length > 0) {
+        filtered = filtered.filter((incident) =>
+          statusFilter.value.includes(incident.status)
+        );
+      }
+
+      // Apply severity filter
+      if (severityFilter.value.length > 0) {
+        filtered = filtered.filter((incident) =>
+          severityFilter.value.includes(incident.severity)
+        );
+      }
+
+      return filtered;
+    });
 
     const columns = computed(() => [
       {
@@ -546,6 +568,7 @@ export default defineComponent({
       loading,
       incidents,
       allIncidents,
+      filteredIncidents,
       statusFilter,
       severityFilter,
       statusOptions,
