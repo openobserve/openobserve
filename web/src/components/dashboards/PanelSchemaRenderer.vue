@@ -47,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           :data="tableRendererData"
           :config="panelSchema.config"
+          @row-click="onChartClick"
         />
         <TableRenderer
           v-else-if="panelSchema.type == 'table'"
