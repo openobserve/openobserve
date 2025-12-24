@@ -323,8 +323,12 @@ export default defineComponent({
           dashboardPanelData.data.queryType = "sql";
         }
 
-        // Preserve the query when switching from promql-builder to promql
-        if (dashboardPanelData.data.type !== "custom_chart") {
+        // For custom charts, preserve the existing query
+        // Only clear the query for non-custom charts when switching to promql
+        if (
+          dashboardPanelData.data.type !== "custom_chart" &&
+          selectedButtonQueryType.value === "promql"
+        ) {
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].query = "";
@@ -345,14 +349,6 @@ export default defineComponent({
             dashboardPanelData.layout.currentQueryIndex
           ].customQuery = false;
           dashboardPanelData.data.queryType = "sql";
-        }
-
-        // Preserve the query when switching from promql-builder to promql
-        if (dashboardPanelData.data.type !== "custom_chart") {
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].query = "";
-          dashboardPanelData.data.type = "line";
         }
       }
     });
