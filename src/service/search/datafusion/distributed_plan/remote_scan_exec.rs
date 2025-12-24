@@ -302,10 +302,14 @@ async fn get_remote_batch(
         .as_ref()
         .and_then(|s| s.as_str().try_into().ok());
 
-    // check timeout for ingester
+    // check timeout
     let mut timeout = remote_scan_node.search_infos.timeout;
-    if matches!(search_type, Some(SearchEventType::UI)) && is_ingester {
-        timeout = std::cmp::min(timeout, cfg.limit.query_ingester_timeout);
+    if matches!(search_type, Some(SearchEventType::UI)) {
+        if is_querier {
+            timeout = std::cmp::min(timeout, cfg.limit.query_querier_timeout);
+        } else if is_ingester {
+            timeout = std::cmp::min(timeout, cfg.limit.query_ingester_timeout);
+        }
     }
     if timeout == 0 {
         timeout = cfg.limit.query_timeout;
@@ -362,25 +366,31 @@ async fn get_remote_batch(
         "[trace_id {trace_id}] flight->search: prepare to request node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}",
     );
 
-    let stream = match client.do_get(request).await {
-        Ok(stream) => stream,
-        Err(e) => {
-            let is_parquet_file_not_found = e.code() == tonic::Code::Internal && {
-                let msg = e.message();
-                msg.find('{')
-                    .and_then(|start| msg.rfind('}').map(|end| &msg[start..=end]))
-                    .and_then(|json_part| infra::errors::ErrorCodes::from_json(json_part).ok())
-                    .map(|err_code| err_code.get_code() == infra::errors::ErrorCodes::SearchParquetFileNotFound.get_code())
-                    .unwrap_or(false)
-            };
-            if e.code() == tonic::Code::Cancelled || e.code() == tonic::Code::DeadlineExceeded || is_parquet_file_not_found {
-                return Ok(get_empty_stream(empty_stream.with_error(e)));
+    // create a deadline that covers both do_get and plan execution
+    let deadline = tokio::time::Instant::now() + tokio::time::Duration::from_secs(timeout);
+    let stream = tokio::select! {
+        result = client.do_get(request) => {
+            match result {
+                Ok(stream) => stream,
+                Err(e) => {
+                    if e.code() == tonic::Code::Cancelled || e.code() == tonic::Code::DeadlineExceeded || is_parquet_file_not_found(&e) {
+                        return Ok(get_empty_stream(empty_stream.with_error(e)));
+                    }
+                    log::error!(
+                        "[trace_id {trace_id}] flight->search: response node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}, err: {e:?}, took: {} ms",
+                        start.elapsed().as_millis(),
+                    );
+                    return Err(DataFusionError::Execution(e.to_string()));
+                }
             }
+        }
+        _ = tokio::time::sleep_until(deadline) => {
+            let e = tonic::Status::new(tonic::Code::DeadlineExceeded, format!("timeout during do_get call name: {node_name}"));
             log::error!(
-                "[trace_id {trace_id}] flight->search: response node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}, err: {e:?}, took: {} ms",
+                "[trace_id {trace_id}] flight->search: do_get timeout node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}, took: {} ms",
                 start.elapsed().as_millis(),
             );
-            return Err(DataFusionError::Execution(e.to_string()));
+            return Ok(get_empty_stream(empty_stream.with_error(e)));
         }
     }
     .into_inner();
@@ -401,8 +411,10 @@ async fn get_remote_batch(
 
     let mut stream = FlightDecoderStream::new(stream, schema.clone(), metrics, query_context);
     let stream = async_stream::stream! {
-        let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(timeout));
+        // use sleep_until with the same deadline to continue the timeout
+        let timeout = tokio::time::sleep_until(deadline);
         pin_mut!(timeout);
+
         loop {
             tokio::select! {
                 batch = stream.next() => {
@@ -413,7 +425,7 @@ async fn get_remote_batch(
                     }
                 }
                 _ = &mut timeout => {
-                    let e = tonic::Status::new(tonic::Code::DeadlineExceeded, "timeout");
+                    let e = tonic::Status::new(tonic::Code::DeadlineExceeded, format!("timeout during plan execution, name: {node_name}"));
                     log::error!(
                         "[trace_id {trace_id}] flight->search: response node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}, err: {e:?}, took: {} ms",
                         start.elapsed().as_millis(),
@@ -426,4 +438,18 @@ async fn get_remote_batch(
     };
 
     Ok(Box::pin(RecordBatchStreamAdapter::new(schema, stream)))
+}
+
+pub fn is_parquet_file_not_found(e: &tonic::Status) -> bool {
+    e.code() == tonic::Code::Internal && {
+        let msg = e.message();
+        msg.find('{')
+            .and_then(|start| msg.rfind('}').map(|end| &msg[start..=end]))
+            .and_then(|json_part| infra::errors::ErrorCodes::from_json(json_part).ok())
+            .map(|err_code| {
+                err_code.get_code()
+                    == infra::errors::ErrorCodes::SearchParquetFileNotFound.get_code()
+            })
+            .unwrap_or(false)
+    }
 }

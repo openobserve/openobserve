@@ -1343,9 +1343,18 @@ pub struct Limit {
     pub grpc_ingest_timeout: u64,
     #[env_config(name = "ZO_QUERY_TIMEOUT", default = 600)]
     pub query_timeout: u64,
-    #[env_config(name = "ZO_QUERY_INGESTER_TIMEOUT", default = 0)]
-    // default equal to query_timeout
+    #[env_config(
+        name = "ZO_QUERY_INGESTER_TIMEOUT",
+        default = 0,
+        help = "Timeout for ingester query, default equal to query_timeout"
+    )]
     pub query_ingester_timeout: u64,
+    #[env_config(
+        name = "ZO_QUERY_QUERIER_TIMEOUT",
+        default = 0,
+        help = "Timeout for querier query, default equal to query_timeout"
+    )]
+    pub query_querier_timeout: u64,
     #[env_config(name = "ZO_QUERY_DEFAULT_LIMIT", default = 1000)]
     pub query_default_limit: i64,
     #[env_config(name = "ZO_QUERY_VALUES_DEFAULT_NUM", default = 10)]
