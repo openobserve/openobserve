@@ -1126,7 +1126,11 @@
     "labelFilters": "ラベルフィルター",
     "operations": "オペレーション",
     "promQLBuilder": "プロムQLビルダー",
-    "options": "[オプション]"
+    "options": "[オプション]",
+    "SQL": "SQL",
+    "builder": "ビルダー",
+    "custom": "カスタム",
+    "sqlBuilder": "SQL ビルダー"
   },
   "home": {
     "streams": "ストリーム",
