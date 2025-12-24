@@ -13,24 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::service::db::kv;
+//! `SeaORM` Entity for kv_store table
 
-pub async fn get(org_id: &str, key: &str) -> Result<bytes::Bytes, anyhow::Error> {
-    let val = kv::get(org_id, key).await?;
-    Ok(val)
+use sea_orm::entity::prelude::*;
+
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
+#[sea_orm(table_name = "kv_store")]
+pub struct Model {
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub org_id: String,
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub key: String,
+    pub value: Vec<u8>,
+    pub created_at: i64,
+    pub updated_at: i64,
 }
 
-pub async fn set(org_id: &str, key: &str, val: bytes::Bytes) -> Result<(), anyhow::Error> {
-    kv::set(org_id, key, val).await?;
-    Ok(())
-}
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {}
 
-pub async fn delete(org_id: &str, key: &str) -> Result<(), anyhow::Error> {
-    kv::delete(org_id, key).await?;
-    Ok(())
-}
-
-pub async fn list(org_id: &str, prefix: &str) -> Result<Vec<String>, anyhow::Error> {
-    let items = kv::list_keys(org_id, prefix).await?;
-    Ok(items)
-}
+impl ActiveModelBehavior for ActiveModel {}
