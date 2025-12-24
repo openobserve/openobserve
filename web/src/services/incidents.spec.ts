@@ -16,9 +16,11 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import incidents from "./incidents";
 import http from "./http";
+import serviceStreamsApi from "./service_streams";
 
 // Mock the http module
 vi.mock("./http");
+vi.mock("./service_streams");
 
 describe("incidents service", () => {
   const mockHttp = {
@@ -160,6 +162,169 @@ describe("incidents service", () => {
       expect(http).toHaveBeenCalled();
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/v2/test-org/alerts/incidents/incident-123/rca"
+      );
+    });
+  });
+
+  describe("getCorrelatedStreams", () => {
+    it("should call correlate API with incident stable dimensions", async () => {
+      const mockIncident = {
+        id: "incident-123",
+        stable_dimensions: {
+          service: "api-gateway",
+          namespace: "production",
+        },
+        first_alert_at: 1000000,
+        last_alert_at: 2000000,
+      } as any;
+
+      const mockCorrelationResponse = {
+        data: {
+          service_name: "api-gateway",
+          matched_dimensions: { service: "api-gateway" },
+          additional_dimensions: { namespace: "production" },
+          related_streams: {
+            logs: [{ stream_name: "default", filters: {} }],
+            metrics: [{ stream_name: "metrics", filters: {} }],
+            traces: [{ stream_name: "traces", filters: {} }],
+          },
+        },
+      };
+
+      vi.mocked(serviceStreamsApi.correlate).mockResolvedValue(mockCorrelationResponse);
+
+      const result = await incidents.getCorrelatedStreams("test-org", mockIncident);
+
+      expect(serviceStreamsApi.correlate).toHaveBeenCalledWith("test-org", {
+        source_stream: "api-gateway",
+        source_type: "logs",
+        available_dimensions: mockIncident.stable_dimensions,
+      });
+
+      expect(result.serviceName).toBe("api-gateway");
+      expect(result.logStreams).toHaveLength(1);
+      expect(result.metricStreams).toHaveLength(1);
+      expect(result.traceStreams).toHaveLength(1);
+    });
+
+    it("should fallback to default when service dimension missing", async () => {
+      const mockIncident = {
+        id: "incident-123",
+        stable_dimensions: {
+          namespace: "production",
+        },
+      } as any;
+
+      const mockCorrelationResponse = {
+        data: {
+          service_name: "unknown",
+          matched_dimensions: {},
+          additional_dimensions: {},
+          related_streams: { logs: [], metrics: [], traces: [] },
+        },
+      };
+
+      vi.mocked(serviceStreamsApi.correlate).mockResolvedValue(mockCorrelationResponse);
+
+      await incidents.getCorrelatedStreams("test-org", mockIncident);
+
+      expect(serviceStreamsApi.correlate).toHaveBeenCalledWith("test-org", {
+        source_stream: "default",
+        source_type: "logs",
+        available_dimensions: mockIncident.stable_dimensions,
+      });
+    });
+
+    it("should check multiple service dimension variations", async () => {
+      const mockIncident = {
+        id: "incident-123",
+        stable_dimensions: {
+          serviceName: "api-gateway",
+        },
+      } as any;
+
+      const mockCorrelationResponse = {
+        data: {
+          service_name: "api-gateway",
+          matched_dimensions: {},
+          additional_dimensions: {},
+          related_streams: { logs: [], metrics: [], traces: [] },
+        },
+      };
+
+      vi.mocked(serviceStreamsApi.correlate).mockResolvedValue(mockCorrelationResponse);
+
+      await incidents.getCorrelatedStreams("test-org", mockIncident);
+
+      expect(serviceStreamsApi.correlate).toHaveBeenCalledWith("test-org", {
+        source_stream: "api-gateway",
+        source_type: "logs",
+        available_dimensions: mockIncident.stable_dimensions,
+      });
+    });
+  });
+
+  describe("extractTraceId", () => {
+    it("should extract trace_id from stable dimensions", () => {
+      const incident = {
+        stable_dimensions: {
+          trace_id: "abc123",
+        },
+      } as any;
+
+      const result = incidents.extractTraceId(incident);
+      expect(result).toBe("abc123");
+    });
+
+    it("should handle traceId variation", () => {
+      const incident = {
+        stable_dimensions: {
+          traceId: "xyz789",
+        },
+      } as any;
+
+      const result = incidents.extractTraceId(incident);
+      expect(result).toBe("xyz789");
+    });
+
+    it("should handle trace.id variation", () => {
+      const incident = {
+        stable_dimensions: {
+          "trace.id": "def456",
+        },
+      } as any;
+
+      const result = incidents.extractTraceId(incident);
+      expect(result).toBe("def456");
+    });
+
+    it("should return undefined when no trace_id found", () => {
+      const incident = {
+        stable_dimensions: {
+          service: "api-gateway",
+        },
+      } as any;
+
+      const result = incidents.extractTraceId(incident);
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe("getServiceGraph", () => {
+    it("should call http.get with correct URL", () => {
+      mockHttp.get.mockResolvedValue({
+        data: {
+          incident_service: "api-gateway",
+          nodes: [],
+          edges: [],
+        },
+      });
+
+      incidents.getServiceGraph("test-org", "incident-123");
+
+      expect(http).toHaveBeenCalled();
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        "/api/v2/test-org/alerts/incidents/incident-123/service_graph"
       );
     });
   });
