@@ -272,6 +272,9 @@ export default defineComponent({
         popupSelectedButtonType.value === "promql" ||
         popupSelectedButtonType.value === "sql";
 
+      const isSwitchingToBuilder =
+        !isQueryTypeChange && popupSelectedButtonType.value === "builder";
+
       if (isQueryTypeChange) {
         selectedButtonQueryType.value = popupSelectedButtonType.value;
       } else {
@@ -287,6 +290,24 @@ export default defineComponent({
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].query = "";
+      }
+
+      // For metrics page: when switching from custom to builder in PromQL, set sample query
+      if (
+        dashboardPanelDataPageKey === "metrics" &&
+        isSwitchingToBuilder &&
+        dashboardPanelData.data.queryType === "promql" &&
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream
+      ) {
+        const streamName =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream;
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].query = `${streamName}{}`;
       }
 
       // empty the errors
