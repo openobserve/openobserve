@@ -29,7 +29,7 @@ export class HeatmapConverter implements PromQLChartConverter {
     panelSchema: any,
     store: any,
     extras: any,
-    chartPanelRef?: any
+    chartPanelRef?: any,
   ) {
     const config = panelSchema.config || {};
 
@@ -58,13 +58,22 @@ export class HeatmapConverter implements PromQLChartConverter {
       });
     });
 
-    const xAxisData = processedData[0]?.timestamps.map(([, formatted]) => formatted) || [];
+    const xAxisData =
+      processedData[0]?.timestamps.map(([, formatted]) => formatted) || [];
 
     // Get color range from configuration or use theme-based palette
     let colorRange: string[];
-    if (config.color_range && Array.isArray(config.color_range) && config.color_range.length > 0) {
+    if (
+      config.color_range &&
+      Array.isArray(config.color_range) &&
+      config.color_range.length > 0
+    ) {
       colorRange = config.color_range;
-    } else if (config.color?.fixedColor && Array.isArray(config.color.fixedColor) && config.color.fixedColor.length > 0) {
+    } else if (
+      config.color?.fixedColor &&
+      Array.isArray(config.color.fixedColor) &&
+      config.color.fixedColor.length > 0
+    ) {
       colorRange = config.color.fixedColor;
     } else {
       // Use theme-based color palette
@@ -88,8 +97,8 @@ export class HeatmapConverter implements PromQLChartConverter {
                   value,
                   config?.unit,
                   config?.unit_custom,
-                  config?.decimals
-                )
+                  config?.decimals,
+                ),
               );
             },
           },
@@ -140,13 +149,14 @@ export class HeatmapConverter implements PromQLChartConverter {
               value,
               config?.unit,
               config?.unit_custom,
-              config?.decimals
-            )
+              config?.decimals,
+            ),
           );
         },
       },
       tooltip: {
         position: "top",
+        confine: true,
         formatter: (params: any) => {
           const [timeIndex, seriesIndex, value] = params.data;
           // Format value with units
@@ -155,8 +165,8 @@ export class HeatmapConverter implements PromQLChartConverter {
               value,
               config?.unit,
               config?.unit_custom,
-              config?.decimals
-            )
+              config?.decimals,
+            ),
           );
           return `${seriesNames[seriesIndex]}<br/>${xAxisData[timeIndex]}: <strong>${formattedValue}</strong>`;
         },
