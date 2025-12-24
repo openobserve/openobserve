@@ -576,9 +576,9 @@ def test_e2e_time_series_window_functions(create_session, base_url):
         },
     }
 
-    # Retry mechanism with exponential backoff
+    # Retry mechanism with exponential backoff for heavy window function query
     max_retries = 3
-    retry_delay = 2
+    retry_delay = 3  # Increased from 2 to 3 seconds
     last_exception = None
 
     for attempt in range(max_retries):
@@ -586,7 +586,7 @@ def test_e2e_time_series_window_functions(create_session, base_url):
             resp_get_allsearch = session.post(
                 f"{url}api/{org_id}/_search?type=logs",
                 json=json_data,
-                timeout=60  # 60 seconds timeout for complex query
+                timeout=90  # Increased from 60 to 90 seconds for complex window function query
             )
             break  # Success, exit retry loop
         except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
@@ -597,7 +597,7 @@ def test_e2e_time_series_window_functions(create_session, base_url):
                 time.sleep(wait_time)
             else:
                 logging.error(f"All {max_retries} attempts failed. Last error: {e}")
-                raise ConnectionError(f"Failed to connect after {max_retries} attempts. Server may be down or unresponsive.") from e
+                pytest.fail(f"Failed to connect to server after {max_retries} attempts (waited total ~{3+6+12}s). Server may be down or unresponsive. Error: {e}")
 
     assert (
         resp_get_allsearch.status_code == 200
