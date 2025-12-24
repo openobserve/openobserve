@@ -1110,7 +1110,11 @@
     "labelFilters": "Filtri per etichette",
     "operations": "Operazioni",
     "promQLBuilder": "Generatore ProMQL",
-    "options": "Opzioni"
+    "options": "Opzioni",
+    "SQL": "SQL",
+    "builder": "Costruttore",
+    "custom": "Personalizzato",
+    "sqlBuilder": "SQL Builder"
   },
   "home": {
     "streams": "Stream",
