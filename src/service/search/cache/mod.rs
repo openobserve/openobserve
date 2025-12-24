@@ -525,7 +525,33 @@ pub async fn prepare_cache_response(
         .as_ref()
         .and_then(|v| svix_ksuid::Ksuid::from_str(v).ok());
 
-    // calculate hash for the query with version
+    // Parse SQL first to get metadata needed for normalization
+    let query: SearchQuery = req.query.clone().into();
+    let sql = match crate::service::search::Sql::new(&query, org_id, stream_type, req.search_type)
+        .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("Error parsing sql: {e}");
+            return Ok((MultiCachedQueryResponse::default(), true));
+        }
+    };
+
+    // Normalize histogram interval in SQL before computing hash
+    // This ensures the hash is consistent regardless of when handle_histogram is called
+    if is_aggregate && sql.histogram_interval.is_some() {
+        let meta_time_range_is_empty = sql.time_range.is_none() || sql.time_range == Some((0, 0));
+        let req_time_range = (req.query.start_time, req.query.end_time);
+        let q_time_range =
+            if meta_time_range_is_empty && (req_time_range.0 > 0 || req_time_range.1 > 0) {
+                Some(req_time_range)
+            } else {
+                sql.time_range
+            };
+        cacher::handle_histogram(&mut origin_sql, q_time_range, req.query.histogram_interval);
+    }
+
+    // calculate hash for the query with version (after normalizing histogram interval)
     let mut hash_body = vec![CACHE_VERSION.to_string(), origin_sql.to_string()];
     if let Some(vrl_function) = &query_fn {
         hash_body.push(vrl_function.to_string());
@@ -541,18 +567,6 @@ pub async fn prepare_cache_response(
     }
     let mut h = config::utils::hash::gxhash::new();
     let hashed_query = h.sum64(&hash_body.join(","));
-
-    // Parse SQL once to get metadata needed for both cache lookup and file path computation
-    let query: SearchQuery = req.query.clone().into();
-    let sql = match crate::service::search::Sql::new(&query, org_id, stream_type, req.search_type)
-        .await
-    {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!("Error parsing sql: {e}");
-            return Ok((MultiCachedQueryResponse::default(), true));
-        }
-    };
 
     let (ts_column, mut is_descending) =
         cacher::get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate).unwrap_or_default();

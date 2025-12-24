@@ -157,19 +157,9 @@ pub async fn check_cache(
 
     let mut histogram_interval = -1;
     if is_aggregate && let Some(interval) = sql.histogram_interval {
-        let mut req_time_range = (req.query.start_time, req.query.end_time);
-        if req_time_range.1 == 0 {
-            req_time_range.1 = now_micros();
-        }
-
-        let meta_time_range_is_empty = sql.time_range.is_none() || sql.time_range == Some((0, 0));
-        let q_time_range =
-            if meta_time_range_is_empty && (req_time_range.0 > 0 || req_time_range.1 > 0) {
-                Some(req_time_range)
-            } else {
-                sql.time_range
-            };
-        handle_histogram(origin_sql, q_time_range, req.query.histogram_interval);
+        // Note: handle_histogram is now called in prepare_cache_response() before hash computation
+        // to ensure consistent hashing. We just need to update req.query.sql with the normalized
+        // SQL.
         req.query.sql = origin_sql.clone();
         histogram_interval = interval * 1000 * 1000; // in microseconds
     }
