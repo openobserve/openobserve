@@ -931,6 +931,7 @@ export const usePanelDataLoader = (
                   start_time: startISOTimestamp,
                   end_time: endISOTimestamp,
                   step: it.config.step_value ?? panelSchema.value.config.step_value ?? "0",
+                  query_type: it.config.query_type || "range", // Add query_type from config (default: range)
                 },
                 type: "promql" as const,
                 traceId: traceId,
