@@ -197,6 +197,7 @@ const getDefaultDashboardPanelData: any = (store: any) => ({
     currentQueryIndex: 0,
     vrlFunctionToggle: false,
     showFieldList: true,
+    hiddenQueries: [],
   },
   meta: {
     parsedQuery: "",

@@ -63,6 +63,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`dashboard-panel-query-tab-${index}`"
             >
               <q-icon
+                v-if="promqlMode"
+                :name="
+                  dashboardPanelData.layout.hiddenQueries.includes(index)
+                    ? 'visibility_off'
+                    : 'visibility'
+                "
+                class="q-ml-xs dashboard-query-visibility-icon"
+                @click.stop="toggleQueryVisibility(index)"
+                style="cursor: pointer"
+                size="18px"
+                :data-test="`dashboard-panel-query-tab-visibility-${index}`"
+              >
+                <q-tooltip>
+                  {{
+                    dashboardPanelData.layout.hiddenQueries.includes(index)
+                      ? "Show query results"
+                      : "Hide query results"
+                  }}
+                </q-tooltip>
+              </q-icon>
+              <q-icon
                 v-if="
                   index > 0 ||
                   (index === 0 && dashboardPanelData.data.queries.length > 1)
@@ -489,6 +510,19 @@ export default defineComponent({
       removeQuery(index);
     };
 
+    const toggleQueryVisibility = (index) => {
+      const hiddenQueries = dashboardPanelData.layout.hiddenQueries;
+      const queryIndex = hiddenQueries.indexOf(index);
+
+      if (queryIndex > -1) {
+        // Query is currently hidden, show it
+        hiddenQueries.splice(queryIndex, 1);
+      } else {
+        // Query is currently visible, hide it
+        hiddenQueries.push(index);
+      }
+    };
+
     // toggle show query view
     const onDropDownClick = () => {
       dashboardPanelData.layout.showQueryBar =
@@ -581,6 +615,7 @@ export default defineComponent({
       onUpdateToggle,
       addTab,
       removeTab,
+      toggleQueryVisibility,
       promqlAutoCompleteKeywords,
       sqlAutoCompleteKeywords,
       sqlAutoCompleteSuggestions,
@@ -611,6 +646,11 @@ export default defineComponent({
 }
 
 .dashboard-query-remove-icon:hover {
+  background-color: #eaeaeaa5;
+  border-radius: 50%;
+}
+
+.dashboard-query-visibility-icon:hover {
   background-color: #eaeaeaa5;
   border-radius: 50%;
 }
