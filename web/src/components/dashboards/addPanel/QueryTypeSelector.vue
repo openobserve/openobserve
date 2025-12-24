@@ -268,10 +268,11 @@ export default defineComponent({
     };
 
     const changeToggle = async () => {
-      if (
+      const isQueryTypeChange =
         popupSelectedButtonType.value === "promql" ||
-        popupSelectedButtonType.value === "sql"
-      ) {
+        popupSelectedButtonType.value === "sql";
+
+      if (isQueryTypeChange) {
         selectedButtonQueryType.value = popupSelectedButtonType.value;
       } else {
         selectedButtonType.value = popupSelectedButtonType.value;
@@ -280,6 +281,13 @@ export default defineComponent({
       await nextTick(); // let the watchers execute first
       removeXYFilters();
       updateXYFieldsForCustomQueryMode();
+
+      // Clear query when switching query types (SQL <-> PromQL)
+      if (isQueryTypeChange && dashboardPanelData.data.type !== "custom_chart") {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].query = "";
+      }
 
       // empty the errors
       dashboardPanelData.meta.errors.queryErrors = [];
