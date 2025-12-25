@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="row button-group">
         <div>
           <button
-            data-test="dashboard-customSql"
+            data-test="dashboard-sql-query-type"
             :class="[
               selectedButtonQueryType === 'sql' ? 'selected' : '',
               !(
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div>
           <button
-            data-test="dashboard-promQL"
+            data-test="dashboard-promql-query-type"
             class="button button-right"
             :style="{
               backgroundColor:
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="row button-group tw-ml-[0.25rem]">
         <div v-if="dashboardPanelData.data.type != 'custom_chart'">
           <button
-            data-test="dashboard-auto"
+            data-test="dashboard-builder-query-type"
             :class="selectedButtonType === 'builder' ? 'selected' : ''"
             class="button button-left"
             @click="onUpdateBuilderMode('builder', $event)"
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div>
           <button
-            data-test="dashboard-promQL-builder"
+            data-test="dashboard-custom-query-type"
             class="button button-right"
             :style="{
               backgroundColor:
