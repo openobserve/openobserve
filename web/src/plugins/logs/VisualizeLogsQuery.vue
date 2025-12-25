@@ -162,6 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :panelSchema="chartData"
                         :selectedTimeObj="dashboardPanelData.meta.dateTime"
                         :variablesData="{}"
+                        :showLegendsButton="true"
                         @updated:vrl-function-field-list="
                           updateVrlFunctionFieldList
                         "
@@ -402,6 +403,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :panelSchema="chartData"
                         :selectedTimeObj="dashboardPanelData.meta.dateTime"
                         :variablesData="{}"
+                        :showLegendsButton="true"
                         @updated:vrl-function-field-list="
                           updateVrlFunctionFieldList
                         "

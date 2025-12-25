@@ -204,6 +204,7 @@
                   :variablesData="currentVariablesDataRef"
                   :width="6"
                   :searchType="searchType"
+                  :showLegendsButton="true"
                   @error="handleChartApiError"
                   @updated:data-zoom="onDataZoom"
                   @update:initialVariableValues="onUpdateInitialVariableValues"
