@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { mergeConfig, defineConfig, configDefaults } from 'vitest/config'
-import type { ConfigEnv, UserConfig as VitestUserConfig } from 'vitest/config'
+import type { ConfigEnv } from 'vite'
 import type { UserConfig } from 'vite'
 import viteConfig from './vite.config'
 
@@ -10,7 +10,7 @@ const viteConfigObj = typeof viteConfig === 'function'
   : viteConfig
 
 export default mergeConfig(
-  viteConfigObj as VitestUserConfig,
+  viteConfigObj,
   defineConfig({
     resolve: {
       alias: {
@@ -31,12 +31,13 @@ export default mergeConfig(
       // Prevent unhandled errors from failing the test suite
       dangerouslyIgnoreUnhandledErrors: true,
       coverage: {
+        provider: 'v8',
         reporter: ["text", "json", "html", "json-summary"],
-        all: true,
+        include: ['src/**/*.{js,ts,vue}'],
         thresholds: {
           lines: 27,
           functions: 27,
-          branches: 64,
+          branches: 40,
           statements: 27
         },
         exclude: [

@@ -320,14 +320,16 @@ describe("usePanelDataLoader", () => {
     vi.spyOn(global, "clearTimeout").mockImplementation(() => {});
 
     // Mock AbortController
-    global.AbortController = vi.fn().mockImplementation(() => ({
-      signal: {
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        aborted: false,
-      },
-      abort: vi.fn(),
-    }));
+    global.AbortController = vi.fn(function() {
+      return {
+        signal: {
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          aborted: false,
+        },
+        abort: vi.fn(),
+      };
+    }) as any;
 
     // Mock window.addEventListener and removeEventListener 
     vi.spyOn(window, 'addEventListener').mockImplementation(() => {});
@@ -2799,14 +2801,16 @@ describe("usePanelDataLoader", () => {
         const variablesData = createMockVariablesData();
 
         // Mock AbortController to throw abort error
-        global.AbortController = vi.fn().mockImplementation(() => ({
-          signal: {
-            addEventListener: vi.fn(),
-            removeEventListener: vi.fn(),
-            aborted: false,
-          },
-          abort: vi.fn(),
-        }));
+        global.AbortController = vi.fn(function() {
+          return {
+            signal: {
+              addEventListener: vi.fn(),
+              removeEventListener: vi.fn(),
+              aborted: false,
+            },
+            abort: vi.fn(),
+          };
+        }) as any;
 
         const loader = usePanelDataLoader(
           panelSchema,

@@ -524,10 +524,14 @@ describe("AddAlert Component", () => {
       });
     });
     describe('getParser', () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         wrapper.vm.sqlQueryErrorMsg = "";
+        // Initialize parser manually by importing and setting it
+        const useParserModule = await import("@/composables/useParser");
+        const { sqlParser } = useParserModule.default();
+        wrapper.vm.parser = await sqlParser();
       });
-    
+
 
       it('returns false and sets error for query with *', async() => {
         const result = wrapper.vm.getParser("SELECT * FROM INDEX_NAME");
