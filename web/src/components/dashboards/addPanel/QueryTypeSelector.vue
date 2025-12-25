@@ -279,7 +279,7 @@ export default defineComponent({
           ) {
             // Switching from PromQL custom to builder
             confirmDialogMessage.value =
-              "Are you sure you want to switch to builder mode? Your custom PromQL query will be wiped of.";
+              "Are you sure you want to switch to builder mode? Your custom PromQL query will be wiped off.";
           } else {
             // Default message for other transitions
             confirmDialogMessage.value =
