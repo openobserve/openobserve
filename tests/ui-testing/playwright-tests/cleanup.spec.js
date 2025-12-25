@@ -33,10 +33,7 @@ test.describe("Pre-Test Cleanup", () => {
       ],
       // Template prefixes to clean up
       [
-        'auto_email_template_',
-        'auto_webhook_template_',
-        'auto_playwright_template_',
-        'auto_url_webhook_template_',
+        'auto_',
         'sanitytemp-',
         'newtemp_',
         'email_tmpl_',

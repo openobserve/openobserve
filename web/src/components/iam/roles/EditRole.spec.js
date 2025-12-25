@@ -314,7 +314,12 @@ describe('EditRole - save and cancel', () => {
     const wrapper = await mountEditRole();
     const spy = vi.spyOn(router, 'push');
     await wrapper.vm.cancelPermissionsUpdate();
-    expect(spy).toHaveBeenCalledWith({ name: 'roles' });
+    expect(spy).toHaveBeenCalledWith({
+      name: 'roles',
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier
+      }
+    });
   });
 
   it('saveRole notifies info when no changes', async () => {
