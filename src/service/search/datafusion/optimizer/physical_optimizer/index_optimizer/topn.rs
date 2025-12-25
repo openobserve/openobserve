@@ -33,11 +33,12 @@ use crate::service::search::datafusion::optimizer::physical_optimizer::{
 };
 
 #[rustfmt::skip]
-/// SimpleTopN(String, usize, bool): 
-/// the sql can like: select name, count(*) as cnt from table where match_all() group by name order by cnt desc limit 10; 
+/// SimpleTopN(String, usize, bool):
+/// the sql can like: select name, count(*) as cnt from table where match_all() group by name order by cnt desc limit 10;
 ///                   or select name as key, count(*) as cnt from table where match_all() group by key order by cnt desc limit 10;
-/// condition: only select a index_field, and only have count(*) as aggregate function, group by the index_field in selct clause,
-/// order by count(*), and have limit
+///                   or select name as key, count(*) as cnt from table where match_all() group by key order by cnt desc, key asc limit 10;
+/// condition: only select a index_field, and only have count(*) as aggregate function, group by the index_field in select clause,
+/// order by count(*) [, key asc], and have limit (secondary sort on key is optional and must be ASC if present)
 /// example plan:
 ///   SortPreservingMergeExec: [cnt@1 DESC], fetch=10
 ///     SortExec: TopK(fetch=10), expr=[cnt@1 DESC], preserve_partitioning=[true]
@@ -70,6 +71,7 @@ pub(crate) fn is_simple_topn(plan: Arc<dyn ExecutionPlan>, index_fields: HashSet
 struct SimpleTopnVisitor {
     pub simple_topn: Option<(String, usize, bool)>,
     index_fields: HashSet<String>,
+    secondary_sort_column: Option<String>,
 }
 
 impl SimpleTopnVisitor {
@@ -77,6 +79,7 @@ impl SimpleTopnVisitor {
         Self {
             simple_topn: None,
             index_fields,
+            secondary_sort_column: None,
         }
     }
 }
@@ -89,16 +92,31 @@ impl<'n> TreeNodeVisitor<'n> for SimpleTopnVisitor {
             // Check if this is a SortPreservingMergeExec with fetch limit
             if let Some(fetch) = sort_merge.fetch()
                 && fetch > 0
-                && sort_merge.expr().len() == 1
+                && !sort_merge.expr().is_empty()
+                && sort_merge.expr().len() <= 2
             {
-                // the sort should be on the count(*) result, not directly on an index field
-                // should not sort by index field
+                // the first sort should be on the count(*) result, not directly on an index field
+                // should not sort by index field as primary sort
                 let sort_expr = sort_merge.expr().first();
                 let column_name = get_column_name(&sort_expr.expr);
                 if is_column(&sort_expr.expr) && self.index_fields.contains(column_name) {
                     self.simple_topn = None;
                     return Ok(TreeNodeRecursion::Stop);
                 }
+
+                // If there's a secondary sort, it should be ASC (not descending)
+                if sort_merge.expr().len() == 2 {
+                    let secondary_sort = &sort_merge.expr()[1];
+                    // Secondary sort must be ASC (not descending) and should be a column
+                    if secondary_sort.options.descending || !is_column(&secondary_sort.expr) {
+                        self.simple_topn = None;
+                        return Ok(TreeNodeRecursion::Stop);
+                    }
+                    // Store the secondary sort column name to validate later in AggregateExec
+                    self.secondary_sort_column =
+                        Some(get_column_name(&secondary_sort.expr).to_string());
+                }
+
                 self.simple_topn = Some((
                     "".to_string(), // Will be set when we find the group by field
                     fetch,
@@ -114,7 +132,16 @@ impl<'n> TreeNodeVisitor<'n> for SimpleTopnVisitor {
             let exprs = projection.expr();
             if exprs.len() == 2 {
                 // First expression should be the index field, second should be count(*)
-                // We'll validate this in the AggregateExec
+                // If we have a secondary sort column, validate it matches the first projection
+                // column alias
+                if let Some(secondary_col) = &self.secondary_sort_column {
+                    let first_alias = &exprs[0].alias;
+                    if secondary_col != first_alias {
+                        // Secondary sort doesn't match the grouped field
+                        self.simple_topn = None;
+                        return Ok(TreeNodeRecursion::Stop);
+                    }
+                }
                 return Ok(TreeNodeRecursion::Continue);
             }
             // If projection doesn't have exactly 2 expressions, stop visiting
@@ -203,6 +230,50 @@ mod tests {
                 "select name as key, count(*) as cnt from t where match_all('error') group by key order by cnt desc limit 10",
                 Some(IndexOptimizeMode::SimpleTopN("name".to_string(), 10, false)),
             ),
+            (
+                "select name as key, count(*) as cnt from t where match_all('error') group by key order by cnt desc, key asc limit 10",
+                Some(IndexOptimizeMode::SimpleTopN("name".to_string(), 10, false)),
+            ),
+            // Invalid case: secondary sort with DESC should not optimize
+            (
+                "select name as key, count(*) as cnt from t where match_all('error') group by key order by cnt desc, key desc limit 10",
+                None,
+            ),
+            // Invalid case: sorting by key only (not count) should not optimize
+            (
+                "select name, count(*) as cnt from t where match_all('error') group by name order by name limit 10",
+                None,
+            ),
+            // Valid case: different index field (id instead of name)
+            (
+                "select id, count(*) as cnt from t where match_all('error') group by id order by cnt desc limit 5",
+                Some(IndexOptimizeMode::SimpleTopN("id".to_string(), 5, false)),
+            ),
+            // Valid case: with alias and secondary sort
+            (
+                "select id as identifier, count(*) as total from t where match_all('error') group by identifier order by total desc, identifier asc limit 20",
+                Some(IndexOptimizeMode::SimpleTopN("id".to_string(), 20, false)),
+            ),
+            // Invalid case: no limit
+            (
+                "select name, count(*) as cnt from t where match_all('error') group by name order by cnt desc",
+                None,
+            ),
+            // Invalid case: multiple aggregations (selecting more than 2 columns)
+            (
+                "select name, count(*) as cnt, count(*) as cnt2 from t where match_all('error') group by name order by cnt desc limit 10",
+                None,
+            ),
+            // Invalid case: group by multiple fields
+            (
+                "select name, id, count(*) as cnt from t where match_all('error') group by name, id order by cnt desc limit 10",
+                None,
+            ),
+            // Invalid case: wrong aggregate function (not count)
+            (
+                "select name, max(name) as maximum from t where match_all('error') group by name order by maximum desc limit 10",
+                None,
+            ),
             ("SELECT count(*) from t", None),
         ];
 
@@ -211,7 +282,149 @@ mod tests {
             let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
 
             let index_fields = HashSet::from(["name".to_string(), "id".to_string()]);
-            assert_eq!(expected, is_simple_topn(physical_plan, index_fields));
+            assert_eq!(expected, is_simple_topn(physical_plan, index_fields), "Failed for SQL: {}", sql);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_simple_topn_with_different_limits() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("hostname", DataType::Utf8, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![1, 2, 3])),
+                Arc::new(StringArray::from(vec!["server1", "server2", "server3"])),
+            ],
+        )
+        .unwrap();
+
+        let ctx = SessionContext::new();
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("logs", Arc::new(provider)).unwrap();
+        ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
+
+        let cases = vec![
+            // Different limit values
+            (
+                "select hostname, count(*) as cnt from logs where match_all('error') group by hostname order by cnt desc limit 1",
+                Some(IndexOptimizeMode::SimpleTopN("hostname".to_string(), 1, false)),
+            ),
+            (
+                "select hostname, count(*) as cnt from logs where match_all('error') group by hostname order by cnt desc limit 100",
+                Some(IndexOptimizeMode::SimpleTopN("hostname".to_string(), 100, false)),
+            ),
+            (
+                "select hostname, count(*) as cnt from logs where match_all('error') group by hostname order by cnt desc limit 1000",
+                Some(IndexOptimizeMode::SimpleTopN("hostname".to_string(), 1000, false)),
+            ),
+        ];
+
+        for (sql, expected) in cases {
+            let plan = ctx.state().create_logical_plan(sql).await.unwrap();
+            let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
+
+            let index_fields = HashSet::from(["hostname".to_string()]);
+            assert_eq!(expected, is_simple_topn(physical_plan, index_fields), "Failed for SQL: {}", sql);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_simple_topn_ascending_order() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("category", DataType::Utf8, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![1])),
+                Arc::new(StringArray::from(vec!["type_a"])),
+            ],
+        )
+        .unwrap();
+
+        let ctx = SessionContext::new();
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("events", Arc::new(provider)).unwrap();
+        ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
+
+        let cases = vec![
+            // Ascending order tests
+            (
+                "select category, count(*) as cnt from events where match_all('error') group by category order by cnt asc limit 10",
+                Some(IndexOptimizeMode::SimpleTopN("category".to_string(), 10, true)),
+            ),
+            (
+                "select category as cat, count(*) as cnt from events where match_all('error') group by cat order by cnt asc, cat asc limit 15",
+                Some(IndexOptimizeMode::SimpleTopN("category".to_string(), 15, true)),
+            ),
+            // Mixed: ascending primary sort with ascending secondary sort
+            (
+                "select category, count(*) as cnt from events where match_all('error') group by category order by cnt asc, category asc limit 10",
+                Some(IndexOptimizeMode::SimpleTopN("category".to_string(), 10, true)),
+            ),
+        ];
+
+        for (sql, expected) in cases {
+            let plan = ctx.state().create_logical_plan(sql).await.unwrap();
+            let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
+
+            let index_fields = HashSet::from(["category".to_string()]);
+            assert_eq!(expected, is_simple_topn(physical_plan, index_fields), "Failed for SQL: {}", sql);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_simple_topn_edge_cases() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("service", DataType::Utf8, false),
+            Field::new("region", DataType::Utf8, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![1])),
+                Arc::new(StringArray::from(vec!["api"])),
+                Arc::new(StringArray::from(vec!["us-west"])),
+            ],
+        )
+        .unwrap();
+
+        let ctx = SessionContext::new();
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("metrics", Arc::new(provider)).unwrap();
+        ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
+
+        let cases = vec![
+            // Valid: field not in index_fields should return None
+            (
+                "select region, count(*) as cnt from metrics where match_all('error') group by region order by cnt desc limit 10",
+                None,
+            ),
+            // Valid: service is in index_fields
+            (
+                "select service, count(*) as cnt from metrics where match_all('error') group by service order by cnt desc limit 10",
+                Some(IndexOptimizeMode::SimpleTopN("service".to_string(), 10, false)),
+            ),
+            // Invalid: zero limit should fail (though this might be a syntax error)
+            // We'll skip this as it's likely a parse error
+
+            // Invalid: negative limit would be a syntax error, skipping
+        ];
+
+        for (sql, expected) in cases {
+            let plan = ctx.state().create_logical_plan(sql).await.unwrap();
+            let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
+
+            let index_fields = HashSet::from(["service".to_string()]);
+            assert_eq!(expected, is_simple_topn(physical_plan, index_fields), "Failed for SQL: {}", sql);
         }
     }
 }
