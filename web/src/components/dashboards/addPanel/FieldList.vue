@@ -981,7 +981,7 @@ export default defineComponent({
       () => {
         updateGroupedFields();
       },
-      { deep: true },
+      { deep: true, immediate: true },
     );
 
     watch(
