@@ -13,7 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import {
+  describe,
+  expect,
+  it,
+  beforeEach,
+  afterEach,
+  vi,
+  beforeAll,
+} from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
@@ -185,6 +193,26 @@ vi.mock("@/plugins/traces/SyntaxGuide.vue", () => ({
   },
 }));
 
+// Mock File constructor and URL for vitest v4
+beforeAll(() => {
+  (globalThis as any).File = vi.fn(function (
+    bits: any[],
+    filename: string,
+    options?: any,
+  ) {
+    return {
+      name: filename,
+      type: options?.type || "",
+      size: bits[0]?.length || 0,
+    };
+  });
+
+  (globalThis as any).URL = {
+    createObjectURL: vi.fn(() => "blob:mock-url"),
+    revokeObjectURL: vi.fn(),
+  };
+});
+
 describe("SearchBar Component", () => {
   let wrapper: any;
 
@@ -337,6 +365,15 @@ describe("SearchBar Component", () => {
 
     it("should handle SQL mode query parsing", async () => {
       wrapper.vm.searchObj.meta.sqlMode = true;
+      // Ensure streamResults.list is available
+      wrapper.vm.searchObj.data.streamResults = {
+        list: [
+          {
+            name: "test_stream",
+            schema: [{ name: "field1" }, { name: "field2" }],
+          },
+        ],
+      };
       const queryValue = "SELECT * FROM test_stream";
 
       await wrapper.vm.updateQueryValue(queryValue);
@@ -468,13 +505,16 @@ describe("SearchBar Component", () => {
       };
 
       // Mock File constructor
-      globalThis.File = vi
-        .fn()
-        .mockImplementation((data, filename, options) => ({
-          data,
-          filename,
-          options,
-        }));
+      globalThis.File = class MockFile {
+        data: any;
+        name: string;
+        type: string;
+        constructor(data: any, filename: string, options?: any) {
+          this.data = data;
+          this.name = filename;
+          this.type = options?.type || "";
+        }
+      } as any;
 
       // Mock document methods only for download operations
       const mockLink = {
@@ -514,18 +554,21 @@ describe("SearchBar Component", () => {
         { field1: "value3", field2: "value4", timestamp: "2023-01-02" },
       ];
 
+      // Spy on File constructor
+      const fileSpy = vi.spyOn(globalThis, "File" as any);
+
       wrapper.vm.downloadLogs();
 
       // Check that File was called with correct parameters
-      expect(globalThis.File).toHaveBeenCalled();
-      const fileMock = globalThis.File as any;
-      const csvData = fileMock.mock.calls[0][0][0]; // First element of the array
+      expect(fileSpy).toHaveBeenCalled();
+      const fileCall = fileSpy.mock.calls[0];
+      const csvData = fileCall[0][0]; // First element of the array
 
       expect(csvData).toContain("field1,field2,timestamp");
       expect(csvData).toContain('"value1","value2","2023-01-01"');
       expect(csvData).toContain('"value3","value4","2023-01-02"');
 
-      expect(globalThis.File).toHaveBeenCalledWith(
+      expect(fileSpy).toHaveBeenCalledWith(
         expect.any(Array), // File constructor receives an array of data
         "logs-data.csv",
         { type: "text/csv" },
@@ -535,6 +578,8 @@ describe("SearchBar Component", () => {
       expect(document.body.appendChild).toHaveBeenCalled();
       expect(document.body.removeChild).toHaveBeenCalled();
       expect(globalThis.URL.revokeObjectURL).toHaveBeenCalledWith("mock-url");
+
+      fileSpy.mockRestore();
     });
 
     it("should handle empty query results in downloadLogs", () => {
@@ -552,14 +597,19 @@ describe("SearchBar Component", () => {
         },
       ];
 
+      // Spy on File constructor
+      const fileSpy = vi.spyOn(globalThis, "File" as any);
+
       wrapper.vm.downloadLogs();
 
-      const fileMock = globalThis.File as any;
-      const csvCall = fileMock.mock.calls[0][0][0]; // First element of the array
+      const fileCall = fileSpy.mock.calls[0];
+      const csvCall = fileCall[0][0]; // First element of the array
       expect(csvCall).toContain("field1,field2,field3");
       expect(csvCall).toContain('"value with \\"quotes\\""');
       expect(csvCall).toContain('"value,with,commas"');
       expect(csvCall).toContain('""'); // null should become empty string
+
+      fileSpy.mockRestore();
     });
   });
 
