@@ -927,7 +927,7 @@ export const usePanelDataLoader = (
               const { traceId } = generateTraceContext();
 
               const queryStepValue = it.config?.step_value?.trim()?.length
-                ? it.config?.step_value
+                ? it.config?.step_value?.trim()
                 : undefined;
 
               const panelStepValue = panelSchema.value.config.step_value?.trim()
