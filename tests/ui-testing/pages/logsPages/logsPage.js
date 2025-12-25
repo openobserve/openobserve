@@ -1581,7 +1581,19 @@ export class LogsPage {
     }
 
     async fillQueryEditor(query) {
-        return await this.page.locator(this.queryEditor).locator('.inputarea').fill(query);
+        // Wait for the query editor to be visible and ready
+        await this.page.locator(this.queryEditor).waitFor({ state: 'visible', timeout: 10000 });
+
+        // Use getByRole('textbox') which is more reliable than .inputarea
+        const textbox = this.page.locator(this.queryEditor).getByRole('textbox');
+        await textbox.waitFor({ state: 'visible', timeout: 10000 });
+
+        // Clear existing content first
+        await textbox.click();
+        await textbox.press('ControlOrMeta+a');
+
+        // Fill with new query
+        return await textbox.fill(query);
     }
 
     async clearQueryEditor() {
