@@ -3,7 +3,7 @@
     <q-separator />
 
     <!-- Options Row: Legend + Step Value -->
-    <div class="tw-py-[0.25rem]">
+    <div class="tw:py-[0.25rem]">
       <div style="display: flex; flex-direction: row" class="q-pl-md">
         <div class="layout-name">{{ t("panel.options") }}</div>
         <span class="layout-separator">:</span>

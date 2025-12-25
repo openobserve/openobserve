@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           title="Toggle Function Editor"
           @update:model-value="onFunctionToggle"
           :disable="promqlMode"
-          class="float-left tw-h-[36px] o2-toggle-button-xs tw-mt-2"
+          class="float-left tw:h-[36px] o2-toggle-button-xs tw:mt-2"
           size="xs"
           :class="
             store.state.theme === 'dark'

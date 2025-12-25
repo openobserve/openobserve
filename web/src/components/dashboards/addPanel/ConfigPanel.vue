@@ -1021,7 +1021,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="dashboardPanelData.data.config.connect_nulls"
         :label="t('dashboard.connectNullValues')"
         data-test="dashboard-config-connect-null-values"
-        class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
+        class="tw:h-[36px] -tw:ml-3 o2-toggle-button-lg"
         size="lg"
         :class="
           store.state.theme === 'dark'
@@ -1241,7 +1241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="dashboardPanelData.data.config.axis_border_show"
         :label="t('dashboard.showBorder')"
         data-test="dashboard-config-axis-border"
-        class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
+        class="tw:h-[36px] -tw:ml-3 o2-toggle-button-lg"
         size="lg"
         :class="
           store.state.theme === 'dark'

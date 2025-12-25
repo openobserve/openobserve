@@ -21,12 +21,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="alert-list-page"
     class="q-pa-none flex flex-col"
   >
-    <div class="tw-w-full tw-h-[68px] tw-px-[0.625rem] tw-mb-[0.625rem] q-pt-xs" v-if="!showAddAlertDialog && !showImportAlertDialog">
+    <div class="tw:w-full tw:h-[68px] tw:px-[0.625rem] tw:mb-[0.625rem] q-pt-xs" v-if="!showAddAlertDialog && !showImportAlertDialog">
       <div class="card-container">
         <div
           class="flex justify-between full-width tw:py-3 tw:px-4 items-center"
         >
-          <div class="tw-flex tw-items-center tw-gap-4">
+          <div class="tw:flex tw:items-center tw:gap-4">
             <!-- Icon-only View Mode Tabs -->
             <div class="view-mode-tabs">
               <q-btn
@@ -55,15 +55,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Page Title -->
             <div
-              class="page-title tw-font-[600] tw-text-[20px]"
+              class="page-title tw:font-[600] tw:text-[20px]"
               :data-test="viewMode === 'alerts' ? 'alerts-list-title' : 'incidents-list-title'"
             >
               {{ viewMode === 'alerts' ? t('alerts.header') : t('alerts.incidents.title') }}
             </div>
           </div>
-          <div class="flex q-ml-auto tw-ps-2 items-center">
+          <div class="flex q-ml-auto tw:ps-2 items-center">
             <!-- Tabs only visible in Alerts view -->
-            <div v-if="viewMode === 'alerts'" class="app-tabs-container tw-h-[36px] q-mr-sm">
+            <div v-if="viewMode === 'alerts'" class="app-tabs-container tw:h-[36px] q-mr-sm">
               <app-tabs
               class="tabs-selection-container"
               :tabs="alertTabs"
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-input>
             <!-- All Folders toggle (only for alerts view) -->
-            <div v-if="viewMode === 'alerts'" class="tw-mb-2">
+            <div v-if="viewMode === 'alerts'" class="tw:mb-2">
               <q-toggle
                 data-test="alert-list-search-across-folders-toggle"
                 v-model="searchAcrossFolders"
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Import button (only for alerts view) -->
           <q-btn
             v-if="viewMode === 'alerts'"
-            class="q-ml-sm o2-secondary-button tw-h-[36px]"
+            class="q-ml-sm o2-secondary-button tw:h-[36px]"
             no-caps
             flat
             :label="t(`dashboard.import`)"
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="height: calc(100vh - 116px)"
     >
       <!-- Incidents View (no folders) -->
-      <div v-if="viewMode === 'incidents'" class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
+      <div v-if="viewMode === 'incidents'" class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
         <IncidentList :searchQuery="incidentSearchQuery" />
       </div>
 
@@ -190,8 +190,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #after>
-          <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
-            <div class="tw-h-full card-container">
+          <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
+            <div class="tw:h-full card-container">
               <!-- Alert List Table -->
               <q-table
                 v-model:selected="selectedAlerts"

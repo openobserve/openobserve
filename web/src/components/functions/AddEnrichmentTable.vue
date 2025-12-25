@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Data Source Selection (only for new tables) -->
             <div v-if="!isUpdating" class="col-12 q-py-md">
-              <div class="text-grey-8 text-bold tw-mb-2">Data Source</div>
+              <div class="text-grey-8 text-bold tw:mb-2">Data Source</div>
               <q-option-group
                 v-model="formData.source"
                 :options="sourceOptions"
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 tabindex="0"
               >
                 <template v-slot:hint>
-                  <div class="tw-text-xs">
+                  <div class="tw:text-xs">
                     Must be a publicly accessible CSV file
                   </div>
                 </template>
