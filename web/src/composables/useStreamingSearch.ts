@@ -227,19 +227,14 @@ const useHttpStreaming = () => {
       const fieldsString = meta?.fields.join(",");
       url = `/_values_stream`;
     } else if (type === "promql") {
-      // PromQL streaming endpoint - route based on query_type
-      // Default to "range" if query_type is not specified
+      // PromQL streaming endpoint
+      // For instant queries, set start == end to get a single evaluation point
       const queryType = queryReq.query_type || "range";
+      const startTime = queryType === "instant" ? queryReq.end_time : queryReq.start_time;
+      const endTime = queryReq.end_time;
 
-      if (queryType === "instant") {
-        // Instant query: /api/v1/query (single point in time)
-        // Use "time" parameter instead of "start" and "end"
-        const timeParam = queryReq.end_time || Math.floor(Date.now() / 1000);
-        url = `/prometheus/api/v1/query?use_streaming=true&use_cache=${use_cache}&time=${timeParam}&query=${encodeURIComponent(queryReq.query)}`;
-      } else {
-        // Range query: /api/v1/query_range (time series over a range)
-        url = `/prometheus/api/v1/query_range?use_streaming=true&use_cache=${use_cache}&start=${queryReq.start_time}&end=${queryReq.end_time}&step=${queryReq.step}&query=${encodeURIComponent(queryReq.query)}`;
-      }
+      // Always use query_range endpoint (returns matrix format)
+      url = `/prometheus/api/v1/query_range?use_streaming=true&use_cache=${use_cache}&start=${startTime}&end=${endTime}&step=${queryReq.step}&query=${encodeURIComponent(queryReq.query)}`;
 
       // Add common metadata parameters
       if (meta?.dashboard_id) url += `&dashboard_id=${meta?.dashboard_id}`;
