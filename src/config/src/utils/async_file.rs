@@ -174,10 +174,8 @@ pub async fn clean_empty_dirs(
 pub fn create_wal_dir_datetime_filter(
     start_time: DateTime<Utc>,
     end_time: DateTime<Utc>,
-    extension_pattern: String,
     skip_count: usize,
 ) -> impl Fn(PathBuf) -> bool + Send + Clone + 'static {
-    let extension_pattern = extension_pattern.to_lowercase();
     move |path: PathBuf| {
         let mut components = path
             .components()
@@ -230,11 +228,7 @@ pub fn create_wal_dir_datetime_filter(
             && (!path.is_file()
                 || path
                     .extension()
-                    .and_then(|extension| {
-                        extension
-                            .to_str()
-                            .map(|s| s.to_lowercase() == extension_pattern)
-                    })
+                    .and_then(|extension| extension.to_str().map(|s| s.to_lowercase() == "parquet"))
                     .unwrap_or_default())
     }
 }
@@ -448,7 +442,6 @@ mod tests {
         let filter = create_wal_dir_datetime_filter(
             start_time,
             end_time,
-            "parquet".to_string(),
             inner_path.components().count() + 1,
         );
         let files = scan_files_filtered(inner_path, filter, None)

@@ -15,7 +15,7 @@
 
 use std::borrow::Cow;
 
-use crate::{FILE_EXT_PARQUET, FILE_EXT_TANTIVY, meta::stream::StreamType};
+use crate::{FILE_EXT_PARQUET, FILE_EXT_TANTIVY, FILE_EXT_VORTEX, meta::stream::StreamType};
 
 /// tantivy inverted index solution has a 1:1 mapping between parquet and idx files.
 /// This is a helper function to convert the parquet file name to tantivy file name.
@@ -46,11 +46,15 @@ pub fn convert_parquet_file_name_to_tantivy_file(from: &str) -> Option<String> {
 
     // Replace the file extension
     let file_name_pos = parts.len() - 1;
-    if !parts[file_name_pos].ends_with(FILE_EXT_PARQUET) {
+    if parts[file_name_pos].ends_with(FILE_EXT_PARQUET) {
+        parts[file_name_pos] =
+            Cow::Owned(parts[file_name_pos].replace(FILE_EXT_PARQUET, FILE_EXT_TANTIVY));
+    } else if parts[file_name_pos].ends_with(FILE_EXT_VORTEX) {
+        parts[file_name_pos] =
+            Cow::Owned(parts[file_name_pos].replace(FILE_EXT_VORTEX, FILE_EXT_TANTIVY));
+    } else {
         return None;
     }
-    parts[file_name_pos] =
-        Cow::Owned(parts[file_name_pos].replace(FILE_EXT_PARQUET, FILE_EXT_TANTIVY));
 
     Some(parts.join("/"))
 }

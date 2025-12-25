@@ -35,7 +35,7 @@
 use std::sync::Arc;
 
 use arrow_schema::{DataType, Schema, SchemaRef};
-use config::PARQUET_MAX_ROW_GROUP_SIZE;
+use config::{FileFormat, PARQUET_MAX_ROW_GROUP_SIZE, meta::bitvec::BitVec};
 use datafusion::{
     common::{DataFusionError, Result, project_schema, stats::Precision},
     datasource::{listing::PartitionedFile, physical_plan::parquet::ParquetAccessPlan},
@@ -46,11 +46,26 @@ use datafusion::{
     },
 };
 use hashbrown::HashMap;
+use vortex_buffer::Buffer;
+use vortex_scan::Selection;
 
 use crate::service::search::{datafusion::storage, index::IndexCondition};
 
-pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessPlan>> {
+pub fn generate_access_plan(
+    file: &PartitionedFile,
+) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
     let segment_ids = storage::file_list::get_segment_ids(file.path().as_ref())?;
+    let file_format = FileFormat::from_extension(file.path().as_ref())?;
+    match file_format {
+        FileFormat::Parquet => generate_parquet_access_plan(file, segment_ids),
+        FileFormat::Vortex => generate_vortex_access_plan(segment_ids),
+    }
+}
+
+fn generate_parquet_access_plan(
+    file: &PartitionedFile,
+    segment_ids: Arc<BitVec>,
+) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
     let stats = file.statistics.as_ref()?;
     let Precision::Exact(num_rows) = stats.num_rows else {
         return None;
@@ -60,7 +75,6 @@ pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessP
     // Determine sampling mode based on BitVec size:
     // - If BitVec size == row_group_count: row-group-level sampling (enterprise feature)
     // - If BitVec size == num_rows: row-level sampling (original behavior)
-
     #[cfg(feature = "enterprise")]
     if segment_ids.len() == row_group_count {
         // Row-group-level sampling: each bit represents a row group
@@ -73,9 +87,7 @@ pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessP
         );
     }
 
-    // Row-level sampling: each bit represents a row (original behavior)
     let mut access_plan = ParquetAccessPlan::new_none(row_group_count);
-
     for (row_group_id, chunk) in segment_ids.chunks(PARQUET_MAX_ROW_GROUP_SIZE).enumerate() {
         let mut selection = Vec::new();
         let mut current_count = 0;
@@ -116,12 +128,24 @@ pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessP
     }
 
     log::debug!(
-        "file path: file={:?}, row_group_count={}, access_plan={:?}",
-        file.path().as_ref(),
-        row_group_count,
-        access_plan
+        "file path: file={:?}, row_group_count={row_group_count}, access_plan={access_plan:?}",
+        file.path().as_ref()
     );
     Some(Arc::new(access_plan))
+}
+
+fn generate_vortex_access_plan(
+    row_ids: Arc<BitVec>,
+) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
+    let indices: Vec<u64> = row_ids
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, bit)| if *bit { Some(idx as u64) } else { None })
+        .collect();
+
+    let buffer = Buffer::from(indices);
+    let selection = Selection::IncludeByIndex(buffer);
+    Some(Arc::new(selection))
 }
 
 fn wrap_filter(
