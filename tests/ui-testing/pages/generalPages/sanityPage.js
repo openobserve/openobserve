@@ -276,9 +276,12 @@ export class SanityPage {
         
         const queryEditor = this.page.locator(this.queryEditorContent);
         await expect(queryEditor).toBeVisible({ timeout: 10000 });
-        
-        await queryEditor.locator('.monaco-editor').click();
-        await queryEditor.locator('.inputarea').fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
+        await queryEditor.waitFor({ state: 'visible', timeout: 10000 });
+
+        const textbox = queryEditor.getByRole('textbox');
+        await textbox.waitFor({ state: 'visible', timeout: 10000 });
+        await textbox.click();
+        await textbox.fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
         
         await this.page.waitForLoadState('domcontentloaded');
         await this.page.locator(this.refreshButton).click({ force: true });
@@ -335,7 +338,11 @@ export class SanityPage {
             }
         }
         
-        await this.page.locator(this.fnEditor).locator(".inputarea").fill(".a=2");
+        const fnEditorLocator = this.page.locator(this.fnEditor);
+        await fnEditorLocator.waitFor({ state: 'visible', timeout: 10000 });
+        const fnTextbox = fnEditorLocator.getByRole('textbox');
+        await fnTextbox.waitFor({ state: 'visible', timeout: 10000 });
+        await fnTextbox.fill(".a=2");
         await waitUtils.smartWait(this.page, 1000, 'VRL editor content stabilization');
 
         // Wait for 3 seconds before attempting to click save button
@@ -1040,9 +1047,12 @@ export class SanityPage {
         // Wait for query editor to be ready
         const queryEditor = this.page.locator(this.queryEditorContent);
         await expect(queryEditor).toBeVisible({ timeout: 15000 });
+        await queryEditor.waitFor({ state: 'visible', timeout: 10000 });
 
-        await queryEditor.locator('.monaco-editor').click();
-        await queryEditor.locator('.inputarea').fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
+        const textbox = queryEditor.getByRole('textbox');
+        await textbox.waitFor({ state: 'visible', timeout: 10000 });
+        await textbox.click();
+        await textbox.fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
         await this.page.waitForLoadState('domcontentloaded');
         await this.page.waitForTimeout(1000);
 

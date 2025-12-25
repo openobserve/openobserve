@@ -214,16 +214,20 @@ export default class LogsVisualise {
   //fill query editor
   async fillQueryEditor(sqlQuery) {
     const queryEditor = this.page.locator('[data-test="logs-search-bar-query-editor"]');
-    await queryEditor.waitFor({ state: "visible", timeout: 5000 });
-    await queryEditor.locator('.monaco-editor').click();
-    await queryEditor.locator('.inputarea').fill(sqlQuery);
+    await queryEditor.waitFor({ state: "visible", timeout: 10000 });
+    const textbox = queryEditor.getByRole('textbox');
+    await textbox.waitFor({ state: 'visible', timeout: 10000 });
+    await textbox.click();
+    await textbox.fill(sqlQuery);
   }
 
   //fill logs query editor with SQL query
   async fillLogsQueryEditor(sqlQuery) {
-    await this.logsQueryEditor.waitFor({ state: "visible", timeout: 5000 });
-    await this.logsQueryEditor.locator('.monaco-editor').click();
-    await this.logsQueryEditor.locator('.inputarea').fill(sqlQuery);
+    await this.logsQueryEditor.waitFor({ state: "visible", timeout: 10000 });
+    const textbox = this.logsQueryEditor.getByRole('textbox');
+    await textbox.waitFor({ state: 'visible', timeout: 10000 });
+    await textbox.click();
+    await textbox.fill(sqlQuery);
   }
 
   // Open the first VRL Function Editor

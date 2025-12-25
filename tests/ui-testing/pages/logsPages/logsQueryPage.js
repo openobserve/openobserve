@@ -22,7 +22,10 @@ export class LogsQueryPage {
   async typeQuery(query) {
     const queryEditor = this.page.locator(this.queryEditor);
     await expect(queryEditor).toBeVisible();
-    await queryEditor.locator(".inputarea").fill(query);
+    await queryEditor.waitFor({ state: 'visible', timeout: 10000 });
+    const textbox = queryEditor.getByRole('textbox');
+    await textbox.waitFor({ state: 'visible', timeout: 10000 });
+    await textbox.fill(query);
   }
 
   async clickRefresh() {

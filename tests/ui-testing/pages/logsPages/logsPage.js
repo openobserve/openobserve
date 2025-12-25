@@ -715,9 +715,12 @@ export class LogsPage {
     }
 
     async typeQuery(query) {
-        await this.page.locator(this.queryEditor).click();
-        await this.page.locator(this.queryEditor).press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-        await this.page.locator(this.queryEditor).locator('.inputarea').fill(query);
+        await this.page.locator(this.queryEditor).waitFor({ state: 'visible', timeout: 10000 });
+        const textbox = this.page.locator(this.queryEditor).getByRole('textbox');
+        await textbox.waitFor({ state: 'visible', timeout: 10000 });
+        await textbox.click();
+        await textbox.press('ControlOrMeta+a');
+        await textbox.fill(query);
     }
 
     async executeQueryWithKeyboardShortcut() {
@@ -2059,7 +2062,10 @@ export class LogsPage {
     }
 
     async clickVrlEditor() {
-        return await this.page.locator(this.vrlEditor).locator('.inputarea').fill('.a=2');
+        await this.page.locator(this.vrlEditor).waitFor({ state: 'visible', timeout: 10000 });
+        const textbox = this.page.locator(this.vrlEditor).getByRole('textbox');
+        await textbox.waitFor({ state: 'visible', timeout: 10000 });
+        return await textbox.fill('.a=2');
     }
 
     async waitForTimeout(milliseconds) {
