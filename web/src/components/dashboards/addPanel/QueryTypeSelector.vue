@@ -85,7 +85,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               backgroundColor:
                 store.state.theme == 'dark' ? 'transparent' : '#f0eaea',
             }"
-            :class="selectedButtonType === 'custom' ? 'selected' : ''"
+            :class="[
+              selectedButtonType === 'custom' ? 'selected' : '',
+              dashboardPanelData.data.type === 'custom_chart'
+                ? 'button-left'
+                : '',
+            ]"
             @click="onUpdateBuilderMode('custom', $event)"
           >
             {{ t("panel.custom") }}
@@ -164,6 +169,8 @@ export default defineComponent({
 
       if (dashboardPanelData.data.type == "custom_chart") {
         // For custom_chart, check the actual query type and customQuery flag
+        selectedButtonQueryType.value = "sql";
+        selectedButtonType.value = "custom";
         ignoreSelectedButtonTypeUpdate.value = false;
         return;
       }
