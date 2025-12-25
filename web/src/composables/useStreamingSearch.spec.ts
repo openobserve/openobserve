@@ -213,8 +213,6 @@ let onDataSpy: any;
           })
         );
 
-        await flushPromises();
-        await new Promise((resolve) => setTimeout(resolve, 100));
         //this will tell us that onData have been called once
         expect(mockHandlers.data).toHaveBeenCalledTimes(1);
 
