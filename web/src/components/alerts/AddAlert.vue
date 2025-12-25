@@ -2252,15 +2252,21 @@ export default defineComponent({
     }
 
     this.formData.is_real_time = this.formData.is_real_time.toString();
-    this.formData.context_attributes = Object.keys(
-      this.formData.context_attributes,
-    ).map((attr) => {
-      return {
-        key: attr,
-        value: this.formData.context_attributes[attr],
-        id: getUUID(),
-      };
-    });
+    // Convert context_attributes from object to array format (only if it's an object)
+    if (this.formData.context_attributes && typeof this.formData.context_attributes === 'object' && !Array.isArray(this.formData.context_attributes)) {
+      this.formData.context_attributes = Object.keys(
+        this.formData.context_attributes,
+      ).map((attr) => {
+        return {
+          key: attr,
+          value: this.formData.context_attributes[attr],
+          id: getUUID(),
+        };
+      });
+    } else if (!this.formData.context_attributes) {
+      // If null or undefined, initialize as empty array
+      this.formData.context_attributes = [];
+    }
     // VERSION DETECTION AND CONVERSION
     // Supports three versions:
     // - V0: Flat array of conditions with implicit AND between all (no groups)
