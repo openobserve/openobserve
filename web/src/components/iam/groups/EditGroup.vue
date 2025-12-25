@@ -241,7 +241,14 @@ const saveGroupChanges = () => {
 };
 
 const cancelEditGroup = () => {
-  router.push({ name: "groups" });
+  router.push(
+    { name: "groups", 
+    query: 
+      { 
+        org_identifier: store.state.selectedOrganization.identifier 
+      }
+    }
+  );
 };
 </script>
 

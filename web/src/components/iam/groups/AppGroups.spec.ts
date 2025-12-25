@@ -256,13 +256,16 @@ describe("AppGroups Component", () => {
     it("navigates to edit page when edit icon is clicked", async () => {
       const routerPushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
       const testGroup = { group_name: "test-group" };
-      
+
       await wrapper.vm.editGroup(testGroup);
-      
+
       expect(routerPushSpy).toHaveBeenCalledWith({
         name: "editGroup",
         params: {
           group_name: "test-group",
+        },
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
         },
       });
     });

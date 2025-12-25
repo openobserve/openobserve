@@ -223,6 +223,14 @@ export class BarConverter implements PromQLChartConverter {
           yAxis: buildValueAxis(panelSchema),
         };
 
+    if (isHorizontal) {
+      axisConfig.yAxis.axisLabel = {
+        ...axisConfig.yAxis.axisLabel,
+        overflow: "truncate",
+        width: config.axis_width || 150,
+      };
+    }
+
     return {
       series,
       ...axisConfig,

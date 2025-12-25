@@ -3,7 +3,7 @@
   "url": "",
   "method": "post",
   "skip_tls_verify": false,
-  "template": "email",
+  "template": "",
   "emails": [
     "shnath@openobserve.ai"
   ],
