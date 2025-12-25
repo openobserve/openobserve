@@ -45,7 +45,7 @@
 
 <script setup lang="ts">
 import RouteTabs from "@/components/RouteTabs.vue";
-import { ref, watch } from "vue";
+import { ref, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
@@ -74,7 +74,7 @@ const collapseSidebar = () => {
   splitterModel.value = showSidebar.value ? lastSplitterPosition.value : 0;
 };
 
-const tabs = ref([
+const allTabs = [
   {
     dataTest: "iam-users-tab",
     name: "users",
@@ -159,7 +159,20 @@ const tabs = ref([
     label: t("iam.invitations"),
     class: "tab_content",
   },
-]);
+];
+
+// Filter tabs based on service_account_enabled config
+const tabs = computed(() => {
+  const serviceAccountEnabled = store.state.zoConfig.service_account_enabled ?? true;
+
+  return allTabs.filter((tab) => {
+    // Hide service accounts tab if disabled
+    if (tab.name === "serviceAccounts" && !serviceAccountEnabled) {
+      return false;
+    }
+    return true;
+  });
+});
 
 watch(
   () => router.currentRoute.value.name,

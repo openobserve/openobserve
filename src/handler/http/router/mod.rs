@@ -599,11 +599,6 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(stream::delete_stream_cache)
         .service(short_url::shorten)
         .service(short_url::retrieve)
-        .service(service_accounts::list)
-        .service(service_accounts::save)
-        .service(service_accounts::delete)
-        .service(service_accounts::update)
-        .service(service_accounts::get_api_token)
         .service(mcp::handle_mcp_post)
         .service(mcp::handle_mcp_get)
         .service(alerts::deduplication::get_config)
@@ -687,6 +682,23 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(organization::org::extend_trial_period);
 
     svc.service(service);
+
+    // Service Accounts routes with guard middleware
+    svc.service(
+        web::scope("/api")
+            .wrap(middleware::from_fn(
+                middlewares::service_account_guard_middleware,
+            ))
+            .wrap(HttpAuthentication::with_fn(
+                super::auth::validator::oo_validator,
+            ))
+            .wrap(cors.clone())
+            .service(service_accounts::list)
+            .service(service_accounts::save)
+            .service(service_accounts::delete)
+            .service(service_accounts::update)
+            .service(service_accounts::get_api_token),
+    );
 }
 
 pub fn get_other_service_routes(svc: &mut web::ServiceConfig) {
