@@ -523,7 +523,6 @@ export default defineComponent({
       )
         dashboardPanelData.layout.currentQueryIndex -= 1;
       removeQuery(index);
-      debugger;
     };
 
     const toggleQueryVisibility = (index) => {
