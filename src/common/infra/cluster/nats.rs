@@ -101,10 +101,10 @@ async fn register() -> Result<()> {
     }
 
     // 2. watch node list
-    task::spawn(async move { super::watch_node_list().await });
+    task::spawn(async move { watch_node_list().await });
 
     // 3. get node list
-    let node_list = match super::list_nodes().await {
+    let node_list = match list_nodes().await {
         Ok(v) => v,
         Err(e) => {
             dist_lock::unlock(&locker).await.map_err(|e| {
@@ -134,7 +134,7 @@ async fn register() -> Result<()> {
         add_node_to_cache(node).await;
     }
 
-    let new_node_id = super::generate_node_id(node_ids);
+    let new_node_id = generate_node_id(node_ids);
     // update local id
     LOCAL_NODE_ID.store(new_node_id, Ordering::Relaxed);
 
@@ -159,18 +159,16 @@ async fn register() -> Result<()> {
 
     // cache local node
     if node.is_interactive_querier() {
-        super::add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive))
-            .await;
+        add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive)).await;
     }
     if node.is_background_querier() {
-        super::add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Background))
-            .await;
+        add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Background)).await;
     }
     if node.is_compactor() {
-        super::add_node_to_consistent_hash(&node, &Role::Compactor, None).await;
+        add_node_to_consistent_hash(&node, &Role::Compactor, None).await;
     }
     if node.is_flatten_compactor() {
-        super::add_node_to_consistent_hash(&node, &Role::FlattenCompactor, None).await;
+        add_node_to_consistent_hash(&node, &Role::FlattenCompactor, None).await;
     }
 
     // cache local node
@@ -232,7 +230,7 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
     let nodes = get_cached_nodes(|_| true).await.unwrap_or_default();
     let node_ids = nodes.iter().map(|n| n.id).collect::<Vec<_>>();
     if node_ids.iter().filter(|&v| *v == node.id).count() > 1 {
-        let new_node_id = super::generate_node_id(node_ids);
+        let new_node_id = generate_node_id(node_ids);
         node.id = new_node_id;
         log::warn!("[CLUSTER] node id is duplicated, generate new node id: {new_node_id}");
         // update local id
@@ -242,7 +240,7 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
     }
 
     // update node status metrics
-    node.metrics = super::update_node_status_metrics().await;
+    node.metrics = update_node_status_metrics().await;
 
     let val = json::to_string(&node).unwrap();
 

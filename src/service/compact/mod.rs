@@ -130,7 +130,7 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
         let retention = columns[3];
 
         // here we use job to get the compactor node, so that we can use different compactor for
-        // different job
+        // different job of same stream
         let Some(node_name) = get_node_from_consistent_hash(&job, &Role::Compactor, None).await
         else {
             continue; // no compactor node

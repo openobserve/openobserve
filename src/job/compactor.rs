@@ -211,6 +211,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+// TODO: refactor here only select node when it start,
+// if this node stopped, then there is no one can continue to merge
 async fn run_enrichment_table_merge() -> Result<(), anyhow::Error> {
     log::info!("[COMPACTOR::JOB] Running enrichment table merge");
     let db = infra::db::get_db().await;
