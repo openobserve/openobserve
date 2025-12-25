@@ -14,9 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::utils::rand::get_rand_element;
+use infra::cluster::get_cached_schedulable_ingester_nodes;
 use tonic::transport::Channel;
-
-use crate::common::infra::cluster;
 
 pub(crate) async fn get_ingester_channel() -> Result<(String, Channel), tonic::Status> {
     let grpc_addr = get_rand_ingester_addr().await?;
@@ -26,7 +25,7 @@ pub(crate) async fn get_ingester_channel() -> Result<(String, Channel), tonic::S
 }
 
 async fn get_rand_ingester_addr() -> Result<String, tonic::Status> {
-    let nodes = cluster::get_cached_schedulable_ingester_nodes().await;
+    let nodes = get_cached_schedulable_ingester_nodes().await;
 
     if let Some(nodes) = nodes
         && !nodes.is_empty()
