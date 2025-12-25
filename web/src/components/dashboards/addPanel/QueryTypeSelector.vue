@@ -314,13 +314,13 @@ export default defineComponent({
       // empty the errors
       dashboardPanelData.meta.errors.queryErrors = [];
 
-      if (selectedButtonType.value == "promql") {
-        dashboardPanelData.layout.currentQueryIndex = 0;
-        dashboardPanelData.data.queries = dashboardPanelData.data.queries.slice(
-          0,
-          1
-        );
-      }
+      // if (selectedButtonType.value == "promql") {
+      //   dashboardPanelData.layout.currentQueryIndex = 0;
+      //   dashboardPanelData.data.queries = dashboardPanelData.data.queries.slice(
+      //     0,
+      //     1
+      //   );
+      // }
       dashboardPanelData.layout.showQueryBar = true;
     };
 
