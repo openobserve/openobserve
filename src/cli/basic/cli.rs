@@ -292,15 +292,6 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             println!("Running migration metadata from {from} to {to}");
             migration::meta::run(&from, &to).await?
         }
-        "migrate-dashboards" => {
-            println!("Running migration dashboard");
-            migration::dashboards::run().await?
-        }
-        "migrate-pipeline" => {
-            println!("Running migration pipeline");
-            let drop_table = command.get_flag("drop-table");
-            migration::pipeline_func::run(drop_table).await?;
-        }
         "delete-parquet" => {
             let account = command.remove_one::<String>("account").unwrap_or_default();
             let file = command.get_one::<String>("file").unwrap();
@@ -323,31 +314,6 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             crate::common::infra::cluster::register_and_keep_alive().await?;
             export::Export::operator(dataCli::arg_matches(command.clone())).await?;
         }
-        "migrate-schemas" => {
-            println!("Running schema migration to row per schema version");
-            #[allow(deprecated)]
-            migration::schema::run().await?
-        }
-        "seaorm-rollback" => match command.subcommand() {
-            Some(("all", _)) => {
-                println!("Rolling back all");
-                infra::table::down(None).await?
-            }
-            Some(("last", sub_matches)) => {
-                let n = sub_matches
-                    .get_one::<u32>("N")
-                    .map(|n| n.to_owned())
-                    .unwrap_or(1);
-                println!("Rolling back {n}");
-                infra::table::down(Some(n)).await?
-            }
-            Some((name, _)) => {
-                return Err(anyhow::anyhow!("unsupported sub command: {name}"));
-            }
-            None => {
-                return Err(anyhow::anyhow!("missing sub command"));
-            }
-        },
         "recover-file-list" => {
             let account = command
                 .get_one::<String>("account")
