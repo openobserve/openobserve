@@ -335,7 +335,8 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.removeField("x_axis_1", "x");
 
     // Open Custom SQL editor
-    await page.locator('[data-test="dashboard-customSql"]').click();
+    await page.locator('[data-test="dashboard-sql-query-type"]').click();
+    await page.locator('[data-test="dashboard-custom-query-type"]').click();
 
     // Focus on the editor and enter the custom SQL query
     await page.locator(".view-line").first().click();
