@@ -305,6 +305,11 @@ export default defineComponent({
     };
 
     const setupEditor = async () => {
+      console.log("🎨 setupEditor called - editorId:", props.editorId);
+      console.log("🎨 setupEditor - props.query:", props.query?.substring(0, 50));
+      console.log("🎨 setupEditor - props.readOnly:", props.readOnly);
+      console.log("🎨 setupEditor - Call stack:", new Error().stack);
+
       monaco.editor.defineTheme("myCustomTheme", {
         base: "vs", // can also be vs-dark or hc-black
         inherit: true, // can also be false to completely replace the builtin rules
@@ -339,7 +344,50 @@ export default defineComponent({
         return;
       }
 
-      if (editorElement && editorElement?.hasChildNodes()) return;
+      // If editor already exists (hasChildNodes), update its value and options instead of returning
+      if (editorElement && editorElement?.hasChildNodes()) {
+        console.log("🎨 Editor already exists, checking if we can update - editorId:", props.editorId);
+        console.log("🎨 Current props.query:", props.query?.substring(0, 100));
+        console.log("🎨 Current props.readOnly:", props.readOnly);
+        console.log("🎨 editorObj exists:", !!editorObj);
+
+        if (editorObj) {
+          // Update editor value if different from current
+          const currentValue = editorObj.getValue();
+          if (currentValue !== props.query?.trim()) {
+            console.log("🎨 Updating editor value from:", currentValue?.substring(0, 50), "to:", props.query?.substring(0, 50));
+            editorObj.setValue(props.query?.trim() || "");
+          }
+
+          // Update readonly option if different
+          const currentReadOnly = editorObj.getRawOptions().readOnly;
+          if (currentReadOnly !== props.readOnly) {
+            console.log("🎨 Updating editor readOnly from:", currentReadOnly, "to:", props.readOnly);
+            editorObj.updateOptions({ readOnly: props.readOnly });
+          }
+          console.log("🎨 Editor updated successfully, returning");
+          return;
+        } else {
+          // editorObj is null but element has children - stale DOM
+          console.log("🎨 editorObj is null but element has children");
+
+          // Don't recreate if new props are empty/readonly (likely a stale mount with default props)
+          // The existing editor in the DOM is probably correct
+          if (!props.query?.trim() && props.readOnly) {
+            console.log("🎨 New props are empty/readonly - skipping recreation to preserve existing editor");
+            return;
+          }
+
+          // New props have actual data - safe to recreate
+          console.log("🎨 New props have data - clearing element to recreate editor with correct props");
+          editorElement.innerHTML = '';
+          // Fall through to create new editor below
+        }
+      }
+
+      console.log("🎨 Creating Monaco editor - editorId:", props.editorId);
+      console.log("🎨 Initial value (props.query):", props.query?.substring(0, 100));
+      console.log("🎨 Initial readOnly:", props.readOnly);
 
       editorObj = monaco.editor.create(editorElement as HTMLElement, {
         value: props.query?.trim(),
@@ -373,6 +421,9 @@ export default defineComponent({
         readOnly: props.readOnly,
         renderValidationDecorations: "on",
       });
+
+      console.log("🎨 Monaco editor created - actual value:", editorObj.getValue()?.substring(0, 100));
+      console.log("🎨 Monaco editor created - readOnly option:", editorObj.getRawOptions().readOnly);
 
       editorObj.onDidChangeModelContent(
         debounce((e: any) => {
@@ -439,6 +490,11 @@ export default defineComponent({
     };
 
     onMounted(async () => {
+      console.log("🎨 CodeQueryEditor onMounted - editorId:", props.editorId);
+      console.log("🎨 CodeQueryEditor onMounted - props.query:", props.query?.substring(0, 100));
+      console.log("🎨 CodeQueryEditor onMounted - props.readOnly:", props.readOnly);
+      console.log("🎨 CodeQueryEditor onMounted - props.language:", props.language);
+
       provider.value?.dispose();
       if (props.language === "vrl") {
         monaco.languages.register({ id: "vrl" });
@@ -489,6 +545,11 @@ export default defineComponent({
     });
 
     onActivated(async () => {
+      console.log("🎨 CodeQueryEditor onActivated - editorId:", props.editorId);
+      console.log("🎨 CodeQueryEditor onActivated - props.query:", props.query?.substring(0, 100));
+      console.log("🎨 CodeQueryEditor onActivated - props.readOnly:", props.readOnly);
+      console.log("🎨 CodeQueryEditor onActivated - editorObj exists:", !!editorObj);
+
       if (!editorObj) {
         setupEditor();
         editorObj?.layout();
@@ -544,9 +605,19 @@ export default defineComponent({
     // update readonly when prop value changes
     watch(
       () => props.query,
-      () => {
+      (newQuery, oldQuery) => {
+        console.log("🎨 CodeQueryEditor query watcher fired - editorId:", props.editorId);
+        console.log("🎨 newQuery:", newQuery?.substring(0, 100));
+        console.log("🎨 oldQuery:", oldQuery?.substring(0, 100));
+        console.log("🎨 props.readOnly:", props.readOnly);
+        console.log("🎨 editorObj exists:", !!editorObj);
+        console.log("🎨 hasWidgetFocus:", editorObj?.hasWidgetFocus());
+
         if (props.readOnly || !editorObj?.hasWidgetFocus()) {
+          console.log("🎨 Setting editor value to:", newQuery?.substring(0, 100));
           editorObj?.getModel().setValue(props.query);
+        } else {
+          console.log("🎨 NOT setting editor value (has focus and not readonly)");
         }
       },
     );

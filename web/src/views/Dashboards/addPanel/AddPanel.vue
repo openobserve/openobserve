@@ -1042,6 +1042,9 @@ export default defineComponent({
       // todo check for the edit more
       if (route.query.panelId) {
         editMode.value = true;
+        console.log("🟦 Before getPanel - dashboardPanelData.data.type:", dashboardPanelData.data.type);
+        console.log("🟦 Before getPanel - dashboardPanelData.data.queries[0]:", JSON.stringify(dashboardPanelData.data.queries[0]));
+
         const panelData = await getPanel(
           store,
           route.query.dashboard,
@@ -1050,11 +1053,27 @@ export default defineComponent({
           route.query.tab,
         );
 
+        console.log("🟩 getPanel returned - panelData.type:", panelData?.type);
+        console.log("🟩 getPanel returned - panelData.queries[0]:", JSON.stringify(panelData?.queries?.[0]));
+
         try {
           Object.assign(
             dashboardPanelData.data,
             JSON.parse(JSON.stringify(panelData ?? {})),
           );
+          console.log("🟨 After Object.assign - dashboardPanelData.data.type:", dashboardPanelData.data.type);
+          console.log("🟨 After Object.assign - dashboardPanelData.data.queries[0]:", JSON.stringify(dashboardPanelData.data.queries[0]));
+
+          // FIX: For custom_chart panels, ensure customQuery flag is always true
+          // This prevents the query from being lost due to watchers that fire during mount
+          if (dashboardPanelData.data.type === "custom_chart") {
+            dashboardPanelData.data.queries.forEach((query: any) => {
+              if (query.query) {  // Only set customQuery=true if there's actually a query
+                query.customQuery = true;
+              }
+            });
+            console.log("🔧 Fixed customQuery for custom_chart - dashboardPanelData.data.queries[0]:", JSON.stringify(dashboardPanelData.data.queries[0]));
+          }
         } catch (e) {
           console.error("Error while parsing panel data", e);
         }
@@ -1069,9 +1088,12 @@ export default defineComponent({
           dashboardPanelData.layout.vrlFunctionToggle = true;
         }
 
+        console.log("🟪 Before nextTick - dashboardPanelData.data.queries[0]:", JSON.stringify(dashboardPanelData.data.queries[0]));
         await nextTick();
+        console.log("🟥 After nextTick - dashboardPanelData.data.queries[0]:", JSON.stringify(dashboardPanelData.data.queries[0]));
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
         updateDateTime(selectedDate.value);
+        console.log("🟧 After updateDateTime - dashboardPanelData.data.queries[0]:", JSON.stringify(dashboardPanelData.data.queries[0]));
       } else {
         editMode.value = false;
         resetDashboardPanelDataAndAddTimeField();
@@ -1081,17 +1103,21 @@ export default defineComponent({
       }
       // console.timeEnd("onMounted");
       // let it call the wathcers and then mark the panel config watcher as activated
+      console.log("⬜ Before final nextTick - dashboardPanelData.data.queries[0]:", JSON.stringify(dashboardPanelData.data.queries[0]));
       await nextTick();
+      console.log("⬛ After final nextTick - dashboardPanelData.data.queries[0]:", JSON.stringify(dashboardPanelData.data.queries[0]));
       isPanelConfigWatcherActivated = true;
 
       //event listener before unload and data is updated
       window.addEventListener("beforeunload", beforeUnloadHandler);
       // console.time("add panel loadDashboard");
+      console.log("🔵 Before loadDashboard - dashboardPanelData.data.queries[0]:", JSON.stringify(dashboardPanelData.data.queries[0]));
       await loadDashboard();
-      
+      console.log("🔴 After loadDashboard - dashboardPanelData.data.queries[0]:", JSON.stringify(dashboardPanelData.data.queries[0]));
+
       // Call makeAutoSQLQuery after dashboard data is loaded
       // Only generate SQL if we're in auto query mode
-      if (!editMode.value && 
+      if (!editMode.value &&
           !dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].customQuery) {
@@ -1110,6 +1136,7 @@ export default defineComponent({
       contextRegistry.register("dashboards", dashboardProvider);
       contextRegistry.setActive("dashboards");
 
+      console.log("✅ End of onMounted - dashboardPanelData.data.queries[0]:", JSON.stringify(dashboardPanelData.data.queries[0]));
       // console.timeEnd("add panel loadDashboard");
     });
 
