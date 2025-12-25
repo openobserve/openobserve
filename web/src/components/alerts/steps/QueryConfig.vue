@@ -275,7 +275,7 @@ export default defineComponent({
     });
 
     const updateTab = (tab: string) => {
-      const hasComparisonWindow = props.multiTimeRange.length > 0;
+      const hasComparisonWindow = props.multiTimeRange?.length > 0;
 
       // Check if switching to custom or promql while multi-windows are present
       if ((tab === 'custom' || tab === 'promql') && hasComparisonWindow) {
