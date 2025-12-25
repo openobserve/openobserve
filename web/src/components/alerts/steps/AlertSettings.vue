@@ -1441,4 +1441,29 @@ export default defineComponent({
     }
   }
 }
+
+// Fix for destinations select - keep selected items and input on same line
+:deep(.q-field__control) {
+  .q-field__native {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+    overflow: hidden !important;
+
+    > span {
+      flex: 0 0 80% !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      white-space: nowrap !important;
+      min-width: 0 !important;
+    }
+
+    > input {
+      flex: 0 0 20% !important;
+      min-width: 0 !important;
+      width: 20% !important;
+    }
+  }
+}
 </style>
