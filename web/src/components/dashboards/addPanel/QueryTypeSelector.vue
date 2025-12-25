@@ -26,8 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               !(
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
-                ].fields.stream_type == 'metrics' &&
-                dashboardPanelData.data.type != 'custom_chart'
+                ].fields.stream_type == 'metrics'
               )
                 ? 'button-right'
                 : '',
@@ -54,8 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-show="
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
-              ].fields.stream_type == 'metrics' &&
-              dashboardPanelData.data.type != 'custom_chart'
+              ].fields.stream_type == 'metrics'
             "
             @click="onUpdateQueryMode('promql', $event)"
           >
@@ -171,7 +169,6 @@ export default defineComponent({
 
       if (dashboardPanelData.data.type == "custom_chart") {
         // For custom_chart, check the actual query type and customQuery flag
-        selectedButtonQueryType.value = "sql";
         selectedButtonType.value = "custom";
         ignoreSelectedButtonTypeUpdate.value = false;
         return;
