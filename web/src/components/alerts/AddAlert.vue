@@ -1936,7 +1936,10 @@ export default defineComponent({
         wizardStep.value = wizardStep.value + 1;
       }
 
-      lastValidStep.value = wizardStep.value;
+      // Only update lastValidStep if moving forward (don't reduce it when editing)
+      if (wizardStep.value > lastValidStep.value) {
+        lastValidStep.value = wizardStep.value;
+      }
     };
 
     // Validate a specific step (used by both Continue button and header navigation)
@@ -2229,6 +2232,8 @@ export default defineComponent({
       this.disableColor = "grey-5";
       this.formData = cloneDeep(this.modelValue);
       this.isAggregationEnabled = !!this.formData.query_condition.aggregation;
+      // Enable all steps when editing an existing alert
+      this.lastValidStep = 6;
 
       if (!this.formData.trigger_condition?.timezone) {
         if (this.formData.tz_offset === 0) {
