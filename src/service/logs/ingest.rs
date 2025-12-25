@@ -316,7 +316,7 @@ pub async fn ingest(
                         && (index_all_max_value_length == 0
                             || value
                                 .as_str()
-                                .map_or(true, |s| s.len() <= index_all_max_value_length))
+                                .is_none_or(|s| s.len() <= index_all_max_value_length))
                     {
                         values.push(value.to_string());
                     }
@@ -461,9 +461,9 @@ pub async fn ingest(
                                 ]
                                 .contains(&k.as_str())
                                     && (index_all_max_value_length == 0
-                                        || value.as_str().map_or(true, |s| {
-                                            s.len() <= index_all_max_value_length
-                                        }))
+                                        || value
+                                            .as_str()
+                                            .is_none_or(|s| s.len() <= index_all_max_value_length))
                                 {
                                     values.push(value.to_string());
                                 }

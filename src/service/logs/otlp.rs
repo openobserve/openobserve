@@ -300,9 +300,8 @@ pub async fn handle_request(
                                 ]
                                 .contains(&k.as_str())
                                     && (index_all_max_value_length == 0
-                                        || v.as_str().map_or(true, |s| {
-                                            s.len() <= index_all_max_value_length
-                                        }))
+                                        || v.as_str()
+                                            .is_none_or(|s| s.len() <= index_all_max_value_length))
                             })
                             .map(|(_, v)| v)
                             .join(" ");
@@ -415,7 +414,7 @@ pub async fn handle_request(
                                     ]
                                     .contains(&k.as_str())
                                         && (index_all_max_value_length == 0
-                                            || v.as_str().map_or(true, |s| {
+                                            || v.as_str().is_none_or(|s| {
                                                 s.len() <= index_all_max_value_length
                                             }))
                                 })
