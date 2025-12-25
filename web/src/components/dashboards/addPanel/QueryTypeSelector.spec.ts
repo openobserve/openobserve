@@ -221,7 +221,7 @@ describe("QueryTypeSelector", () => {
       mockDashboardPanelData.data.type = "custom_chart";
       wrapper = createWrapper();
       await nextTick();
-      expect(wrapper.vm.selectedButtonType).toBe("builder");
+      expect(wrapper.vm.selectedButtonType).toBe("custom");
     });
 
     it("should handle builder mode initialization", async () => {
