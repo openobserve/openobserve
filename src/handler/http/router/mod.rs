@@ -705,6 +705,8 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(cloud::billings::create_billing_portal_session)
         .service(cloud::org_usage::get_org_usage)
         .service(cloud::marketing::handle_new_attribution_event)
+        .service(cloud::aws_marketplace::link_subscription)
+        .service(cloud::aws_marketplace::activation_status)
         .service(organization::org::all_organizations)
         .service(organization::org::extend_trial_period);
 
