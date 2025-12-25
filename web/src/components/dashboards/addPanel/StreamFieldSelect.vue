@@ -52,12 +52,12 @@ import { defineComponent, ref, watch, PropType, inject } from "vue";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import useStreams from "@/composables/useStreams";
 
-interface OptionChild {
+export interface OptionChild {
   label: string;
   value: string;
 }
 
-interface Option {
+export interface Option {
   label: string;
   children: OptionChild[];
 }

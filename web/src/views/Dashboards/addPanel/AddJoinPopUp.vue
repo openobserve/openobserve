@@ -231,31 +231,31 @@ import RightJoinTypeSvg from "@/components/icons/RightJoinTypeSvg.vue";
 import RightJoinLineSvg from "@/components/icons/RightJoinLineSvg.vue";
 import InnerJoinTypeSvg from "@/components/icons/InnerJoinTypeSvg.vue";
 
-interface StreamOption {
+export interface StreamOption {
   label: string;
   value: string;
 }
 
-interface JoinFieldReference {
+export interface JoinFieldReference {
   streamAlias: string;
   field: string;
 }
 
-interface JoinCondition {
+export interface JoinCondition {
   leftField: JoinFieldReference;
   rightField: JoinFieldReference;
   logicalOperator: "AND" | "OR";
   operation: "=" | "!=" | ">" | "<" | ">=" | "<=";
 }
 
-interface JoinConfig {
+export interface JoinConfig {
   stream: string;
   streamAlias: string;
   joinType: "inner" | "left" | "right";
   conditions: JoinCondition[];
 }
 
-interface StreamReference {
+export interface StreamReference {
   stream: string;
   streamAlias?: string;
 }

@@ -506,7 +506,7 @@ export default defineComponent({
     showLegendsButton: {
       type: Boolean,
       required: false,
-      default: true,
+      default: false,
     },
   },
   emits: [
