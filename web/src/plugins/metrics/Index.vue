@@ -268,6 +268,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   handleLastTriggeredAtUpdate
                                 "
                                 @series-data-update="seriesDataUpdate"
+                                @show-legends="showLegendsDialog = true"
+                                ref="panelSchemaRendererRef"
                                 searchType="ui"
                               />
                             </div>
@@ -469,6 +471,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             handleLastTriggeredAtUpdate
                           "
                           @series-data-update="seriesDataUpdate"
+                          @show-legends="showLegendsDialog = true"
                           searchType="ui"
                         />
                       </template>
@@ -513,6 +516,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <add-to-dashboard
         @save="addPanelToDashboard"
         :dashboardPanelData="dashboardPanelData"
+      />
+    </q-dialog>
+    <q-dialog v-model="showLegendsDialog">
+      <ShowLegendsPopup
+        :panelData="currentPanelData"
+        @close="showLegendsDialog = false"
       />
     </q-dialog>
   </div>
@@ -573,6 +582,10 @@ const CustomMarkdownEditor = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/CustomMarkdownEditor.vue");
 });
 
+const ShowLegendsPopup = defineAsyncComponent(() => {
+  return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
+});
+
 export default defineComponent({
   name: "Metrics",
   props: ["metaData"],
@@ -599,11 +612,14 @@ export default defineComponent({
     AddToDashboard,
     AutoRefreshInterval,
     CustomChartEditor,
+    ShowLegendsPopup,
   },
   setup(props) {
     provide("dashboardPanelDataPageKey", "metrics");
 
     // This will be used to copy the chart data to the chart renderer component
+    const showLegendsDialog = ref(false);
+    const panelSchemaRendererRef: any = ref(null);
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
     const chartData = ref();
     const { t } = useI18n();
@@ -1227,6 +1243,15 @@ export default defineComponent({
     };
 
     // [END] cancel running queries
+
+    const currentPanelData = computed(() => {
+      const rendererData = panelSchemaRendererRef.value?.panelData || {};
+      return {
+        ...rendererData,
+        config: dashboardPanelData.data.config || {},
+      };
+    });
+
     return {
       t,
       updateDateTime,
@@ -1264,6 +1289,9 @@ export default defineComponent({
       refreshInterval,
       splitterModel,
       collapseFieldList,
+      showLegendsDialog,
+      currentPanelData,
+      panelSchemaRendererRef,
     };
   },
 });

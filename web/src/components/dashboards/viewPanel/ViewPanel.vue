@@ -213,8 +213,10 @@
                   @limit-number-of-series-warning-message-update="
                     handleLimitNumberOfSeriesWarningMessage
                   "
+                  @show-legends="showLegendsDialog = true"
                   data-test="dashboard-viewpanel-panel-schema-renderer"
                   style="height: calc(100% - 21px)"
+                  ref="panelSchemaRendererRef"
                 />
               </div>
               <DashboardErrorsComponent
@@ -226,6 +228,12 @@
         </div>
       </div>
     </div>
+    <q-dialog v-model="showLegendsDialog">
+      <ShowLegendsPopup
+        :panelData="currentPanelData"
+        @close="showLegendsDialog = false"
+      />
+    </q-dialog>
   </div>
 </template>
 
@@ -268,6 +276,11 @@ import { isEqual } from "lodash-es";
 import { processQueryMetadataErrors } from "@/utils/zincutils";
 import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
 import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
+import { defineAsyncComponent } from "vue";
+
+const ShowLegendsPopup = defineAsyncComponent(() => {
+  return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
+});
 
 export default defineComponent({
   name: "ViewPanel",
@@ -279,6 +292,7 @@ export default defineComponent({
     AutoRefreshInterval,
     HistogramIntervalDropDown,
     RelativeTime,
+    ShowLegendsPopup,
   },
   props: {
     panelId: {
@@ -309,6 +323,8 @@ export default defineComponent({
     // This will be used to copy the chart data to the chart renderer component
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
     const chartData = ref();
+    const showLegendsDialog = ref(false);
+    const panelSchemaRendererRef: any = ref(null);
     const { t } = useI18n();
     const router = useRouter();
     const route = useRoute();
@@ -715,6 +731,14 @@ export default defineComponent({
 
     // [END] cancel running queries
 
+    const currentPanelData = computed(() => {
+      const rendererData = panelSchemaRendererRef.value?.panelData || {};
+      return {
+        ...rendererData,
+        config: dashboardPanelData.data.config || {},
+      };
+    });
+
     return {
       t,
       setTimeForVariables,
@@ -755,6 +779,9 @@ export default defineComponent({
       errorMessage,
       outlinedWarning,
       symOutlinedDataInfoAlert,
+      showLegendsDialog,
+      currentPanelData,
+      panelSchemaRendererRef,
     };
   },
 });
