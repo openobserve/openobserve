@@ -213,6 +213,8 @@ let onDataSpy: any;
           })
         );
 
+        await flushPromises();
+        await new Promise((resolve) => setTimeout(resolve, 100));
         //this will tell us that onData have been called once
         expect(mockHandlers.data).toHaveBeenCalledTimes(1);
 
@@ -368,10 +370,6 @@ let onDataSpy: any;
         // Assert worker received cancel message
         // Check the most recent postMessage call after startStream
         await flushPromises();
-
-        console.log('Worker constructor was called:', WorkerConstructor.mock.calls.length, 'times');
-        console.log('mockWorker.postMessage was called:', mockWorker.postMessage.mock.calls.length, 'times');
-        console.log('postMessage calls:', JSON.stringify(mockWorker.postMessage.mock.calls));
 
         const cancelCall = mockWorker.postMessage.mock.calls.find((call: any) => call[0]?.action === 'cancelStream');
         expect(cancelCall, `postMessage was called ${mockWorker.postMessage.mock.calls.length} times with: ${JSON.stringify(mockWorker.postMessage.mock.calls)}`).toBeDefined();
