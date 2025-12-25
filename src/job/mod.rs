@@ -455,6 +455,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await
         .expect("cloud usage metering job init failed");
 
+        // Initialize AWS Marketplace SQS notification polling
+        o2_enterprise::enterprise::aws_marketplace::init()
+            .await
+            .expect("AWS Marketplace integration init failed");
+
         // run these cloud jobs only in alert manager
         if LOCAL_NODE.is_alert_manager() {
             cloud::start();
