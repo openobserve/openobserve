@@ -1461,7 +1461,11 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
         .enabled
     {
         log::info!("init super cluster");
-        o2_enterprise::enterprise::super_cluster::kv::init().await?;
+        let get_querier_nodes_fn: o2_enterprise::enterprise::super_cluster::kv::GetCachedOnlineQuerierNodesFn =
+            std::sync::Arc::new(|group| {
+                Box::pin(openobserve::common::infra::cluster::get_cached_online_querier_nodes(group))
+            });
+        o2_enterprise::enterprise::super_cluster::kv::init(get_querier_nodes_fn).await?;
         openobserve::super_cluster_queue::init().await?;
     }
 
