@@ -384,7 +384,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     hide-selected
                     fill-input
                     :rules="[(val: any) => !!val || 'Field is required!']"
-                    style="width: 88px"
+                    :style="{
+                      width: (formData.trigger_condition.operator === 'Contains' || formData.trigger_condition.operator === 'NotContains')
+                        ? '124px'
+                        : '88px',
+                      minWidth: '88px'
+                    }"
                     @update:model-value="emitTriggerUpdate"
                   />
                   <div
