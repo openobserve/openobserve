@@ -17,6 +17,7 @@ import {
   PromQLChartConverter,
   ProcessedPromQLData,
   MapsConfig,
+  TOOLTIP_SCROLL_STYLE,
 } from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
 import { getCountryName } from "../countryMappings";
@@ -130,7 +131,7 @@ export class MapsConverter implements PromQLChartConverter {
         showDelay: 0,
         transitionDuration: 0.2,
         backgroundColor: "rgba(255,255,255,0.8)",
-        extraCssText: "max-height: 200px; overflow: auto; max-width: 400px; word-wrap: break-word; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent;",
+        extraCssText: TOOLTIP_SCROLL_STYLE,
         formatter: (params: any) => {
           let formattedValue = params.value;
           if (formattedValue === "-" || Number.isNaN(formattedValue)) {

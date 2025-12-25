@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
+import { PromQLChartConverter, ProcessedPromQLData, TOOLTIP_SCROLL_STYLE } from "./shared/types";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
 
 /**
@@ -149,7 +149,7 @@ export class HeatmapConverter implements PromQLChartConverter {
           store.state.theme === "dark"
             ? "rgba(0,0,0,1)"
             : "rgba(255,255,255,1)",
-        extraCssText: "max-height: 200px; overflow: auto; max-width: 400px; word-wrap: break-word; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent;",
+        extraCssText: TOOLTIP_SCROLL_STYLE,
         formatter: (params: any) => {
           try {
             const seriesName = seriesNames[params?.value[1]] || params?.seriesName;

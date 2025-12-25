@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
+import { PromQLChartConverter, ProcessedPromQLData, TOOLTIP_SCROLL_STYLE } from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
 import { getSeriesColor } from "../colorPalette";
@@ -133,7 +133,7 @@ export class GaugeConverter implements PromQLChartConverter {
           color: store.state.theme === "dark" ? "#fff" : "#000",
           fontSize: 12,
         },
-        extraCssText: "max-height: 200px; overflow: auto; max-width: 400px; word-wrap: break-word; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent;",
+        extraCssText: TOOLTIP_SCROLL_STYLE,
         valueFormatter: (value: any) => {
           return formatUnitValue(
             getUnitValue(value, config?.unit, config?.unit_custom, config?.decimals)

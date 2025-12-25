@@ -17,6 +17,7 @@ import {
   PromQLChartConverter,
   ProcessedPromQLData,
   GeoMapConfig,
+  TOOLTIP_SCROLL_STYLE,
 } from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
 
@@ -117,7 +118,7 @@ export class GeoConverter implements PromQLChartConverter {
         },
         padding: 6,
         backgroundColor: "rgba(255,255,255,0.8)",
-        extraCssText: "max-height: 200px; overflow: auto; max-width: 400px; word-wrap: break-word; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent;",
+        extraCssText: TOOLTIP_SCROLL_STYLE,
         formatter: function (params: any) {
           return `Layer 1: ${params.value[2]}`;
         },

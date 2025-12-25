@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
+import { TOOLTIP_SCROLL_STYLE } from "./types";
 
 /**
  * Build tooltip configuration with unit formatting and decimals
@@ -34,7 +35,7 @@ export function buildTooltip(panelSchema: any, triggerType: "axis" | "item" = "a
     textStyle: {
       fontSize: 12,
     },
-    extraCssText: "max-height: 200px; overflow: auto; max-width: 400px; word-wrap: break-word; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent;",
+    extraCssText: TOOLTIP_SCROLL_STYLE,
     axisPointer: {
       type: "cross",
     },
@@ -52,7 +53,7 @@ export function buildTooltip(panelSchema: any, triggerType: "axis" | "item" = "a
 
       // Add axis label (timestamp for time-series)
       if (params[0]?.axisValue) {
-        tooltipItems.push(`${params[0].axisValue} <br/>`);
+        tooltipItems.push(params[0].axisValue);
       }
 
       // Add series data with unit formatting
