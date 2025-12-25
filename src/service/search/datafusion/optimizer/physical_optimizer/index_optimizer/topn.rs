@@ -282,7 +282,12 @@ mod tests {
             let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
 
             let index_fields = HashSet::from(["name".to_string(), "id".to_string()]);
-            assert_eq!(expected, is_simple_topn(physical_plan, index_fields), "Failed for SQL: {}", sql);
+            assert_eq!(
+                expected,
+                is_simple_topn(physical_plan, index_fields),
+                "Failed for SQL: {}",
+                sql
+            );
         }
     }
 
@@ -311,15 +316,27 @@ mod tests {
             // Different limit values
             (
                 "select hostname, count(*) as cnt from logs where match_all('error') group by hostname order by cnt desc limit 1",
-                Some(IndexOptimizeMode::SimpleTopN("hostname".to_string(), 1, false)),
+                Some(IndexOptimizeMode::SimpleTopN(
+                    "hostname".to_string(),
+                    1,
+                    false,
+                )),
             ),
             (
                 "select hostname, count(*) as cnt from logs where match_all('error') group by hostname order by cnt desc limit 100",
-                Some(IndexOptimizeMode::SimpleTopN("hostname".to_string(), 100, false)),
+                Some(IndexOptimizeMode::SimpleTopN(
+                    "hostname".to_string(),
+                    100,
+                    false,
+                )),
             ),
             (
                 "select hostname, count(*) as cnt from logs where match_all('error') group by hostname order by cnt desc limit 1000",
-                Some(IndexOptimizeMode::SimpleTopN("hostname".to_string(), 1000, false)),
+                Some(IndexOptimizeMode::SimpleTopN(
+                    "hostname".to_string(),
+                    1000,
+                    false,
+                )),
             ),
         ];
 
@@ -328,7 +345,12 @@ mod tests {
             let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
 
             let index_fields = HashSet::from(["hostname".to_string()]);
-            assert_eq!(expected, is_simple_topn(physical_plan, index_fields), "Failed for SQL: {}", sql);
+            assert_eq!(
+                expected,
+                is_simple_topn(physical_plan, index_fields),
+                "Failed for SQL: {}",
+                sql
+            );
         }
     }
 
@@ -357,16 +379,28 @@ mod tests {
             // Ascending order tests
             (
                 "select category, count(*) as cnt from events where match_all('error') group by category order by cnt asc limit 10",
-                Some(IndexOptimizeMode::SimpleTopN("category".to_string(), 10, true)),
+                Some(IndexOptimizeMode::SimpleTopN(
+                    "category".to_string(),
+                    10,
+                    true,
+                )),
             ),
             (
                 "select category as cat, count(*) as cnt from events where match_all('error') group by cat order by cnt asc, cat asc limit 15",
-                Some(IndexOptimizeMode::SimpleTopN("category".to_string(), 15, true)),
+                Some(IndexOptimizeMode::SimpleTopN(
+                    "category".to_string(),
+                    15,
+                    true,
+                )),
             ),
             // Mixed: ascending primary sort with ascending secondary sort
             (
                 "select category, count(*) as cnt from events where match_all('error') group by category order by cnt asc, category asc limit 10",
-                Some(IndexOptimizeMode::SimpleTopN("category".to_string(), 10, true)),
+                Some(IndexOptimizeMode::SimpleTopN(
+                    "category".to_string(),
+                    10,
+                    true,
+                )),
             ),
         ];
 
@@ -375,7 +409,12 @@ mod tests {
             let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
 
             let index_fields = HashSet::from(["category".to_string()]);
-            assert_eq!(expected, is_simple_topn(physical_plan, index_fields), "Failed for SQL: {}", sql);
+            assert_eq!(
+                expected,
+                is_simple_topn(physical_plan, index_fields),
+                "Failed for SQL: {}",
+                sql
+            );
         }
     }
 
@@ -411,7 +450,11 @@ mod tests {
             // Valid: service is in index_fields
             (
                 "select service, count(*) as cnt from metrics where match_all('error') group by service order by cnt desc limit 10",
-                Some(IndexOptimizeMode::SimpleTopN("service".to_string(), 10, false)),
+                Some(IndexOptimizeMode::SimpleTopN(
+                    "service".to_string(),
+                    10,
+                    false,
+                )),
             ),
             // Invalid: zero limit should fail (though this might be a syntax error)
             // We'll skip this as it's likely a parse error
@@ -424,7 +467,12 @@ mod tests {
             let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
 
             let index_fields = HashSet::from(["service".to_string()]);
-            assert_eq!(expected, is_simple_topn(physical_plan, index_fields), "Failed for SQL: {}", sql);
+            assert_eq!(
+                expected,
+                is_simple_topn(physical_plan, index_fields),
+                "Failed for SQL: {}",
+                sql
+            );
         }
     }
 }
