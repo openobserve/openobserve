@@ -14,6 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
+ * Shared tooltip overflow CSS style for chart tooltips
+ */
+export const TOOLTIP_SCROLL_STYLE = "max-height: 200px; overflow: auto; max-width: 400px; word-wrap: break-word; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent;";
+
+/**
  * PromQL result item structure
  */
 export interface PromQLResultItem {
