@@ -57,8 +57,26 @@ export class HeatmapConverter implements PromQLChartConverter {
       });
     });
 
+    // Format timestamps to extract time portion (consistent with bar charts)
     const xAxisData =
-      processedData[0]?.timestamps.map(([, formatted]) => formatted) || [];
+      processedData[0]?.timestamps.map(([, formatted]) => {
+        // formatted can be Date object or ISO string
+        let timeString: string;
+        if (formatted instanceof Date) {
+          // Format as HH:MM:SS
+          const hours = String(formatted.getHours()).padStart(2, '0');
+          const minutes = String(formatted.getMinutes()).padStart(2, '0');
+          const seconds = String(formatted.getSeconds()).padStart(2, '0');
+          timeString = `${hours}:${minutes}:${seconds}`;
+        } else {
+          // ISO string - extract time portion
+          const dateStr = formatted.toString();
+          // Try to extract time (HH:MM:SS) from datetime string
+          const timeMatch = dateStr.match(/(\d{2}:\d{2}:\d{2})/);
+          timeString = timeMatch ? timeMatch[1] : dateStr;
+        }
+        return timeString;
+      }) || [];
 
     return {
       series: [
