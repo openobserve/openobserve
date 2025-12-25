@@ -278,7 +278,8 @@ describe("HeatmapConverter", () => {
 
       const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
-      expect(result.xAxis[0].data).toEqual(["2021-01-01 00:00:00", "2021-01-01 00:01:00"]);
+      // The implementation extracts only the time portion (HH:MM:SS) from timestamps
+      expect(result.xAxis[0].data).toEqual(["00:00:00", "00:01:00"]);
     });
 
     it("should set yAxis data from series names", () => {

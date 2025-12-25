@@ -632,7 +632,7 @@ describe("BarConverter", () => {
       expect(result.xAxis.data).toEqual(["2021-01-01"]);
     });
 
-    it("should handle missing data values as 0 in stacked chart", () => {
+    it("should handle missing data values as '-' in stacked chart", () => {
       const processedData: ProcessedPromQLData[] = [
         {
           series: [
@@ -660,7 +660,7 @@ describe("BarConverter", () => {
 
       const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
-      expect(result.series[0].data).toEqual([10, 0]);
+      expect(result.series[0].data).toEqual([10, '-']);
     });
 
     it("should apply colors to stacked series", () => {

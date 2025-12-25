@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
+import { PromQLChartConverter, ProcessedPromQLData, TOOLTIP_SCROLL_STYLE } from "./shared/types";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
 
 /**
@@ -57,8 +57,26 @@ export class HeatmapConverter implements PromQLChartConverter {
       });
     });
 
+    // Format timestamps to extract time portion (consistent with bar charts)
     const xAxisData =
-      processedData[0]?.timestamps.map(([, formatted]) => formatted) || [];
+      processedData[0]?.timestamps.map(([, formatted]) => {
+        // formatted can be Date object or ISO string
+        let timeString: string;
+        if (formatted instanceof Date) {
+          // Format as HH:MM:SS
+          const hours = String(formatted.getHours()).padStart(2, '0');
+          const minutes = String(formatted.getMinutes()).padStart(2, '0');
+          const seconds = String(formatted.getSeconds()).padStart(2, '0');
+          timeString = `${hours}:${minutes}:${seconds}`;
+        } else {
+          // ISO string - extract time portion
+          const dateStr = formatted.toString();
+          // Try to extract time (HH:MM:SS) from datetime string
+          const timeMatch = dateStr.match(/(\d{2}:\d{2}:\d{2})/);
+          timeString = timeMatch ? timeMatch[1] : dateStr;
+        }
+        return timeString;
+      }) || [];
 
     return {
       series: [
@@ -122,6 +140,7 @@ export class HeatmapConverter implements PromQLChartConverter {
       },
       tooltip: {
         position: "top",
+        confine: true,
         textStyle: {
           color: store.state.theme === "dark" ? "#fff" : "#000",
           fontSize: 12,
@@ -130,20 +149,19 @@ export class HeatmapConverter implements PromQLChartConverter {
           store.state.theme === "dark"
             ? "rgba(0,0,0,1)"
             : "rgba(255,255,255,1)",
+        extraCssText: TOOLTIP_SCROLL_STYLE,
         formatter: (params: any) => {
           try {
-            return `${
-              seriesNames[params?.value[1]] || params?.seriesName
-            } <br/> ${params?.marker} ${params?.name} : ${
-              formatUnitValue(
-                getUnitValue(
-                  params?.value?.[2],
-                  config?.unit,
-                  config?.unit_custom,
-                  config?.decimals,
-                ),
-              ) || params?.value?.[2]
-            }`;
+            const seriesName = seriesNames[params?.value[1]] || params?.seriesName;
+            const value = formatUnitValue(
+              getUnitValue(
+                params?.value?.[2],
+                config?.unit,
+                config?.unit_custom,
+                config?.decimals,
+              ),
+            ) || params?.value?.[2];
+            return `${seriesName} <br/> ${params?.marker} ${params?.name} : ${value}`;
           } catch (error) {
             return "";
           }
