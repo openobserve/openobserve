@@ -1110,7 +1110,11 @@
     "labelFilters": "Etiket Filtreleri",
     "operations": "Operasyonlar",
     "promQLBuilder": "PromQL Oluşturucu",
-    "options": "Seçenekler"
+    "options": "Seçenekler",
+    "SQL": "SQL",
+    "builder": "inşaatçı",
+    "custom": "Özel",
+    "sqlBuilder": "SQL Oluşturucu"
   },
   "home": {
     "streams": "Akışlar",

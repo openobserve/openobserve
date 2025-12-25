@@ -195,7 +195,8 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardPanelActions.addPanelName(panelName);
 
     // Open Custom SQL editor
-    await page.locator('[data-test="dashboard-customSql"]').click();
+    await page.locator('[data-test="dashboard-sql-query-type"]').click();
+    await page.locator('[data-test="dashboard-custom-query-type"]').click();
     // await page.locator(".cm-line").first().click();
 
     // Focus on the first line of the editor
@@ -773,7 +774,8 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.removeField("x_axis_1", "x");
     await pm.chartTypeSelector.selectChartType("table");
 
-    await page.locator('[data-test="dashboard-customSql"]').click();
+    await page.locator('[data-test="dashboard-sql-query-type"]').click();
+    await page.locator('[data-test="dashboard-custom-query-type"]').click();    
     await page.locator(".view-line").first().click();
     await page
       .locator('[data-test="dashboard-panel-query-editor"] .inputarea')
@@ -826,7 +828,8 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.removeField("x_axis_1", "x");
     await pm.chartTypeSelector.selectChartType("line");
 
-    await page.locator('[data-test="dashboard-customSql"]').click();
+    await page.locator('[data-test="dashboard-sql-query-type"]').click();
+    await page.locator('[data-test="dashboard-custom-query-type"]').click();    
     await page.locator(".view-line").first().click();
     await page
       .locator('[data-test="dashboard-panel-query-editor"] .inputarea')
@@ -922,7 +925,9 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.removeField("x_axis_1", "x");
     await pm.chartTypeSelector.selectChartType("line");
 
-    await page.locator('[data-test="dashboard-customSql"]').click();
+    await page.locator('[data-test="dashboard-sql-query-type"]').click();
+    await page.locator('[data-test="dashboard-custom-query-type"]').click();    
+    
     await page.locator(".view-line").first().click();
     await page
       .locator('[data-test="dashboard-panel-query-editor"] .inputarea')
