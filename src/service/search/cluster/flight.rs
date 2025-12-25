@@ -35,6 +35,7 @@ use datafusion::{
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{
+    cluster,
     errors::{Error, ErrorCodes, Result},
     file_list::FileId,
 };
@@ -46,7 +47,6 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use crate::service::search::SEARCH_SERVER;
 use crate::{
-    common::infra::cluster as infra_cluster,
     handler::grpc::flight::visitor::get_peak_memory_from_ctx,
     service::{
         db::enrichment_table,
@@ -431,9 +431,9 @@ pub async fn get_online_querier_nodes(
     // get nodes from cluster
     let cfg = get_config();
     let nodes = if cfg.common.feature_query_skip_wal {
-        infra_cluster::get_cached_online_querier_nodes(role_group).await
+        cluster::get_cached_online_querier_nodes(role_group).await
     } else {
-        infra_cluster::get_cached_online_query_nodes(role_group).await
+        cluster::get_cached_online_query_nodes(role_group).await
     };
     let mut nodes = match nodes {
         Some(nodes) => nodes,
@@ -576,8 +576,7 @@ pub(crate) async fn partition_file_by_hash(
     let mut partitions = vec![Vec::new(); idx];
     for fk in file_id_list {
         let node_name =
-            infra_cluster::get_node_from_consistent_hash(&fk.id.to_string(), &Role::Querier, group)
-                .await;
+            cluster::get_node_from_consistent_hash(&fk.id.to_string(), &Role::Querier, group).await;
         let idx = match node_name {
             Some(node_name) => match node_idx.get(&node_name) {
                 Some(idx) => *idx,
