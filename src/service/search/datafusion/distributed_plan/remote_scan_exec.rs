@@ -304,15 +304,17 @@ async fn get_remote_batch(
 
     // check timeout
     let mut timeout = remote_scan_node.search_infos.timeout;
-    if matches!(search_type, Some(SearchEventType::UI)) {
-        if is_querier {
-            timeout = std::cmp::min(timeout, cfg.limit.query_querier_timeout);
-        } else if is_ingester {
-            timeout = std::cmp::min(timeout, cfg.limit.query_ingester_timeout);
-        }
-    }
     if timeout == 0 {
         timeout = cfg.limit.query_timeout;
+    }
+    // check grpc timeout
+    let mut grpc_timeout = timeout;
+    if matches!(search_type, Some(SearchEventType::UI)) {
+        if is_querier {
+            grpc_timeout = std::cmp::min(grpc_timeout, cfg.limit.query_querier_timeout);
+        } else if is_ingester {
+            grpc_timeout = std::cmp::min(grpc_timeout, cfg.limit.query_ingester_timeout);
+        }
     }
 
     let empty_stream = EmptyStream::new(
@@ -352,7 +354,7 @@ async fn get_remote_batch(
         node.clone(),
         request,
         &context,
-        timeout,
+        grpc_timeout,
     )
     .await
     {
@@ -366,31 +368,17 @@ async fn get_remote_batch(
         "[trace_id {trace_id}] flight->search: prepare to request node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}",
     );
 
-    // create a deadline that covers both do_get and plan execution
-    let deadline = tokio::time::Instant::now() + tokio::time::Duration::from_secs(timeout);
-    let stream = tokio::select! {
-        result = client.do_get(request) => {
-            match result {
-                Ok(stream) => stream,
-                Err(e) => {
-                    if e.code() == tonic::Code::Cancelled || e.code() == tonic::Code::DeadlineExceeded || is_parquet_file_not_found(&e) {
-                        return Ok(get_empty_stream(empty_stream.with_error(e)));
-                    }
-                    log::error!(
-                        "[trace_id {trace_id}] flight->search: response node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}, err: {e:?}, took: {} ms",
-                        start.elapsed().as_millis(),
-                    );
-                    return Err(DataFusionError::Execution(e.to_string()));
-                }
+    let stream = match client.do_get(request).await {
+        Ok(stream) => stream,
+        Err(e) => {
+            if e.code() == tonic::Code::Cancelled || e.code() == tonic::Code::DeadlineExceeded || is_parquet_file_not_found(&e) {
+                return Ok(get_empty_stream(empty_stream.with_error(e)));
             }
-        }
-        _ = tokio::time::sleep_until(deadline) => {
-            let e = tonic::Status::new(tonic::Code::DeadlineExceeded, format!("timeout during do_get call name: {node_name}"));
             log::error!(
-                "[trace_id {trace_id}] flight->search: do_get timeout node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}, took: {} ms",
+                "[trace_id {trace_id}] flight->search: response node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}, err: {e:?}, took: {} ms",
                 start.elapsed().as_millis(),
             );
-            return Ok(get_empty_stream(empty_stream.with_error(e)));
+            return Err(DataFusionError::Execution(e.to_string()));
         }
     }
     .into_inner();
@@ -411,10 +399,8 @@ async fn get_remote_batch(
 
     let mut stream = FlightDecoderStream::new(stream, schema.clone(), metrics, query_context);
     let stream = async_stream::stream! {
-        // use sleep_until with the same deadline to continue the timeout
-        let timeout = tokio::time::sleep_until(deadline);
+        let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(timeout));
         pin_mut!(timeout);
-
         loop {
             tokio::select! {
                 batch = stream.next() => {
@@ -425,7 +411,7 @@ async fn get_remote_batch(
                     }
                 }
                 _ = &mut timeout => {
-                    let e = tonic::Status::new(tonic::Code::DeadlineExceeded, format!("timeout during plan execution, name: {node_name}"));
+                    let e = tonic::Status::new(tonic::Code::DeadlineExceeded, "timeout");
                     log::error!(
                         "[trace_id {trace_id}] flight->search: response node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}, err: {e:?}, took: {} ms",
                         start.elapsed().as_millis(),

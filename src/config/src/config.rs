@@ -2428,6 +2428,17 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.max_dashboard_series = 100;
     }
 
+    // check query timeout
+    if cfg.limit.query_timeout == 0 {
+        cfg.limit.query_timeout = 600;
+    }
+    if cfg.limit.query_ingester_timeout == 0 {
+        cfg.limit.query_ingester_timeout = cfg.limit.query_timeout;
+    }
+    if cfg.limit.query_querier_timeout == 0 {
+        cfg.limit.query_querier_timeout = cfg.limit.query_timeout;
+    }
+
     // check for uds
     #[allow(deprecated)]
     if cfg.limit.udschema_max_fields > 0 {
