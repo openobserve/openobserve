@@ -78,6 +78,8 @@ pub async fn handle_request(
     let max_ts =
         (Utc::now() + Duration::hours(cfg.limit.ingest_allowed_in_future)).timestamp_micros();
 
+    let index_all_max_value_length = cfg.limit.index_all_max_value_length;
+
     let mut stream_params = vec![StreamParams::new(org_id, &stream_name, StreamType::Logs)];
     // Start retrieve associated pipeline and construct pipeline components
     let executable_pipeline = crate::service::ingestion::get_stream_executable_pipeline(
@@ -289,7 +291,7 @@ pub async fn handle_request(
                     {
                         let values = local_val
                             .iter()
-                            .filter(|(k, _)| {
+                            .filter(|(k, v)| {
                                 ![
                                     TIMESTAMP_COL_NAME,
                                     ID_COL_NAME,
@@ -297,6 +299,10 @@ pub async fn handle_request(
                                     ALL_VALUES_COL_NAME,
                                 ]
                                 .contains(&k.as_str())
+                                    && (index_all_max_value_length == 0
+                                        || v.as_str().map_or(true, |s| {
+                                            s.len() <= index_all_max_value_length
+                                        }))
                             })
                             .map(|(_, v)| v)
                             .join(" ");
@@ -400,7 +406,7 @@ pub async fn handle_request(
                         {
                             let values = local_val
                                 .iter()
-                                .filter(|(k, _)| {
+                                .filter(|(k, v)| {
                                     ![
                                         TIMESTAMP_COL_NAME,
                                         ID_COL_NAME,
@@ -408,6 +414,10 @@ pub async fn handle_request(
                                         ALL_VALUES_COL_NAME,
                                     ]
                                     .contains(&k.as_str())
+                                        && (index_all_max_value_length == 0
+                                            || v.as_str().map_or(true, |s| {
+                                                s.len() <= index_all_max_value_length
+                                            }))
                                 })
                                 .map(|(_, v)| v)
                                 .join(" ");

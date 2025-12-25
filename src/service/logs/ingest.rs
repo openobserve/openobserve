@@ -95,6 +95,8 @@ pub async fn ingest(
     let min_ts = now - cfg.limit.ingest_allowed_upto_micro;
     let max_ts = now + cfg.limit.ingest_allowed_in_future_micro;
 
+    let index_all_max_value_length = cfg.limit.index_all_max_value_length;
+
     let mut stream_params = vec![StreamParams::new(org_id, &stream_name, stream_type)];
     let mut derived_streams = HashSet::new();
 
@@ -304,17 +306,20 @@ pub async fn ingest(
             {
                 let mut values = Vec::with_capacity(local_val.len());
                 for (k, value) in local_val.iter() {
-                    if [
+                    if ![
                         TIMESTAMP_COL_NAME,
                         ID_COL_NAME,
                         ORIGINAL_DATA_COL_NAME,
                         ALL_VALUES_COL_NAME,
                     ]
                     .contains(&k.as_str())
+                        && (index_all_max_value_length == 0
+                            || value
+                                .as_str()
+                                .map_or(true, |s| s.len() <= index_all_max_value_length))
                     {
-                        continue;
+                        values.push(value.to_string());
                     }
-                    values.push(value.to_string());
                 }
                 local_val.insert(
                     ALL_VALUES_COL_NAME.to_string(),
@@ -448,17 +453,20 @@ pub async fn ingest(
                         {
                             let mut values = Vec::with_capacity(local_val.len());
                             for (k, value) in local_val.iter() {
-                                if [
+                                if ![
                                     TIMESTAMP_COL_NAME,
                                     ID_COL_NAME,
                                     ORIGINAL_DATA_COL_NAME,
                                     ALL_VALUES_COL_NAME,
                                 ]
                                 .contains(&k.as_str())
+                                    && (index_all_max_value_length == 0
+                                        || value.as_str().map_or(true, |s| {
+                                            s.len() <= index_all_max_value_length
+                                        }))
                                 {
-                                    continue;
+                                    values.push(value.to_string());
                                 }
-                                values.push(value.to_string());
                             }
                             local_val.insert(
                                 ALL_VALUES_COL_NAME.to_string(),
