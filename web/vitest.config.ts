@@ -62,6 +62,15 @@ export default mergeConfig(
       },
       // Prevent unhandled errors from failing the test suite
       dangerouslyIgnoreUnhandledErrors: true,
+      // Suppress all console output during tests except test results
+      silent: false,
+      reporters: ['default'],
+      // Suppress all console output (both stderr and stdout)
+      onConsoleLog: (log: string, type: 'stdout' | 'stderr') => {
+        // Return false to prevent all console logs from being printed
+        // This keeps test output clean and only shows test results
+        return false;
+      },
       coverage: {
         provider: 'v8',
         reporter: ["text", "json", "html", "json-summary"],

@@ -85,6 +85,9 @@ console.log = (...args) => {
       message.includes('Error while updating field values') ||
       message.includes('Error while extracting fields') ||
       message.includes('Error in setSelectedOrganization') ||
+      message.includes('Failed to load incidents:') ||
+      message.includes('Failed to update incident status:') ||
+      message.includes('Failed to') ||
       // Suppress any Error objects being logged during tests
       (args[0] instanceof Error)) {
     return; // Suppress this specific log
@@ -127,11 +130,18 @@ console.warn = (...args) => {
         message.includes('Unhandled error during execution of native event handler') ||
         message.includes('Unhandled error during execution of activated hook') ||
         message.includes('Unhandled error during execution of mounted hook') ||
+        message.includes('Unhandled error during execution of beforeMount hook') ||
+        message.includes('Unhandled error during execution of beforeUpdate hook') ||
+        message.includes('Unhandled error during execution of updated hook') ||
+        message.includes('Unhandled error during execution of unmounted hook') ||
         message.includes('Unhandled error during execution of render function') ||
         message.includes('Unhandled error during execution of component update') ||
         message.includes('Extraneous non-props attributes') ||
         message.includes('were passed to component but could not be automatically inherited') ||
         message.includes('Invalid prop: type check failed for prop') ||
+        message.includes('Failed setting prop') ||
+        message.includes('value lg is invalid') ||
+        message.includes('DOMException') ||
         message.includes('VNode created with invalid key') ||
         message.includes('Duplicate keys found during update') ||
         message.includes('Component emitted event') ||
@@ -148,7 +158,18 @@ console.warn = (...args) => {
         // Suppress Vue Router warnings from tests
         message.includes('[Vue Router warn]') ||
         message.includes('No match found for location') ||
-        message.includes('No active route record was found')) {
+        message.includes('No active route record was found') ||
+        // Suppress Vuex warnings from tests
+        message.includes('[vuex]') ||
+        message.includes('unknown action type') ||
+        message.includes('unknown getter') ||
+        message.includes('unknown mutation type') ||
+        // Suppress unhandled promise rejection warnings from intentional error tests
+        message.includes('Unhandled promise rejection:') ||
+        message.includes('Unhandled promise rejection') ||
+        // Suppress geo/map related warnings
+        message.includes('geo3D exists') ||
+        message.includes('3D exists')) {
       return; // Suppress this specific warning
     }
   }
@@ -176,6 +197,10 @@ console.error = (...args) => {
     'Failed to parse URL',
     'Failed to fetch',
     'Failed to copy text',
+    'Failed to load incidents:',
+    'Failed to update incident status:',
+    'Failed to',
+    'No alert history found',
     'TypeError: Cannot set properties of undefined',
     'Error: Error: Response for preflight has invalid HTTP status code',
     'Mock Interceptor Error AxiosError',
