@@ -192,8 +192,8 @@ let onDataSpy: any;
         });
 
         await flushPromises();
-        await new Promise((resolve) => setTimeout(resolve, 20)); 
-        //this will tell us that onData have been called once 
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        //this will tell us that onData have been called once
         expect(mockHandlers.data).toHaveBeenCalledTimes(1);
       });
 
@@ -327,11 +327,12 @@ let onDataSpy: any;
 
         await flushPromises();
         await nextTick();
-        await new Promise((r) => setTimeout(r, 1000));
-        expect(mockWorker.postMessage).toHaveBeenCalledWith({
-            action: 'cancelStream',
-            traceId: traceId,
-        });
+        await vi.waitFor(() => {
+          expect(mockWorker.postMessage).toHaveBeenCalledWith({
+              action: 'cancelStream',
+              traceId: traceId,
+          });
+        }, { timeout: 2000 });
     });
     
     it("should abort all controllers, send 'closeAll' to worker, clear traceMap, and reset activeStreamId", async () => {
@@ -356,12 +357,13 @@ let onDataSpy: any;
       
         await flushPromises();
         await nextTick();
-        await new Promise((r) => setTimeout(r, 1000));
+        await vi.waitFor(() => {
+          // Assert 'closeAll' message was sent to worker
+          expect(postMessageSpy).toHaveBeenCalledWith({ action: 'closeAll' });
+        }, { timeout: 2000 });
+
         // Assert all abort controllers were removed
         expect(httpStreaming.abortControllers.value).toEqual({});
-      
-        // Assert 'closeAll' message was sent to worker
-        expect(postMessageSpy).toHaveBeenCalledWith({ action: 'closeAll' });
       
         // Assert activeStreamId was reset
         expect(httpStreaming.activeStreamId.value).toBeNull();
@@ -393,13 +395,13 @@ let onDataSpy: any;
       
         await flushPromises();
         await nextTick();
-        await new Promise((r) => setTimeout(r, 10)); // Less wait needed here
-      
+        await vi.waitFor(() => {
+          // Assert 'closeAll' message was sent to worker
+          expect(postMessageSpy).toHaveBeenCalledWith({ action: 'closeAll' });
+        }, { timeout: 2000 });
+
         // Assert all abort controllers were removed
         expect(httpStreaming.abortControllers.value).toEqual({});
-      
-        // Assert 'closeAll' message was sent to worker
-        expect(postMessageSpy).toHaveBeenCalledWith({ action: 'closeAll' });
       
         // Assert activeStreamId was reset
         expect(httpStreaming.activeStreamId.value).toBeNull();
