@@ -234,11 +234,14 @@ export function useTextHighlighter() {
         } else {
           // This is a real opening quote
           // Save any accumulated content before quote
-          if (current.trim()) {
-            tokens.push({ content: current.trim(), type: "token" });
-          }
-          if (current !== current.trim()) {
-            tokens.push({ content: " ", type: "whitespace" });
+          if (current) {
+            const trimmed = current.trim();
+            const leadingSpace = current.match(/^(\s+)/)?.[0] || '';
+            const trailingSpace = current.match(/(\s+)$/)?.[0] || '';
+
+            if (leadingSpace) tokens.push({ content: leadingSpace, type: "whitespace" });
+            if (trimmed) tokens.push({ content: trimmed, type: "token" });
+            if (trailingSpace) tokens.push({ content: trailingSpace, type: "whitespace" });
           }
           current = "";
           inQuotes = true;
@@ -249,11 +252,14 @@ export function useTextHighlighter() {
       // Start of bracketed content: [
       else if (!inQuotes && !inBrackets && char === "[") {
         // Save any accumulated content before bracket
-        if (current.trim()) {
-          tokens.push({ content: current.trim(), type: "token" });
-        }
-        if (current !== current.trim()) {
-          tokens.push({ content: " ", type: "whitespace" });
+        if (current) {
+          const trimmed = current.trim();
+          const leadingSpace = current.match(/^(\s+)/)?.[0] || '';
+          const trailingSpace = current.match(/(\s+)$/)?.[0] || '';
+
+          if (leadingSpace) tokens.push({ content: leadingSpace, type: "whitespace" });
+          if (trimmed) tokens.push({ content: trimmed, type: "token" });
+          if (trailingSpace) tokens.push({ content: trailingSpace, type: "whitespace" });
         }
         current = "";
         inBrackets = true;
@@ -289,8 +295,13 @@ export function useTextHighlighter() {
       }
       // Whitespace outside quotes/brackets: separator
       else if (!inQuotes && !inBrackets && /\s/.test(char)) {
-        if (current.trim()) {
-          tokens.push({ content: current.trim(), type: "token" });
+        if (current) {
+          const trimmed = current.trim();
+          const leadingSpace = current.match(/^(\s+)/)?.[0] || '';
+
+          if (leadingSpace) tokens.push({ content: leadingSpace, type: "whitespace" });
+          if (trimmed) tokens.push({ content: trimmed, type: "token" });
+          // Note: trailing space is handled by the current whitespace char
         }
         tokens.push({ content: char, type: "whitespace" });
         current = "";
@@ -302,11 +313,29 @@ export function useTextHighlighter() {
     }
 
     // Handle any remaining content
-    if (current.trim()) {
-      tokens.push({
-        content: current.trim(),
-        type: inQuotes ? "quoted" : inBrackets ? "bracketed" : "token",
-      });
+    // If we have unclosed quotes or brackets, treat them as regular tokens
+    if (current) {
+      // For unclosed quotes/brackets, we need to break them down properly
+      if (inQuotes || inBrackets) {
+        // Unclosed quote or bracket - treat the entire thing as regular text
+        // Break it down character by character or as tokens
+        const leadingSpace = current.match(/^(\s+)/)?.[0] || '';
+        const trailingSpace = current.match(/(\s+)$/)?.[0] || '';
+        const trimmed = current.trim();
+
+        if (leadingSpace) tokens.push({ content: leadingSpace, type: "whitespace" });
+        if (trimmed) tokens.push({ content: trimmed, type: "token" });
+        if (trailingSpace) tokens.push({ content: trailingSpace, type: "whitespace" });
+      } else {
+        // Normal token at the end
+        const leadingSpace = current.match(/^(\s+)/)?.[0] || '';
+        const trailingSpace = current.match(/(\s+)$/)?.[0] || '';
+        const trimmed = current.trim();
+
+        if (leadingSpace) tokens.push({ content: leadingSpace, type: "whitespace" });
+        if (trimmed) tokens.push({ content: trimmed, type: "token" });
+        if (trailingSpace) tokens.push({ content: trailingSpace, type: "whitespace" });
+      }
     }
     
     // SECOND PASS: Preserve all tokens as-is

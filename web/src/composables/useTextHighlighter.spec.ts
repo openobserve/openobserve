@@ -625,4 +625,308 @@ describe("useTextHighlighter", () => {
       expect(result).toContain("'"); // single quotes (or &#39; if escaped)
     });
   });
+
+  describe("unclosed brackets and quotes handling", () => {
+    const mockColors = { stringValue: "#047857" };
+
+    it("should preserve last character with unclosed bracket - ANSI escape sequence", () => {
+      // Real-world example: ANSI escape codes with unclosed brackets
+      const text = "src/plugins/logs/QueryEditor.spec.ts[2m";
+      const result = textHighlighter.processTextWithHighlights(
+        text,
+        "",
+        mockColors,
+      );
+      // CRITICAL: The 's' from '.ts' must not be lost
+      expect(result).toContain("QueryEditor.spec.ts");
+      expect(result).toContain(".ts");
+    });
+
+    it("should preserve last character with unclosed bracket - file path", () => {
+      const text = "src/views/About.spec.ts[2m | test";
+      const result = textHighlighter.processTextWithHighlights(
+        text,
+        "",
+        mockColors,
+      );
+      // The 's' from '.ts' must be preserved
+      expect(result).toContain("About.spec.ts");
+      expect(result).toContain(".ts");
+    });
+
+    it("should handle unclosed single quote at end", () => {
+      const text = "hello world 'unclosed";
+      const result = textHighlighter.processTextWithHighlights(
+        text,
+        "",
+        mockColors,
+      );
+      // All characters should be preserved
+      expect(result).toContain("hello");
+      expect(result).toContain("world");
+      expect(result).toContain("unclosed");
+      expect(result).toContain("'");
+    });
+
+    it("should handle unclosed double quote at end", () => {
+      const text = 'hello world "unclosed';
+      const result = textHighlighter.processTextWithHighlights(
+        text,
+        "",
+        mockColors,
+      );
+      // All characters should be preserved
+      expect(result).toContain("hello");
+      expect(result).toContain("world");
+      expect(result).toContain("unclosed");
+      expect(result).toContain("&quot;");
+    });
+
+    it("should handle text ending with bracket but no closing", () => {
+      const text = "test[incomplete";
+      const result = textHighlighter.processTextWithHighlights(
+        text,
+        "",
+        mockColors,
+      );
+      expect(result).toContain("test");
+      expect(result).toContain("incomplete");
+      // The 'e' at the end must be preserved
+      expect(result).toContain("incomplete");
+    });
+
+    it("should preserve trailing whitespace before unclosed bracket", () => {
+      const text = "test  [unclosed";
+      const result = textHighlighter.processTextWithHighlights(
+        text,
+        "",
+        mockColors,
+      );
+      expect(result).toContain("test");
+      expect(result).toContain("unclosed");
+    });
+
+    it("should handle multiple unclosed brackets", () => {
+      const text = "test[first[second";
+      const result = textHighlighter.processTextWithHighlights(
+        text,
+        "",
+        mockColors,
+      );
+      expect(result).toContain("test");
+      expect(result).toContain("first");
+      expect(result).toContain("second");
+      // Last character must be preserved
+      expect(result).toContain("second");
+    });
+  });
+
+  describe("complex ANSI escape sequences", () => {
+    const mockColors = { stringValue: "#047857" };
+
+    it("should handle ANSI color codes without losing characters", () => {
+      // Simulated ANSI: \u001b[90mstderr\u001b[2m | file.ts
+      const text = "[90mstderr[2m | src/views/About.spec.ts[2m";
+      const result = textHighlighter.processTextWithHighlights(
+        text,
+        "",
+        mockColors,
+      );
+      // Must preserve 'stderr' and '.ts'
+      expect(result).toContain("stderr");
+      expect(result).toContain("About.spec.ts");
+      expect(result).toContain(".ts");
+    });
+
+    it("should handle nested brackets with mixed content", () => {
+      const text = "test [22m[2m content end";
+      const result = textHighlighter.processTextWithHighlights(
+        text,
+        "",
+        mockColors,
+      );
+      expect(result).toContain("test");
+      expect(result).toContain("content");
+      expect(result).toContain("end");
+    });
+
+    it("should preserve all characters in complex log line", () => {
+      const text = "[90mstderr[2m | src/plugins/logs/QueryEditor.spec.ts[2m > [22m[2mshould mount";
+      const result = textHighlighter.processTextWithHighlights(
+        text,
+        "",
+        mockColors,
+      );
+      // Critical characters to preserve
+      expect(result).toContain("QueryEditor.spec.ts");
+      expect(result).toContain("should");
+      expect(result).toContain("mount");
+    });
+  });
+
+  describe("leading and trailing whitespace preservation", () => {
+    const mockColors = { stringValue: "#047857" };
+
+    it("should preserve leading whitespace before bracket", () => {
+      const text = "test  [content]";
+      const result = textHighlighter.processTextWithHighlights(
+        text,
+        "",
+        mockColors,
+      );
+      // Should have 2 spaces between test and bracket
+      expect(result).toContain("test");
+      expect(result).toContain("content");
+    });
+
+    it("should preserve trailing whitespace after content before bracket", () => {
+      const text = "test  [content";
+      const result = textHighlighter.processTextWithHighlights(
+        text,
+        "",
+        mockColors,
+      );
+      expect(result).toContain("test");
+      expect(result).toContain("content");
+    });
+
+    it("should preserve leading whitespace before quote", () => {
+      const text = 'test  "quoted"';
+      const result = textHighlighter.processTextWithHighlights(
+        text,
+        "",
+        mockColors,
+      );
+      expect(result).toContain("test");
+      expect(result).toContain("quoted");
+    });
+
+    it("should preserve multiple spaces between tokens", () => {
+      const text = "word1    word2";
+      const result = textHighlighter.processTextWithHighlights(
+        text,
+        "",
+        mockColors,
+      );
+      expect(result).toContain("word1");
+      expect(result).toContain("word2");
+    });
+
+    it("should handle text with only whitespace", () => {
+      const text = "   ";
+      const result = textHighlighter.processTextWithHighlights(
+        text,
+        "",
+        mockColors,
+      );
+      // Should return something (whitespace tokens)
+      expect(result).toBeDefined();
+    });
+
+    it("should preserve whitespace at start and end", () => {
+      const text = "  test content  ";
+      const result = textHighlighter.processTextWithHighlights(
+        text,
+        "",
+        mockColors,
+      );
+      expect(result).toContain("test");
+      expect(result).toContain("content");
+    });
+  });
+
+  describe("bracket and quote edge cases", () => {
+    const mockColors = { stringValue: "#047857" };
+
+    it("should handle closed bracket followed by text", () => {
+      const text = "[content] after";
+      const result = textHighlighter.processTextWithHighlights(
+        text,
+        "",
+        mockColors,
+      );
+      expect(result).toContain("content");
+      expect(result).toContain("after");
+    });
+
+    it("should handle empty brackets", () => {
+      const text = "test [] end";
+      const result = textHighlighter.processTextWithHighlights(
+        text,
+        "",
+        mockColors,
+      );
+      expect(result).toContain("test");
+      expect(result).toContain("end");
+    });
+
+    it("should handle bracket at start of string", () => {
+      const text = "[start content";
+      const result = textHighlighter.processTextWithHighlights(
+        text,
+        "",
+        mockColors,
+      );
+      expect(result).toContain("start");
+      expect(result).toContain("content");
+    });
+
+    it("should handle bracket at end of string", () => {
+      const text = "content ends[";
+      const result = textHighlighter.processTextWithHighlights(
+        text,
+        "",
+        mockColors,
+      );
+      expect(result).toContain("content");
+      expect(result).toContain("ends");
+    });
+
+    it("should handle quote at start of string", () => {
+      const text = '"start content';
+      const result = textHighlighter.processTextWithHighlights(
+        text,
+        "",
+        mockColors,
+      );
+      expect(result).toContain("start");
+      expect(result).toContain("content");
+    });
+
+    it("should handle apostrophe in contractions", () => {
+      const text = "it's don't can't";
+      const result = textHighlighter.processTextWithHighlights(
+        text,
+        "",
+        mockColors,
+      );
+      expect(result).toContain("it's");
+      expect(result).toContain("don't");
+      expect(result).toContain("can't");
+    });
+
+    it("should handle single character before bracket", () => {
+      const text = "a[content";
+      const result = textHighlighter.processTextWithHighlights(
+        text,
+        "",
+        mockColors,
+      );
+      expect(result).toContain("a");
+      expect(result).toContain("content");
+    });
+
+    it("should handle alternating brackets and quotes", () => {
+      const text = '[test] "quote" [more] end';
+      const result = textHighlighter.processTextWithHighlights(
+        text,
+        "",
+        mockColors,
+      );
+      expect(result).toContain("test");
+      expect(result).toContain("quote");
+      expect(result).toContain("more");
+      expect(result).toContain("end");
+    });
+  });
 });
