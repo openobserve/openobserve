@@ -140,6 +140,7 @@ export class HeatmapConverter implements PromQLChartConverter {
       },
       tooltip: {
         position: "top",
+        confine: true,
         textStyle: {
           color: store.state.theme === "dark" ? "#fff" : "#000",
           fontSize: 12,
@@ -148,20 +149,19 @@ export class HeatmapConverter implements PromQLChartConverter {
           store.state.theme === "dark"
             ? "rgba(0,0,0,1)"
             : "rgba(255,255,255,1)",
+        extraCssText: "max-height: 200px; overflow: auto; max-width: 400px; word-wrap: break-word; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent;",
         formatter: (params: any) => {
           try {
-            return `${
-              seriesNames[params?.value[1]] || params?.seriesName
-            } <br/> ${params?.marker} ${params?.name} : ${
-              formatUnitValue(
-                getUnitValue(
-                  params?.value?.[2],
-                  config?.unit,
-                  config?.unit_custom,
-                  config?.decimals,
-                ),
-              ) || params?.value?.[2]
-            }`;
+            const seriesName = seriesNames[params?.value[1]] || params?.seriesName;
+            const value = formatUnitValue(
+              getUnitValue(
+                params?.value?.[2],
+                config?.unit,
+                config?.unit_custom,
+                config?.decimals,
+              ),
+            ) || params?.value?.[2];
+            return `${seriesName} <br/> ${params?.marker} ${params?.name} : ${value}`;
           } catch (error) {
             return "";
           }

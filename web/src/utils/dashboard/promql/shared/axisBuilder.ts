@@ -30,9 +30,11 @@ export function buildTooltip(panelSchema: any, triggerType: "axis" | "item" = "a
 
   return {
     trigger: triggerType,
+    confine: true,
     textStyle: {
       fontSize: 12,
     },
+    extraCssText: "max-height: 200px; overflow: auto; max-width: 400px; word-wrap: break-word; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent;",
     axisPointer: {
       type: "cross",
     },
@@ -46,11 +48,11 @@ export function buildTooltip(panelSchema: any, triggerType: "axis" | "item" = "a
         params = [params];
       }
 
-      let tooltip = "";
+      const tooltipItems: string[] = [];
 
       // Add axis label (timestamp for time-series)
       if (params[0]?.axisValue) {
-        tooltip += `<div style="margin-bottom: 4px;"><strong>${params[0].axisValue}</strong></div>`;
+        tooltipItems.push(`${params[0].axisValue} <br/>`);
       }
 
       // Add series data with unit formatting
@@ -64,11 +66,11 @@ export function buildTooltip(panelSchema: any, triggerType: "axis" | "item" = "a
             getUnitValue(value, unit, unitCustom, decimals)
           );
 
-          tooltip += `<div>${marker} ${param.seriesName}: <strong>${formattedValue}</strong></div>`;
+          tooltipItems.push(`${marker} ${param.seriesName}: <strong>${formattedValue}</strong>`);
         }
       });
 
-      return tooltip;
+      return tooltipItems.join("<br/>");
     },
   };
 }

@@ -128,10 +128,12 @@ export class GaugeConverter implements PromQLChartConverter {
       tooltip: {
         show: true,
         trigger: "item",
+        confine: true,
         textStyle: {
           color: store.state.theme === "dark" ? "#fff" : "#000",
           fontSize: 12,
         },
+        extraCssText: "max-height: 200px; overflow: auto; max-width: 400px; word-wrap: break-word; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent;",
         valueFormatter: (value: any) => {
           return formatUnitValue(
             getUnitValue(value, config?.unit, config?.unit_custom, config?.decimals)
