@@ -22,6 +22,7 @@ import { validatePanel } from "@/utils/dashboard/convertDataIntoUnitValue";
 import useStreams from "./useStreams";
 import useValuesWebSocket from "./dashboard/useValuesWebSocket";
 import queryService from "@/services/search";
+import metricsService from "@/services/metrics";
 import logsUtils from "./useLogs/logsUtils";
 import {
   buildSQLChartQuery,
@@ -125,6 +126,19 @@ const getDefaultDashboardPanelData: any = (store: any) => ({
         colorBySeries: [],
       },
       background: null,
+      // PromQL aggregation config
+      aggregation: "last",
+      // GeoMap config
+      lat_label: "latitude",
+      lon_label: "longitude",
+      weight_label: "weight",
+      name_label: "name",
+      // PromQL Table config
+      table_aggregations: ["last"],
+      promql_table_mode: "single",
+      visible_columns: [],
+      hidden_columns: [],
+      sticky_columns: [],
     },
     htmlContent: "",
     markdownContent: "",
@@ -145,6 +159,8 @@ const getDefaultDashboardPanelData: any = (store: any) => ({
           y: [],
           z: [],
           breakdown: [],
+          promql_labels: [],
+          promql_operations: [],
           filter: {
             filterType: "group",
             logicalOperator: "AND",
@@ -161,6 +177,7 @@ const getDefaultDashboardPanelData: any = (store: any) => ({
         },
         config: {
           promql_legend: "",
+          step_value: null,
           layer_type: "scatter",
           weight_fixed: 1,
           limit: 0,
@@ -180,6 +197,7 @@ const getDefaultDashboardPanelData: any = (store: any) => ({
     currentQueryIndex: 0,
     vrlFunctionToggle: false,
     showFieldList: true,
+    hiddenQueries: [],
   },
   meta: {
     parsedQuery: "",
@@ -212,6 +230,11 @@ const getDefaultDashboardPanelData: any = (store: any) => ({
     },
     streamFields: {
       groupedFields: [],
+    },
+    promql: {
+      availableLabels: <string[]>[],
+      labelValuesMap: new Map<string, string[]>(),
+      loadingLabels: false,
     },
   },
 });
@@ -252,12 +275,13 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 
   const addQuery = () => {
-    const queryType =
-      dashboardPanelData.data.queryType === "sql" ? "sql" : "promql";
     const newQuery: any = {
       query: "",
       vrlFunctionQuery: "",
-      customQuery: queryType === "promql",
+      customQuery:
+        dashboardPanelData?.data?.queries?.[
+          dashboardPanelData?.layout?.currentQueryIndex
+        ]?.customQuery ?? false,
       fields: {
         stream:
           dashboardPanelData.data.queries[
@@ -271,6 +295,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         y: [],
         z: [],
         breakdown: [],
+        promql_labels: [],
+        promql_operations: [],
         filter: {
           filterType: "group",
           logicalOperator: "AND",
@@ -371,35 +397,60 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     pendingUpdateGroupedFields = false;
 
     try {
-      const currentStream =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream;
-      if (!currentStream) return;
+      // For PromQL queries, collect streams from ALL queries
+      if (dashboardPanelData.data.queryType === "promql") {
+        const allStreams = new Set<string>();
 
-      // Collect streams (main + joins)
-      const joinsStreams = [
-        { stream: currentStream, streamAlias: undefined },
-        ...(dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].joins?.filter((stream: any) => stream?.stream) ?? []),
-      ];
+        // Iterate through all queries to collect unique streams
+        dashboardPanelData.data.queries?.forEach((query: any) => {
+          if (query?.fields?.stream) {
+            allStreams.add(query.fields.stream);
+          }
+        });
 
-      // Fetch stream fields
-      const groupedFields = await Promise.all(
-        joinsStreams.map(async (stream: any) => {
-          const streamData = await loadStreamFields(stream?.stream);
-          return {
-            ...streamData,
-            stream_alias: stream?.streamAlias,
-          };
-        }),
-      );
+        if (allStreams.size === 0) return;
 
-      // Filter out any invalid entries (streams with no name)
-      dashboardPanelData.meta.streamFields.groupedFields = groupedFields.filter(
-        (field: any) => field?.name,
-      );
+        // Fetch stream fields for all unique streams
+        const groupedFields = await Promise.all(
+          Array.from(allStreams).map(async (streamName) => {
+            const streamData = await loadStreamFields(streamName);
+            return streamData;
+          }),
+        );
+
+        // Filter out any invalid entries (streams with no name)
+        dashboardPanelData.meta.streamFields.groupedFields =
+          groupedFields.filter((field: any) => field?.name);
+      } else {
+        const currentStream =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream;
+        if (!currentStream) return;
+
+        // Collect streams (main + joins)
+        const joinsStreams = [
+          { stream: currentStream, streamAlias: undefined },
+          ...(dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].joins?.filter((stream: any) => stream?.stream) ?? []),
+        ];
+
+        // Fetch stream fields
+        const groupedFields = await Promise.all(
+          joinsStreams.map(async (stream: any) => {
+            const streamData = await loadStreamFields(stream?.stream);
+            return {
+              ...streamData,
+              stream_alias: stream?.streamAlias,
+            };
+          }),
+        );
+
+        // Filter out any invalid entries (streams with no name)
+        dashboardPanelData.meta.streamFields.groupedFields =
+          groupedFields.filter((field: any) => field?.name);
+      }
     } finally {
       isUpdatingGroupedFields = false;
       // If there was a pending update request, run it now
@@ -2930,6 +2981,70 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     processExtractedFields(extractedFields, autoSelectChartType);
   };
 
+  // Fetch available labels and their values for PromQL builder
+  const fetchPromQLLabels = async (metric: string) => {
+    if (!metric || !dashboardPanelData.meta.promql) return;
+
+    // Update shared meta
+    dashboardPanelData.meta.promql.loadingLabels = true;
+
+    try {
+      const endTime = Math.floor(Date.now() * 1000); // microseconds
+      const startTime = endTime - 24 * 60 * 60 * 1000000; // 24 hours ago in microseconds
+
+      const response = await metricsService.get_promql_series({
+        org_identifier: store.state.selectedOrganization.identifier,
+        labels: `{__name__="${metric}"}`,
+        start_time: startTime,
+        end_time: endTime,
+      });
+
+      if (
+        response.data &&
+        response.data.data &&
+        response.data.data.length > 0
+      ) {
+        // Extract all unique label keys and their values from the series
+        const labelSet = new Set<string>();
+        const valuesMap = new Map<string, Set<string>>();
+
+        response.data.data.forEach((series: any) => {
+          Object.keys(series).forEach((key) => {
+            if (key !== "__name__") {
+              labelSet.add(key);
+
+              // Collect all values for this label key
+              if (!valuesMap.has(key)) {
+                valuesMap.set(key, new Set<string>());
+              }
+              valuesMap.get(key)!.add(series[key]);
+            }
+          });
+        });
+
+        // Save to shared meta
+        dashboardPanelData.meta.promql.availableLabels =
+          Array.from(labelSet).sort();
+
+        // Convert Sets to sorted arrays and store in the map
+        const newLabelValuesMap = new Map<string, string[]>();
+        valuesMap.forEach((valueSet, labelKey) => {
+          newLabelValuesMap.set(labelKey, Array.from(valueSet).sort());
+        });
+        dashboardPanelData.meta.promql.labelValuesMap = newLabelValuesMap;
+      } else {
+        dashboardPanelData.meta.promql.availableLabels = [];
+        dashboardPanelData.meta.promql.labelValuesMap = new Map();
+      }
+    } catch (error) {
+      console.error("Error fetching PromQL labels:", error);
+      dashboardPanelData.meta.promql.availableLabels = [];
+      dashboardPanelData.meta.promql.labelValuesMap = new Map();
+    } finally {
+      dashboardPanelData.meta.promql.loadingLabels = false;
+    }
+  };
+
   return {
     dashboardPanelData,
     resetDashboardPanelData,
@@ -2990,6 +3105,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     setFieldsBasedOnChartTypeValidation,
     getDefaultDashboardPanelData,
     getStreamNameFromStreamAlias,
+    fetchPromQLLabels,
   };
 };
 export default useDashboardPanelData;

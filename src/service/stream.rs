@@ -844,6 +844,33 @@ pub async fn delete_stream(
         .await
         .unwrap();
     if schema.is_empty() {
+        // If stream schema doesn't exist, check if this is an enrichment table with a URL job
+        if stream_type == StreamType::EnrichmentTables
+            && let Ok(Some(_job)) = db::enrichment_table::get_url_job(org_id, stream_name).await
+        {
+            // URL job exists - delete it and return success
+            if let Err(e) = db::enrichment_table::delete_url_job(org_id, stream_name).await {
+                return Ok(
+                    HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("failed to delete URL job: {e}"),
+                    )),
+                );
+            }
+
+            log::info!(
+                "Deleted URL job for enrichment table: {}/{}",
+                org_id,
+                stream_name
+            );
+
+            return Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                StatusCode::OK,
+                "URL job deleted successfully".to_string(),
+            )));
+        }
+
+        // No schema and no URL job - stream not found
         return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             StatusCode::NOT_FOUND,
             "stream not found",

@@ -140,7 +140,7 @@ export class AlertDestinationsPage {
         await expect(this.page.locator(this.destinationImportNameError)).toBeVisible();
         await this.page.locator(this.destinationImportTemplateInput).click();
         await this.commonActions.scrollAndFindOption(templateName, 'template');
-        
+
         await this.page.locator(this.destinationImportNameInput).click();
         await this.page.locator(this.destinationImportNameInput).fill(destinationName);
         await this.page.locator(this.destinationImportJsonBtn).click();

@@ -822,6 +822,7 @@ export const usePanelDataLoader = (
       log("loadData: good to go... starting query executions...");
 
       const timestamps = selectedTimeObj.value;
+
       let startISOTimestamp: any;
       let endISOTimestamp: any;
       if (
@@ -929,7 +930,7 @@ export const usePanelDataLoader = (
                   query: query,
                   start_time: startISOTimestamp,
                   end_time: endISOTimestamp,
-                  step: panelSchema.value.config.step_value ?? "0",
+                  step: it.config.step_value ?? panelSchema.value.config.step_value ?? "0",
                 },
                 type: "promql" as const,
                 traceId: traceId,

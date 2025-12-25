@@ -47,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :depth="0"
               condition-input-width="tw-w-[130px]"
               :allow-custom-columns="true"
+              module="pipelines"
               @add-condition="(updatedGroup) => updateGroup(updatedGroup)"
               @add-group="(updatedGroup) => updateGroup(updatedGroup)"
               @remove-group="(groupId) => removeConditionGroup(groupId)"
@@ -430,10 +431,12 @@ const isValidStreamName = computed(() => {
 });
 
 const updateStreamFields = async (streamName : any, streamType : any) => {
-
   let streamCols: any = [];
+
+  // Fetch stream details including schema and settings
   const streams: any = await getStream(streamName, streamType, true);
 
+  // Map all schema fields to column objects with label, value, and type
   if (streams && Array.isArray(streams.schema)) {
     streamCols = streams.schema.map((column: any) => ({
       label: column.name,
@@ -441,6 +444,39 @@ const updateStreamFields = async (streamName : any, streamType : any) => {
       type: column.type,
     }));
   }
+
+  // Check if User Defined Schema (UDS) fields are configured
+  // If defined_schema_fields exists and is not empty, we should filter to show only those fields
+  // This allows users to limit which fields are visible in pipeline conditions to only the important ones
+  if (
+    streams?.settings?.defined_schema_fields &&
+    Array.isArray(streams.settings.defined_schema_fields) &&
+    streams.settings.defined_schema_fields.length > 0
+  ) {
+    const definedFields = streams.settings.defined_schema_fields;
+
+    // Get special system field names from config
+    // These are OpenObserve internal fields that should always be available
+    const timestampColumn = store.state.zoConfig?.timestamp_column || '_timestamp';
+    const allFieldsName = store.state.zoConfig?.all_fields_name;
+
+    // Filter the columns to include:
+    // 1. System fields (timestamp and all_fields) - always needed for OpenObserve functionality
+    // 2. User-defined schema fields - only the fields user explicitly configured as important
+    streamCols = streamCols.filter((col: any) => {
+      // Always include timestamp column (e.g., '_timestamp') - required for time-based queries
+      // Always include all fields column (e.g., '_all') - used for full-text search
+      if (col.value === timestampColumn || col.value === allFieldsName) {
+        return true;
+      }
+      // Include field only if it's in the defined_schema_fields list
+      return definedFields.includes(col.value);
+    });
+  }
+  // If defined_schema_fields is not present or empty, show all schema fields (default behavior)
+
+  // Append the filtered/unfiltered columns to existing fields
+  // Note: Using spread to add to existing arrays as this function may be called multiple times
   originalStreamFields.value = [...originalStreamFields.value, ...streamCols];
   filteredColumns.value = [...filteredColumns.value, ...streamCols];
 };

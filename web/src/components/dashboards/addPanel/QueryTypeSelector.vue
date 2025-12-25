@@ -33,8 +33,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div>
         <button
-          data-test="dashboard-promQL"
+          data-test="dashboard-customSql"
+          :class="selectedButtonType === 'custom-sql' ? 'selected' : ''"
+          :style="{
+            backgroundColor:
+            store.state.theme == 'dark' ? 'transparent' : '#f0eaea',
+          }"
           class="button"
+          @click="onUpdateButton('custom-sql', $event)"
+        >
+          {{ t("panel.customSql") }}
+        </button>
+      </div>
+      <div>
+        <button
+          data-test="dashboard-promQL-builder"
+          class="button"
+          :style="{
+            backgroundColor:
+            store.state.theme == 'dark' ? 'transparent' : '#f0eaea',
+          }"
+          :class="selectedButtonType === 'promql-builder' ? 'selected' : ''"
+          v-show="
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.stream_type == 'metrics'
+          "
+          @click="onUpdateButton('promql-builder', $event)"
+        >
+          {{ t("panel.promQLBuilder") }}
+        </button>
+      </div>
+      <div>
+        <button
+          data-test="dashboard-promQL"
+          class="button button-right"
           :style="{
             backgroundColor:
             store.state.theme == 'dark' ? 'transparent' : '#f0eaea',
@@ -48,20 +81,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="onUpdateButton('promql', $event)"
         >
           {{ t("panel.promQL") }}
-        </button>
-      </div>
-      <div>
-        <button
-          data-test="dashboard-customSql"
-          :class="selectedButtonType === 'custom-sql' ? 'selected' : ''"
-          :style="{
-            backgroundColor:
-            store.state.theme == 'dark' ? 'transparent' : '#f0eaea',
-          }"
-          class="button button-right"
-          @click="onUpdateButton('custom-sql', $event)"
-        >
-          {{ t("panel.customSql") }}
         </button>
       </div>
     </div>
@@ -126,8 +145,12 @@ export default defineComponent({
 
       ignoreSelectedButtonTypeUpdate.value = true;
       if (dashboardPanelData.data.type == "custom_chart") {
-        // For custom_chart, check the actual query type instead of assuming custom-sql
-        if (dashboardPanelData.data.queryType == "promql") {
+        // For custom_chart, check the actual query type and customQuery flag
+        if (dashboardPanelData.data.queryType == "promql" &&
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.customQuery == false) {
+          selectedButtonType.value = "promql-builder";
+        } else if (dashboardPanelData.data.queryType == "promql" &&
+                   dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.customQuery == true) {
           selectedButtonType.value = "promql";
         } else {
           selectedButtonType.value = "custom-sql";
@@ -148,6 +171,13 @@ export default defineComponent({
         dashboardPanelData.data.queryType == "sql"
       ) {
         selectedButtonType.value = "custom-sql";
+      } else if (
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery == false &&
+        dashboardPanelData.data.queryType == "promql"
+      ) {
+        selectedButtonType.value = "promql-builder";
       } else if (
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -196,7 +226,8 @@ export default defineComponent({
       event.stopPropagation();
       if (selectedQueryType != selectedButtonType.value) {
         // some exceptions
-        // If user is switching from auto to custom, promql to auto, or propmql to custom-sql no need for the popup,
+        // If user is switching from auto to custom, promql to auto, promql to custom-sql,
+        // promql-builder to promql, or promql-builder to auto no need for the popup,
         // else show the popup
         if (
           (selectedButtonType.value == "auto" &&
@@ -204,7 +235,13 @@ export default defineComponent({
           (selectedButtonType.value == "promql" &&
             selectedQueryType == "auto") ||
           (selectedButtonType.value == "promql" &&
-            selectedQueryType == "custom-sql")
+            selectedQueryType == "custom-sql") ||
+          (selectedButtonType.value == "promql-builder" &&
+            selectedQueryType == "promql") ||
+          (selectedButtonType.value == "promql-builder" &&
+            selectedQueryType == "auto") ||
+          (selectedButtonType.value == "promql" &&
+            selectedQueryType == "promql-builder")
         ) {
           // act like you confirmed without opening the popup
           popupSelectedButtonType.value = selectedQueryType;
@@ -227,7 +264,7 @@ export default defineComponent({
       // empty the errors
       dashboardPanelData.meta.errors.queryErrors = [];
 
-      if (selectedButtonType.value == "promql") {
+      if (selectedButtonType.value == "promql" || selectedButtonType.value == "promql-builder") {
         dashboardPanelData.layout.currentQueryIndex = 0;
         dashboardPanelData.data.queries = dashboardPanelData.data.queries.slice(
           0,
@@ -247,7 +284,7 @@ export default defineComponent({
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields.stream_type != "metrics" &&
-          selectedButtonType.value == "promql"
+          (selectedButtonType.value == "promql" || selectedButtonType.value == "promql-builder")
         ) {
           selectedButtonType.value = "auto";
         }
@@ -267,20 +304,28 @@ export default defineComponent({
             dashboardPanelData.layout.currentQueryIndex
           ].customQuery = true;
           dashboardPanelData.data.queryType = "sql";
-        } else if (selectedButtonType.value == "promql") {
+        } else if (selectedButtonType.value == "promql-builder") {
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ].customQuery = true;
+          ].customQuery = false;
           dashboardPanelData.data.queryType = "promql";
 
           // For custom charts, preserve the existing query
-          // Only clear the query for non-custom charts when switching to promql
+          // Only clear the query for non-custom charts when switching to promql-builder
           if (dashboardPanelData.data.type !== "custom_chart") {
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].query = "";
             dashboardPanelData.data.type = "line";
           }
+        } else if (selectedButtonType.value == "promql") {
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery = true;
+          dashboardPanelData.data.queryType = "promql";
+
+          // Preserve the query when switching from promql-builder to promql
+          // The query has already been generated by the builder, so don't clear it
         } else {
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex

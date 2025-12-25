@@ -37,9 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template v-slot:body-cell="props">
       <q-td :props="props" :style="getStyle(props)" class="copy-cell-td">
-        <div
-          class="flex items-center no-wrap copy-cell-content"
-        >
+        <div class="flex items-center no-wrap copy-cell-content">
           <!-- Use JsonFieldRenderer if column is marked as JSON -->
           <JsonFieldRenderer
             v-if="props.col.showFieldAsJson"
@@ -51,21 +49,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{
                 props.value == "undefined" || props.value === null
                   ? ""
-                  : props.value
+                  : props.col.format
+                    ? props.col.format(props.value, props.row)
+                    : props.value
               }}
             </span>
           </template>
           <q-btn
-            :icon="isCellCopied(props.rowIndex, props.col.name) ? 'check' : 'content_copy'"
+            :icon="
+              isCellCopied(props.rowIndex, props.col.name)
+                ? 'check'
+                : 'content_copy'
+            "
             dense
             size="xs"
             no-caps
             class="copy-btn"
-            @click.stop="copyCellContent(props.value, props.rowIndex, props.col.name)"
+            @click.stop="
+              copyCellContent(props.value, props.rowIndex, props.col.name)
+            "
           >
           </q-btn>
         </div>
       </q-td>
+    </template>
+
+    <!-- Expose a bottom slot so callers (e.g., PromQL table) can provide footer content -->
+    <template v-slot:bottom>
+      <slot name="bottom" />
     </template>
   </q-table>
 </template>
@@ -257,14 +268,14 @@ export default defineComponent({
 
     const copyCellContent = (value: any, rowIndex: number, colName: string) => {
       if (value === null || value === undefined) return;
-      
+
       const textToCopy = String(value);
       copyToClipboard(textToCopy)
         .then(() => {
           // Set copied state
           const key = `${rowIndex}_${colName}`;
           copiedCells.value.set(key, true);
-          
+
           // Reset after 3 seconds
           setTimeout(() => {
             copiedCells.value.delete(key);
@@ -359,6 +370,14 @@ export default defineComponent({
     word-break: break-word;
     overflow-wrap: break-word;
     white-space: normal !important;
+  }
+
+  // also ensure the inner content (which uses flex and a 'no-wrap' utility) allows wrapping
+  :deep(.copy-cell-content) {
+    white-space: normal !important;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    flex-wrap: wrap !important;
   }
 }
 

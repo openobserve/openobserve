@@ -834,8 +834,8 @@ pub async fn dex_login() -> Result<HttpResponse, Error> {
     use o2_dex::meta::auth::PreLoginData;
 
     let login_data: PreLoginData = get_dex_login();
-    let state = login_data.state;
-    let _ = crate::service::kv::set(PKCE_STATE_ORG, &state, state.to_owned().into()).await;
+    let state = login_data.state.clone();
+    let _ = crate::service::kv::set(PKCE_STATE_ORG, &state, state.clone().into()).await;
 
     Ok(HttpResponse::Ok().json(login_data.url))
 }
