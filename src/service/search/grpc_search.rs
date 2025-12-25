@@ -21,12 +21,13 @@ use config::{
 };
 use infra::{
     client::grpc::make_grpc_search_client,
+    cluster,
     errors::{Error, ErrorCodes},
 };
 use rand::{SeedableRng, rngs::StdRng, seq::IndexedRandom};
 use tracing::{Instrument, info_span};
 
-use crate::{common::infra::cluster as infra_cluster, service::search::server_internal_error};
+use crate::service::search::server_internal_error;
 
 #[tracing::instrument(name = "service:search:grpc_search", skip_all)]
 pub async fn grpc_search(
@@ -37,7 +38,7 @@ pub async fn grpc_search(
     in_req: &search::Request,
     role_group: Option<RoleGroup>,
 ) -> Result<search::Response, Error> {
-    let mut nodes = infra_cluster::get_cached_online_querier_nodes(role_group)
+    let mut nodes = cluster::get_cached_online_querier_nodes(role_group)
         .await
         .unwrap_or_default();
     // sort nodes by node_id this will improve hit cache ratio
@@ -109,7 +110,7 @@ pub async fn grpc_search_multi(
     in_req: &search::MultiStreamRequest,
     role_group: Option<RoleGroup>,
 ) -> Result<search::Response, Error> {
-    let mut nodes = infra_cluster::get_cached_online_querier_nodes(role_group)
+    let mut nodes = cluster::get_cached_online_querier_nodes(role_group)
         .await
         .unwrap_or_default();
     // sort nodes by node_id this will improve hit cache ratio
@@ -181,7 +182,7 @@ pub async fn grpc_search_partition(
     role_group: Option<RoleGroup>,
     skip_max_query_range: bool,
 ) -> Result<search::SearchPartitionResponse, Error> {
-    let mut nodes = infra_cluster::get_cached_online_querier_nodes(role_group)
+    let mut nodes = cluster::get_cached_online_querier_nodes(role_group)
         .await
         .unwrap_or_default();
     // sort nodes by node_id this will improve hit cache ratio

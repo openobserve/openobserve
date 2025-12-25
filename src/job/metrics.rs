@@ -22,14 +22,11 @@ use config::{
     utils::async_file::scan_files,
 };
 use hashbrown::HashMap;
-use infra::{cache, db::get_db};
+use infra::{cache, cluster::get_cached_online_nodes, db::get_db};
 use tokio::time;
 
 use crate::{
-    common::infra::{
-        cluster::get_cached_online_nodes,
-        config::{ORG_USERS, USERS},
-    },
+    common::infra::config::{ORG_USERS, USERS},
     service::db,
 };
 

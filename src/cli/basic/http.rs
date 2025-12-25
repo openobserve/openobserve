@@ -403,7 +403,7 @@ async fn request(
 ) -> Result<Option<String>, anyhow::Error> {
     let cfg = config::get_config();
     let client = reqwest::Client::new();
-    let local = config::cluster::load_local_node();
+    let local = config::cluster::LOCAL_NODE.clone();
     let url = format!("{}{}", local.http_addr, url);
     let user = cfg.auth.root_user_email.clone();
     let password = cfg.auth.root_user_password.clone();
