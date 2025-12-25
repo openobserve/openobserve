@@ -12,6 +12,38 @@ const viteConfigObj = typeof viteConfig === 'function'
 export default mergeConfig(
   viteConfigObj,
   defineConfig({
+    logLevel: 'error', // Suppress Vite warnings (e.g., Monaco editor source map issues)
+    customLogger: {
+      info: (msg) => console.info(msg),
+      warn: (msg) => {
+        // Suppress Monaco editor source map warnings
+        const msgStr = String(msg);
+        if ((msgStr.includes('Failed to load source map') || msgStr.includes('marked.umd.js.map')) &&
+            msgStr.includes('monaco-editor')) {
+          return;
+        }
+        console.warn(msg);
+      },
+      warnOnce: (msg) => {
+        const msgStr = String(msg);
+        if ((msgStr.includes('Failed to load source map') || msgStr.includes('marked.umd.js.map')) &&
+            msgStr.includes('monaco-editor')) {
+          return;
+        }
+        console.warn(msg);
+      },
+      error: (msg) => {
+        const msgStr = String(msg);
+        if ((msgStr.includes('Failed to load source map') || msgStr.includes('marked.umd.js.map')) &&
+            msgStr.includes('monaco-editor')) {
+          return;
+        }
+        console.error(msg);
+      },
+      clearScreen: () => {},
+      hasErrorLogged: () => false,
+      hasWarned: false,
+    },
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url))
