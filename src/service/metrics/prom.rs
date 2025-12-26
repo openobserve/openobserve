@@ -183,10 +183,33 @@ pub async fn remote_write(
     let mut uds_check_time = 0u128;
     let mut schema_check_time = 0u128;
     let mut partition_check_time = 0u128;
-    let mut alerts_check_time = 0u128;
     let mut sample_processing_time = 0u128;
     let mut event_count = 0;
     let mut sample_count = 0;
+
+    // Pre-load alerts for all unique metrics to avoid repeated lock contention
+    let preload_start = std::time::Instant::now();
+    let mut unique_metrics = HashSet::new();
+    for event in &request.timeseries {
+        if let Some(name_label) = event.labels.iter().find(|l| l.name == NAME_LABEL) {
+            let metric_name = format_stream_name(name_label.value.to_string());
+            unique_metrics.insert(metric_name);
+        }
+    }
+
+    if !unique_metrics.is_empty() {
+        let streams_for_alerts: Vec<StreamParams> = unique_metrics
+            .iter()
+            .map(|name| StreamParams {
+                org_id: org_id.to_owned().into(),
+                stream_name: name.to_owned().into(),
+                stream_type: StreamType::Metrics,
+            })
+            .collect();
+        crate::service::ingestion::get_stream_alerts(&streams_for_alerts, &mut stream_alerts_map)
+            .await;
+    }
+    let alerts_preload_time = preload_start.elapsed().as_micros();
 
     for mut event in request.timeseries {
         event_count += 1;
@@ -276,21 +299,7 @@ pub async fn remote_write(
             partition_check_time += t.elapsed().as_micros();
         }
 
-        // get stream alerts (moved to event level - only once per metric)
-        let alert_key = format!("{}/{}/{}", &org_id, StreamType::Metrics, metric_name);
-        if !stream_alerts_map.contains_key(&alert_key) {
-            let t = std::time::Instant::now();
-            crate::service::ingestion::get_stream_alerts(
-                &[StreamParams {
-                    org_id: org_id.to_owned().into(),
-                    stream_name: metric_name.to_owned().into(),
-                    stream_type: StreamType::Metrics,
-                }],
-                &mut stream_alerts_map,
-            )
-            .await;
-            alerts_check_time += t.elapsed().as_micros();
-        }
+        // Note: alerts are now pre-loaded before the loop to avoid repeated lock contention
 
         // parse samples
         let sample_start = std::time::Instant::now();
@@ -412,23 +421,23 @@ pub async fn remote_write(
 
     // Detailed performance logging
     if parse_timeseries_ms > 200 || ha_check_total_time > 200.0 {
-        let other_time = parse_timeseries_ms as u128 * 1000
+        let other_time = parse_timeseries_ms * 1000
             - pipeline_check_time
             - uds_check_time
             - schema_check_time
             - partition_check_time
-            - alerts_check_time
+            - alerts_preload_time
             - sample_processing_time
             - (ha_check_total_time * 1000.0) as u128;
 
         log::info!(
             "[remote_write] org: {org_id}, parse timeseries took: {parse_timeseries_ms} ms (events: {event_count}, samples: {sample_count}) | \
-            breakdown: pipeline={:.1}ms, uds={:.1}ms, schema={:.1}ms, partition={:.1}ms, alerts={:.1}ms, sample_proc={:.1}ms, ha={:.1}ms, other={:.1}ms",
+            breakdown: alerts_preload={:.1}ms, pipeline={:.1}ms, uds={:.1}ms, schema={:.1}ms, partition={:.1}ms, sample_proc={:.1}ms, ha={:.1}ms, other={:.1}ms",
+            alerts_preload_time as f64 / 1000.0,
             pipeline_check_time as f64 / 1000.0,
             uds_check_time as f64 / 1000.0,
             schema_check_time as f64 / 1000.0,
             partition_check_time as f64 / 1000.0,
-            alerts_check_time as f64 / 1000.0,
             sample_processing_time as f64 / 1000.0,
             ha_check_total_time,
             other_time as f64 / 1000.0,
