@@ -177,7 +177,19 @@ pub async fn remote_write(
     step_start = std::time::Instant::now();
     let mut first_line = true;
     let mut ha_check_total_time = 0.0;
+
+    // Detailed performance tracking
+    let mut pipeline_check_time = 0u128;
+    let mut uds_check_time = 0u128;
+    let mut schema_check_time = 0u128;
+    let mut partition_check_time = 0u128;
+    let mut alerts_check_time = 0u128;
+    let mut sample_processing_time = 0u128;
+    let mut event_count = 0;
+    let mut sample_count = 0;
+
     for mut event in request.timeseries {
+        event_count += 1;
         // get labels
         let mut replica_label = String::new();
 
@@ -207,8 +219,9 @@ pub async fn remote_write(
             None => continue,
         };
 
-        // get stream pipeline
+        // get stream pipeline (moved to event level - only once per metric)
         if !stream_executable_pipelines.contains_key(&metric_name) {
+            let t = std::time::Instant::now();
             let pipeline_params = crate::service::ingestion::get_stream_executable_pipeline(
                 org_id,
                 &metric_name,
@@ -216,24 +229,73 @@ pub async fn remote_write(
             )
             .await;
             stream_executable_pipelines.insert(metric_name.clone(), pipeline_params);
+            pipeline_check_time += t.elapsed().as_micros();
         }
 
-        // get user defined schema
-        let streams = vec![StreamParams {
-            org_id: org_id.to_owned().into(),
-            stream_type: StreamType::Metrics,
-            stream_name: metric_name.to_owned().into(),
-        }];
-        crate::service::ingestion::get_uds_and_original_data_streams(
-            &streams,
-            &mut user_defined_schema_map,
-            &mut streams_need_original_map,
-            &mut streams_need_all_values_map,
-        )
-        .await;
+        // get user defined schema (moved to event level - only once per metric)
+        if !user_defined_schema_map.contains_key(&metric_name) {
+            let t = std::time::Instant::now();
+            let streams = vec![StreamParams {
+                org_id: org_id.to_owned().into(),
+                stream_type: StreamType::Metrics,
+                stream_name: metric_name.to_owned().into(),
+            }];
+            crate::service::ingestion::get_uds_and_original_data_streams(
+                &streams,
+                &mut user_defined_schema_map,
+                &mut streams_need_original_map,
+                &mut streams_need_all_values_map,
+            )
+            .await;
+            uds_check_time += t.elapsed().as_micros();
+        }
+
+        // check for schema (moved to event level - only once per metric)
+        if !metric_schema_map.contains_key(&metric_name) {
+            let t = std::time::Instant::now();
+            let _schema_exists = stream_schema_exists(
+                org_id,
+                &metric_name,
+                StreamType::Metrics,
+                &mut metric_schema_map,
+            )
+            .await;
+            schema_check_time += t.elapsed().as_micros();
+        }
+
+        // get partition keys (moved to event level - only once per metric)
+        if !stream_partitioning_map.contains_key(&metric_name) {
+            let t = std::time::Instant::now();
+            let partition_det = crate::service::ingestion::get_stream_partition_keys(
+                org_id,
+                &StreamType::Metrics,
+                &metric_name,
+            )
+            .await;
+            stream_partitioning_map.insert(metric_name.clone(), partition_det.clone());
+            partition_check_time += t.elapsed().as_micros();
+        }
+
+        // get stream alerts (moved to event level - only once per metric)
+        let alert_key = format!("{}/{}/{}", &org_id, StreamType::Metrics, metric_name);
+        if !stream_alerts_map.contains_key(&alert_key) {
+            let t = std::time::Instant::now();
+            crate::service::ingestion::get_stream_alerts(
+                &[StreamParams {
+                    org_id: org_id.to_owned().into(),
+                    stream_name: metric_name.to_owned().into(),
+                    stream_type: StreamType::Metrics,
+                }],
+                &mut stream_alerts_map,
+            )
+            .await;
+            alerts_check_time += t.elapsed().as_micros();
+        }
 
         // parse samples
+        let sample_start = std::time::Instant::now();
         for sample in event.samples {
+            sample_count += 1;
             let mut sample_val = sample.value;
             // revisit in future
             if sample_val.is_infinite() {
@@ -308,38 +370,6 @@ pub async fn remote_write(
                 return Ok(());
             }
 
-            // check for schema
-            let _schema_exists = stream_schema_exists(
-                org_id,
-                &metric_name,
-                StreamType::Metrics,
-                &mut metric_schema_map,
-            )
-            .await;
-
-            // get partition keys
-            if !stream_partitioning_map.contains_key(&metric_name) {
-                let partition_det = crate::service::ingestion::get_stream_partition_keys(
-                    org_id,
-                    &StreamType::Metrics,
-                    &metric_name,
-                )
-                .await;
-                stream_partitioning_map.insert(metric_name.clone(), partition_det.clone());
-            }
-
-            // Start get stream alerts
-            crate::service::ingestion::get_stream_alerts(
-                &[StreamParams {
-                    org_id: org_id.to_owned().into(),
-                    stream_name: metric_name.to_owned().into(),
-                    stream_type: StreamType::Metrics,
-                }],
-                &mut stream_alerts_map,
-            )
-            .await;
-            // End get stream alert
-
             let mut value: json::Value = json::to_value(&metric).unwrap();
             let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
             value.as_object_mut().unwrap().insert(
@@ -376,11 +406,32 @@ pub async fn remote_write(
                     .push((local_val, timestamp));
             }
         }
+        sample_processing_time += sample_start.elapsed().as_micros();
     }
     let parse_timeseries_ms = step_start.elapsed().as_millis();
+
+    // Detailed performance logging
     if parse_timeseries_ms > 200 || ha_check_total_time > 200.0 {
+        let other_time = parse_timeseries_ms as u128 * 1000
+            - pipeline_check_time
+            - uds_check_time
+            - schema_check_time
+            - partition_check_time
+            - alerts_check_time
+            - sample_processing_time
+            - (ha_check_total_time * 1000.0) as u128;
+
         log::info!(
-            "[remote_write] org: {org_id}, parse timeseries took: {parse_timeseries_ms} ms, HA check took: {ha_check_total_time} ms",
+            "[remote_write] org: {org_id}, parse timeseries took: {parse_timeseries_ms} ms (events: {event_count}, samples: {sample_count}) | \
+            breakdown: pipeline={:.1}ms, uds={:.1}ms, schema={:.1}ms, partition={:.1}ms, alerts={:.1}ms, sample_proc={:.1}ms, ha={:.1}ms, other={:.1}ms",
+            pipeline_check_time as f64 / 1000.0,
+            uds_check_time as f64 / 1000.0,
+            schema_check_time as f64 / 1000.0,
+            partition_check_time as f64 / 1000.0,
+            alerts_check_time as f64 / 1000.0,
+            sample_processing_time as f64 / 1000.0,
+            ha_check_total_time,
+            other_time as f64 / 1000.0,
         );
     }
 
