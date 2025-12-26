@@ -1128,11 +1128,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 
   const resetAggregationFunction = () => {
-    // always set queryType to sql for custom_chart type
-    if (dashboardPanelData.data.type === "custom_chart") {
-      dashboardPanelData.data.queryType = "sql";
-    }
-
     // Skip resetting fields for PromQL mode to preserve the query
     if (dashboardPanelData.data.queryType === "promql") {
       return;
