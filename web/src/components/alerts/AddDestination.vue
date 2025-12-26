@@ -16,14 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
  <q-page class="q-pa-none o2-custom-bg" style="height: calc(100vh - 48px); min-height: inherit" >
-      <div class="row items-center no-wrap card-container q-px-md tw-mb-[0.675rem]">
-        <div class="flex items-center tw-h-[60px]">
+      <div class="row items-center no-wrap card-container q-px-md tw:mb-[0.675rem]">
+        <div class="flex items-center tw:h-[60px]">
           <div
             no-caps
             padding="xs"
             outline
             icon="arrow_back_ios_new"
-            class="el-border tw-w-6 tw-h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
+            class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
             title="Go Back"
             @click="$emit('cancel:hideform')"
           >
@@ -39,11 +39,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-      <div class="card-container tw-h-full tw-py-2">
+      <div class="card-container tw:h-full tw:py-2">
         <div>
        <div class="row q-col-gutter-sm q-px-md q-mt-sm q-mb-xs">
         <div v-if="isAlerts" class="col-12 q-pb-md">
-         <div class="app-tabs-container tw-h-[36px] q-mr-sm tw-w-fit">
+         <div class="app-tabs-container tw:h-[36px] q-mr-sm tw:w-fit">
           <app-tabs
             data-test="add-destination-tabs"
             :tabs="tabs"
@@ -231,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="col-12 q-py-sm">
               <q-toggle
                 data-test="add-destination-skip-tls-verify-toggle"
-                class="o2-toggle-button-lg tw-mr-3 -tw-ml-4"
+                class="o2-toggle-button-lg tw:mr-3 -tw:ml-4"
                 size="lg"
                 v-model="formData.skip_tls_verify"
                 :label="t('alert_destinations.skip_tls_verify')"
@@ -281,11 +281,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </div>
     </div>
-    <div class="flex justify-end q-px-lg q-py-lg full-width tw-absolute tw-bottom-0">
+    <div class="flex justify-end q-px-lg q-py-lg full-width tw:absolute tw:bottom-0">
       <q-btn
         data-test="add-destination-cancel-btn"
         v-close-popup="true"
-        class="q-mr-md o2-secondary-button tw-h-[36px]"
+        class="q-mr-md o2-secondary-button tw:h-[36px]"
         :label="t('alerts.cancel')"
         no-caps
         flat
@@ -293,7 +293,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <q-btn
         data-test="add-destination-submit-btn"
-        class="o2-primary-button no-border tw-h-[36px]"
+        class="o2-primary-button no-border tw:h-[36px]"
         :label="t('alerts.save')"
         type="submit"
         no-caps

@@ -16,13 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="q-pa-none" style="min-height: inherit;">
     <div class="row items-center no-wrap q-mx-md q-pt-sm">
-      <div class="flex items-center tw-py-2">
+      <div class="flex items-center tw:py-2">
         <div
           no-caps
             padding="xs"
             outline
             icon="arrow_back_ios_new"
-            class="el-border tw-w-6 tw-h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
+            class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
           title="Go Back"
           @click="$emit('cancel:hideform')"
         >
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               data-test="add-report-step1-continue-btn"
               @click="validateForm(2)"
-              class="o2-primary-button tw-h-[36px]"
+              class="o2-primary-button tw:h-[36px]"
               flat
               no-caps
               :label="'Continue'"
@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="add-cipher-key-step2-back-btn"
               flat
               @click="step = 1"
-              class="o2-secondary-button tw-h-[36px] q-mb-sm"
+              class="o2-secondary-button tw:h-[36px] q-mb-sm"
               :label="t('common.back')"
               no-caps
             />
@@ -157,13 +157,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-step>
       </q-stepper>
     </div>
-    <div class="tw-mx-2">
+    <div class="tw:mx-2">
             <div class="flex justify-end q-px-sm q-py-lg full-width"
       style="position: sticky; bottom: 0px; z-index: 2"
       >
         <q-btn
           data-test="add-cipher-key-cancel-btn"
-          class="q-mr-md o2-secondary-button tw-h-[36px]"
+          class="q-mr-md o2-secondary-button tw:h-[36px]"
           :label="t('common.cancel')"
           no-caps
           flat
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             (step === 1 && isUpdatingCipherKey == false) || isSubmitting
           "
           data-test="add-cipher-key-save-btn"
-          class="o2-primary-button no-border tw-h-[36px]"
+          class="o2-primary-button no-border tw:h-[36px]"
           :label="t('common.save')"
           type="submit"
           no-caps

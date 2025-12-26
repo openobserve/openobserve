@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <!-- o2 ai context add button in the detail table -->
           <O2AIContextAddBtn
-            class="tw-px-2 tw-py-2"
+            class="tw:px-2 tw:py-2"
             @sendToAiChat="sendToAiChat(JSON.stringify(rowData))"
              />
         </q-tabs>
@@ -128,10 +128,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-tab-panel>
       <q-tab-panel name="table" class="q-pa-none">
         <q-card-section
-          class="tw-p-[0.675rem] q-mb-lg"
+          class="tw:p-[0.675rem] q-mb-lg"
           data-test="log-detail-table-content"
         >
-          <div v-if="rowData.length == 0" class="q-pt-md tw-max-w-[350px]">
+          <div v-if="rowData.length == 0" class="q-pt-md tw:max-w-[350px]">
             No data available.
           </div>
           <q-table
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="tableColumns"
             :row-key="(row) => 'field_' + row.field"
             :rows-per-page-options="[0]"
-            class="q-table o2-quasar-table o2-row-md o2-schema-table tw-w-full tw-border tw-border-solid tw-border-[var(--o2-border-color)]"
+            class="q-table o2-quasar-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
             :class="store.state.theme === 'dark' && 'dark'"
             dense
           >
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-td
                 :data-test="`log-detail-${props.row.field}-key`"
                 class="text-left"
-                :class="store.state.theme == 'dark' ? 'tw-text-[#f67a7aff]' : 'tw-text-[#B71C1C]'"
+                :class="store.state.theme == 'dark' ? 'tw:text-[#f67a7aff]' : 'tw:text-[#B71C1C]'"
               >
                 {{ props.row.field }}
               </q-td>
@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-left"
                 :class="!shouldWrapValues ? 'ellipsis' : ''"
               >
-                <div class="tw-flex tw-items-start tw-gap-2">
+                <div class="tw:flex tw:items-start tw:gap-2">
                   <q-btn-dropdown
                     :data-test="`log-details-include-exclude-field-btn-${props.row.field}`"
                     size="6px"
@@ -282,11 +282,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-btn-dropdown>
                   <pre
                     :data-test="`log-detail-${props.row.field}-value`"
-                    class="table-pre tw-flex-1"
+                    class="table-pre tw:flex-1"
                     :class="
                       !shouldWrapValues
-                        ? 'tw-whitespace-nowrap'
-                        : 'tw-whitespace-pre-wrap'
+                        ? 'tw:whitespace-nowrap'
+                        : 'tw:whitespace-pre-wrap'
                     "
                   ><LogsHighLighting :data="props.row.value" :show-braces="false" :query-string="highlightQuery" /></pre>
                 </div>
@@ -315,11 +315,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @close="tab = 'json'"
         />
         <!-- Loading/Empty state when no data -->
-        <div v-else class="tw-flex tw-items-center tw-justify-center tw-h-full tw-py-20">
-          <div class="tw-text-center">
-            <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw-mb-4" />
-            <div v-else-if="correlationError" class="tw-text-base tw-text-red-500">{{ correlationError }}</div>
-            <div v-else class="tw-text-base tw-text-gray-500">{{ t('correlation.clickToLoadLogs') }}</div>
+        <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
+          <div class="tw:text-center">
+            <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw:mb-4" />
+            <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
+            <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadLogs') }}</div>
           </div>
         </div>
       </q-tab-panel>
@@ -344,11 +344,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @close="tab = 'json'"
         />
         <!-- Loading/Empty state when no data -->
-        <div v-else class="tw-flex tw-items-center tw-justify-center tw-h-full tw-py-20">
-          <div class="tw-text-center">
-            <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw-mb-4" />
-            <div v-else-if="correlationError" class="tw-text-base tw-text-red-500">{{ correlationError }}</div>
-            <div v-else class="tw-text-base tw-text-gray-500">{{ t('correlation.clickToLoadMetrics') }}</div>
+        <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
+          <div class="tw:text-center">
+            <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw:mb-4" />
+            <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
+            <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadMetrics') }}</div>
           </div>
         </div>
       </q-tab-panel>
@@ -373,11 +373,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @close="tab = 'json'"
         />
         <!-- Loading/Empty state when no data -->
-        <div v-else class="tw-flex tw-items-center tw-justify-center tw-h-full tw-py-20">
-          <div class="tw-text-center">
-            <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw-mb-4" />
-            <div v-else-if="correlationError" class="tw-text-base tw-text-red-500">{{ correlationError }}</div>
-            <div v-else class="tw-text-base tw-text-gray-500">{{ t('correlation.clickToLoadTraces') }}</div>
+        <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
+          <div class="tw:text-center">
+            <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw:mb-4" />
+            <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
+            <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadTraces') }}</div>
           </div>
         </div>
       </q-tab-panel>
@@ -390,7 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="col-1">
           <q-btn
             data-test="log-detail-previous-detail-btn"
-            class="o2-secondary-button tw-h-[36px]"
+            class="o2-secondary-button tw:h-[36px]"
             no-caps
             :disabled="currentIndex <= 0"
             @click="$emit('showPrevDetail', false, true)"
@@ -406,10 +406,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           class="col row justify-center align-center q-gutter-sm"
         >
-          <div class="tw-leading-10 tw-font-bold">
+          <div class="tw:leading-10 tw:font-bold">
             {{ t("common.noOfRecords") }}
           </div>
-          <div class="tw-min-w-[70px]">
+          <div class="tw:min-w-[70px]">
             <q-select
               v-model="selectedRelativeValue"
               :options="recordSizeOptions"
@@ -420,7 +420,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="">
             <q-btn
               data-test="logs-detail-table-search-around-btn"
-              class="o2-secondary-button tw-h-[36px]"
+              class="o2-secondary-button tw:h-[36px]"
               text-color="light-text"
               no-caps
               flat
@@ -433,7 +433,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="col-1 items-end" style="display: contents;">
           <q-btn
             data-test="log-detail-next-detail-btn"
-            class="o2-secondary-button tw-h-[36px]"
+            class="o2-secondary-button tw:h-[36px]"
             text-color="light-text"
             :disabled="currentIndex >= totalLength - 1"
             @click="$emit('showNextDetail', true, false)"
@@ -624,14 +624,14 @@ export default defineComponent({
         label: t("search.sourceName"),
         field: "field",
         align: "left" as const,
-        headerClasses: "!tw-text-left",
+        headerClasses: "tw:text-left!",
       },
       {
         name: "value",
         label: t("search.sourceValue"),
         field: "value",
         align: "left" as const,
-        headerClasses: "!tw-text-left",
+        headerClasses: "tw:text-left!",
       },
     ];
 

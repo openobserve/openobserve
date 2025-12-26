@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         horizontal
       >
         <template v-slot:before>
-          <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem] q-pt-xs">
+          <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
             <search-bar
               data-test="logs-search-bar"
               ref="searchBarRef"
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="onSplitterUpdate"
             >
               <template #before>
-                <div class="relative-position tw-h-full tw-pl-[0.625rem]">
+                <div class="relative-position tw:h-full tw:pl-[0.625rem]">
                   <index-list
                     v-if="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
@@ -94,17 +94,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template #after>
                 <div
-                  class="tw-pr-[0.625rem] tw-pb-[0.625rem] tw-h-full"
+                  class="tw:pr-[0.625rem] tw:pb-[0.625rem] tw:h-full"
                 >
                   <div
-                    class="card-container tw-h-full tw-w-full relative-position"
+                    class="card-container tw:h-full tw:w-full relative-position"
                   >
                     <div
                       v-if="
                         searchObj.data.filterErrMsg !== '' &&
                         searchObj.loading == false
                       "
-                      class="tw-justify-center"
+                      class="tw:justify-center"
                     >
                       <h5 class="text-center">
                         <q-icon
@@ -123,9 +123,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.data.errorMsg !== '' &&
                         searchObj.loading == false
                       "
-                      class="tw-justify-center"
+                      class="tw:justify-center"
                     >
-                      <h5 class="text-center q-ma-none tw-pt-[2rem]">
+                      <h5 class="text-center q-ma-none tw:pt-[2rem]">
                         <div
                           data-test="logs-search-result-not-found-text"
                           class="q-pt-lg"
@@ -193,11 +193,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.data.stream.selectedStream.length == 0 &&
                         searchObj.loading == false
                       "
-                      class="row tw-justify-center"
+                      class="row tw:justify-center"
                     >
                       <h6
                         data-test="logs-search-no-stream-selected-text"
-                        class="text-center col-10 q-mx-none !tw-mt-none tw-pt-[2rem]"
+                        class="text-center col-10 q-mx-none tw:mt-none! tw:pt-[2rem]"
                       >
                         <q-icon name="info" color="primary" size="md" />
                         {{ t("search.noStreamSelectedMessage") }}
@@ -211,11 +211,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.loading == false &&
                         searchObj.meta.searchApplied == true
                       "
-                      class="row tw-justify-center"
+                      class="row tw:justify-center"
                     >
                       <h6
                         data-test="logs-search-error-message"
-                        class="text-center q-ma-none col-10 tw-pt-[2rem]"
+                        class="text-center q-ma-none col-10 tw:pt-[2rem]"
                       >
                         <q-icon name="info" color="primary"
 size="md" />
@@ -239,11 +239,11 @@ size="md" />
                         searchObj.loading == false &&
                         searchObj.meta.searchApplied == false
                       "
-                      class="row tw-justify-center"
+                      class="row tw:justify-center"
                     >
                       <h6
                         data-test="logs-search-error-message"
-                        class="text-center q-ma-none col-10 tw-pt-[2rem]"
+                        class="text-center q-ma-none col-10 tw:pt-[2rem]"
                       >
                         <q-icon name="info" color="primary"
 size="md" />
@@ -257,11 +257,11 @@ size="md" />
                         searchObj.meta.searchApplied == false &&
                         searchObj.loading == false
                       "
-                      class="row tw-justify-center"
+                      class="row tw:justify-center"
                     >
                       <h6
                         data-test="logs-search-error-message"
-                        class="text-center q-ma-none col-10 tw-pt-[2rem]"
+                        class="text-center q-ma-none col-10 tw:pt-[2rem]"
                       >
                         <q-icon name="info" color="primary"
     size="md" />
@@ -284,7 +284,7 @@ size="md" />
                       />
                     </div>
                     <div class="text-center col-10 q-ma-none">
-                      <h5 class="tw-my-none">
+                      <h5 class="tw:my-none">
                         <span v-if="disableMoreErrorDetails">
                           <SanitizedHtmlRenderer
                             data-test="logs-search-detail-error-message"

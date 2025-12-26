@@ -20,20 +20,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dialog-box"
       :class="
         warningMessage && warningMessage.length > 0
-          ? 'tw-w-[600px]'
-          : 'tw-w-[400px]'
+          ? 'tw:w-[600px]'
+          : 'tw:w-[400px]'
       "
     >
       <q-card-section class="confirmBody">
         <div class="head">{{ title }}</div>
         <div class="para">{{ message }}</div>
-        <div v-if="warningMessage && warningMessage.length > 0" class="tw-mt-4">
+        <div v-if="warningMessage && warningMessage.length > 0" class="tw:mt-4">
           <q-banner
             :class="[
-              'tw-border-l-4 tw-p-4 tw-rounded',
+              'tw:border-l-4 tw:p-4 tw:rounded',
               store.state.theme === 'dark'
-                ? 'tw-bg-gray-800/60 tw-border-yellow-600/70'
-                : 'tw-bg-orange-50 tw-border-orange-400',
+                ? 'tw:bg-gray-800/60 tw:border-yellow-600/70'
+                : 'tw:bg-orange-50 tw:border-orange-400',
             ]"
           >
             <template v-slot:avatar>
@@ -41,41 +41,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 name="warning"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw-text-yellow-500/80'
-                    : 'tw-text-orange-500'
+                    ? 'tw:text-yellow-500/80'
+                    : 'tw:text-orange-500'
                 "
                 size="24px"
               />
             </template>
             <div
               :class="[
-                'tw-font-medium tw-text-sm tw-leading-relaxed tw-text-left',
+                'tw:font-medium tw:text-sm tw:leading-relaxed tw:text-left',
                 store.state.theme === 'dark'
-                  ? 'tw-text-gray-300'
-                  : 'tw-text-orange-800',
+                  ? 'tw:text-gray-300'
+                  : 'tw:text-orange-800',
               ]"
             >
               {{ warningMessage }}
             </div>
           </q-banner>
         </div>
-        <div v-if="hasQuery" class="tw-mt-4">
+        <div v-if="hasQuery" class="tw:mt-4">
           <q-checkbox
             v-model="replaceQuery"
             label="Also replace query with example query"
             data-test="replace-query-checkbox"
             :class="
               store.state.theme === 'dark'
-                ? 'tw-text-gray-300'
-                : 'tw-text-gray-700'
+                ? 'tw:text-gray-300'
+                : 'tw:text-gray-700'
             "
           />
           <div
-            class="tw-text-xs tw-mt-1 tw-ml-7"
+            class="tw:text-xs tw:mt-1 tw:ml-7"
             :class="
               store.state.theme === 'dark'
-                ? 'tw-text-gray-400'
-                : 'tw-text-gray-500'
+                ? 'tw:text-gray-400'
+                : 'tw:text-gray-500'
             "
           >
             The example query will be inserted into the query editor

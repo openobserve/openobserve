@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-card class="column full-height">
-    <q-card-section class="q-px-md q-py-md tw-h-[64px]">
+    <q-card-section class="q-px-md q-py-md tw:h-[64px]">
       <div class="row items-center no-wrap">
         <div class="col">
           <div
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             v-close-popup="true"
             :label="t('dashboard.cancel')"
-            class="o2-secondary-button tw-h-[36px]"
+            class="o2-secondary-button tw:h-[36px]"
             :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             flat
             data-test="dashboard-add-cancel"
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disable="tabData.name.trim() === ''"
             :loading="onSubmit.isLoading.value"
             :label="t('dashboard.save')"
-            class="o2-primary-button tw-h-[36px] q-ml-md"
+            class="o2-primary-button tw:h-[36px] q-ml-md"
             :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             flat
             borderless

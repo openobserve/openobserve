@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div data-test="traces-search-result" class="col column overflow-hidden">
-    <div data-test="traces-search-result-list" class="search-list tw-w-full">
+    <div data-test="traces-search-result-list" class="search-list tw:w-full">
       <!-- RED Metrics Dashboard -->
       <transition
         enter-active-class="transition-all duration-300 ease-in-out"
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-        class="full-height flex justify-center items-center tw-pt-[4rem]"
+        class="full-height flex justify-center items-center tw:pt-[4rem]"
         v-if="searchObj.loading == true"
       >
         <div class="q-pb-lg">
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           searchObj.data.queryResults?.hits?.length == 0 &&
           searchObj.loading == false
         "
-        class="text-center tw-mx-[10%] tw-my-[40px] tw-text-[20px]"
+        class="text-center tw:mx-[10%] tw:my-[40px] tw:text-[20px]"
       >
         <q-icon name="info"
 color="primary" size="md" /> No traces found. Please
@@ -97,8 +97,8 @@ color="primary" size="md" /> No traces found. Please
         class="traces-table-container"
         :class="
           searchObj.meta.showHistogram
-            ? 'tw-h-[calc(100vh-30rem)]'
-            : 'tw-h-[calc(100vh-14.50rem)]'
+            ? 'tw:h-[calc(100vh-30rem)]'
+            : 'tw:h-[calc(100vh-14.50rem)]'
         "
         v-slot="{ item, index }"
         :virtual-scroll-item-size="25"

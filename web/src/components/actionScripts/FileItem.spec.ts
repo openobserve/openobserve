@@ -47,14 +47,14 @@ describe("FileItem.vue", () => {
       wrapper = createWrapper({ isActive: true });
       const listItem = wrapper.find("li");
       expect(listItem.classes()).toContain("bg-primary");
-      expect(listItem.classes()).toContain("tw-text-white");
+      expect(listItem.classes()).toContain("tw:text-white");
     });
 
     it("does not apply active styling when isActive is false", () => {
       wrapper = createWrapper({ isActive: false });
       const listItem = wrapper.find("li");
       expect(listItem.classes()).not.toContain("bg-primary");
-      expect(listItem.classes()).not.toContain("tw-text-white");
+      expect(listItem.classes()).not.toContain("tw:text-white");
     });
 
     it("renders edit and delete buttons", () => {
@@ -264,8 +264,8 @@ describe("FileItem.vue", () => {
       await nextTick();
 
       const input = wrapper.find("input");
-      expect(input.classes()).toContain("tw-text-white");
-      expect(input.classes()).not.toContain("tw-text-black");
+      expect(input.classes()).toContain("tw:text-white");
+      expect(input.classes()).not.toContain("tw:text-black");
     });
 
     it("applies black text when not active and editing", async () => {
@@ -276,8 +276,8 @@ describe("FileItem.vue", () => {
       await nextTick();
 
       const input = wrapper.find("input");
-      expect(input.classes()).toContain("tw-text-black");
-      expect(input.classes()).not.toContain("tw-text-white");
+      expect(input.classes()).toContain("tw:text-black");
+      expect(input.classes()).not.toContain("tw:text-white");
     });
   });
 
@@ -287,8 +287,8 @@ describe("FileItem.vue", () => {
       const buttons = wrapper.findAll("button");
 
       buttons.forEach((button) => {
-        expect(button.classes()).toContain("tw-text-gray-100");
-        expect(button.classes()).not.toContain("tw-text-gray-600");
+        expect(button.classes()).toContain("tw:text-gray-100");
+        expect(button.classes()).not.toContain("tw:text-gray-600");
       });
     });
 
@@ -297,8 +297,8 @@ describe("FileItem.vue", () => {
       const buttons = wrapper.findAll("button");
 
       buttons.forEach((button) => {
-        expect(button.classes()).toContain("tw-text-gray-600");
-        expect(button.classes()).not.toContain("tw-text-gray-100");
+        expect(button.classes()).toContain("tw:text-gray-600");
+        expect(button.classes()).not.toContain("tw:text-gray-100");
       });
     });
   });
@@ -377,10 +377,10 @@ describe("FileItem.vue", () => {
       wrapper = createWrapper();
       const listItem = wrapper.find("li");
 
-      expect(listItem.classes()).toContain("tw-cursor-pointer");
-      expect(listItem.classes()).toContain("tw-py-[1px]");
-      expect(listItem.classes()).toContain("tw-px-2");
-      expect(listItem.classes()).toContain("hover:tw-bg-gray-200");
+      expect(listItem.classes()).toContain("tw:cursor-pointer");
+      expect(listItem.classes()).toContain("tw:py-[1px]");
+      expect(listItem.classes()).toContain("tw:px-2");
+      expect(listItem.classes()).toContain("hover:tw:bg-gray-200");
       expect(listItem.classes()).toContain("file-item");
     });
 

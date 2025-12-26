@@ -1,10 +1,10 @@
 <template>
-  <div class="tw-flex tw-gap-2">
+  <div class="tw:flex tw:gap-2">
     <div style="width: 134px; padding-right: 12px; padding-top: 12px">
-      <div class="text-label-bold tw-pb-3">Property</div>
+      <div class="text-label-bold tw:pb-3">Property</div>
       <div style="display: flex; flex-direction: column; gap: 14px">
         <div>
-          <div class="text-label-normal tw-text-sm">Label</div>
+          <div class="text-label-normal tw:text-sm">Label</div>
           <input
             v-model="fields.label"
             :class="[
@@ -15,7 +15,7 @@
           />
         </div>
         <div>
-          <div class="text-label-normal tw-text-sm">Alias</div>
+          <div class="text-label-normal tw:text-sm">Alias</div>
           <input
             v-model="fields.alias"
             disabled
@@ -63,7 +63,7 @@
         <q-tab-panel name="build" style="padding: 0px; padding-top: 8px">
           <div style="display: flex">
             <div style="width: calc(100% - 134px)">
-              <div class="text-label-bold tw-pb-3">Configuration</div>
+              <div class="text-label-bold tw:pb-3">Configuration</div>
               <SelectFunction
                 v-model="fields"
                 data-test="dynamic-function-popup-select-function"
@@ -84,9 +84,9 @@
         </q-tab-panel>
       </q-tab-panels>
 
-      <div class="tw-pt-2 tw-pr-3" v-if="allowAggregation">
-        <div class="tw-flex tw-items-center tw-gap-2 tw-mb-2">
-          <span class="tw-font-bold">Having</span>
+      <div class="tw:pt-2 tw:pr-3" v-if="allowAggregation">
+        <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
+          <span class="tw:font-bold">Having</span>
 
           <q-btn
             dense
@@ -103,7 +103,7 @@
         </div>
 
         <div
-          class="tw-flex tw-space-x-2 tw-items-center"
+          class="tw:flex tw:space-x-2 tw:items-center"
           v-if="isHavingFilterVisible()"
         >
           <q-select

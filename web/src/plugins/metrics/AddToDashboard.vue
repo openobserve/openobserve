@@ -59,7 +59,7 @@
             <q-btn
               v-close-popup="true"
               data-test="metrics-schema-cancel-button"
-              class="o2-secondary-button tw-h-[36px]"
+              class="o2-secondary-button tw:h-[36px]"
               :class="
                 store.state.theme === 'dark'
                   ? 'o2-secondary-button-dark'
@@ -73,7 +73,7 @@
             <q-btn
               data-test="metrics-schema-update-settings-button"
               :label="t('metrics.add')"
-              class="o2-primary-button tw-h-[36px] q-ml-md"
+              class="o2-primary-button tw:h-[36px] q-ml-md"
               :class="
                 store.state.theme === 'dark'
                   ? 'o2-primary-button-dark'

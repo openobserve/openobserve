@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
     >
       <q-icon :name="transformIcon" class="toolbar-icon-in-toggle" :class="transformsLabel" />
-      <q-tooltip class="tw-text-[12px]" :offset="[0, 2]">
+      <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">
         {{ getTransformLabelTooltip }}
       </q-tooltip>
     </q-toggle>
@@ -36,10 +36,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <q-btn-group
     :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
-    class="q-pa-none float-left q-mr-xs tw-h-[32px] transform-selector element-box-shadow el-border"
+    class="q-pa-none float-left q-mr-xs tw:h-[32px] transform-selector element-box-shadow el-border"
   >
     <div>
-      <q-tooltip class="tw-text-[12px]" :offset="[0, 2]">{{
+      <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">{{
         transformsLabel
       }}</q-tooltip>
       <q-btn-dropdown
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="transformIcon"
         :label="transformsLabel"
         no-caps
-        class="btn-function no-case q-pl-sm q-pr-none no-border no-outline tw-border-none"
+        class="btn-function no-case q-pl-sm q-pr-none no-border no-outline tw:border-none"
         :class="`${searchObj.data.transformType || 'transform'}-icon`"
         label-class="no-case"
         :disable="searchObj.meta.logsVisualizeToggle === 'visualize'"
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div v-if="filteredTransformOptions.length">
             <q-item
-              class="tw-border-b saved-view-item"
+              class="tw:border-b saved-view-item"
               clickable
               v-for="(item, i) in filteredTransformOptions"
               :key="'transform-' + item?.name"
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click="fnSavedFunctionDialog"
 
     >
-      <q-tooltip class="tw-text-[12px]" :offset="[0, 6]">
+      <q-tooltip class="tw:text-[12px]" :offset="[0, 6]">
         {{
           searchObj.data.transformType === "action"
             ? t("search.saveActionDisabled")

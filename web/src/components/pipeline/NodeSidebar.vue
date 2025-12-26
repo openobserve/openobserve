@@ -66,7 +66,7 @@ export default {
             <q-icon size="1.3em" :name="node.icon" />
             <q-separator vertical class="node-separator" />
           </div>
-          <div class="node-label tw-w-[70px]">{{ node.label }}</div>
+          <div class="node-label tw:w-[70px]">{{ node.label }}</div>
           <div class="drag-dots">
             <span class="dot"></span>
             <span class="dot"></span>

@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="step-advanced" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-    <div class="step-content card-container tw-px-3 tw-py-4">
+    <div class="step-content card-container tw:px-3 tw:py-4">
       <!-- Context Variables -->
-      <div class="tw-mb-4">
-        <div class="tw-pb-2 custom-input-label text-bold">
+      <div class="tw:mb-4">
+        <div class="tw:pb-2 custom-input-label text-bold">
           <span>{{ t("alerts.additionalVariables") }}</span>
           <q-btn
             style="color: #A0A0A0;"
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             data-test="alert-variables-add-btn"
             size="sm"
-            class="no-border o2-secondary-button tw-h-[36px]"
+            class="no-border o2-secondary-button tw:h-[36px]"
             flat
             no-caps
             @click="addVariable"
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(variable, index) in localVariables"
             :key="variable.id"
-            class="tw-flex tw-items-center tw-mb-2"
+            class="tw:flex tw:items-center tw:mb-2"
             :data-test="`alert-variables-${index + 1}`"
           >
             <q-input
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Description -->
-      <div class="tw-mb-4">
+      <div class="tw:mb-4">
         <div class="flex items-center q-mb-sm">
           <span class="text-bold custom-input-label">{{ t("alerts.description") }}</span>
         </div>
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Row Template -->
-      <div class="tw-mb-4">
+      <div class="tw:mb-4">
         <div class="flex items-center justify-between q-mb-sm">
           <div class="flex items-center">
             <span class="text-bold custom-input-label">{{ t("alerts.row") }}</span>

@@ -1,5 +1,5 @@
 <template>
-  <div class="tw-py-[0.25rem]">
+  <div class="tw:py-[0.25rem]">
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">{{ t("panel.operations") }}</div>
       <span class="layout-separator">:</span>
@@ -139,7 +139,7 @@
           size="sm"
           color="primary"
           @click="showOperationSelector = true"
-          class="add-operation-btn tw-ml-[0.25rem]"
+          class="add-operation-btn tw:ml-[0.25rem]"
           data-test="promql-add-operation"
         >
           <q-tooltip>Add operation</q-tooltip>
@@ -150,11 +150,11 @@
     <!-- Operation Selector Dialog -->
     <q-dialog v-model="showOperationSelector">
       <q-card style="min-width: 500px">
-        <q-card-section class="!tw-pt-[0.625rem] !tw-pb-[0.625rem]">
-          <div class="tw-text-[1.2rem]">Add Operation</div>
+        <q-card-section class="tw:pt-[0.625rem]! tw:pb-[0.625rem]!">
+          <div class="tw:text-[1.2rem]">Add Operation</div>
         </q-card-section>
 
-        <q-card-section class="!tw-py-[0.625rem]">
+        <q-card-section class="tw:py-[0.625rem]!">
           <q-input
             v-model="searchQuery"
             dense

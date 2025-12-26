@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @mouseover="() => (spanHoveredIndex = index)"
         @mouseout="() => (spanHoveredIndex = -1)"
       >
-        <div :style="{ width: leftWidth + 'px' }" class="tw-pl-[0.375rem]">
+        <div :style="{ width: leftWidth + 'px' }" class="tw:pl-[0.375rem]">
           <div
             :style="{
               height: '100%',
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-subtitle2 text-bold q-mr-sm"
                   :class="{
                     highlighted: isHighlighted(span.spanId),
-                    'tw-text-gray-900':
+                    'tw:text-gray-900':
                       store.state.theme === 'dark' &&
                       isHighlighted(span.spanId),
                     'current-match': currentSelectedValue === span.spanId, // Current match class

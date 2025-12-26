@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     expand-icon-class="field-expansion-icon"
     expand-icon="expand_more"
     expanded-icon="expand_less"
-    class="hover:tw-bg-[var(--o2-hover-accent)] tw-rounded-[0.25rem]"
+    class="hover:tw:bg-[var(--o2-hover-accent)] tw:rounded-[0.25rem]"
     @before-show="(event: any) => handleBeforeShow(event)"
     @before-hide="() => handleBeforeHide()"
   >
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`logs-field-list-item-${field.name}`"
         >
           <div
-            class="ellipsis !tw-max-w-[calc(100%-1.5rem)]"
+            class="ellipsis tw:max-w-[calc(100%-1.5rem)]!"
             style="display: inline-block"
           >
             {{ field.name }}
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </span>
         </div>
-        <div class="field_overlay tw-rounded-[0.25rem] tw-overflow-hidden">
+        <div class="field_overlay tw:rounded-[0.25rem] tw:overflow-hidden">
           <q-btn
             v-if="field.isSchemaField"
             :data-test="`log-search-index-list-filter-${field.name}-field-btn`"
@@ -170,30 +170,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Include/Exclude buttons -->
                 <div
                   v-if="selectedStreamsCount == field.streams.length"
-                  class="flex row tw-ml-[0.125rem]"
+                  class="flex row tw:ml-[0.125rem]"
                   :class="theme === 'dark' ? 'text-white' : 'text-black'"
                 >
                   <q-btn
-                    class="o2-custom-button-hover tw-ml-[0.25rem] tw-mr-[0.25rem] !tw-border !tw-border-solid !tw-border-[var(--o2-border-color)]"
+                    class="o2-custom-button-hover tw:ml-[0.25rem] tw:mr-[0.25rem] tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]!"
                     size="0.3125rem"
                     @click="handleAddSearchTerm(field.name, value.key, 'include')"
                     title="Include Term"
                     round
                     :data-test="`log-search-subfield-list-equal-${field.name}-field-btn`"
                   >
-                    <q-icon class="tw-h-[0.5rem] tw-w-[0.5rem]">
+                    <q-icon class="tw:h-[0.5rem] tw:w-[0.5rem]">
                       <EqualIcon></EqualIcon>
                     </q-icon>
                   </q-btn>
                   <q-btn
-                    class="o2-custom-button-hover !tw-border !tw-border-solid !tw-border-[var(--o2-border-color)]"
+                    class="o2-custom-button-hover tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]!"
                     size="0.3125rem"
                     @click="handleAddSearchTerm(field.name, value.key, 'exclude')"
                     title="Exclude Term"
                     round
                     :data-test="`log-search-subfield-list-not-equal-${field.name}-field-btn`"
                   >
-                    <q-icon class="tw-h-[0.5rem] tw-w-[0.5rem]">
+                    <q-icon class="tw:h-[0.5rem] tw:w-[0.5rem]">
                       <NotEqualIcon></NotEqualIcon>
                     </q-icon>
                   </q-btn>
