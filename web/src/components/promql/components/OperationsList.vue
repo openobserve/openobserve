@@ -284,7 +284,7 @@ const getFilteredOperationsForCategory = (
   category: string,
 ): QueryBuilderOperationDef[] => {
   const operations = promQueryModeller.getOperationsForCategory(category);
-  console.log("category operations ------ ", category, operations);
+  // Operations for this category
   if (!searchQuery.value) return operations;
 
   const needle = searchQuery.value.toLowerCase();
