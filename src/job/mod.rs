@@ -129,6 +129,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(mmdb_downloader::run());
     }
 
+    // Initialize URL job processor for enrichment tables on ingesters
+    // This ensures the stale job recovery task starts even if this ingester
+    // never receives a URL enrichment event. Critical for distributed deployments.
+    if LOCAL_NODE.is_ingester() {
+        crate::service::enrichment_table::init_url_processor();
+    }
+
     db::user::cache().await.expect("user cache failed");
     db::organization::cache()
         .await

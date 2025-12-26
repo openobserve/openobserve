@@ -554,6 +554,7 @@ pub async fn save_url_job(
         append_data: job.append_data,
         last_byte_position: job.last_byte_position as i64,
         supports_range: job.supports_range,
+        is_local_region: true, // This job was created in the current region
     };
     enrichment_table_urls::put(record.clone()).await?;
 
