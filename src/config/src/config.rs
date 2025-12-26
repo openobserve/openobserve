@@ -1343,9 +1343,18 @@ pub struct Limit {
     pub grpc_ingest_timeout: u64,
     #[env_config(name = "ZO_QUERY_TIMEOUT", default = 600)]
     pub query_timeout: u64,
-    #[env_config(name = "ZO_QUERY_INGESTER_TIMEOUT", default = 0)]
-    // default equal to query_timeout
+    #[env_config(
+        name = "ZO_QUERY_INGESTER_TIMEOUT",
+        default = 0,
+        help = "Timeout for ingester query, default equal to query_timeout"
+    )]
     pub query_ingester_timeout: u64,
+    #[env_config(
+        name = "ZO_QUERY_QUERIER_TIMEOUT",
+        default = 0,
+        help = "Timeout for querier query, default equal to query_timeout"
+    )]
+    pub query_querier_timeout: u64,
     #[env_config(name = "ZO_QUERY_DEFAULT_LIMIT", default = 1000)]
     pub query_default_limit: i64,
     #[env_config(name = "ZO_QUERY_VALUES_DEFAULT_NUM", default = 10)]
@@ -1567,6 +1576,12 @@ pub struct Limit {
         help = "Maximum length of a token in the inverted index."
     )]
     pub inverted_index_max_token_length: usize,
+    #[env_config(
+        name = "ZO_INDEX_ALL_MAX_VALUE_LENGTH",
+        default = 0,
+        help = "Maximum length of a value in the index all feature."
+    )]
+    pub index_all_max_value_length: usize,
     #[env_config(
         name = "ZO_DEFAULT_MAX_QUERY_RANGE_DAYS",
         default = 0,
@@ -2417,6 +2432,17 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // reset to default if given zero
     if cfg.limit.max_dashboard_series < 1 {
         cfg.limit.max_dashboard_series = 100;
+    }
+
+    // check query timeout
+    if cfg.limit.query_timeout == 0 {
+        cfg.limit.query_timeout = 600;
+    }
+    if cfg.limit.query_ingester_timeout == 0 {
+        cfg.limit.query_ingester_timeout = cfg.limit.query_timeout;
+    }
+    if cfg.limit.query_querier_timeout == 0 {
+        cfg.limit.query_querier_timeout = cfg.limit.query_timeout;
     }
 
     // check for uds

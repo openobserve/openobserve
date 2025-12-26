@@ -397,6 +397,7 @@ self="top right" max-width="220px">
       :allowAnnotationsAdd="true"
       :allowAlertCreation="allowAlertCreation"
       @show-legends="showLegendsDialog = true"
+      :showLegendsButton="true"
     ></PanelSchemaRenderer>
     <q-dialog v-model="showViewPanel">
       <QueryInspector :metaData="metaData" :data="props.data"></QueryInspector>

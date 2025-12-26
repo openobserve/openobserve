@@ -104,6 +104,19 @@ export const restHandlers = [
   ),
 
   http.get(
+    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/users/roles`,
+    ({ request }) => {
+      return HttpResponse.json({
+        data: [
+          { label: "Admin", value: "admin" },
+          { label: "Editor", value: "editor" },
+          { label: "Viewer", value: "viewer" },
+        ],
+      });
+    },
+  ),
+
+  http.get(
     `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts`,
     ({ request }) => {
       return HttpResponse.json(alerts.alerts.get);
@@ -121,6 +134,27 @@ export const restHandlers = [
     `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/destinations`,
     ({ request }) => {
       return HttpResponse.json(alerts.destinations.get);
+    },
+  ),
+
+  http.get(
+    `${store.state.API_ENDPOINT}/api/v2/${store.state.selectedOrganization.identifier}/folders/alerts`,
+    ({ request }) => {
+      return HttpResponse.json({ folders: [] });
+    },
+  ),
+
+  http.options(
+    `${store.state.API_ENDPOINT}/api/v2/${store.state.selectedOrganization.identifier}/folders/alerts`,
+    ({ request }) => {
+      return new HttpResponse(null, {
+        status: 200,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+        }
+      });
     },
   ),
 

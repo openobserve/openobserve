@@ -1110,7 +1110,11 @@
     "labelFilters": "Label-Filter",
     "operations": "Operationen",
     "promQLBuilder": "PromQL Builder",
-    "options": "Optionen"
+    "options": "Optionen",
+    "SQL": "SQL",
+    "builder": "Baumeister",
+    "custom": "Benutzerdefiniert",
+    "sqlBuilder": "SQL-Generator"
   },
   "home": {
     "streams": "Streams",

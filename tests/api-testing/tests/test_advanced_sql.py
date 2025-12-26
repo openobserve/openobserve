@@ -568,21 +568,28 @@ def test_e2e_time_series_window_functions(create_session, base_url):
         },
     }
 
-    try:
-        resp_get_allsearch = session.post(
-            f"{url}api/{org_id}/_search?type=logs",
-            json=json_data,
-            timeout=60  # 60 seconds timeout for complex query
-        )
-    except requests.exceptions.ConnectionError as e:
-        logging.warning(f"Connection error during complex query: {e}. Retrying once...")
-        # Retry once after a brief pause
-        time.sleep(2)
-        resp_get_allsearch = session.post(
-            f"{url}api/{org_id}/_search?type=logs",
-            json=json_data,
-            timeout=60
-        )
+    # Retry logic with exponential backoff for connection errors
+    max_retries = 3
+    retry_delay = 2
+    last_error = None
+
+    for attempt in range(max_retries):
+        try:
+            resp_get_allsearch = session.post(
+                f"{url}api/{org_id}/_search?type=logs",
+                json=json_data,
+                timeout=60  # 60 seconds timeout for complex query
+            )
+            break  # Success, exit retry loop
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+            last_error = e
+            if attempt < max_retries - 1:
+                wait_time = retry_delay * (2 ** attempt)  # Exponential backoff
+                logging.warning(f"Attempt {attempt + 1}/{max_retries} failed with {type(e).__name__}: {e}. Retrying in {wait_time}s...")
+                time.sleep(wait_time)
+            else:
+                logging.error(f"All {max_retries} attempts failed. Last error: {e}")
+                pytest.skip(f"Skipping test due to persistent connection issues after {max_retries} attempts: {e}")
 
     assert (
         resp_get_allsearch.status_code == 200

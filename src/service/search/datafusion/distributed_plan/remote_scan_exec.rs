@@ -302,13 +302,19 @@ async fn get_remote_batch(
         .as_ref()
         .and_then(|s| s.as_str().try_into().ok());
 
-    // check timeout for ingester
+    // check timeout
     let mut timeout = remote_scan_node.search_infos.timeout;
-    if matches!(search_type, Some(SearchEventType::UI)) && is_ingester {
-        timeout = std::cmp::min(timeout, cfg.limit.query_ingester_timeout);
-    }
     if timeout == 0 {
         timeout = cfg.limit.query_timeout;
+    }
+    // check grpc timeout
+    let mut grpc_timeout = timeout;
+    if matches!(search_type, Some(SearchEventType::UI)) {
+        if is_querier {
+            grpc_timeout = std::cmp::min(grpc_timeout, cfg.limit.query_querier_timeout);
+        } else if is_ingester {
+            grpc_timeout = std::cmp::min(grpc_timeout, cfg.limit.query_ingester_timeout);
+        }
     }
 
     let empty_stream = EmptyStream::new(
@@ -348,7 +354,7 @@ async fn get_remote_batch(
         node.clone(),
         request,
         &context,
-        timeout,
+        grpc_timeout,
     )
     .await
     {
@@ -365,15 +371,7 @@ async fn get_remote_batch(
     let stream = match client.do_get(request).await {
         Ok(stream) => stream,
         Err(e) => {
-            let is_parquet_file_not_found = e.code() == tonic::Code::Internal && {
-                let msg = e.message();
-                msg.find('{')
-                    .and_then(|start| msg.rfind('}').map(|end| &msg[start..=end]))
-                    .and_then(|json_part| infra::errors::ErrorCodes::from_json(json_part).ok())
-                    .map(|err_code| err_code.get_code() == infra::errors::ErrorCodes::SearchParquetFileNotFound.get_code())
-                    .unwrap_or(false)
-            };
-            if e.code() == tonic::Code::Cancelled || e.code() == tonic::Code::DeadlineExceeded || is_parquet_file_not_found {
+            if e.code() == tonic::Code::Cancelled || e.code() == tonic::Code::DeadlineExceeded || is_parquet_file_not_found(&e) {
                 return Ok(get_empty_stream(empty_stream.with_error(e)));
             }
             log::error!(
@@ -426,4 +424,18 @@ async fn get_remote_batch(
     };
 
     Ok(Box::pin(RecordBatchStreamAdapter::new(schema, stream)))
+}
+
+pub fn is_parquet_file_not_found(e: &tonic::Status) -> bool {
+    e.code() == tonic::Code::Internal && {
+        let msg = e.message();
+        msg.find('{')
+            .and_then(|start| msg.rfind('}').map(|end| &msg[start..=end]))
+            .and_then(|json_part| infra::errors::ErrorCodes::from_json(json_part).ok())
+            .map(|err_code| {
+                err_code.get_code()
+                    == infra::errors::ErrorCodes::SearchParquetFileNotFound.get_code()
+            })
+            .unwrap_or(false)
+    }
 }

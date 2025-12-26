@@ -1110,7 +1110,11 @@
     "labelFilters": "Filtros de etiquetas",
     "operations": "Operaciones",
     "promQLBuilder": "Constructor PromQL",
-    "options": "Opciones"
+    "options": "Opciones",
+    "SQL": "SQL",
+    "builder": "Constructor",
+    "custom": "Personalizado",
+    "sqlBuilder": "Constructor SQL"
   },
   "home": {
     "streams": "Transmisiones",

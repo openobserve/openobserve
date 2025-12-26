@@ -1052,7 +1052,6 @@ describe("Index List", async () => {
 
       const result = wrapper.vm.filterFieldFn(rows, "");
 
-      console.log(result);
       expect(result).toEqual([
         { name: "no-fields-found", label: "No matching fields found" },
       ]);
