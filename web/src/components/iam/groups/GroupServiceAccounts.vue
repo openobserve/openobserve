@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="userSearchKey"
             borderless
             dense
-            class=" no-border o2-search-input tw:h-[36px] tw:w-[200px]"
+            class=" no-border o2-search-input tw-h-[36px] tw-w-[200px]"
             placeholder="Search Service Accounts"
           >
             <template #prepend>

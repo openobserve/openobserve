@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #no-data>
         <template v-if="loading">
           <div
-            class="text-center full-width full-height q-mt-lg tw:flex tw:justify-center"
+            class="text-center full-width full-height q-mt-lg tw-flex tw-justify-center"
           >
             <q-spinner-hourglass color="primary" size="lg" />
           </div>
@@ -45,16 +45,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </template>
       <template #top="scope">
-        <div class="tw:flex tw:justify-between tw:w-full">
+        <div class="tw-flex tw-justify-between tw-w-full">
           <div
-            class="q-table__title tw:flex tw:items-center"
+            class="q-table__title tw-flex tw-items-center"
             data-test="alerts-list-title"
           >
             {{ t("dashboard.scheduledDashboards") }}
           </div>
 
-          <div class="tw:flex tw:items-center">
-            <div class="app-tabs-container tw:h-[36px] q-mr-sm">
+          <div class="tw-flex tw-items-center">
+            <div class="app-tabs-container tw-h-[36px] q-mr-sm">
               <app-tabs
                 class="tabs-selection-container"
                 :tabs="reportTypeTabs"
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <q-btn
               data-test="alert-list-add-alert-btn"
-              class="o2-primary-button tw:h-[36px] q-ml-md"
+              class="o2-primary-button tw-h-[36px] q-ml-md"
               :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
               flat
               :label="t(`dashboard.newReport`)"

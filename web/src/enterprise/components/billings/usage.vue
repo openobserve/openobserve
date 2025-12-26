@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
     <div class="q-pa-md " style="height: calc(100vh - 130px); width: 100%;" >
       <div class="row items-baseline justify-between">
-        <div class="row q-table__title tw:font-[600] q-pb-md">
+        <div class="row q-table__title tw-font-[600] q-pb-md">
           {{ t("billing.totalUsage") }}
         </div>
       </div>
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <!-- new section introduced to show the usage for ingestion , search , functions -->
         <div v-if="!dataLoading && Object.keys(usageData).length > 0" class="row wrap justify-evenly q-gutter-md ">
-            <div class="tw:grid tw:grid-cols-3 tw:gap-4 tw:w-full">
+            <div class="tw-grid tw-grid-cols-3 tw-gap-4 tw-w-full">
                 <div class="feature-card">
               <div class="tile-content text-center column justify-between ">
               <!-- Top Section (60%) -->
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 </div>
             </div>
-            <div class="tw:grid tw:grid-cols-3 tw:gap-4 tw:w-full">
+            <div class="tw-grid tw-grid-cols-3 tw-gap-4 tw-w-full">
                 <div class="feature-card">
               <div class="tile-content text-center column justify-between ">
                 <!-- Top Section (60%) -->
@@ -161,8 +161,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Title row -->
                     <div class="row justify-between">
                     <div class="usage-tile-title">Pipelines</div>
-                    <div style="opacity: 0.8;" class="tw:bg-[#E6EFFE] tw:flex tw:items-center tw:justify-center tw:rounded-[9px] tw:h-[33px] tw:w-[33px]">
-                        <img :src="pipelineIcon" class="tw:h-[18px] tw:w-[18px] tw:mx-[7px] tw:my-[7px]" />
+                    <div style="opacity: 0.8;" class="tw-bg-[#E6EFFE] tw-flex tw-items-center tw-justify-center tw-rounded-[9px] tw-h-[33px] tw-w-[33px]">
+                        <img :src="pipelineIcon" class="tw-h-[18px] tw-w-[18px] tw-mx-[7px] tw-my-[7px]" />
                     </div>
                     </div>
                 </div>
@@ -180,8 +180,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Title row -->
                     <div class="row justify-between">
                     <div class="usage-tile-title">Remote Pipelines</div>
-                    <div style="opacity: 0.8;" class="tw:bg-[#F2DCF5] tw:flex tw:items-center tw:justify-center tw:rounded-[9px] tw:h-[33px] tw:w-[33px]">
-                        <img :src="remotePipelineIcon" class="tw:h-[18px] tw:w-[18px] tw:mx-[7px] tw:my-[7px]" />
+                    <div style="opacity: 0.8;" class="tw-bg-[#F2DCF5] tw-flex tw-items-center tw-justify-center tw-rounded-[9px] tw-h-[33px] tw-w-[33px]">
+                        <img :src="remotePipelineIcon" class="tw-h-[18px] tw-w-[18px] tw-mx-[7px] tw-my-[7px]" />
                     </div>
                     </div>
                 </div>
@@ -199,8 +199,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Title row -->
                     <div class="row justify-between">
                     <div class="usage-tile-title">Data Retention</div>
-                    <div style="opacity: 0.8;" class="tw:bg-[#FFF4E6] tw:flex tw:items-center tw:justify-center tw:rounded-[9px] tw:h-[33px] tw:w-[33px]">
-                        <img :src="dataRetentionIcon" class="tw:h-[18px] tw:w-[18px] tw:mx-[7px] tw:my-[7px]" />
+                    <div style="opacity: 0.8;" class="tw-bg-[#FFF4E6] tw-flex tw-items-center tw-justify-center tw-rounded-[9px] tw-h-[33px] tw-w-[33px]">
+                        <img :src="dataRetentionIcon" class="tw-h-[18px] tw-w-[18px] tw-mx-[7px] tw-my-[7px]" />
                     </div>
                     </div>
                 </div>

@@ -17,11 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     :class="[store.state.theme === 'dark' ? 'bg-dark' : 'bg-white']"
-    class="tw:h-full tw:flex tw:flex-col"
+    class="tw-h-full tw-flex tw-flex-col"
     style="width: 94vw"
   >
     <!-- Header -->
-    <div class="incident-detail-header row items-center no-wrap q-px-md tw:p-4">
+    <div class="incident-detail-header row items-center no-wrap q-px-md tw-p-4">
       <div class="col">
         <div class="tw-flex tw-items-center tw-gap-3 tw-flex-wrap">
           <div class="tw-text-[18px]">
@@ -32,13 +32,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="[
               'tw-font-bold tw-px-2 tw-py-1 tw-rounded-md tw-max-w-xs tw-truncate tw-inline-block',
               store.state.theme === 'dark'
-                ? 'tw:text-blue-400 tw:bg-blue-900/50'
-                : 'tw:text-blue-600 tw:bg-blue-50'
+                ? 'tw-text-blue-400 tw-bg-blue-900/50'
+                : 'tw-text-blue-600 tw-bg-blue-50'
             ]"
             data-test="incident-detail-title"
           >
             {{ incidentDetails?.title }}
-            <q-tooltip v-if="incidentDetails && incidentDetails.title.length > 35" class="tw:text-xs">
+            <q-tooltip v-if="incidentDetails && incidentDetails.title.length > 35" class="tw-text-xs">
               {{ incidentDetails.title }}
             </q-tooltip>
           </span>
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator />
 
     <!-- Content -->
-    <div v-if="!loading && incidentDetails" class="tw:flex-1 tw:flex tw:overflow-hidden">
+    <div v-if="!loading && incidentDetails" class="tw-flex-1 tw-flex tw-overflow-hidden">
       <!-- Left Column: Incident Details -->
       <div class="incident-details-column tw-w-[400px] tw-flex-shrink-0 tw-flex tw-flex-col" :class="store.state.theme === 'dark' ? 'tw-border-r tw-border-gray-700' : 'tw-border-r tw-border-gray-200'">
 
@@ -262,33 +262,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           id="timeline"
           :class="[
-            'tw:rounded-lg tw:border tw:mb-4 tw:overflow-hidden',
+            'tw-rounded-lg tw-border tw-mb-4 tw-overflow-hidden',
             store.state.theme === 'dark'
-              ? 'tw:border-gray-700'
-              : 'tw:border-gray-200'
+              ? 'tw-border-gray-700'
+              : 'tw-border-gray-200'
           ]"
         >
           <!-- Header -->
           <div
             :class="[
-              'tw:px-3 tw:py-2 tw:flex tw:items-center tw:justify-between tw:border-b',
+              'tw-px-3 tw-py-2 tw-flex tw-items-center tw-justify-between tw-border-b',
               store.state.theme === 'dark'
-                ? 'tw:bg-gray-800 tw:border-gray-700'
-                : 'tw:bg-gray-100 tw:border-gray-200'
+                ? 'tw-bg-gray-800 tw-border-gray-700'
+                : 'tw-bg-gray-100 tw-border-gray-200'
             ]"
           >
-            <div class="tw:flex tw:items-center tw:gap-2">
-              <q-icon name="schedule" size="16px" class="tw:opacity-80" />
-              <span :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'" class="tw:text-xs tw:font-semibold">
+            <div class="tw-flex tw-items-center tw-gap-2">
+              <q-icon name="schedule" size="16px" class="tw-opacity-80" />
+              <span :class="store.state.theme === 'dark' ? 'tw-text-gray-300' : 'tw-text-gray-700'" class="tw-text-xs tw-font-semibold">
                 Timeline
               </span>
             </div>
             <span
               :class="[
-                'tw:text-[10px] tw:font-medium tw:px-2 tw:py-0.5 tw:rounded-full',
+                'tw-text-[10px] tw-font-medium tw-px-2 tw-py-0.5 tw-rounded-full',
                 store.state.theme === 'dark'
-                  ? 'tw:text-blue-300 tw:bg-blue-900/30'
-                  : 'tw:text-blue-700 tw:bg-blue-100'
+                  ? 'tw-text-blue-300 tw-bg-blue-900/30'
+                  : 'tw-text-blue-700 tw-bg-blue-100'
               ]"
             >
               UTC
@@ -440,9 +440,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Right Column: Tabs and Content -->
-      <div class="tabs-content-column tw:flex-1 tw:flex tw:flex-col tw:overflow-hidden">
+      <div class="tabs-content-column tw-flex-1 tw-flex tw-flex-col tw-overflow-hidden">
         <!-- Tabs -->
-        <div class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:pt-4 tw:pb-2 q-px-md tw:flex-shrink-0">
+        <div class="tw-flex tw-items-center tw-justify-between tw-px-4 tw-pt-4 tw-pb-2 q-px-md tw-flex-shrink-0">
           <q-tabs v-model="activeTab" inline-label dense no-caps align="left">
             <q-tab
               name="incidentAnalysis"
@@ -454,9 +454,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon="notifications_active"
             >
               <template #default>
-                <div class="tw:flex tw:items-center tw:gap-1.5">
+                <div class="tw-flex tw-items-center tw-gap-1.5">
                   <span>Alert Triggers</span>
-                  <span class="tw:text-xs tw:opacity-70">({{ triggers.length }})</span>
+                  <span class="tw-text-xs tw-opacity-70">({{ triggers.length }})</span>
                 </div>
               </template>
             </q-tab>
@@ -525,11 +525,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Tab Content Area -->
-        <div class="tw:flex-1 tw:flex tw:flex-col tw:px-4 tw:pt-2 q-px-md tw:pb-2 tw:overflow-hidden">
+        <div class="tw-flex-1 tw-flex tw-flex-col tw-px-4 tw-pt-2 q-px-md tw-pb-2 tw-overflow-hidden">
         <!-- Incident Analysis Tab Content -->
-        <div v-if="activeTab === 'incidentAnalysis'" class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden">
+        <div v-if="activeTab === 'incidentAnalysis'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
           <!-- Trigger button when no analysis exists and not loading -->
-          <div v-if="!hasExistingRca && !rcaLoading" class="tw:mb-2 tw:flex-shrink-0">
+          <div v-if="!hasExistingRca && !rcaLoading" class="tw-mb-2 tw-flex-shrink-0">
             <q-btn
               size="sm"
               color="primary"
@@ -543,10 +543,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Loading state with streaming content -->
-          <div v-if="rcaLoading" class="rca-container tw:rounded tw:p-3 tw:flex-1 tw:overflow-auto tw:border" :class="isDarkMode ? 'tw:bg-gray-800 tw:border-gray-700' : 'tw:bg-blue-50 tw:border-blue-200'">
-            <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
+          <div v-if="rcaLoading" class="rca-container tw-rounded tw-p-3 tw-flex-1 tw-overflow-auto tw-border" :class="isDarkMode ? 'tw-bg-gray-800 tw-border-gray-700' : 'tw-bg-blue-50 tw-border-blue-200'">
+            <div class="tw-flex tw-items-center tw-gap-2 tw-mb-2">
               <q-spinner size="sm" color="primary" />
-              <span class="tw:text-sm">Analysis in progress...</span>
+              <span class="tw-text-sm">Analysis in progress...</span>
             </div>
             <div
               v-if="rcaStreamContent"
@@ -556,7 +556,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Existing analysis content -->
-          <div v-else-if="hasExistingRca" class="rca-container tw:rounded tw:p-3 tw:flex-1 tw:overflow-auto tw:border" :class="isDarkMode ? 'tw:bg-gray-800 tw:border-gray-700' : 'tw:bg-blue-50 tw:border-blue-200'">
+          <div v-else-if="hasExistingRca" class="rca-container tw-rounded tw-p-3 tw-flex-1 tw-overflow-auto tw-border" :class="isDarkMode ? 'tw-bg-gray-800 tw-border-gray-700' : 'tw-bg-blue-50 tw-border-blue-200'">
             <div
               class="tw-text-sm tw-whitespace-pre-wrap rca-content"
               v-html="formattedRcaContent"
@@ -564,18 +564,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- No analysis yet -->
-          <div v-else class="tw:rounded tw:p-3 tw:text-sm tw:flex-1 tw:border" :class="isDarkMode ? 'tw:bg-gray-700 tw:border-gray-600 tw:text-gray-300' : 'tw:bg-gray-50 tw:border-gray-200 tw:text-gray-500'">
+          <div v-else class="tw-rounded tw-p-3 tw-text-sm tw-flex-1 tw-border" :class="isDarkMode ? 'tw-bg-gray-700 tw-border-gray-600 tw-text-gray-300' : 'tw-bg-gray-50 tw-border-gray-200 tw-text-gray-500'">
             No analysis performed yet
           </div>
         </div>
 
         <!-- Alert Triggers Tab Content -->
-        <div v-if="activeTab === 'alertTriggers'" class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden">
-          <div class="tw:flex-1 tw:overflow-auto">
-            <q-list bordered separator class="tw:rounded">
+        <div v-if="activeTab === 'alertTriggers'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
+          <div class="tw-flex-1 tw-overflow-auto">
+            <q-list bordered separator class="tw-rounded">
               <q-item v-for="trigger in triggers" :key="trigger.alert_id + trigger.alert_fired_at">
                 <q-item-section>
-                  <q-item-label class="tw:font-medium">
+                  <q-item-label class="tw-font-medium">
                     {{ trigger.alert_name }}
                   </q-item-label>
                   <q-item-label caption>
@@ -591,7 +591,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item-section>
               </q-item>
               <q-item v-if="triggers.length === 0">
-                <q-item-section class="tw:text-gray-400">
+                <q-item-section class="tw-text-gray-400">
                   No triggers loaded
                 </q-item-section>
               </q-item>
@@ -603,7 +603,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Loading state -->
-    <div v-if="loading" class="tw:flex-1 tw:flex tw:items-center tw:justify-center">
+    <div v-if="loading" class="tw-flex-1 tw-flex tw-items-center tw-justify-center">
       <q-spinner-hourglass size="lg" color="primary" />
     </div>
   </div>
@@ -1418,23 +1418,23 @@ body.body--dark .muted-text {
 
 /* Responsive scrolling */
 .incident-details-column::-webkit-scrollbar,
-.tabs-content-column .tw:overflow-auto::-webkit-scrollbar {
+.tabs-content-column .tw-overflow-auto::-webkit-scrollbar {
   width: 6px;
 }
 
 .incident-details-column::-webkit-scrollbar-track,
-.tabs-content-column .tw:overflow-auto::-webkit-scrollbar-track {
+.tabs-content-column .tw-overflow-auto::-webkit-scrollbar-track {
   background: transparent;
 }
 
 .incident-details-column::-webkit-scrollbar-thumb,
-.tabs-content-column .tw:overflow-auto::-webkit-scrollbar-thumb {
+.tabs-content-column .tw-overflow-auto::-webkit-scrollbar-thumb {
   background: #cbd5e1;
   border-radius: 3px;
 }
 
 body.body--dark .incident-details-column::-webkit-scrollbar-thumb,
-body.body--dark .tabs-content-column .tw:overflow-auto::-webkit-scrollbar-thumb {
+body.body--dark .tabs-content-column .tw-overflow-auto::-webkit-scrollbar-thumb {
   background: #475569;
 }
 </style>

@@ -15,16 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:h-[calc(100vh-2.5625rem)] tw:overflow-hidden tw:mt-[0.325rem]">
+  <div class="tw-h-[calc(100vh-2.5625rem)] tw-overflow-hidden tw-mt-[0.325rem]">
     <template v-if="isLoading.length">
       <div
-        class="q-pb-lg flex items-center justify-center text-center q-pt-xs tw:h-[calc(100vh-11.875rem)]"
+        class="q-pb-lg flex items-center justify-center text-center q-pt-xs tw-h-[calc(100vh-11.875rem)]"
       >
         <div>
           <q-spinner-hourglass
             color="primary"
             size="2.5rem"
-            class="tw:mx-auto tw:block"
+            class="tw-mx-auto tw-block"
           />
           <div class="text-center full-width">
             Hold on tight, we're loading RUM data.
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-else-if="isRumEnabled || isSessionReplayEnabled">
-      <div v-if="showTabs" class="tw:pb-[0.625rem] tw:px-[0.625rem] q-pt-xs">
+      <div v-if="showTabs" class="tw-pb-[0.625rem] tw-px-[0.625rem] q-pt-xs">
         <AppTabs
           :show="showTabs"
           :tabs="tabs"
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <router-view v-slot="{ Component }">
         <template v-if="$route.meta.keepAlive">
           <keep-alive
-            :class="showTabs ? 'tw:h-[calc(100%-53px)]' : 'tw:h-full'"
+            :class="showTabs ? 'tw-h-[calc(100%-53px)]' : 'tw-h-full'"
           >
             <component
               :is="Component"
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </keep-alive>
         </template>
         <template v-else>
-          <div :class="showTabs ? 'tw:h-[calc(100%-53px)]' : 'tw:h-full'">
+          <div :class="showTabs ? 'tw-h-[calc(100%-53px)]' : 'tw-h-full'">
             <component
               :is="Component"
               :isRumEnabled="isRumEnabled"
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <div class="">
         <div
-          class="card-container q-pa-lg tw:mx-[0.625rem] tw:max-w-full tw:max-h-full tw:h-[calc(100vh - 3.125rem)]"
+          class="card-container q-pa-lg tw-mx-[0.625rem] tw-max-w-full tw-max-h-full tw-h-[calc(100vh - 3.125rem)]"
         >
           <div class="q-pb-lg">
             <div class="text-left text-h6 text-bold q-pb-md">
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <q-btn
-            class="o2-primary-button tw:h-[36px]"
+            class="o2-primary-button tw-h-[36px]"
             flat
             no-caps
             :title="t('rum.getStartedTitle')"

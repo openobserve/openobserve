@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #bottom="scope">
         <q-btn
           data-test="qm-multiple-cancel-query-btn"
-          class="o2-secondary-button no-border tw:h-[36px]"
+          class="o2-secondary-button no-border tw-h-[36px]"
           flat
           outline
           padding="sm lg"

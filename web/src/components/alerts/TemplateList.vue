@@ -17,12 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="q-pa-none" style="height: calc(100vh - 88px); min-height: inherit">
     <div v-if="!showImportTemplate && !showTemplateEditor" >
-      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
+      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[68px] tw-border-b-[1px]"
       >
-        <div class="q-table__title tw:font-[600]" data-test="alert-templates-list-title">
+        <div class="q-table__title tw-font-[600]" data-test="alert-templates-list-title">
             {{ t("alert_templates.header") }}
           </div>
-          <div class="tw:flex tw:justify-end">
+          <div class="tw-flex tw-justify-end">
             <q-input
               v-model="filterQuery"
               borderless
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-input>
           <q-btn
-            class="o2-secondary-button q-ml-sm tw:h-[36px]"
+            class="o2-secondary-button q-ml-sm tw-h-[36px]"
             no-caps
             flat
             :label="t(`dashboard.import`)"
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-btn
             data-test="template-list-add-btn"
-            class="o2-primary-button q-ml-sm tw:h-[36px]"
+            class="o2-primary-button q-ml-sm tw-h-[36px]"
             no-caps
             flat
             :label="t(`alert_templates.add`)"

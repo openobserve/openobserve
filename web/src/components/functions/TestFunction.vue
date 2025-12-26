@@ -1,11 +1,11 @@
 <template>
   <div
     data-test="test-function-section"
-    class="tw:flex tw:items-center tw:flex-wrap q-pb-sm"
+    class="tw-flex tw-items-center tw-flex-wrap q-pb-sm"
   >
     <div
       data-test="test-function-query-section"
-      class="test-function-query-container tw:w-[100%] tw:mt-2"
+      class="test-function-query-container tw-w-[100%] tw-mt-2"
     >
       <q-form ref="querySelectionRef" @submit="getResults">
         <FullViewContainer
@@ -18,14 +18,14 @@
             <q-icon
               v-if="!!sqlQueryErrorMsg"
               name="info"
-              class="tw:text-red-600 tw:mx-1 tw:cursor-pointer"
+              class="tw-text-red-600 tw-mx-1 tw-cursor-pointer"
               size="16px"
             >
               <q-tooltip
                 anchor="center right"
                 self="center left"
                 :offset="[10, 10]"
-                class="tw:text-[12px]"
+                class="tw-text-[12px]"
               >
                 {{ sqlQueryErrorMsg }}
               </q-tooltip>
@@ -34,7 +34,7 @@
           <template #right>
             <q-btn
               :label="t('search.runQuery')"
-              class="test-function-run-query-btn text-bold tw:ml-[12px] no-border"
+              class="test-function-run-query-btn text-bold tw-ml-[12px] no-border"
               padding="sm md"
               icon="search"
               no-caps
@@ -47,20 +47,20 @@
           </template>
         </FullViewContainer>
         <div
-          class="tw:flex tw:items-center tw:flex-wrap q-px-md q-py-sm tw:w-[100%]"
+          class="tw-flex tw-items-center tw-flex-wrap q-px-md q-py-sm tw-w-[100%]"
           :class="
-            store.state.theme === 'dark' ? 'tw:bg-gray-950' : ' tw:bg-white'
+            store.state.theme === 'dark' ? 'tw-bg-gray-950' : ' tw-bg-white'
           "
           v-show="expandState.query"
           data-test="test-function-query-editor-section"
         >
-          <div class="function-stream-select-input tw:w-[120px] q-pr-md">
+          <div class="function-stream-select-input tw-w-[120px] q-pr-md">
             <div
-              class="tw:text-[12px]"
+              class="tw-text-[12px]"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-gray-200'
-                  : 'tw:text-gray-700'
+                  ? 'tw-text-gray-200'
+                  : 'tw-text-gray-700'
               "
             >
               {{ t("alerts.streamType") + " *" }}
@@ -82,13 +82,13 @@
               style="width: 100px"
             />
           </div>
-          <div class="function-stream-select-input tw:w-[300px]">
+          <div class="function-stream-select-input tw-w-[300px]">
             <div
-              class="tw:text-[12px]"
+              class="tw-text-[12px]"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-gray-200'
-                  : 'tw:text-gray-700'
+                  ? 'tw-text-gray-200'
+                  : 'tw-text-gray-700'
               "
             >
               {{ t("alerts.stream_name") + " *" }}
@@ -114,13 +114,13 @@
               :rules="[(val: any) => !!val || '']"
             />
           </div>
-          <div class="functions-duration-input tw:w-[330px]">
+          <div class="functions-duration-input tw-w-[330px]">
             <div
-              class="tw:text-[12px]"
+              class="tw-text-[12px]"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-gray-200'
-                  : 'tw:text-gray-700'
+                  ? 'tw-text-gray-200'
+                  : 'tw-text-gray-700'
               "
             >
               {{ t("common.duration") + " *" }}
@@ -128,7 +128,7 @@
 
             <DateTime
               label="Start Time"
-              class="q-py-xs tw:w-full"
+              class="q-py-xs tw-w-full"
               auto-apply
               :default-type="dateTime.type"
               :default-absolute-time="{
@@ -142,17 +142,17 @@
           </div>
 
           <div
-            class="tw:text-[12px] tw:w-[100%] q-mt-xs"
+            class="tw-text-[12px] tw-w-[100%] q-mt-xs"
             :class="
               store.state.theme === 'dark'
-                ? 'tw:text-gray-200'
-                : 'tw:text-gray-700'
+                ? 'tw-text-gray-200'
+                : 'tw-text-gray-700'
             "
           >
             {{ t("common.query") + " *" }}
           </div>
           <div
-            class="tw:border-[1px] tw:border-gray-200 tw:relative tw:w-[100%]"
+            class="tw-border-[1px] tw-border-gray-200 tw-relative tw-w-[100%]"
           >
             <query-editor
               data-test="vrl-function-test-sql-editor"
@@ -163,9 +163,9 @@
               language="sql"
             />
             <div
-              class="text-negative q-pa-xs invalid-sql-error tw:min-h-[22px]"
+              class="text-negative q-pa-xs invalid-sql-error tw-min-h-[22px]"
             >
-              <span v-show="!!sqlQueryErrorMsg" class="tw:text-[13px]">
+              <span v-show="!!sqlQueryErrorMsg" class="tw-text-[13px]">
                 Error: {{ sqlQueryErrorMsg }}</span
               >
             </div>
@@ -185,24 +185,24 @@
         <template #left>
           <div
             v-if="loading.events"
-            class="text-weight-bold tw:flex tw:items-center tw:text-gray-500 tw:ml-2 tw:text-[13px]"
+            class="text-weight-bold tw-flex tw-items-center tw-text-gray-500 tw-ml-2 tw-text-[13px]"
           >
             <q-spinner-hourglass size="18px" />
-            <div class="tw:relative tw:top-[2px]">
+            <div class="tw-relative tw-top-[2px]">
               {{ t("confirmDialog.loading") }}
             </div>
           </div>
           <q-icon
             v-if="!!eventsErrorMsg"
             name="info"
-            class="tw:text-red-600 tw:mx-1 tw:cursor-pointer"
+            class="tw-text-red-600 tw-mx-1 tw-cursor-pointer"
             size="16px"
           >
             <q-tooltip
               anchor="center right"
               self="center left"
               :offset="[10, 10]"
-              class="tw:text-[12px]"
+              class="tw-text-[12px]"
             >
               {{ eventsErrorMsg }}
             </q-tooltip>
@@ -215,13 +215,13 @@
             :size="'6px'"
             :imageHeight="'16px'"
             :imageWidth="'16px'"
-            :class="'tw:px-2 tw:mr-4'"
+            :class="'tw-px-2 tw-mr-4'"
            />
           </template>
       </FullViewContainer>
       <div
         v-show="expandState.events"
-        class="tw:border-[1px] tw:border-gray-200 tw:relative"
+        class="tw-border-[1px] tw-border-gray-200 tw-relative"
         data-test="test-function-input-editor-section"
       >
         <query-editor
@@ -245,10 +245,10 @@
         <template #left>
           <div
             v-if="loading.output"
-            class="text-subtitle2 text-weight-bold tw:flex tw:items-center tw:text-gray-500 tw:ml-2 tw:text-[13px]"
+            class="text-subtitle2 text-weight-bold tw-flex tw-items-center tw-text-gray-500 tw-ml-2 tw-text-[13px]"
           >
             <q-spinner-hourglass size="18px" />
-            <div class="tw:relative tw:top-[2px]">
+            <div class="tw-relative tw-top-[2px]">
               {{ t("confirmDialog.loading") }}
             </div>
           </div>
@@ -256,14 +256,14 @@
           <q-icon
             v-if="!!outputEventsErrorMsg"
             name="info"
-            class="tw:text-red-600 tw:mx-1 tw:cursor-pointer"
+            class="tw-text-red-600 tw-mx-1 tw-cursor-pointer"
             size="16px"
           >
             <q-tooltip
               anchor="center right"
               self="center left"
               :offset="[10, 10]"
-              class="tw:text-[12px]"
+              class="tw-text-[12px]"
             >
               {{ outputEventsErrorMsg }}
             </q-tooltip>
@@ -273,24 +273,24 @@
 
       <div
         v-show="expandState.output"
-        class="tw:border-[1px] tw:border-gray-200 tw:relative"
+        class="tw-border-[1px] tw-border-gray-200 tw-relative"
         data-test="test-function-output-editor-section"
       >
         <div
           v-if="!outputEvents"
-          class="tw:absolute tw:z-10 tw:flex tw:flex-col tw:justify-center tw:items-center tw:w-full tw:h-full tw:opacity-90"
+          class="tw-absolute tw-z-10 tw-flex tw-flex-col tw-justify-center tw-items-center tw-w-full tw-h-full tw-opacity-90"
         >
           <q-icon
             :name="outlinedLightbulb"
             size="40px"
-            class="tw:text-orange-400"
+            class="tw-text-orange-400"
           />
           <div
-            class="tw:text-[15px] tw:text-gray-600"
+            class="tw-text-[15px] tw-text-gray-600"
             :class="
               store.state.theme === 'dark'
-                ? 'tw:text-gray-200'
-                : 'tw:text-gray-600'
+                ? 'tw-text-gray-200'
+                : 'tw-text-gray-600'
             "
           >
             {{ outputMessage }}

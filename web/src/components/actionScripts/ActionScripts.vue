@@ -18,13 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div data-test="action-scripts-list-page">
-    <div v-if="!showAddActionScriptDialog" class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
-      <div class="card-container tw:mb-[0.625rem]">
-        <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:w-full tw:h-[68px]">
-          <div class="tw:font-[600] tw:text-[20px]" data-test="alerts-list-title">
+    <div v-if="!showAddActionScriptDialog" class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem] q-pt-xs">
+      <div class="card-container tw-mb-[0.625rem]">
+        <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-w-full tw-h-[68px]">
+          <div class="tw-font-[600] tw-text-[20px]" data-test="alerts-list-title">
                   {{ t("actions.header") }}
                 </div>
-                <div class="tw:full-width tw:flex tw:items-center tw:justify-end">
+                <div class="tw-full-width tw-flex tw-items-center tw-justify-end">
                   <q-input
                     v-model="filterQuery"
                     borderless
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-input>
                 <q-btn
                   data-test="action-list-add-btn"
-                  class="q-ml-sm o2-primary-button tw:h-[36px]"
+                  class="q-ml-sm o2-primary-button tw-h-[36px]"
                   flat
                   no-caps
                   :label="t(`actions.add`)"
@@ -48,8 +48,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
         </div>
       </div>
-      <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-        <div class="card-container tw:h-[calc(100vh-124px)]">
+      <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
+        <div class="card-container tw-h-[calc(100vh-124px)]">
           <q-table
             data-test="action-scripts-table"
             ref="qTable"
@@ -185,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <template v-else>
-      <div class="tw:w-full">
+      <div class="tw-w-full">
         <EditScript
           :isUpdated="isUpdated"
           @update:list="refreshList"

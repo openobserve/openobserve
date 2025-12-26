@@ -2,14 +2,14 @@
   <div class="chat-container" :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
     <div class="chat-content-wrapper" :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
       <div class="chat-header" :style="{ height: headerHeight ? headerHeight + 'px' : '' }">
-        <div class="chat-title tw:flex tw:justify-between tw:items-center tw:w-full">
+        <div class="chat-title tw-flex tw-justify-between tw-items-center tw-w-full">
 
-          <div class="tw:flex tw:items-center tw:gap-2">
+          <div class="tw-flex tw-items-center tw-gap-2">
             <q-avatar size="24px">
               <img :src="o2AiTitleLogo" />
             </q-avatar>
-            <div class="tw:flex tw:items-center">
-              <span class="tw:mr-[5.5px]">SRE Assistant</span>
+            <div class="tw-flex tw-items-center">
+              <span class="tw-mr-[5.5px]">SRE Assistant</span>
             </div>
 
           </div>
@@ -28,7 +28,7 @@
                       dense
                     filled
                     borderless
-                      class="tw:mb-2"
+                      class="tw-mb-2"
                     >
                     <template #prepend>
                     <q-icon name="search" />
@@ -67,7 +67,7 @@
           </div>
         </div>
       </div>
-      <q-separator class="tw:bg-[#DBDBDB]" />
+      <q-separator class="tw-bg-[#DBDBDB]" />
       
       <!-- History Panel -->
       <q-dialog v-model="showHistory" position="right">
@@ -106,22 +106,22 @@
         <div class="messages-container " ref="messagesContainer" @scroll="checkIfShouldAutoScroll">
           <!-- Context annotation -->
           <div v-if="contextData" class="context-annotation" :class="store.state.theme == 'dark' ? 'context-annotation-dark' : 'context-annotation-light'">
-            <q-icon name="info" size="14px" class="tw:mr-1" />
-            <span class="tw:text-xs">
+            <q-icon name="info" size="14px" class="tw-mr-1" />
+            <span class="tw-text-xs">
               <template v-if="contextType === 'alert'">
                 Alert: <strong>{{ contextData.name }}</strong>
               </template>
               <template v-else-if="contextType === 'incident'">
                 Incident: <strong>{{ contextData.title || 'Untitled' }}</strong>
-                <span v-if="contextData.severity" class="tw:ml-2 tw:opacity-75">{{ contextData.severity }}</span>
+                <span v-if="contextData.severity" class="tw-ml-2 tw-opacity-75">{{ contextData.severity }}</span>
               </template>
             </span>
           </div>
 
           <div v-if="chatMessages.length === 0" class="welcome-section ">
-            <div class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full ">
+            <div class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full ">
               <img :src="o2AiTitleLogo" />
-              <span class="tw:text-[14px] tw:font-[600] tw:text-center">AI native  observability</span>
+              <span class="tw-text-[14px] tw-font-[600] tw-text-center">AI native  observability</span>
             </div>
           </div>
           <div v-for="(message, index) in processedMessages" 
@@ -150,16 +150,16 @@
                         color="primary"
                         @click="copyToClipboard(block.content)"
                       >
-                      <div class="tw:flex tw:items-center">
+                      <div class="tw-flex tw-items-center">
                         <q-icon size="16px" name="content_copy" />
-                        <span class="tw:ml-1" >Copy</span>
+                        <span class="tw-ml-1" >Copy</span>
                       </div>
                       </q-btn>
                     </div>
                     <span class="generated-code-block">
                       <code :class="['hljs', block.language]" v-html="block.highlightedContent"></code>
                     </span>
-                    <div class="code-block-footer code-block-theme tw:flex tw:items-center tw:justify-between tw:w-full">
+                    <div class="code-block-footer code-block-theme tw-flex tw-items-center tw-justify-between tw-w-full">
                       <q-btn
                         flat
                         dense
@@ -168,12 +168,12 @@
                         color="primary"
                         @click="retryGeneration(message)"
                       >
-                      <div class="tw:flex tw:items-center">
+                      <div class="tw-flex tw-items-center">
                         <q-icon size="16px" name="refresh" />
-                        <span class="tw:ml-1" >Retry</span>
+                        <span class="tw-ml-1" >Retry</span>
                       </div>
                       </q-btn>
-                      <div v-if="false" class="tw:flex tw:items-center tw:gap-2">
+                      <div v-if="false" class="tw-flex tw-items-center tw-gap-2">
                         <q-btn flat dense :icon="outlinedThumbUpOffAlt" color="primary" @click="likeCodeBlock(message)"  />
                         <q-btn flat dense :icon="outlinedThumbDownOffAlt" color="primary" @click="dislikeCodeBlock(message)"  />
                       </div>
@@ -185,7 +185,7 @@
               </div>
             </div>
           </div>
-          <div v-if="isLoading" id="loading-indicator" class="tw:flex tw:items-center tw:gap-2 tw:p-4">
+          <div v-if="isLoading" id="loading-indicator" class="tw-flex tw-items-center tw-gap-2 tw-p-4">
             <q-spinner-dots color="primary" size="2em" />
             <span style="font-size: 14px; opacity: 0.7;">{{ currentObservingMessage }}</span>
           </div>
@@ -210,7 +210,7 @@
           </q-btn>
         </div>
       </div>
-      <div class="chat-input-wrapper tw:flex tw:flex-col q-ma-md" @click="focusInput">
+      <div class="chat-input-wrapper tw-flex tw-flex-col q-ma-md" @click="focusInput">
         <q-input
           ref="chatInput"
           v-model="inputMessage"
@@ -227,7 +227,7 @@
           flat
         >
         </q-input>
-        <div class="tw:flex tw:items-center tw:justify-end tw:mt-2 tw:gap-2" :class="store.state.theme == 'dark' ? 'dark-mode-bottom-bar' : 'light-mode-bottom-bar'">
+        <div class="tw-flex tw-items-center tw-justify-end tw-mt-2 tw-gap-2" :class="store.state.theme == 'dark' ? 'dark-mode-bottom-bar' : 'light-mode-bottom-bar'">
           <!-- Send button - shown when not loading -->
           <q-btn
             v-if="!isLoading"
@@ -236,7 +236,7 @@
             round
             dense
             flat
-            class="tw:ml-1 send-button"
+            class="tw-ml-1 send-button"
           >
             <q-icon name="send" size="16px" color="white" />
           </q-btn>
@@ -248,7 +248,7 @@
             round
             dense
             flat
-            class="tw:ml-1 stop-button"
+            class="tw-ml-1 stop-button"
           >
             <q-icon name="stop" size="16px" color="white" />
           </q-btn>

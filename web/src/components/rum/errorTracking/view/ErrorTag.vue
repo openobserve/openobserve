@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tag-block row items-center no-wrap q-mr-sm q-mt-sm">
     <div class="q-px-md">{{ tag.key }}</div>
     <q-separator data-test="separator" vertical />
-    <div class="q-px-md tw:bg-[var(--o2-table-header-bg)] tw:break-all">
+    <div class="q-px-md tw-bg-[var(--o2-table-header-bg)] tw-break-all">
       {{ tag.value }}
     </div>
   </div>

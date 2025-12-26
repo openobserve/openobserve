@@ -66,7 +66,7 @@ describe('FilterCondition.vue Branch Coverage', () => {
       });
 
       // Branch: index == 0 ? 'if' : computedLabel (line 5)
-      const labelElement = wrapper.find('.tw:text-sm');
+      const labelElement = wrapper.find('.tw-text-sm');
       expect(labelElement.text().trim()).toBe('if');
     });
 
@@ -92,7 +92,7 @@ describe('FilterCondition.vue Branch Coverage', () => {
       });
 
       // Branch: computedLabel (when not first in group) - CSS lowercase applied
-      const labelElement = wrapper.find('.tw:lowercase');
+      const labelElement = wrapper.find('.tw-lowercase');
       // Text content is still 'OR' but CSS applies text-transform: lowercase
       expect(labelElement.exists()).toBe(true);
       expect(labelElement.text().trim()).toBe('OR'); // Content is uppercase, CSS transforms to lowercase visually
@@ -116,7 +116,7 @@ describe('FilterCondition.vue Branch Coverage', () => {
       });
 
       // Branch: index == 0 && depth == 0 shows "if"
-      const labelElement = wrapper.find('.tw:text-sm');
+      const labelElement = wrapper.find('.tw-text-sm');
       expect(labelElement.text().trim()).toBe('if');
     });
 
@@ -138,7 +138,7 @@ describe('FilterCondition.vue Branch Coverage', () => {
       });
 
       // Branch: isFirstInGroup && depth > 0 shows empty space (no label)
-      const labelContainer = wrapper.find('.tw:min-w-\\[60px\\]');
+      const labelContainer = wrapper.find('.tw-min-w-\\[60px\\]');
       expect(labelContainer.exists()).toBe(true);
       // Should not contain operator label or "if"
       expect(labelContainer.text().trim()).toBe('');

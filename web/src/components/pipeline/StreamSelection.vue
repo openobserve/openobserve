@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex justify-start q-mt-lg q-px-md">
         <q-btn
           v-close-popup
-          class="q-mr-md o2-secondary-button tw:h-[36px]"
+          class="q-mr-md o2-secondary-button tw-h-[36px]"
           :label="t('alerts.cancel')"
           no-caps
           flat
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="add-pipeline-cancel-btn"
         />
         <q-btn
-          class="o2-primary-button no-border tw:h-[36px]"
+          class="o2-primary-button no-border tw-h-[36px]"
           :label="t('alerts.save')"
           type="submit"
           no-caps

@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:px-[0.625rem] q-mt-xs tw:pb-[0.625rem]">
+  <div class="tw-w-full tw-h-full tw-px-[0.625rem] q-mt-xs tw-pb-[0.625rem]">
     <div data-test="add-report-section" class="full-width create-report-page">
-      <div class="row items-center no-wrap card-container tw:py-[0.675rem] tw:h-[64px] tw:px-[0.675rem] tw:mb-[0.675rem] ">
+      <div class="row items-center no-wrap card-container tw-py-[0.675rem] tw-h-[64px] tw-px-[0.675rem] tw-mb-[0.675rem] ">
         <div class="flex items-center">
           <div
             data-test="add-report-back-btn"
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-      <div class="flex card-container tw:mb-[0.675rem]" style="height: calc(100vh - 192px); overflow: auto">
+      <div class="flex card-container tw-mb-[0.675rem]" style="height: calc(100vh - 192px); overflow: auto">
         <div ref="addAlertFormRef" class="q-px-lg q-my-md" style="width: 1024px">
           <q-form
             class="create-report-form"
@@ -103,12 +103,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
 
-            <div class="tw:flex tw:items-center tw:pt-4">
+            <div class="tw-flex tw-items-center tw-pt-4">
               <q-toggle
                 data-test="report-cached-toggle-btn"
                 v-model="isCachedReport"
                 size="lg"
-                class="q-pl-0 o2-toggle-button-lg tw:h-[36px] tw:ml-1"
+                class="q-pl-0 o2-toggle-button-lg tw-h-[36px] tw-ml-1"
                 :label="t('reports.cachedReport')"
               />
               <q-icon
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="showInfoTooltip"
                   anchor="center end"
                   self="center left"
-                  class="tw:text-[12px]"
+                  class="tw-text-[12px]"
                 >
                   Note: Cached reports are stored for quick access to dashboards;
                   sharing is disabled for these reports.</q-tooltip
@@ -309,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-btn
                     data-test="add-report-step1-continue-btn"
                     @click="step = 2"
-                    class="o2-primary-button tw:h-[36px]"
+                    class="o2-primary-button tw-h-[36px]"
                     :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
                     flat
                     no-caps
@@ -452,9 +452,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </template>
                   <template v-else>
-                    <div class="q-mt-md tw:flex tw:justify-start tw:items-center">
+                    <div class="q-mt-md tw-flex tw-justify-start tw-items-center">
                       <div
-                        class="tw:flex tw:justify-center tw:align-center"
+                        class="tw-flex tw-justify-center tw-align-center"
                         style="
                           border: 1px solid #d7d7d7;
                           width: fit-content;
@@ -489,7 +489,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <q-tooltip
                           anchor="center end"
                           self="center left"
-                          class="tw:text-[12px]"
+                          class="tw-text-[12px]"
                         >
                           "Schedule Now" will schedule the report using the
                           current date, time, and timezone.<br />
@@ -677,7 +677,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="add-report-step2-back-btn"
                     flat
                     @click="step = 1"
-                    class="o2-secondary-button tw:h-[36px] q-ml-sm"
+                    class="o2-secondary-button tw-h-[36px] q-ml-sm"
                     :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                     :label="'Back'"
                     no-caps
@@ -686,7 +686,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="!isCachedReport"
                     data-test="add-report-step2-continue-btn"
                     @click="step = 3"
-                    class="o2-primary-button tw:h-[36px] q-ml-md"
+                    class="o2-primary-button tw-h-[36px] q-ml-md"
                     :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
                     flat
                     no-caps
@@ -772,7 +772,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="add-report-step3-back-btn"
                     flat
                     @click="step = 2"
-                    class="o2-secondary-button tw:h-[36px] q-ml-sm"
+                    class="o2-secondary-button tw-h-[36px] q-ml-sm"
                     :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                     :label="'Back'"
                     no-caps
@@ -786,7 +786,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     </div>
       <div
-        class="flex justify-end q-px-md full-width tw:py-3 card-container"
+        class="flex justify-end q-px-md full-width tw-py-3 card-container"
         style="position: sticky; bottom: 0.375rem; z-index: 2"
         :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         :style="{
@@ -798,7 +798,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <q-btn
           data-test="add-report-cancel-btn"
-          class="q-mr-md o2-secondary-button tw:h-[36px]"
+          class="q-mr-md o2-secondary-button tw-h-[36px]"
           :label="t('alerts.cancel')"
           no-caps
           flat
@@ -806,7 +806,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <q-btn
           data-test="add-report-save-btn"
-          class="o2-primary-button no-border tw:h-[36px]"
+          class="o2-primary-button no-border tw-h-[36px]"
           :label="t('alerts.save')"
           type="submit"
           no-caps

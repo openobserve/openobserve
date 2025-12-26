@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div>
       <div class="row items-center no-wrap">
         <span :class="`fi fi-${column.country_iso_code} q-mr-sm`" />
-        <div class="tw:text-[0.75rem]">{{ column.country }}</div>
+        <div class="tw-text-[0.75rem]">{{ column.country }}</div>
       </div>
       <div class="row q-mt-xs items-center">
         <div class="text-grey-8">

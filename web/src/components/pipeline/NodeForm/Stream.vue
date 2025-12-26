@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
-    <div class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between">
+    <div class="stream-routing-title q-pb-sm q-pl-md tw-flex tw-items-center tw-justify-between">
       {{ t("pipeline.streamTitle") }}
       <div>
           <q-btn v-close-popup="true" round flat icon="cancel" >
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-toggle
         v-if="selectedNodeType == 'input'"
         data-test="create-stream-toggle"
-        class="q-mb-sm tw:mr-3 tw:h-[36px] o2-toggle-button-lg"
+        class="q-mb-sm tw-mr-3 tw-h-[36px] o2-toggle-button-lg"
         size="lg"
         :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
         :label="isUpdating ? 'Edit Stream' : 'Create new Stream'"
@@ -115,10 +115,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           </div>
           <div v-if="selectedNodeType == 'output'" style="font-size: 14px;" class="note-message" >
-            <span class="tw:flex tw:items-center"> <q-icon name="info" class="q-pr-xs"</q-icon> Select an existing stream from the list or enter the name to create a new one</span>
-            <span class="tw:flex tw:items-center"> <q-icon name="info" class="q-pr-xs"</q-icon> Enrichment_tables as destination stream is only available for scheduled pipelines</span>
+            <span class="tw-flex tw-items-center"> <q-icon name="info" class="q-pr-xs"</q-icon> Select an existing stream from the list or enter the name to create a new one</span>
+            <span class="tw-flex tw-items-center"> <q-icon name="info" class="q-pr-xs"</q-icon> Enrichment_tables as destination stream is only available for scheduled pipelines</span>
 
-          <span class="tw:flex"> <q-icon name="info" class="q-pr-xs q-pt-xs"</q-icon> Use curly braces '{}' to configure stream name dynamically. e.g. static_text_{fieldname}_postfix. Static text before/after {} is optional</span>
+          <span class="tw-flex"> <q-icon name="info" class="q-pr-xs q-pt-xs"</q-icon> Use curly braces '{}' to configure stream name dynamically. e.g. static_text_{fieldname}_postfix. Static text before/after {} is optional</span>
 
             </div>
         </div>
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-btn
             v-if="pipelineObj.isEditNode"
             data-test="input-node-stream-delete-btn"
-            class="o2-secondary-button tw:h-[36px] q-mr-md"
+            class="o2-secondary-button tw-h-[36px] q-mr-md"
             color="negative"
             flat
             :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-btn>
           <q-btn
             data-test="input-node-stream-cancel-btn"
-            class="o2-secondary-button tw:h-[36px]"
+            class="o2-secondary-button tw-h-[36px]"
             :label="t('alerts.cancel')"
             no-caps
             flat
@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             data-test="input-node-stream-save-btn"
             :label="t('alerts.save')"
-            class="no-border q-ml-md o2-primary-button tw:h-[36px]"
+            class="no-border q-ml-md o2-primary-button tw-h-[36px]"
             :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             flat
             no-caps

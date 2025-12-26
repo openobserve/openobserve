@@ -224,7 +224,7 @@ describe("SyntaxGuide", () => {
       expect(button.classes()).toContain("q-pa-xs");
       expect(button.classes()).toContain("syntax-guide-button");
       // Verify Tailwind classes are present
-      expect(button.classes()).toContain("tw:cursor-pointer");
+      expect(button.classes()).toContain("tw-cursor-pointer");
     });
   });
 

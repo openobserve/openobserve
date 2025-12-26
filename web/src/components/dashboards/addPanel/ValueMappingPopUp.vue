@@ -39,7 +39,7 @@
         data-test="dashboard-tab-settings-tab-name-edit-cancel"
       ></q-btn>
     </div>
-    <div class="tw:mb-4">
+    <div class="tw-mb-4">
       <draggable
         v-model="editedValueMapping"
         :options="dragOptions"
@@ -51,7 +51,7 @@
           :key="index"
           class="draggable-row"
         >
-          <div class="draggable-handle tw:self-center">
+          <div class="draggable-handle tw-self-center">
             <q-icon
               name="drag_indicator"
               color="grey-13"
@@ -59,7 +59,7 @@
               :data-test="`dashboard-addpanel-config-value-mapping-drag-handle-${index}`"
             />
           </div>
-          <div class="draggable-content tw:flex tw:gap-x-6">
+          <div class="draggable-content tw-flex tw-gap-x-6">
             <q-select
               v-model="mapping.type"
               label="Type"
@@ -71,11 +71,11 @@
               behavior="menu"
               borderless
               dense
-              class="q-mb-xs tw:flex-1 o2-custom-select-dashboard"
+              class="q-mb-xs tw-flex-1 o2-custom-select-dashboard"
              hide-bottom-space></q-select>
             <div
               v-if="mapping.type === 'value'"
-              class="input-container tw:flex-1"
+              class="input-container tw-flex-1"
             >
               <q-input
                 v-model="mapping.value"
@@ -87,7 +87,7 @@
             </div>
             <div
               v-if="mapping.type === 'regex'"
-              class="input-container tw:flex-1"
+              class="input-container tw-flex-1"
             >
               <q-input
                 v-model="mapping.pattern"
@@ -99,7 +99,7 @@
             </div>
             <div
               v-if="mapping.type === 'range'"
-              class="input-container tw:flex-1"
+              class="input-container tw-flex-1"
             >
               <q-input
                 v-model="mapping.from"
@@ -111,7 +111,7 @@
               <q-input
                 v-model="mapping.to"
                 label="To"
-                class="input-spacing tw:flex-1"
+                class="input-spacing tw-flex-1"
                 dense
                 :data-test="`dashboard-addpanel-config-value-mapping-to-input-${index}`"
                borderless hide-bottom-space/>
@@ -119,14 +119,14 @@
             <q-input
               v-model="mapping.text"
               label="Display Value"
-              class="input-spacing tw:flex-1"
+              class="input-spacing tw-flex-1"
               dense
               :data-test="`dashboard-addpanel-config-value-mapping-text-input-${index}`"
              borderless hide-bottom-space/>
-            <div class="color-section tw:flex-1">
+            <div class="color-section tw-flex-1">
               <div
                 v-if="mapping.color !== null"
-                class="tw:items-center tw:flex"
+                class="tw-items-center tw-flex"
               >
                 <q-input
                   v-model="mapping.color"
@@ -145,19 +145,19 @@
                 <q-icon
                   :name="outlinedCancel"
                   style="width: 10%"
-                  class="cursor-pointer tw:align-middle"
+                  class="cursor-pointer tw-align-middle"
                   size="xs"
                   title="Remove color"
                   @click="removeColorByIndex(index)"
                 />
               </div>
-              <div v-else class="tw:w-full">
+              <div v-else class="tw-w-full">
                 <q-btn
                   label="Set color"
                   no-caps
                   flat
                   dense
-                  class="tw:text-blue-700 tw:font-semibold tw:w-full"
+                  class="tw-text-blue-700 tw-font-semibold tw-w-full"
                   @click="setColorByIndex(index)"
                 />
               </div>

@@ -19,10 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page>
     <div v-if="!showAddJSTransformDialog">
-      <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-        <div class="card-container tw:mb-[0.625rem]">
-          <div class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:h-[68px]">
-            <div class="q-table__title tw:font-[600]">
+      <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
+        <div class="card-container tw-mb-[0.625rem]">
+          <div class="tw-flex tw-items-center tw-justify-between tw-py-3 tw-px-4 tw-h-[68px]">
+            <div class="q-table__title tw-font-[600]">
                 {{ t("function.header") }}
               </div>
               <div class="q-ml-auto" data-test="functions-list-search-input">
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-input>
               </div>
               <q-btn
-                  class="q-ml-sm o2-primary-button tw:h-[36px]"
+                  class="q-ml-sm o2-primary-button tw-h-[36px]"
                 flat
                 no-caps
                 :label="t(`function.add`)"
@@ -47,8 +47,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
           </div>
         </div>
-        <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-          <div class="card-container tw:h-[calc(100vh-127px)]">
+        <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
+          <div class="card-container tw-h-[calc(100vh-127px)]">
             <q-table
               ref="qTable"
               :rows="visibleRows"
@@ -210,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-dialog v-model="confirmForceDelete" persistent>
       <q-card style="width: 40vw; max-height: 90vh; overflow-y: auto">
         <q-card-section
-          class="text-h6 dialog-heading tw:flex tw:justify-between tw:items-center"
+          class="text-h6 dialog-heading tw-flex tw-justify-between tw-items-center"
         >
           <div>
             Pipelines Associated with

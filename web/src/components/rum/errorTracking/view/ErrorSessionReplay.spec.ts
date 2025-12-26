@@ -152,7 +152,7 @@ describe("ErrorSessionReplay Component", () => {
       const playButton = wrapper.findComponent({ name: "QBtn" });
       expect(playButton.classes()).toContain("bg-primary");
       expect(playButton.classes()).toContain("rounded");
-      expect(playButton.classes()).toContain("tw:mt-[0.625rem]");
+      expect(playButton.classes()).toContain("tw-mt-[0.625rem]");
       expect(playButton.classes()).toContain("text-white");
     });
 
@@ -160,7 +160,7 @@ describe("ErrorSessionReplay Component", () => {
       const playButton = wrapper.findComponent({ name: "QBtn" });
       expect(playButton.classes()).toContain("bg-primary");
       expect(playButton.classes()).toContain("rounded");
-      expect(playButton.classes()).toContain("tw:mt-[0.625rem]");
+      expect(playButton.classes()).toContain("tw-mt-[0.625rem]");
     });
 
     it("should display play icon", () => {

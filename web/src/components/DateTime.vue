@@ -204,8 +204,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <table v-if="!hideRelativeTime" class="q-px-md startEndTime">
                 <tbody>
                   <tr>
-                    <td class="label tw:px-2">Start time</td>
-                    <td class="label tw:px-2">End time</td>
+                    <td class="label tw-px-2">Start time</td>
+                    <td class="label tw-px-2">End time</td>
                   </tr>
                   <tr>
                     <td>
@@ -324,7 +324,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-separator class="q-my-sm" />
           <q-btn
             data-test="date-time-apply-btn"
-            class="q-pa-none o2-primary-button tw:h-[30px] element-box-shadow"
+            class="q-pa-none o2-primary-button tw-h-[30px] element-box-shadow"
             no-caps
             size="sm"
             @click="saveDate(null)"

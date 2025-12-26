@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Note at the bottom -->
       <q-card-section class="q-pt-none q-pb-sm">
         <q-separator class="q-mb-sm" />
-        <div class="text-caption text-grey-7 tw:flex tw:items-start q-gutter-xs">
+        <div class="text-caption text-grey-7 tw-flex tw-items-start q-gutter-xs">
           <q-icon name="info_outline" size="14px" class="q-mt-xs" />
           <span>Theme preferences are stored locally on this device and will not sync across different browsers or devices.</span>
         </div>
