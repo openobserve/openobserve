@@ -13,10 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, http, patch, post, put, web};
+use actix_web::{
+    HttpRequest, HttpResponse, Responder, delete, get, http, patch, post, put,
+    web::{self, Query},
+};
 use config::meta::dashboards::Dashboard;
 use hashbrown::HashMap;
 
+#[cfg(feature = "enterprise")]
+use crate::common::utils::auth::check_permissions;
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::{
@@ -29,6 +34,7 @@ use crate::{
             MoveDashboardRequestBody,
             MoveDashboardsRequestBody, // UpdateDashboardRequestBody, UpdateDashboardResponseBody,
         },
+        request::{BulkDeleteRequest, BulkDeleteResponse},
     },
     service::dashboards::{self, DashboardError},
 };
@@ -314,6 +320,82 @@ async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
         )),
         Err(err) => err.into(),
     }
+}
+
+/// DeleteDashboardBulk
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Dashboards",
+    operation_id = "DeleteDashboardBulk",
+    summary = "Delete multiple dashboard",
+    description = "Permanently deletes multiple dashboard and all their associated panels and configurations. This action cannot be undone",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(
+        content = BulkDeleteRequest,
+        description = "Dashboard ids",
+        example = json!({"ids": vec!["1","2","3"]}),
+    ),
+    responses(
+        (status = StatusCode::OK, description = "Success", body = BulkDeleteResponse),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"}))
+    )
+)]
+#[delete("/{org_id}/dashboards/bulk")]
+async fn delete_dashboard_bulk(
+    path: web::Path<String>,
+    Query(query): Query<HashMap<String, String>>,
+    Headers(user_email): Headers<UserEmail>,
+    req: web::Json<BulkDeleteRequest>,
+) -> impl Responder {
+    let org_id = path.into_inner();
+    let req = req.into_inner();
+    let _user_id = user_email.user_id;
+    let _folder_id = crate::common::utils::http::get_folder(&query);
+
+    #[cfg(feature = "enterprise")]
+    for id in &req.ids {
+        if !check_permissions(
+            id,
+            &org_id,
+            &_user_id,
+            "dashboards",
+            "DELETE",
+            Some(&_folder_id),
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
+    for id in req.ids {
+        match dashboards::delete_dashboard(&org_id, &id).await {
+            Ok(()) => successful.push(id),
+            Err(e) => {
+                log::error!("error deleting dashboard {org_id}/{id} : {e}");
+                unsuccessful.push(id);
+                err = Some(e.to_string())
+            }
+        }
+    }
+
+    MetaHttpResponse::json(BulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    })
 }
 
 /// MoveDashboard

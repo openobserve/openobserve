@@ -519,12 +519,12 @@ pub async fn move_to_folder<C: ConnectionTrait + TransactionTrait>(
         if get_openfga_config().enabled {
             // TODO: Try to make a single call for all alerts
             if !check_permissions(
-                Some(_alert_id_str.clone()),
+                &_alert_id_str,
                 org_id,
                 _user_id,
                 "alerts",
                 "PUT",
-                &curr_folder.folder_id,
+                Some(&curr_folder.folder_id),
             )
             .await
             {

@@ -43,6 +43,9 @@ const jstransform = {
     const config = force ? { params: { force: true } } : {};
     return http().delete(url, config);
   },
+  bulkDelete: (org_identifier: string, data: any) => {
+    return http().delete(`/api/${org_identifier}/functions/bulk`, { data });
+  },
   create_with_index: (
     org_identifier: string,
     stream_name: string,

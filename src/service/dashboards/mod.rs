@@ -468,12 +468,12 @@ pub async fn move_dashboard(
     if _check_openfga && get_openfga_config().enabled {
         // TODO: Try to make a single call for all alerts
         if !check_permissions(
-            Some(dashboard_id.to_owned()),
+            dashboard_id,
             org_id,
             _user_id,
             "dashboards",
             "PUT",
-            &curr_folder.folder_id,
+            Some(&curr_folder.folder_id),
         )
         .await
         {
