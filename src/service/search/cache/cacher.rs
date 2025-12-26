@@ -35,10 +35,7 @@ use crate::{
             MultiCachedQueryResponse,
             result_utils::{get_ts_value, has_non_timestamp_ordering, is_timestamp_field},
         },
-        sql::{
-            RE_HISTOGRAM, RE_SELECT_FROM, Sql,
-            visitor::histogram_interval::generate_histogram_interval,
-        },
+        sql::{RE_HISTOGRAM, Sql, visitor::histogram_interval::generate_histogram_interval},
     },
 };
 
@@ -127,25 +124,10 @@ pub async fn check_cache(
         };
     }
 
-    // Hack select for _timestamp
-    let result_ts_col = if !is_aggregate
-        && sql.group_by.is_empty()
-        && order_by.is_empty()
-        && !origin_sql.contains('*')
-    {
-        let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
-        let cap_str = caps.get(1).unwrap().as_str();
-        if !cap_str.contains(TIMESTAMP_COL_NAME) {
-            *origin_sql =
-                origin_sql.replacen(cap_str, &format!("{TIMESTAMP_COL_NAME},{cap_str}"), 1);
-        }
-        req.query.sql = origin_sql.clone();
-        TIMESTAMP_COL_NAME.to_string()
-    } else if !is_aggregate && origin_sql.contains('*') {
-        TIMESTAMP_COL_NAME.to_string()
-    } else {
-        result_ts_col.to_string()
-    };
+    // Note: Both result_ts_col refinement and SQL modification (adding _timestamp to SELECT)
+    // are now done in prepare_cache_response() before calling this function.
+    // We just use the refined result_ts_col that was passed in.
+    let result_ts_col = result_ts_col.to_string();
 
     // Check ts_col again, if it is still empty, return default
     if result_ts_col.is_empty() {
@@ -465,10 +447,9 @@ pub async fn get_cached_results(
         }
         // reset the start and end time
         let first_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.first().unwrap());
-        let last_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap())
-            + histogram_interval;
+        let last_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap());
         matching_meta.start_time = std::cmp::min(first_ts, last_ts);
-        matching_meta.end_time = std::cmp::max(first_ts, last_ts);
+        matching_meta.end_time = std::cmp::max(first_ts, last_ts) + histogram_interval;
     }
     cached_response.total = cached_response.hits.len();
 

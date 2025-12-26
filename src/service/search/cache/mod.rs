@@ -59,6 +59,7 @@ use crate::{
             cache::{cacher::check_cache, result_utils::extract_timestamp_range},
             init_vrl_runtime,
             inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+            sql::RE_SELECT_FROM,
         },
         self_reporting::{http_report_metrics, report_request_usage_stats},
     },
@@ -573,8 +574,31 @@ pub async fn prepare_cache_response(
     let mut h = config::utils::hash::gxhash::new();
     let hashed_query = h.sum64(&hash_body.join(","));
 
-    let (ts_column, mut is_descending) =
+    let (mut ts_column, mut is_descending) =
         cacher::get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate).unwrap_or_default();
+
+    // Refine ts_column for non-aggregate queries with SELECT * or missing _timestamp
+    // Also modify the SQL to add _timestamp to SELECT clause if missing
+    if !is_aggregate && origin_sql.contains('*') {
+        ts_column = TIMESTAMP_COL_NAME.to_string();
+    } else if !is_aggregate
+        && sql.group_by.is_empty()
+        && sql.order_by.is_empty()
+        && !origin_sql.contains('*')
+    {
+        if let Some(caps) = RE_SELECT_FROM.captures(&origin_sql) {
+            if let Some(cap) = caps.get(1) {
+                let cap_str = cap.as_str();
+                if !cap_str.contains(TIMESTAMP_COL_NAME) {
+                    // Add _timestamp to SELECT clause
+                    origin_sql =
+                        origin_sql.replacen(cap_str, &format!("{TIMESTAMP_COL_NAME},{cap_str}"), 1);
+                    req.query.sql = origin_sql.clone();
+                    ts_column = TIMESTAMP_COL_NAME.to_string();
+                }
+            }
+        }
+    }
 
     // Refine is_descending for histogram queries with non-timestamp ORDER BY
     is_descending = cacher::refine_is_descending_for_histogram(&sql, &ts_column, is_descending);
