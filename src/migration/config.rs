@@ -197,8 +197,8 @@ mod tests {
 
     #[test]
     fn test_with_exclude_trims_whitespace() {
-        let config = MigrationConfig::new("sqlite", "mysql")
-            .with_exclude(Some(" logs , temp ".to_string()));
+        let config =
+            MigrationConfig::new("sqlite", "mysql").with_exclude(Some(" logs , temp ".to_string()));
 
         assert_eq!(
             config.exclude,
@@ -241,10 +241,12 @@ mod tests {
         let config = MigrationConfig::new("invalid", "mysql");
         let result = config.validate();
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Invalid source database type"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Invalid source database type")
+        );
     }
 
     #[test]
@@ -252,10 +254,12 @@ mod tests {
         let config = MigrationConfig::new("sqlite", "invalid");
         let result = config.validate();
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Invalid target database type"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Invalid target database type")
+        );
     }
 
     #[test]
@@ -263,22 +267,25 @@ mod tests {
         let config = MigrationConfig::new("sqlite", "sqlite");
         let result = config.validate();
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Source and target database types must be different"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Source and target database types must be different")
+        );
     }
 
     #[test]
     fn test_validate_incremental_without_since() {
-        let config =
-            MigrationConfig::new("sqlite", "mysql").with_incremental(true, None);
+        let config = MigrationConfig::new("sqlite", "mysql").with_incremental(true, None);
         let result = config.validate();
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Incremental mode requires --since parameter"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Incremental mode requires --since parameter")
+        );
     }
 
     #[test]
@@ -293,10 +300,12 @@ mod tests {
         let config = MigrationConfig::new("sqlite", "mysql").with_batch_size(0);
         let result = config.validate();
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Batch size must be greater than 0"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Batch size must be greater than 0")
+        );
     }
 
     #[test]

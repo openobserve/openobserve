@@ -437,8 +437,8 @@ mod tests {
     #[test]
     fn test_filter_tables_with_include_filter() {
         let all_tables = create_test_tables();
-        let config = MigrationConfig::new("sqlite", "mysql")
-            .with_tables(Some("users,config".to_string()));
+        let config =
+            MigrationConfig::new("sqlite", "mysql").with_tables(Some("users,config".to_string()));
 
         let result = filter_tables(&all_tables, MigrationMode::Meta, &config);
 
@@ -462,11 +462,7 @@ mod tests {
 
     #[test]
     fn test_filter_tables_sorted() {
-        let all_tables = vec![
-            "zebra".to_string(),
-            "alpha".to_string(),
-            "beta".to_string(),
-        ];
+        let all_tables = vec!["zebra".to_string(), "alpha".to_string(), "beta".to_string()];
         let config = MigrationConfig::new("sqlite", "mysql");
 
         let result = filter_tables(&all_tables, MigrationMode::Meta, &config);
