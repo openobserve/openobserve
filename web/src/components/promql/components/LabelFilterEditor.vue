@@ -39,7 +39,7 @@
                     use-input
                     fill-input
                     hide-selected
-                    input-debounce="0"
+                    input-debounce="300"
                     :loading="loadingLabels"
                     clearable
                     @filter="(val, update) => filterLabels(val, update, index)"
@@ -86,7 +86,7 @@
                     use-input
                     fill-input
                     hide-selected
-                    input-debounce="0"
+                    input-debounce="300"
                     emit-value
                     map-options
                     option-value="value"

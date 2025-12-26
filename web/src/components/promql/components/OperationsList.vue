@@ -88,13 +88,16 @@
                         <q-select
                           v-else-if="param.type === 'select'"
                           v-model="element.params[paramIndex] as string[]"
-                          :options="availableLabels"
+                          :options="filteredLabels"
                           :label="param.name"
                           dense
                           borderless
                           stack-label
                           hide-bottom-space
                           multiple
+                          use-input
+                          input-debounce="300"
+                          @filter="filterOperationLabels"
                           class="operation-label-selector showLabelOnTop no-case q-mb-sm"
                           input-class="!tw-normal-case"
                           :data-test="`promql-operation-param-${paramIndex}`"
@@ -230,7 +233,12 @@ const showOperationSelector = ref(false);
 const searchQuery = ref("");
 
 // Access shared label options from meta
-const availableLabels = computed(() => props.dashboardData?.meta?.promql?.availableLabels || []);
+const availableLabels = computed(
+  () => props.dashboardData?.meta?.promql?.availableLabels || [],
+);
+
+// State for filtered labels in the select
+const filteredLabels = ref<string[]>([]);
 
 const categories = computed(() => promQueryModeller.getCategories());
 
@@ -305,6 +313,30 @@ const removeOperation = (index: number) => {
   props.operations.splice(index, 1);
 };
 
+// Filter operation labels with autocomplete
+const filterOperationLabels = (val: string, update: any) => {
+  update(() => {
+    if (val === "") {
+      filteredLabels.value = availableLabels.value;
+    } else {
+      // Filter labels based on input
+      const needle = val.toLowerCase();
+      filteredLabels.value = availableLabels.value.filter((label: string) =>
+        label.toLowerCase().includes(needle)
+      );
+    }
+  });
+};
+
+// Initialize filtered labels when available labels change
+watch(
+  availableLabels,
+  (newLabels) => {
+    filteredLabels.value = newLabels;
+  },
+  { immediate: true }
+);
+
 defineExpose({
   availableLabels,
 });
@@ -348,6 +380,7 @@ defineExpose({
     > :first-child
 ) {
   text-transform: none;
+  max-width: 75% !important;
 }
 
 .drag-handle {
