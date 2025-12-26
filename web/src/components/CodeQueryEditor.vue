@@ -571,7 +571,7 @@ export default defineComponent({
       () => props.query,
       (newQuery, oldQuery) => {
         if (props.readOnly || !editorObj?.hasWidgetFocus()) {
-          editorObj?.getModel().setValue(props.query);
+          editorObj?.getModel()?.setValue(props.query);
         }
       },
     );
