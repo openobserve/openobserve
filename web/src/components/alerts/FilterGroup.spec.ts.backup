@@ -1860,7 +1860,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       const wrapper = mount(FilterGroup, {
         props: {
           ...defaultProps,
-          conditionInputWidth: 'tw-w-[100px]'
+          conditionInputWidth: 'tw:w-[100px]'
         },
         global: {
           plugins: [Quasar, mockI18n],
@@ -1873,7 +1873,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
         },
       });
 
-      expect(wrapper.props('conditionInputWidth')).toBe('tw-w-[100px]');
+      expect(wrapper.props('conditionInputWidth')).toBe('tw:w-[100px]');
     });
 
     it('should have empty string as default for conditionInputWidth', () => {
@@ -2239,7 +2239,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       });
 
       // Should find preview section at depth 0
-      const previewSection = wrapper.find('.tw-mb-2.tw-p-2.tw-rounded.tw-border');
+      const previewSection = wrapper.find('.tw:mb-2.tw:p-2.tw:rounded.tw:border');
       expect(previewSection.exists()).toBe(true);
       expect(previewSection.text()).toContain('Preview');
     });
@@ -2271,7 +2271,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       });
 
       // Should not find preview section at depth > 0
-      const previewSection = wrapper.find('.tw-mb-2.tw-p-2.tw-rounded.tw-border');
+      const previewSection = wrapper.find('.tw:mb-2.tw:p-2.tw:rounded.tw:border');
       expect(previewSection.exists()).toBe(false);
     });
 
@@ -2304,7 +2304,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       expect(wrapper.vm.showPreview).toBe(true);
 
       // Find and click the preview header
-      const previewHeader = wrapper.find('.tw-cursor-pointer');
+      const previewHeader = wrapper.find('.tw:cursor-pointer');
       await previewHeader.trigger('click');
 
       expect(wrapper.vm.showPreview).toBe(false);

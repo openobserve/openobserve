@@ -19,15 +19,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="height: calc(100vh - 48px); min-height: inherit"
   >
     <div
-      class="row items-center no-wrap card-container q-px-md tw-mb-[0.675rem]"
+      class="row items-center no-wrap card-container q-px-md tw:mb-[0.675rem]"
     >
-      <div class="flex items-center tw-h-[60px]">
+      <div class="flex items-center tw:h-[60px]">
         <div
           no-caps
             padding="xs"
             outline
             icon="arrow_back_ios_new"
-            class="el-border tw-w-6 tw-h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
+            class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
           title="Go Back"
           @click="$emit('cancel:hideform')"
         >
@@ -50,8 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="height: calc(100vh - 106px)"
     >
       <template v-slot:before>
-        <div class="card-container tw-h-full tw-flex tw-flex-col">
-          <div class="q-pa-md tw-flex-1 tw-overflow-auto">
+        <div class="card-container tw:h-full tw:flex tw:flex-col">
+          <div class="q-pa-md tw:flex-1 tw:overflow-auto">
             <div class="col-12 q-pb-sm q-pt-sm o2-input">
             <q-input
               data-test="add-template-name-input"
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <div class="col-12 q-pb-md">
-            <div class="app-tabs-container tw-w-fit">
+            <div class="app-tabs-container tw:w-fit">
               <app-tabs
                 class="tabs-selection-container"
                 :tabs="tabs"
@@ -125,11 +125,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
-            class="flex justify-end q-px-lg q-py-lg full-width tw-bg-[var(--q-card-background)]"
+            class="flex justify-end q-px-lg q-py-lg full-width tw:bg-[var(--q-card-background)]"
           >
             <q-btn
               v-close-popup
-              class="q-mr-md o2-secondary-button tw-h-[36px]"
+              class="q-mr-md o2-secondary-button tw:h-[36px]"
               :label="t('alerts.cancel')"
               no-caps
               flat
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="add-template-cancel-btn"
             />
             <q-btn
-              class="o2-primary-button no-border tw-h-[36px]"
+              class="o2-primary-button no-border tw:h-[36px]"
               :label="t('alerts.save')"
               no-caps
               flat
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template v-slot:after>
         <div
-          class="q-px-sm q-pt-sm tw-h-full tw-overflow-auto card-container"
+          class="q-px-sm q-pt-sm tw:h-full tw:overflow-auto card-container"
         >
           <div class="text-bold q-py-sm q-px-xs text-subtitle2">
             {{ t("alert_templates.variable_guide_header") }}

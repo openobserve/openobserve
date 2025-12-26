@@ -17,25 +17,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="q-ma-md">
     <CopyContent class="q-mt-sm" :content="content" />
-    <div class="tw-text-[16px]">
-      <div class="tw-font-bold tw-pt-6 tw-pb-2">
+    <div class="tw:text-[16px]">
+      <div class="tw:font-bold tw:pt-6 tw:pb-2">
         Check further documentation at:
       </div>
-      <ol class="tw-list-decimal q-pl-md">
-        <li class="tw-py-1">
+      <ol class="tw:list-decimal q-pl-md">
+        <li class="tw:py-1">
           <a
             href="https://openobserve.ai/blog/send-gcp-logs-to-openobserve"
-            class="tw-underline"
+            class="tw:underline"
             target="_blank"
             rel="noopener noreferrer"
           >
           {{ t("ingestion.pubsub") }}
           </a>
         </li>
-        <li class="tw-py-1">
+        <li class="tw:py-1">
           <a
             href="https://short.openobserve.ai/security/google-workspace"
-            class="tw-underline"
+            class="tw:underline"
             target="_blank"
             rel="noopener noreferrer"
           >

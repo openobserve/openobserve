@@ -1,7 +1,7 @@
 <template>
-<div class="tw-flex tw-h-screen">
+<div class="tw:flex tw:h-screen">
   <!-- Left Banner Section -->
-  <div class="tw-hidden lg:tw-flex lg:tw-w-[40%] login_banner_container">
+  <div class="tw:hidden lg:tw:flex lg:tw:w-[40%] login_banner_container">
 
     <div style="display: flex; justify-content: start; align-items: end; height: 100%;">
     <div style="margin-bottom: 34px; margin-left: 32px;">
@@ -16,15 +16,15 @@
 
   <!-- Right Form Section -->
   <div :class="[
-    store.state.theme == 'dark' ? 'tw-bg-black' : 'tw-bg-white'
-  ]" class="tw-w-full lg:tw-w-[60%]  tw-h-full tw-flex tw-flex-col tw-justify-center tw-items-center tw-relative">
+    store.state.theme == 'dark' ? 'tw:bg-black' : 'tw:bg-white'
+  ]" class="tw:w-full lg:tw:w-[60%]  tw:h-full tw:flex tw:flex-col tw:justify-center tw:items-center tw:relative">
 
     <!-- Top Section: Logo and Heading -->
-    <div class="tw-flex tw-flex-col tw-items-center tw-mb-4">
+    <div class="tw:flex tw:flex-col tw:items-center tw:mb-4">
       <img style="height: 64px;" src="@/assets/images/common/o2_logo.svg" alt="Get Started Banner" />
-      <div class="tw-text-[24px] md:tw-text-[32px] tw-font-semibold  tw-text-center" 
+      <div class="tw:text-[24px] md:tw:text-[32px] tw:font-semibold  tw:text-center" 
       :class="[
-        store.state.theme == 'dark' ? 'tw-text-[#ffffff]' : 'tw-text-[#525252]'
+        store.state.theme == 'dark' ? 'tw:text-[#ffffff]' : 'tw:text-[#525252]'
       ]"
       >
         One last thing before we begin
@@ -33,8 +33,8 @@
 
     <!-- Form Section -->
 <!-- Form Section -->
-<div class="tw-w-full tw-flex tw-justify-center">
-  <div class="tw-w-full tw-max-w-[500px] tw-flex tw-flex-col tw-items-center tw-gap-y-2 tw-px-4">
+<div class="tw:w-full tw:flex tw:justify-center">
+  <div class="tw:w-full tw:max-w-[500px] tw:flex tw:flex-col tw:items-center tw:gap-y-2 tw:px-4">
     <q-input
       class="showLabelOnTop no-case input-field o2-input"
       v-model="hearAboutUs"
@@ -50,7 +50,7 @@
       :rules="[(val) => val.length > 0 || 'This field is required']"
     />
     <q-input
-      class="showLabelOnTop no-case -tw-mt-2"
+      class="showLabelOnTop no-case -tw:mt-2"
       v-model="whereDoYouWork"
       outlined
       :label="`Where do you work? *`"
@@ -62,18 +62,18 @@
       required
       :rules="[(val) => val.length > 0 || 'This field is required']"
     />
-    <div class="tw-w-full tw-flex tw-items-center tw-ml-[-18px]">
-      <q-checkbox v-model="isAgree" class="tw-items-center">
-        <span class="tw-text-sm">
+    <div class="tw:w-full tw:flex tw:items-center tw:ml-[-18px]">
+      <q-checkbox v-model="isAgree" class="tw:items-center">
+        <span class="tw:text-sm">
           I have read and agree with the
-          <a href="#" class="tw-text-[#6B76E3] hover:underline">Terms of use</a> and
-          <a href="#" class="tw-text-[#6B76E3] hover:underline">Privacy policy*</a>
+          <a href="#" class="tw:text-[#6B76E3] hover:underline">Terms of use</a> and
+          <a href="#" class="tw:text-[#6B76E3] hover:underline">Privacy policy*</a>
         </span>
       </q-checkbox>
     </div>
     <q-btn
       :disable="!isAgree || isSubmitting"
-      class="tw-w-full tw-h-[40px] tw-bg-[#6B76E3] tw-text-white tw-font-semibold  tw-mt-4"
+      class="tw:w-full tw:h-[40px] tw:bg-[#6B76E3] tw:text-white tw:font-semibold  tw:mt-4"
       label="Start your 14-day Trial"
       no-caps
       :loading="isSubmitting"
@@ -84,9 +84,9 @@
 
 
     <!-- Footer -->
-    <div class="tw-absolute tw-bottom-5 tw-text-sm tw-mb-[16px]" 
+    <div class="tw:absolute tw:bottom-5 tw:text-sm tw:mb-[16px]" 
     :class="[
-      store.state.theme == 'dark' ? 'tw-text-[#ffffff]' : 'tw-text-[#767676]'
+      store.state.theme == 'dark' ? 'tw:text-[#ffffff]' : 'tw:text-[#767676]'
     ]"
     >
       &copy; OpenObserve <span id="year">{{ new Date().getFullYear() }}</span>

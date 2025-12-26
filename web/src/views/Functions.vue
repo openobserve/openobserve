@@ -16,16 +16,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-page>
-    <div class=" tw-pb-[0.625rem]">
+    <div class=" tw:pb-[0.625rem]">
       <q-splitter
         v-model="splitterModel"
         unit="px"
         :limits="[0, 400]"
-        class="tw-overflow-hidden logs-splitter-smooth"
+        class="tw:overflow-hidden logs-splitter-smooth"
       >
         <template v-slot:before>
-          <div class="tw-w-full tw-h-full tw-pl-[0.625rem] tw-pb-[0.625rem] q-pt-xs">
-            <div v-if="showSidebar" class="card-container tw-h-[calc(100vh-50px)]">
+          <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
+            <div v-if="showSidebar" class="card-container tw:h-[calc(100vh-50px)]">
               <q-tabs
                 v-model="activeTab"
                 indicator-color="transparent"

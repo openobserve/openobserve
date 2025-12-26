@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :pagination="{ rowsPerPage: 10000 }"
         hide-header
         hide-bottom
-        class="traces-field-table tw-h-full"
+        class="traces-field-table tw:h-full"
         id="tracesFieldList"
       >
         <template #body-cell-name="props">
@@ -65,14 +65,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 switch-toggle-side
                 :label="props.row.name"
-                expand-icon-class="field-expansion-icon tw-text-[1rem]! tw-text-[var(--o2-icon-color)]"
+                expand-icon-class="field-expansion-icon tw:text-[1rem]! tw:text-[var(--o2-icon-color)]"
                 expand-icon="
                      expand_more
                   "
                 @before-show="
                   (event: any) => openFilterCreator(event, props.row)
                 "
-                class="hover:tw-bg-[var(--o2-hover-accent)] tw-rounded-[0.25rem]"
+                class="hover:tw:bg-[var(--o2-hover-accent)] tw:rounded-[0.25rem]"
               >
                 <template v-slot:header>
                   <div
@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               "
                             >
                               <q-btn
-                                class="q-mr-xs tw-border! tw-border-solid! tw-border-[var(--o2-border-color)]!"
+                                class="q-mr-xs tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]!"
                                 size="5px"
                                 title="Include Term"
                                 round
@@ -181,12 +181,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   )
                                 "
                               >
-                                <q-icon class="tw-h-[0.5rem]! tw-w-[0.5rem]!">
+                                <q-icon class="tw:h-[0.5rem]! tw:w-[0.5rem]!">
                                   <EqualIcon></EqualIcon>
                                 </q-icon>
                               </q-btn>
                               <q-btn
-                                class="q-mr-xs tw-border! tw-border-solid! tw-border-[var(--o2-border-color)]!"
+                                class="q-mr-xs tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]!"
                                 size="5px"
                                 title="Include Term"
                                 round
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   )
                                 "
                               >
-                                <q-icon class="tw-h-[0.5rem]! tw-w-[0.5rem]!">
+                                <q-icon class="tw:h-[0.5rem]! tw:w-[0.5rem]!">
                                   <NotEqualIcon></NotEqualIcon>
                                 </q-icon>
                               </q-btn>
@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             clearable
             debounce="1"
             :placeholder="t('search.searchField')"
-            class="o2-search-input tw-min-w-full "
+            class="o2-search-input tw:min-w-full "
           >
             <template #prepend>
               <q-icon name="search" class="o2-search-input-icon" />

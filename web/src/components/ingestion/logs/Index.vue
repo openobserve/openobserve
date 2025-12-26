@@ -22,8 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="min-height: calc(100vh - 130px)"
   >
     <template v-slot:before>
-      <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
-        <div class="card-container tw-h-[calc(100vh-140px)]">
+      <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
+        <div class="card-container tw:h-[calc(100vh-140px)]">
           <q-tabs
             v-model="ingestiontabs"
             indicator-color="transparent"
@@ -133,8 +133,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template v-slot:after>
-      <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
-        <div class="card-container tw-h-[calc(100vh-140px)]">
+      <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
+        <div class="card-container tw:h-[calc(100vh-140px)]">
           <router-view
             :title="ingestiontabs"
             :currOrgIdentifier="currOrgIdentifier"

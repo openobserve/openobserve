@@ -1,6 +1,6 @@
 <template>
   <div
-    class="field_overlay tw-absolute tw-right-0 tw-top-[50%] table-cell-actions tw-translate-y-[-50%]"
+    class="field_overlay tw:absolute tw:right-0 tw:top-[50%] table-cell-actions tw:translate-y-[-50%]"
     :class="backgroundClass"
     :title="row[column.id]"
     :data-test="`log-add-data-from-column-${row[column.id]}`"
@@ -82,7 +82,7 @@ const addSearchTerm = (
 };
 
 const backgroundClass = computed(() =>
-  store.state.theme === "dark" ? "tw-bg-black" : "tw-bg-white",
+  store.state.theme === "dark" ? "tw:bg-black" : "tw:bg-white",
 );
 const sendToAiChat = (value: any) => {
   emit("sendToAiChat", value);

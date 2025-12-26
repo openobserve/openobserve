@@ -38,13 +38,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
           store.state.zoConfig?.custom_logo_text != ''
         "
-        class="text-h6 text-bold q-pa-none cursor-pointer q-mr-sm tw-flex tw-items-center"
+        class="text-h6 text-bold q-pa-none cursor-pointer q-mr-sm tw:flex tw:items-center"
         @click="goToHome"
         >{{ store.state.zoConfig.custom_logo_text }}</span
       >
 
       <!-- Custom logo image - shows appropriate logo based on current theme -->
-       <div class="tw-flex tw-items-center">
+       <div class="tw:flex tw:items-center">
         <!-- Dark mode: Show dark logo, fallback to light logo -->
         <img
           v-if="
@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @mouseenter="handleMouseEnter"
         @mouseleave="handleMouseLeave"
       >
-        <div class="row items-center no-wrap tw-gap-2">
+        <div class="row items-center no-wrap tw:gap-2">
           <img :src="getBtnLogo" class="header-icon ai-icon" />
         </div>
       </q-btn>
@@ -212,10 +212,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
           no-caps
           flat
-          class="tw-text-ellipsis tw-overflow-hidden"
+          class="tw:text-ellipsis tw:overflow-hidden"
         >
           <div class="row items-center no-wrap full-width">
-            <div class="col tw-truncate">
+            <div class="col tw:truncate">
               {{ userClickedOrg?.label || "" }}
             </div>
             <q-icon name="arrow_drop_down" class="q-ml-xs" />
@@ -303,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-slot:no-data>
                       <div
                         data-test="organization-menu-no-data"
-                        class="text-center q-pa-sm tw-w-full tw-flex tw-justify-center"
+                        class="text-center q-pa-sm tw:w-full tw:flex tw:justify-center"
                       >
                         No organizations found
                       </div>
@@ -475,7 +475,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon size="xs" name="language" class="padding-none" />
               </q-item-section>
               <q-item-section>
-                <q-item-label class="tw-max-w-[150px]">{{
+                <q-item-label class="tw:max-w-[150px]">{{
                   t("menu.language")
                 }}</q-item-label>
               </q-item-section>

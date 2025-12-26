@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex justify-start q-mt-sm">
           <q-btn
             v-close-popup="true"
-            class="o2-secondary-button tw-h-[36px]"
+            class="o2-secondary-button tw:h-[36px]"
             :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             flat
             :label="t('dashboard.cancel')"
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disable="activeFolderId === selectedFolder.value"
             :loading="onSubmit.isLoading.value"
             :label="t('common.move')"
-            class="o2-primary-button tw-h-[36px] q-ml-md"
+            class="o2-primary-button tw:h-[36px] q-ml-md"
             :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             flat
             type="submit"

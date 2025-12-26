@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
     <div
-      class="full-width column flex-center q-gutter-sm q-mt-xs tw-h-full"
+      class="full-width column flex-center q-gutter-sm q-mt-xs tw:h-full"
       style="font-size: 1.5rem"
     >
       <q-img

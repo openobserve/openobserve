@@ -15,20 +15,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="traces-metrics-dashboard tw-w-full tw-pt-2 tw-px-1">
+  <div class="traces-metrics-dashboard tw:w-full tw:pt-2 tw:px-1">
     <!-- Filters Section -->
     <div
       v-if="show"
-      class="filters-section tw-flex tw-items-center tw-gap-2 tw-px-1 tw-flex-wrap"
+      class="filters-section tw:flex tw:items-center tw:gap-2 tw:px-1 tw:flex-wrap"
     >
-      <span class="filters-label tw-text-sm tw-font-semibold">Filters:</span>
+      <span class="filters-label tw:text-sm tw:font-semibold">Filters:</span>
       <!-- Error Only Toggle -->
       <div
-        class="tw-flex tw-items-center tw-justify-center tw-border tw-border-solid tw-border-[var(--o2-border-color)] tw-rounded-[0.375rem]"
+        class="tw:flex tw:items-center tw:justify-center tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded-[0.375rem]"
       >
         <q-toggle
           v-model="showErrorOnly"
-          class="o2-toggle-button-xs tw-flex tw-items-center tw-justify-center"
+          class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center"
           size="xs"
           flat
           :class="
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="error-only-toggle"
         />
         <q-icon name="error" size="1.1rem"
-class="tw-mx-1 tw-text-red-500" />
+class="tw:mx-1 tw:text-red-500" />
         <q-tooltip>Show Error Only</q-tooltip>
       </div>
 
@@ -47,7 +47,7 @@ class="tw-mx-1 tw-text-red-500" />
       <div
         v-for="[panelId, filter] in rangeFilters"
         :key="panelId"
-        class="filter-chip tw-h-[2rem] tw-px-[0.375rem]"
+        class="filter-chip tw:h-[2rem] tw:px-[0.375rem]"
         data-test="range-filter-chip"
       >
         <span class="chip-label"
@@ -91,7 +91,7 @@ class="tw-mx-1 tw-text-red-500" />
         color="primary"
         icon="analytics"
         :label="t('latencyInsights.analyzeButtonLabel')"
-        class="analyze-button tw-h-[2rem]"
+        class="analyze-button tw:h-[2rem]"
         @click="openUnifiedAnalysisDashboard"
         data-test="analyze-dimensions-button"
       >
@@ -101,7 +101,7 @@ class="tw-mx-1 tw-text-red-500" />
 
     <!-- Charts Section -->
     <div
-      class="charts-container tw-pt-[0.25rem]!"
+      class="charts-container tw:pt-[0.25rem]!"
       v-show="searchObj.meta.showHistogram"
     >
       <RenderDashboardCharts

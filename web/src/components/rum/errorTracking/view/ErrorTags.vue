@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <img
           :src="ip"
           alt="IP"
-          class="q-mr-sm inline-block tw-w-[1.875rem]! tw-h-auto!"
+          class="q-mr-sm inline-block tw:w-[1.875rem]! tw:h-auto!"
         />
         <div class="inline-block">
           <div class="q-pl-xs">IP</div>
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <img
           :src="browserIcon"
           alt="Chrome"
-          class="q-mr-md inline-block tw-h-auto tw-w-[1.875rem]"
+          class="q-mr-md inline-block tw:h-auto tw:w-[1.875rem]"
         />
         <div class="inline-block">
           <div class="q-pl-xs">{{ error.user_agent_user_agent_family }}</div>
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <img
           :src="osIcon"
           alt="OS"
-          class="q-mr-md inline-block tw-h-auto tw-w-[1.875rem]"
+          class="q-mr-md inline-block tw:h-auto tw:w-[1.875rem]"
         />
         <div class="inline-block">
           <div class="q-pl-xs">{{ error.user_agent_os_family }}</div>

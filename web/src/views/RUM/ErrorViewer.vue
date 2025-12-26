@@ -15,16 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="error-viewer-container tw-mx-[0.625rem] tw-my-[0.375rem] card-container">
+  <div class="error-viewer-container tw:mx-[0.625rem] tw:my-[0.375rem] card-container">
     <template v-if="isLoading.length">
       <div
-        class="q-pb-lg flex items-center justify-center text-center tw-h-[calc(100vh-12.5rem)]"
+        class="q-pb-lg flex items-center justify-center text-center tw:h-[calc(100vh-12.5rem)]"
       >
         <div>
           <q-spinner-hourglass
             color="primary"
             size="2.5rem"
-            class="tw-mx-auto tw-block"
+            class="tw:mx-auto tw:block"
           />
           <div class="text-center full-width">
             Hold on tight, we're fetching error details.
@@ -33,11 +33,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <div v-else>
-      <div class="tw-p-[0.625rem]">
+      <div class="tw:p-[0.625rem]">
         <ErrorHeader :error="errorDetails" />
       </div>
       <q-separator class="full-width" />
-      <div class="tw-p-[0.625rem]">
+      <div class="tw:p-[0.625rem]">
         <ErrorTags :error="errorDetails" />
         <ErrorStackTrace
           :error_stack="errorDetails.error_stack || []"

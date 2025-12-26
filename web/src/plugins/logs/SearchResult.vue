@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
   >
     <div class="search-list full-height full-width" ref="searchListContainer">
-      <div class="row tw-min-h-[28px] tw-pt-[0.375rem]">
+      <div class="row tw:min-h-[28px] tw:pt-[0.375rem]">
         <div
           class="col-7 text-left q-pl-lg bg-warning text-white rounded-borders"
           v-if="searchObj.data.countErrorMsg != ''"
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               !searchObj.loadingCounter &&
               searchObj.meta.showHistogram
             "
-            class="q-ml-md tw-cursor-pointer"
+            class="q-ml-md tw:cursor-pointer"
             :class="
               store.state.theme == 'dark'
                 ? 'histogram-unavailable-text'
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- {{ searchObj.data.histogram.errorMsg }} -->
             <q-icon name="info"
 color="warning" size="sm"> </q-icon>
-            <q-tooltip position="top" class="tw-text-sm tw-font-semi-bold">
+            <q-tooltip position="top" class="tw:text-sm tw:font-semi-bold">
               {{ searchObj.data.histogram.errorMsg }}
             </q-tooltip>
           </div>
@@ -277,7 +277,7 @@ color="warning" size="xs"></q-icon> Error while
           :selected-stream-fts-keys="selectedStreamFullTextSearchKeys"
           :highlight-query="searchObj.data.highlightQuery"
           :default-columns="!searchObj.data.stream.selectedFields.length"
-          class="col-12 tw-mt-[0.375rem]"
+          class="col-12 tw:mt-[0.375rem]"
           :class="[
             !searchObj.meta.showHistogram ||
             (searchObj.meta.showHistogram &&
@@ -302,7 +302,7 @@ color="warning" size="xs"></q-icon> Error while
       <!-- Patterns View -->
       <div
         v-if="searchObj.meta.logsVisualizeToggle === 'patterns'"
-        class="tw-flex tw-flex-col"
+        class="tw:flex tw:flex-col"
         :class="[
           !searchObj.meta.showHistogram ||
           (searchObj.meta.showHistogram &&
