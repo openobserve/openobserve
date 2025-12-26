@@ -1110,7 +1110,11 @@
     "labelFilters": "Filtres d'étiquettes",
     "operations": "Opérations",
     "promQLBuilder": "Générateur ProMQL",
-    "options": "Options"
+    "options": "Options",
+    "SQL": "SQL",
+    "builder": "Constructeur",
+    "custom": "Personnalisé",
+    "sqlBuilder": "Générateur SQL"
   },
   "home": {
     "streams": "Ruisseaux",

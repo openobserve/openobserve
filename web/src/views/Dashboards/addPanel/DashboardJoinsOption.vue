@@ -97,26 +97,26 @@ import LeftJoinTypeSvg from "@/components/icons/LeftJoinTypeSvg.vue";
 import InnerJoinTypeSvg from "@/components/icons/InnerJoinTypeSvg.vue";
 import RightJoinTypeSvg from "@/components/icons/RightJoinTypeSvg.vue";
 
-interface JoinFieldReference {
+export interface JoinFieldReference {
   streamAlias: string;
   field: string;
 }
 
-interface JoinCondition {
+export interface JoinCondition {
   leftField: JoinFieldReference;
   rightField: JoinFieldReference;
   logicalOperator: "AND" | "OR";
   operation: "=" | "!=" | ">" | "<" | ">=" | "<=";
 }
 
-interface JoinConfig {
+export interface JoinConfig {
   stream: string;
   streamAlias: string;
   joinType: "inner" | "left" | "right";
   conditions: JoinCondition[];
 }
 
-interface Query {
+export interface Query {
   joins?: JoinConfig[];
   customQuery?: boolean;
   fields?: {
@@ -124,7 +124,7 @@ interface Query {
   };
 }
 
-interface DashboardPanelData {
+export interface DashboardPanelData {
   data: {
     queries: Query[];
     queryType?: string;

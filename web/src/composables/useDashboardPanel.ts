@@ -350,6 +350,16 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     () => dashboardPanelData.data.queryType == "promql",
   );
 
+  // Watch queryType and toggle off VRL functions when switching to PromQL
+  watch(
+    () => dashboardPanelData.data.queryType,
+    (newQueryType) => {
+      if (newQueryType === "promql") {
+        dashboardPanelData.layout.vrlFunctionToggle = false;
+      }
+    },
+  );
+
   const selectedStreamFieldsBasedOnUserDefinedSchema = computed(() => {
     if (
       store.state.zoConfig.user_defined_schemas_enabled &&
@@ -1119,6 +1129,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 
   const resetAggregationFunction = () => {
+    // Skip resetting fields for PromQL mode to preserve the query
+    if (dashboardPanelData.data.queryType === "promql") {
+      return;
+    }
+
     switch (dashboardPanelData.data.type) {
       case "heatmap":
         dashboardPanelData.data.queries[

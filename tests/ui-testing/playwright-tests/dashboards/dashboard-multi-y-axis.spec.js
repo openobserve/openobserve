@@ -69,13 +69,13 @@ test.describe("dashboard multi y axis testcases", () => {
     await page
       .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
       .click();
-    // await page.waitForTimeout(5000);
+    await page.waitForTimeout(1000);
     await expect(
       page
         .getByRole("cell", {
           name: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1", count(kubernetes_container_name) as "y_axis_2", kubernetes_labels_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC',
         })
-        .nth(1)
+        .first()
     ).toBeVisible();
 
     // Close the query inspector

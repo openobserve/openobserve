@@ -221,10 +221,12 @@ describe("Dashboards.vue", () => {
     document.body.removeChild = vi.fn();
 
     // Mock AbortController
-    global.AbortController = vi.fn().mockImplementation(() => ({
-      abort: vi.fn(),
-      signal: {},
-    }));
+    global.AbortController = vi.fn(function() {
+      return {
+        abort: vi.fn(),
+        signal: {},
+      };
+    }) as any;
 
     // Mock window methods
     Object.defineProperty(window, 'getComputedStyle', {

@@ -1110,7 +1110,11 @@
     "labelFilters": "标签筛选器",
     "operations": "运营",
     "promQLBuilder": "PromQL 生成器",
-    "options": "选项"
+    "options": "选项",
+    "SQL": "SQL",
+    "builder": "生成器",
+    "custom": "自定义",
+    "sqlBuilder": "SQL 生成器"
   },
   "home": {
     "streams": "数据流",

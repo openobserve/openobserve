@@ -88,6 +88,7 @@ describe("MenuLink", async () => {
     await wrapper.find('[data-test="menu-link-#-item"]').trigger("click");
     expect(windowOpen).toHaveBeenCalledTimes(1);
     expect(windowOpen).toBeCalledWith("#", "_blank");
+    windowOpen.mockRestore();
   });
 
   it("should render icon when icon prop is provided", async () => {

@@ -202,9 +202,13 @@ export const convertPromQLData = async (
   // add all series timestamp
   limitedSearchQueryData.forEach((queryData: any) => {
     if (queryData && queryData.result) {
-      queryData.result.forEach((result: any) =>
-        result.values.forEach((value: any) => xAxisData.add(value[0])),
-      );
+      queryData.result.forEach((result: any) => {
+        if (result.values) {
+          result.values.forEach((value: any) => xAxisData.add(value[0]));
+        } else if (result.value) {
+          xAxisData.add(result.value[0]);
+        }
+      });
     }
   });
 
@@ -642,17 +646,66 @@ export const convertPromQLData = async (
             return seriesObj;
           }
           case "vector": {
-            const traces = it?.result?.map((metric: any) => {
+            const seriesObj = it?.result?.map((metric: any) => {
               const values = [metric.value];
+
+              const seriesName = getPromqlLegendName(
+                metric.metric,
+                panelSchema.queries[index].config.promql_legend,
+              );
+
               return {
-                name: JSON.stringify(metric.metric),
-                x: values.map((value: any) =>
-                  moment(value[0] * 1000).toISOString(true),
-                ),
-                y: values.map((value: any) => value[1]),
+                name: seriesName,
+                label: {
+                  show: panelSchema.config?.label_option?.position != null,
+                  position:
+                    panelSchema.config?.label_option?.position || "None",
+                  rotate: panelSchema.config?.label_option?.rotate || 0,
+                },
+                smooth:
+                  panelSchema.config?.line_interpolation === "smooth" ||
+                  panelSchema.config?.line_interpolation == null,
+                step: ["step-start", "step-end", "step-middle"].includes(
+                  panelSchema.config?.line_interpolation,
+                )
+                  ? panelSchema.config.line_interpolation.replace("step-", "")
+                  : false,
+                showSymbol: panelSchema.config?.show_symbol ?? false,
+                zlevel: 2,
+                itemStyle: {
+                  color: (() => {
+                    try {
+                      return getSeriesColor(
+                        panelSchema?.config?.color,
+                        seriesName,
+                        values.map((value: any) => value[1]),
+                        chartMin,
+                        chartMax,
+                        store.state.theme,
+                        panelSchema?.config?.color?.colorBySeries,
+                      );
+                    } catch (error) {
+                      console.warn("Failed to get series color:", error);
+                      return undefined;
+                    }
+                  })(),
+                },
+                data: values.map((value: any) => [
+                  store.state.timezone != "UTC"
+                    ? toZonedTime(value[0] * 1000, store.state.timezone)
+                    : new Date(value[0] * 1000).toISOString().slice(0, -1),
+                  value[1],
+                ]),
+                ...seriesPropsBasedOnChartType,
+                markLine: {
+                  silent: true,
+                  animation: false,
+                  data: getMarkLineData(panelSchema),
+                },
+                connectNulls: panelSchema.config?.connect_nulls ?? false,
               };
             });
-            return traces;
+            return seriesObj;
           }
         }
       }
@@ -899,6 +952,12 @@ export const convertPromQLData = async (
   }
 
   options.series = options.series.flat();
+
+  // For metric chart type, only show one metric value (from last query with data)
+  if (panelSchema.type === "metric" && options.series.length > 1) {
+    options.series = options.series.slice(-1);
+  }
+
   // Apply series color mappings via reusable helper
   applySeriesColorMappings(
     options.series,

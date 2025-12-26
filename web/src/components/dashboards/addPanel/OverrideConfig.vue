@@ -91,10 +91,6 @@ export default defineComponent({
 
         // Try to get columns from the actual rendered panelData first
         if (props.panelData?.options?.columns) {
-          console.log(
-            "[OverrideConfig] Using columns from panelData:",
-            props.panelData.options.columns,
-          );
           props.panelData.options.columns.forEach((col: any) => {
             if (col.name) {
               columnNames.add(col.name);
@@ -102,9 +98,6 @@ export default defineComponent({
           });
         } else {
           // Fallback: Build columns based on table mode and available labels
-          console.log(
-            "[OverrideConfig] No panelData.options.columns, using fallback",
-          );
           const config = dashboardPanelData.data.config || {};
           const tableMode = config.promql_table_mode || "single";
 
@@ -152,7 +145,6 @@ export default defineComponent({
           label: columnName,
         }));
 
-        console.log("[OverrideConfig] Final columns:", columns.value);
       } else {
         const x = dashboardPanelData.data.queries[0].fields.x || [];
         const y = dashboardPanelData.data.queries[0].fields.y || [];
