@@ -714,7 +714,7 @@ pub async fn get_service_graph(
 
     let mut nodes = Vec::new();
     let mut edges = Vec::new();
-    let mut all_services: HashSet<String> = HashSet::new();
+    let mut all_services: HashSet<String> = all_services.into_iter().collect();
 
     // Add primary service
     all_services.insert(incident_service.clone());
