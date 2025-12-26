@@ -38,14 +38,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:header="props">
           <q-tr
             :props="props"
-            class="thead-sticky !tw-bg-[var(--o2-table-header-bg)]"
+            class="thead-sticky tw-bg-[var(--o2-table-header-bg)]!"
           >
             <q-th
               v-for="col in props.cols"
               :key="col.name"
               :props="props"
               :style="col.style"
-              class="!tw-bg-[var(--o2-table-header-bg)]"
+              class="tw-bg-[var(--o2-table-header-bg)]!"
             >
               {{ col.label }}
             </q-th>
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-tr
             :props="props"
             :key="`m_${props.row.index}`"
-            class="cursor-pointer hover:!tw-bg-[var(--o2-hover-accent)]"
+            class="cursor-pointer hover:tw-bg-[var(--o2-hover-accent)]!"
           >
             <q-td
               v-for="col in props.cols"

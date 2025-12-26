@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`logs-field-list-item-${field.name}`"
         >
           <div
-            class="ellipsis !tw-max-w-[calc(100%-1.5rem)]"
+            class="ellipsis tw-max-w-[calc(100%-1.5rem)]!"
             style="display: inline-block"
           >
             {{ field.name }}
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="theme === 'dark' ? 'text-white' : 'text-black'"
                 >
                   <q-btn
-                    class="o2-custom-button-hover tw-ml-[0.25rem] tw-mr-[0.25rem] !tw-border !tw-border-solid !tw-border-[var(--o2-border-color)]"
+                    class="o2-custom-button-hover tw-ml-[0.25rem] tw-mr-[0.25rem] tw-border! tw-border-solid! tw-border-[var(--o2-border-color)]!"
                     size="0.3125rem"
                     @click="handleAddSearchTerm(field.name, value.key, 'include')"
                     title="Include Term"
@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-icon>
                   </q-btn>
                   <q-btn
-                    class="o2-custom-button-hover !tw-border !tw-border-solid !tw-border-[var(--o2-border-color)]"
+                    class="o2-custom-button-hover tw-border! tw-border-solid! tw-border-[var(--o2-border-color)]!"
                     size="0.3125rem"
                     @click="handleAddSearchTerm(field.name, value.key, 'exclude')"
                     title="Exclude Term"

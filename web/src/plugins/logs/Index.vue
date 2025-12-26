@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <h6
                         data-test="logs-search-no-stream-selected-text"
-                        class="text-center col-10 q-mx-none !tw-mt-none tw-pt-[2rem]"
+                        class="text-center col-10 q-mx-none tw-mt-none! tw-pt-[2rem]"
                       >
                         <q-icon name="info" color="primary" size="md" />
                         {{ t("search.noStreamSelectedMessage") }}

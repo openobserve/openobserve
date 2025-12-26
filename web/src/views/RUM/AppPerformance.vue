@@ -36,11 +36,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state?.zoConfig?.min_auto_refresh_interval || 5
               "
               trigger
-              class="app-performance-auto-refresh-interval !tw-ml-[0.5rem] !tw-pl-0 !tw-overflow-hidden"
+              class="app-performance-auto-refresh-interval tw-ml-[0.5rem]! tw-pl-0! tw-overflow-hidden!"
               @trigger="refreshData"
             />
             <q-btn
-              class="q-ml-sm !tw-border !tw-border-solid !tw-border-[var(--o2-border-color)] tw-h-[2rem] !tw-px-[0.325rem] hover:!tw-bg-[var(--o2-hover-accent)]"
+              class="q-ml-sm tw-border! tw-border-solid! tw-border-[var(--o2-border-color)]! tw-h-[2rem] tw-px-[0.325rem]! hover:tw-bg-[var(--o2-hover-accent)]!"
               outline
               padding="xs"
               no-caps
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <router-view v-slot="{ Component }">
       <keep-alive>
-        <div class="tw-pb-[0.375rem] tw-px-[0.625rem] !tw-h-[calc(100%-101px)]">
+        <div class="tw-pb-[0.375rem] tw-px-[0.625rem] tw-h-[calc(100%-101px)]!">
           <div
             class="card-container tw-py-[0.625rem] tw-h-full tw-overflow-hidden"
           >

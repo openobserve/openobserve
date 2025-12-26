@@ -139,8 +139,8 @@ describe("ErrorTags Component", () => {
       const ipIcon = wrapper.find("img[src='/mock/ip.png']");
       expect(ipIcon.exists()).toBe(true);
       expect(ipIcon.attributes("alt")).toBe("IP");
-      expect(ipIcon.classes()).toContain("!tw-w-[1.875rem]");
-      expect(ipIcon.classes()).toContain("!tw-h-auto");
+      expect(ipIcon.classes()).toContain("tw-w-[1.875rem]!");
+      expect(ipIcon.classes()).toContain("tw-h-auto!");
     });
   });
 

@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-cy="metrics-explorer-run-query-button"
                 dense
                 title="Run query"
-                class="q-pa-none !tw-mr-none o2-run-query-button o2-color-primary tw-h-[33px] element-box-shadow"
+                class="q-pa-none tw-mr-none! o2-run-query-button o2-color-primary tw-h-[33px] element-box-shadow"
                 @click="runQuery"
                 no-caps
               >
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <q-splitter
-        class="!tw-pl-[0.625rem] tw-h-[calc(100%-80px)]"
+        class="tw-pl-[0.625rem]! tw-h-[calc(100%-80px)]"
         v-model="splitterModel"
         unit="px"
         vertical
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             color="primary"
             text-color="white"
             icon="drag_indicator"
-            class="!tw-top-[2rem] tw-w-[0.75rem] !tw-h-[2rem] !tw-text-[2rem] !tw-rounded-[0.325rem]"
+            class="tw-top-[2rem]! tw-w-[0.75rem] tw-h-[2rem]! tw-text-[2rem]! tw-rounded-[0.325rem]!"
           />
         </template>
         <template #after>

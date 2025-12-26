@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #before>
               <QueryEditor
                 ref="queryEditorRef"
-                class="monaco-editor !tw-h-full"
+                class="monaco-editor tw-h-full!"
                 style="width: 100%"
                 v-model:query="
                   dashboardPanelData.data.queries[

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     ref="parentRef"
-    class="container !tw-rounded-none tw-overflow-x-auto tw-relative table-container"
+    class="container tw-rounded-none! tw-overflow-x-auto tw-relative table-container"
   >
     <table
       v-if="table"
