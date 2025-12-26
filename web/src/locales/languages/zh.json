@@ -1029,8 +1029,11 @@
     "visibleColumns": "可见列",
     "hiddenColumns": "隐藏列",
     "stickyFirstColumn": "置顶第一列",
-    "stickyColumns": "置顶列",
-    "promqlTableMode": "PromQL 表格模式"
+    "stickyColumns": "置顶专栏",
+    "promqlTableMode": "PromQL 表格模式",
+    "overrideMessageExample": "例如，{endpoint} 将被替换为端点的标签值。",
+    "stepValueTooltipInfo": "如果未指定，则将使用面板配置中的步长值。",
+    "optional": "可选"
   },
   "panel": {
     "header": "面板",
