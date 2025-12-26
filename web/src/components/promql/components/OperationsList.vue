@@ -174,7 +174,10 @@
           </q-input>
         </q-card-section>
 
-        <q-card-section class="q-pt-none" style="max-height: 400px; overflow-y: auto">
+        <q-card-section
+          class="q-pt-none"
+          style="max-height: 400px; overflow-y: auto"
+        >
           <q-list bordered separator>
             <template v-for="category in categories" :key="category">
               <q-expansion-item
@@ -192,7 +195,9 @@
                   >
                     <q-item-section>
                       <q-item-label>{{ op.name }}</q-item-label>
-                      <q-item-label caption>{{ op.documentation }}</q-item-label>
+                      <q-item-label caption>{{
+                        op.documentation
+                      }}</q-item-label>
                     </q-item-section>
                   </q-item>
                 </q-list>
@@ -276,10 +281,10 @@ const getOperationDef = (id: string): QueryBuilderOperationDef | undefined => {
 };
 
 const getFilteredOperationsForCategory = (
-  category: string
+  category: string,
 ): QueryBuilderOperationDef[] => {
   const operations = promQueryModeller.getOperationsForCategory(category);
-  console.log("category operations ------ ", category, operations);
+  // Operations for this category
   if (!searchQuery.value) return operations;
 
   const needle = searchQuery.value.toLowerCase();
@@ -288,7 +293,7 @@ const getFilteredOperationsForCategory = (
       op.name.toLowerCase().includes(needle) ||
       op.id.toLowerCase().includes(needle) ||
       op.documentation?.toLowerCase().includes(needle) ||
-      op.category?.toLowerCase().includes(needle)
+      op.category?.toLowerCase().includes(needle),
   );
 };
 

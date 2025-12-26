@@ -676,7 +676,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <LabelFilterEditor
       v-model:labels="promqlBuilderQuery.labels"
       :metric="promqlBuilderQuery.metric"
-      :dashboardData="dashboardPanelData"
+      :dashboardData="dashboardData"
+      :dashboardPanelData="dashboardPanelData"
     />
     <q-separator />
     <OperationsList
@@ -723,6 +724,7 @@ import OperationsList from "@/components/promql/components/OperationsList.vue";
 import PromQLBuilderOptions from "@/components/promql/components/PromQLBuilderOptions.vue";
 import { promQueryModeller } from "@/components/promql/operations/queryModeller";
 import type { PromVisualQuery } from "@/components/promql/types";
+import usePromlqSuggestions from "@/composables/usePromqlSuggestions";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
@@ -780,6 +782,8 @@ export default defineComponent({
       selectedStreamFieldsBasedOnUserDefinedSchema,
       fetchPromQLLabels
     } = useDashboardPanelData(dashboardPanelDataPageKey);
+
+    const { parsePromQlQuery } = usePromlqSuggestions();
 
     // Initialize treatAsNonTimestamp for existing fields (only for table charts)
     const initializeTreatAsNonTimestamp = () => {
@@ -1341,6 +1345,28 @@ export default defineComponent({
         }
       },
       { deep: true }
+    );
+
+    // Watch for query changes in PromQL custom mode and extract metric name to set as stream
+    watch(
+      () => dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ]?.query,
+      (newQuery) => {
+        // Only process if in PromQL custom mode (not builder mode)
+        if (promqlMode.value && !promqlBuilderMode.value && newQuery) {
+          const parsedQuery = parsePromQlQuery(newQuery);
+          const metricName = parsedQuery?.metricName;
+
+          if (metricName) {
+            const currentQuery = dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ];
+            // Set the extracted metric name as the stream
+            currentQuery.fields.stream = metricName;
+          }
+        }
+      }
     );
 
     return {
