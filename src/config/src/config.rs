@@ -1595,18 +1595,6 @@ pub struct Limit {
     )]
     pub max_query_range_for_sa: i64,
     #[env_config(
-        name = "ZO_TEXT_DATA_TYPE",
-        default = "longtext",
-        help = "Default data type for LongText compliant DB's"
-    )]
-    pub db_text_data_type: String,
-    #[env_config(
-        name = "ZO_BINARY_DATA_TYPE",
-        default = "longblob",
-        help = "Default data type for LongBinary compliant DB's"
-    )]
-    pub db_binary_data_type: String,
-    #[env_config(
         name = "ZO_MAX_DASHBOARD_SERIES",
         default = 100,
         help = "maximum series to display in charts"

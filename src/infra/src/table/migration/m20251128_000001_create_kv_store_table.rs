@@ -45,7 +45,7 @@ fn create_table_stmt() -> TableCreateStatement {
         .col(ColumnDef::new(KvStore::Key).string_len(256).not_null())
         .col(
             ColumnDef::new(KvStore::Value)
-                .custom(Alias::new(&binary_type))
+                .custom(Alias::new(binary_type))
                 .not_null(),
         )
         .col(ColumnDef::new(KvStore::CreatedAt).big_integer().not_null())
