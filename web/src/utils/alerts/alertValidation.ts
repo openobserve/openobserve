@@ -4,7 +4,7 @@
  */
 
 import searchService from "@/services/search";
-import cronParser from "cron-parser";
+import CronExpressionParser from "cron-parser";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import useStreams from "@/composables/useStreams";
 
@@ -436,7 +436,10 @@ export const validateInputs = (
   // Validate cron expression if frequency type is cron
   if (input.trigger_condition.frequency_type === "cron") {
     try {
-      cronParser.parseExpression(input.trigger_condition.cron!);
+      CronExpressionParser.parse(input.trigger_condition.cron!, {
+        currentDate: new Date(),
+        utc: true,
+      });
     } catch (err) {
       console.log(err);
       notify &&

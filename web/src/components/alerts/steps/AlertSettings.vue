@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="filteredDestinations"
                 color="input-border"
                 bg-color="input-bg"
-                class="showLabelOnTop no-case"
+                class="showLabelOnTop no-case destinations-select-field"
                 :class="
                   store.state.theme === 'dark' ? 'input-box-bg-dark input-border-dark' : 'input-box-bg-light input-border-light'
                 "
@@ -384,7 +384,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     hide-selected
                     fill-input
                     :rules="[(val: any) => !!val || 'Field is required!']"
-                    style="width: 88px"
+                    :style="{
+                      width: (formData.trigger_condition.operator === 'Contains' || formData.trigger_condition.operator === 'NotContains')
+                        ? '124px'
+                        : '88px',
+                      minWidth: '88px'
+                    }"
                     @update:model-value="emitTriggerUpdate"
                   />
                   <div
@@ -715,7 +720,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ref="destinationsFieldRef"
                 v-model="localDestinations"
                 :options="filteredDestinations"
-                class="no-case q-py-none"
+                class="no-case q-py-none destinations-select-field"
                 borderless
                 dense
                 multiple
@@ -1438,6 +1443,33 @@ export default defineComponent({
   .frequency-toggle-btn {
     &.inactive {
       color: #5c5c5c !important;
+    }
+  }
+}
+
+// Fix for destinations select - keep selected items and input on same line
+.destinations-select-field {
+  :deep(.q-field__control) {
+    .q-field__native {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      flex-wrap: nowrap !important;
+      overflow: hidden !important;
+
+      > span {
+        flex: 0 0 80% !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        min-width: 0 !important;
+      }
+
+      > input {
+        flex: 0 0 20% !important;
+        min-width: 0 !important;
+        width: 20% !important;
+      }
     }
   }
 }
