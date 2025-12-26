@@ -17,7 +17,7 @@
 @source "../**/*.{vue,js,ts}";
 
 @theme {
-  --prefix: tw;
+  --prefix: tw-;
 
   /* Custom colors */
   /* --color-primary: rgb(var(--q-primary) / <alpha-value>);
