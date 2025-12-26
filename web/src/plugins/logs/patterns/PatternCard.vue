@@ -16,14 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw-flex tw-items-center tw-border-b tw-cursor-pointer hover:tw-bg-[var(--o2-hover-gray)] table-row-hover"
+    class="tw:flex tw:items-center tw:border-b tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)] table-row-hover"
     @click="$emit('click', pattern, index)"
     :data-test="`pattern-card-${index}`"
   >
     <!-- Pattern Column -->
-    <div class="tw-flex-1 tw-min-w-0 tw-px-2">
+    <div class="tw:flex-1 tw:min-w-0 tw:px-2">
       <div
-        class="tw-truncate pattern-template-text"
+        class="tw:truncate pattern-template-text"
         :class="store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8'"
         :data-test="`pattern-card-${index}-template`"
         :title="pattern.template"
@@ -32,14 +32,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <span
         v-if="pattern.is_anomaly"
-        class="text-negative text-weight-bold tw-text-[0.625rem]"
+        class="text-negative text-weight-bold tw:text-[0.625rem]"
         :data-test="`pattern-card-${index}-anomaly-badge`"
         >⚠️ {{ t("search.anomalyLabel") }}</span
       >
     </div>
 
     <!-- Occurrence Column -->
-    <div class="tw-w-16 tw-flex-shrink-0 tw-px-2 tw-text-right">
+    <div class="tw:w-16 tw:flex-shrink-0 tw:px-2 tw:text-right">
       <span
         class="text-weight-bold text-primary"
         :data-test="`pattern-card-${index}-frequency`"
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Percentage Column -->
-    <div class="tw-w-14 tw-flex-shrink-0 tw-px-2 tw-text-right">
+    <div class="tw:w-14 tw:flex-shrink-0 tw:px-2 tw:text-right">
       <span
         class="text-weight-bold text-primary"
         :data-test="`pattern-card-${index}-percentage`"
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Actions Column -->
-    <div class="tw-w-20 tw-flex-shrink-0 tw-px-2 tw-flex tw-items-center">
+    <div class="tw:w-20 tw:flex-shrink-0 tw:px-2 tw:flex tw:items-center">
       <q-btn
         size="6px"
         @click.stop="$emit('include', pattern)"

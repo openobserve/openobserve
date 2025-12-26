@@ -122,25 +122,25 @@ describe("LoadingProgress", () => {
   it("should have correct CSS classes for dark theme", () => {
     store.state.theme = "dark";
     wrapper = createWrapper();
-    const element = wrapper.find('.tw-relative.tw-overflow-x-hidden');
-    expect(element.classes()).toContain('tw-bg-gray-700');
+    const element = wrapper.find('.tw:relative.tw:overflow-x-hidden');
+    expect(element.classes()).toContain('tw:bg-gray-700');
   });
 
   it("should have correct CSS classes for light theme", () => {
     store.state.theme = "light";
     wrapper = createWrapper();
-    const element = wrapper.find('.tw-relative.tw-overflow-x-hidden');
-    expect(element.classes()).toContain('tw-bg-gray-200');
+    const element = wrapper.find('.tw:relative.tw:overflow-x-hidden');
+    expect(element.classes()).toContain('tw:bg-gray-200');
   });
 
   it("should show opacity 100 when loading", () => {
     wrapper = createWrapper({ loading: true });
-    expect(wrapper.classes()).toContain('tw-opacity-100');
+    expect(wrapper.classes()).toContain('tw:opacity-100');
   });
 
   it("should show opacity 0 when not loading and not fading out", () => {
     wrapper = createWrapper({ loading: false });
-    expect(wrapper.classes()).toContain('tw-opacity-0');
+    expect(wrapper.classes()).toContain('tw:opacity-0');
   });
 
   it("should expose correct properties from setup", () => {

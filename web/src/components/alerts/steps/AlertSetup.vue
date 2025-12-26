@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="step-alert-setup" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-    <div class="step-content card-container tw-px-3 tw-py-4">
+    <div class="step-content card-container tw:px-3 tw:py-4">
       <q-form ref="step1Form" @submit.prevent>
         <!-- Alert Name -->
-        <div class="form-field tw-mb-4">
+        <div class="form-field tw:mb-4">
           <q-input
             data-test="add-alert-name-input"
             v-model="formData.name"
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Folder Selection -->
-        <div class="form-field tw-mb-4">
+        <div class="form-field tw:mb-4">
           <SelectFolderDropDown
             :disableDropdown="beingUpdated"
             :type="'alerts'"
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Stream Type and Stream Name Row -->
-        <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
+        <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-2 tw:gap-4">
           <!-- Stream Type -->
           <div class="form-field">
             <q-select
@@ -106,8 +106,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Alert Type (Scheduled/Real-time) -->
-        <div class="form-field tw-mb-4 tw-mt-4">
-          <div class="tw-flex tw-items-center tw-gap-5">
+        <div class="form-field tw:mb-4 tw:mt-4">
+          <div class="tw:flex tw:items-center tw:gap-5">
             <q-radio
               data-test="add-alert-scheduled-alert-radio"
               v-bind:readonly="beingUpdated"

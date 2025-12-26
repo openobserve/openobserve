@@ -15,21 +15,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw-w-full org-dedup-settings">
-    <div class="tw-mb-6">
-      <div class="text-h6 tw-mb-2">{{ t('alerts.correlation.title') }}</div>
+  <div class="tw:w-full org-dedup-settings">
+    <div class="tw:mb-6">
+      <div class="text-h6 tw:mb-2">{{ t('alerts.correlation.title') }}</div>
       <div class="text-body2 text-grey-7">
         {{ t('alerts.correlation.description') }}
       </div>
-      <div class="text-body2 text-grey-6 tw-mt-2 tw-italic">
+      <div class="text-body2 text-grey-6 tw:mt-2 tw:italic">
         {{ t('alerts.correlation.semanticFieldNote') }}
       </div>
     </div>
 
-    <q-separator class="tw-mb-6" />
+    <q-separator class="tw:mb-6" />
 
     <!-- Enable Deduplication -->
-    <div class="tw-mb-6">
+    <div class="tw:mb-6">
       <q-checkbox
         v-model="localConfig.enabled"
         :label="t('alerts.correlation.enableOrgLevel')"
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Cross-Alert Deduplication -->
-    <div class="tw-mb-6" v-if="localConfig.enabled">
+    <div class="tw:mb-6" v-if="localConfig.enabled">
       <q-checkbox
         v-model="localConfig.alert_dedup_enabled"
         :label="t('alerts.correlation.enableCrossAlert')"
@@ -57,9 +57,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Cross-Alert Fingerprint Groups -->
-    <div class="tw-mb-6" v-if="localConfig.alert_dedup_enabled">
-      <div class="tw-font-semibold tw-pb-2 tw-flex tw-items-center">
-        {{ t('alerts.correlation.fingerprintGroups') }} <span class="tw-text-red-500 tw-ml-1">*</span>
+    <div class="tw:mb-6" v-if="localConfig.alert_dedup_enabled">
+      <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
+        {{ t('alerts.correlation.fingerprintGroups') }} <span class="tw:text-red-500 tw:ml-1">*</span>
         <q-icon
           :name="outlinedInfo"
           size="17px"
@@ -76,10 +76,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tooltip>
         </q-icon>
       </div>
-      <div class="tw-text-sm tw-text-gray-600 dark:tw-text-gray-400 tw-mb-2">
+      <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
         {{ t('alerts.correlation.fingerprintGroupsHint') }}
       </div>
-      <div class="tw-flex tw-flex-col tw-gap-2">
+      <div class="tw:flex tw:flex-col tw:gap-2">
         <q-checkbox
           v-for="group in localSemanticGroups"
           :key="group.id"
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           v-if="!localConfig.alert_fingerprint_groups || localConfig.alert_fingerprint_groups.length === 0"
-          class="tw-text-red-500 tw-text-sm tw-mt-1"
+          class="tw:text-red-500 tw:text-sm tw:mt-1"
         >
           {{ t('alerts.correlation.fingerprintGroupsRequired') }}
         </div>
@@ -98,8 +98,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Time Window -->
-    <div class="tw-mb-6">
-      <div class="tw-font-semibold tw-pb-2 tw-flex tw-items-center">
+    <div class="tw:mb-6">
+      <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
         {{ t('alerts.correlation.defaultWindow') }}
         <q-icon
           :name="outlinedInfo"
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tooltip>
         </q-icon>
       </div>
-      <div class="tw-text-sm tw-text-gray-600 dark:tw-text-gray-400 tw-mb-2">
+      <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
         {{ t('alerts.correlation.defaultWindowDescription') }}
       </div>
       <q-input
@@ -136,14 +136,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <div class="tw-flex tw-justify-end tw-gap-3">
-      <q-btn outline :label="t('alerts.correlation.cancelButton')" @click="$emit('cancel')" class="tw-px-4" />
+    <div class="tw:flex tw:justify-end tw:gap-3">
+      <q-btn outline :label="t('alerts.correlation.cancelButton')" @click="$emit('cancel')" class="tw:px-4" />
       <q-btn
         :label="t('alerts.correlation.saveButton')"
         color="primary"
         @click="saveSettings"
         :loading="saving"
-        class="tw-px-4"
+        class="tw:px-4"
       />
     </div>
   </div>

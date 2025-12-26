@@ -24,48 +24,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="row items-center no-wrap">
         <div class="col">
           <div
-            class="tw-text-[18px] tw-flex tw-items-center"
+            class="tw:text-[18px] tw:flex tw:items-center"
             data-test="schema-title-text"
           >
             {{ t("logStream.schemaHeader") }}
             <!-- introduced name at the top  -->
             <span 
               :class="[
-                'tw-font-bold tw-mr-4 tw-px-2 tw-py-1 tw-rounded-md tw-ml-2 tw-max-w-xs tw-truncate tw-inline-block',
+                'tw:font-bold tw:mr-4 tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:max-w-xs tw:truncate tw:inline-block',
                 store.state.theme === 'dark' 
-                  ? 'tw-text-blue-400 tw-bg-blue-900/50' 
-                  : 'tw-text-blue-600 tw-bg-blue-50'
+                  ? 'tw:text-blue-400 tw:bg-blue-900/50' 
+                  : 'tw:text-blue-600 tw:bg-blue-50'
               ]"
             >
               {{ indexData.name }}
-              <q-tooltip v-if="indexData.name.length > 35" class="tw-text-xs">
+              <q-tooltip v-if="indexData.name.length > 35" class="tw:text-xs">
                 {{ indexData.name }}
               </q-tooltip>
             </span>
             <div 
               :class="[
-                'tw-flex tw-items-center tw-gap-1.5 tw-px-2 tw-py-1 tw-rounded-md tw-border',
+                'tw:flex tw:items-center tw:gap-1.5 tw:px-2 tw:py-1 tw:rounded-md tw:border',
                 store.state.theme === 'dark' 
-                  ? 'tw-bg-gray-800/50 tw-border-gray-600' 
-                  : 'tw-bg-gray-50 tw-border-gray-200'
+                  ? 'tw:bg-gray-800/50 tw:border-gray-600' 
+                  : 'tw:bg-gray-50 tw:border-gray-200'
               ]"
             >
-              <img :src="getTimelineIcon" alt="Timeline Icon" class="tw-w-[14px] tw-h-[14px] tw-opacity-70" />
-              <div class="tw-flex tw-items-center tw-gap-1.5">
+              <img :src="getTimelineIcon" alt="Timeline Icon" class="tw:w-[14px] tw:h-[14px] tw:opacity-70" />
+              <div class="tw:flex tw:items-center tw:gap-1.5">
                 <span 
                   :class="[
-                    'tw-text-[10px] tw-font-medium tw-px-1.5 tw-py-0.5 tw-rounded',
+                    'tw:text-[10px] tw:font-medium tw:px-1.5 tw:py-0.5 tw:rounded',
                     store.state.theme === 'dark' 
-                      ? 'tw-text-gray-300 tw-bg-gray-700/50' 
-                      : 'tw-text-gray-600 tw-bg-gray-100'
+                      ? 'tw:text-gray-300 tw:bg-gray-700/50' 
+                      : 'tw:text-gray-600 tw:bg-gray-100'
                   ]"
                 >
                   UTC
                 </span>
                 <div 
                   :class="[
-                    'tw-text-xs tw-font-semibold',
-                    store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-800'
+                    'tw:text-xs tw:font-semibold',
+                    store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-800'
                   ]"
                 >
                   {{ indexData.stats.doc_time_min }} → {{ indexData.stats.doc_time_max }}
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- we will show loading state here -->
         <div
           v-if="loadingState"
-          class="q-pt-md text-center q-w-md q-mx-lg tw-flex tw-justify-center"
+          class="q-pt-md text-center q-w-md q-mx-lg tw:flex tw:justify-center"
           style="max-width: 450px"
         >
           <q-spinner-hourglass color="primary" size="lg" />
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- if we have data and no loading then we will show the data otherwise we will show the loading state -->
         <div v-else class="indexDetailsContainer" style="height: calc(100vh - 120px)">
           <!-- this the grid section the tiles section -->
-          <div class="stats-grid tw-grid tw-grid-cols-4 tw-gap-2 tw-mb-2">
+          <div class="stats-grid tw:grid tw:grid-cols-4 tw:gap-2 tw:mb-2">
               <!-- Docs Count Tile -->
               <div
                 v-if="store.state.zoConfig.show_stream_stats_doc_num"
@@ -103,23 +103,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="docs-count-tile"
               >
                 <div 
-                  class="tile-content tw-rounded-lg tw-p-3 tw-text-center tw-border tw-shadow-sm tw-h-20 tw-flex tw-flex-col tw-justify-between"
-                  :class="store.state.theme === 'dark' ? 'tile-content-dark tw-border-gray-700' : 'tile-content-light tw-border-gray-200'"
+                  class="tile-content tw:rounded-lg tw:p-3 tw:text-center tw:border tw:shadow-sm tw:h-20 tw:flex tw:flex-col tw:justify-between"
+                  :class="store.state.theme === 'dark' ? 'tile-content-dark tw:border-gray-700' : 'tile-content-light tw:border-gray-200'"
                 >
-                  <div class="tile-header tw-flex tw-justify-between tw-items-start">
+                  <div class="tile-header tw:flex tw:justify-between tw:items-start">
                     <div 
-                      class="tile-title tw-text-xs tw-font-bold tw-text-left"
-                      :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'"
+                      class="tile-title tw:text-xs tw:font-bold tw:text-left"
+                      :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
                     >
                     Events
                     </div>
-                    <div class="tile-icon tw-opacity-80">
-                      <img src="@/assets/images/home/records.svg" alt="Records Icon" class="tw-h-6 tw-w-6" />
+                    <div class="tile-icon tw:opacity-80">
+                      <img src="@/assets/images/home/records.svg" alt="Records Icon" class="tw:h-6 tw:w-6" />
                     </div>
                   </div>
                   <div 
-                    class="tile-value tw-text-lg tw-flex tw-items-end tw-justify-start"
-                    :class="store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-gray-900'"
+                    class="tile-value tw:text-lg tw:flex tw:items-end tw:justify-start"
+                    :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-gray-900'"
                   >
                     {{ parseInt(indexData.stats.doc_num).toLocaleString("en-US") }}
                   </div>
@@ -128,23 +128,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Storage Size Tile -->
               <div class="tile" data-test="storage-size-tile">
                 <div 
-                  class="tile-content tw-rounded-lg tw-p-3 tw-text-center tw-border tw-shadow-sm tw-h-20 tw-flex tw-flex-col tw-justify-between"
-                  :class="store.state.theme === 'dark' ? 'tile-content-dark tw-border-gray-700' : 'tile-content-light tw-border-gray-200'"
+                  class="tile-content tw:rounded-lg tw:p-3 tw:text-center tw:border tw:shadow-sm tw:h-20 tw:flex tw:flex-col tw:justify-between"
+                  :class="store.state.theme === 'dark' ? 'tile-content-dark tw:border-gray-700' : 'tile-content-light tw:border-gray-200'"
                 >
-                  <div class="tile-header tw-flex tw-justify-between tw-items-start">
+                  <div class="tile-header tw:flex tw:justify-between tw:items-start">
                     <div 
-                      class="tile-title tw-text-xs tw-font-bold tw-text-left"
-                      :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'"
+                      class="tile-title tw:text-xs tw:font-bold tw:text-left"
+                      :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
                     >
                       {{ t("logStream.storageSize") }}
                     </div>
-                    <div class="tile-icon tw-opacity-80">
-                      <img src="@/assets/images/home/ingested_size.svg" alt="Ingested Size Icon" class="tw-h-6 tw-w-6" />
+                    <div class="tile-icon tw:opacity-80">
+                      <img src="@/assets/images/home/ingested_size.svg" alt="Ingested Size Icon" class="tw:h-6 tw:w-6" />
                     </div>
                   </div>
                   <div 
-                    class="tile-value tw-text-lg  tw-flex tw-items-end tw-justify-start"
-                    :class="store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-gray-900'"
+                    class="tile-value tw:text-lg  tw:flex tw:items-end tw:justify-start"
+                    :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-gray-900'"
                   >
                     {{ formatSizeFromMB(indexData.stats.storage_size) }}
                   </div>
@@ -157,23 +157,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="compressed-size-tile"
               >
                 <div 
-                  class="tile-content tw-rounded-lg tw-p-3 tw-text-center tw-border tw-shadow-sm tw-h-20 tw-flex tw-flex-col tw-justify-between"
-                  :class="store.state.theme === 'dark' ? 'tile-content-dark tw-border-gray-700' : 'tile-content-light tw-border-gray-200'"
+                  class="tile-content tw:rounded-lg tw:p-3 tw:text-center tw:border tw:shadow-sm tw:h-20 tw:flex tw:flex-col tw:justify-between"
+                  :class="store.state.theme === 'dark' ? 'tile-content-dark tw:border-gray-700' : 'tile-content-light tw:border-gray-200'"
                 >
-                  <div class="tile-header tw-flex tw-justify-between tw-items-start">
+                  <div class="tile-header tw:flex tw:justify-between tw:items-start">
                     <div 
-                      class="tile-title tw-text-xs tw-font-bold tw-text-left"
-                      :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'"
+                      class="tile-title tw:text-xs tw:font-bold tw:text-left"
+                      :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
                     >
                       {{ t("logStream.compressedSize") }}
                     </div>
-                    <div class="tile-icon tw-opacity-80">
-                      <img src="@/assets/images/home/compressed_size.svg" alt="Compressed Size Icon" class="tw-h-6 tw-w-6" />
+                    <div class="tile-icon tw:opacity-80">
+                      <img src="@/assets/images/home/compressed_size.svg" alt="Compressed Size Icon" class="tw:h-6 tw:w-6" />
                     </div>
                   </div>
                   <div 
-                    class="tile-value tw-text-lg tw-flex tw-items-end tw-justify-start"
-                    :class="store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-gray-900'"
+                    class="tile-value tw:text-lg tw:flex tw:items-end tw:justify-start"
+                    :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-gray-900'"
                   >
                     {{ formatSizeFromMB(indexData.stats.compressed_size) }}
                   </div>
@@ -186,35 +186,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="index-size-tile"
               >
                 <div 
-                  class="tile-content tw-rounded-lg tw-p-3 tw-text-center tw-border tw-shadow-sm tw-h-20 tw-flex tw-flex-col tw-justify-between"
-                  :class="store.state.theme === 'dark' ? 'tile-content-dark tw-border-gray-700' : 'tile-content-light tw-border-gray-200'"
+                  class="tile-content tw:rounded-lg tw:p-3 tw:text-center tw:border tw:shadow-sm tw:h-20 tw:flex tw:flex-col tw:justify-between"
+                  :class="store.state.theme === 'dark' ? 'tile-content-dark tw:border-gray-700' : 'tile-content-light tw:border-gray-200'"
                 >
-                  <div class="tile-header tw-flex tw-justify-between tw-items-start">
+                  <div class="tile-header tw:flex tw:justify-between tw:items-start">
                     <div 
-                      class="tile-title tw-text-xs tw-font-bold tw-text-left"
-                      :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'"
+                      class="tile-title tw:text-xs tw:font-bold tw:text-left"
+                      :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
                     >
                       {{ t("logStream.indexSize") }}
                     </div>
-                    <div class="tile-icon tw-opacity-80">
-                      <img src="@/assets/images/home/index_size.svg" alt="Index Size Icon" class="tw-h-6 tw-w-6" />
+                    <div class="tile-icon tw:opacity-80">
+                      <img src="@/assets/images/home/index_size.svg" alt="Index Size Icon" class="tw:h-6 tw:w-6" />
                     </div>
                   </div>
                   <div 
-                    class="tile-value tw-text-lg tw-flex tw-items-end tw-justify-start"
-                    :class="store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-gray-900'"
+                    class="tile-value tw:text-lg tw:flex tw:items-end tw:justify-start"
+                    :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-gray-900'"
                   >
                     {{ formatSizeFromMB(indexData.stats.index_size) }}
                   </div>
                 </div>
               </div>
           </div>
-          <div class="tw-w-full tw-flex tw-gap-2">
+          <div class="tw:w-full tw:flex tw:gap-2">
           <!--  left section(includes tabs and schema settings) -->
             <div 
               :class="[
-                'tw-w-[100%] tw-h-[calc(100vh-200px)] tw-rounded-lg tw-border tw-shadow-sm tw-p-2 tw-flex tw-flex-col tw-h-full',
-                store.state.theme === 'dark' ? 'tw-bg-[#181A1B] tw-border-gray-700' : 'tw-bg-white tw-border-gray-200'
+                'tw:w-[100%] tw:h-[calc(100vh-200px)] tw:rounded-lg tw:border tw:shadow-sm tw:p-2 tw:flex tw:flex-col tw:h-full',
+                store.state.theme === 'dark' ? 'tw:bg-[#181A1B] tw:border-gray-700' : 'tw:bg-white tw:border-gray-200'
               ]"
             >
             <div>
@@ -249,10 +249,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- schema settings tab -->
             <div v-if="activeMainTab == 'schemaSettings'">
               <div
-                class="flex tw-justify-between tw-items-center"
+                class="flex tw:justify-between tw:items-center"
                 data-test="schema-log-stream-mapping-title-text"
               >
-                <div  v-if="indexData.defaultFts" style="font-weight: 400" class="tw-mt-[12px]">
+                <div  v-if="indexData.defaultFts" style="font-weight: 400" class="tw:mt-[12px]">
                   <label
                     style="font-weight: 600"
                     class="mapping-warning-msg"
@@ -291,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
 
-                  <div class="flex items-center tw-gap-2">
+                  <div class="flex items-center tw:gap-2">
                     <q-input
                       data-test="schema-field-search-input"
                       v-model="filterField"
@@ -329,7 +329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="q-pa-none"
                     style="padding: 4px 16px 4px 16px"
                   >
-                    <div class="tw-flex tw-justify-between tw-items-center">
+                    <div class="tw:flex tw:justify-between tw:items-center">
                       <div class="text-h6">Add Field(s)</div>
                       <div>
                         <q-btn
@@ -405,11 +405,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :key="col.name"
                         :props="props"
                       >
-                        <span v-if="col.icon" class="tw-ml-[5px]">
+                        <span v-if="col.icon" class="tw:ml-[5px]">
                           <q-icon  size="12px" :name="outlinedPerson"></q-icon>
                           <q-icon  size="12px" :name="outlinedSchema"></q-icon>
                         </span>
-                        <span class="tw-pl-7" v-else-if="col.name === 'patterns'">
+                        <span class="tw:pl-7" v-else-if="col.name === 'patterns'">
                           {{ col.label }}
                           <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle">
                             {{ t('logStream.sdr') }}
@@ -450,27 +450,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`schema-stream-delete-${scope.row.name}-field-fts-key-checkbox`"
                       v-model="scope.selected"
                       size="xs"
-                      class="tw-flex tw-items-center tw-justify-center tw-w-full"
+                      class="tw:flex tw:items-center tw:justify-center tw:w-full"
                     />
                   </template>
 
                   <template v-slot:body-cell-name="props">
                     <q-td class="q-td--no-hover field-name field-name-ellipsis">
-                      <div class="tw-flex tw-items-center">
+                      <div class="tw:flex tw:items-center">
                         <span class="field-name-text">
                           {{ props.row.name }}
-                          <q-tooltip v-if="props.row.name.length > 30" class="tw-text-[12px]">
+                          <q-tooltip v-if="props.row.name.length > 30" class="tw:text-[12px]">
                             {{ props.row.name }}
                           </q-tooltip>
                         </span>
-                        <span v-if="isEnvQuickModeField(props.row.name)" class="tw-flex tw-items-center tw-ml-1">
+                        <span v-if="isEnvQuickModeField(props.row.name)" class="tw:flex tw:items-center tw:ml-1">
                           <img
                             :src="quickModeIcon"
                             :alt="t('logStream.envQuickModeMsg')"
-                            class="tw-w-[20px] tw-h-[20px]"
+                            class="tw:w-[20px] tw:h-[20px]"
                           />
                           <q-tooltip
-                          class="tw-text-[12px] tw-w-[200px]"
+                          class="tw:text-[12px] tw:w-[200px]"
                         >
                           {{ t('logStream.envQuickModeMsg') }}
                         </q-tooltip>
@@ -549,14 +549,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               {{ scope.opt.label }}
                             </q-item-label>
                           </q-item-section>
-                          <q-tooltip class="tw-text-[12px] tw-w-[200px]" v-if="checkIfOptionPresentInDefaultEnv(props.row.name, scope.opt) == true">
+                          <q-tooltip class="tw:text-[12px] tw:w-[200px]" v-if="checkIfOptionPresentInDefaultEnv(props.row.name, scope.opt) == true">
                             This is a predefined environment setting and cannot be changed.
                           </q-tooltip>
                         </q-item>
                       </template>
                       <q-tooltip 
                         v-if="props.row.index_type && props.row.index_type.length > 0" 
-                        class="tw-text-[12px]"
+                        class="tw:text-[12px]"
                       >
                         {{ streamIndexType.filter(opt => props.row.index_type.includes(opt.value)).map(opt => opt.label).join(', ') }}
                       </q-tooltip>
@@ -565,7 +565,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <!-- here we will render the number of regex patterns associated with the specific field -->
                   <template v-slot:body-cell-patterns="props">
-                    <q-td v-if="config.isEnterprise == 'true' && !(props.row.name == store.state.zoConfig.timestamp_column) && (props.row.type == 'Utf8' || props.row.type == 'utf8')" class="field-name text-left tw-text-[#5960B2] tw-cursor-pointer " style="padding-left: 12px !important;" @click="openPatternAssociationDialog(props.row.name)">
+                    <q-td v-if="config.isEnterprise == 'true' && !(props.row.name == store.state.zoConfig.timestamp_column) && (props.row.type == 'Utf8' || props.row.type == 'utf8')" class="field-name text-left tw:text-[#5960B2] tw:cursor-pointer " style="padding-left: 12px !important;" @click="openPatternAssociationDialog(props.row.name)">
                       {{ patternAssociations[props.row.name]?.length ? `View ${patternAssociations[props.row.name]?.length} Patterns` : 'Add Pattern' }}
                       <span>
                         <q-icon name="arrow_forward" size="xs" />
@@ -592,22 +592,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             
             <!-- Configuration tab -->
             <div v-if="activeMainTab == 'configuration'">
-              <div class="tw-w-full tw-h-[calc(100vh-267px)] tw-flex tw-flex-col tw-gap-4 tw-h-full tw-overflow-y-auto tw-p-4">
+              <div class="tw:w-full tw:h-[calc(100vh-267px)] tw:flex tw:flex-col tw:gap-4 tw:h-full tw:overflow-y-auto tw:p-4">
                 <!-- Configuration Settings Card -->
                 <div 
                   :class="[
-                    'tw-rounded-lg tw-p-2 tw-border tw-shadow-sm tw-flex tw-flex-col tw-justify-evenly',
-                    store.state.theme === 'dark' ? 'dark:tw-bg-[#181A1B] dark:tw-border-gray-700' : 'tw-border-gray-200'
+                    'tw:rounded-lg tw:p-2 tw:border tw:shadow-sm tw:flex tw:flex-col tw:justify-evenly',
+                    store.state.theme === 'dark' ? 'dark:tw:bg-[#181A1B] dark:tw:border-gray-700' : 'tw:border-gray-200'
                   ]"
                 >
                   
-                  <div class="tw-flex tw-flex-col tw-gap-2 tw-flex-1">
+                  <div class="tw:flex tw:flex-col tw:gap-2 tw:flex-1">
                     <!-- Data Retention -->
                     <div v-if="showDataRetention" class="setting-group">
                       <label 
                         :class="[
-                          'tw-block tw-text-sm tw-font-semibold tw-mb-1',
-                          store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-700'
+                          'tw:block tw:text-sm tw:font-semibold tw:mb-1',
+                          store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-700'
                         ]"
                       >
                         Data Retention (days)
@@ -620,7 +620,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         min="1"
                         borderless
                         :class="[
-                          'tw-w-full',
+                          'tw:w-full',
                           store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'
                         ]"
                         class="o2-search-input no-border"
@@ -631,15 +631,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <small 
                           v-if="dataRetentionDays > 0 && dataRetentionDays != ''"
                           :class="[
-                            'tw-block tw-text-xs tw-mt-1 tw-italic',
-                            store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'
+                            'tw:block tw:text-xs tw:mt-1 tw:italic',
+                            store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'
                           ]"
                       >
                         Global retention is {{ store.state.zoConfig.data_retention_days }} days
                         
                       </small>
                       <!-- Error Message -->
-                      <div class="tw-text-red-500 tw-text-sm">
+                      <div class="tw:text-red-500 tw:text-sm">
                         <span v-if="dataRetentionDays <= 0 || dataRetentionDays == ''">
                           Retention period must be at least 1 day
                         </span>
@@ -650,8 +650,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="setting-group">
                       <label 
                         :class="[
-                          'tw-block tw-text-sm tw-font-semibold tw-mb-1',
-                          store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-700'
+                          'tw:block tw:text-sm tw:font-semibold tw:mb-1',
+                          store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-700'
                         ]"
                       >
                         Max Query Range (hours)
@@ -664,7 +664,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         borderless
                         min="0"
                         :class="[
-                          'tw-w-full',
+                          'tw:w-full',
                           store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'
                         ]"
                         class="o2-search-input no-border"
@@ -675,8 +675,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <small 
                         :class="[
-                          'tw-block tw-text-xs tw-mt-1 tw-italic',
-                          store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'
+                          'tw:block tw:text-xs tw:mt-1 tw:italic',
+                          store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'
                         ]"
                       >
                         Maximum time range allowed for queries. Set 0 for unlimited range.
@@ -687,8 +687,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="setting-group">
                       <label 
                         :class="[
-                          'tw-block tw-text-sm tw-font-semibold tw-mb-1',
-                          store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-700'
+                          'tw:block tw:text-sm tw:font-semibold tw:mb-1',
+                          store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-700'
                         ]"
                       >
                         {{ t("logStream.flattenLevel") }}
@@ -701,7 +701,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         borderless
                         min="0"
                         :class="[
-                          'tw-w-full',
+                          'tw:w-full',
                           store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'
                         ]"
                         class="o2-search-input no-border"
@@ -711,8 +711,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <small 
                         :class="[
-                          'tw-block tw-text-xs tw-mt-1 tw-italic',
-                          store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'
+                          'tw:block tw:text-xs tw:mt-1 tw:italic',
+                          store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'
                         ]"
                       >
                         Global is {{ store.state.zoConfig.ingest_flatten_level || 3 }}
@@ -722,13 +722,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Toggles -->
                     <div 
                       :class="[
-                        'tw-flex tw-items-center tw-justify-between tw-border-b tw-text-sm',
-                        store.state.theme === 'dark' ? 'tw-border-gray-600' : 'tw-border-gray-200'
+                        'tw:flex tw:items-center tw:justify-between tw:border-b tw:text-sm',
+                        store.state.theme === 'dark' ? 'tw:border-gray-600' : 'tw:border-gray-200'
                       ]"
                     >
                       <span 
                         :class="[
-                          store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-700'
+                          store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-700'
                         ]"
                       >
                         Use Stream Stats for Partitioning
@@ -745,8 +745,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <div 
                       :class="[
-                        'tw-flex tw-items-center tw-justify-between tw-border-b tw-text-sm',
-                        store.state.theme === 'dark' ? 'tw-border-gray-600 tw-text-gray-200' : 'tw-border-gray-200 tw-text-gray-700'
+                        'tw:flex tw:items-center tw:justify-between tw:border-b tw:text-sm',
+                        store.state.theme === 'dark' ? 'tw:border-gray-600 tw:text-gray-200' : 'tw:border-gray-200 tw:text-gray-700'
                       ]"
                     >
                       <span>Store Original Data</span>
@@ -763,8 +763,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <div
                       :class="[
-                        'tw-flex tw-items-center tw-justify-between tw-border-b tw-text-sm',
-                        store.state.theme === 'dark' ? 'tw-border-gray-600 tw-text-gray-200' : 'tw-border-gray-200 tw-text-gray-700'
+                        'tw:flex tw:items-center tw:justify-between tw:border-b tw:text-sm',
+                        store.state.theme === 'dark' ? 'tw:border-gray-600 tw:text-gray-200' : 'tw:border-gray-200 tw:text-gray-700'
                       ]"
                     >
                       <span>Enable Distinct Values</span>
@@ -798,7 +798,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
               </div>
               <div class="q-mt-sm">
-                <div class="text-center q-mt-sm tw-flex items-center">
+                <div class="text-center q-mt-sm tw:flex items-center">
                   <div class="flex items-center">
                     <span class="text-bold"> Select Date</span>
                     <date-time
@@ -884,7 +884,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-btn
                     v-if="isSchemaUDSEnabled && activeMainTab == 'schemaSettings'"
                     data-test="schema-add-field-button"
-                    class=" no-border q-mr-md o2-secondary-button tw-h-[36px]"
+                    class=" no-border q-mr-md o2-secondary-button tw:h-[36px]"
                     :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                     no-caps
                     v-bind:disable="!selectedFields.length"
@@ -906,7 +906,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       !selectedFields.length && !selectedDateFields.length
                     "
                     data-test="schema-delete-button"
-                    class="text-bold btn-delete o2-secondary-button tw-h-[36px]"
+                    class="text-bold btn-delete o2-secondary-button tw:h-[36px]"
                     :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                     no-caps
                     flat
@@ -916,7 +916,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : (confirmDeleteDatesDialog = true)
                     "
                   >
-                    <span class="flex items-center tw-gap-1">
+                    <span class="flex items-center tw:gap-1">
                       <q-icon size="14px" :name="outlinedDelete" />
                       {{ t("logStream.delete") }}
                     </span>
@@ -926,7 +926,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-btn
                     v-close-popup="true"
                     data-test="schema-cancel-button"
-                    class="q-ml-md o2-secondary-button tw-h-[36px]"
+                    class="q-ml-md o2-secondary-button tw:h-[36px]"
                     :label="t('logStream.cancel')"
                     :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                     no-caps
@@ -936,7 +936,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-bind:disable="!formDirtyFlag"
                     data-test="schema-update-settings-button"
                     :label="t('logStream.updateSettings')"
-                    class=" no-border q-ml-md o2-primary-button tw-h-[36px"
+                    class=" no-border q-ml-md o2-primary-button tw:h-[36px"
                     :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
                     type="submit"
                     no-caps

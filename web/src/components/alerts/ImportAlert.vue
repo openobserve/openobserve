@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Custom URL Input Section with Folder Dropdown -->
     <template #url-input-section="{ url, updateUrl }">
-      <div class="flex tw-mt-[0.725rem] tw-h-[64px]">
+      <div class="flex tw:mt-[0.725rem] tw:h-[64px]">
         <div style="width: calc(69%)" class="q-pr-sm">
           <q-input
             data-test="alert-import-url-input"
@@ -98,11 +98,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #output-content>
       <div
         v-if="alertErrorsToDisplay.length > 0"
-        class="text-center text-h6 tw-py-2"
+        class="text-center text-h6 tw:py-2"
       >
         Error Validations
       </div>
-      <div v-else class="text-center text-h6 tw-py-2">Output Messages</div>
+      <div v-else class="text-center text-h6 tw:py-2">Output Messages</div>
       <q-separator class="q-mx-md q-mt-md" />
       <div class="error-report-container" style="height: calc(100vh - 192px) !important; overflow: auto; resize: none;">
         <!-- Alert Errors Section -->

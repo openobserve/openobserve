@@ -251,8 +251,8 @@ describe('Databricks.vue', () => {
   it('should have correct component structure', () => {
     wrapper = mount(Databricks, getGlobalConfig());
     const container = wrapper.find('.q-pa-sm');
-    const textDiv = container.find('div[class*="tw-text-"]');
-    const boldDiv = wrapper.find('div[class*="tw-font-bold"]');
+    const textDiv = container.find('div[class*="tw:text-"]');
+    const boldDiv = wrapper.find('div[class*="tw:font-bold"]');
     
     expect(container.exists()).toBe(true);
     expect(textDiv.exists()).toBe(true);
@@ -271,11 +271,11 @@ describe('Databricks.vue', () => {
     wrapper = mount(Databricks, {
       ...getGlobalConfig()
     });
-    const docSection = wrapper.find('.tw-font-bold.tw-pt-6.tw-pb-2');
+    const docSection = wrapper.find('.tw:font-bold.tw:pt-6.tw:pb-2');
     expect(docSection.exists()).toBe(true);
-    expect(docSection.classes()).toContain('tw-font-bold');
-    expect(docSection.classes()).toContain('tw-pt-6');
-    expect(docSection.classes()).toContain('tw-pb-2');
+    expect(docSection.classes()).toContain('tw:font-bold');
+    expect(docSection.classes()).toContain('tw:pt-6');
+    expect(docSection.classes()).toContain('tw:pb-2');
   });
 
   // Test 22: Template text content

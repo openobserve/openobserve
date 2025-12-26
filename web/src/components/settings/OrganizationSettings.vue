@@ -68,7 +68,7 @@
         v-model="toggleIngestionLogs"
         :label="t('settings.toggleIngestionLogsLabel')"
         stack-label
-        class="q-mt-sm o2-toggle-button-lg tw-mr-3 -tw-ml-4"
+        class="q-mt-sm o2-toggle-button-lg tw:mr-3 -tw:ml-4"
         size="lg"
       >
       </q-toggle>
@@ -78,7 +78,7 @@
       <q-btn
         data-test="add-alert-cancel-btn"
         v-close-popup="true"
-        class="q-mr-md o2-secondary-button tw-h-[36px]"
+        class="q-mr-md o2-secondary-button tw:h-[36px]"
         :label="t('alerts.cancel')"
         no-caps
         flat
@@ -87,7 +87,7 @@
       <q-btn
         data-test="add-alert-submit-btn"
         :label="t('alerts.save')"
-        class="o2-primary-button no-border tw-h-[36px]"
+        class="o2-primary-button no-border tw:h-[36px]"
         type="submit"
         no-caps
         flat

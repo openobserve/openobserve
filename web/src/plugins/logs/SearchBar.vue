@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="logs-search-bar-component"
     id="searchBarComponent"
   >
-    <div class="row tw-m-0! tw-p-[0.375rem]! tw-items-start!">
+    <div class="row tw:m-0! tw:p-[0.375rem]! tw:items-start!">
       <div class="float-right col flex">
         <div class="button-group logs-visualize-toggle element-box-shadow">
           <div class="row">
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-caps
                 size="sm"
                 icon="search"
-                class="button button-left tw-flex tw-justify-center tw-items-center no-border no-outline tw-rounded-r-none! q-px-sm btn-height-32"
+                class="button button-left tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-r-none! q-px-sm btn-height-32"
               >
                 <q-tooltip>
                   {{ t("common.search") }}
@@ -48,8 +48,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="logs-visualize-toggle"
                 :class="[
                   searchObj.meta.logsVisualizeToggle === 'visualize' ? 'selected' : '',
-                  config.isEnterprise == 'true' ? 'button button-center tw-rounded-none' : 'button button-right tw-rounded-l-none!',
-                  'tw-flex tw-justify-center tw-items-center no-border no-outline q-px-sm btn-height-32'
+                  config.isEnterprise == 'true' ? 'button button-center tw:rounded-none' : 'button button-right tw:rounded-l-none!',
+                  'tw:flex tw:justify-center tw:items-center no-border no-outline q-px-sm btn-height-32'
                 ]"
                 @click="onLogsVisualizeToggleUpdate('visualize')"
                 :disable="isVisualizeDisabled"
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? 'selected'
                     : ''
                 "
-                class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline tw-rounded-l-none! q-px-sm btn-height-32"
+                class="button button-right tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm btn-height-32"
                 @click="onLogsVisualizeToggleUpdate('patterns')"
                 no-caps
                 size="sm"
@@ -226,7 +226,7 @@ alt="SQL Mode" class="toolbar-icon" />
                           dense
                           clearable
                           debounce="1"
-                          class="tw-mx-2 tw-my-2"
+                          class="tw:mx-2 tw:my-2"
                           :placeholder="t('search.searchSavedView')"
                         >
                           <template #prepend>
@@ -466,7 +466,7 @@ class="field_list" no-hover>
                 class="q-pa-sm saved-view-item"
               >
                 <q-item-section>
-                  <q-item-label class="tw-flex tw-items-center">
+                  <q-item-label class="tw:flex tw:items-center">
                     <div
                       style="
                         width: 28px;
@@ -505,7 +505,7 @@ class="field_list" no-hover>
                 class="q-pa-sm saved-view-item"
               >
                 <q-item-section>
-                  <q-item-label class="tw-flex tw-items-center">
+                  <q-item-label class="tw:flex tw:items-center">
                     <div
                       style="
                         width: 28px;
@@ -544,7 +544,7 @@ class="field_list" no-hover>
                 class="q-pa-sm saved-view-item"
               >
                 <q-item-section>
-                  <q-item-label class="tw-flex tw-items-center">
+                  <q-item-label class="tw:flex tw:items-center">
                     <div
                       style="
                         width: 28px;
@@ -575,7 +575,7 @@ class="field_list" no-hover>
               <!-- Syntax Guide -->
               <q-item clickable class="q-pa-sm saved-view-item">
                 <q-item-section>
-                  <q-item-label class="tw-flex tw-items-center">
+                  <q-item-label class="tw:flex tw:items-center">
                     <div
                       style="
                         width: 28px;
@@ -607,7 +607,7 @@ class="field_list" no-hover>
                 class="q-pa-sm saved-view-item"
               >
                 <q-item-section>
-                  <q-item-label class="tw-flex tw-items-center">
+                  <q-item-label class="tw:flex tw:items-center">
                     <div
                       style="
                         width: 28px;
@@ -717,7 +717,7 @@ alt="Quick Mode" class="toolbar-icon" />
                 v-close-popup
               >
                 <q-item-section @click.stop="showSearchHistoryfn">
-                  <q-item-label class="tw-flex tw-items-center tw-gap-2">
+                  <q-item-label class="tw:flex tw:items-center tw:gap-2">
                     <img
                       :src="searchHistoryIcon"
                       alt="Search History"
@@ -737,7 +737,7 @@ alt="Quick Mode" class="toolbar-icon" />
                 @mouseenter="showDownloadMenu = true"
               >
                 <q-item-section class="cursor-pointer">
-                  <q-item-label class="tw-flex tw-items-center tw-gap-2">
+                  <q-item-label class="tw:flex tw:items-center tw:gap-2">
                     <img
                       :src="downloadTableIcon"
                       alt="Download Table"
@@ -771,7 +771,7 @@ alt="Quick Mode" class="toolbar-icon" />
 class="q-pr-sm q-pt-xs" />
                       <q-item-section>
                         <q-item-label
-                          class="tw-flex tw-items-center tw-gap-2 q-mr-md"
+                          class="tw:flex tw:items-center tw:gap-2 q-mr-md"
                         >
                           {{ t("search.downloadCSV") }}
                         </q-item-label>
@@ -790,7 +790,7 @@ class="q-pr-sm q-pt-xs" />
 class="q-pr-sm q-pt-xs" />
                       <q-item-section>
                         <q-item-label
-                          class="tw-flex tw-items-center tw-gap-2 q-mr-md"
+                          class="tw:flex tw:items-center tw:gap-2 q-mr-md"
                         >
                           {{ t("search.downloadJSON") }}
                         </q-item-label>
@@ -809,7 +809,7 @@ class="q-pr-sm q-pt-xs" />
                   @click.stop="toggleCustomDownloadDialog"
                   v-close-popup
                 >
-                  <q-item-label class="tw-flex tw-items-center tw-gap-2">
+                  <q-item-label class="tw:flex tw:items-center tw:gap-2">
                     <img
                       :src="customRangeIcon"
                       alt="Custom Range"
@@ -831,7 +831,7 @@ class="q-pr-sm q-pt-xs" />
                 @click="openExplainDialog"
               >
                 <q-item-section v-close-popup>
-                  <q-item-label class="tw-flex tw-items-center tw-gap-2">
+                  <q-item-label class="tw:flex tw:items-center tw:gap-2">
                     <q-icon name="lightbulb" size="20px" />
                     {{ t("search.explainQuery") }}</q-item-label
                   >
@@ -848,7 +848,7 @@ class="q-pr-sm q-pt-xs" />
               >
                 <q-item-section v-close-popup>
                   <q-item-label
-                    class="tw-flex tw-items-center tw-gap-2"
+                    class="tw:flex tw:items-center tw:gap-2"
                     data-test="search-scheduler-create-new-label"
                   >
                     <img
@@ -870,7 +870,7 @@ class="q-pr-sm q-pt-xs" />
               >
                 <q-item-section v-close-popup>
                   <q-item-label
-                    class="tw-flex tw-items-center tw-gap-2"
+                    class="tw:flex tw:items-center tw:gap-2"
                     data-test="search-scheduler-list-label"
                   >
                     <img
@@ -888,7 +888,7 @@ class="q-pr-sm q-pt-xs" />
             {{ t("search.moreActions") }}
           </q-tooltip>
         </q-btn>
-        <div class="float-left tw-mr-[-4px]">
+        <div class="float-left tw:mr-[-4px]">
           <date-time
             ref="dateTimeRef"
             auto-apply
@@ -942,7 +942,7 @@ class="q-pr-sm q-pt-xs" />
                   borderless
                   dense
                   clearable
-                  class="tw-mb-[0.375rem]! indexlist-search-input q-mx-sm q-mt-sm"
+                  class="tw:mb-[0.375rem]! indexlist-search-input q-mx-sm q-mt-sm"
                   v-model="regionFilter"
                   :label="t('search.regionFilterMsg')"
                 >
@@ -959,7 +959,7 @@ class="q-pr-sm q-pt-xs" />
               </q-btn-dropdown>
             </q-btn-group>
             <div v-if="searchObj.meta.logsVisualizeToggle === 'visualize'">
-              <div v-if="config.isEnterprise == 'true'" class="tw-flex">
+              <div v-if="config.isEnterprise == 'true'" class="tw:flex">
                 <q-btn
                 v-if="
                   visualizeSearchRequestTraceIds.length > 0
@@ -983,7 +983,7 @@ class="q-pr-sm q-pt-xs" />
                   dense
                   flat
                   :title="t('search.runQuery')"
-                  class="q-pa-none o2-run-query-button o2-color-primary tw-h-[30px] element-box-shadow"
+                  class="q-pa-none o2-run-query-button o2-color-primary tw:h-[30px] element-box-shadow"
                   :class="
                     config.isEnterprise == 'true'
                       ? 'search-button-enterprise-border-radius'
@@ -993,10 +993,10 @@ class="q-pr-sm q-pt-xs" />
                   @click="handleRunQueryFn"
                   >{{ t("search.runQuery") }}</q-btn
                 >
-              <q-separator class="tw-h-[29px] tw-w-[1px]" />
+              <q-separator class="tw:h-[29px] tw:w-[1px]" />
               <q-btn-dropdown
                 flat
-                class="tw-h-[29px] search-button-dropdown"
+                class="tw:h-[29px] search-button-dropdown"
                 :class="[
                   config.isEnterprise == 'true' &&
                   visualizeSearchRequestTraceIds.length
@@ -1016,7 +1016,7 @@ class="q-pr-sm q-pt-xs" />
                   flat
                   no-caps
                   :title="t('search.refreshCacheAndRunQuery')"
-                  class="q-pa-sm search-button-dropdown tw-text-[12px]"
+                  class="q-pa-sm search-button-dropdown tw:text-[12px]"
                   v-close-popup
                   @click="handleRunQueryFn(true)"
                   :disable="
@@ -1029,13 +1029,13 @@ class="q-pr-sm q-pt-xs" />
                 >
               </q-btn-dropdown>
               </div>
-              <div v-else class="tw-flex">
+              <div v-else class="tw:flex">
                 <q-btn
                   data-test="logs-search-bar-visualize-refresh-btn"
                   dense
                   flat
                   :title="t('search.runQuery')"
-                  class="q-pa-none o2-run-query-button o2-color-primary tw-h-[30px] element-box-shadow"
+                  class="q-pa-none o2-run-query-button o2-color-primary tw:h-[30px] element-box-shadow"
                   :class="
                     config.isEnterprise == 'true'
                       ? 'search-button-enterprise-border-radius'
@@ -1048,7 +1048,7 @@ class="q-pr-sm q-pt-xs" />
                 >
               </div>
             </div>
-            <div v-else class="tw-flex">
+            <div v-else class="tw:flex">
               <q-btn
                 v-if="
                   config.isEnterprise == 'true' &&
@@ -1072,7 +1072,7 @@ class="q-pr-sm q-pt-xs" />
                 data-cy="search-bar-refresh-button"
                 dense
                 :title="t('search.runQuery')"
-                class="q-pa-none o2-run-query-button o2-color-primary tw-h-[30px] element-box-shadow"
+                class="q-pa-none o2-run-query-button o2-color-primary tw:h-[30px] element-box-shadow"
                 :class="config.isEnterprise == 'true' ? 'search-button-enterprise-border-radius' : 'search-button-normal-border-radius'"
                 no-caps
                 @click="handleRunQueryFn"
@@ -1083,8 +1083,8 @@ class="q-pr-sm q-pt-xs" />
                 "
                 >{{ t("search.runQuery") }}</q-btn
               >
-               <q-separator  class="tw-h-[29px] tw-w-[1px]" />
-              <q-btn-dropdown v-if="config.isEnterprise == 'true'" flat class="tw-h-[29px]"
+               <q-separator  class="tw:h-[29px] tw:w-[1px]" />
+              <q-btn-dropdown v-if="config.isEnterprise == 'true'" flat class="tw:h-[29px]"
                 :class="[
                 config.isEnterprise == 'true' &&
                     (!!searchObj.data.searchRequestTraceIds.length ||
@@ -1101,7 +1101,7 @@ class="q-pr-sm q-pt-xs" />
                       flat
                       no-caps
                       :title="t('search.refreshCacheAndRunQuery')"
-                      class="q-pa-sm tw-text-[12px] "
+                      class="q-pa-sm tw:text-[12px] "
                       v-close-popup
                       @click="handleRunQueryFn(true)"
                       :disable="
@@ -1119,27 +1119,27 @@ class="q-pr-sm q-pt-xs" />
     </div>
     <div class="row query-editor-container">
       <div
-        class="col tw-h-full"
+        class="col tw:h-full"
         :class="{ 'expand-on-focus': isFocused }"
         :style="backgroundColorStyle"
       >
         <q-splitter
-          class="logs-search-splitter tw-h-full!"
+          class="logs-search-splitter tw:h-full!"
           no-scroll
           v-model="searchObj.config.fnSplitterModel"
           :limits="searchObj.config.fnSplitterLimit"
         >
           <template #before>
             <div
-              class="col tw-border tw-solid tw-border-[var(--o2-border-color)] tw-mb-[0.375rem] tw-rounded-[0.375rem] tw-overflow-hidden tw-h-full"
-              :class="searchObj.data.transformType && searchObj.meta.showTransformEditor ? 'tw-ml-[0.375rem]' : 'tw-mx-[0.375rem]'"
+              class="col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full"
+              :class="searchObj.data.transformType && searchObj.meta.showTransformEditor ? 'tw:ml-[0.375rem]' : 'tw:mx-[0.375rem]'"
             >
               <code-query-editor
                 v-if="router.currentRoute.value.name === 'logs'"
                 data-test="logs-search-bar-query-editor"
                 editor-id="logsQueryEditor"
                 ref="queryEditorRef"
-                class="monaco-editor tw-px-[0.325rem] tw-py-[0.125rem]"
+                class="monaco-editor tw:px-[0.325rem] tw:py-[0.125rem]"
                 :style="editorWidthToggleFunction"
                 v-model:query="searchObj.data.query"
                 :keywords="autoCompleteKeywords"
@@ -1167,16 +1167,16 @@ class="q-pr-sm q-pt-xs" />
               style="width: 100%; height: 100%"
             >
               <template v-if="showFunctionEditor">
-                <div class="tw-relative tw-h-full tw-w-full">
+                <div class="tw:relative tw:h-full tw:w-full">
                   <div
-                    class="tw-border tw-solid tw-border-[var(--o2-border-color)] tw-mr-[0.375rem] tw-mb-[0.375rem] tw-rounded-[0.375rem] tw-overflow-hidden tw-h-full"
+                    class="tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mr-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full"
                   >
                     <code-query-editor
                       v-if="router.currentRoute.value.name === 'logs'"
                       data-test="logs-vrl-function-editor"
                       ref="fnEditorRef"
                       editor-id="fnEditor"
-                      class="monaco-editor tw-px-[0.325rem] tw-py-[0.125rem]"
+                      class="monaco-editor tw:px-[0.325rem] tw:py-[0.125rem]"
                       v-model:query="searchObj.data.tempFunctionContent"
                       :class="
                         searchObj.data.tempFunctionContent == '' &&
@@ -1202,10 +1202,10 @@ class="q-pr-sm q-pt-xs" />
                   v-if="searchObj.meta.logsVisualizeToggle === 'visualize'"
                   :class="
                     store.state.theme == 'dark'
-                      ? 'tw-bg-white tw-bg-opacity-10'
-                      : 'tw-bg-black tw-bg-opacity-10'
+                      ? 'tw:bg-white tw:bg-opacity-10'
+                      : 'tw:bg-black tw:bg-opacity-10'
                   "
-                  class="tw-absolute tw-bottom-0 tw-w-full"
+                  class="tw:absolute tw:bottom-0 tw:w-full"
                   style="margin-top: 12px; display: flex; align-items: center; flex"
                 >
                   <q-icon
@@ -1464,8 +1464,8 @@ class="q-pr-sm q-pt-xs" />
         </q-card-section>
 
         <q-card-section class="q-pt-none">
-          <div class="tw-flex tw-items-center ">
-          <span class="tw-mt-2">Update</span>
+          <div class="tw:flex tw:items-center ">
+          <span class="tw:mt-2">Update</span>
           <q-toggle
             data-test="saved-function-action-toggle"
             v-bind:disable="functionOptions.length == 0"
@@ -1478,7 +1478,7 @@ class="q-pr-sm q-pt-xs" />
             class="o2-toggle-button-lg"
             @change="savedFunctionName = ''"
           />
-          <span class="tw-mt-2">Create</span>
+          <span class="tw:mt-2">Create</span>
           </div>
           <div v-if="isSavedFunctionAction == 'create'">
             <q-input

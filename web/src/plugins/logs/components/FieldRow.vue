@@ -18,15 +18,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Simple field without expansion (FTS keys or fields without values) -->
   <div
     v-if="field.ftsKey || !field.isSchemaField || !field.showValues"
-    class="field-container flex content-center ellipsis q-pl-lg full-width hover:tw-bg-[var(--o2-hover-accent)] tw-rounded-[0.25rem]"
+    class="field-container flex content-center ellipsis q-pl-lg full-width hover:tw:bg-[var(--o2-hover-accent)] tw:rounded-[0.25rem]"
     :title="field.name"
   >
     <div
-      class="field_label full-width tw-flex! tw-items-center! tw-justify-between!"
+      class="field_label full-width tw:flex! tw:items-center! tw:justify-between!"
       :data-test="`logs-field-list-item-${field.name}`"
     >
       <div
-        class="ellipsis tw-flex tw-items-center tw-max-w-[calc(100%-1.5rem)]!"
+        class="ellipsis tw:flex tw:items-center tw:max-w-[calc(100%-1.5rem)]!"
         style="display: inline-block"
       >
         {{ field.name }}
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </div>
     <div
-      class="field_overlay tw-rounded-[0.25rem] tw-overflow-hidden"
+      class="field_overlay tw:rounded-[0.25rem] tw:overflow-hidden"
       v-if="field.name !== timestampColumn"
     >
       <q-btn

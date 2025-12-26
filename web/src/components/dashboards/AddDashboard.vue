@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :loading="onSubmit.isLoading.value"
             :label="t('dashboard.save')"
             flat
-            class="o2-primary-button tw-h-[36px] q-ml-md"
+            class="o2-primary-button tw:h-[36px] q-ml-md"
             :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             type="submit"
             no-caps
