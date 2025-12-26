@@ -386,7 +386,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         true,
       );
     } catch (e: any) {
-      console.error("Error while loading stream fields", e);
       return { name: streamName, schema: [], settings: {} };
     }
   }
@@ -1134,7 +1133,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       return;
     }
 
-    console.log("🔴 resetAggregationFunction called for type:", dashboardPanelData.data.type, "\nStack trace:", new Error().stack);
     switch (dashboardPanelData.data.type) {
       case "heatmap":
         dashboardPanelData.data.queries[
@@ -2669,13 +2667,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       selectedStreamFieldsBasedOnUserDefinedSchema.value,
     ],
     async (newVal, oldVal) => {
-      console.log("🔔 WATCHER FIRED - useDashboardPanel.ts:2646");
-      console.log("🔔 newVal[0] (query):", newVal[0]?.substring(0, 100));
-      console.log("🔔 oldVal[0] (query):", oldVal[0]?.substring(0, 100));
-      console.log("🔔 newVal[1] (customQuery):", newVal[1]);
-      console.log("🔔 oldVal[1] (customQuery):", oldVal[1]);
-      console.log("🔔 dashboardPanelData.data.type:", dashboardPanelData.data.type);
-
       // if pageKey is logs, then return
       // because custom query fields will be extracted from the query using the result schema api
       // NOW: we need to only skip custom query fields for logs page
@@ -2686,7 +2677,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
       // Check if customQuery mode has changed
       const customQueryChanged = newVal[1] !== oldVal[1];
-      console.log("🔔 customQueryChanged:", customQueryChanged);
 
       // Only continue if the current mode is "show custom query"
       if (
@@ -2695,19 +2685,16 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ].customQuery &&
         dashboardPanelData.data.queryType == "sql"
       ) {
-        console.log("🔔 Branch: customQuery && sql - calling updateQueryValue");
         // Call the updateQueryValue function
         // will skip custom query fields extraction for logs page
         if (parser) await updateQueryValue(pageKey == "logs" ? true : false);
       } else if (customQueryChanged) {
-        console.log("🔔 Branch: customQueryChanged - clearing fields");
         // Only clear lists when switching modes
         // auto query mode selected
         // remove the custom fields from the list
         dashboardPanelData.meta.stream.customQueryFields = [];
         dashboardPanelData.meta.stream.vrlFunctionFieldList = []; // Clear VRL function field list
       }
-      console.log("🔔 WATCHER END - dashboardPanelData.data.queries[0]:", JSON.stringify(dashboardPanelData.data.queries[0]));
       // if (dashboardPanelData.data.queryType == "promql") {
       //     updatePromQLQuery()
       // }
@@ -3064,7 +3051,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.meta.promql.labelValuesMap = new Map();
       }
     } catch (error) {
-      console.error("Error fetching PromQL labels:", error);
       dashboardPanelData.meta.promql.availableLabels = [];
       dashboardPanelData.meta.promql.labelValuesMap = new Map();
     } finally {
