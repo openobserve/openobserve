@@ -169,6 +169,7 @@ const props = defineProps<{
   labels: QueryBuilderLabelFilter[];
   metric?: string;
   dashboardData?: any; // Dashboard data containing variables
+  dashboardPanelData?: any;
 }>();
 
 const emit = defineEmits<{
@@ -184,16 +185,10 @@ const dashboardPanelDataPageKey = inject(
 );
 const { fetchPromQLLabels } = useDashboardPanelData(dashboardPanelDataPageKey);
 
-const availableLabels = computed(
-  () => props.dashboardData?.meta?.promql?.availableLabels || [],
-);
-
-const labelValuesMap = computed(
-  () => props.dashboardData?.meta?.promql?.labelValuesMap || new Map(),
-);
-const loadingLabels = computed(
-  () => props.dashboardData?.meta?.promql?.loadingLabels || false,
-);
+// Use shared meta from dashboard data for label options
+const availableLabels = computed(() => props.dashboardPanelData?.meta?.promql?.availableLabels || []);
+const labelValuesMap = computed(() => props.dashboardPanelData?.meta?.promql?.labelValuesMap || new Map());
+const loadingLabels = computed(() => props.dashboardPanelData?.meta?.promql?.loadingLabels || false);
 
 const operatorOptions = ["=", "!=", "=~", "!~"];
 

@@ -676,7 +676,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <LabelFilterEditor
       v-model:labels="promqlBuilderQuery.labels"
       :metric="promqlBuilderQuery.metric"
-      :dashboardData="dashboardPanelData"
+      :dashboardData="dashboardData"
+      :dashboardPanelData="dashboardPanelData"
     />
     <q-separator />
     <OperationsList
