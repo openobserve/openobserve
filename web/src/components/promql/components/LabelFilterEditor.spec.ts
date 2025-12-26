@@ -58,6 +58,7 @@ describe("LabelFilterEditor", () => {
     labels: mockLabels,
     metric: "http_requests_total",
     dashboardData: mockDashboardData,
+    dashboardPanelData: mockDashboardData,
   };
 
   beforeEach(() => {
@@ -348,7 +349,7 @@ describe("LabelFilterEditor", () => {
           },
         },
       };
-      wrapper = createWrapper({ dashboardData: loadingData });
+      wrapper = createWrapper({ dashboardPanelData: loadingData });
 
       expect(wrapper.vm.loadingLabels).toBe(true);
     });
