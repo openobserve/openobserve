@@ -161,8 +161,11 @@ describe("OperationsList", () => {
       );
       await removeButton.trigger("click");
 
-      expect(operations.length).toBe(1);
-      expect(operations[0].id).toBe(PromOperationId.Sum);
+      // Check that update:operations event was emitted with removed operation
+      const emitted = wrapper.emitted("update:operations");
+      expect(emitted).toBeTruthy();
+      expect(emitted![0][0]).toHaveLength(1);
+      expect(emitted![0][0][0].id).toBe(PromOperationId.Sum);
     });
 
     it("should add operation with default params", () => {
@@ -179,9 +182,12 @@ describe("OperationsList", () => {
 
       wrapper.vm.addOperation(opDef);
 
-      expect(operations.length).toBe(1);
-      expect(operations[0].id).toBe(PromOperationId.Rate);
-      expect(operations[0].params).toEqual(["5m"]);
+      // Check that update:operations event was emitted with new operation
+      const emitted = wrapper.emitted("update:operations");
+      expect(emitted).toBeTruthy();
+      expect(emitted![0][0]).toHaveLength(1);
+      expect(emitted![0][0][0].id).toBe(PromOperationId.Rate);
+      expect(emitted![0][0][0].params).toEqual(["5m"]);
     });
   });
 
@@ -193,8 +199,11 @@ describe("OperationsList", () => {
       const reordered = [mockOperations[1], mockOperations[0]];
       wrapper.vm.handleDragUpdate(reordered);
 
-      expect(operations[0].id).toBe(PromOperationId.Sum);
-      expect(operations[1].id).toBe(PromOperationId.Rate);
+      // Check that update:operations event was emitted with reordered operations
+      const emitted = wrapper.emitted("update:operations");
+      expect(emitted).toBeTruthy();
+      expect(emitted![0][0][0].id).toBe(PromOperationId.Sum);
+      expect(emitted![0][0][1].id).toBe(PromOperationId.Rate);
     });
 
     it("should emit update event on drag", () => {
