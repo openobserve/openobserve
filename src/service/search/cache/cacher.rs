@@ -983,10 +983,10 @@ mod tests {
     use std::sync::Arc;
 
     use arrow_schema::{Field, Schema};
-    use config::meta::{
+    use config::{meta::{
         search::{Query, Request, RequestEncoding, Response, ResponseTook, SearchEventType},
         sql::OrderBy,
-    };
+    }, utils::time::now_micros};
     use datafusion::common::TableReference;
     use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
     use proto::cluster_rpc::SearchQuery;
