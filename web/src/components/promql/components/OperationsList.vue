@@ -42,10 +42,10 @@
                 >
                   <q-menu class="q-pa-md">
                     <div style="width: 350px">
-                      <div class="text-weight-medium q-mb-sm">
+                      <div class="text-weight-medium">
                         {{ getOperationDef(element.id)?.name || element.id }}
                       </div>
-                      <div class="text-caption text-grey-7 q-mb-md">
+                      <div class="text-caption text-grey-7">
                         {{ getOperationDef(element.id)?.documentation }}
                       </div>
 
@@ -95,7 +95,8 @@
                           stack-label
                           hide-bottom-space
                           multiple
-                          class="showLabelOnTop q-mb-sm"
+                          class="operation-label-selector showLabelOnTop no-case q-mb-sm"
+                          input-class="!tw-normal-case"
                           :data-test="`promql-operation-param-${paramIndex}`"
                           :hint="
                             availableLabels.length
@@ -340,9 +341,13 @@ defineExpose({
   align-items: center;
 }
 
-.operation-item {
-  display: flex;
-  align-items: center;
+:deep(
+  .operation-label-selector.q-field--labeled.showLabelOnTop.q-select
+    .q-field__control-container
+    .q-field__native
+    > :first-child
+) {
+  text-transform: none;
 }
 
 .drag-handle {
