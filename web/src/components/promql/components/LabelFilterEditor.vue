@@ -185,10 +185,16 @@ const dashboardPanelDataPageKey = inject(
 );
 const { fetchPromQLLabels } = useDashboardPanelData(dashboardPanelDataPageKey);
 
-// Use shared meta from dashboard data for label options
-const availableLabels = computed(() => props.dashboardPanelData?.meta?.promql?.availableLabels || []);
-const labelValuesMap = computed(() => props.dashboardPanelData?.meta?.promql?.labelValuesMap || new Map());
-const loadingLabels = computed(() => props.dashboardPanelData?.meta?.promql?.loadingLabels || false);
+const availableLabels = computed(
+  () => props.dashboardPanelData?.meta?.promql?.availableLabels || [],
+);
+
+const labelValuesMap = computed(
+  () => props.dashboardPanelData?.meta?.promql?.labelValuesMap || new Map(),
+);
+const loadingLabels = computed(
+  () => props.dashboardPanelData?.meta?.promql?.loadingLabels || false,
+);
 
 const operatorOptions = ["=", "!=", "=~", "!~"];
 
