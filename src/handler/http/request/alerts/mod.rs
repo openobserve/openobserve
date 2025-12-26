@@ -26,11 +26,12 @@ use config::meta::{
 use hashbrown::HashMap;
 use infra::db::{ORM_CLIENT, connect_to_orm};
 use svix_ksuid::Ksuid;
-
 #[cfg(feature = "enterprise")]
-use crate::handler::http::request::search::utils::{
-    check_resource_permissions, check_stream_permissions,
+use {
+    crate::common::utils::auth::check_permissions,
+    crate::handler::http::request::search::utils::check_stream_permissions,
 };
+
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::{
@@ -354,17 +355,17 @@ async fn delete_alert_bulk(
 
     #[cfg(feature = "enterprise")]
     for id in &req.ids {
-        if let Some(res) = check_resource_permissions(
+        if !check_permissions(
+            Some(id.to_string()),
             &org_id,
             &_user_id,
             "alerts",
-            &id.to_string(),
             "DELETE",
             &folder_id,
         )
         .await
         {
-            return res;
+            return MetaHttpResponse::forbidden("Unauthorized Access");
         }
     }
 
@@ -374,7 +375,7 @@ async fn delete_alert_bulk(
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     for id in req.ids {
-        match alert::delete_by_id(client, &org_id, id.clone()).await {
+        match alert::delete_by_id(client, &org_id, id).await {
             Ok(_) => {
                 successful.push(id);
             }
@@ -545,11 +546,9 @@ async fn enable_alert_bulk(
         let user_id = &user_email.user_id;
 
         for id in &req.ids {
-            if let Some(res) =
-                check_resource_permissions(&org_id, user_id, "alerts", &id.to_string(), "PUT", "")
-                    .await
+            if !check_permissions(Some(id.to_string()), &org_id, user_id, "alerts", "PUT", "").await
             {
-                return res;
+                return MetaHttpResponse::forbidden("Unauthorized Access");
             }
         }
     }

@@ -26,7 +26,6 @@ use config::meta::{
 use svix_ksuid::Ksuid;
 #[cfg(feature = "enterprise")]
 use {
-    crate::handler::http::request::search::utils::check_resource_permissions,
     crate::{
         common::{
             meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
@@ -149,17 +148,17 @@ pub async fn delete_action_bulk(
         let user_id = user_email.user_id;
 
         for id in &req.ids {
-            if let Some(res) = check_resource_permissions(
+            if !check_permissions(
+                Some(id.to_string()),
                 &org_id,
                 &user_id,
                 "actions",
-                &id.to_string(),
                 "DELETE",
                 "",
             )
             .await
             {
-                return Ok(res);
+                return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
             }
         }
 

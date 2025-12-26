@@ -16,10 +16,7 @@ use std::io::Error;
 
 use actix_web::{HttpResponse, delete, get, post, put, web};
 #[cfg(feature = "enterprise")]
-use {
-    crate::handler::http::request::search::utils::check_resource_permissions,
-    o2_dex::meta::auth::RoleRequest,
-};
+use {crate::common::utils::auth::check_permissions, o2_dex::meta::auth::RoleRequest};
 
 use crate::{
     common::{
@@ -189,17 +186,17 @@ pub async fn delete_role_bulk(
     let user_id = user_email.user_id;
 
     for name in &req.ids {
-        if let Some(res) = check_resource_permissions(
+        if !check_permissions(
+            Some(format!("{org_id}/{name}")),
             &org_id,
             &user_id,
             "roles",
-            &format!("{org_id}/{name}"),
             "DELETE",
             "",
         )
         .await
         {
-            return Ok(res);
+            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
         }
     }
 
@@ -1083,17 +1080,17 @@ pub async fn delete_group_bulk(
     let user_id = user_email.user_id;
 
     for name in &req.ids {
-        if let Some(res) = check_resource_permissions(
+        if !check_permissions(
+            Some(format!("{org_id}/{name}")),
             &org_id,
             &user_id,
             "groups",
-            &format!("{org_id}/{name}"),
             "DELETE",
             "",
         )
         .await
         {
-            return Ok(res);
+            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
         }
     }
 

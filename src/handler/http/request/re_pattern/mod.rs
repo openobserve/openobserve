@@ -387,7 +387,7 @@ pub async fn delete_bulk(
 ) -> Result<HttpResponse, Error> {
     use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 
-    use crate::handler::http::request::search::utils::check_resource_permissions;
+    use crate::common::utils::auth::check_permissions;
 
     let org_id = path.into_inner();
     let user_id = user_email.user_id;
@@ -408,12 +408,19 @@ pub async fn delete_bulk(
     let mut err = None;
 
     for id in &req.ids {
-        if let Some(res) =
-            check_resource_permissions(&org_id, &user_id, "re_patterns", id, "DELETE", "").await
+        if !check_permissions(
+            Some(id.to_string()),
+            &org_id,
+            &user_id,
+            "re_patterns",
+            "DELETE",
+            "",
+        )
+        .await
         {
-            return Ok(res);
+            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
         }
-        let pattern_usage = mgr.get_pattern_usage(&id);
+        let pattern_usage = mgr.get_pattern_usage(id);
         let (pattern_streams, extra) = if pattern_usage.len() > 5 {
             (
                 &pattern_usage[0..5],

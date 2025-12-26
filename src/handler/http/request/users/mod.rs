@@ -30,7 +30,6 @@ use serde::Serialize;
 #[cfg(feature = "enterprise")]
 use {
     crate::common::utils::auth::check_permissions,
-    crate::handler::http::request::search::utils::check_resource_permissions,
     crate::service::self_reporting::audit,
     config::utils::time::now_micros,
     o2_dex::config::get_config as get_dex_config,
@@ -383,10 +382,17 @@ pub async fn delete_bulk(
 
     #[cfg(feature = "enterprise")]
     for email in &req.ids {
-        if let Some(res) =
-            check_resource_permissions(&org_id, &initiator_id, "users", email, "DELETE", "").await
+        if !check_permissions(
+            Some(email.to_string()),
+            &org_id,
+            &initiator_id,
+            "users",
+            "DELETE",
+            "",
+        )
+        .await
         {
-            return Ok(res);
+            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
         }
     }
 

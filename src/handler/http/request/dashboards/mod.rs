@@ -21,7 +21,7 @@ use config::meta::dashboards::Dashboard;
 use hashbrown::HashMap;
 
 #[cfg(feature = "enterprise")]
-use crate::handler::http::request::search::utils::check_resource_permissions;
+use crate::common::utils::auth::check_permissions;
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::{
@@ -363,11 +363,17 @@ async fn delete_dashboard_bulk(
 
     #[cfg(feature = "enterprise")]
     for id in &req.ids {
-        if let Some(res) =
-            check_resource_permissions(&org_id, &_user_id, "dashboards", id, "DELETE", &folder_id)
-                .await
+        if !check_permissions(
+            Some(id.to_string()),
+            &org_id,
+            &_user_id,
+            "dashboards",
+            "DELETE",
+            &folder_id,
+        )
+        .await
         {
-            return res;
+            return MetaHttpResponse::forbidden("Unauthorized Access");
         }
     }
 

@@ -18,7 +18,7 @@ use std::{collections::HashMap, io::Error};
 use actix_web::{HttpRequest, HttpResponse, delete, get, http::StatusCode, post, put, web};
 
 #[cfg(feature = "enterprise")]
-use crate::handler::http::request::search::utils::check_resource_permissions;
+use crate::common::utils::auth::check_permissions;
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::{
@@ -301,10 +301,17 @@ async fn delete_destination_bulk(
 
     #[cfg(feature = "enterprise")]
     for name in &req.ids {
-        if let Some(res) =
-            check_resource_permissions(&org_id, &_user_id, "destinations", name, "DELETE", "").await
+        if !check_permissions(
+            Some(name.to_string()),
+            &org_id,
+            &_user_id,
+            "destinations",
+            "DELETE",
+            "",
+        )
+        .await
         {
-            return Ok(res);
+            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
         }
     }
 

@@ -24,7 +24,7 @@ use config::meta::{
 };
 
 #[cfg(feature = "enterprise")]
-use crate::handler::http::request::search::utils::check_resource_permissions;
+use crate::common::utils::auth::check_permissions;
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::{
@@ -373,10 +373,17 @@ async fn delete_report_bulk(
 
     #[cfg(feature = "enterprise")]
     for id in &req.ids {
-        if let Some(res) =
-            check_resource_permissions(&org_id, &_user_id, "reports", id, "DELETE", "").await
+        if !check_permissions(
+            Some(id.to_string()),
+            &org_id,
+            &_user_id,
+            "reports",
+            "DELETE",
+            "",
+        )
+        .await
         {
-            return Ok(res);
+            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
         }
     }
 

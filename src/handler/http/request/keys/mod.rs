@@ -23,12 +23,12 @@ use {
     crate::cipher::{
         KeyAddRequest, KeyBulkDeleteRequest, KeyGetResponse, KeyInfo, KeyListResponse,
     },
+    crate::common::utils::auth::check_permissions,
     crate::common::{
         meta::authz::Authz,
         utils::auth::{UserEmail, remove_ownership, set_ownership},
     },
     crate::handler::http::extractors::Headers,
-    crate::handler::http::request::search::utils::check_resource_permissions,
     actix_web::http,
     actix_web::web::Json,
     config::utils::time::now_micros,
@@ -347,10 +347,17 @@ pub async fn delete_bulk(
     let body = body.into_inner();
     let user_id = &user_email.user_id;
     for key in &body.ids {
-        if let Some(res) =
-            check_resource_permissions(&org_id, user_id, "cipher_keys", key, "DELETE", "").await
+        if !check_permissions(
+            Some(key.to_string()),
+            &org_id,
+            user_id,
+            "cipher_keys",
+            "DELETE",
+            "",
+        )
+        .await
         {
-            return Ok(res);
+            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
         }
     }
     let mut successful = Vec::with_capacity(body.ids.len());

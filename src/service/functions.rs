@@ -270,7 +270,7 @@ pub async fn list_functions(
 }
 
 pub async fn delete_function(org_id: &str, fn_name: &str) -> Result<(), FunctionDeleteError> {
-    let existing_fn = match check_existing_fn(org_id, &fn_name).await {
+    let existing_fn = match check_existing_fn(org_id, fn_name).await {
         Some(function) => function,
         None => {
             return Err(FunctionDeleteError::NotFound);
@@ -298,7 +298,7 @@ pub async fn delete_function(org_id: &str, fn_name: &str) -> Result<(), Function
             )));
         }
     }
-    let pipeline_dep = get_dependencies(org_id, &fn_name).await;
+    let pipeline_dep = get_dependencies(org_id, fn_name).await;
     if !pipeline_dep.is_empty() {
         let pipeline_data = serde_json::to_string(&pipeline_dep).unwrap_or("[]".to_string());
         return Err(FunctionDeleteError::PipelineDependencies(format!(
@@ -308,10 +308,10 @@ pub async fn delete_function(org_id: &str, fn_name: &str) -> Result<(), Function
             pipeline_data
         )));
     }
-    let result = db::functions::delete(org_id, &fn_name).await;
+    let result = db::functions::delete(org_id, fn_name).await;
     match result {
         Ok(_) => {
-            remove_ownership(&org_id, "functions", Authz::new(&fn_name)).await;
+            remove_ownership(org_id, "functions", Authz::new(fn_name)).await;
             Ok(())
         }
         Err(_) => Err(FunctionDeleteError::NotFound),

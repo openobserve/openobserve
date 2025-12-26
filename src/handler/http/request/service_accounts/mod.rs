@@ -24,7 +24,7 @@ use config::{meta::user::UserRole, utils::rand::generate_random_string};
 use hashbrown::HashMap;
 
 #[cfg(feature = "enterprise")]
-use crate::handler::http::request::search::utils::check_resource_permissions;
+use crate::common::utils::auth::check_permissions;
 use crate::{
     common::{
         meta::{
@@ -312,17 +312,17 @@ pub async fn delete_bulk(
 
     #[cfg(feature = "enterprise")]
     for email in &req.ids {
-        if let Some(res) = check_resource_permissions(
+        if !check_permissions(
+            Some(email.to_string()),
             &org_id,
             &initiator_id,
             "service_accounts",
-            email,
             "DELETE",
             "",
         )
         .await
         {
-            return Ok(res);
+            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
         }
     }
 
