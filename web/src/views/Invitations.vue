@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="invitations-page tw-h-[100vh-128px] ">
+  <div class="invitations-page tw:h-[100vh-128px] ">
     <InvitationList
       :userEmail="userEmail"
       @invitations-processed="handleInvitationsProcessed"

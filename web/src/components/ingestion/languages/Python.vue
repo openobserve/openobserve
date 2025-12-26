@@ -29,15 +29,15 @@ const docURLFastAPI = languagesDocURLs["fastapi"];
 
 <template>
   <div class="q-pa-sm">
-    <div class="tw-text-[16px]">
+    <div class="tw:text-[16px]">
       <CopyContent :content="content" />
-      <div class="tw-font-bold tw-pt-6 tw-pb-2">Check further documentation at:</div>
-      <ol class="tw-list-decimal q-pl-md">
-        <li class="tw-py-1">
-          <a :href="docURL" target="_blank" class="text-blue-500 tw-underline">Python</a>
+      <div class="tw:font-bold tw:pt-6 tw:pb-2">Check further documentation at:</div>
+      <ol class="tw:list-decimal q-pl-md">
+        <li class="tw:py-1">
+          <a :href="docURL" target="_blank" class="text-blue-500 tw:underline">Python</a>
         </li>
-        <li class="tw-py-1">
-          <a :href="docURLFastAPI" target="_blank" class="text-blue-500 tw-underline">FastAPI</a>
+        <li class="tw:py-1">
+          <a :href="docURLFastAPI" target="_blank" class="text-blue-500 tw:underline">FastAPI</a>
         </li>
       </ol>
     </div>

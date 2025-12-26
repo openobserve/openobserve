@@ -334,20 +334,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       </template>
     </div>
-    <div v-else class="text-h6 text-grey-6 q-mt-md q-mb-lg tw-w-full text-center q-pa-lg domain-card">
+    <div v-else class="text-h6 text-grey-6 q-mt-md q-mb-lg tw:w-full text-center q-pa-lg domain-card">
       {{ t("settings.noDomainMessage") }}
     </div>
 
     <!-- Action Buttons -->
-    <div class="flex justify-end q-px-lg q-py-lg full-width tw-absolute tw-bottom-0">
+    <div class="flex justify-end q-px-lg q-py-lg full-width tw:absolute tw:bottom-0">
       <q-btn
         :label="t('common.cancel')"
-        class="q-mr-md o2-secondary-button tw-h-[36px]"
+        class="q-mr-md o2-secondary-button tw:h-[36px]"
         @click="resetForm"
       />
       <q-btn
         :label="t('settings.saveChanges')"
-        class="o2-primary-button no-border tw-h-[36px] q-mr-md"
+        class="o2-primary-button no-border tw:h-[36px] q-mr-md"
         unelevated
         @click="saveChanges"
         :loading="saving"

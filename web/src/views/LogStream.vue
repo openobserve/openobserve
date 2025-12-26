@@ -21,16 +21,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="alert-list-page"
     class="q-pa-none flex flex-col"
   >
-    <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem] q-pt-xs">
-        <div class="card-container tw-mb-[0.625rem]">
-          <div class="flex items-center justify-between full-width tw-py-3 tw-px-4 tw-h-[68px]">
-            <div class="q-table__title tw-font-[600]" data-test="log-stream-title-text">
+    <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
+        <div class="card-container tw:mb-[0.625rem]">
+          <div class="flex items-center justify-between full-width tw:py-3 tw:px-4 tw:h-[68px]">
+            <div class="q-table__title tw:font-[600]" data-test="log-stream-title-text">
               {{ t("logStream.header") }}
             </div>
             <div class="flex items-start">
               <div class="flex justify-between items-end">
 
-                  <div class="app-tabs-container tw-h-[36px] q-mr-sm">
+                  <div class="app-tabs-container tw:h-[36px] q-mr-sm">
                       <app-tabs
                       class="tabs-selection-container"
                       :tabs="streamTabs"
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="filterQuery"
                   borderless
                   dense
-                  class="q-ml-auto no-border o2-search-input tw-h-[36px]"
+                  class="q-ml-auto no-border o2-search-input tw:h-[36px]"
                   :placeholder="t('logStream.search')"
                   debounce="300"
                 >
@@ -55,18 +55,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <q-btn
                 data-test="log-stream-refresh-stats-btn"
-                class="q-ml-sm text-bold no-border o2-secondary-button tw-h-[36px]"
+                class="q-ml-sm text-bold no-border o2-secondary-button tw:h-[36px]"
                 flat
                 no-caps
                 @click="getLogStream(true)"
               >
                 <q-icon name="refresh" size="18px" />
-                <span class="tw-ml-2">{{ t(`logStream.refreshStats`) }}</span>
+                <span class="tw:ml-2">{{ t(`logStream.refreshStats`) }}</span>
               </q-btn>
               <q-btn
                 v-if="isSchemaUDSEnabled"
                 data-test="log-stream-add-stream-btn"
-                class="q-ml-sm o2-primary-button tw-h-[36px]"
+                class="q-ml-sm o2-primary-button tw:h-[36px]"
                 flat
                 no-caps
                 :label="t(`logStream.add`)"
@@ -75,8 +75,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-      <div class="tw-w-full tw-h-full">
-        <div class="card-container tw-h-[calc(100vh-126px)]">
+      <div class="tw:w-full tw:h-full">
+        <div class="card-container tw:h-[calc(100vh-126px)]">
           <q-table
             data-test="log-stream-table"
             class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-else
-                class="text-center full-width full-height q-mt-lg tw-flex tw-justify-center"
+                class="text-center full-width full-height q-mt-lg tw:flex tw:justify-center"
               >
                 <q-spinner-hourglass color="primary" size="lg" />
               </div>
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-td>
             </template>
             <template v-slot:pagination="scope">
-              <div class="tw-flex tw-items-center tw-justify-between tw-py-3 tw-px-4">
+              <div class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4">
 
 
               <div class="q-btn-group row no-wrap inline q-ml-md">
@@ -209,12 +209,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
             <template v-slot:bottom="scope">
-              <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
-                <div class="q-table__separator tw-flex tw-items-center tw-w-full text-bold tw-text-[14px]">
+              <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+                <div class="q-table__separator tw:flex tw:items-center tw:w-full text-bold tw:text-[14px]">
                   {{scope.pagination.rowsNumber}} Stream(s)
                   <q-btn
                   v-if="selected.length > 0"
-                  class="o2-secondary-button tw-h-[36px] tw-ml-4"
+                  class="o2-secondary-button tw:h-[36px] tw:ml-4"
                   no-caps
                   flat
                   :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="confirmBatchDeleteAction"
                 >
                   <q-icon name="delete" size="16px" />
-                  <span class="tw-ml-2">{{ isDeleting ? 'Deleting...' : 'Delete' }}</span>
+                  <span class="tw:ml-2">{{ isDeleting ? 'Deleting...' : 'Delete' }}</span>
               </q-btn>
                 </div>
                 <QTablePagination
@@ -269,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="head">{{ t("logStream.confirmDeleteHead") }}</div>
           <div class="para">{{ t("logStream.confirmDeleteMsg") }}</div>
         </q-card-section>
-        <div class="tw-w-full tw-flex tw-justify-center tw-items-center tw-text-sm tw-text-gray-500">
+        <div class="tw:w-full tw:flex tw:justify-center tw:items-center tw:text-sm tw:text-gray-500">
             <q-checkbox class="checkbox-delete-associated-alerts-pipelines" v-model="deleteAssociatedAlertsPipelines" />
           <span class="delete-associated-alerts-pipelines-text">
             Delete all pipelines and alerts associated with the stream
@@ -298,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="head">{{ t("logStream.confirmBatchDeleteHead") }}</div>
           <div class="para">{{ t("logStream.confirmBatchDeleteMsg") }}</div>
         </q-card-section>
-        <div class="tw-w-full tw-flex tw-justify-center tw-items-center tw-text-sm tw-text-gray-500">
+        <div class="tw:w-full tw:flex tw:justify-center tw:items-center tw:text-sm tw:text-gray-500">
             <q-checkbox class="checkbox-delete-associated-alerts-pipelines" v-model="deleteAssociatedAlertsPipelines" />
           <span class="delete-associated-alerts-pipelines-text">
             Delete all pipelines and alerts associated with the selected streams

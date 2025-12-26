@@ -1,13 +1,13 @@
 <template>
   <div
-  class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem] q-pt-xs"
+  class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
   >
    <div class="">
-    <div class="flex tw-justify-between tw-items-center tw-h-[68px] card-container tw-mb-[0.625rem]">
+    <div class="flex tw:justify-between tw:items-center tw:h-[68px] card-container tw:mb-[0.625rem]">
       <div class="flex items-center q-py-sm q-pl-md">
         <div
           data-test="search-history-alert-back-btn"
-          class="flex justify-center items-center q-mr-md cursor-pointer tw-font-[600]"
+          class="flex justify-center items-center q-mr-md cursor-pointer tw:font-[600]"
           style="
             border: 1.5px solid;
             border-radius: 50%;
@@ -19,9 +19,9 @@
         >
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
-        <div class="text-h6 tw-font-[600]" data-test="add-alert-title">{{ t('search_history.title') }}</div>
+        <div class="text-h6 tw:font-[600]" data-test="add-alert-title">{{ t('search_history.title') }}</div>
       </div>
-      <div class="tw-flex tw-items-center q-pr-md">
+      <div class="tw:flex tw:items-center q-pr-md">
         <div>
           <q-toggle
             v-model="wrapText"
@@ -35,7 +35,7 @@
                 : 'o2-toggle-button-xs-light'
             " />
         </div>
-        <div class="warning-text flex items-center q-px-sm q-mr-md tw-h-[36px] tw-rounded-md">
+        <div class="warning-text flex items-center q-px-sm q-mr-md tw:h-[36px] tw:rounded-md">
           <q-icon name="info" class="q-mr-xs" size="16px" />
           <div>
             {{ t('search_history.delayMessage') }} <b>{{ delayMessage }}</b>
@@ -58,7 +58,7 @@
             :label=" t('search_history.get_history')"
             flat
             @click="fetchSearchHistory"
-            class="q-ml-md o2-primary-button tw-h-[36px]"
+            class="q-ml-md o2-primary-button tw:h-[36px]"
             :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             no-caps
             :disable="isLoading"
@@ -66,8 +66,8 @@
         </div>
       </div>
     </div>
-   <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
-      <div class=" tw-h-[calc(100vh-128px)] card-container">
+   <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
+      <div class=" tw:h-[calc(100vh-128px)] card-container">
         <q-table
           ref="qTable"
           dense
@@ -124,8 +124,8 @@
                   />
                 </div>
                 <div v-show="activeTab === 'query'">
-                  <div class="text-left tw-px-2 q-mb-sm expanded-content">
-                    <div class="tw-flex tw-items-center q-py-sm">
+                  <div class="text-left tw:px-2 q-mb-sm expanded-content">
+                    <div class="tw:flex tw:items-center q-py-sm">
                       <strong
                         >SQL Query :
                         <span>
@@ -137,14 +137,14 @@
                             dense
                             flat
                             icon="content_copy"
-                            class="copy-btn-sql tw-ml-2 tw-py-2 tw-px-2" /></span
+                            class="copy-btn-sql tw:ml-2 tw:py-2 tw:px-2" /></span
                       ></strong>
                       <q-btn
                         @click.stop="goToLogs(props.row)"
                         size="xs"
                         label="Logs"
                         dense
-                        class="copy-btn tw-py-2 tw-mx-2 tw-px-2"
+                        class="copy-btn tw:py-2 tw:mx-2 tw:px-2"
                         icon="search"
                         flat
                         style="
@@ -154,7 +154,7 @@
                         "
                       />
                     </div>
-                    <div class="tw-flex tw-items-start tw-justify-center">
+                    <div class="tw:flex tw:items-start tw:justify-center">
                       <div class="scrollable-content expanded-sql">
                         <pre style="text-wrap: wrap">{{ props.row?.sql }}</pre>
                       </div>
@@ -162,9 +162,9 @@
                   </div>
                   <div
                     v-if="props.row?.function"
-                    class="text-left q-mb-sm tw-px-2 expanded-content"
+                    class="text-left q-mb-sm tw:px-2 expanded-content"
                   >
-                    <div class="tw-flex tw-items-center q-py-sm">
+                    <div class="tw:flex tw:items-center q-py-sm">
                       <strong
                         >Function Definition :
                         <span>
@@ -179,11 +179,11 @@
                             dense
                             flat
                             icon="content_copy"
-                            class="copy-btn-function tw-ml-2 tw-py-2 tw-px-2" /></span
+                            class="copy-btn-function tw:ml-2 tw:py-2 tw:px-2" /></span
                       ></strong>
                     </div>
 
-                    <div class="tw-flex tw-items-start tw-justify-center">
+                    <div class="tw:flex tw:items-start tw:justify-center">
                       <div class="scrollable-content expanded-function">
                         <pre style="text-wrap: wrap">{{
                           props.row?.function
@@ -207,11 +207,11 @@
             </q-tr>
           </template>
           <template #bottom="scope">
-            <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
-            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[150px] tw-mr-md">
+            <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md">
               {{ resultTotal }} {{ t('search_history.results') }}
             </div>
-            <div class="tw-ml-auto tw-mr-2">Max Limit : <b>1000</b></div>
+            <div class="tw:ml-auto tw:mr-2">Max Limit : <b>1000</b></div>
             <q-separator
               style="height: 1.5rem; margin: auto 0"
               vertical
@@ -231,7 +231,7 @@
           </div>
           </template>
           <template #no-data>
-            <div v-if="!isLoading" class="tw-flex tw-mx-auto">
+            <div v-if="!isLoading" class="tw:flex tw:mx-auto">
               <NoData />
             </div>
           </template>
@@ -239,7 +239,7 @@
 
         <div
           v-if="isLoading"
-          class="text-center full-width full-height q-mt-lg tw-flex tw-justify-center"
+          class="text-center full-width full-height q-mt-lg tw:flex tw:justify-center"
         >
           <q-spinner-hourglass color="primary" size="lg" />
         </div>

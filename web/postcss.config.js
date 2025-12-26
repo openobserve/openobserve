@@ -1,7 +1,7 @@
 /* eslint-disable no-undef */
 export default {
   plugins: {
-    tailwindcss: {},
+    '@tailwindcss/postcss': {},
     autoprefixer: {},
   },
 };

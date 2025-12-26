@@ -40,12 +40,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="col">
         <div data-test="dashboard-error">
-          <ul class="tw-list-disc tw-list-inside tw-px-3">
+          <ul class="tw:list-disc tw:list-inside tw:px-3">
             <li
               v-for="(item, index) in props.errors.errors"
               :key="index"
               style="color: red"
-              class="tw-py-1"
+              class="tw:py-1"
             >
               {{ item }}
             </li>

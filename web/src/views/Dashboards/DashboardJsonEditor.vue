@@ -13,7 +13,7 @@
         <q-icon
           v-close-popup
           name="cancel"
-          class="cursor-pointer tw-mr-3"
+          class="cursor-pointer tw:mr-3"
           size="20px"
           data-test="json-editor-close"
         />
@@ -54,12 +54,12 @@
         flat
         :label="t('common.cancel')"
         color="primary"
-        class="q-ml-sm o2-secondary-button tw-h-[36px]"
+        class="q-ml-sm o2-secondary-button tw:h-[36px]"
         v-close-popup
         data-test="json-editor-cancel"
       />
       <q-btn
-        class="q-ml-sm o2-primary-button tw-h-[36px]"
+        class="q-ml-sm o2-primary-button tw:h-[36px]"
         padding="sm lg"
         no-caps
         :label="t('common.save')"

@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             emit-value
             filled
             :options="searchFieldOptions"
-            class="q-pa-none tw-w-[140px] q-mr-sm"
+            class="q-pa-none tw:w-[140px] q-mr-sm"
             data-test="running-queries-search-fields-select"
             @update:model-value="filterQuery = ''"
           ></q-select>
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="filterQuery"
             dense
             borderless
-            class="no-border search-input q-pa-none search-running-query o2-search-input tw-h-[36px]"
+            class="no-border search-input q-pa-none search-running-query o2-search-input tw:h-[36px]"
             :class="store.state.theme == 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
             :placeholder="t('queries.search')"
             data-test="running-queries-search-input"
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <q-btn
             data-test="running-queries-refresh-btn"
-            class="q-ml-sm text-bold no-border o2-secondary-button tw-h-[36px]"
+            class="q-ml-sm text-bold no-border o2-secondary-button tw:h-[36px]"
             :class="store.state.theme == 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             padding="sm"
             flat
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div class="label-container tw-flex tw-justify-end q-py-sm tw-h-[54px]">
+    <div class="label-container tw:flex tw:justify-end q-py-sm tw:h-[54px]">
       <div v-if="selectedQueryTypeTab === 'all'">
         <div
           style="border: 1px solid #cacaca; padding: 2px; border-radius: 4px"

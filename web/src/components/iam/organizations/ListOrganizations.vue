@@ -19,18 +19,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
     <div>
-    <div class="card-container tw-mb-[0.625rem]">
-      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[68px] tw-border-b-[1px]"
+    <div class="card-container tw:mb-[0.625rem]">
+      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
       style="position: sticky; top: 0; z-index: 1000 ;"
       >
-          <div  class="q-table__title full-width tw-font-[600]" data-test="organizations-title-text">{{ t("organization.header") }}</div>
-          <div class="full-width tw-flex tw-justify-end">
+          <div  class="q-table__title full-width tw:font-[600]" data-test="organizations-title-text">{{ t("organization.header") }}</div>
+          <div class="full-width tw:flex tw:justify-end">
 
             <q-input
               v-model="filterQuery"
               borderless
               dense
-              class="q-ml-auto no-border o2-search-input tw-h-[36px]"
+              class="q-ml-auto no-border o2-search-input tw:h-[36px]"
               :placeholder="t('organization.search')"
             >
               <template #prepend>
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-input>
           
             <q-btn
-              class="q-ml-sm o2-primary-button tw-h-[36px]"
+              class="q-ml-sm o2-primary-button tw:h-[36px]"
               flat
               no-caps
               :label="t(`organization.add`)"
@@ -50,8 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         </div>
     <div>
-      <div class="tw-w-full tw-h-full">
-      <div class="card-container tw-h-[calc(100vh-127px)]">
+      <div class="tw:w-full tw:h-full">
+      <div class="card-container tw:h-[calc(100vh-127px)]">
       <q-table
       ref="qTable"
       :rows="visibleRows"
@@ -85,8 +85,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
       <template #bottom="scope">
-        <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
-          <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
+        <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+          <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md">
             {{ resultTotal }} {{ t('organization.header') }}
           </div>
             <QTablePagination

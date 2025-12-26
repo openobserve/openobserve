@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="error_details tw-w-[40vw]">
+  <div class="error_details tw:w-[40vw]">
     <div @click="handleErrorTypeClick" class="error_type cursor-pointer">
       {{ column.error_type || "Error" }}
     </div>

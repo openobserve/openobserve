@@ -233,7 +233,7 @@ describe("SearchResult", () => {
     expect(searchList.exists()).toBe(true);
     expect(searchList.classes()).toContain("search-list");
     // Width is now applied via Tailwind CSS class instead of inline style
-    expect(searchList.classes()).toContain("tw-w-full");
+    expect(searchList.classes()).toContain("tw:w-full");
   });
 
   it("should render TracesMetricsDashboard component", () => {

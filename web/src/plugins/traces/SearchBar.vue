@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="search-bar-component" id="searchBarComponent">
-    <div class="row !tw-m-0 tw-p-[0.375rem]">
+    <div class="row tw:m-0! tw:p-[0.375rem]">
       <div class="float-right col flex items-center">
         <!-- Tab Toggle Buttons -->
-        <div v-if="store.state.zoConfig.service_graph_enabled" class="button-group logs-visualize-toggle element-box-shadow tw-mr-[0.375rem]">
+        <div v-if="store.state.zoConfig.service_graph_enabled" class="button-group logs-visualize-toggle element-box-shadow tw:mr-[0.375rem]">
           <div class="row">
             <div>
               <q-btn
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-caps
                 size="sm"
                 icon="search"
-                class="button button-left tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-r-none q-px-sm tw-h-[2rem]"
+                class="button button-left tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-r-none! q-px-sm tw:h-[2rem]"
               >
                 <q-tooltip>
                   {{ t("common.search") }}
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-caps
                 size="sm"
                 icon="hub"
-                class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-l-none q-px-sm tw-h-[2rem]"
+                class="button button-right tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm tw:h-[2rem]"
               >
                 <q-tooltip>
                   Service Maps
@@ -57,12 +57,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Show search controls only when on Search tab -->
         <template v-if="activeTab === 'search'">
           <div
-            class="q-pr-xs tw-mr-[0.375rem] tw-flex tw-items-center tw-justify-center tw-border-solid tw-border tw-border-[var(--o2-border-color)] tw-rounded-[0.375rem]"
+            class="q-pr-xs tw:mr-[0.375rem] tw:flex tw:items-center tw:justify-center tw:border-solid tw:border tw:border-[var(--o2-border-color)] tw:rounded-[0.375rem]"
           >
             <q-toggle
               data-test="traces-search-bar-show-metrics-toggle-btn"
               v-model="searchObj.meta.showHistogram"
-              class="o2-toggle-button-xs tw-flex tw-items-center tw-justify-center"
+              class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center"
               size="xs"
               flat
               :class="
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             no-caps
             size="13px"
             icon="restart_alt"
-            class="tw-flex tw-justify-center tw-items-center tw-w-[2rem] tw-min-h-[2rem] tw-h-[2rem] tw-mr-[0.375rem] tw-rounded-[0.375rem] el-border"
+            class="tw:flex tw:justify-center tw:items-center tw:w-[2rem] tw:min-h-[2rem] tw:h-[2rem] tw:mr-[0.375rem] tw:rounded-[0.375rem] el-border"
             @click="resetFilters"
           >
             <q-tooltip>
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </div>
       <div v-if="activeTab === 'search'" class="float-right col-auto">
-        <div class="float-left tw-mr-[0.375rem]">
+        <div class="float-left tw:mr-[0.375rem]">
           <date-time
             ref="dateTimeRef"
             auto-apply
@@ -117,19 +117,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :queryRangeRestrictionMsg="
               searchObj.data.datetime.queryRangeRestrictionMsg
             "
-            class="tw-h-[2rem]"
+            class="tw:h-[2rem]"
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
           />
         </div>
-        <div class="search-time tw-mr-[0.375rem] float-left">
+        <div class="search-time tw:mr-[0.375rem] float-left">
           <q-btn
             data-test="logs-search-bar-refresh-btn"
             data-cy="search-bar-refresh-button"
             dense
             flat
             :title="t('search.runQuery')"
-            class="q-pa-none o2-primary-button tw-h-[30px] element-box-shadow"
+            class="q-pa-none o2-primary-button tw:h-[30px] element-box-shadow"
             @click="searchData"
             :loading="isLoading"
             :disable="isLoading"
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </div>
         <q-btn
-          class="tw-mr-[0.375rem] float-left download-logs-btn q-pa-sm tw-min-h-[2rem] el-border"
+          class="tw:mr-[0.375rem] float-left download-logs-btn q-pa-sm tw:min-h-[2rem] el-border"
           size="sm"
           :disable="!searchObj.data.queryResults?.hits?.length"
           icon="download"
@@ -147,19 +147,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <share-button
           data-test="logs-search-bar-share-link-btn"
           :url="tracesShareURL"
-          button-class="tw-mr-0 download-logs-btn q-px-sm tw-min-h-[2rem] el-border"
+          button-class="tw:mr-0 download-logs-btn q-px-sm tw:min-h-[2rem] el-border"
           button-size="sm"
         />
       </div>
     </div>
     <div v-if="activeTab === 'search' && searchObj.meta.showQuery" class="row">
       <div
-        class="col tw-border tw-solid tw-border-[var(--o2-border-color)] tw-mx-[0.375rem] tw-mb-[0.375rem] tw-rounded-[0.375rem] tw-overflow-hidden"
+        class="col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mx-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden"
       >
         <code-query-editor
           ref="queryEditorRef"
           editor-id="traces-query-editor"
-          class="monaco-editor tw-px-[0.325rem] tw-py-[0.125rem]"
+          class="monaco-editor tw:px-[0.325rem] tw:py-[0.125rem]"
           v-model:query="searchObj.data.editorValue"
           :keywords="autoCompleteKeywords"
           :class="

@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-item-section>
               <q-item-label>
                 {{ filterText }}
-                <span class="text-grey-6 q-ml-xs tw-text-xs tw-italic"
+                <span class="text-grey-6 q-ml-xs tw:text-xs tw:italic"
                   >(Custom)</span
                 >
               </q-item-label>
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-item-section>
               <q-item-label>
                 {{ filterText }}
-                <span class="text-grey-6 q-ml-xs tw-text-xs tw-italic"
+                <span class="text-grey-6 q-ml-xs tw:text-xs tw:italic"
                   >(Custom)</span
                 >
               </q-item-label>

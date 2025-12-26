@@ -10,7 +10,7 @@
     <div>
       <div class="text-subtitle1 q-pl-xs q-mt-md">
         Once you have installed the OpenObserve collector, it will:
-        <ul class="tw-list-disc tw-ml-5">
+        <ul class="tw:list-disc tw:ml-5">
           <li>Collect logs from Windows event log</li>
           <li>Collect metrics from Windows performance counters</li>
         </ul>

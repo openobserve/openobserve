@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-card class="o2-side-dialog column full-height ">
-    <q-card-section class="q-py-md tw-w-full">
+    <q-card-section class="q-py-md tw:w-full">
       <div class="row items-center no-wrap q-py-sm">
         <div class="col">
           <div v-if="beingUpdated" style="font-size: 18px">
@@ -38,15 +38,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator />
       <div>
         <q-form ref="updateUserForm" @submit.prevent="onSubmit">
-          <!-- <p class="q-pt-sm tw-truncate">{{t('user.organization')}} : <strong>{{formData.organization}}</strong></p> -->
-          <p class="tw-mt-2 tw-truncate" v-if="!existingUser">
+          <!-- <p class="q-pt-sm tw:truncate">{{t('user.organization')}} : <strong>{{formData.organization}}</strong></p> -->
+          <p class="tw:mt-2 tw:truncate" v-if="!existingUser">
             {{ t("user.email") }} : <strong>{{ formData.email }}</strong>
           </p>
-          <p class="tw-mt-2 tw-truncate" v-if="!existingUser && !beingUpdated">
+          <p class="tw:mt-2 tw:truncate" v-if="!existingUser && !beingUpdated">
             {{ t("user.roles") }} : <strong>{{ formData.role }}</strong>
           </p>
           <p
-            class="tw-mt-2 tw-truncate"
+            class="tw:mt-2 tw:truncate"
             v-if="
               !existingUser && !beingUpdated && formData?.custom_role?.length
             "
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="existingUser && !beingUpdated"
             v-model="formData.email"
             :label="t('user.email') + ' *'"
-            class="showLabelOnTop tw-mt-2"
+            class="showLabelOnTop tw:mt-2"
             stack-label
             hide-bottom-space
             dense
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="user-email-field"
           />
 
-          <div v-if="!beingUpdated && !existingUser" class="tw-mt-2">
+          <div v-if="!beingUpdated && !existingUser" class="tw:mt-2">
             <q-input
               :type="isPwd ? 'password' : 'text'"
               v-model="formData.password"
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!existingUser"
             v-model="formData.first_name"
             :label="t('user.firstName')"
-            class="showLabelOnTop tw-mt-2"
+            class="showLabelOnTop tw:mt-2"
             stack-label
             dense
             hide-bottom-space
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!existingUser"
             v-model="formData.last_name"
             :label="t('user.lastName')"
-            class="showLabelOnTop tw-mt-2"
+            class="showLabelOnTop tw:mt-2"
             stack-label
             dense
             hide-bottom-space
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="formData.role"
             :label="t('user.role') + ' *'"
             :options="roles"
-            class="showLabelOnTop tw-mt-2"
+            class="showLabelOnTop tw:mt-2"
             emit-value
             map-options
             stack-label
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="formData.custom_role"
             :label="t('user.customRole')"
             :options="filterdOption"
-            class="showLabelOnTop tw-mt-2"
+            class="showLabelOnTop tw:mt-2"
             multiple
             emit-value
             map-options
@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="user-custom-role-field"
             :disable="filterdOption.length === 0"
           />
-          <div v-if="beingUpdated" class="tw-mt-2">
+          <div v-if="beingUpdated" class="tw:mt-2">
             <q-toggle
               v-model="formData.change_password"
               :label="t('user.changePassword')"
@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               outlined
               filled
               hide-bottom-space
-              class="o2-toggle-button-lg -tw-ml-4"
+              class="o2-toggle-button-lg -tw:ml-4"
               size="lg"
               :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
               data-test="user-change-password-field"
@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :type="isOldPwd ? 'password' : 'text'"
               v-model="formData.old_password"
               :label="t('user.oldPassword') + ' *'"
-              class="showLabelOnTop tw-mt-2"
+              class="showLabelOnTop tw:mt-2"
               stack-label
               dense
               borderless
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :type="isNewPwd ? 'password' : 'text'"
               v-model="formData.new_password"
               :label="t('user.newPassword') + ' *'"
-              class="showLabelOnTop tw-mt-2"
+              class="showLabelOnTop tw:mt-2"
               stack-label
               dense
               hide-bottom-space
@@ -243,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             v-model="formData.other_organization"
             :label="t('user.otherOrganization')"
-            class="showLabelOnTop tw-mt-2"
+            class="showLabelOnTop tw:mt-2"
             stack-label
             dense
             borderless
@@ -256,10 +256,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             maxlength="100"
           />
 
-          <div class="flex justify-start tw-mt-6">
+          <div class="flex justify-start tw:mt-6">
             <q-btn
               v-close-popup
-              class="q-mr-md o2-secondary-button tw-h-[36px]"
+              class="q-mr-md o2-secondary-button tw:h-[36px]"
               :label="t('user.cancel')"
               no-caps
               flat
@@ -268,7 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="cancel-user-button"
             />
             <q-btn
-              class="o2-primary-button no-border tw-h-[36px]"
+              class="o2-primary-button no-border tw:h-[36px]"
               :label="t('user.save')"
               type="submit"
               no-caps

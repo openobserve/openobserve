@@ -15,18 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw-w-full tw-h-full ">
-    <div class="card-container tw-mb-[0.625rem]">
-      <div class="flex justify-between full-width tw-py-3 tw-px-4 items-center tw-h-[68px]">
-        <div class="q-table__title tw-font-[600]" data-test="invitation-title-text">
+  <div class="tw:w-full tw:h-full ">
+    <div class="card-container tw:mb-[0.625rem]">
+      <div class="flex justify-between full-width tw:py-3 tw:px-4 items-center tw:h-[68px]">
+        <div class="q-table__title tw:font-[600]" data-test="invitation-title-text">
           {{ t("invitation.pendingInvitations") }}
         </div>
-        <div class="tw-h-[36px]" />
+        <div class="tw:h-[36px]" />
       </div>
     </div>
 
-    <div class="tw-w-full tw-h-full">
-      <div class="card-container tw-h-[calc(100vh-128px)]">
+    <div class="tw:w-full tw:h-full">
+      <div class="card-container tw:h-[calc(100vh-128px)]">
         <q-table
           ref="qTable"
           :rows="invitations"
@@ -76,8 +76,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #bottom="scope">
-      <div class="bottom-btn tw-h-[48px] tw-flex tw-w-full">
-          <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[250px] tw-mr-md">
+      <div class="bottom-btn tw:h-[48px] tw:flex tw:w-full">
+          <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[250px] tw:mr-md">
             {{ resultTotal }} {{ t('invitation.pendingInvitations') }}
           </div>
         <QTablePagination

@@ -113,13 +113,13 @@ describe("ErrorTag Component", () => {
       const valueElements = wrapper.findAll(".q-px-md");
       const valueElement = valueElements[1]; // Second q-px-md is the value
       expect(valueElement.classes()).toContain("q-px-md");
-      expect(valueElement.classes()).toContain("tw-break-all");
+      expect(valueElement.classes()).toContain("tw:break-all");
     });
 
     it("should handle word breaking", () => {
       const valueElements = wrapper.findAll(".q-px-md");
       const valueElement = valueElements[1]; // Second q-px-md is the value
-      expect(valueElement.classes()).toContain("tw-break-all");
+      expect(valueElement.classes()).toContain("tw:break-all");
     });
   });
 
@@ -165,7 +165,7 @@ describe("ErrorTag Component", () => {
       const valueElements = wrapper.findAll(".q-px-md");
       const valueElement = valueElements[1]; // Second q-px-md is the value
       expect(valueElement.text()).toBe(longTag.value);
-      expect(valueElement.classes()).toContain("tw-break-all");
+      expect(valueElement.classes()).toContain("tw:break-all");
     });
 
     it("should handle special characters", async () => {
@@ -220,7 +220,7 @@ describe("ErrorTag Component", () => {
     it("should apply background color to value section", () => {
       const valueElements = wrapper.findAll(".q-px-md");
       const valueElement = valueElements[1]; // Second q-px-md is the value
-      expect(valueElement.classes()).toContain("tw-bg-[var(--o2-table-header-bg)]");
+      expect(valueElement.classes()).toContain("tw:bg-[var(--o2-table-header-bg)]");
     });
 
     it("should apply correct spacing classes", () => {
