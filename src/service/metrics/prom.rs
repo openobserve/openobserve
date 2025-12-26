@@ -142,10 +142,10 @@ pub async fn remote_write(
             log::error!("Error updating metadata for stream: {metric_name}, err: {e}");
         }
     }
-    log::info!(
-        "[remote_write] org: {org_id}, parse metadata took: {} ms",
-        step_start.elapsed().as_millis()
-    );
+    let elapsed_ms = step_start.elapsed().as_millis();
+    if elapsed_ms > 200 {
+        log::info!("[remote_write] org: {org_id}, parse metadata took: {elapsed_ms} ms",);
+    }
 
     // maybe empty, we can return immediately
     if request.timeseries.is_empty() {
@@ -377,12 +377,12 @@ pub async fn remote_write(
             }
         }
     }
-    log::info!(
-        "[remote_write] org: {}, parse timeseries took: {} ms, HA check took: {} ms",
-        org_id,
-        step_start.elapsed().as_millis(),
-        ha_check_total_time as i64
-    );
+    let parse_timeseries_ms = step_start.elapsed().as_millis();
+    if parse_timeseries_ms > 200 || ha_check_total_time > 200.0 {
+        log::info!(
+            "[remote_write] org: {org_id}, parse timeseries took: {parse_timeseries_ms} ms, HA check took: {ha_check_total_time} ms",
+        );
+    }
 
     // process records buffered for pipeline processing
     for (stream_name, exec_pl_option) in &stream_executable_pipelines {
@@ -554,10 +554,12 @@ pub async fn remote_write(
             // End check for alert trigger
         }
     }
-    log::info!(
-        "[remote_write] org: {org_id}, build records and schema check took: {} ms",
-        step_start.elapsed().as_millis()
-    );
+    let elapsed_ms = step_start.elapsed().as_millis();
+    if elapsed_ms > 200 {
+        log::info!(
+            "[remote_write] org: {org_id}, build records and schema check took: {elapsed_ms} ms",
+        );
+    }
 
     // write data to wal
     step_start = std::time::Instant::now();
@@ -611,10 +613,10 @@ pub async fn remote_write(
         )
         .await;
     }
-    log::info!(
-        "[remote_write] org: {org_id}, write to WAL took: {} ms",
-        step_start.elapsed().as_millis()
-    );
+    let elapsed_ms = step_start.elapsed().as_millis();
+    if elapsed_ms > 200 {
+        log::info!("[remote_write] org: {org_id}, write to WAL took: {elapsed_ms} ms",);
+    }
 
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
@@ -645,10 +647,10 @@ pub async fn remote_write(
         }
     }
 
-    log::info!(
-        "[remote_write] org: {org_id}, total time: {:.3}ms",
-        start.elapsed().as_millis()
-    );
+    let total_ms = start.elapsed().as_millis();
+    if total_ms > 1000 {
+        log::info!("[remote_write] org: {org_id}, total time: {total_ms} ms",);
+    }
 
     Ok(())
 }
