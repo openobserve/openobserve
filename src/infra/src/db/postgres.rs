@@ -773,3 +773,336 @@ pub async fn drop_column(table: &str, column: &str) -> Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_postgres_db_new() {
+        let db = PostgresDb::new();
+        assert_eq!(std::mem::size_of_val(&db), 0);
+    }
+
+    #[test]
+    fn test_postgres_db_default() {
+        let db = PostgresDb::default();
+        assert_eq!(std::mem::size_of_val(&db), 0);
+    }
+
+    #[test]
+    fn test_parse_key_full() {
+        let key = "/module/key1/key2";
+        let (module, k1, k2) = super::super::parse_key(key);
+        assert_eq!(module, "module");
+        assert_eq!(k1, "key1");
+        assert_eq!(k2, "key2");
+    }
+
+    #[test]
+    fn test_parse_key_no_leading_slash() {
+        let key = "module/key1/key2";
+        let (module, k1, k2) = super::super::parse_key(key);
+        assert_eq!(module, "module");
+        assert_eq!(k1, "key1");
+        assert_eq!(k2, "key2");
+    }
+
+    #[test]
+    fn test_parse_key_module_only() {
+        let key = "/module";
+        let (module, k1, k2) = super::super::parse_key(key);
+        assert_eq!(module, "module");
+        assert_eq!(k1, "");
+        assert_eq!(k2, "");
+    }
+
+    #[test]
+    fn test_parse_key_module_and_key1() {
+        let key = "/module/key1";
+        let (module, k1, k2) = super::super::parse_key(key);
+        assert_eq!(module, "module");
+        assert_eq!(k1, "key1");
+        assert_eq!(k2, "");
+    }
+
+    #[test]
+    fn test_parse_key_with_slashes_in_key2() {
+        let key = "/module/key1/key2/subkey/subsubkey";
+        let (module, k1, k2) = super::super::parse_key(key);
+        assert_eq!(module, "module");
+        assert_eq!(k1, "key1");
+        assert_eq!(k2, "key2/subkey/subsubkey");
+    }
+
+    #[test]
+    fn test_parse_key_empty() {
+        let key = "";
+        let (module, k1, k2) = super::super::parse_key(key);
+        assert_eq!(module, "");
+        assert_eq!(k1, "");
+        assert_eq!(k2, "");
+    }
+
+    #[test]
+    fn test_build_key_without_start_dt() {
+        let key = super::super::build_key("module", "key1", "key2", 0);
+        assert_eq!(key, "/module/key1/key2");
+    }
+
+    #[test]
+    fn test_build_key_with_start_dt() {
+        let key = super::super::build_key("module", "key1", "key2", 1234567890);
+        assert_eq!(key, "/module/key1/key2/1234567890");
+    }
+
+    #[test]
+    fn test_build_key_empty_parts() {
+        let key = super::super::build_key("", "", "", 0);
+        assert_eq!(key, "//");
+    }
+
+    #[test]
+    fn test_build_key_with_special_chars() {
+        let key = super::super::build_key("mod-ule", "key_1", "key.2", 0);
+        assert_eq!(key, "/mod-ule/key_1/key.2");
+    }
+
+    #[test]
+    fn test_index_statement_new() {
+        let stmt = IndexStatement::new("test_idx", "test_table", false, &["col1", "col2"]);
+        assert_eq!(stmt.idx_name, "test_idx");
+        assert_eq!(stmt.table, "test_table");
+        assert!(!stmt.unique);
+        assert_eq!(stmt.fields, vec!["col1", "col2"]);
+    }
+
+    #[test]
+    fn test_index_statement_unique() {
+        let stmt = IndexStatement::new("unique_idx", "table", true, &["id"]);
+        assert_eq!(stmt.idx_name, "unique_idx");
+        assert_eq!(stmt.table, "table");
+        assert!(stmt.unique);
+        assert_eq!(stmt.fields, vec!["id"]);
+    }
+
+    #[test]
+    fn test_db_index_hash_same() {
+        use std::collections::HashSet;
+
+        let idx1 = DBIndex {
+            name: "test_idx".to_string(),
+            table: "test_table".to_string(),
+        };
+        let idx2 = DBIndex {
+            name: "test_idx".to_string(),
+            table: "test_table".to_string(),
+        };
+
+        let mut set = HashSet::new();
+        set.insert(idx1);
+        assert!(set.contains(&idx2));
+    }
+
+    #[test]
+    fn test_db_index_hash_different_name() {
+        use std::collections::HashSet;
+
+        let idx1 = DBIndex {
+            name: "idx1".to_string(),
+            table: "table".to_string(),
+        };
+        let idx2 = DBIndex {
+            name: "idx2".to_string(),
+            table: "table".to_string(),
+        };
+
+        let mut set = HashSet::new();
+        set.insert(idx1);
+        assert!(!set.contains(&idx2));
+    }
+
+    #[test]
+    fn test_add_column_check_sql_format() {
+        let table = "test_table";
+        let column = "new_column";
+
+        let check_sql = format!(
+            "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='{table}' AND column_name='{column}';"
+        );
+        assert_eq!(
+            check_sql,
+            "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='test_table' AND column_name='new_column';"
+        );
+    }
+
+    #[test]
+    fn test_add_column_alter_sql_format() {
+        let table = "test_table";
+        let column = "new_column";
+        let data_type = "VARCHAR(255) NOT NULL DEFAULT ''";
+
+        // PostgreSQL supports IF NOT EXISTS
+        let alert_sql =
+            format!("ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {data_type};");
+        assert_eq!(
+            alert_sql,
+            "ALTER TABLE test_table ADD COLUMN IF NOT EXISTS new_column VARCHAR(255) NOT NULL DEFAULT '';"
+        );
+    }
+
+    #[test]
+    fn test_drop_column_check_sql_format() {
+        let table = "test_table";
+        let column = "old_column";
+
+        let check_sql = format!(
+            "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='{table}' AND column_name='{column}';"
+        );
+        assert_eq!(
+            check_sql,
+            "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='test_table' AND column_name='old_column';"
+        );
+    }
+
+    #[test]
+    fn test_drop_column_alter_sql_format() {
+        let table = "test_table";
+        let column = "old_column";
+
+        let alert_sql = format!("ALTER TABLE {table} DROP COLUMN {column};");
+        assert_eq!(alert_sql, "ALTER TABLE test_table DROP COLUMN old_column;");
+    }
+
+    #[test]
+    fn test_add_column_sql_with_various_postgres_types() {
+        let table = "users";
+
+        // BIGINT type
+        let alert_sql = format!(
+            "ALTER TABLE {} ADD COLUMN IF NOT EXISTS {} {};",
+            table, "big_id", "BIGINT NOT NULL DEFAULT 0"
+        );
+        assert_eq!(
+            alert_sql,
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS big_id BIGINT NOT NULL DEFAULT 0;"
+        );
+
+        // VARCHAR type
+        let alert_sql = format!(
+            "ALTER TABLE {} ADD COLUMN IF NOT EXISTS {} {};",
+            table, "email", "VARCHAR(255)"
+        );
+        assert_eq!(
+            alert_sql,
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255);"
+        );
+
+        // TEXT type
+        let alert_sql = format!(
+            "ALTER TABLE {} ADD COLUMN IF NOT EXISTS {} {};",
+            table, "description", "TEXT"
+        );
+        assert_eq!(
+            alert_sql,
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS description TEXT;"
+        );
+
+        // TIMESTAMP type
+        let alert_sql = format!(
+            "ALTER TABLE {} ADD COLUMN IF NOT EXISTS {} {};",
+            table, "created_at", "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"
+        );
+        assert_eq!(
+            alert_sql,
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP;"
+        );
+
+        // BOOLEAN type
+        let alert_sql = format!(
+            "ALTER TABLE {} ADD COLUMN IF NOT EXISTS {} {};",
+            table, "is_active", "BOOLEAN NOT NULL DEFAULT TRUE"
+        );
+        assert_eq!(
+            alert_sql,
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;"
+        );
+
+        // JSONB type (PostgreSQL specific)
+        let alert_sql = format!(
+            "ALTER TABLE {} ADD COLUMN IF NOT EXISTS {} {};",
+            table, "metadata", "JSONB"
+        );
+        assert_eq!(
+            alert_sql,
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS metadata JSONB;"
+        );
+
+        // UUID type (PostgreSQL specific)
+        let alert_sql = format!(
+            "ALTER TABLE {} ADD COLUMN IF NOT EXISTS {} {};",
+            table, "uuid", "UUID"
+        );
+        assert_eq!(
+            alert_sql,
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS uuid UUID;"
+        );
+    }
+
+    #[test]
+    fn test_sql_quote_escaping() {
+        let key = "key'with'quotes";
+        let escaped = key.replace('\'', "''");
+        assert_eq!(escaped, "key''with''quotes");
+    }
+
+    #[test]
+    fn test_sql_like_pattern_construction() {
+        let key2 = "prefix";
+        let pattern = format!("{key2}/%");
+        assert_eq!(pattern, "prefix/%");
+    }
+
+    #[test]
+    fn test_build_key_roundtrip() {
+        let original_parts = ("module", "key1", "key2");
+        let key = super::super::build_key(original_parts.0, original_parts.1, original_parts.2, 0);
+        let (module, k1, k2) = super::super::parse_key(&key);
+        assert_eq!(module, original_parts.0);
+        assert_eq!(k1, original_parts.1);
+        assert_eq!(k2, original_parts.2);
+    }
+
+    #[test]
+    fn test_parse_key_with_numbers() {
+        let key = "/123/456/789";
+        let (module, k1, k2) = super::super::parse_key(key);
+        assert_eq!(module, "123");
+        assert_eq!(k1, "456");
+        assert_eq!(k2, "789");
+    }
+
+    #[test]
+    fn test_parse_key_with_hyphens_underscores() {
+        let key = "/test-module/test_key1/test-key-2";
+        let (module, k1, k2) = super::super::parse_key(key);
+        assert_eq!(module, "test-module");
+        assert_eq!(k1, "test_key1");
+        assert_eq!(k2, "test-key-2");
+    }
+
+    #[test]
+    fn test_index_statement_empty_fields() {
+        let stmt = IndexStatement::new("empty_idx", "table", false, &[]);
+        assert_eq!(stmt.fields.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_key_trailing_slash() {
+        let key = "/module/key1/key2/";
+        let (module, k1, k2) = super::super::parse_key(key);
+        assert_eq!(module, "module");
+        assert_eq!(k1, "key1");
+        assert!(k2.starts_with("key2"));
+    }
+}

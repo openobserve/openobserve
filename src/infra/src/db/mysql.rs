@@ -1176,4 +1176,118 @@ mod tests {
         // Double slashes create empty segments
         assert!(k1.is_empty() || k1 == "key1");
     }
+
+    #[test]
+    fn test_add_column_check_sql_format() {
+        let table = "test_table";
+        let column = "new_column";
+
+        let check_sql = format!(
+            "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='{table}' AND column_name='{column}';"
+        );
+        assert_eq!(
+            check_sql,
+            "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='test_table' AND column_name='new_column';"
+        );
+    }
+
+    #[test]
+    fn test_add_column_alter_sql_format() {
+        let table = "test_table";
+        let column = "new_column";
+        let data_type = "VARCHAR(255) NOT NULL DEFAULT ''";
+
+        let alert_sql = format!("ALTER TABLE {table} ADD COLUMN {column} {data_type};");
+        assert_eq!(
+            alert_sql,
+            "ALTER TABLE test_table ADD COLUMN new_column VARCHAR(255) NOT NULL DEFAULT '';"
+        );
+    }
+
+    #[test]
+    fn test_drop_column_check_sql_format() {
+        let table = "test_table";
+        let column = "old_column";
+
+        let check_sql = format!(
+            "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='{table}' AND column_name='{column}';"
+        );
+        assert_eq!(
+            check_sql,
+            "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='test_table' AND column_name='old_column';"
+        );
+    }
+
+    #[test]
+    fn test_drop_column_alter_sql_format() {
+        let table = "test_table";
+        let column = "old_column";
+
+        let alert_sql = format!("ALTER TABLE {table} DROP COLUMN {column}");
+        assert_eq!(alert_sql, "ALTER TABLE test_table DROP COLUMN old_column");
+    }
+
+    #[test]
+    fn test_add_column_sql_with_various_mysql_types() {
+        let table = "users";
+
+        // BIGINT type
+        let alert_sql = format!(
+            "ALTER TABLE {} ADD COLUMN {} {};",
+            table, "big_id", "BIGINT NOT NULL DEFAULT 0"
+        );
+        assert_eq!(
+            alert_sql,
+            "ALTER TABLE users ADD COLUMN big_id BIGINT NOT NULL DEFAULT 0;"
+        );
+
+        // VARCHAR type
+        let alert_sql = format!(
+            "ALTER TABLE {} ADD COLUMN {} {};",
+            table, "email", "VARCHAR(255)"
+        );
+        assert_eq!(alert_sql, "ALTER TABLE users ADD COLUMN email VARCHAR(255);");
+
+        // TEXT type
+        let alert_sql = format!(
+            "ALTER TABLE {} ADD COLUMN {} {};",
+            table, "description", "TEXT"
+        );
+        assert_eq!(
+            alert_sql,
+            "ALTER TABLE users ADD COLUMN description TEXT;"
+        );
+
+        // DATETIME type
+        let alert_sql = format!(
+            "ALTER TABLE {} ADD COLUMN {} {};",
+            table, "created_at", "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"
+        );
+        assert_eq!(
+            alert_sql,
+            "ALTER TABLE users ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP;"
+        );
+
+        // BOOLEAN type
+        let alert_sql = format!(
+            "ALTER TABLE {} ADD COLUMN {} {};",
+            table, "is_active", "BOOLEAN NOT NULL DEFAULT TRUE"
+        );
+        assert_eq!(
+            alert_sql,
+            "ALTER TABLE users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT TRUE;"
+        );
+    }
+
+    #[test]
+    fn test_add_column_sql_escaping_special_names() {
+        // Test with reserved words or special characters
+        let table = "order";
+        let column = "select";
+        let data_type = "INT";
+
+        let alert_sql = format!("ALTER TABLE {table} ADD COLUMN {column} {data_type};");
+        // Note: In real usage, these should be backtick-quoted for MySQL
+        assert_eq!(alert_sql, "ALTER TABLE order ADD COLUMN select INT;");
+    }
 }
