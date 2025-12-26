@@ -947,7 +947,9 @@ const validateActionScriptData = async () => {
   if (formData.value.execution_details === "repeat") {
     try {
       cronError.value = "";
-      cronParser.parseExpression(frequency.value.cron);
+      cronParser.parseExpression(frequency.value.cron, {
+        currentDate: new Date(),
+      });
       validateFrequency(frequency.value.cron);
     } catch (err) {
       cronError.value = "Invalid cron expression!";

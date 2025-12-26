@@ -1440,7 +1440,9 @@ const validateReportData = async () => {
   if (formData.value.frequency.type === "cron") {
     try {
       cronError.value = "";
-      cronParser.parseExpression(frequency.value.cron);
+      cronParser.parseExpression(frequency.value.cron, {
+        currentDate: new Date(),
+      });
       validateFrequency();
     } catch (err) {
       cronError.value = "Invalid cron expression!";

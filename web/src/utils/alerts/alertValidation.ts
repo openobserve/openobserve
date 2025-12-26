@@ -436,7 +436,9 @@ export const validateInputs = (
   // Validate cron expression if frequency type is cron
   if (input.trigger_condition.frequency_type === "cron") {
     try {
-      cronParser.parseExpression(input.trigger_condition.cron!);
+      cronParser.parseExpression(input.trigger_condition.cron!, {
+        currentDate: new Date(),
+      });
     } catch (err) {
       console.log(err);
       notify &&
