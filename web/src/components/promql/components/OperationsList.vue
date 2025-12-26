@@ -293,10 +293,9 @@ const getFilteredOperationsForCategory = (
 };
 
 const handleDragUpdate = (newVal: QueryBuilderOperation[]) => {
-  // Clear and repopulate the array to maintain reactivity
-  props.operations.splice(0, props.operations.length, ...newVal);
-  // Emit the update to trigger parent watcher
-  emit("update:operations", props.operations);
+  // Create new array instead of mutating props
+  const newOperations = [...newVal];
+  emit("update:operations", newOperations);
 };
 
 const addOperation = (opDef: QueryBuilderOperationDef) => {
@@ -304,13 +303,15 @@ const addOperation = (opDef: QueryBuilderOperationDef) => {
     id: opDef.id,
     params: [...opDef.defaultParams],
   };
-  props.operations.push(newOp);
+  const newOperations = [...props.operations, newOp];
+  emit("update:operations", newOperations);
   showOperationSelector.value = false;
   searchQuery.value = "";
 };
 
 const removeOperation = (index: number) => {
-  props.operations.splice(index, 1);
+  const newOperations = props.operations.filter((_, idx) => idx !== index);
+  emit("update:operations", newOperations);
 };
 
 // Filter operation labels with autocomplete
