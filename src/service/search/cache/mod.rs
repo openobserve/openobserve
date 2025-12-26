@@ -35,7 +35,7 @@ use config::{
         hash::Sum64,
         json,
         sql::{is_aggregate_query, is_eligible_for_histogram},
-        time::{format_duration, second_micros},
+        time::{format_duration, now_micros, second_micros},
     },
 };
 use infra::{
@@ -540,8 +540,13 @@ pub async fn prepare_cache_response(
     // Normalize histogram interval in SQL before computing hash
     // This ensures the hash is consistent regardless of when handle_histogram is called
     if is_aggregate && sql.histogram_interval.is_some() {
+        let mut req_time_range = (req.query.start_time, req.query.end_time);
+        // If end_time is 0, it means "now" (current time)
+        if req_time_range.1 == 0 {
+            req_time_range.1 = now_micros();
+        }
+
         let meta_time_range_is_empty = sql.time_range.is_none() || sql.time_range == Some((0, 0));
-        let req_time_range = (req.query.start_time, req.query.end_time);
         let q_time_range =
             if meta_time_range_is_empty && (req_time_range.0 > 0 || req_time_range.1 > 0) {
                 Some(req_time_range)
