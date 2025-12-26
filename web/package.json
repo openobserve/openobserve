@@ -83,6 +83,7 @@
     "@cypress/webpack-dev-server": "^5.4.1",
     "@quasar/vite-plugin": "^1.9.0",
     "@rushstack/eslint-patch": "^1.10.5",
+    "@tailwindcss/postcss": "^4.1.18",
     "@tailwindcss/typography": "^0.5.16",
     "@types/axios": "^0.14.4",
     "@types/d3-force": "^3.0.10",
