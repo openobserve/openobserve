@@ -2050,9 +2050,11 @@ const getStreamFields = () => {
         });
       })
       .finally(() => {
-        if (tab.value === "sql") {
+        // Only set default query if query is empty
+        // Don't overwrite user's custom query when they change streams
+        if (tab.value === "sql" && !query.value.trim()) {
           query.value = `SELECT * FROM "${selectedStreamName.value}"`;
-        } else if (tab.value === "promql") {
+        } else if (tab.value === "promql" && !query.value.trim()) {
           query.value = `${selectedStreamName.value}{}`;
         }
         expandState.value.query = true;
