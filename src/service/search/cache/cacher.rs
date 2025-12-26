@@ -501,10 +501,9 @@ pub async fn get_cached_results(
         }
         // reset the start and end time
         let first_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.first().unwrap());
-        let last_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap())
-            + histogram_interval;
+        let last_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap());
         matching_meta.start_time = std::cmp::min(first_ts, last_ts);
-        matching_meta.end_time = std::cmp::max(first_ts, last_ts);
+        matching_meta.end_time = std::cmp::max(first_ts, last_ts) + histogram_interval;
     }
     cached_response.total = cached_response.hits.len();
 
