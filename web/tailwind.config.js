@@ -4,7 +4,7 @@ import typography from "@tailwindcss/typography";
 
 // eslint-disable-next-line no-undef
 export default {
-  prefix: "tw-",
+  prefix: "tw:",
   content: [
     "./index.html",
     "./src/**/*.{vue,js,ts}", // path to all template files

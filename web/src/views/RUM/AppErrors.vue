@@ -16,9 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="sessions_page">
-    <div class="tw-pb-[0.625rem] tw-px-[0.625rem]">
+    <div class="tw:pb-[0.625rem] tw:px-[0.625rem]">
       <div class="card-container">
-        <div class="text-right tw-p-[0.375rem] flex align-center justify-between">
+        <div class="text-right tw:p-[0.375rem] flex align-center justify-between">
           <syntax-guide class="q-mr-sm" />
           <div class="flex align-center justify-end metrics-date-time">
             <date-time
@@ -40,17 +40,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-cy="metrics-explorer-run-query-button"
               dense
               title="Run query"
-              class="q-pa-none !tw-mr-none o2-run-query-button o2-color-primary tw-h-[33px] element-box-shadow"
+              class="q-pa-none tw:mr-none! o2-run-query-button o2-color-primary tw:h-[33px] element-box-shadow"
               @click="runQuery"
             >
               Run query
             </q-btn>
           </div>
         </div>
-        <div class="tw-pb-[0.375rem] tw-px-[0.375rem]">
+        <div class="tw:pb-[0.375rem] tw:px-[0.375rem]">
           <query-editor
             editor-id="rum-errors-query-editor"
-            class="monaco-editor tw-border tw-solid tw-border-[var(--o2-border-color)] tw-p-[0.25rem] tw-rounded-[0.375rem] tw-overflow-hidden !tw-h-[4rem]"
+            class="monaco-editor tw:border tw:solid tw:border-[var(--o2-border-color)] tw:p-[0.25rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-[4rem]!"
             v-model:query="errorTrackingState.data.editorValue"
             :debounce-time="300"
           />
@@ -58,13 +58,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <q-splitter
-      class="logs-horizontal-splitter !tw-pl-[0.625rem] !tw-h-[calc(100%-80px)]"
+      class="logs-horizontal-splitter tw:pl-[0.625rem]! tw:h-[calc(100%-80px)]!"
       v-model="splitterModel"
       unit="px"
       vertical
     >
       <template #before>
-        <div class="card-container tw-p-[0.325rem] tw-h-full">
+        <div class="card-container tw:p-[0.325rem] tw:h-full">
           <FieldList
             :fields="streamFields"
             :time-stamp="{
@@ -81,21 +81,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           color="primary"
           text-color="white"
           icon="drag_indicator"
-          class="!tw-top-[2rem] tw-w-[0.75rem] !tw-h-[2rem] !tw-text-[2rem] !tw-rounded-[0.325rem]"
+          class="tw:top-[2rem]! tw:w-[0.75rem]! tw:h-[2rem]! tw:text-[2rem]! tw:rounded-[0.325rem]!"
         />
       </template>
       <template #after>
-        <div class="tw-pr-[0.625rem] tw-h-full">
-          <div class="card-container tw-h-full">
+        <div class="tw:pr-[0.625rem] tw:h-full">
+          <div class="card-container tw:h-full">
             <template v-if="isLoading.length">
               <div
-                class="q-pb-lg flex items-center justify-center text-center tw-h-[calc(100vh-18.75rem)]"
+                class="q-pb-lg flex items-center justify-center text-center tw:h-[calc(100vh-18.75rem)]"
               >
                 <div>
                   <q-spinner-hourglass
                     color="primary"
                     size="2.5rem"
-                    class="tw-mx-auto tw-block"
+                    class="tw:mx-auto tw:block"
                   />
                   <div class="text-center full-width">
                     Hold on tight, we're fetching your application errors.
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <AppTable
               :columns="columns"
               :rows="errorTrackingState.data.errors"
-              class="app-table-container tw-h-full"
+              class="app-table-container tw:h-full"
               @event-emitted="handleTableEvent"
             >
               <template v-slot:error_details="slotProps">

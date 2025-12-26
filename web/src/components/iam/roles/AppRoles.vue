@@ -17,12 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
     <div>
-      <div class="card-container tw-mb-[0.625rem]">
-      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[68px]"
+      <div class="card-container tw:mb-[0.625rem]">
+      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px]"
         >
         <div
           data-test="iam-roles-section-title"
-          class="q-table__title tw-font-[600]"
+          class="q-table__title tw:font-[600]"
         >
           {{ t("iam.roles") }}
         </div>
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="filterQuery"
                 borderless
                 dense
-                class="q-ml-auto no-border o2-search-input tw-h-[36px]"
+                class="q-ml-auto no-border o2-search-input tw:h-[36px]"
                 :placeholder="t('iam.searchRole')"
               >
                 <template #prepend>
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <q-btn
               data-test="alert-list-add-alert-btn"
-              class="q-ml-sm o2-primary-button tw-h-[36px]"
+              class="q-ml-sm o2-primary-button tw:h-[36px]"
               flat
               no-caps
               :label="t(`iam.addRole`)"
@@ -52,8 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
       </div>
     </div>
-      <div class="tw-w-full tw-h-full">
-      <div class="card-container tw-h-[calc(100vh-127px)]">
+      <div class="tw:w-full tw:h-full">
+      <div class="card-container tw:h-[calc(100vh-127px)]">
     <app-table
       data-test="iam-roles-table-section"
       class="iam-table o2-quasar-app-table o2-quasar-table-header-sticky"
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :theme="store.state.theme"
     >
       <template v-slot:actions="slotProps: any">
-        <div class="tw-flex tw-items-center tw-gap-2 tw-justify-center">
+        <div class="tw:flex tw:items-center tw:gap-2 tw:justify-center">
           <q-btn
             :data-test="`iam-roles-edit-${slotProps.column.row.role_name}-role-icon`"
             padding="sm"

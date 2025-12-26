@@ -463,7 +463,7 @@ describe("TraceHeader", () => {
       const operationNameSection = wrapper.find(
         '[data-test="trace-header-operation-name"]',
       );
-      expect(operationNameSection.classes()).toContain("tw-relative");
+      expect(operationNameSection.classes()).toContain("tw:relative");
       expect(operationNameSection.classes()).toContain("flex");
       expect(operationNameSection.classes()).toContain("justify-start");
       expect(operationNameSection.classes()).toContain("items-center");

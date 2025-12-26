@@ -16,9 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="add-action-script-section">
-    <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem] q-pt-xs">
+    <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
       <div class="card-container">
-        <div class="tw-flex tw-items-center tw-justify-between tw-py-3 tw-pl-4 tw-pr-2 tw-h-[68px]">
+        <div class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:pl-4 tw:pr-2 tw:h-[68px]">
         
           <div
             data-test="add-action-script-back-btn"
@@ -42,8 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     
-      <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
-        <div class="card-container tw-h-[calc(100vh-192px)] tw-overflow-auto">
+      <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem]">
+        <div class="card-container tw:h-[calc(100vh-192px)] tw:overflow-auto">
           <div ref="addAlertFormRef" class="q-px-lg q-pb-md" style="width: 1024px">
             <q-form
               class="create-report-form"
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="formData.type"
                   :label="t('common.type') + ' *'"
                   :options="actionTypes"
-                  class="showLabelOnTop no-case tw-w-[400px]"
+                  class="showLabelOnTop no-case tw:w-[400px]"
                   stack-label
                   map-options
                   emit-value
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-model="formData.codeZip"
                       :label="t('actions.zipFile') + ' *'"
                       bg-color="input-bg"
-                      class="tw-w-[300px] q-pt-md q-pb-sm showLabelOnTop lookup-table-file-uploader"
+                      class="tw:w-[300px] q-pt-md q-pb-sm showLabelOnTop lookup-table-file-uploader"
                       stack-label
                       outlined
                       dense
@@ -198,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-btn
                       data-test="add-action-script-step1-continue-btn"
                       @click="step = 2"
-                      class="o2-primary-button tw-h-[36px] q-mt-sm"
+                      class="o2-primary-button tw:h-[36px] q-mt-sm"
                       :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
                       flat
                       :label="'Continue'"
@@ -225,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t("actions.frequency") }} *
                     </div>
                     <div
-                      class="q-pa-xs el-border-radius el-border tw-w-fit"
+                      class="q-pa-xs el-border-radius el-border tw:w-fit"
                     >
                       <template v-for="visual in frequencyTabs" :key="visual.value">
                         <q-btn
@@ -327,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :label="t('actions.timezone') + ' *'"
                             :loading="isFetchingServiceAccounts"
                             :popup-content-style="{ textTransform: 'lowercase' }"
-                            class="showLabelOnTop no-case tw-mb-[2.4rem]"
+                            class="showLabelOnTop no-case tw:mb-[2.4rem]"
                             borderless
                             stack-label
                             dense
@@ -354,7 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="add-action-script-step2-back-btn"
                         @click="step = 1"
                         flat
-                        class="o2-secondary-button tw-h-[36px] q-ml-sm"
+                        class="o2-secondary-button tw:h-[36px] q-ml-sm"
                         :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                         :label="'Back'"
                         no-caps
@@ -362,7 +362,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-btn
                         data-test="add-action-script-step2-continue-btn"
                         @click="step = 3"
-                        class="o2-primary-button tw-h-[36px] q-ml-md "
+                        class="o2-primary-button tw:h-[36px] q-ml-md "
                         :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
                         flat
                         :label="'Continue'"
@@ -431,7 +431,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="add-action-script-step3-back-btn"
                       @click="step = formData.type === 'scheduled' ? 2 : 1"
                       flat
-                      class="o2-secondary-button tw-h-[36px]"
+                      class="o2-secondary-button tw:h-[36px]"
                       :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                       :label="'Back'"
                       no-caps
@@ -439,7 +439,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-btn
                       data-test="add-action-script-step3-continue-btn"
                       @click="step = 4"
-                      class="o2-primary-button tw-h-[36px] q-ml-md"
+                      class="o2-primary-button tw:h-[36px] q-ml-md"
                       :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
                       flat
                       :label="'Continue'"
@@ -517,7 +517,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="add-action-script-step4-back-btn"
                       flat
                       @click="step = 3"
-                      class="o2-secondary-button tw-h-[36px]"
+                      class="o2-secondary-button tw:h-[36px]"
                       :label="'Back'"
                       no-caps
                     />
@@ -528,14 +528,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-      <div class="tw-mx-2">
+      <div class="tw:mx-2">
               <div
-        class="flex justify-end q-px-md full-width tw-py-[0.625rem] card-container"
+        class="flex justify-end q-px-md full-width tw:py-[0.625rem] card-container"
         style="position: sticky; bottom: 0px; z-index: 2"
       >
         <q-btn
           data-test="add-action-script-cancel-btn"
-          class="q-mr-md o2-secondary-button tw-h-[36px]"
+          class="q-mr-md o2-secondary-button tw:h-[36px]"
           flat
           :label="t('alerts.cancel')"
           no-caps
@@ -544,7 +544,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-btn
           data-test="add-action-script-save-btn"
           :label="t('alerts.save')"
-          class="o2-primary-button tw-h-[36px]"
+          class="o2-primary-button tw:h-[36px]"
           flat
           no-caps
           @click="saveActionScript"

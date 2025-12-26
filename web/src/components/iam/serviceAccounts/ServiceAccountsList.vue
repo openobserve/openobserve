@@ -21,22 +21,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
     <div>
-      <div class="card-container tw-mb-[0.625rem]">
-      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-full-width tw-h-[68px] tw-border-b-[1px]"
+      <div class="card-container tw:mb-[0.625rem]">
+      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:full-width tw:h-[68px] tw:border-b-[1px]"
       >
 
         <div
-            class="q-table__title full-width tw-font-[600]"
+            class="q-table__title full-width tw:font-[600]"
             data-test="service-accounts-title-text"
           >
             {{ t("serviceAccounts.header") }}
           </div>
-          <div class="full-width tw-flex tw-justify-end">
+          <div class="full-width tw:flex tw:justify-end">
             <q-input
                 v-model="filterQuery"
                 borderless
                 dense
-                class="q-ml-auto no-border o2-search-input tw-h-[36px]"
+                class="q-ml-auto no-border o2-search-input tw:h-[36px]"
                 :placeholder="t('serviceAccounts.search')"
               >
                 <template #prepend>
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </q-input>
               <q-btn
-                class="q-ml-sm o2-primary-button tw-h-[36px]"
+                class="q-ml-sm o2-primary-button tw:h-[36px]"
                 flat
                 no-caps
                 :label="t(`serviceAccounts.add`)"
@@ -53,8 +53,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
       </div>
       </div>
-      <div class="tw-w-full tw-h-full">
-        <div class="card-container tw-h-[calc(100vh-127px)]">
+      <div class="tw:w-full tw:h-full">
+        <div class="card-container tw:h-[calc(100vh-127px)]">
           <q-table
             ref="qTable"
             class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
@@ -79,11 +79,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #body-cell-token="props">
             <q-td :props="props" side >
-              <div class="tw-flex tw-items-center" v-if="props.row.isLoading">
+              <div class="tw:flex tw:items-center" v-if="props.row.isLoading">
                 <q-spinner-dots color="primary"  />
               </div>
               <!-- Display the token or masked text based on visibility -->
-            <div v-else  class="tw-flex tw-items-center">
+            <div v-else  class="tw:flex tw:items-center">
               <span 
                 style="
                 display: inline-block;
@@ -171,8 +171,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-td>
             </template>
             <template #bottom="scope">
-              <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
-                <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
+              <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+                <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md">
                   {{ resultTotal }} {{ t('serviceAccounts.header') }}
                 </div>
                 <q-btn
@@ -327,23 +327,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <q-dialog v-model="isShowToken"  persistent>
   <q-card style="width: 40vw; max-height: 90vh; overflow-y: auto;">
-    <q-card-section  class="text-h6 dialog-heading tw-flex tw-justify-between tw-items-center" >
+    <q-card-section  class="text-h6 dialog-heading tw:flex tw:justify-between tw:items-center" >
       <div>Service Account Token </div>
           <q-btn data-test="sa-cancel-button" dense flat icon="cancel" size="md" @click="isShowToken = false" style="cursor: pointer" />
     </q-card-section>
 
     <q-card-section>
 
-      <div class="tw-flex tw-items-center tw-gap-2" style="padding: 0rem 1rem;  border-radius: 8px;">
+      <div class="tw:flex tw:items-center tw:gap-2" style="padding: 0rem 1rem;  border-radius: 8px;">
   <!-- Token section taking 75% of the width -->
   <div
-    class="text-h6 text-center tw-truncate el-border"
+    class="text-h6 text-center tw:truncate el-border"
     style="flex: 3;  padding: 0.5rem; border-radius: 6px; font-family: monospace; text-align: center; overflow: hidden;"
   >
     {{  serviceToken }}
   </div>
   <!-- Buttons section taking 25% of the width -->
-  <div class="tw-flex tw-justify-end tw-gap-1" style="flex: 1; max-width: 25%;">
+  <div class="tw:flex tw:justify-end tw:gap-1" style="flex: 1; max-width: 25%;">
     <q-btn
       @click.stop="copyToClipboard(serviceToken)"
       size="lg"

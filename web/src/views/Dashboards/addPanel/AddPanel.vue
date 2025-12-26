@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div style="overflow-y: auto" class="scroll">
-    <div class="tw-px-[0.625rem] tw-mb-[0.625rem] q-pt-xs">
+    <div class="tw:px-[0.625rem] tw:mb-[0.625rem] q-pt-xs">
       <div
         class="flex items-center q-pa-sm card-container"
         :class="!store.state.isAiChatEnabled ? 'justify-between' : ''"
@@ -199,9 +199,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div>
       <div class="row" style="overflow-y: auto">
-        <div class="tw-pl-[0.625rem]">
+        <div class="tw:pl-[0.625rem]">
           <div
-            class="col scroll card-container tw-mr-[0.625rem]"
+            class="col scroll card-container tw:mr-[0.625rem]"
             style="
               overflow-y: auto;
               height: 100%;
@@ -223,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.data.type,
             )
           "
-          class="col tw-mr-[0.625rem]"
+          class="col tw:mr-[0.625rem]"
           style="display: flex; flex-direction: row; overflow-x: hidden"
         >
           <!-- collapse field list bar -->
@@ -253,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
           >
             <template #before>
-              <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
+              <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
                 <div
                   v-if="dashboardPanelData.layout.showFieldList"
                   class="col scroll card-container"
@@ -326,7 +326,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :initialVariableValues="initialVariableValues"
                     />
 
-                    <div v-if="isOutDated" class="tw-p-2">
+                    <div v-if="isOutDated" class="tw:p-2">
                       <div
                         :style="{
                           borderColor: '#c3920d',
@@ -348,7 +348,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </div>
                     </div>
-                    <div class="tw-flex tw-justify-end tw-mr-2 tw-items-center">
+                    <div class="tw:flex tw:justify-end tw:mr-2 tw:items-center">
                       <!-- Error/Warning tooltips moved here -->
                       <q-btn
                         v-if="errorMessage"
@@ -415,7 +415,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </span>
                     </div>
-                    <div class="tw-h-[calc(100vh-500px)] tw-min-h-[140px]">
+                    <div class="tw:h-[calc(100vh-500px)] tw:min-h-[140px]">
                       <PanelSchemaRenderer
                         v-if="chartData"
                         @metadata-update="metaDataValue"
@@ -457,7 +457,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="flex-shrink: 0"
                     />
                   </div>
-                  <div class="row column tw-h-[calc(100vh-180px)]">
+                  <div class="row column tw:h-[calc(100vh-180px)]">
                     <DashboardQueryEditor />
                   </div>
                 </div>
@@ -483,7 +483,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="col column"
           style="width: 100%; height: calc(100vh - 99px); flex: 1"
         >
-          <div class="card-container tw-h-full tw-flex tw-flex-col">
+          <div class="card-container tw:h-full tw:flex tw:flex-col">
             <VariablesValueSelector
               :variablesConfig="currentDashboardData.data?.variables"
               :showDynamicFilters="
@@ -492,7 +492,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :selectedTimeDate="dashboardPanelData.meta.dateTime"
               @variablesData="variablesDataUpdated"
               :initialVariableValues="initialVariableValues"
-              class="tw-flex-shrink-0 q-mb-sm"
+              class="tw:flex-shrink-0 q-mb-sm"
             />
             <CustomHTMLEditor
               v-model="dashboardPanelData.data.htmlContent"
@@ -510,7 +510,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="col column"
           style="width: 100%; height: calc(100vh - 99px); flex: 1"
         >
-          <div class="card-container tw-h-full tw-flex tw-flex-col">
+          <div class="card-container tw:h-full tw:flex tw:flex-col">
             <VariablesValueSelector
               :variablesConfig="currentDashboardData.data?.variables"
               :showDynamicFilters="
@@ -519,7 +519,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :selectedTimeDate="dashboardPanelData.meta.dateTime"
               @variablesData="variablesDataUpdated"
               :initialVariableValues="initialVariableValues"
-              class="tw-flex-shrink-0 q-mb-sm"
+              class="tw:flex-shrink-0 q-mb-sm"
             />
             <CustomMarkdownEditor
               v-model="dashboardPanelData.data.markdownContent"
@@ -570,7 +570,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #before>
               <div
-                class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]"
+                class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]"
               >
                 <div
                   class="col scroll card-container"
@@ -712,7 +712,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="flex-shrink: 0"
                     />
                   </div>
-                  <div class="row column tw-h-[calc(100vh-180px)]">
+                  <div class="row column tw:h-[calc(100vh-180px)]">
                     <DashboardQueryEditor />
                   </div>
                 </div>

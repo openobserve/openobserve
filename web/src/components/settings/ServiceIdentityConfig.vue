@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw-w-full service-identity-config">
+  <div class="tw:w-full service-identity-config">
     <!-- Section Header -->
-    <GroupHeader :title="t('settings.correlation.serviceIdentityTitle')" :showIcon="false" class="tw-mb-2" />
-    <div class="text-body2 text-grey-7 tw-mb-4">
+    <GroupHeader :title="t('settings.correlation.serviceIdentityTitle')" :showIcon="false" class="tw:mb-2" />
+    <div class="text-body2 text-grey-7 tw:mb-4">
       {{ t("settings.correlation.serviceIdentityDescription") }}
     </div>
 
@@ -28,37 +28,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       dense-toggle
       icon="help_outline"
       :label="t('settings.correlation.howItWorksTitle')"
-      class="tw-mb-4 tw-rounded-lg"
+      class="tw:mb-4 tw:rounded-lg"
       :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'"
     >
-      <div class="tw-p-4 text-body2 tw-leading-relaxed">
-        <div class="tw-mb-3">
-          <span class="tw-font-semibold text-primary">Service FQN</span>
+      <div class="tw:p-4 text-body2 tw:leading-relaxed">
+        <div class="tw:mb-3">
+          <span class="tw:font-semibold text-primary">Service FQN</span>
           <span class="text-grey-7"> {{ t("settings.correlation.howItWorksDescription") }}</span>
         </div>
-        <div class="tw-mb-3">
-          <span class="tw-font-semibold text-primary">{{ t("settings.correlation.priorityOrderLabel") }}</span>
+        <div class="tw:mb-3">
+          <span class="tw:font-semibold text-primary">{{ t("settings.correlation.priorityOrderLabel") }}</span>
           <span class="text-grey-7"> {{ t("settings.correlation.priorityOrderDescription") }}</span>
         </div>
-        <div class="tw-mb-3 tw-p-3 tw-rounded" :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-white'">
-          <span class="tw-font-semibold text-primary">{{ t("settings.correlation.exampleLabel") }} </span>
+        <div class="tw:mb-3 tw:p-3 tw:rounded" :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-white'">
+          <span class="tw:font-semibold text-primary">{{ t("settings.correlation.exampleLabel") }} </span>
           <i18n-t keypath="settings.correlation.exampleText" tag="span" class="text-grey-7">
             <template #dim1>
-              <q-chip dense size="sm" color="primary" text-color="white" class="tw-mx-1">k8s-deployment=my-app</q-chip>
+              <q-chip dense size="sm" color="primary" text-color="white" class="tw:mx-1">k8s-deployment=my-app</q-chip>
             </template>
             <template #dim2>
-              <q-chip dense size="sm" color="grey-7" text-color="white" class="tw-mx-1">service=myapp</q-chip>
+              <q-chip dense size="sm" color="grey-7" text-color="white" class="tw:mx-1">service=myapp</q-chip>
             </template>
             <template #value>
-              <q-chip dense size="sm" color="positive" text-color="white" class="tw-mx-1">my-app</q-chip>
+              <q-chip dense size="sm" color="positive" text-color="white" class="tw:mx-1">my-app</q-chip>
             </template>
           </i18n-t>
         </div>
         <div>
-          <span class="tw-font-semibold text-primary">{{ t("settings.correlation.correlationLabel") }} </span>
+          <span class="tw:font-semibold text-primary">{{ t("settings.correlation.correlationLabel") }} </span>
           <i18n-t keypath="settings.correlation.correlationDescription" tag="span" class="text-grey-7">
             <template #field>
-              <span class="tw-font-mono tw-font-semibold">service</span>
+              <span class="tw:font-mono tw:font-semibold">service</span>
             </template>
           </i18n-t>
         </div>
@@ -72,12 +72,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('settings.correlation.fqnPriorityTitle')"
       :caption="t('settings.correlation.fqnPriorityDescription')"
       header-class="section-header"
-      class="tw-mb-4 tw-rounded-lg tw-border tw-border-solid"
-      :class="store.state.theme === 'dark' ? 'tw-border-gray-700' : 'tw-border-gray-200'"
+      class="tw:mb-4 tw:rounded-lg tw:border tw:border-solid"
+      :class="store.state.theme === 'dark' ? 'tw:border-gray-700' : 'tw:border-gray-200'"
       default-opened
     >
-      <div class="tw-p-4">
-        <div class="tw-flex tw-gap-2 tw-mb-3">
+      <div class="tw:p-4">
+        <div class="tw:flex tw:gap-2 tw:mb-3">
           <q-btn
             flat
             dense
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-icon
             :name="outlinedInfo"
             size="1rem"
-            class="cursor-pointer tw-self-center"
+            class="cursor-pointer tw:self-center"
             :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
           >
             <q-tooltip
@@ -103,28 +103,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-icon>
         </div>
 
-        <q-list bordered class="tw-rounded-lg">
+        <q-list bordered class="tw:rounded-lg">
         <q-item
           v-for="(dim, index) in localFqnPriority"
           :key="dim"
           dense
-          class="tw-py-2"
+          class="tw:py-2"
         >
-          <q-item-section avatar class="tw-min-w-0">
+          <q-item-section avatar class="tw:min-w-0">
             <q-badge
               :color="index < 4 ? 'primary' : 'grey'"
               text-color="white"
-              class="tw-w-6 tw-h-6 tw-flex tw-items-center tw-justify-center tw-rounded-full"
+              class="tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:rounded-full"
             >
               {{ index + 1 }}
             </q-badge>
           </q-item-section>
           <q-item-section>
-            <q-item-label class="tw-font-medium">{{ getDimensionDisplay(dim) }}</q-item-label>
-            <q-item-label caption class="tw-font-mono tw-text-xs">{{ dim }}</q-item-label>
+            <q-item-label class="tw:font-medium">{{ getDimensionDisplay(dim) }}</q-item-label>
+            <q-item-label caption class="tw:font-mono tw:text-xs">{{ dim }}</q-item-label>
           </q-item-section>
           <q-item-section side>
-            <div class="tw-flex tw-gap-1">
+            <div class="tw:flex tw:gap-1">
               <q-btn
                 flat
                 dense
@@ -161,17 +161,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </q-item-section>
         </q-item>
-        <q-item v-if="localFqnPriority.length === 0" class="tw-py-4 tw-text-center tw-text-gray-500">
+        <q-item v-if="localFqnPriority.length === 0" class="tw:py-4 tw:text-center tw:text-gray-500">
           {{ t("settings.correlation.noDimensionsConfigured") }}
         </q-item>
       </q-list>
 
       <!-- Add new semantic group to FQN priority -->
-      <div class="tw-mt-3">
-        <div class="tw-text-sm tw-text-gray-600 dark:tw-text-gray-400 tw-mb-2">
+      <div class="tw:mt-3">
+        <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
           {{ t("settings.correlation.addDimensionHint") }}
         </div>
-        <div class="tw-flex tw-gap-2 tw-items-end">
+        <div class="tw:flex tw:gap-2 tw:items-end">
           <q-select
             v-model="selectedSemanticGroup"
             :options="availableSemanticGroups"
@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             borderless
             stack-label
             :label="t('settings.correlation.selectSemanticGroup')"
-            class="tw-flex-1 showLabelOnTop"
+            class="tw:flex-1 showLabelOnTop"
             emit-value
             map-options
             clearable
@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-item v-bind="scope.itemProps">
                 <q-item-section>
                   <q-item-label>{{ scope.opt.label }}</q-item-label>
-                  <q-item-label caption class="tw-text-xs tw-font-mono">
+                  <q-item-label caption class="tw:text-xs tw:font-mono">
                     {{ scope.opt.value }}
                   </q-item-label>
                 </q-item-section>
@@ -216,18 +216,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-btn>
         </div>
       </div>
-      <div v-if="availableSemanticGroups.length === 0 && localSemanticGroups.length === 0" class="tw-mt-2 tw-text-sm tw-text-amber-600 dark:tw-text-amber-400">
+      <div v-if="availableSemanticGroups.length === 0 && localSemanticGroups.length === 0" class="tw:mt-2 tw:text-sm tw:text-amber-600 dark:tw:text-amber-400">
         {{ t("settings.correlation.noSemanticGroupsConfigured") }}
       </div>
 
         <!-- Save FQN Priority Button -->
-        <div class="tw-flex tw-justify-end tw-mt-4">
+        <div class="tw:flex tw:justify-end tw:mt-4">
           <q-btn
             :label="t('common.save')"
             color="primary"
             @click="saveFqnPriority"
             :loading="savingFqn"
-            class="tw-px-4"
+            class="tw:px-4"
           />
         </div>
       </div>
@@ -240,24 +240,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('settings.correlation.semanticFieldTitle')"
       :caption="t('settings.correlation.semanticFieldDescription')"
       header-class="section-header"
-      class="tw-mb-4 tw-rounded-lg tw-border tw-border-solid"
-      :class="store.state.theme === 'dark' ? 'tw-border-gray-700' : 'tw-border-gray-200'"
+      class="tw:mb-4 tw:rounded-lg tw:border tw:border-solid"
+      :class="store.state.theme === 'dark' ? 'tw:border-gray-700' : 'tw:border-gray-200'"
       default-opened
     >
-      <div class="tw-p-4">
+      <div class="tw:p-4">
           <SemanticFieldGroupsConfig
           v-model:semantic-field-groups="localSemanticGroups"
           @update:semantic-field-groups="handleSemanticGroupsUpdate"
         />
 
         <!-- Save Semantic Mappings Button -->
-        <div class="tw-flex tw-justify-end tw-mt-4">
+        <div class="tw:flex tw:justify-end tw:mt-4">
           <q-btn
             :label="t('common.save')"
             color="primary"
             @click="saveSemanticMappings"
             :loading="savingSemanticMappings"
-            class="tw-px-4"
+            class="tw:px-4"
           />
         </div>
       </div>
