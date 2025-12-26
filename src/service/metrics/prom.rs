@@ -113,6 +113,7 @@ pub async fn remote_write(
     let mut json_data_by_stream: HashMap<String, Vec<_>> = HashMap::new();
 
     // parse metadata
+    let mut step_start = std::time::Instant::now();
     for item in request.metadata {
         let metric_name = format_stream_name(item.metric_family_name.to_string());
         let schema = infra::schema::get(org_id, &metric_name, StreamType::Metrics)
@@ -141,6 +142,10 @@ pub async fn remote_write(
             log::error!("Error updating metadata for stream: {metric_name}, err: {e}");
         }
     }
+    log::info!(
+        "[remote_write] org: {org_id}, parse metadata took: {} ms",
+        step_start.elapsed().as_millis()
+    );
 
     // maybe empty, we can return immediately
     if request.timeseries.is_empty() {
@@ -169,7 +174,9 @@ pub async fn remote_write(
     }
 
     // parse timeseries
+    step_start = std::time::Instant::now();
     let mut first_line = true;
+    let mut ha_check_total_time = 0.0;
     for mut event in request.timeseries {
         // get labels
         let mut replica_label = String::new();
@@ -245,6 +252,7 @@ pub async fn remote_write(
             };
 
             if first_line && dedup_enabled && !cluster_name.is_empty() {
+                let ha_start = std::time::Instant::now();
                 let lock = METRIC_CLUSTER_LEADER.read().await;
                 match lock.get(&cluster_name) {
                     Some(leader) => {
@@ -270,6 +278,7 @@ pub async fn remote_write(
                 };
                 has_entry = true;
                 first_line = false;
+                ha_check_total_time += ha_start.elapsed().as_millis() as f64;
             } else {
                 accept_record = true
             }
@@ -368,6 +377,12 @@ pub async fn remote_write(
             }
         }
     }
+    log::info!(
+        "[remote_write] org: {}, parse timeseries took: {} ms, HA check took: {} ms",
+        org_id,
+        step_start.elapsed().as_millis(),
+        ha_check_total_time as i64
+    );
 
     // process records buffered for pipeline processing
     for (stream_name, exec_pl_option) in &stream_executable_pipelines {
@@ -436,6 +451,7 @@ pub async fn remote_write(
         }
     }
 
+    step_start = std::time::Instant::now();
     for (stream_name, json_data) in json_data_by_stream {
         // get partition keys
         let partition_det = stream_partitioning_map.get(&stream_name).unwrap();
@@ -538,8 +554,13 @@ pub async fn remote_write(
             // End check for alert trigger
         }
     }
+    log::info!(
+        "[remote_write] org: {org_id}, build records and schema check took: {} ms",
+        step_start.elapsed().as_millis()
+    );
 
     // write data to wal
+    step_start = std::time::Instant::now();
     for (stream_name, stream_data) in metric_data_map {
         // stream_data could be empty if metric value is nan, check it
         if stream_data.is_empty() {
@@ -590,6 +611,10 @@ pub async fn remote_write(
         )
         .await;
     }
+    log::info!(
+        "[remote_write] org: {org_id}, write to WAL took: {} ms",
+        step_start.elapsed().as_millis()
+    );
 
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
@@ -619,6 +644,11 @@ pub async fn remote_write(
             evaluate_trigger(entry).await;
         }
     }
+
+    log::info!(
+        "[remote_write] org: {org_id}, total time: {:.3}ms",
+        start.elapsed().as_millis()
+    );
 
     Ok(())
 }
