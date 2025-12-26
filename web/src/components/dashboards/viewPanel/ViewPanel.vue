@@ -27,6 +27,11 @@
         <HistogramIntervalDropDown
           v-if="!promqlMode && histogramFields.length"
           v-model="histogramInterval"
+          @update:modelValue="
+            (newValue: any) => {
+              histogramInterval = newValue.value;
+            }
+          "
           class="viewpanel-icons"
           style="width: 150px"
           data-test="dashboard-viewpanel-histogram-interval-dropdown"
@@ -199,6 +204,7 @@
                   :variablesData="currentVariablesDataRef"
                   :width="6"
                   :searchType="searchType"
+                  :showLegendsButton="true"
                   @error="handleChartApiError"
                   @updated:data-zoom="onDataZoom"
                   @update:initialVariableValues="onUpdateInitialVariableValues"
@@ -207,8 +213,10 @@
                   @limit-number-of-series-warning-message-update="
                     handleLimitNumberOfSeriesWarningMessage
                   "
+                  @show-legends="showLegendsDialog = true"
                   data-test="dashboard-viewpanel-panel-schema-renderer"
                   style="height: calc(100% - 21px)"
+                  ref="panelSchemaRendererRef"
                 />
               </div>
               <DashboardErrorsComponent
@@ -220,6 +228,12 @@
         </div>
       </div>
     </div>
+    <q-dialog v-model="showLegendsDialog">
+      <ShowLegendsPopup
+        :panelData="currentPanelData"
+        @close="showLegendsDialog = false"
+      />
+    </q-dialog>
   </div>
 </template>
 
@@ -262,6 +276,11 @@ import { isEqual } from "lodash-es";
 import { processQueryMetadataErrors } from "@/utils/zincutils";
 import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
 import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
+import { defineAsyncComponent } from "vue";
+
+const ShowLegendsPopup = defineAsyncComponent(() => {
+  return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
+});
 
 export default defineComponent({
   name: "ViewPanel",
@@ -273,6 +292,7 @@ export default defineComponent({
     AutoRefreshInterval,
     HistogramIntervalDropDown,
     RelativeTime,
+    ShowLegendsPopup,
   },
   props: {
     panelId: {
@@ -303,6 +323,8 @@ export default defineComponent({
     // This will be used to copy the chart data to the chart renderer component
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
     const chartData = ref();
+    const showLegendsDialog = ref(false);
+    const panelSchemaRendererRef: any = ref(null);
     const { t } = useI18n();
     const router = useRouter();
     const route = useRoute();
@@ -360,10 +382,7 @@ export default defineComponent({
     const refreshInterval = ref(0);
 
     // histogram interval
-    const histogramInterval: any = ref({
-      value: null,
-      label: "Auto",
-    });
+    const histogramInterval: any = ref(null);
 
     // array of histogram fields
     let histogramFields: any = ref([]);
@@ -413,7 +432,7 @@ export default defineComponent({
                 histogramExpr.args.type === "expr_list"
               ) {
                 // if selected histogramInterval is null then remove interval argument
-                if (!histogramInterval.value.value) {
+                if (!histogramInterval.value) {
                   histogramExpr.args.value = histogramExpr.args.value.slice(
                     0,
                     1,
@@ -429,13 +448,13 @@ export default defineComponent({
                     // Update existing interval value
                     histogramExpr.args.value[1] = {
                       type: "single_quote_string",
-                      value: `${histogramInterval.value.value}`,
+                      value: `${histogramInterval.value}`,
                     };
                   } else {
                     // create new arg for interval
                     histogramExpr.args.value.push({
                       type: "single_quote_string",
-                      value: `${histogramInterval.value.value}`,
+                      value: `${histogramInterval.value}`,
                     });
                   }
                 }
@@ -504,7 +523,7 @@ export default defineComponent({
           : dashboardPanelData.data.queries
               .map((q: any) =>
                 [...q.fields.x, ...q.fields.y, ...q.fields.z].find(
-                  (f: any) => f.aggregationFunction == "histogram",
+                  (f: any) => f.functionName == "histogram",
                 ),
               )
               .filter((field: any) => field != undefined);
@@ -517,10 +536,7 @@ export default defineComponent({
             histogramFields.value[i]?.args &&
             histogramFields.value[i]?.args[0]?.value
           ) {
-            histogramInterval.value = {
-              value: histogramFields.value[i]?.args[0]?.value,
-              label: histogramFields.value[i]?.args[0]?.value,
-            };
+            histogramInterval.value = histogramFields.value[i]?.args[0]?.value;
             break;
           }
         }
@@ -715,6 +731,14 @@ export default defineComponent({
 
     // [END] cancel running queries
 
+    const currentPanelData = computed(() => {
+      const rendererData = panelSchemaRendererRef.value?.panelData || {};
+      return {
+        ...rendererData,
+        config: dashboardPanelData.data.config || {},
+      };
+    });
+
     return {
       t,
       setTimeForVariables,
@@ -755,6 +779,9 @@ export default defineComponent({
       errorMessage,
       outlinedWarning,
       symOutlinedDataInfoAlert,
+      showLegendsDialog,
+      currentPanelData,
+      panelSchemaRendererRef,
     };
   },
 });

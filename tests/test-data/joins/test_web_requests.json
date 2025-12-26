@@ -1,0 +1,14 @@
+[
+  {"request_id": "R001", "user_id": "U001", "session_id": "S001", "method": "GET", "path": "/dashboard", "status": 200, "response_time_ms": 120, "bytes": 4500},
+  {"request_id": "R002", "user_id": "U001", "session_id": "S001", "method": "POST", "path": "/api/data", "status": 201, "response_time_ms": 350, "bytes": 1200},
+  {"request_id": "R003", "user_id": "U002", "session_id": "S003", "method": "GET", "path": "/profile", "status": 200, "response_time_ms": 80, "bytes": 3200},
+  {"request_id": "R004", "user_id": "U003", "session_id": "S004", "method": "GET", "path": "/settings", "status": 200, "response_time_ms": 95, "bytes": 2800},
+  {"request_id": "R005", "user_id": "U003", "session_id": "S004", "method": "PUT", "path": "/api/settings", "status": 500, "response_time_ms": 2500, "bytes": 500},
+  {"request_id": "R006", "user_id": "U004", "session_id": "S005", "method": "GET", "path": "/admin", "status": 200, "response_time_ms": 150, "bytes": 8000},
+  {"request_id": "R007", "user_id": "U004", "session_id": "S005", "method": "DELETE", "path": "/api/users/123", "status": 204, "response_time_ms": 200, "bytes": 0},
+  {"request_id": "R008", "user_id": "U005", "session_id": "S006", "method": "GET", "path": "/home", "status": 200, "response_time_ms": 60, "bytes": 2500},
+  {"request_id": "R009", "user_id": "U001", "session_id": "S007", "method": "GET", "path": "/reports", "status": 403, "response_time_ms": 45, "bytes": 800},
+  {"request_id": "R010", "user_id": "U999", "session_id": "S008", "method": "GET", "path": "/login", "status": 401, "response_time_ms": 30, "bytes": 600},
+  {"request_id": "R011", "user_id": "U002", "session_id": "S003", "method": "POST", "path": "/api/upload", "status": 413, "response_time_ms": 100, "bytes": 200},
+  {"request_id": "R012", "user_id": "U001", "session_id": "S002", "method": "GET", "path": "/mobile/home", "status": 200, "response_time_ms": 180, "bytes": 1800}
+]

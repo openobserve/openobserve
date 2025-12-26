@@ -162,6 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :panelSchema="chartData"
                         :selectedTimeObj="dashboardPanelData.meta.dateTime"
                         :variablesData="{}"
+                        :showLegendsButton="true"
                         @updated:vrl-function-field-list="
                           updateVrlFunctionFieldList
                         "
@@ -175,6 +176,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
                         :allowAlertCreation="true"
                         @series-data-update="seriesDataUpdate"
+                        @show-legends="showLegendsDialog = true"
+                        ref="panelSchemaRendererRef"
                       />
                     </div>
                     <div
@@ -402,6 +405,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :panelSchema="chartData"
                         :selectedTimeObj="dashboardPanelData.meta.dateTime"
                         :variablesData="{}"
+                        :showLegendsButton="true"
                         @updated:vrl-function-field-list="
                           updateVrlFunctionFieldList
                         "
@@ -412,6 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
                         :allowAlertCreation="true"
                         @series-data-update="seriesDataUpdate"
+                        @show-legends="showLegendsDialog = true"
                       />
                     </template>
                   </q-splitter>
@@ -439,6 +444,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-splitter>
       </div>
     </div>
+    <q-dialog v-model="showLegendsDialog">
+      <ShowLegendsPopup
+        :panelData="currentPanelData"
+        @close="showLegendsDialog = false"
+      />
+    </q-dialog>
     <q-dialog
       v-model="showAddToDashboardDialog"
       position="right"
@@ -500,6 +511,10 @@ const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
 });
 
+const ShowLegendsPopup = defineAsyncComponent(() => {
+  return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
+});
+
 export default defineComponent({
   name: "VisualizeLogsQuery",
   props: {
@@ -538,6 +553,7 @@ export default defineComponent({
     CustomMarkdownEditor,
     AddToDashboard,
     CustomChartEditor,
+    ShowLegendsPopup,
   },
   emits: ["handleChartApiError"],
   setup(props, { emit }) {
@@ -552,6 +568,8 @@ export default defineComponent({
     const metaData = ref(null);
     const resultMetaData = ref(null);
     const seriesData = ref([] as any[]);
+    const showLegendsDialog = ref(false);
+    const panelSchemaRendererRef: any = ref(null);
     const seriesDataUpdate = (data: any) => {
       seriesData.value = data;
     };
@@ -940,6 +958,14 @@ export default defineComponent({
       );
     };
 
+    const currentPanelData = computed(() => {
+      const rendererData = panelSchemaRendererRef.value?.panelData || {};
+      return {
+        ...rendererData,
+        config: dashboardPanelData.data.config || {},
+      };
+    });
+
     return {
       t,
       layoutSplitterUpdated,
@@ -974,6 +1000,9 @@ export default defineComponent({
       outlinedWarning,
       symOutlinedDataInfoAlert,
       outlinedRunningWithErrors,
+      showLegendsDialog,
+      currentPanelData,
+      panelSchemaRendererRef,
     };
   },
 });

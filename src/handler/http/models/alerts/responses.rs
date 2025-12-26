@@ -124,3 +124,28 @@ pub struct AlertBulkDeleteResponse {
     pub unsuccessful: Vec<Ksuid>,
     pub err: Option<String>,
 }
+
+/// HTTP response body for `GenerateSql` endpoint.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct GenerateSqlResponseBody {
+    /// The generated SQL query string
+    #[schema(example = "SELECT * FROM \"my_stream\" WHERE field > 100")]
+    pub sql: String,
+
+    /// Optional metadata about the generated query
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<GenerateSqlMetadata>,
+}
+
+/// Metadata about the generated SQL query.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct GenerateSqlMetadata {
+    /// Whether aggregation is present
+    pub has_aggregation: bool,
+
+    /// Whether WHERE clause is present
+    pub has_conditions: bool,
+
+    /// Whether GROUP BY is present
+    pub has_group_by: bool,
+}

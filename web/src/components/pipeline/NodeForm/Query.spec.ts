@@ -542,22 +542,23 @@ describe("Query Component", () => {
     it("should not save when SQL validation fails", async () => {
       // Clear mocks to ensure clean state
       vi.clearAllMocks();
-      
-      // Based on the actual implementation, the validateSqlQuery resolves even on error
-      // and sets isValidSqlQuery to false. We need to mock it to reject to prevent save.
-      vi.mocked(searchService.search).mockImplementationOnce(() => 
-        Promise.reject() // Reject with no error to trigger the reject branch
+
+      // Mock search to reject with an error to trigger validation failure
+      vi.mocked(searchService.search).mockImplementationOnce(() =>
+        Promise.reject({
+          response: { data: { message: "Invalid SQL syntax" } }
+        })
       );
-      
+
       wrapper.vm.scheduledPipelineRef = {
         validateInputs: vi.fn().mockReturnValue(true)
       };
       wrapper.vm.streamRoute.query_condition.type = "sql";
       wrapper.vm.streamRoute.query_condition.sql = "INVALID SQL";
-      
+
       // This should now properly prevent the save
       const result = await wrapper.vm.saveQueryData();
-      
+
       expect(result).toBe(false);
       expect(mockAddNode).not.toHaveBeenCalled();
     });

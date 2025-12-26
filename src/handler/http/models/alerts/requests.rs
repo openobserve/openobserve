@@ -18,7 +18,7 @@ use serde::Deserialize;
 use svix_ksuid::Ksuid;
 use utoipa::ToSchema;
 
-use super::{Alert, StreamType};
+use super::{Alert, QueryCondition, StreamType};
 
 /// HTTP request body for `CreateAlert` endpoint.
 #[derive(Clone, Debug, Deserialize, ToSchema)]
@@ -131,4 +131,19 @@ pub struct AlertBulkEnableRequest {
 pub struct AlertBulkDeleteRequest {
     #[schema(value_type = Vec<String>)]
     pub ids: Vec<Ksuid>,
+}
+
+/// HTTP request body for `GenerateSql` endpoint.
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+pub struct GenerateSqlRequestBody {
+    /// Stream name to query
+    #[schema(example = "default")]
+    pub stream_name: String,
+
+    /// Type of stream (logs, metrics, traces, etc.)
+    pub stream_type: StreamType,
+
+    /// Query condition containing aggregation and WHERE conditions
+    /// The conditions field within QueryCondition supports both V1 and V2 formats
+    pub query_condition: QueryCondition,
 }

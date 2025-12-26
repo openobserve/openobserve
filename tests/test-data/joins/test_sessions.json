@@ -1,0 +1,10 @@
+[
+  {"session_id": "S001", "user_id": "U001", "device": "desktop", "browser": "Chrome", "os": "Windows", "duration_mins": 45},
+  {"session_id": "S002", "user_id": "U001", "device": "mobile", "browser": "Safari", "os": "iOS", "duration_mins": 12},
+  {"session_id": "S003", "user_id": "U002", "device": "desktop", "browser": "Firefox", "os": "MacOS", "duration_mins": 30},
+  {"session_id": "S004", "user_id": "U003", "device": "tablet", "browser": "Chrome", "os": "Android", "duration_mins": 22},
+  {"session_id": "S005", "user_id": "U004", "device": "desktop", "browser": "Edge", "os": "Windows", "duration_mins": 60},
+  {"session_id": "S006", "user_id": "U005", "device": "mobile", "browser": "Chrome", "os": "Android", "duration_mins": 8},
+  {"session_id": "S007", "user_id": "U001", "device": "desktop", "browser": "Chrome", "os": "Windows", "duration_mins": 90},
+  {"session_id": "S008", "user_id": "U999", "device": "desktop", "browser": "Chrome", "os": "Linux", "duration_mins": 5}
+]

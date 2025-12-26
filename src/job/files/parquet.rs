@@ -967,13 +967,13 @@ async fn merge_files(
     }
 
     // generate tantivy inverted index and write to storage
-    let (schema, reader) = get_recordbatch_reader_from_bytes(&buf).await?;
+    let (_parquet_schema, reader) = get_recordbatch_reader_from_bytes(&buf).await?;
     let index_size = create_tantivy_index(
         "INGESTER",
         &new_file_key,
         &full_text_search_fields,
         &index_fields,
-        schema,
+        latest_schema.clone(), // Use stream schema to include all configured fields
         reader,
     )
     .await
@@ -1256,7 +1256,7 @@ async fn queue_services_from_parquet(
 
         // Process Arrow batch using Arrow-native method
         let services = processor
-            .process_arrow_batch(&batch, stream_type, &stream_name)
+            .process_arrow_batch(&batch, stream_type, stream_name)
             .await;
 
         // Merge discovered services

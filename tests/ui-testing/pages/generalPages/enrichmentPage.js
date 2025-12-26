@@ -16,6 +16,7 @@ class EnrichmentPage {
         // Navigation locators
         this.pipelineMenuItem = '[data-test="menu-link-\\/pipeline-item"]';
         this.enrichmentTableTab = '[data-test="function-enrichment-table-tab"]';
+        this.enrichmentTablesSearchInput = '[data-test="enrichment-tables-search-input"]';
         
         // Logs table locators
         this.timestampColumn = '[data-test="log-table-column-0-_timestamp"]';
@@ -588,11 +589,21 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     async searchEnrichmentTableInList(tableName) {
-        // Use getByRole to find the textbox input within the search wrapper
-        const searchInput = this.page.locator('[data-test="enrichment-tables-search-input"]').getByRole('textbox');
-        await searchInput.waitFor({ state: 'visible' });
+        // Wait for page to stabilize
+        await this.page.waitForLoadState('networkidle');
+
+        // Use getByPlaceholder which works reliably with Quasar q-input components
+        // Directly wait for search input instead of title - search input visibility indicates page is ready
+        const searchInput = this.page.getByPlaceholder(/search enrichment table/i);
+        await searchInput.waitFor({ state: 'visible', timeout: 30000 });
+
+        // Fill the search input with table name to filter results
         await searchInput.fill(tableName);
         await this.page.waitForLoadState('networkidle');
+
+        // Wait for filtered results to appear - look for table row containing the searched name
+        const tableRow = this.page.locator('tbody tr').filter({ hasText: tableName });
+        await tableRow.first().waitFor({ state: 'visible', timeout: 15000 });
     }
 
     async verifyTableVisibleInList(tableName) {

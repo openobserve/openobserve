@@ -243,6 +243,7 @@ export default defineComponent({
     "onMovePanel",
     "panelsValues",
     "searchRequestTraceIds",
+    "chart:contextmenu",
   ],
   props: {
     viewOnly: {},
@@ -632,7 +633,7 @@ export default defineComponent({
       grid.removeAll(false);
 
       if (panels.value.length === 0) {
-        grid.commit();
+        grid.batchUpdate(false);
         gridStackUpdateInProgress = false;
         return;
       }
@@ -665,7 +666,7 @@ export default defineComponent({
         }
       }
 
-      grid.commit();
+      grid.batchUpdate(false);
 
       gridStackUpdateInProgress = false;
       window.dispatchEvent(new Event("resize"));

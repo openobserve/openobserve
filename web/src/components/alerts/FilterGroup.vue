@@ -60,6 +60,7 @@
             :stream-fields="props.streamFields"
             :condition-input-width="props.conditionInputWidth"
             :allow-custom-columns="props.allowCustomColumns"
+            :module="props.module"
             @input:update="(name, field) => inputUpdate(name, field)"
           />
           <div
@@ -77,6 +78,7 @@
                 :input-width="props.conditionInputWidth"
                 :is-first-in-group="index === 0"
                 :allow-custom-columns="props.allowCustomColumns"
+                :module="props.module"
             />
             <div class="tw-mb-3">
                 <q-btn data-test="alert-conditions-delete-condition-btn" icon="close" size="10px" flat border-less @click="removeCondition(item.id)" />
@@ -161,6 +163,7 @@
     import { getUUID } from '@/utils/zincutils';
     import AppTabs from '../common/AppTabs.vue';
     import ConfirmDialog from '@/components/ConfirmDialog.vue';
+    import { buildConditionsString } from '@/utils/alerts/conditionsFormatter';
     const props = defineProps({
     group: {
         type: Object,
@@ -193,6 +196,27 @@
         type: Boolean,
         default: false,
         required: false,
+    },
+    showSqlPreview: {
+        type: Boolean,
+        default: false,
+        required: false,
+    },
+    streamFieldsMap: {
+        type: Object,
+        default: () => ({}),
+        required: false,
+    },
+    sqlQuery: {
+        type: String,
+        default: '',
+        required: false,
+    },
+    module: {
+        type: String,
+        default: 'alerts',
+        required: false,
+        validator: (value: string) => ['alerts', 'pipelines'].includes(value),
     },
     });
   
@@ -420,49 +444,33 @@ const computedOpacity = computed(() => {
   return props.depth + 10;
 });
 
-// Build preview string recursively
-const buildPreviewString = (group: any): string => {
-  // V2: Use conditions array instead of items
-  if (!group || !group.conditions || group.conditions.length === 0) {
-    return '';
+// Computed preview string
+// Supports three modes:
+// 1. Display mode (default): lowercase operators, simple formatting, wrapped in parentheses - for pipelines
+// 2. SQL Query mode (when sqlQuery prop provided): shows full SQL query - for alerts
+// 3. WHERE clause mode (when showSqlPreview=true but no sqlQuery): shows just WHERE clause
+const previewString = computed(() => {
+  // Mode 1: Full SQL Query (for alerts with aggregation, etc.)
+  if (props.sqlQuery && props.sqlQuery.trim().length > 0) {
+    return props.sqlQuery;
   }
 
-  const parts: string[] = [];
+  // Mode 2: SQL WHERE clause only (fallback for alerts)
+  if (props.showSqlPreview) {
+    return buildConditionsString(groups.value, {
+      sqlMode: true,              // SQL format (uppercase AND/OR, LIKE operators)
+      addWherePrefix: true,        // Add "WHERE" prefix
+      formatValues: true,          // Type-aware formatting (Int64 no quotes, String with quotes)
+      streamFieldsMap: props.streamFieldsMap,
+    });
+  }
 
-  group.conditions.forEach((item: any, index: number) => {
-    let conditionStr = '';
-
-    if (isGroup(item)) {
-      // Nested group - recursively build its preview
-      const nestedPreview = buildPreviewString(item);
-      if (nestedPreview) {
-        conditionStr = `(${nestedPreview})`;
-      }
-    } else {
-      // Condition - show full condition: column operator value
-      const column = item.column || 'field';
-      const operator = item.operator || '=';
-      const value = item.value !== undefined && item.value !== null && item.value !== ''
-        ? `'${item.value}'`
-        : "''";
-      conditionStr = `${column} ${operator} ${value}`;
-    }
-
-    // Add logical operator before condition (except for first condition)
-    if (index > 0 && item.logicalOperator) {
-      parts.push(`${item.logicalOperator.toLowerCase()} ${conditionStr}`);
-    } else {
-      parts.push(conditionStr);
-    }
+  // Mode 3: Display format (for pipelines)
+  const preview = buildConditionsString(groups.value, {
+    sqlMode: false,            // Display format (lowercase operators)
+    addWherePrefix: false,
+    formatValues: false,       // Simple display format without type-aware formatting
   });
-
-  // Join all parts with spaces (operators are already included)
-  return parts.join(' ');
-};
-
-// Computed preview string
-const previewString = computed(() => {
-  const preview = buildPreviewString(groups.value);
   // Wrap the entire root expression in parentheses
   return preview ? `(${preview})` : '';
 });

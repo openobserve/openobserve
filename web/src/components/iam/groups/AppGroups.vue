@@ -247,6 +247,9 @@ const editGroup = (group: any) => {
     params: {
       group_name: group.group_name,
     },
+    query: {
+      org_identifier: store.state.selectedOrganization.identifier,
+    },
   });
 };
 

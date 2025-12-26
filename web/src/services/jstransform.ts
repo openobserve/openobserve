@@ -109,6 +109,24 @@ const jstransform = {
       data,
     );
   },
+  create_enrichment_table_from_url: (
+    org_identifier: string,
+    table_name: string,
+    url: string,
+    append_data: boolean,
+  ) => {
+    return http().post(
+      `/api/${org_identifier}/enrichment_tables/${table_name}/url?append=${append_data}`,
+      { url },
+    );
+  },
+  get_all_enrichment_table_statuses: (
+    org_identifier: string,
+  ) => {
+    return http().get(
+      `/api/${org_identifier}/enrichment_tables/status`,
+    );
+  },
   test: (org_identifier: string, data: TestFunctionPayload) => {
     return http().post(`/api/${org_identifier}/functions/test`, data);
   },

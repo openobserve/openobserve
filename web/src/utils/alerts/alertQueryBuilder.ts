@@ -3,6 +3,8 @@
  * Extracted from AddAlert.vue to reduce file complexity
  */
 
+import { buildConditionsString } from './conditionsFormatter';
+
 export interface StreamFieldsMap {
   [key: string]: {
     label: string;
@@ -78,55 +80,14 @@ export const generateWhereClause = (
   group: any,
   streamFieldsMap: StreamFieldsMap,
 ) => {
-  //this method is used to format the value
-  //if the value is a number or a string and the operator is contains or not contains then we need to return the value as it is
-  //else we need to return the value as a string and add single quotes to it
-  const formatValue = (column: any, operator: any, value: any) => {
-    return streamFieldsMap[column]?.type === "Int64" ||
-      operator === "contains" ||
-      operator === "not_contains" ||
-      operator === "Contains" ||
-      operator === "NotContains"
-      ? value
-      : `'${value}'`;
-  };
-  //this method is used to parse the group
-  //if the group is not present or the items are not present then we need to return an empty string
-  //else we need to iterate over the items and get the conditions
-  //and then we need to return the where clause
-  const parseGroup = (groupNode: any): string => {
-    if (!groupNode || !Array.isArray(groupNode.items)) return "";
-
-    const parts = groupNode.items
-      .map((item: any) => {
-        // Nested group
-        if (item.items && Array.isArray(item.items)) {
-          return `(${parseGroup(item)})`;
-        }
-
-        // Single condition
-        if (item.column && item.operator && item.value !== undefined) {
-          const formattedValue = formatValue(
-            item.column,
-            item.operator,
-            item.value,
-          );
-          return getFormattedCondition(
-            item.column,
-            item.operator,
-            formattedValue,
-          );
-        }
-
-        return "";
-      })
-      .filter(Boolean);
-
-    return parts.join(` ${groupNode.label.toUpperCase()} `);
-  };
-
-  const clause = parseGroup(group);
-  return clause.trim().length ? "WHERE " + clause : "";
+  // V2 FORMAT: Uses filterType, logicalOperator, and conditions array
+  // Uses shared buildConditionsString utility for consistency with UI preview
+  return buildConditionsString(group, {
+    sqlMode: true,
+    addWherePrefix: true,
+    formatValues: true,
+    streamFieldsMap,
+  });
 };
 
 export const generateSqlQuery = (

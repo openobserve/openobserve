@@ -198,9 +198,17 @@ pub struct RequestRangeQuery {
     pub use_streaming: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub search_type: Option<SearchEventType>,
-    #[serde(default, deserialize_with = "deserialize_string_or_vec")]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        deserialize_with = "deserialize_string_or_vec"
+    )]
     pub regions: Vec<String>, // default query all regions, local: only query local region clusters
-    #[serde(default, deserialize_with = "deserialize_string_or_vec")]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        deserialize_with = "deserialize_string_or_vec"
+    )]
     pub clusters: Vec<String>, // default query all clusters, local: only query local cluster
 }
 

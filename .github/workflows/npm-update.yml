@@ -1,0 +1,177 @@
+name: Weekly NPM Update
+
+on:
+  schedule:
+    # Run every Monday at 9:00 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch: # Allow manual trigger
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-dependencies:
+    name: Update NPM Dependencies
+    runs-on:
+      labels: repo-openobserve-standard-8
+
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create update branch
+        run: |
+          BRANCH_NAME="automated/npm-update-$(date +%Y%m%d)"
+          git checkout -b "$BRANCH_NAME"
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+
+      - name: Check for outdated packages
+        id: check_updates
+        run: |
+          cd web
+          echo "Checking for outdated packages..."
+          npm outdated --json > outdated.json || true
+
+          if [ -s outdated.json ] && [ "$(cat outdated.json)" != "{}" ]; then
+            echo "has_updates=true" >> $GITHUB_OUTPUT
+            echo "Found outdated packages:"
+            cat outdated.json | jq '.'
+          else
+            echo "has_updates=false" >> $GITHUB_OUTPUT
+            echo "No outdated packages found"
+          fi
+
+      - name: Update dependencies
+        if: steps.check_updates.outputs.has_updates == 'true'
+        run: |
+          cd web
+          echo "Updating dependencies..."
+
+          # Update all dependencies to their latest versions
+          # This will update both package.json and package-lock.json
+          npm update --save
+
+          # Also check for major version updates and update them
+          npx npm-check-updates -u
+
+          # Install to ensure package-lock.json is updated
+          npm install
+
+          echo "Dependencies updated successfully"
+
+      - name: Run type check
+        if: steps.check_updates.outputs.has_updates == 'true'
+        run: |
+          cd web
+          echo "Running type check..."
+          npm run type-check
+
+      - name: Run unit tests
+        if: steps.check_updates.outputs.has_updates == 'true'
+        run: |
+          cd web
+          echo "Running unit tests..."
+          npm run test:unit:coverage
+
+      - name: Build project
+        if: steps.check_updates.outputs.has_updates == 'true'
+        env:
+          NODE_OPTIONS: "--max-old-space-size=8192"
+        run: |
+          cd web
+          echo "Building project..."
+          npm run build
+
+      - name: Generate update summary
+        if: steps.check_updates.outputs.has_updates == 'true'
+        id: summary
+        run: |
+          cd web
+
+          # Get the list of updated packages
+          UPDATED_PACKAGES=$(cat outdated.json | jq -r 'to_entries[] | "- **\(.key)**: \(.value.current) → \(.value.latest)"')
+
+          # Create PR body
+          cat > /tmp/pr_body.md <<EOF
+          ## 📦 Weekly NPM Dependencies Update
+
+          This automated PR updates npm packages to their latest versions.
+
+          ### Updated Packages
+
+          $UPDATED_PACKAGES
+
+          ### Testing Results
+
+          - ✅ Type check passed
+          - ✅ Unit tests passed
+          - ✅ Build successful
+
+          ### Notes
+
+          - All dependencies have been updated to their latest compatible versions
+          - \`package-lock.json\` has been regenerated
+          - All tests passed successfully
+
+          Please review the changes and merge if everything looks good.
+
+          ---
+
+          🤖 This PR was automatically created by the Weekly NPM Update workflow
+          EOF
+
+          echo "summary_created=true" >> $GITHUB_OUTPUT
+
+      - name: Commit changes
+        if: steps.check_updates.outputs.has_updates == 'true'
+        run: |
+          cd web
+
+          # Check if there are changes to commit
+          if [[ -n $(git status --porcelain) ]]; then
+            git add package.json package-lock.json
+            git commit -m "chore: update npm dependencies ($(date +%Y-%m-%d))
+
+            - Updated packages to their latest versions
+            - Regenerated package-lock.json
+            - All tests passing
+
+            🤖 Automated update by GitHub Actions"
+
+            git push origin "$BRANCH_NAME"
+            echo "changes_committed=true" >> $GITHUB_ENV
+          else
+            echo "No changes to commit"
+            echo "changes_committed=false" >> $GITHUB_ENV
+          fi
+
+      - name: Create Pull Request
+        if: steps.check_updates.outputs.has_updates == 'true' && env.changes_committed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr create \
+            --title "chore: Weekly NPM dependencies update ($(date +%Y-%m-%d))" \
+            --body-file /tmp/pr_body.md \
+            --base main \
+            --head "$BRANCH_NAME" \
+            --label "dependencies" \
+            --label "automated"
+
+      - name: No updates needed
+        if: steps.check_updates.outputs.has_updates == 'false'
+        run: |
+          echo "✅ All npm packages are up to date. No PR needed."

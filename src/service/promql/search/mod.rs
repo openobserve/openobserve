@@ -36,6 +36,7 @@ use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::{
     client::grpc::make_grpc_metrics_client,
+    cluster::get_cached_online_querier_nodes,
     errors::{Error, ErrorCodes, Result},
 };
 #[cfg(feature = "enterprise")]
@@ -43,16 +44,13 @@ use o2_enterprise::enterprise::search::WorkGroup;
 use proto::cluster_rpc;
 use tracing::{Instrument, info_span};
 
-use crate::{
-    common::infra::cluster,
-    service::{
-        promql::{
-            DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, MetricsQueryRequest, adjust_start_end,
-            micros,
-        },
-        search::server_internal_error,
-        self_reporting::report_request_usage_stats,
+use crate::service::{
+    promql::{
+        DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, MetricsQueryRequest, adjust_start_end,
+        micros,
     },
+    search::server_internal_error,
+    self_reporting::report_request_usage_stats,
 };
 
 mod cache;
@@ -151,7 +149,7 @@ async fn search_in_cluster(
     .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
 
     // get querier nodes from cluster
-    let mut nodes = cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
+    let mut nodes = get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
         .await
         .unwrap();
     // sort nodes by node_id this will improve hit cache ratio

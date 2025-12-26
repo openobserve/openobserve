@@ -235,6 +235,15 @@ const alerts = {
     }
     return http().patch(url);
   },
+  generate_sql: (
+    org_identifier: string,
+    data: any,
+  ) => {
+    return http().post(
+      `/api/v2/${org_identifier}/alerts/generate_sql`,
+      data,
+    );
+  },
 };
 
 export default alerts;

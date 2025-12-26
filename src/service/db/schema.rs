@@ -28,6 +28,7 @@ use config::{
 use hashbrown::{HashMap, HashSet};
 use infra::{
     cache,
+    cluster::get_cached_online_querier_nodes,
     schema::{
         STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
         SchemaCache, unwrap_stream_settings,
@@ -41,10 +42,7 @@ use {
 
 use crate::{
     common::{
-        infra::{
-            cluster::get_cached_online_querier_nodes,
-            config::{ENRICHMENT_TABLES, ORGANIZATIONS},
-        },
+        infra::config::{ENRICHMENT_TABLES, ORGANIZATIONS},
         meta::stream::StreamSchema,
     },
     service::{db, enrichment::StreamTable, organization::check_and_create_org},
@@ -571,6 +569,8 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
     let r = STREAM_SCHEMAS_LATEST.read().await;
     let mut tables = HashMap::new();
+    let mut org_tables: HashMap<String, Vec<(String, String)>> = HashMap::new(); // org_id -> [(key, table_name)]
+
     for schema_key in r.keys() {
         if !schema_key.contains(format!("/{}/", StreamType::EnrichmentTables).as_str()) {
             continue;
@@ -582,6 +582,13 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
         if !stream_type.eq(&StreamType::EnrichmentTables) {
             continue;
         }
+
+        // Group by org_id for batch fetching URL jobs
+        org_tables
+            .entry(org_id.to_string())
+            .or_default()
+            .push((schema_key.to_owned(), stream_name.to_string()));
+
         tables.insert(
             schema_key.to_owned(),
             StreamTable {
@@ -596,6 +603,79 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
         log::info!("EnrichmentTables Cached");
         return Ok(());
     }
+
+    // Fetch all URL jobs per organization to check completion status
+    // This avoids making individual database calls for each enrichment table
+    let mut url_jobs_by_org: HashMap<
+        String,
+        HashMap<String, config::meta::enrichment_table::EnrichmentTableUrlJob>,
+    > = HashMap::new();
+    for org_id in org_tables.keys() {
+        match db::enrichment_table::list_url_jobs(org_id).await {
+            Ok(jobs) => {
+                let jobs_map: HashMap<
+                    String,
+                    config::meta::enrichment_table::EnrichmentTableUrlJob,
+                > = jobs
+                    .into_iter()
+                    .map(|job| (job.table_name.clone(), job))
+                    .collect();
+                url_jobs_by_org.insert(org_id.clone(), jobs_map);
+                log::debug!(
+                    "[CACHE] Fetched {} URL jobs for org {}",
+                    url_jobs_by_org.get(org_id).unwrap().len(),
+                    org_id
+                );
+            }
+            Err(e) => {
+                log::warn!("[CACHE] Failed to fetch URL jobs for org {}: {}", org_id, e);
+                url_jobs_by_org.insert(org_id.clone(), HashMap::new());
+            }
+        }
+    }
+
+    // Filter out enrichment tables that have incomplete URL jobs
+    let mut tables_to_cache = Vec::new();
+    for (key, tbl) in tables.iter() {
+        let should_cache = if let Some(org_jobs) = url_jobs_by_org.get(&tbl.org_id) {
+            if let Some(url_job) = org_jobs.get(&tbl.stream_name) {
+                // This is a URL-based enrichment table
+                // Only cache if status is Completed
+                let is_completed = url_job.status
+                    == config::meta::enrichment_table::EnrichmentTableStatus::Completed;
+                if !is_completed {
+                    log::info!(
+                        "[CACHE] Skipping enrichment table {}/{} - URL job status: {:?}",
+                        tbl.org_id,
+                        tbl.stream_name,
+                        url_job.status
+                    );
+                }
+                is_completed
+            } else {
+                // No URL job found - this is a file-based enrichment table, cache it
+                true
+            }
+        } else {
+            // No jobs for this org (shouldn't happen but handle gracefully)
+            true
+        };
+
+        if should_cache {
+            tables_to_cache.push((key.clone(), tbl.clone()));
+        }
+    }
+
+    if tables_to_cache.is_empty() {
+        log::info!("EnrichmentTables Cached (0 tables ready)");
+        return Ok(());
+    }
+
+    log::info!(
+        "[CACHE] Caching {} enrichment tables (filtered {} incomplete URL jobs)",
+        tables_to_cache.len(),
+        tables.len() - tables_to_cache.len()
+    );
 
     // waiting for querier to be ready
     let expect_querier_num = get_config().limit.starting_expect_querier_num;
@@ -612,7 +692,7 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
 
     // fill data
     let total = std::time::Instant::now();
-    for (key, tbl) in tables {
+    for (key, tbl) in tables_to_cache {
         let start = std::time::Instant::now();
         // Only use the primary region if specified to fetch enrichment table data assuming only the
         // primary region contains the data.

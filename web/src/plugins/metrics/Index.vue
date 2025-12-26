@@ -257,6 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 :selectedTimeObj="dashboardPanelData.meta.dateTime"
                                 :variablesData="{}"
                                 :width="6"
+                                :showLegendsButton="true"
                                 @error="handleChartApiError"
                                 @updated:data-zoom="onDataZoom"
                                 :allowAlertCreation="true"
@@ -267,6 +268,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   handleLastTriggeredAtUpdate
                                 "
                                 @series-data-update="seriesDataUpdate"
+                                @show-legends="showLegendsDialog = true"
+                                ref="panelSchemaRendererRef"
                                 searchType="ui"
                               />
                             </div>
@@ -457,6 +460,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :selectedTimeObj="dashboardPanelData.meta.dateTime"
                           :variablesData="{}"
                           :width="6"
+                          :showLegendsButton="true"
                           @error="handleChartApiError"
                           @updated:data-zoom="onDataZoom"
                           :allowAlertCreation="true"
@@ -467,6 +471,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             handleLastTriggeredAtUpdate
                           "
                           @series-data-update="seriesDataUpdate"
+                          @show-legends="showLegendsDialog = true"
                           searchType="ui"
                         />
                       </template>
@@ -511,6 +516,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <add-to-dashboard
         @save="addPanelToDashboard"
         :dashboardPanelData="dashboardPanelData"
+      />
+    </q-dialog>
+    <q-dialog v-model="showLegendsDialog">
+      <ShowLegendsPopup
+        :panelData="currentPanelData"
+        @close="showLegendsDialog = false"
       />
     </q-dialog>
   </div>
@@ -571,6 +582,10 @@ const CustomMarkdownEditor = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/CustomMarkdownEditor.vue");
 });
 
+const ShowLegendsPopup = defineAsyncComponent(() => {
+  return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
+});
+
 export default defineComponent({
   name: "Metrics",
   props: ["metaData"],
@@ -597,11 +612,14 @@ export default defineComponent({
     AddToDashboard,
     AutoRefreshInterval,
     CustomChartEditor,
+    ShowLegendsPopup,
   },
   setup(props) {
     provide("dashboardPanelDataPageKey", "metrics");
 
     // This will be used to copy the chart data to the chart renderer component
+    const showLegendsDialog = ref(false);
+    const panelSchemaRendererRef: any = ref(null);
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
     const chartData = ref();
     const { t } = useI18n();
@@ -614,6 +632,7 @@ export default defineComponent({
       resetAggregationFunction,
       validatePanel,
       removeXYFilters,
+      makeAutoSQLQuery,
     } = useDashboardPanelData("metrics");
     const editMode = ref(false);
     const splitterModel = ref(50);
@@ -680,7 +699,7 @@ export default defineComponent({
       dashboardPanelData.data.type = "line";
       // set the default query type as promql for metrics
       dashboardPanelData.data.queryType = "promql";
-      dashboardPanelData.data.queries[0].customQuery = true;
+      dashboardPanelData.data.queries[0].customQuery = false;
 
       // set the show query bar by default for metrics page
       dashboardPanelData.layout.showQueryBar = true;
@@ -744,6 +763,75 @@ export default defineComponent({
         window.dispatchEvent(new Event("resize"));
         // console.timeEnd("watch:dashboardPanelData.layout.isConfigPanelOpen");
       },
+    );
+
+    // Generate the query when the fields are updated
+    watch(
+      () => [
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.x,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.y,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.breakdown,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.z,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.filter,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.latitude,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.longitude,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.weight,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.source,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.target,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.value,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.name,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.value_for_maps,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.limit,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].joins,
+      ],
+      () => {
+        // only continue if current mode is auto query generation
+        if (
+          !dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery
+        ) {
+          // makeAutoSQLQuery is async function
+          makeAutoSQLQuery();
+        }
+      },
+      { deep: true },
     );
 
     // resize the chart when query editor is opened and closed
@@ -1155,6 +1243,15 @@ export default defineComponent({
     };
 
     // [END] cancel running queries
+
+    const currentPanelData = computed(() => {
+      const rendererData = panelSchemaRendererRef.value?.panelData || {};
+      return {
+        ...rendererData,
+        config: dashboardPanelData.data.config || {},
+      };
+    });
+
     return {
       t,
       updateDateTime,
@@ -1192,6 +1289,9 @@ export default defineComponent({
       refreshInterval,
       splitterModel,
       collapseFieldList,
+      showLegendsDialog,
+      currentPanelData,
+      panelSchemaRendererRef,
     };
   },
 });

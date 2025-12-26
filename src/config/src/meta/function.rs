@@ -216,4 +216,94 @@ mod tests {
         assert_eq!(f1.name, f2.name);
         assert_eq!(format!("{:?}", f1), format!("{:?}", f2));
     }
+
+    #[test]
+    fn test_transform_is_vrl() {
+        let vrl_trans = Transform {
+            function: ". = {}".to_string(),
+            name: "test".to_string(),
+            params: "row".to_string(),
+            num_args: 1,
+            trans_type: Some(0), // VRL
+            streams: None,
+        };
+        assert!(vrl_trans.is_vrl());
+
+        let lua_trans = Transform {
+            function: "function test() end".to_string(),
+            name: "test".to_string(),
+            params: "row".to_string(),
+            num_args: 1,
+            trans_type: Some(1), // Lua
+            streams: None,
+        };
+        assert!(!lua_trans.is_vrl());
+    }
+
+    #[test]
+    fn test_transform_is_result_array_vrl() {
+        let result_array_trans = Transform {
+            function: "#ResultArray#\n. = {}".to_string(),
+            name: "test".to_string(),
+            params: "row".to_string(),
+            num_args: 1,
+            trans_type: Some(0),
+            streams: None,
+        };
+        assert!(result_array_trans.is_result_array_vrl());
+
+        let normal_vrl = Transform {
+            function: ". = {}".to_string(),
+            name: "test".to_string(),
+            params: "row".to_string(),
+            num_args: 1,
+            trans_type: Some(0),
+            streams: None,
+        };
+        assert!(!normal_vrl.is_result_array_vrl());
+    }
+
+    #[test]
+    fn test_transform_is_result_array_skip_vrl() {
+        let skip_vrl_trans = Transform {
+            function: "#ResultArray#SkipVRL#\n. = {}".to_string(),
+            name: "test".to_string(),
+            params: "row".to_string(),
+            num_args: 1,
+            trans_type: Some(0),
+            streams: None,
+        };
+        assert!(skip_vrl_trans.is_result_array_skip_vrl());
+
+        let result_array_trans = Transform {
+            function: "#ResultArray#\n. = {}".to_string(),
+            name: "test".to_string(),
+            params: "row".to_string(),
+            num_args: 1,
+            trans_type: Some(0),
+            streams: None,
+        };
+        assert!(!result_array_trans.is_result_array_skip_vrl());
+    }
+
+    #[test]
+    fn test_vrl_result_new() {
+        let event = json::json!({"key": "value"});
+        let result = VRLResult::new("success", event.clone());
+        assert_eq!(result.message, "success");
+        assert_eq!(result.event, event);
+    }
+
+    #[test]
+    fn test_default_trans_type() {
+        let trans = Transform {
+            function: ". = {}".to_string(),
+            name: "test".to_string(),
+            params: "row".to_string(),
+            num_args: 1,
+            trans_type: default_trans_type(),
+            streams: None,
+        };
+        assert_eq!(trans.trans_type, Some(0));
+    }
 }

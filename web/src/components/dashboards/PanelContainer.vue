@@ -396,9 +396,18 @@ self="top right" max-width="220px">
       ref="PanleSchemaRendererRef"
       :allowAnnotationsAdd="true"
       :allowAlertCreation="allowAlertCreation"
+      @show-legends="showLegendsDialog = true"
+      :showLegendsButton="true"
     ></PanelSchemaRenderer>
     <q-dialog v-model="showViewPanel">
       <QueryInspector :metaData="metaData" :data="props.data"></QueryInspector>
+    </q-dialog>
+
+    <q-dialog v-model="showLegendsDialog">
+      <ShowLegendsPopup
+        :panelData="currentPanelData"
+        @close="showLegendsDialog = false"
+      />
     </q-dialog>
 
     <ConfirmDialog
@@ -470,6 +479,7 @@ export default defineComponent({
     "update:initial-variable-values",
     "onEditLayout",
     "update:runId",
+    "contextmenu",
   ],
   props: [
     "data",
@@ -499,6 +509,9 @@ export default defineComponent({
     ConfirmDialog,
     SinglePanelMove,
     RelativeTime,
+    ShowLegendsPopup: defineAsyncComponent(() => {
+      return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
+    }),
   },
   setup(props, { emit }) {
     const store = useStore();
@@ -508,6 +521,7 @@ export default defineComponent({
     const { t } = useI18n();
     const metaData = ref();
     const showViewPanel = ref(false);
+    const showLegendsDialog = ref(false);
     const confirmDeletePanelDialog = ref(false);
     const confirmMovePanelDialog: any = ref(false);
     const {
@@ -901,6 +915,15 @@ export default defineComponent({
       }
     });
 
+    const currentPanelData = computed(() => {
+      // panelData is a ref exposed by PanelSchemaRenderer
+      const rendererData = PanleSchemaRendererRef.value?.panelData || {};
+      return {
+        ...rendererData,
+        config: props.data?.config || {},
+      };
+    });
+
     return {
       props,
       onEditPanel,
@@ -940,6 +963,8 @@ export default defineComponent({
       handleIsPartialDataUpdate,
       config,
       t,
+      showLegendsDialog,
+      currentPanelData,
     };
   },
   methods: {

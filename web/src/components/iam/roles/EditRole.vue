@@ -831,7 +831,13 @@ const decodePermission = (permission: string) => {
 };
 
 const cancelPermissionsUpdate = () => {
-  router.push({ name: "roles" });
+  router.push(
+    { name: "roles",
+    query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+        }
+     } 
+);
 };
 
 const handlePermissionChange = (row: any, permission: string) => {
