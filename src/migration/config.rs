@@ -129,3 +129,179 @@ impl MigrationConfig {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_migration_config_default() {
+        let config = MigrationConfig::default();
+        assert!(config.from.is_empty());
+        assert!(config.to.is_empty());
+        assert_eq!(config.batch_size, 1000);
+        assert!(config.tables.is_none());
+        assert!(config.exclude.is_none());
+        assert!(!config.truncate_target);
+        assert!(!config.incremental);
+        assert!(config.since.is_none());
+        assert!(!config.dry_run);
+    }
+
+    #[test]
+    fn test_migration_config_new() {
+        let config = MigrationConfig::new("SQLite", "MySQL");
+        assert_eq!(config.from, "sqlite");
+        assert_eq!(config.to, "mysql");
+        assert_eq!(config.batch_size, 1000);
+    }
+
+    #[test]
+    fn test_migration_config_builder_pattern() {
+        let config = MigrationConfig::new("sqlite", "postgresql")
+            .with_batch_size(500)
+            .with_tables(Some("users,orders".to_string()))
+            .with_exclude(Some("logs".to_string()))
+            .with_truncate_target(true)
+            .with_incremental(true, Some(1234567890))
+            .with_dry_run(true);
+
+        assert_eq!(config.from, "sqlite");
+        assert_eq!(config.to, "postgresql");
+        assert_eq!(config.batch_size, 500);
+        assert_eq!(
+            config.tables,
+            Some(vec!["users".to_string(), "orders".to_string()])
+        );
+        assert_eq!(config.exclude, Some(vec!["logs".to_string()]));
+        assert!(config.truncate_target);
+        assert!(config.incremental);
+        assert_eq!(config.since, Some(1234567890));
+        assert!(config.dry_run);
+    }
+
+    #[test]
+    fn test_with_tables_trims_whitespace() {
+        let config = MigrationConfig::new("sqlite", "mysql")
+            .with_tables(Some(" users , orders , products ".to_string()));
+
+        assert_eq!(
+            config.tables,
+            Some(vec![
+                "users".to_string(),
+                "orders".to_string(),
+                "products".to_string()
+            ])
+        );
+    }
+
+    #[test]
+    fn test_with_exclude_trims_whitespace() {
+        let config = MigrationConfig::new("sqlite", "mysql")
+            .with_exclude(Some(" logs , temp ".to_string()));
+
+        assert_eq!(
+            config.exclude,
+            Some(vec!["logs".to_string(), "temp".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_with_tables_none() {
+        let config = MigrationConfig::new("sqlite", "mysql").with_tables(None);
+        assert!(config.tables.is_none());
+    }
+
+    #[test]
+    fn test_validate_valid_config() {
+        let config = MigrationConfig::new("sqlite", "mysql");
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_all_valid_db_types() {
+        // Test all valid source types
+        for from in &["sqlite", "mysql", "postgresql", "postgres"] {
+            for to in &["sqlite", "mysql", "postgresql", "postgres"] {
+                if from != to {
+                    let config = MigrationConfig::new(from, to);
+                    assert!(
+                        config.validate().is_ok(),
+                        "Expected valid for from={}, to={}",
+                        from,
+                        to
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_validate_invalid_source_db() {
+        let config = MigrationConfig::new("invalid", "mysql");
+        let result = config.validate();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid source database type"));
+    }
+
+    #[test]
+    fn test_validate_invalid_target_db() {
+        let config = MigrationConfig::new("sqlite", "invalid");
+        let result = config.validate();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid target database type"));
+    }
+
+    #[test]
+    fn test_validate_same_source_and_target() {
+        let config = MigrationConfig::new("sqlite", "sqlite");
+        let result = config.validate();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Source and target database types must be different"));
+    }
+
+    #[test]
+    fn test_validate_incremental_without_since() {
+        let config =
+            MigrationConfig::new("sqlite", "mysql").with_incremental(true, None);
+        let result = config.validate();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Incremental mode requires --since parameter"));
+    }
+
+    #[test]
+    fn test_validate_incremental_with_since() {
+        let config =
+            MigrationConfig::new("sqlite", "mysql").with_incremental(true, Some(1234567890));
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_zero_batch_size() {
+        let config = MigrationConfig::new("sqlite", "mysql").with_batch_size(0);
+        let result = config.validate();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Batch size must be greater than 0"));
+    }
+
+    #[test]
+    fn test_validate_non_zero_batch_size() {
+        let config = MigrationConfig::new("sqlite", "mysql").with_batch_size(1);
+        assert!(config.validate().is_ok());
+    }
+}

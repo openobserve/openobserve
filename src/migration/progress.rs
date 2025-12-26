@@ -195,3 +195,100 @@ fn truncate_str(s: &str, max_len: usize) -> String {
         format!("{}...", &s[..max_len - 3])
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_progress_bar_new() {
+        let pb = ProgressBar::new(100, "Test");
+        assert_eq!(pb.current, 0);
+        assert_eq!(pb.total, 100);
+        assert_eq!(pb.width, 30);
+        assert_eq!(pb.prefix, "Test");
+    }
+
+    #[test]
+    fn test_progress_bar_update() {
+        let mut pb = ProgressBar::new(100, "Test");
+        pb.update(50);
+        assert_eq!(pb.current, 50);
+    }
+
+    #[test]
+    fn test_progress_bar_finish() {
+        let mut pb = ProgressBar::new(100, "Test");
+        pb.update(50);
+        pb.finish();
+        assert_eq!(pb.current, 100);
+    }
+
+    #[test]
+    fn test_progress_bar_zero_total() {
+        let mut pb = ProgressBar::new(0, "Test");
+        pb.update(0);
+        pb.finish();
+        assert_eq!(pb.current, 0);
+        assert_eq!(pb.total, 0);
+    }
+
+    #[test]
+    fn test_table_stats_creation() {
+        let stats = TableStats {
+            name: "users".to_string(),
+            total: 1000,
+            migrated: 500,
+            timestamp_col: Some("updated_at".to_string()),
+            duration_ms: 1234,
+        };
+
+        assert_eq!(stats.name, "users");
+        assert_eq!(stats.total, 1000);
+        assert_eq!(stats.migrated, 500);
+        assert_eq!(stats.timestamp_col, Some("updated_at".to_string()));
+        assert_eq!(stats.duration_ms, 1234);
+    }
+
+    #[test]
+    fn test_table_stats_without_timestamp() {
+        let stats = TableStats {
+            name: "config".to_string(),
+            total: 10,
+            migrated: 10,
+            timestamp_col: None,
+            duration_ms: 100,
+        };
+
+        assert_eq!(stats.name, "config");
+        assert!(stats.timestamp_col.is_none());
+    }
+
+    #[test]
+    fn test_truncate_str_short() {
+        assert_eq!(truncate_str("hello", 10), "hello");
+        assert_eq!(truncate_str("hello", 5), "hello");
+    }
+
+    #[test]
+    fn test_truncate_str_exact() {
+        assert_eq!(truncate_str("hello", 5), "hello");
+    }
+
+    #[test]
+    fn test_truncate_str_long() {
+        assert_eq!(truncate_str("hello_world", 8), "hello...");
+        assert_eq!(truncate_str("very_long_table_name", 10), "very_lo...");
+    }
+
+    #[test]
+    fn test_truncate_str_empty() {
+        assert_eq!(truncate_str("", 10), "");
+    }
+
+    #[test]
+    fn test_truncate_str_minimum_length() {
+        // When max_len is 3, we can only show "..."
+        assert_eq!(truncate_str("hello", 4), "h...");
+    }
+}

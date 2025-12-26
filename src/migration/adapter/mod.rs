@@ -115,3 +115,159 @@ pub async fn create_adapter(db_type: &str) -> Result<Box<dyn DbAdapter>, anyhow:
         _ => Err(anyhow::anyhow!("Unsupported database type: {}", db_type)),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_column_info_creation() {
+        let col = ColumnInfo {
+            name: "id".to_string(),
+            data_type: "INTEGER".to_string(),
+            is_nullable: false,
+        };
+
+        assert_eq!(col.name, "id");
+        assert_eq!(col.data_type, "INTEGER");
+        assert!(!col.is_nullable);
+    }
+
+    #[test]
+    fn test_column_info_nullable() {
+        let col = ColumnInfo {
+            name: "description".to_string(),
+            data_type: "TEXT".to_string(),
+            is_nullable: true,
+        };
+
+        assert!(col.is_nullable);
+    }
+
+    #[test]
+    fn test_value_null() {
+        let val = Value::Null;
+        assert!(matches!(val, Value::Null));
+    }
+
+    #[test]
+    fn test_value_bool() {
+        let val_true = Value::Bool(true);
+        let val_false = Value::Bool(false);
+
+        assert!(matches!(val_true, Value::Bool(true)));
+        assert!(matches!(val_false, Value::Bool(false)));
+    }
+
+    #[test]
+    fn test_value_integers() {
+        let tiny = Value::TinyInt(127);
+        let small = Value::SmallInt(32767);
+        let int = Value::Int(2147483647);
+        let big = Value::BigInt(9223372036854775807);
+
+        assert!(matches!(tiny, Value::TinyInt(127)));
+        assert!(matches!(small, Value::SmallInt(32767)));
+        assert!(matches!(int, Value::Int(2147483647)));
+        assert!(matches!(big, Value::BigInt(9223372036854775807)));
+    }
+
+    #[test]
+    fn test_value_floats() {
+        let float = Value::Float(3.14);
+        let double = Value::Double(3.14159265358979);
+
+        assert!(matches!(float, Value::Float(_)));
+        assert!(matches!(double, Value::Double(_)));
+    }
+
+    #[test]
+    fn test_value_string() {
+        let val = Value::String("hello".to_string());
+        assert!(matches!(val, Value::String(s) if s == "hello"));
+    }
+
+    #[test]
+    fn test_value_bytes() {
+        let val = Value::Bytes(vec![1, 2, 3, 4]);
+        assert!(matches!(val, Value::Bytes(b) if b == vec![1, 2, 3, 4]));
+    }
+
+    #[test]
+    fn test_value_timestamp() {
+        let val = Value::Timestamp("2024-01-15 10:30:00".to_string());
+        assert!(matches!(val, Value::Timestamp(s) if s == "2024-01-15 10:30:00"));
+    }
+
+    #[test]
+    fn test_row_creation() {
+        let row = Row {
+            values: vec![
+                Value::BigInt(1),
+                Value::String("test".to_string()),
+                Value::Bool(true),
+            ],
+        };
+
+        assert_eq!(row.values.len(), 3);
+        assert!(matches!(&row.values[0], Value::BigInt(1)));
+        assert!(matches!(&row.values[1], Value::String(s) if s == "test"));
+        assert!(matches!(&row.values[2], Value::Bool(true)));
+    }
+
+    #[test]
+    fn test_row_empty() {
+        let row = Row { values: vec![] };
+        assert!(row.values.is_empty());
+    }
+
+    #[test]
+    fn test_value_clone() {
+        let original = Value::String("test".to_string());
+        let cloned = original.clone();
+        assert!(matches!(cloned, Value::String(s) if s == "test"));
+    }
+
+    #[test]
+    fn test_row_clone() {
+        let original = Row {
+            values: vec![Value::BigInt(42), Value::String("hello".to_string())],
+        };
+        let cloned = original.clone();
+
+        assert_eq!(cloned.values.len(), 2);
+        assert!(matches!(&cloned.values[0], Value::BigInt(42)));
+    }
+
+    #[test]
+    fn test_column_info_clone() {
+        let original = ColumnInfo {
+            name: "test".to_string(),
+            data_type: "TEXT".to_string(),
+            is_nullable: true,
+        };
+        let cloned = original.clone();
+
+        assert_eq!(cloned.name, "test");
+        assert_eq!(cloned.data_type, "TEXT");
+        assert!(cloned.is_nullable);
+    }
+
+    #[test]
+    fn test_value_debug() {
+        let val = Value::BigInt(42);
+        let debug_str = format!("{:?}", val);
+        assert!(debug_str.contains("BigInt"));
+        assert!(debug_str.contains("42"));
+    }
+
+    #[test]
+    fn test_row_debug() {
+        let row = Row {
+            values: vec![Value::Null],
+        };
+        let debug_str = format!("{:?}", row);
+        assert!(debug_str.contains("Row"));
+        assert!(debug_str.contains("Null"));
+    }
+}

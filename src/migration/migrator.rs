@@ -363,3 +363,246 @@ fn truncate_str(s: &str, max_len: usize) -> String {
         format!("{}...", &s[..max_len - 3])
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_test_tables() -> Vec<String> {
+        vec![
+            "users".to_string(),
+            "orders".to_string(),
+            "file_list".to_string(),
+            "file_list_deleted".to_string(),
+            "file_list_history".to_string(),
+            "file_list_dump_stats".to_string(),
+            "file_list_jobs".to_string(),
+            "sqlite_sequence".to_string(),
+            "config".to_string(),
+        ]
+    }
+
+    #[test]
+    fn test_migration_mode_name() {
+        assert_eq!(MigrationMode::Meta.name(), "migrate-meta");
+        assert_eq!(MigrationMode::FileList.name(), "migrate-file-list");
+    }
+
+    #[test]
+    fn test_filter_tables_meta_mode() {
+        let all_tables = create_test_tables();
+        let config = MigrationConfig::new("sqlite", "mysql");
+
+        let result = filter_tables(&all_tables, MigrationMode::Meta, &config);
+
+        // Should include non-file-list, non-system tables
+        assert!(result.contains(&"users".to_string()));
+        assert!(result.contains(&"orders".to_string()));
+        assert!(result.contains(&"config".to_string()));
+
+        // Should exclude file_list tables
+        assert!(!result.contains(&"file_list".to_string()));
+        assert!(!result.contains(&"file_list_deleted".to_string()));
+        assert!(!result.contains(&"file_list_history".to_string()));
+        assert!(!result.contains(&"file_list_dump_stats".to_string()));
+        assert!(!result.contains(&"file_list_jobs".to_string()));
+
+        // Should exclude system tables
+        assert!(!result.contains(&"sqlite_sequence".to_string()));
+    }
+
+    #[test]
+    fn test_filter_tables_file_list_mode() {
+        let all_tables = create_test_tables();
+        let config = MigrationConfig::new("sqlite", "mysql");
+
+        let result = filter_tables(&all_tables, MigrationMode::FileList, &config);
+
+        // Should include file_list tables
+        assert!(result.contains(&"file_list".to_string()));
+        assert!(result.contains(&"file_list_deleted".to_string()));
+        assert!(result.contains(&"file_list_history".to_string()));
+        assert!(result.contains(&"file_list_dump_stats".to_string()));
+        assert!(result.contains(&"file_list_jobs".to_string()));
+
+        // Should exclude non-file-list tables
+        assert!(!result.contains(&"users".to_string()));
+        assert!(!result.contains(&"orders".to_string()));
+        assert!(!result.contains(&"config".to_string()));
+
+        // Should exclude system tables
+        assert!(!result.contains(&"sqlite_sequence".to_string()));
+    }
+
+    #[test]
+    fn test_filter_tables_with_include_filter() {
+        let all_tables = create_test_tables();
+        let config = MigrationConfig::new("sqlite", "mysql")
+            .with_tables(Some("users,config".to_string()));
+
+        let result = filter_tables(&all_tables, MigrationMode::Meta, &config);
+
+        assert!(result.contains(&"users".to_string()));
+        assert!(result.contains(&"config".to_string()));
+        assert!(!result.contains(&"orders".to_string()));
+    }
+
+    #[test]
+    fn test_filter_tables_with_exclude_filter() {
+        let all_tables = create_test_tables();
+        let config =
+            MigrationConfig::new("sqlite", "mysql").with_exclude(Some("users".to_string()));
+
+        let result = filter_tables(&all_tables, MigrationMode::Meta, &config);
+
+        assert!(!result.contains(&"users".to_string()));
+        assert!(result.contains(&"orders".to_string()));
+        assert!(result.contains(&"config".to_string()));
+    }
+
+    #[test]
+    fn test_filter_tables_sorted() {
+        let all_tables = vec![
+            "zebra".to_string(),
+            "alpha".to_string(),
+            "beta".to_string(),
+        ];
+        let config = MigrationConfig::new("sqlite", "mysql");
+
+        let result = filter_tables(&all_tables, MigrationMode::Meta, &config);
+
+        assert_eq!(result, vec!["alpha", "beta", "zebra"]);
+    }
+
+    #[test]
+    fn test_get_excluded_tables_meta_mode() {
+        let all_tables = create_test_tables();
+
+        let result = get_excluded_tables(&all_tables, MigrationMode::Meta);
+
+        // In Meta mode, file_list tables and system tables are excluded
+        assert!(result.contains(&"file_list".to_string()));
+        assert!(result.contains(&"file_list_deleted".to_string()));
+        assert!(result.contains(&"sqlite_sequence".to_string()));
+
+        // Regular tables should not be in excluded list
+        assert!(!result.contains(&"users".to_string()));
+        assert!(!result.contains(&"orders".to_string()));
+    }
+
+    #[test]
+    fn test_get_excluded_tables_file_list_mode() {
+        let all_tables = create_test_tables();
+
+        let result = get_excluded_tables(&all_tables, MigrationMode::FileList);
+
+        // In FileList mode, non-file-list tables and system tables are excluded
+        assert!(result.contains(&"users".to_string()));
+        assert!(result.contains(&"orders".to_string()));
+        assert!(result.contains(&"config".to_string()));
+        assert!(result.contains(&"sqlite_sequence".to_string()));
+
+        // file_list tables should not be in excluded list
+        assert!(!result.contains(&"file_list".to_string()));
+        assert!(!result.contains(&"file_list_deleted".to_string()));
+    }
+
+    #[test]
+    fn test_detect_timestamp_column_with_updated_at() {
+        use super::super::adapter::ColumnInfo;
+
+        let columns = vec![
+            ColumnInfo {
+                name: "id".to_string(),
+                data_type: "INTEGER".to_string(),
+                is_nullable: false,
+            },
+            ColumnInfo {
+                name: "created_at".to_string(),
+                data_type: "TIMESTAMP".to_string(),
+                is_nullable: false,
+            },
+            ColumnInfo {
+                name: "updated_at".to_string(),
+                data_type: "TIMESTAMP".to_string(),
+                is_nullable: false,
+            },
+        ];
+
+        let result = detect_timestamp_column(&columns);
+        assert_eq!(result, Some("updated_at".to_string()));
+    }
+
+    #[test]
+    fn test_detect_timestamp_column_with_only_created_at() {
+        use super::super::adapter::ColumnInfo;
+
+        let columns = vec![
+            ColumnInfo {
+                name: "id".to_string(),
+                data_type: "INTEGER".to_string(),
+                is_nullable: false,
+            },
+            ColumnInfo {
+                name: "created_at".to_string(),
+                data_type: "TIMESTAMP".to_string(),
+                is_nullable: false,
+            },
+        ];
+
+        let result = detect_timestamp_column(&columns);
+        assert_eq!(result, Some("created_at".to_string()));
+    }
+
+    #[test]
+    fn test_detect_timestamp_column_without_timestamp() {
+        use super::super::adapter::ColumnInfo;
+
+        let columns = vec![
+            ColumnInfo {
+                name: "id".to_string(),
+                data_type: "INTEGER".to_string(),
+                is_nullable: false,
+            },
+            ColumnInfo {
+                name: "name".to_string(),
+                data_type: "TEXT".to_string(),
+                is_nullable: true,
+            },
+        ];
+
+        let result = detect_timestamp_column(&columns);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_truncate_str_short() {
+        assert_eq!(truncate_str("hello", 10), "hello");
+    }
+
+    #[test]
+    fn test_truncate_str_exact() {
+        assert_eq!(truncate_str("hello", 5), "hello");
+    }
+
+    #[test]
+    fn test_truncate_str_long() {
+        assert_eq!(truncate_str("hello_world", 8), "hello...");
+    }
+
+    #[test]
+    fn test_file_list_tables_constant() {
+        assert!(FILE_LIST_TABLES.contains(&"file_list"));
+        assert!(FILE_LIST_TABLES.contains(&"file_list_deleted"));
+        assert!(FILE_LIST_TABLES.contains(&"file_list_history"));
+        assert!(FILE_LIST_TABLES.contains(&"file_list_dump_stats"));
+        assert!(FILE_LIST_TABLES.contains(&"file_list_jobs"));
+        assert_eq!(FILE_LIST_TABLES.len(), 5);
+    }
+
+    #[test]
+    fn test_system_tables_constant() {
+        assert!(SYSTEM_TABLES.contains(&"sqlite_sequence"));
+        assert_eq!(SYSTEM_TABLES.len(), 1);
+    }
+}
