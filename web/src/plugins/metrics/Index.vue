@@ -216,45 +216,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </span>
                     </div>
-                    <div class="tw-h-[calc(100vh-500px)] tw-min-h-[140px]">
-                      <PanelSchemaRenderer
-                        v-if="chartData"
-                        @metadata-update="metaDataValue"
-                        :key="dashboardPanelData.data.type"
-                        :panelSchema="chartData"
-                        :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                        :variablesData="{}"
-                        :width="6"
-                        :showLegendsButton="true"
-                        @error="handleChartApiError"
-                        @updated:data-zoom="onDataZoom"
-                        :allowAlertCreation="true"
-                        @updated:vrl-function-field-list="
-                          updateVrlFunctionFieldList
-                        "
-                        @last-triggered-at-update="
-                          handleLastTriggeredAtUpdate
-                        "
-                        @series-data-update="seriesDataUpdate"
-                        @show-legends="showLegendsDialog = true"
-                        ref="panelSchemaRendererRef"
-                        searchType="ui"
-                      />
-                    </div>
-                    <div
-                      class="flex justify-end q-pr-sm q-mb-md q-pt-xs"
-                      style="position: absolute; top: 4px; right: 0px; z-index: 1;"
-                    >
-                      <q-btn
-                        size="md"
-                        class="q-pa-none o2-primary-button tw-h-[30px] element-box-shadow"
-                        no-caps
-                        dense
-                        style="padding: 2px 4px;"
-                        @click="addToDashboard"
-                        :title="t('search.addToDashboard')"
-                        >{{ t("search.addToDashboard") }}</q-btn
+                    <div class="col tw-relative" >
+                      <div
+                        class="tw-h-[calc(100vh-500px)] tw-min-h-[140px] tw-mt-[40px]"
                       >
+                        <PanelSchemaRenderer
+                          v-if="chartData"
+                          @metadata-update="metaDataValue"
+                          :key="dashboardPanelData.data.type"
+                          :panelSchema="chartData"
+                          :selectedTimeObj="dashboardPanelData.meta.dateTime"
+                          :variablesData="{}"
+                          :width="6"
+                          :showLegendsButton="true"
+                          @error="handleChartApiError"
+                          @updated:data-zoom="onDataZoom"
+                          :allowAlertCreation="true"
+                          @updated:vrl-function-field-list="
+                            updateVrlFunctionFieldList
+                          "
+                          @last-triggered-at-update="
+                            handleLastTriggeredAtUpdate
+                          "
+                          @series-data-update="seriesDataUpdate"
+                          @show-legends="showLegendsDialog = true"
+                          ref="panelSchemaRendererRef"
+                          searchType="ui"
+                        />
+                      </div>
+                      <div
+                        class="flex justify-end q-pr-sm q-mb-md q-pt-xs"
+                        style="position: absolute; top: 4px; right: 0px"
+                      >
+                        <q-btn
+                          size="md"
+                          class="q-pa-none o2-primary-button tw-h-[30px] element-box-shadow"
+                          no-caps
+                          dense
+                          style="padding: 2px 4px;"
+                          @click="addToDashboard"
+                          :title="t('search.addToDashboard')"
+                          >{{ t("search.addToDashboard") }}</q-btn
+                        >
+                      </div>
                     </div>
                     <DashboardErrorsComponent
                       :errors="errorData"
