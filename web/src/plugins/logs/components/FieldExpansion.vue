@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`logs-field-list-item-${field.name}`"
         >
           <div
-            class="ellipsis !tw-max-w-[calc(100%-1.5rem)]"
+            class="ellipsis tw-max-w-[calc(100%-1.5rem)]!"
             style="display: inline-block"
           >
             {{ field.name }}

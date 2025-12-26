@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-cy="metrics-explorer-run-query-button"
               dense
               title="Run query"
-              class="q-pa-none !tw-mr-none o2-run-query-button o2-color-primary tw-h-[33px] element-box-shadow"
+              class="q-pa-none tw-mr-none! o2-run-query-button o2-color-primary tw-h-[33px] element-box-shadow"
               @click="runQuery"
             >
               Run query
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw-pb-[0.375rem] tw-px-[0.375rem]">
           <query-editor
             editor-id="rum-errors-query-editor"
-            class="monaco-editor tw-border tw-solid tw-border-[var(--o2-border-color)] tw-p-[0.25rem] tw-rounded-[0.375rem] tw-overflow-hidden !tw-h-[4rem]"
+            class="monaco-editor tw-border tw-solid tw-border-[var(--o2-border-color)] tw-p-[0.25rem] tw-rounded-[0.375rem] tw-overflow-hidden tw-h-[4rem]!"
             v-model:query="errorTrackingState.data.editorValue"
             :debounce-time="300"
           />
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <q-splitter
-      class="logs-horizontal-splitter !tw-pl-[0.625rem] !tw-h-[calc(100%-80px)]"
+      class="logs-horizontal-splitter tw-pl-[0.625rem]! tw-h-[calc(100%-80px)]!"
       v-model="splitterModel"
       unit="px"
       vertical

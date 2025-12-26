@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <q-btn
-        class="q-mx-xs view-span-logs-btn tw-border !tw-py-[0.3rem]"
+        class="q-mx-xs view-span-logs-btn tw-border tw-py-[0.3rem]!"
         size="10px"
         icon="search"
         dense
@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-slot:body-cell="props">
           <q-td
-            class="text-left !tw-text-[0.85rem]"
+            class="text-left tw-text-[0.85rem]!"
             :class="
               props.col.name === 'field' ? 'tw-text-[var(--o2-json-key)]' : ''
             "
@@ -218,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-slot:body-cell="props">
           <q-td
-            class="text-left !tw-text-[0.85rem]"
+            class="text-left tw-text-[0.85rem]!"
             :class="
               props.col.name === 'field' ? 'tw-text-[var(--o2-json-key)]' : ''
             "
@@ -721,14 +721,14 @@ export default defineComponent({
         label: "Field",
         field: "field",
         align: "left" as const,
-        headerClasses: "!tw-text-left",
+        headerClasses: "tw-text-left!",
       },
       {
         name: "value",
         label: "Value",
         field: "value",
         align: "left" as const,
-        headerClasses: "!tw-text-left",
+        headerClasses: "tw-text-left!",
       },
     ];
 
@@ -745,14 +745,14 @@ export default defineComponent({
         label: "Field",
         field: "field",
         align: "left" as const,
-        headerClasses: "!tw-text-left",
+        headerClasses: "tw-text-left!",
       },
       {
         name: "value",
         label: "Value",
         field: "value",
         align: "left" as const,
-        headerClasses: "!tw-text-left",
+        headerClasses: "tw-text-left!",
       },
     ];
 
